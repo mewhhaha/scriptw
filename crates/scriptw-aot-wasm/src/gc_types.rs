@@ -359,14 +359,26 @@ impl GlobalLedger {
     }
 
     /// The section declaring every global after the first `skip`, then the
-    /// module's `site_records` record globals.
-    fn section_after(&self, skip: u32, site_records: u32, schema: &RuntimeSchema) -> GlobalSection {
+    /// module's site record globals, each typed for its kind's record.
+    fn section_after(
+        &self,
+        skip: u32,
+        site_records: &[SiteRecordKind],
+        schema: &RuntimeSchema,
+    ) -> GlobalSection {
         let mut section = GlobalSection::new();
         for (global_type, init) in &self.entries[skip as usize..] {
             section.global(*global_type, init);
         }
-        let record = schema.reference_type::<OwnDataReadCache>(GcNullability::Nullable);
-        for _ in 0..site_records {
+        for kind in site_records {
+            let record = match kind {
+                SiteRecordKind::Property => {
+                    schema.reference_type::<OwnDataReadCache>(GcNullability::Nullable)
+                }
+                SiteRecordKind::Instanceof => {
+                    schema.reference_type::<InstanceofSiteRecord>(GcNullability::Nullable)
+                }
+            };
             section.global(
                 GlobalType {
                     val_type: ValType::Ref(record),
@@ -380,26 +392,53 @@ impl GlobalLedger {
     }
 }
 
-/// The global that holds one static property site's record: null until the
-/// site's first use. A module's record globals follow all its other globals,
-/// in the order its functions asked for them.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct SiteRecordGlobal {
-    index: u32,
+/// What a site record global holds: a static property site's record, or an
+/// `instanceof` site's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SiteRecordKind {
+    Property,
+    Instanceof,
 }
 
-impl SiteRecordGlobal {
+/// A record type a site global may hold, tied to its global's declared kind.
+pub(crate) trait SiteRecordType: GcHeapType {
+    const KIND: SiteRecordKind;
+}
+impl SiteRecordType for OwnDataReadCache {
+    const KIND: SiteRecordKind = SiteRecordKind::Property;
+}
+impl SiteRecordType for InstanceofSiteRecord {
+    const KIND: SiteRecordKind = SiteRecordKind::Instanceof;
+}
+
+/// The global that holds one site's record: null until the site's first
+/// use. A module's record globals follow all its other globals, in the order
+/// its functions asked for them, each declared for its record type.
+#[derive(Debug)]
+pub(crate) struct SiteRecordGlobal<T = OwnDataReadCache> {
+    index: u32,
+    record: std::marker::PhantomData<fn() -> T>,
+}
+
+impl<T> Clone for SiteRecordGlobal<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<T> Copy for SiteRecordGlobal<T> {}
+
+impl<T: SiteRecordType> SiteRecordGlobal<T> {
     /// Pushes the record, null until the site stores one.
     pub(crate) fn load(
         self,
         _schema: &RuntimeSchema,
         function: &mut Function,
-    ) -> GcStackReference<OwnDataReadCache, Nullable> {
+    ) -> GcStackReference<T, Nullable> {
         function.instruction(&Instruction::GlobalGet(self.index));
         GcStackReference::new()
     }
 
-    pub(crate) fn store(self, value: GcStackReference<OwnDataReadCache>, function: &mut Function) {
+    pub(crate) fn store(self, value: GcStackReference<T>, function: &mut Function) {
         let GcStackReference { .. } = value;
         function.instruction(&Instruction::GlobalSet(self.index));
     }
@@ -868,11 +907,11 @@ impl RuntimeSchema {
         ))
     }
 
-    /// The module's site record global at `position`.
-    pub(crate) fn site_record_global(
+    /// The module's site record global at `position`, declared for `T`.
+    pub(crate) fn site_record_global<T: SiteRecordType>(
         &self,
         position: u32,
-    ) -> Result<SiteRecordGlobal, crate::EmitError> {
+    ) -> Result<SiteRecordGlobal<T>, crate::EmitError> {
         let index = self
             .site_records
             .first
@@ -880,7 +919,10 @@ impl RuntimeSchema {
             .ok_or_else(|| {
                 crate::EmitError::unsupported("site record globals exceed the Wasm index space")
             })?;
-        Ok(SiteRecordGlobal { index })
+        Ok(SiteRecordGlobal {
+            index,
+            record: std::marker::PhantomData,
+        })
     }
 
     pub(crate) fn layouts(&self) -> &GcLayoutRegistry {
@@ -978,24 +1020,24 @@ impl FinalizedModuleGlobals {
     /// encoder stays inside this owner and cannot be cloned or extended by a
     /// module assembly caller.
     ///
-    /// `site_records` record globals, one per static property site of the
-    /// module's functions, end the section.
+    /// `site_records` record globals, one per record site of the module's
+    /// functions in the order they asked, end the section.
     pub(crate) fn defined_section<'a>(
         &'a self,
         imported: u32,
-        site_records: u32,
+        site_records: Vec<SiteRecordKind>,
     ) -> impl Section + 'a {
         struct DefinedGlobalSection<'a> {
             ledger: &'a GlobalLedger,
             imported: u32,
-            site_records: u32,
+            site_records: Vec<SiteRecordKind>,
             schema: &'a RuntimeSchema,
         }
 
         impl Encode for DefinedGlobalSection<'_> {
             fn encode(&self, sink: &mut Vec<u8>) {
                 self.ledger
-                    .section_after(self.imported, self.site_records, self.schema)
+                    .section_after(self.imported, &self.site_records, self.schema)
                     .encode(sink);
             }
         }
@@ -1036,7 +1078,7 @@ mod tests {
         let runtime = registered.finalize_globals(GlobalLedger::new(), false, 0);
         let mut module = wasm_encoder::Module::new();
         module.section(runtime.types());
-        module.section(&runtime.globals().defined_section(0, 0));
+        module.section(&runtime.globals().defined_section(0, Vec::new()));
         let bytes = module.finish();
         wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all())
             .validate_all(&bytes)

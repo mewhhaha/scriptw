@@ -121,7 +121,8 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 68 adds the call-free instanceof entry in front of HasInstance.
 // Version 69 keeps static property site records in P globals and passes the
 // record, not the site and key, to the cached read helpers.
-const LAYOUT_VERSION: u32 = 69;
+// Version 70 keeps instanceof site records in P globals, made by a new R helper.
+const LAYOUT_VERSION: u32 = 70;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

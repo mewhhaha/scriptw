@@ -3854,7 +3854,7 @@ pub(crate) struct FunctionMetaRegistry {
     next_own_data_read_site: std::cell::Cell<u32>,
     /// How many static property sites of this module keep their record in
     /// a global of their own; each new site takes the next one.
-    site_records: std::cell::Cell<u32>,
+    site_records: std::cell::RefCell<Vec<crate::gc_types::SiteRecordKind>>,
     /// Whether the program declares a module import binding, the only cell
     /// whose TARGET ever links to another cell. True unless the program's
     /// IR proves otherwise.
@@ -3900,20 +3900,21 @@ impl FunctionMetaRegistry {
         Ok(site)
     }
 
-    /// The position of a new static property site's record global.
-    pub(crate) fn next_site_record(&self) -> Result<u32, EmitError> {
-        let position = self.site_records.get();
-        self.site_records.set(
-            position
-                .checked_add(1)
-                .ok_or_else(|| EmitError::unsupported("site records exceed u32"))?,
-        );
+    /// The position of a new site's record global, declared for `kind`.
+    pub(crate) fn next_site_record(
+        &self,
+        kind: crate::gc_types::SiteRecordKind,
+    ) -> Result<u32, EmitError> {
+        let mut records = self.site_records.borrow_mut();
+        let position = u32::try_from(records.len())
+            .map_err(|_| EmitError::unsupported("site records exceed u32"))?;
+        records.push(kind);
         Ok(position)
     }
 
-    /// How many record globals the module's functions use.
-    pub(crate) fn site_record_count(&self) -> u32 {
-        self.site_records.get()
+    /// The kinds of the record globals the module's functions use, in order.
+    pub(crate) fn site_record_kinds(&self) -> Vec<crate::gc_types::SiteRecordKind> {
+        self.site_records.borrow().clone()
     }
 
     /// Records whether the program declares any module import binding.
@@ -3972,7 +3973,7 @@ impl FunctionMetaRegistry {
         Self {
             compact_shape_sites: std::cell::RefCell::new(BTreeMap::new()),
             next_own_data_read_site: std::cell::Cell::new(0),
-            site_records: std::cell::Cell::new(0),
+            site_records: std::cell::RefCell::new(Vec::new()),
             module_import_bindings: true,
             foreign_imports: crate::foreign::ForeignImportPlan::default(),
             module_graph,

@@ -270,9 +270,9 @@ pub(crate) struct ModuleAssemblySections {
     /// Globals the module imports from the runtime; the global section
     /// declares only the ones after them.
     imported_globals: u32,
-    /// How many site record globals the module's functions use; they end
-    /// the global section.
-    site_records: u32,
+    /// The kinds of the site record globals the module's functions use, in
+    /// order; they end the global section.
+    site_records: Vec<crate::gc_types::SiteRecordKind>,
 }
 
 impl ModuleAssemblySections {
@@ -284,7 +284,7 @@ impl ModuleAssemblySections {
         exports: ExportSection,
         data: Option<DataSection>,
         imported_globals: u32,
-        site_records: u32,
+        site_records: Vec<crate::gc_types::SiteRecordKind>,
     ) -> Self {
         Self {
             imports,
@@ -314,7 +314,7 @@ const _: fn(
     ExportSection,
     Option<DataSection>,
     u32,
-    u32,
+    Vec<crate::gc_types::SiteRecordKind>,
 ) -> ModuleAssemblySections = ModuleAssemblySections::new;
 const _: fn(
     &mut CompiledModulePackage,

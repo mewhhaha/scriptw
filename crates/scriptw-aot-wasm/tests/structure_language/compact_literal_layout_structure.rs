@@ -65,8 +65,8 @@ fn shared_layouts_keep_physical_instance_roots_and_live_object_reads() {
     // Read records stay distinct per source site, in the site's own P
     // global, and prove current storage, shape and key before loading this
     // receiver's current value.
-    assert!(PLANNING.contains("site_records: std::cell::Cell::new(0),"));
-    assert!(EMIT.contains("let position = self.functions.next_site_record()?;"));
+    assert!(PLANNING.contains("site_records: std::cell::RefCell::new(Vec::new()),"));
+    assert!(EMIT.contains("let position = self.functions.next_site_record(T::KIND)?;"));
     assert!(EMIT.contains("self.runtime_schema().site_record_global(position)"));
     assert!(READ.contains("PropertyReadPlan::CachedStaticString => self.next_site_record().map(Some)"));
     assert!(READ.contains("let may_be_ordinary = target.possible_kinds.contains(ValueKind::Object);"));

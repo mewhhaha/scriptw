@@ -2128,13 +2128,13 @@ impl<'a> FunctionBuilder<'a> {
         Ok(ProgramSiteId(self.functions.next_program_site_index(kind)?))
     }
 
-    /// The global that holds a new static property site's record in this
-    /// module.
-    pub(crate) fn next_site_record(
+    /// The global that holds a new site's record in this module, declared
+    /// for the record type `T`.
+    pub(crate) fn next_site_record<T: crate::gc_types::SiteRecordType>(
         &mut self,
-    ) -> Result<crate::gc_types::SiteRecordGlobal, EmitError> {
+    ) -> Result<crate::gc_types::SiteRecordGlobal<T>, EmitError> {
         self.require_genuine_source_site()?;
-        let position = self.functions.next_site_record()?;
+        let position = self.functions.next_site_record(T::KIND)?;
         self.runtime_schema().site_record_global(position)
     }
 

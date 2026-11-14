@@ -1040,6 +1040,22 @@ gc_layout_registry! {
         }
         // One flat table per ProgramInstance, indexed by site.
         array OwnDataReadCacheTable => OwnDataReadCacheTableSchema { ELEMENT: GcRef<OwnDataReadCache>, Mutable, Nullable; }
+        // An instanceof site's record, made once for the first right-hand
+        // side the site meets. A usable record names a function whose own
+        // "prototype" is a non-writable, non-configurable data property
+        // holding an object, and whose [[Prototype]] EDGE was a Realm's
+        // %Function.prototype%, or a function object (EDGE_HEADER its
+        // header) whose [[Prototype]] was: its header, those edges and that
+        // value. A declined record has a null HEADER. See
+        // `operations/has_instance/site.rs`.
+        struct InstanceofSiteRecord => InstanceofSiteRecordSchema {
+            CONSTRUCTOR: AnyGcRef, Immutable, Nullable;
+            HEADER: GcRef<OrdinaryObject>, Immutable, Nullable;
+            EDGE: GcRef<JavaScriptObject>, Immutable, Nullable;
+            EDGE_HEADER: GcRef<OrdinaryObject>, Immutable, Nullable;
+            FUNCTION_PROTOTYPE: GcRef<JavaScriptObject>, Immutable, Nullable;
+            PROTOTYPE: GcRef<JavaScriptObject>, Immutable, Nullable;
+        }
         struct OrdinaryPropertyStorage: ObjectPropertyStorage => OrdinaryPropertyStorageSchema {
             ENTRIES: GcRef<PropertyTable>, Mutable, NonNullable;
             LENGTH: I32Value, Mutable, NonNullable;

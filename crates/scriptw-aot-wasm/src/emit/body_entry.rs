@@ -148,6 +148,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::LooseEquality
             | RuntimeHelperId::HasInstance
             | RuntimeHelperId::InstanceofEntry
+            | RuntimeHelperId::InstanceofRecord
             | RuntimeHelperId::ForInAdvance
             | RuntimeHelperId::ObjectOwnKeys
             | RuntimeHelperId::ObjectGetOwnProperty

@@ -167,6 +167,34 @@ fn both_has_instance_entries_share_one_typed_whole_completion_kernel() {
             .collect::<Vec<_>>()
     };
     assert_eq!(imported(entry.index).len(), 1, "P imports the single R entry");
+    let record = bodies.unique("helper::instanceof_record");
+    assert_eq!(
+        imported(record.index).len(),
+        1,
+        "P imports the single R record maker"
+    );
+    let record_signature = signature(runtime, record.index);
+    assert_eq!(
+        signature(&artifact.bytes, imported(record.index)[0]),
+        record_signature
+    );
+    assert_eq!(
+        record_signature.params()[0],
+        ValType::Ref(wasmparser::RefType::EQREF),
+        "the record is made from the right-hand side's reference alone"
+    );
+    assert_eq!(
+        record_signature.params().len(),
+        4,
+        "then the Realm, the Environment and the program"
+    );
+    let [ValType::Ref(made)] = record_signature.results() else {
+        panic!("the maker returns one record reference");
+    };
+    assert!(
+        !made.is_nullable(),
+        "R returns a record for every right-hand side, declined or usable"
+    );
     let kernels = imported(helper.index);
     assert_eq!(kernels.len(), 1, "P imports the single actual R owner");
     let entry_signature = signature(runtime, entry.index);
@@ -254,6 +282,7 @@ fn repeated_instanceof_sites_do_not_expand_the_state_machine_in_p() {
             .0
     };
     let (imported, kernel) = (import_of(entry.index), import_of(helper.index));
+    let maker = import_of(bodies.unique("helper::instanceof_record").index);
     let mut sizes = Vec::new();
     for (name, sites) in [("single", 1), ("repeated", 8)] {
         let matched = bodies
@@ -265,6 +294,20 @@ fn repeated_instanceof_sites_do_not_expand_the_state_machine_in_p() {
         let body = matched[0];
         let code = operators(&artifact.bytes, body.index);
         assert_eq!(call_count(&code, imported), sites);
+        assert_eq!(
+            call_count(&code, maker),
+            sites,
+            "each site asks R for its own record, kept in its own global"
+        );
+        let first_call = |target: u32| {
+            code.iter()
+                .position(|op| matches!(op, Operator::Call { function_index } if *function_index == target))
+                .unwrap()
+        };
+        assert!(
+            first_call(maker) < first_call(imported),
+            "a site answers from its record before it asks the entry"
+        );
         assert_eq!(
             call_count(&code, kernel),
             sites,
@@ -281,8 +324,11 @@ fn repeated_instanceof_sites_do_not_expand_the_state_machine_in_p() {
     let growth = sizes[1]
         .checked_sub(sizes[0])
         .expect("seven more dynamic operations");
+    // Each site also carries its record answer: the record's checks and an
+    // inline walk of the candidate's chain, about 1 KiB. The entry and the
+    // HasInstance state machine stay in R.
     assert!(
-        growth < 7 * 1024,
-        "seven operator sites must add bounded argument/result transport, not seven kernels: {sizes:?}"
+        growth < 7 * 1280,
+        "seven operator sites must add bounded record answers and argument/result transport, not seven kernels: {sizes:?}"
     );
 }

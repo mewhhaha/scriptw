@@ -18,6 +18,8 @@ use crate::runtime_helpers::{
     InstanceofEntryParameters, ObjectGetPrototypeOfArguments, RuntimeHelperId,
 };
 
+mod site;
+
 /// The site word of a request that has no operator site: the native method
 /// and operators compiled outside source code. Site ids are never negative.
 const NO_INSTANCEOF_SITE: i32 = -1;
@@ -214,13 +216,28 @@ impl FunctionBuilder<'_> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let (state, constructor, object) = match request {
-            // A source operator asks its call-free entry first and calls the
-            // complete helper only when the entry has no answer.
+            // A source operator answers from its own record first, then asks
+            // its call-free entry, and calls the complete helper only when
+            // the entry has no answer.
             HasInstanceRequest::InstanceofOperator {
                 object,
                 constructor,
                 site: Some(site),
             } => {
+                let global = self.next_site_record::<crate::gc_types::InstanceofSiteRecord>()?;
+                let done = self.open_frame(ControlFrameKind::Block, function);
+                let slow = self.open_frame(ControlFrameKind::Block, function);
+                self.emit_instanceof_record_answer(
+                    global,
+                    object,
+                    constructor,
+                    result,
+                    slow,
+                    function,
+                )?;
+                self.emit_branch_to_target(done, function);
+                self.pop_control(ControlFrameKind::Block);
+                function.instruction(&Instruction::End);
                 let site_id = schema.reserve_i32_local(function);
                 site.emit(site_id, function);
                 let realm = self.emit_execution_realm(function);
@@ -271,6 +288,8 @@ impl FunctionBuilder<'_> {
                 schema.release_i32_local(answer, function);
                 realm.clear(function);
                 schema.release_i32_local(site_id, function);
+                self.pop_control(ControlFrameKind::Block);
+                function.instruction(&Instruction::End);
                 return Ok(());
             }
             HasInstanceRequest::InstanceofOperator {
