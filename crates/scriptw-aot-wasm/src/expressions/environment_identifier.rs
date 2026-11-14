@@ -216,6 +216,37 @@ impl FunctionBuilder<'_> {
                 return Ok(());
             }
         }
+        if let EnvironmentIdentifierResolutionStart::Cell(proof) = &resolution {
+            if matches!(
+                identifier.operation,
+                Operation::Assign { .. }
+                    | Operation::Update { .. }
+                    | Operation::EagerCompound { .. }
+                    | Operation::LogicalCompound { .. }
+            ) {
+                // Resolving this identity cannot run source code, and the
+                // cell's own INITIALIZED, MUTABLE and IMMUTABLE_STRICT words
+                // decide GetBindingValue and SetMutableBinding: no pooled key,
+                // generic Reference or by-name runtime call.
+                let storage = self.module_cell_storage(proof, &identifier.name)?;
+                let value = schema.reserve_value_local(function);
+                if let Operation::Assign { value: rhs } = &identifier.operation {
+                    self.compile_expr_to_value(rhs, &value, function)?;
+                    self.write_binding_from_locals_checked(storage, &value, function)?;
+                } else {
+                    self.read_binding_to_locals(storage, &value, function)?;
+                    self.emit_identifier_mutation(
+                        &identifier.operation,
+                        IdentifierPut::Cell(storage),
+                        &value,
+                        function,
+                    )?;
+                }
+                output.copy_from(&value, function);
+                value.clear(function);
+                return Ok(());
+            }
+        }
         if matches!(identifier.strictness, Strictness::Strict) {
             if let (
                 EnvironmentIdentifierResolutionStart::Cell(proof),
@@ -390,72 +421,14 @@ impl FunctionBuilder<'_> {
                         self.emit_typeof_value(&value, output, function)?;
                         value.copy_from(output, function);
                     }
-                    Operation::Update {
+                    Operation::Update { .. }
+                    | Operation::EagerCompound { .. }
+                    | Operation::LogicalCompound { .. } => self.emit_identifier_mutation(
                         operation,
-                        return_mode,
-                    } => {
-                        let pending = schema.reserve_completion(function);
-                        pending.initialize(function);
-                        self.emit_value_to_numeric_locals(&value, &pending, function)?;
-                        self.completion().copy_from(&pending, function);
-                        self.emit_propagate_current_throw_if_needed(function);
-                        value.copy_from(pending.value(), function);
-                        pending.clear(function);
-                        let old = schema.reserve_value_local(function);
-                        old.copy_from(&value, function);
-                        self.emit_numeric_update_to_locals(
-                            *operation,
-                            NumericUpdateValueKind::Dynamic,
-                            &old,
-                            &value,
-                            function,
-                        )?;
-                        self.emit_environment_identifier_put(&reference, &value, function)?;
-                        if *return_mode == UpdateReturnMode::Postfix {
-                            value.copy_from(&old, function);
-                        }
-                        old.clear(function);
-                    }
-                    Operation::EagerCompound { operation, rhs } => {
-                        self.push_scope();
-                        let (lhs, id) =
-                            self.retain_expression_operand("\0environment.old", &value, function);
-                        let result = match operation {
-                            EnvironmentCompoundOperationIr::Add => {
-                                self.compile_coercive_add_to_locals(&lhs, rhs, &value, function)
-                            }
-                            EnvironmentCompoundOperationIr::Arithmetic(op) => self
-                                .compile_coercive_binary_number_to_locals(
-                                    *op, &lhs, rhs, &value, function,
-                                ),
-                            EnvironmentCompoundOperationIr::Bitwise(op) => self
-                                .compile_bitwise_numeric_to_locals(
-                                    *op, &lhs, rhs, &value, function,
-                                ),
-                        };
-                        self.pop_scope();
-                        self.release_local_binding(id, function);
-                        result?;
-                        self.emit_environment_identifier_put(&reference, &value, function)?;
-                    }
-                    Operation::LogicalCompound { operation, rhs } => {
-                        match operation {
-                            LogicalBinaryOp::And | LogicalBinaryOp::Or => {
-                                self.compile_truthy_tagged_i32(&value, function)?;
-                                if *operation == LogicalBinaryOp::Or {
-                                    function.instruction(&Instruction::I32Eqz);
-                                }
-                            }
-                            LogicalBinaryOp::Coalesce => {
-                                self.compile_nullish_tagged_i32(value.tag(), function)?
-                            }
-                        }
-                        self.open_frame(ControlFrameKind::If, function);
-                        self.compile_expr_to_value(rhs, &value, function)?;
-                        self.emit_environment_identifier_put(&reference, &value, function)?;
-                        self.pop_control(ControlFrameKind::If);
-                        function.instruction(&Instruction::End);
-                    }
+                        IdentifierPut::Reference(&reference),
+                        &value,
+                        function,
+                    )?,
                     Operation::Call {
                         args,
                         direct_eval,
@@ -565,6 +538,121 @@ impl FunctionBuilder<'_> {
                 output,
                 function,
             )?;
+        }
+        Ok(())
+    }
+}
+
+/// Where an identifier mutation stores its result.
+enum IdentifierPut<'a> {
+    /// A resolved Reference, through PutValue.
+    Reference(&'a crate::environments::environment_reference::EnvironmentIdentifierReference),
+    /// A statically proven cell: SetMutableBinding's initialization and
+    /// mutability checks run inline on the cell's own words.
+    Cell(BindingStorage),
+}
+
+impl FunctionBuilder<'_> {
+    fn emit_identifier_put(
+        &mut self,
+        target: &IdentifierPut<'_>,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        match target {
+            IdentifierPut::Reference(reference) => {
+                self.emit_environment_identifier_put(reference, value, function)
+            }
+            IdentifierPut::Cell(storage) => {
+                self.write_binding_from_locals_checked(*storage, value, function)
+            }
+        }
+    }
+
+    /// An update, compound or logical assignment after GetValue left the
+    /// old value in `value`: computes the result into `value` and stores it
+    /// to `target`; a postfix update then leaves the old numeric value.
+    fn emit_identifier_mutation(
+        &mut self,
+        operation: &EnvironmentIdentifierOperationIr,
+        target: IdentifierPut<'_>,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        use EnvironmentIdentifierOperationIr as Operation;
+        let schema = self.runtime_schema();
+        match operation {
+            Operation::Update {
+                operation,
+                return_mode,
+            } => {
+                let pending = schema.reserve_completion(function);
+                pending.initialize(function);
+                self.emit_value_to_numeric_locals(value, &pending, function)?;
+                self.completion().copy_from(&pending, function);
+                self.emit_propagate_current_throw_if_needed(function);
+                value.copy_from(pending.value(), function);
+                pending.clear(function);
+                let old = schema.reserve_value_local(function);
+                old.copy_from(value, function);
+                self.emit_numeric_update_to_locals(
+                    *operation,
+                    NumericUpdateValueKind::Dynamic,
+                    &old,
+                    value,
+                    function,
+                )?;
+                self.emit_identifier_put(&target, value, function)?;
+                if *return_mode == UpdateReturnMode::Postfix {
+                    value.copy_from(&old, function);
+                }
+                old.clear(function);
+            }
+            Operation::EagerCompound { operation, rhs } => {
+                self.push_scope();
+                let (lhs, id) =
+                    self.retain_expression_operand("\0environment.old", value, function);
+                let result = match operation {
+                    EnvironmentCompoundOperationIr::Add => {
+                        self.compile_coercive_add_to_locals(&lhs, rhs, value, function)
+                    }
+                    EnvironmentCompoundOperationIr::Arithmetic(op) => self
+                        .compile_coercive_binary_number_to_locals(
+                            *op, &lhs, rhs, value, function,
+                        ),
+                    EnvironmentCompoundOperationIr::Bitwise(op) => self
+                        .compile_bitwise_numeric_to_locals(
+                            *op, &lhs, rhs, value, function,
+                        ),
+                };
+                self.pop_scope();
+                self.release_local_binding(id, function);
+                result?;
+                self.emit_identifier_put(&target, value, function)?;
+            }
+            Operation::LogicalCompound { operation, rhs } => {
+                match operation {
+                    LogicalBinaryOp::And | LogicalBinaryOp::Or => {
+                        self.compile_truthy_tagged_i32(value, function)?;
+                        if *operation == LogicalBinaryOp::Or {
+                            function.instruction(&Instruction::I32Eqz);
+                        }
+                    }
+                    LogicalBinaryOp::Coalesce => {
+                        self.compile_nullish_tagged_i32(value.tag(), function)?
+                    }
+                }
+                self.open_frame(ControlFrameKind::If, function);
+                self.compile_expr_to_value(rhs, value, function)?;
+                self.emit_identifier_put(&target, value, function)?;
+                self.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
+            }
+            _ => {
+                return Err(EmitError::unsupported(
+                    "compiler invariant: only update, compound and logical assignments mutate after GetValue",
+                ))
+            }
         }
         Ok(())
     }

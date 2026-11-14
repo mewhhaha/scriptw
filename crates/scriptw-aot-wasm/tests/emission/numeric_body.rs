@@ -22,6 +22,8 @@ fn concrete(value: ValType) -> u32 {
     };
     index
 }
+/// Every write of the captured cell's value word: a Number prefix's, and
+/// each source assignment's inline SetMutableBinding.
 fn writes(body: &[Operator<'_>], cell: u32) -> Vec<usize> {
     let field = GcHostField::BindingCellScalar.definition().index();
     body.iter().enumerate().filter_map(|(at,op)| matches!(op,Operator::StructSet {struct_type_index,field_index} if *struct_type_index==cell && *field_index==field).then_some(at)).collect()
@@ -58,7 +60,9 @@ fn unchanged_assigned_step_uses_its_existing_entry_and_one_immediate_cell_write(
                 assert_eq!(p.function_type(index).params().len(),15,"the original local entry remains canonical");
                 let actual=writes(body,cell);
                 if expected==1 {
-                    assert_eq!(actual.len(),1,"one Number prefix writes through the existing canonical cell owner");
+                    // The Number prefix writes first; the unchanged fallback
+                    // body's one source assignment writes the same cell inline.
+                    assert_eq!(actual.len(),2,"one Number prefix writes through the existing canonical cell owner before the fallback's own assignment");
                     assert!(body[..actual[0]].iter().any(|op|matches!(op,Operator::F64Add)));
                     assert!(body[..actual[0]].iter().any(|op|matches!(op,Operator::BrIf{..})),"preflight can decline before the write");
                     assert_eq!(body.iter().filter(|op|matches!(op,Operator::Call{function_index}if *function_index==cached)).count(),2,"both unchanged generic field reads remain in fallback");
@@ -71,7 +75,7 @@ fn unchanged_assigned_step_uses_its_existing_entry_and_one_immediate_cell_write(
                     let (_,adapter)=p.named(&format!("js-arguments-adapter::{}#{}",source.name,source.id));
                     assert_eq!(adapter.iter().filter(|op|matches!(op,Operator::ReturnCall{function_index}if *function_index==index)).count(),1,"vector callers enter the same body exactly once");
                 } else {
-                    assert!(actual.is_empty(),"branching frame closures retain the original body");
+                    assert_eq!(actual.len(),1,"branching frame closures retain the original body: only their one source assignment writes the cell");
                 }
             }
         }

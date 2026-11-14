@@ -195,10 +195,16 @@ fn with_selection_and_global_start_consume_one_selected_reference() {
         "let reference = match identifier.resolution_start()",
         "self.emit_environment_identifier_get(&reference, read, &value, function)?;",
     );
+    // The resolved Reference's logical assignment shares its GetValue tail
+    // with a proven cell's; the Reference target still puts through PutValue.
+    assert!(ENVIRONMENT_EMITTER.contains("IdentifierPut::Reference(&reference),"));
+    assert!(ENVIRONMENT_EMITTER.contains(
+        "IdentifierPut::Reference(reference) => {\n                self.emit_environment_identifier_put(reference, value, function)"
+    ));
     let logical = bounded(
         ENVIRONMENT_EMITTER,
-        "                    Operation::LogicalCompound { operation, rhs } => {",
-        "                    Operation::Call {",
+        "            Operation::LogicalCompound { operation, rhs } => {",
+        "            _ => {",
     );
     assert_before(
         logical,
@@ -208,12 +214,12 @@ fn with_selection_and_global_start_consume_one_selected_reference() {
     assert_before(
         logical,
         "self.compile_expr_to_value(rhs",
-        "self.emit_environment_identifier_put(&reference",
+        "self.emit_identifier_put(&target",
     );
     assert!(!logical.contains("emit_resolve_"));
     assert_before(
         logical,
-        "self.emit_environment_identifier_put(&reference",
+        "self.emit_identifier_put(&target",
         "self.pop_control(ControlFrameKind::If)",
     );
 }
