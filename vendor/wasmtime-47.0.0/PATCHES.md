@@ -262,6 +262,16 @@ The copying collector is generational when the GC heap starts at 2 MiB or more
   ephemeron no minor collection visits any more; rejection of a module
   compiled for another nursery).
 
+## Growth to a limit
+
+`src/runtime/store/gc.rs`: GC heap growth aims to double the heap; when a
+limit refuses the doubled size, it now grows by what the allocation needs
+instead of failing. A nursery keeps part of the heap out of both semi-spaces,
+so a live set that fit a heap just under a Store's memory limit before the
+young generation needs this to fit at the limit (`aot_gc_virtual_reservation`
+in the engine's tests; `a_heap_near_its_limit_still_grows_to_the_limit` in
+`copying.rs`).
+
 Three upstream test feature guards are corrected so the collector control can
 compile with the product's narrow feature set plus `wat`: Linux copy-on-write
 tests in `src/runtime/vm/cow.rs` require `pooling-allocator`, and the hash-key

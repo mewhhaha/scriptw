@@ -2798,6 +2798,41 @@ mod generational_tests {
     }
 
     #[test]
+    fn a_heap_near_its_limit_still_grows_to_the_limit() {
+        use crate::{
+            ArrayRef, ArrayRefPre, ArrayType, FieldType, Mutability, StorageType,
+            StoreLimitsBuilder,
+        };
+        // Doubling from about 64 MiB would pass the 128 MiB limit; the four
+        // 8 MiB arrays still fit a heap grown only as far as they need.
+        let mut config = Config::new();
+        config
+            .wasm_gc(true)
+            .collector(Collector::Copying)
+            .gc_heap_initial_size(16 << 20)
+            .gc_heap_reservation(1 << 32)
+            .gc_heap_reservation_for_growth(0)
+            .gc_heap_may_move(false);
+        let engine = Engine::new(&config).unwrap();
+        let limit = 128 << 20;
+        let mut store = Store::new(&engine, StoreLimitsBuilder::new().memory_size(limit).build());
+        store.limiter(|limits| limits);
+        let ty = ArrayType::new(&engine, FieldType::new(Mutability::Var, StorageType::I8));
+        let pre = ArrayRefPre::new(&mut store, ty);
+        let mut live = Vec::new();
+        for marker in 0..4 {
+            live.push(ArrayRef::new(&mut store, &pre, &Val::I32(marker), 8 << 20).unwrap());
+            store.gc(None).unwrap();
+        }
+        assert!(store.gc_heap_capacity() <= limit);
+        for (marker, array) in live.iter().enumerate() {
+            let last = array.get(&mut store, (8 << 20) - 1).unwrap().unwrap_i32();
+            assert_eq!(last, marker as i32);
+        }
+        assert!(ArrayRef::new(&mut store, &pre, &Val::I32(0), 256 << 20).is_err());
+    }
+
+    #[test]
     fn a_module_compiled_for_another_nursery_is_rejected() {
         let small = engine(2 << 20);
         let large = engine(4 << 20);

@@ -280,7 +280,7 @@ impl StoreOpaque {
     /// Returns an error if growing the GC heap fails.
     pub(crate) async fn grow_gc_heap(
         &mut self,
-        limiter: Option<&mut StoreResourceLimiter<'_>>,
+        mut limiter: Option<&mut StoreResourceLimiter<'_>>,
         bytes_needed: u64,
         asyncness: Asyncness,
     ) -> Result<()> {
@@ -345,13 +345,27 @@ impl StoreOpaque {
         // Safety: we pair growing the GC heap with updating its associated
         // `VMMemoryDefinition` in the `VMStoreContext` immediately
         // afterwards.
-        unsafe {
+        let mut grown = unsafe {
             heap.memory
-                .grow(delta_pages_for_alloc, limiter)
+                .grow(delta_pages_for_alloc, limiter.as_deref_mut())
                 .await
                 .context(GcHeapGrowthFailed)?
-                .ok_or(GcHeapGrowthFailed)?;
-        }
+        };
+        // When a limit refuses the doubling, grow by what the allocation
+        // needs, so that the heap can still reach the limit. (A nursery keeps
+        // part of the heap out of both semi-spaces.)
+        let delta_pages_for_alloc = if grown.is_none() && delta_pages_for_alloc > pages_needed {
+            grown = unsafe {
+                heap.memory
+                    .grow(pages_needed, limiter)
+                    .await
+                    .context(GcHeapGrowthFailed)?
+            };
+            pages_needed
+        } else {
+            delta_pages_for_alloc
+        };
+        grown.ok_or(GcHeapGrowthFailed)?;
         *heap.store.vm_store_context.gc_heap.get_mut() = heap.memory.vmmemory();
 
         let new_size_in_bytes = u64::try_from(heap.memory.byte_size())?;
