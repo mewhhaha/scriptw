@@ -22,12 +22,16 @@ impl RuntimeSchema {
         registered: impl FnOnce(&mut Function),
     ) -> GcStackReference<OrdinaryObject> {
         let output = self.reference_type::<OrdinaryObject>(GcNullability::NonNullable);
+        // One inline test both proves and casts an actual OrdinaryObject;
+        // every other value drops its reference and takes the projection.
+        function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(output))));
         value.reference.load(function);
-        function.instruction(&Instruction::RefTestNonNull(output.heap_type));
-        function.instruction(&Instruction::If(BlockType::Result(ValType::Ref(output))));
-        value.reference.load(function);
-        function.instruction(&Instruction::RefCastNonNull(output.heap_type));
-        function.instruction(&Instruction::Else);
+        function.instruction(&Instruction::BrOnCast {
+            relative_depth: 0,
+            from_ref_type: RefType::EQREF,
+            to_ref_type: output,
+        });
+        function.instruction(&Instruction::Drop);
         registered(function);
         function.instruction(&Instruction::End);
         GcStackReference::new()

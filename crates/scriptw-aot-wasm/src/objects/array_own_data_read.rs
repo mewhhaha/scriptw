@@ -2,7 +2,7 @@
 //! They need no public descriptor allocation; deferred values resolve on demand. All reads that can invoke user
 //! code or consult a prototype retain the ordinary completion-aware path.
 use super::*;
-use crate::gc_types::{ArrayObject, ArrayObjectSchema, GcNullability};
+use crate::gc_types::{ArrayObject, ArrayObjectSchema};
 
 impl FunctionBuilder<'_> {
     pub(super) fn emit_array_own_data_read(
@@ -16,15 +16,14 @@ impl FunctionBuilder<'_> {
         let handled = schema.reserve_i32_local(function);
         function.instruction(&Instruction::I32Const(0));
         handled.store(function);
-        target.reference().load(function);
-        function.instruction(&Instruction::RefTestNonNull(
-            schema
-                .reference_type::<ArrayObject>(GcNullability::NonNullable)
-                .heap_type,
-        ));
-        self.open_frame(ControlFrameKind::If, function);
+        // One inline test proves and casts an actual Array.
+        let other = self.open_frame(ControlFrameKind::Block, function);
         let array = schema.reserve_gc_local(function).initialize(
-            target.cast_reference::<ArrayObject>(schema, function),
+            target.sealed_reference_or_branch::<ArrayObject>(
+                schema,
+                self.local_branch_label(other),
+                function,
+            ),
             function,
         );
         // Array length is a nonconfigurable intrinsic stored only in LENGTH.
@@ -96,7 +95,7 @@ impl FunctionBuilder<'_> {
         schema.release_i32_local(length_key, function);
         value.clear(function);
         array.clear(function);
-        self.pop_control(ControlFrameKind::If);
+        self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
         Ok(handled)
     }

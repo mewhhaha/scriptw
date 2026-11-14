@@ -139,17 +139,21 @@ fn array_length_branches<'a>(
     };
     let heap = wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(array));
     let length = crate::GcSnapshotField::ArrayLength.index();
-    operators.windows(2).enumerate().filter_map(|(index, window)| {
-        if !matches!(window, [Operator::RefTestNonNull { hty }, Operator::If { .. }] if *hty == heap) {
+    // One br_on_cast proves the Array; the arm follows the cast's block
+    // (drop, branch to the other arm, end) up to the end of its frame.
+    operators.windows(4).enumerate().filter_map(|(index, window)| {
+        if !matches!(window, [Operator::BrOnCast { to_ref_type, .. }, Operator::Drop, Operator::Br { .. }, Operator::End]
+            if to_ref_type.heap_type() == heap)
+        {
             return None;
         }
-        let branch = then_branch(operators, index + 2);
+        let branch = then_branch(operators, index + 4);
         branch.windows(4).any(|ops| matches!(ops,
             [Operator::StructGet { struct_type_index, field_index },
              Operator::LocalSet { local_index: stored }, Operator::LocalGet { local_index: loaded },
              Operator::F64ConvertI64U]
             if *struct_type_index == array && *field_index == length && stored == loaded
-        )).then_some((index + 2, branch))
+        )).then_some((index + 4, branch))
     }).collect()
 }
 

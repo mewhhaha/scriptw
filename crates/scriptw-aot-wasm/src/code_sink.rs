@@ -648,6 +648,22 @@ impl Function {
         self.instruction(&Instruction::BrIf(depth.immediate()));
     }
 
+    /// Branches to `label` with the operand, of type `from`, unless it is a
+    /// `to`; otherwise leaves it on the stack as a `to`.
+    pub(crate) fn branch_on_cast_fail_to_label(
+        &mut self,
+        label: LabelDepth,
+        from: wasm_encoder::RefType,
+        to: wasm_encoder::RefType,
+    ) {
+        let depth = self.branch_depth_to(label);
+        self.instruction(&Instruction::BrOnCastFail {
+            relative_depth: depth.immediate(),
+            from_ref_type: from,
+            to_ref_type: to,
+        });
+    }
+
     /// Pops a null reference and branches to `label`; leaves any other
     /// reference on the stack, refined to non-null.
     pub(crate) fn branch_on_null_to_label(&mut self, label: LabelDepth) {

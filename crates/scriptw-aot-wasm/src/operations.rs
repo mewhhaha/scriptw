@@ -1052,29 +1052,21 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         // Bound functions and callable proxies cannot acquire the HTMLDDA
-        // internal slot merely by being callable. Test the concrete record.
-        value.reference().load(function);
-        function.instruction(&Instruction::RefTestNonNull(
-            schema
-                .reference_type::<FunctionObject>(crate::gc_types::GcNullability::NonNullable)
-                .heap_type,
-        ));
-        function.instruction(&Instruction::If(BlockType::Result(ValType::I32)));
-        let callable_slot = schema.reserve_gc_local(function);
-        let callable = callable_slot.initialize(
-            value.cast_reference::<FunctionObject>(schema, function),
-            function,
-        );
-        let is_htmldda = schema.reserve_i32_local(function);
-        schema
+        // internal slot merely by being callable. Test the concrete record
+        // once: the cast that proves it leaves the record for its field.
+        function.instruction(&Instruction::Block(BlockType::Result(ValType::I32)));
+        function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(
+            wasm_encoder::RefType::EQREF,
+        ))));
+        let other = function.label_depth();
+        let callable = value.sealed_reference_or_fail_to::<FunctionObject>(schema, other, function);
+        let _ = schema
             .struct_type::<FunctionObject>()
             .field(FunctionObjectSchema::IS_HTMLDDA)
-            .read(&callable, schema, function)
-            .store(is_htmldda, function);
-        is_htmldda.load(function);
-        schema.release_i32_local(is_htmldda, function);
-        callable.clear(function);
-        function.instruction(&Instruction::Else);
+            .read_top(callable, function);
+        function.instruction(&Instruction::Br(1));
+        function.instruction(&Instruction::End);
+        function.instruction(&Instruction::Drop);
         function.instruction(&Instruction::I32Const(0));
         function.instruction(&Instruction::End);
         Ok(())

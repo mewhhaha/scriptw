@@ -1689,6 +1689,27 @@ impl ValueLocals {
             function,
         )
     }
+    /// The reference as the sealed layout `T`, after branching to `other`
+    /// for every other reference, null included, with that reference as an
+    /// eqref: `other`'s label carries one. One inline test proves and casts.
+    pub(crate) fn sealed_reference_or_fail_to<T: JavaScriptReference>(
+        &self,
+        schema: &RuntimeSchema,
+        other: crate::LabelDepth,
+        function: &mut Function,
+    ) -> GcStackReference<T> {
+        assert!(
+            T::LAYOUT.sealed_descendants().is_empty(),
+            "one inline test identifies only a sealed layout"
+        );
+        function.instruction(&Instruction::LocalGet(self.reference.index));
+        function.branch_on_cast_fail_to_label(
+            other,
+            RefType::EQREF,
+            schema.reference_type::<T>(GcNullability::NonNullable),
+        );
+        GcStackReference::new()
+    }
     pub(crate) fn set_reference<T: JavaScriptReference>(
         &self,
         source: &GcLocal<T>,

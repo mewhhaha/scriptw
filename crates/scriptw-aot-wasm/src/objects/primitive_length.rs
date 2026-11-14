@@ -1,6 +1,6 @@
 //! Exact static length consumers inspect actual Strings and Arrays before Get.
 use super::*;
-use crate::gc_types::{ArrayObject, ArrayObjectSchema, GcNullability, StringValue};
+use crate::gc_types::{ArrayObject, ArrayObjectSchema, StringValue};
 
 mod local_binding;
 
@@ -110,22 +110,24 @@ impl FunctionBuilder<'_> {
         self.emit_primitive_string_length_value(&string, output, function);
         string.clear(function);
         function.instruction(&Instruction::Else);
-        receiver.reference().load(function);
-        function.instruction(&Instruction::RefTestNonNull(
-            schema
-                .reference_type::<ArrayObject>(GcNullability::NonNullable)
-                .heap_type,
-        ));
-        self.open_frame(ControlFrameKind::If, function);
+        // One inline test proves and casts an actual Array.
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        let other = self.open_frame(ControlFrameKind::Block, function);
         let array = schema.reserve_gc_local(function).initialize(
-            receiver.cast_reference::<ArrayObject>(schema, function),
+            receiver.sealed_reference_or_branch::<ArrayObject>(
+                schema,
+                self.local_branch_label(other),
+                function,
+            ),
             function,
         );
         self.emit_array_length_value(key_proof, &array, output, function);
         array.clear(function);
-        function.instruction(&Instruction::Else);
+        self.emit_branch_to_target(done, function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
         self.compile_ordinary_property_read_from_locals(target, key, receiver, output, function)?;
-        self.pop_control(ControlFrameKind::If);
+        self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
@@ -158,22 +160,21 @@ impl FunctionBuilder<'_> {
         handled.set_constant(1, function);
         string.clear(function);
         function.instruction(&Instruction::Else);
-        receiver.reference().load(function);
-        function.instruction(&Instruction::RefTestNonNull(
-            schema
-                .reference_type::<ArrayObject>(GcNullability::NonNullable)
-                .heap_type,
-        ));
-        self.open_frame(ControlFrameKind::If, function);
+        // One inline test proves and casts an actual Array.
+        let other = self.open_frame(ControlFrameKind::Block, function);
         let array = schema.reserve_gc_local(function).initialize(
-            receiver.cast_reference::<ArrayObject>(schema, function),
+            receiver.sealed_reference_or_branch::<ArrayObject>(
+                schema,
+                self.local_branch_label(other),
+                function,
+            ),
             function,
         );
         self.emit_array_length_value(key_proof, &array, result.value(), function);
         result.set_normal(result.value(), function);
         handled.set_constant(1, function);
         array.clear(function);
-        self.pop_control(ControlFrameKind::If);
+        self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);

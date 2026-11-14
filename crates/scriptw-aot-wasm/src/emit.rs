@@ -332,6 +332,11 @@ pub(crate) struct FunctionBuilder<'a> {
     schema: &'a RuntimeSchema,
     owned_body: Option<Function>,
     current_environment: GcLocal<Environment, Nullable>,
+    /// The root of a source body's environment chain, memoized at its first
+    /// use in this invocation: every environment a source body installs is
+    /// a descendant of, or restores, its entry environment, so all share
+    /// one root. Null at entry; never reused for anything else.
+    source_global_environment: GcLocal<Environment, Nullable>,
     current_private_environment: GcLocal<PrivateEnvironment, Nullable>,
     direct_eval_context: Option<GcLocal<DirectEvalExecutionContext, Nullable>>,
     completion: CompletionLocals,
@@ -1492,6 +1497,9 @@ impl<'a> FunctionBuilder<'a> {
     pub(crate) fn current_environment(&self) -> &GcLocal<Environment, Nullable> {
         &self.current_environment
     }
+    pub(crate) fn source_global_environment_cache(&self) -> &GcLocal<Environment, Nullable> {
+        &self.source_global_environment
+    }
     pub(crate) fn replace_current_environment(
         &self,
         value: GcStackReference<Environment, Nullable>,
@@ -1988,6 +1996,9 @@ impl<'a> FunctionBuilder<'a> {
         let current_private_environment = schema
             .reserve_gc_local::<PrivateEnvironment, Nullable>(&mut owned_body)
             .initialize_null(schema, &mut owned_body);
+        let source_global_environment = schema
+            .reserve_gc_local::<Environment, Nullable>(&mut owned_body)
+            .initialize_null(schema, &mut owned_body);
         let completion = schema.reserve_completion(&mut owned_body);
         completion.initialize(&mut owned_body);
         let body_entry_locals = module_state.planned_body_entry().map(|entry| {
@@ -2031,6 +2042,7 @@ impl<'a> FunctionBuilder<'a> {
             schema,
             owned_body: Some(owned_body),
             current_environment,
+            source_global_environment,
             current_private_environment,
             direct_eval_context,
             completion,

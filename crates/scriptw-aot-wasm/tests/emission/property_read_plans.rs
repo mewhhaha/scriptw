@@ -746,9 +746,11 @@ function repeatedRead(record, count, callback) {
                 Operator::StructGet { struct_type_index, field_index }
                     if *struct_type_index == array && *field_index == GcSnapshotField::ArrayLength.index()))
                 .expect("the exact length consumer loads the actual Array's live intrinsic field");
+            // One br_on_cast both proves and casts the actual Array.
             assert!(length[..live_length].iter().any(|op| matches!(op,
-                Operator::RefTestNonNull { hty: HeapType::Concrete(UnpackedIndex::Module(index)) }
-                    if *index == array)), "the actual Array type dominates the intrinsic field load");
+                Operator::BrOnCast { to_ref_type, .. }
+                    if to_ref_type.heap_type() == HeapType::Concrete(UnpackedIndex::Module(array)))),
+                "the actual Array type dominates the intrinsic field load");
             assert!(calls(&length[live_length..], fallback),
                 "other actual receivers still reach the complete saved-value Get fallback");
         })

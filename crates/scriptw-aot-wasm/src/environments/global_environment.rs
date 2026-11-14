@@ -65,6 +65,15 @@ impl FunctionBuilder<'_> {
     ) -> GcLocal<Environment> {
         assert!(self.has_source_execution_environment());
         let schema = self.runtime_schema();
+        // A source body's environments share one root, so the walk runs at
+        // most once per invocation; later uses read the memoized root.
+        function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(
+            schema.reference_type::<Environment>(crate::gc_types::GcNullability::NonNullable),
+        ))));
+        let _ = self
+            .source_global_environment_cache()
+            .load(schema, function);
+        function.instruction(&Instruction::BrOnNonNull(0));
         let environment = schema
             .reserve_gc_local::<Environment, NonNullable>(function)
             .initialize(
@@ -73,9 +82,16 @@ impl FunctionBuilder<'_> {
                     .require_non_null(function),
                 function,
             );
-        let result = self.emit_global_environment_from(&environment, function);
+        let root = self.emit_global_environment_from(&environment, function);
         environment.clear(function);
-        result
+        self.source_global_environment_cache()
+            .replace(root.load(schema, function).nullable(), function);
+        let result = root.load(schema, function);
+        root.clear(function);
+        function.instruction(&Instruction::End);
+        schema
+            .reserve_gc_local(function)
+            .initialize(result, function)
     }
 
     /// Walk the explicitly supplied source chain, never the active Realm fallback.
