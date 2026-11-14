@@ -181,6 +181,17 @@ keeps those bytes faulting
   count the guard out of a semi-space, and `tests/interrupt_handle.rs` tells a
   null access and a request apart.
 
+## Global roots
+
+`src/runtime/store/gc.rs`: a collection traces an instance's globals from
+the module's own global types, reading each reference-typed definition
+directly, instead of building a typed `Global` handle (and its registered
+type) for every defined global. P defines 1,691 globals, so root tracing took
+0.17–0.22 ms of every collection; it now takes about 0.02 ms. Host-created
+globals keep the typed path. `global_root_tests` in `copying.rs` covers a
+mutable and an immutable reference global, an `i31ref` global and a bottom-typed
+global across collections.
+
 Three upstream test feature guards are corrected so the collector control can
 compile with the product's narrow feature set plus `wat`: Linux copy-on-write
 tests in `src/runtime/vm/cow.rs` require `pooling-allocator`, and the hash-key

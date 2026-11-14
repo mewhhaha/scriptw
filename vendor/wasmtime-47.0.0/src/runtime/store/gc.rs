@@ -831,7 +831,35 @@ impl StoreOpaque {
 
     fn trace_vmctx_roots(&mut self, gc_roots_list: &mut GcRootsList) {
         log::trace!("Begin trace GC roots :: vmctx");
-        self.for_each_global(|store, global| global.trace_root(store, gc_roots_list));
+        // Host-created globals are few; their typed handles decide.
+        for global in self.host_globals.keys() {
+            let global = crate::Global::new_host(self, global);
+            global.trace_root(self, gc_roots_list);
+        }
+        // A module may define thousands of globals. Decide from each one's
+        // module-level type, without building a typed handle per global.
+        for id in self.instances.keys() {
+            let module = self.instance(id).env_module().clone();
+            for (index, global) in module.globals.iter() {
+                let Some(index) = module.defined_global_index(index) else {
+                    continue;
+                };
+                let wasmtime_environ::WasmValType::Ref(ty) = global.wasm_ty else {
+                    continue;
+                };
+                if !ty.heap_type.is_vmgcref_type_and_not_i31() || ty.heap_type.is_bottom() {
+                    continue;
+                }
+                let mut definition = self.instance(id).global_ptr(index);
+                // SAFETY: the definition belongs to a live instance of this
+                // store and holds a GC reference, per its type.
+                if let Some(gc_ref) = unsafe { definition.as_mut().as_gc_ref_mut() } {
+                    unsafe {
+                        gc_roots_list.add_vmgcref_root(gc_ref.into(), "Wasm global");
+                    }
+                }
+            }
+        }
         self.for_each_table(|store, table| table.trace_roots(store, gc_roots_list));
         log::trace!("End trace GC roots :: vmctx");
     }

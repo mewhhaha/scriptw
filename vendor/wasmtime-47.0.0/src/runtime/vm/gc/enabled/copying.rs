@@ -1964,3 +1964,66 @@ mod null_guard_tests {
         assert_eq!(heap.gc_heap.null_guard_len(), guard as usize);
     }
 }
+
+#[cfg(all(
+    test,
+    feature = "std",
+    feature = "cranelift",
+    feature = "wat",
+    not(miri),
+    not(gc_zeal)
+))]
+mod global_root_tests {
+    use crate::{Collector, Config, Engine, Instance, Module, Store};
+
+    /// Globals of reference type are roots, read from each module's global
+    /// types; globals of other types, `i31ref` and bottom types are not.
+    #[test]
+    fn reference_globals_keep_their_objects_across_collections() {
+        let mut config = Config::new();
+        config
+            .wasm_gc(true)
+            .wasm_function_references(true)
+            .collector(Collector::Copying);
+        let engine = Engine::new(&config).unwrap();
+        let module = Module::new(
+            &engine,
+            r#"
+            (module
+              (type $s (struct (field i32)))
+              (global $n (mut i32) (i32.const 3))
+              (global $o (mut (ref null $s)) (ref.null $s))
+              (global $i (mut i31ref) (ref.i31 (i32.const 9)))
+              (global $z (mut (ref null none)) (ref.null none))
+              (global $c (ref $s) (struct.new $s (i32.const 11)))
+              (func (export "fill") (param i32)
+                (global.set $o (struct.new $s (local.get 0))))
+              (func (export "churn")
+                (local i32)
+                (loop $l
+                  (drop (struct.new $s (local.get 0)))
+                  (local.set 0 (i32.add (local.get 0) (i32.const 1)))
+                  (br_if $l (i32.lt_u (local.get 0) (i32.const 100000)))))
+              (func (export "read") (result i32)
+                (i32.add
+                  (i32.add (struct.get $s 0 (global.get $o)) (struct.get $s 0 (global.get $c)))
+                  (i32.add (global.get $n) (i31.get_s (global.get $i)))))
+            )
+            "#,
+        )
+        .unwrap();
+        let mut store = Store::new(&engine, ());
+        let instance = Instance::new(&mut store, &module, &[]).unwrap();
+        let fill = instance
+            .get_typed_func::<i32, ()>(&mut store, "fill")
+            .unwrap();
+        let churn = instance.get_typed_func::<(), ()>(&mut store, "churn").unwrap();
+        let read = instance.get_typed_func::<(), i32>(&mut store, "read").unwrap();
+        fill.call(&mut store, 20).unwrap();
+        for _ in 0..3 {
+            churn.call(&mut store, ()).unwrap();
+            store.gc(None).unwrap();
+            assert_eq!(read.call(&mut store, ()).unwrap(), 20 + 11 + 3 + 9);
+        }
+    }
+}
