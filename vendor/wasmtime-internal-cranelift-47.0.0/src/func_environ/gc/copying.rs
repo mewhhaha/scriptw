@@ -118,6 +118,143 @@ pub(super) fn translate_read_interned_func_ref(
     result
 }
 
+/// The copying heap's generational write barrier, for a reference `value`
+/// stored into the GC heap slot at native address `slot`.
+///
+/// The nursery is the heap below `copying_heap_data::nursery_end`, so a
+/// store into the old generation is one at or above the heap base plus that
+/// end: one compare against a value hoisted per function, taken only by old
+/// targets. Such a store of a nursery reference (a non-null, non-`i31` value
+/// below the end) records the slot's heap index in the remembered-slot buffer
+/// the runtime publishes, or flags the buffer's overflow. Initializing stores
+/// into new objects need none: compiled code allocates them in the nursery,
+/// and the runtime remembers any it allocates in the old space whole.
+pub(super) fn emit_old_to_young_barrier(
+    func_env: &mut FuncEnvironment<'_>,
+    builder: &mut FunctionBuilder,
+    ty: WasmRefType,
+    slot: ir::Value,
+    value: ir::Value,
+) -> WasmResult<()> {
+    let nursery_end = crate::copying_heap_data::nursery_end(func_env.tunables.gc_heap_initial_size);
+    if nursery_end == 0 || !ty.heap_type.is_vmgcref_type_and_not_i31() || ty.heap_type.is_bottom()
+    {
+        return Ok(());
+    }
+    use ir::condcodes::IntCC;
+    let pointer_type = func_env.pointer_type();
+    let pointer_bytes = pointer_type.bytes();
+    let base = func_env.get_gc_heap_base(builder)?;
+    let boundary = builder.ins().iadd_imm_u(base, i64::from(nursery_end));
+    let is_old = builder
+        .ins()
+        .icmp(IntCC::UnsignedGreaterThanOrEqual, slot, boundary);
+
+    let old_block = builder.create_block();
+    let record_block = builder.create_block();
+    let push_block = builder.create_block();
+    let overflow_block = builder.create_block();
+    let continue_block = builder.create_block();
+    for block in [old_block, record_block, push_block, overflow_block] {
+        builder.set_cold_block(block);
+    }
+    builder.ins().brif(is_old, old_block, &[], continue_block, &[]);
+
+    // An old slot: is the value a nursery object?
+    builder.switch_to_block(old_block);
+    builder.seal_block(old_block);
+    let below = builder.ins().iadd_imm_s(value, -1);
+    let in_nursery = builder
+        .ins()
+        .icmp_imm_u(IntCC::UnsignedLessThan, below, i64::from(nursery_end - 1));
+    let low_bit = builder.ins().band_imm_u(value, 1);
+    let not_i31 = builder.ins().icmp_imm_u(IntCC::Equal, low_bit, 0);
+    let young = builder.ins().band(in_nursery, not_i31);
+    builder
+        .ins()
+        .brif(young, record_block, &[], continue_block, &[]);
+
+    // Record the slot, or flag the overflow.
+    builder.switch_to_block(record_block);
+    builder.seal_block(record_block);
+    let heap_data = CopyingCompiler::load_vmcopying_heap_data_ptr(func_env, builder);
+    let len_offset = crate::copying_heap_data::remembered_len(pointer_bytes);
+    let cap_offset = crate::copying_heap_data::remembered_cap(pointer_bytes);
+    let overflow_offset = crate::copying_heap_data::remembered_overflow(pointer_bytes);
+    let buffer_offset = crate::copying_heap_data::remembered(pointer_bytes);
+    let field = |func_env: &mut FuncEnvironment<'_>, builder: &mut FunctionBuilder, offset| {
+        func_env
+            .alias_regions
+            .vmcopying_heap_data_field_flags(&mut builder.func, offset)
+    };
+    let len_flags = field(func_env, builder, len_offset);
+    let cap_flags = field(func_env, builder, cap_offset);
+    let overflow_flags = field(func_env, builder, overflow_offset);
+    let buffer_flags = field(func_env, builder, buffer_offset);
+    let len = builder.ins().load(
+        ir::types::I32,
+        len_flags,
+        heap_data,
+        i32::try_from(len_offset).unwrap(),
+    );
+    let cap = builder.ins().load(
+        ir::types::I32,
+        cap_flags,
+        heap_data,
+        i32::try_from(cap_offset).unwrap(),
+    );
+    let has_room = builder.ins().icmp(IntCC::UnsignedLessThan, len, cap);
+    builder
+        .ins()
+        .brif(has_room, push_block, &[], overflow_block, &[]);
+
+    builder.switch_to_block(push_block);
+    builder.seal_block(push_block);
+    let buffer = builder.ins().load(
+        pointer_type,
+        buffer_flags,
+        heap_data,
+        i32::try_from(buffer_offset).unwrap(),
+    );
+    let index = builder.ins().isub(slot, base);
+    let index = if pointer_type == ir::types::I32 {
+        index
+    } else {
+        builder.ins().ireduce(ir::types::I32, index)
+    };
+    let entry = if pointer_type == ir::types::I32 {
+        len
+    } else {
+        builder.ins().uextend(pointer_type, len)
+    };
+    let entry = builder.ins().ishl_imm_u(entry, 2);
+    let entry = builder.ins().iadd(buffer, entry);
+    let entry_flags = func_env
+        .alias_regions
+        .remembered_slots_flags(&mut builder.func);
+    builder.ins().store(entry_flags, index, entry, 0);
+    let next = builder.ins().iadd_imm_u(len, 1);
+    builder
+        .ins()
+        .store(len_flags, next, heap_data, i32::try_from(len_offset).unwrap());
+    builder.ins().jump(continue_block, &[]);
+
+    builder.switch_to_block(overflow_block);
+    builder.seal_block(overflow_block);
+    let one = builder.ins().iconst(ir::types::I32, 1);
+    builder.ins().store(
+        overflow_flags,
+        one,
+        heap_data,
+        i32::try_from(overflow_offset).unwrap(),
+    );
+    builder.ins().jump(continue_block, &[]);
+
+    builder.switch_to_block(continue_block);
+    builder.seal_block(continue_block);
+    Ok(())
+}
+
 impl CopyingCompiler {
     /// Load the pointer to the `VMCopyingHeapData` from vmctx.
     fn load_vmcopying_heap_data_ptr(

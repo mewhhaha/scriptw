@@ -192,6 +192,49 @@ globals keep the typed path. `global_root_tests` in `copying.rs` covers a
 mutable and an immutable reference global, an `i31ref` global and a bottom-typed
 global across collections.
 
+## Young generation
+
+The copying collector is generational when the GC heap starts at 2 MiB or more
+([measurements](../../docs/rust-rewrite/benchmarks.md#young-generation-2026-11-14)).
+
+- `src/runtime/vm/gc/enabled/copying.rs`: the heap's first eighth of its
+  initial size (in 64 KiB units; 2 MiB of the product's 16 MiB) is a nursery
+  after the null guard, and the two old semi-spaces split the rest. The
+  mutator, inline and through `gc_alloc_raw`, bump-allocates in the nursery;
+  an object larger than a quarter of it goes to the old space and is
+  remembered whole until the next collection, since its initializing stores
+  pass no barrier. The nursery's allocation window never exceeds the old
+  space's free bytes, so a minor collection can always promote everything in
+  it and a full one can always copy the old space and the nursery into the
+  other semi-space.
+- A full nursery with a whole nursery's room in the old space asks for a minor
+  collection: roots, the remembered old-space slots, the objects allocated old
+  since the last collection (or, after the slot buffer overflowed, every old
+  object) are scanned, nursery survivors are copied into the old space and
+  scanned there, and ephemerons, weak edges and `externref`s are processed
+  with every old object counting as live. Without that room the failure goes
+  to the existing collect-or-grow policy on the old space, which a full
+  collection (nursery included) or growth answers. Explicit collections are
+  full. The policy's post-collection live size comes from full collections
+  only (`GcHeap::last_collection_was_minor`). Each collection advances the
+  weak epoch, since young keys move.
+- The remembered-slot buffer (4,096 slots, doubling after an overflow up to
+  1 Mi) is published in `VMCopyingHeapData` after the funcref view, at the
+  offsets the vendored translator's `copying_heap_data` module defines.
+  Compiled stores record into it (see the translator's notes); host stores of
+  references into existing objects record through `GcHeap::write_barrier`
+  (`src/runtime/vm/gc/gc_ref.rs`).
+- The nursery's end is a function of `gc_heap_initial_size`, which the module
+  compatibility check already compares, so a module compiled for another
+  boundary is rejected. Below a 2 MiB initial heap there is no nursery and the
+  collector behaves as before.
+- Tests: `generational_tests` in `copying.rs` (old-to-young stores through
+  compiled `struct.set`, `array.set`, `array.fill`, `array.copy` and
+  `array.init_elem`, and through the host API, survive minor collections; an
+  overflowing slot buffer; large objects allocated old with young
+  initializers; weak references to young targets; rejection of a module
+  compiled for another nursery).
+
 Three upstream test feature guards are corrected so the collector control can
 compile with the product's narrow feature set plus `wat`: Linux copy-on-write
 tests in `src/runtime/vm/cow.rs` require `pooling-allocator`, and the hash-key

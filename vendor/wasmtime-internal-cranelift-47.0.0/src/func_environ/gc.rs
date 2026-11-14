@@ -586,6 +586,9 @@ pub fn write_field_at_addr(
                 write_func_ref_at_addr(func_env, builder, r, flags, field_addr, new_val)?
             }
             WasmHeapTopType::Extern | WasmHeapTopType::Any | WasmHeapTopType::Exn => {
+                if func_env.tunables.collector == Some(Collector::Copying) {
+                    copying::emit_old_to_young_barrier(func_env, builder, r, field_addr, new_val)?;
+                }
                 gc_compiler(func_env)?.translate_write_gc_reference(
                     func_env, builder, r, field_addr, new_val, flags,
                 )?;

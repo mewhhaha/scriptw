@@ -30,7 +30,10 @@ pub(super) struct EphemeronMarking {
 }
 
 impl EphemeronMarking {
-    pub(super) fn new(registry: &WeakGcRegistry) -> Result<Self> {
+    /// `live(raw)` says which original indices are live before anything is
+    /// copied: none for a full collection, the old objects for a minor one.
+    /// A gate whose object is already live opens at once.
+    pub(super) fn new(registry: &WeakGcRegistry, live: impl Fn(u32) -> bool) -> Result<Self> {
         let count = registry
             .slots
             .iter()
@@ -64,16 +67,20 @@ impl EphemeronMarking {
                 value: Some(_),
             }) = entry.edge.as_ref()
             {
-                marking.dependencies.push(Dependency {
-                    original: owner.as_raw_u32(),
-                    slot,
-                    gate: 1,
-                });
-                marking.dependencies.push(Dependency {
-                    original: key.as_raw_u32(),
-                    slot,
-                    gate: 2,
-                });
+                for (original, gate) in [(owner.as_raw_u32(), 1), (key.as_raw_u32(), 2)] {
+                    if live(original) {
+                        marking.live_gates[slot] |= gate;
+                    } else {
+                        marking.dependencies.push(Dependency {
+                            original,
+                            slot,
+                            gate,
+                        });
+                    }
+                }
+                if marking.live_gates[slot] == 3 {
+                    marking.ready.push(slot);
+                }
             }
         }
         marking
@@ -81,7 +88,8 @@ impl EphemeronMarking {
             .sort_unstable_by_key(|dependency| dependency.original);
         let (Some(first), Some(last)) = (marking.dependencies.first(), marking.dependencies.last())
         else {
-            unreachable!("a counted edge records two dependencies")
+            // Every gate is already open.
+            return Ok(marking);
         };
         let base = first.original;
         let span = usize::try_from((last.original - base) >> GRANULE_SHIFT)? + 1;

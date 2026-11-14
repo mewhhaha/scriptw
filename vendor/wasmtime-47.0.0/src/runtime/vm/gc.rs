@@ -187,11 +187,15 @@ impl GcStore {
         };
         let collection = self.gc_heap.gc(roots, &mut trace_state);
         collect_async(collection, asyncness, yield_fn).await?;
-        self.last_post_gc_allocated_bytes = Some({
-            let size = self.gc_heap.allocated_bytes();
-            log::trace!("After collection, GC heap's allocated bytes = {size:#x} bytes");
-            size
-        });
+        // The growth policy's live size is the one a full collection leaves:
+        // a minor collection keeps every old object, dead or not.
+        if !self.gc_heap.last_collection_was_minor() {
+            self.last_post_gc_allocated_bytes = Some({
+                let size = self.gc_heap.allocated_bytes();
+                log::trace!("After collection, GC heap's allocated bytes = {size:#x} bytes");
+                size
+            });
+        }
         Ok(())
     }
 

@@ -493,6 +493,19 @@ pub unsafe trait GcHeap: 'static + Send + Sync {
     /// the same size or larger than it was.
     unsafe fn replace_memory(&mut self, memory: crate::vm::Memory, delta_bytes_grown: u64);
 
+    /// Whether the last collection was a minor one, which leaves the old
+    /// generation as it was. False by default.
+    fn last_collection_was_minor(&self) -> bool {
+        false
+    }
+
+    /// Called after host code stored `value` into the reference field at
+    /// `offset` of the existing object `object`, for a generational heap to
+    /// record an old-to-young edge. Nothing by default.
+    fn write_barrier(&mut self, object: &VMGcRef, offset: u32, value: Option<&VMGcRef>) {
+        let _ = (object, offset, value);
+    }
+
     /// Makes the null guard (see `GcRuntime::null_guard_bytes`) of a just
     /// attached heap inaccessible. Fails, leaving the heap unusable, where
     /// the backing memory cannot be protected.

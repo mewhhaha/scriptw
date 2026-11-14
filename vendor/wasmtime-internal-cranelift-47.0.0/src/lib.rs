@@ -52,6 +52,40 @@ pub mod copying_heap_data {
     /// within this distance of a null reference faults. The runtime rounds
     /// it up to whole host pages.
     pub const NULL_GUARD_BYTES: u32 = 4096;
+
+    /// Offset of the remembered-slot count, a `u32`.
+    pub const fn remembered_len(pointer_bytes: u32) -> u32 {
+        func_refs(pointer_bytes) + pointer_bytes
+    }
+
+    /// Offset of the remembered-slot capacity, a `u32`.
+    pub const fn remembered_cap(pointer_bytes: u32) -> u32 {
+        remembered_len(pointer_bytes) + 4
+    }
+
+    /// Offset of the remembered-slot overflow flag, a `u32`.
+    pub const fn remembered_overflow(pointer_bytes: u32) -> u32 {
+        remembered_cap(pointer_bytes) + 4
+    }
+
+    /// Offset of the address of the first remembered slot, a pointer.
+    pub const fn remembered(pointer_bytes: u32) -> u32 {
+        (remembered_overflow(pointer_bytes) + 4).next_multiple_of(pointer_bytes)
+    }
+
+    /// The end of the copying heap's nursery for a GC heap of
+    /// `initial_size` bytes: one eighth of it, in whole 64 KiB units, and no
+    /// nursery (zero) below 256 KiB. A slot at or above it belongs to the old
+    /// generation, a reference below it to the young one. The runtime's
+    /// layout tests compare it with the heap's own.
+    pub const fn nursery_end(initial_size: u64) -> u32 {
+        let end = (initial_size / 8) & !(64 * 1024 - 1);
+        if end < 256 * 1024 || end > (u32::MAX / 2) as u64 {
+            0
+        } else {
+            end as u32
+        }
+    }
 }
 mod obj;
 pub use obj::*;

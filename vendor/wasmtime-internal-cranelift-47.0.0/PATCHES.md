@@ -124,3 +124,18 @@ Wasm semantics and trap codes are unchanged.
 - `src/func_environ/gc.rs`: `ref.test` and the casts test for `i31` only when
   the operand's static heap type is `any`, `eq` or `i31`; a struct or array
   reference never holds one.
+
+## Generational write barrier
+
+`src/func_environ/gc{.rs,/copying.rs}`, `src/lib.rs`: with the copying
+collector and a nursery (`copying_heap_data::nursery_end` of the GC heap's
+initial size, nonzero from 2 MiB), every reference stored into an existing GC
+object (`struct.set`, `array.set` and the per-element loops of `array.fill`,
+`array.copy` and `array.init_*` on initialized arrays) first compares the
+slot's address with the heap base plus the nursery's end. Only a store into
+the old generation leaves that compare: if the value is a nursery object (a
+non-null, non-`i31` reference below the end), the slot's heap index is
+appended to the remembered-slot buffer the runtime publishes in
+`VMCopyingHeapData`, or the buffer's overflow flag is set. Those paths are
+cold blocks. Initializing stores, table and global stores need none: tables
+and globals are roots, and new objects are young or remembered whole.

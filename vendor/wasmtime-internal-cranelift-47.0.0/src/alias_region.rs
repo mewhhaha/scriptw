@@ -39,6 +39,8 @@ enum VmType {
     BuiltinFunctionsArray,
     ComponentBuiltinFunctionsArray,
     HostValRaw,
+    /// The copying heap's remembered-slot buffer.
+    RememberedSlots,
 }
 
 /// A key that uniquely identifies an alias region across an entire compilation.
@@ -171,6 +173,7 @@ impl AliasRegionKey {
     const HOST_VAL_RAW_KIND: u32 = Self::new_kind(0b011110);
     const ELEMENT_SEGMENT_KIND: u32 = Self::new_kind(0b011111);
     const DATA_SEGMENT_KIND: u32 = Self::new_kind(0b100000);
+    const REMEMBERED_SLOTS_KIND: u32 = Self::new_kind(0b100001);
 
     /// Encode this key into a raw `u32` suitable for use as an
     /// `AliasRegionData::user_id`.
@@ -203,6 +206,7 @@ impl AliasRegionKey {
                         Self::COMPONENT_BUILTIN_FUNCTIONS_KIND
                     }
                     VmType::HostValRaw => Self::HOST_VAL_RAW_KIND,
+                    VmType::RememberedSlots => Self::REMEMBERED_SLOTS_KIND,
                 };
                 kind | (offset & Self::OFFSET_MASK)
             }
@@ -2576,6 +2580,30 @@ where
             copying_heap_data,
             i32::try_from(offset).unwrap(),
         )
+    }
+
+    /// Memory flags for the copying heap data's field at `offset` (the
+    /// remembered-slot buffer's count, capacity, overflow flag and address).
+    pub fn vmcopying_heap_data_field_flags(
+        &mut self,
+        func: &mut ir::Function,
+        offset: u32,
+    ) -> ir::MemFlagsData {
+        let region = self.vmcopying_heap_data_region(func, offset);
+        ir::MemFlagsData::trusted().with_alias_region(Some(region))
+    }
+
+    /// Memory flags for an entry of the copying heap's remembered-slot
+    /// buffer.
+    pub fn remembered_slots_flags(&mut self, func: &mut ir::Function) -> ir::MemFlagsData {
+        let region = self.region(
+            func,
+            AliasRegionKey::Vm {
+                ty: VmType::RememberedSlots,
+                offset: 0,
+            },
+        );
+        ir::MemFlagsData::trusted().with_alias_region(Some(region))
     }
 
     /// Emit a store to the copying collector's bump pointer.

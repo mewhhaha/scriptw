@@ -4,10 +4,11 @@ use crate::vm::WeakGcEdge;
 
 impl CopyingHeap {
     fn weak_forwarded(&self, reference: &VMGcRef) -> Result<Option<VMGcRef>> {
-        if reference.is_i31() || self.is_in_active_space(reference.heap_index()?.get()) {
+        // Objects the collection does not move are live: copies in the active
+        // semi-space, and old objects during a minor collection.
+        if reference.is_i31() || !self.is_in_from_space(reference.heap_index()?.get()) {
             return Ok(Some(reference.unchecked_copy()));
         }
-        debug_assert!(self.is_in_idle_space(reference.heap_index()?.get()));
         self.index(header_and_forwarding_ref(reference))?
             .forwarding_ref()
     }

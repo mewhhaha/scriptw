@@ -580,7 +580,9 @@ impl VMGcRef {
                 let store = store.require_gc_store_mut()?;
                 store.write_gc_ref(&mut gc_ref, e.as_ref())?;
                 let data = store.gc_object_data(self)?;
-                data.write_u32(offset, gc_ref.map_or(0, |r| r.as_raw_u32()))
+                data.write_u32(offset, gc_ref.as_ref().map_or(0, |r| r.as_raw_u32()))?;
+                store.gc_heap.write_barrier(self, offset, gc_ref.as_ref());
+                Ok(())
             }
             Val::AnyRef(a) => {
                 let raw = data.read_u32(offset)?;
@@ -592,7 +594,9 @@ impl VMGcRef {
                 let store = store.require_gc_store_mut()?;
                 store.write_gc_ref(&mut gc_ref, a.as_ref())?;
                 let data = store.gc_object_data(self)?;
-                data.write_u32(offset, gc_ref.map_or(0, |r| r.as_raw_u32()))
+                data.write_u32(offset, gc_ref.as_ref().map_or(0, |r| r.as_raw_u32()))?;
+                store.gc_heap.write_barrier(self, offset, gc_ref.as_ref());
+                Ok(())
             }
             Val::ExnRef(e) => {
                 let raw = data.read_u32(offset)?;
@@ -604,7 +608,9 @@ impl VMGcRef {
                 let store = store.require_gc_store_mut()?;
                 store.write_gc_ref(&mut gc_ref, e.as_ref())?;
                 let data = store.gc_object_data(self)?;
-                data.write_u32(offset, gc_ref.map_or(0, |r| r.as_raw_u32()))
+                data.write_u32(offset, gc_ref.as_ref().map_or(0, |r| r.as_raw_u32()))?;
+                store.gc_heap.write_barrier(self, offset, gc_ref.as_ref());
+                Ok(())
             }
 
             Val::FuncRef(f) => {

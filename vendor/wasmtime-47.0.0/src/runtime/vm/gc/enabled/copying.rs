@@ -47,7 +47,8 @@ unsafe impl GcRuntime for CopyingCollector {
     }
 
     fn new_gc_heap(&self, engine: &Engine) -> Result<Box<dyn GcHeap>> {
-        let heap = CopyingHeap::new(null_guard_bytes(engine.tunables()))?;
+        let tunables = engine.tunables();
+        let heap = CopyingHeap::new(null_guard_bytes(tunables), nursery_end(tunables))?;
         Ok(Box::new(heap) as _)
     }
 
@@ -78,6 +79,32 @@ fn null_guard_bytes(tunables: &Tunables) -> u32 {
     let page = u32::try_from(crate::runtime::vm::host_page_size()).unwrap();
     COMPILED_NULL_GUARD_BYTES.next_multiple_of(page)
 }
+
+/// The end of the young generation: the nursery is the heap below this index,
+/// after the null guard, and the old semi-spaces lie above it. Compiled code
+/// tests `slot >= base + nursery_end` in its write barrier, so this derives
+/// from tunables alone (`gc_heap_initial_size`, which module compatibility
+/// checks) and is the same function as the vendored translator's
+/// `copying_heap_data::nursery_end`. Zero means no nursery.
+fn nursery_end(tunables: &Tunables) -> u32 {
+    nursery_end_for_initial_size(tunables.gc_heap_initial_size)
+}
+
+/// One eighth of the initial heap, in whole 64 KiB units; no nursery below
+/// 256 KiB.
+const fn nursery_end_for_initial_size(initial_size: u64) -> u32 {
+    let end = (initial_size / 8) & !(64 * 1024 - 1);
+    if end < 256 * 1024 || end > (u32::MAX / 2) as u64 {
+        0
+    } else {
+        end as u32
+    }
+}
+
+/// Initial capacity of the remembered-slot buffer, in slots.
+const REMEMBERED_INITIAL: usize = 4096;
+/// Largest capacity the buffer grows to after overflowing.
+const REMEMBERED_MAX: usize = 1 << 20;
 
 /// The common header for all objects in the copying collector.
 #[repr(C)]
@@ -227,6 +254,17 @@ struct VMCopyingHeapDataInner {
     /// Compiled code reads an entry inline when the id is below
     /// `func_refs_len`.
     func_refs: usize,
+    /// Old-space slots that write barriers recorded since the last collection
+    /// as holding a nursery reference: `remembered[..remembered_len]`.
+    remembered_len: u32,
+    /// Capacity of `remembered`. A barrier that finds the buffer full sets
+    /// `remembered_overflow` instead, and the next minor collection scans the
+    /// whole old space.
+    remembered_cap: u32,
+    /// Nonzero once a barrier found `remembered` full.
+    remembered_overflow: u32,
+    /// Address of the first remembered slot, a `*mut u32`.
+    remembered: usize,
 }
 
 #[derive(Default)]
@@ -390,12 +428,51 @@ struct CopyingHeap {
 
     /// Whether the first `null_guard` bytes of the memory are inaccessible.
     null_guard_protected: bool,
+
+    /// The young generation's end (see `nursery_end`). With a nursery the
+    /// JIT-visible bump pointer and limit allocate in
+    /// `nursery_start()..nursery_end`, the old semi-spaces lie above it and
+    /// `old_bump`/`old_end` allocate in the active one. Zero without a
+    /// nursery, when the JIT-visible pair is the active semi-space's.
+    nursery_end: u32,
+
+    /// The active old semi-space's allocation pointer, with a nursery.
+    old_bump: u32,
+
+    /// The active old semi-space's end.
+    old_end: u32,
+
+    /// The mutator found the nursery full while the old space had room for
+    /// everything in it: the next collection may be a minor one.
+    minor_requested: bool,
+
+    /// The heap grew since the mutator last found the nursery full; the
+    /// allocation retried after growth goes to the old space.
+    grew: bool,
+
+    /// Whether the collection in progress is a minor one.
+    collecting_minor: bool,
+
+    /// Whether the last completed collection was a minor one.
+    last_minor: bool,
+
+    /// Objects allocated directly in the old space since the last collection.
+    /// Their initializing stores pass no barrier, so a minor collection scans
+    /// them whole.
+    direct_old: Vec<u32>,
+
+    /// Backing store of the remembered-slot buffer that `vmctx_data`
+    /// publishes to compiled code.
+    remembered: Box<[u32]>,
+
+    /// The set of `externref`s in the nursery.
+    young_extern_ref_set_head: Option<VMExternRef>,
 }
 
 impl CopyingHeap {
-    fn new(null_guard: u32) -> Result<Self> {
+    fn new(null_guard: u32, nursery_end: u32) -> Result<Self> {
         log::trace!("allocating new copying heap");
-        Ok(Self {
+        let mut heap = Self {
             trace_infos: TraceInfos::new(),
             no_gc_count: 0,
             memory: None,
@@ -409,7 +486,121 @@ impl CopyingHeap {
             idle_extern_ref_set_head: None,
             null_guard,
             null_guard_protected: false,
-        })
+            nursery_end,
+            old_bump: 0,
+            old_end: 0,
+            minor_requested: false,
+            grew: false,
+            collecting_minor: false,
+            last_minor: false,
+            direct_old: Vec::new(),
+            remembered: Box::default(),
+            young_extern_ref_set_head: None,
+        };
+        if nursery_end != 0 {
+            heap.resize_remembered(REMEMBERED_INITIAL)?;
+        }
+        Ok(heap)
+    }
+
+    /// Replaces the (empty) remembered-slot buffer by one of `capacity` slots.
+    fn resize_remembered(&mut self, capacity: usize) -> Result<()> {
+        let mut slots = Vec::new();
+        slots.try_reserve_exact(capacity)?;
+        slots.resize(capacity, 0);
+        self.remembered = slots.into_boxed_slice();
+        let inner = self.vmctx_data.inner.get_mut();
+        inner.remembered = self.remembered.as_mut_ptr() as usize;
+        inner.remembered_cap = u32::try_from(capacity).unwrap();
+        inner.remembered_len = 0;
+        inner.remembered_overflow = 0;
+        Ok(())
+    }
+
+    /// Records that the old-space slot at heap index `slot` holds a nursery
+    /// reference, as a write barrier does.
+    fn remember_slot(&mut self, slot: u32) {
+        let inner = self.vmctx_data.inner.get_mut();
+        let len = usize::try_from(inner.remembered_len).unwrap();
+        if len < self.remembered.len() {
+            self.remembered[len] = slot;
+            inner.remembered_len += 1;
+        } else {
+            inner.remembered_overflow = 1;
+        }
+    }
+
+    /// Whether `index` is a nursery object's index.
+    fn is_young(&self, index: u32) -> bool {
+        index < self.nursery_end
+    }
+
+    /// The first index the nursery allocates: past the null guard, and never 0.
+    fn nursery_start(&self) -> u32 {
+        self.null_guard.max(ALIGN)
+    }
+
+    /// The end of the nursery's backed bytes.
+    fn nursery_limit(&self) -> u32 {
+        self.nursery_end.min(self.capacity())
+    }
+
+    /// The nursery's size.
+    fn nursery_capacity(&self) -> u32 {
+        self.nursery_limit().saturating_sub(self.nursery_start())
+    }
+
+    /// Bytes not yet allocated in the active old semi-space.
+    fn old_free(&self) -> u32 {
+        self.active_space_end() - self.bump_ptr()
+    }
+
+    /// The end of the part of the nursery the mutator may fill. Its size
+    /// never exceeds the old space's free bytes, so that a minor collection
+    /// can promote everything in it and a full one can copy the old space's
+    /// objects and everything in it into the other semi-space.
+    fn nursery_window_end(&self) -> u32 {
+        self.nursery_start() + self.nursery_capacity().min(self.old_free())
+    }
+
+    /// After either collection: the nursery is empty, and with it every
+    /// old-to-young edge the barriers recorded.
+    fn finish_young_generation(&mut self) -> Result<()> {
+        self.last_minor = self.collecting_minor;
+        self.collecting_minor = false;
+        self.minor_requested = false;
+        self.grew = false;
+        self.direct_old.clear();
+        if self.nursery_end == 0 {
+            return Ok(());
+        }
+        if cfg!(gc_zeal) {
+            let start = usize::try_from(self.nursery_start()).unwrap();
+            let end = usize::try_from(self.vmctx_data.bump_ptr()).unwrap();
+            self.heap_slice_mut()[start..end].fill(POISON);
+        }
+        self.reset_nursery();
+        let inner = self.vmctx_data.inner.get_mut();
+        let overflowed = inner.remembered_overflow != 0;
+        inner.remembered_len = 0;
+        inner.remembered_overflow = 0;
+        if overflowed && self.remembered.len() < REMEMBERED_MAX {
+            // Reallocation failure only keeps the smaller buffer.
+            let _ = self.resize_remembered((self.remembered.len() * 2).min(REMEMBERED_MAX));
+        }
+        Ok(())
+    }
+
+    /// Empties the nursery and publishes it as the mutator's allocation window.
+    fn reset_nursery(&mut self) {
+        if self.nursery_end == 0 {
+            return;
+        }
+        let start = self.nursery_start();
+        let end = self.nursery_window_end();
+        self.vmctx_data.set_bump_ptr(start);
+        self.vmctx_data.set_active_space_end(end);
+        self.young_extern_ref_set_head = None;
     }
 
     /// Makes the first `null_guard` bytes of the memory inaccessible, once
@@ -433,21 +624,33 @@ impl CopyingHeap {
         Ok(true)
     }
 
-
+    /// The active old semi-space's allocation pointer.
     fn bump_ptr(&self) -> u32 {
-        self.vmctx_data.bump_ptr()
+        if self.nursery_end == 0 {
+            self.vmctx_data.bump_ptr()
+        } else {
+            self.old_bump
+        }
     }
 
     fn set_bump_ptr(&mut self, val: u32) {
-        self.vmctx_data.set_bump_ptr(val);
+        if self.nursery_end == 0 {
+            self.vmctx_data.set_bump_ptr(val);
+        } else {
+            self.old_bump = val;
+        }
     }
 
+    /// The end of the active old semi-space.
     fn active_space_end(&self) -> u32 {
-        self.vmctx_data.active_space_end()
+        self.old_end
     }
 
     fn set_active_space_end(&mut self, val: u32) {
-        self.vmctx_data.set_active_space_end(val);
+        self.old_end = val;
+        if self.nursery_end == 0 {
+            self.vmctx_data.set_active_space_end(val);
+        }
     }
 
     fn capacity(&self) -> u32 {
@@ -465,6 +668,7 @@ impl CopyingHeap {
 
         self.resize_semi_spaces();
         self.reset_bump_ptr();
+        self.reset_nursery();
     }
 
     fn resize_semi_spaces(&mut self) {
@@ -482,11 +686,11 @@ impl CopyingHeap {
             return;
         }
 
-        // The null guard at the start of the heap belongs to neither
-        // semi-space: they split the rest equally. (Both multiples of
+        // The null guard and the nursery at the start of the heap belong to
+        // neither semi-space: they split the rest equally. (Both multiples of
         // `2 * ALIGN`, so each half is a multiple of `ALIGN`.)
         let capacity = self.capacity();
-        let floor = self.null_guard.min(capacity);
+        let floor = self.null_guard.max(self.nursery_end).min(capacity);
         let halfway = floor + (capacity - floor) / 2;
 
         debug_assert!(self.bump_ptr() <= halfway);
@@ -521,10 +725,13 @@ impl CopyingHeap {
         // spaces are always equally sized, which is required to guarantee that
         // evacuating objects from one to the other will succeed.
         //
-        // A null guard already keeps the first semi-space away from index 0,
-        // so then neither skips.
+        // A null guard or a nursery already keeps the first semi-space away
+        // from index 0, so then neither skips.
         let mut bp = self.active_space_start;
-        if self.null_guard == 0 && self.active_space_end() - self.active_space_start >= ALIGN {
+        if self.null_guard == 0
+            && self.nursery_end == 0
+            && self.active_space_end() - self.active_space_start >= ALIGN
+        {
             bp += ALIGN;
         }
         self.set_bump_ptr(bp);
@@ -554,6 +761,42 @@ impl CopyingHeap {
         Some(result)
     }
 
+    /// The mutator's allocation when there is a nursery. Objects up to a
+    /// quarter of the nursery bump it. Larger ones, and the one retried right
+    /// after the heap grew (the store then collects no more before it), go
+    /// to the old space and are remembered whole until the next collection.
+    fn allocate_with_nursery(&mut self, size: u32) -> Option<u32> {
+        let capacity = self.nursery_capacity();
+        let window_end = self.vmctx_data.active_space_end();
+        let large = size > capacity / 4;
+        if !large && !self.grew {
+            let bump = self.vmctx_data.bump_ptr();
+            if let Some(end) = bump.checked_add(size)
+                && end <= window_end
+            {
+                self.vmctx_data.set_bump_ptr(end);
+                return Some(bump);
+            }
+            // The nursery is full. With room in the old space for a whole
+            // nursery, a minor collection follows. Otherwise the failure
+            // reaches the old space's own collect-or-grow policy, as an old
+            // allocation that failed would.
+            self.minor_requested = self.old_free() >= capacity;
+            return None;
+        }
+        // Keep room in the old space for everything the nursery's window
+        // may hold.
+        let window = window_end.saturating_sub(self.nursery_start());
+        if self.old_free() < size.checked_add(window)? {
+            return None;
+        }
+        self.direct_old.try_reserve(1).ok()?;
+        let index = self.allocate(size)?;
+        self.grew = false;
+        self.direct_old.push(index);
+        Some(index)
+    }
+
     /// Check whether an index is within the active semi-space.
     fn is_in_active_space(&self, index: u32) -> bool {
         index >= self.active_space_start && index < self.active_space_end()
@@ -562,6 +805,13 @@ impl CopyingHeap {
     /// Check whether an index is within the idle semi-space.
     fn is_in_idle_space(&self, index: u32) -> bool {
         index >= self.idle_space_start && index < self.idle_space_end
+    }
+
+    /// Whether the collection in progress moves the object at `index`: one
+    /// in the nursery, and for a full collection one in the idle semi-space
+    /// it evacuates too. A minor collection leaves old objects in place.
+    fn is_in_from_space(&self, index: u32) -> bool {
+        self.is_young(index) || (!self.collecting_minor && self.is_in_idle_space(index))
     }
 
     /// Swap the active and idle semi-spaces.
@@ -644,7 +894,7 @@ impl CopyingHeap {
     /// semi-space.
     fn forward(&mut self, from_ref: &VMGcRef, marking: &mut EphemeronMarking) -> Result<VMGcRef> {
         debug_assert!(!from_ref.is_i31());
-        debug_assert!(self.is_in_idle_space(from_ref.heap_index()?.get()));
+        debug_assert!(self.is_in_from_space(from_ref.heap_index()?.get()));
 
         if let Some(to_ref) = self
             .index(header_and_forwarding_ref(from_ref))?
@@ -660,7 +910,7 @@ impl CopyingHeap {
     fn copy(&mut self, from_ref: &VMGcRef, marking: &mut EphemeronMarking) -> Result<VMGcRef> {
         debug_assert!(!from_ref.is_i31());
         let from_index = from_ref.heap_index()?.get();
-        debug_assert!(self.is_in_idle_space(from_index));
+        debug_assert!(self.is_in_from_space(from_index));
         debug_assert!(!self.index(copying_ref(from_ref))?.copied());
 
         let size = self.index(copying_ref(from_ref))?.object_size();
@@ -810,8 +1060,8 @@ survived collection, since the active space is the same size as the idle space",
 
         if let Some(child) = VMGcRef::from_raw_u32(raw)
             && !child.is_i31()
+            && self.is_in_from_space(child.heap_index()?.get())
         {
-            debug_assert!(self.is_in_idle_space(child.heap_index()?.get()));
             let new_ref = self.forward(&child, marking)?;
             debug_assert!(self.is_in_active_space(new_ref.heap_index()?.get()));
             // Write the new reference back.
@@ -854,6 +1104,13 @@ unsafe impl GcHeap for CopyingHeap {
 
         self.set_bump_ptr(0);
         self.set_active_space_end(0);
+        self.vmctx_data.set_bump_ptr(0);
+        self.vmctx_data.set_active_space_end(0);
+        {
+            let inner = self.vmctx_data.inner.get_mut();
+            inner.remembered_len = 0;
+            inner.remembered_overflow = 0;
+        }
         // The next Store publishes its own table.
         self.vmctx_data.set_func_refs(crate::vm::FuncRefTableView { base: 0, len: 0 });
 
@@ -881,8 +1138,26 @@ unsafe impl GcHeap for CopyingHeap {
             trace_infos,
             null_guard: _,
             null_guard_protected: _,
+            nursery_end: _,
+            old_bump,
+            old_end,
+            minor_requested,
+            grew,
+            collecting_minor,
+            last_minor,
+            direct_old,
+            remembered: _,
+            young_extern_ref_set_head,
         } = self;
 
+        *old_bump = 0;
+        *old_end = 0;
+        *minor_requested = false;
+        *grew = false;
+        *collecting_minor = false;
+        *last_minor = false;
+        direct_old.clear();
+        *young_extern_ref_set_head = None;
         *no_gc_count = 0;
         *vmmemory = None;
         *active_space_start = 0;
@@ -964,13 +1239,23 @@ unsafe impl GcHeap for CopyingHeap {
             Err(n) => return Ok(Err(n)),
             Ok(gc_ref) => gc_ref,
         };
-        // Take the old list head before borrowing self mutably through index_mut.
-        let old_head = self.active_extern_ref_set_head.take();
+        // Take the old list head before borrowing self mutably through
+        // index_mut. A nursery externref joins the nursery's list.
+        let young = self.is_young(gc_ref.heap_index()?.get());
+        let old_head = if young {
+            self.young_extern_ref_set_head.take()
+        } else {
+            self.active_extern_ref_set_head.take()
+        };
         let externref_obj = self.index_mut::<VMCopyingExternRef>(gc_ref.as_typed_unchecked())?;
         externref_obj.host_data = host_data;
         externref_obj.next_extern_ref = old_head;
         let externref = gc_ref.into_externref_unchecked();
-        self.active_extern_ref_set_head = Some(externref.unchecked_copy());
+        if young {
+            self.young_extern_ref_set_head = Some(externref.unchecked_copy());
+        } else {
+            self.active_extern_ref_set_head = Some(externref.unchecked_copy());
+        }
         Ok(Ok(externref))
     }
 
@@ -1032,7 +1317,12 @@ unsafe impl GcHeap for CopyingHeap {
             .checked_next_multiple_of(ALIGN)
             .ok_or_else(|| crate::Trap::AllocationTooLarge)?;
 
-        let gc_ref = match self.allocate(size) {
+        let index = if self.nursery_end == 0 {
+            self.allocate(size)
+        } else {
+            self.allocate_with_nursery(size)
+        };
+        let gc_ref = match index {
             None => {
                 // Multiply by two because we need capacity in both semi-spaces.
                 let bytes_needed = u64::try_from(layout.size()).unwrap().saturating_mul(2);
@@ -1135,6 +1425,10 @@ unsafe impl GcHeap for CopyingHeap {
         bytes_needed: u64,
         last_post_gc_allocated_bytes: usize,
     ) -> bool {
+        // A full nursery whose objects all fit the old space is collected.
+        if self.minor_requested {
+            return true;
+        }
         let capacity = usize::try_from(self.active_space_end() - self.active_space_start).unwrap();
 
         // Only the active semi-space can satisfy allocations. Wait for a
@@ -1162,6 +1456,10 @@ unsafe impl GcHeap for CopyingHeap {
         'b: 'a,
     {
         assert_eq!(self.no_gc_count, 0, "Cannot GC inside a no-GC scope!");
+        // Only a full nursery asks for a minor collection, and only while the
+        // old space can take everything in it; any other collection, explicit
+        // ones included, is full.
+        self.collecting_minor = self.nursery_end != 0 && self.minor_requested;
         Box::new(CopyingCollection {
             roots: Some(roots),
             trace_state,
@@ -1203,6 +1501,15 @@ unsafe impl GcHeap for CopyingHeap {
             // Otherwise the memory was grown: try to resize the semi-spaces
             // accordingly.
             self.resize_semi_spaces();
+            if self.nursery_end != 0 {
+                // More of the nursery may be backed, and the old space may
+                // have grown; the window only widens.
+                let end = self
+                    .nursery_window_end()
+                    .max(self.vmctx_data.active_space_end());
+                self.vmctx_data.set_active_space_end(end);
+                self.grew |= delta_bytes_grown > 0;
+            }
         }
 
         // Poison the newly-grown region.
@@ -1222,6 +1529,25 @@ unsafe impl GcHeap for CopyingHeap {
             matches!(protected, Ok(true)),
             "protecting the GC heap's null guard after growth: {protected:?}"
         );
+    }
+
+    fn last_collection_was_minor(&self) -> bool {
+        self.last_minor
+    }
+
+    fn write_barrier(&mut self, object: &VMGcRef, offset: u32, value: Option<&VMGcRef>) {
+        if self.nursery_end == 0 || object.is_i31() {
+            return;
+        }
+        let Some(value) = value.filter(|v| !v.is_i31()) else {
+            return;
+        };
+        let (Ok(object), Ok(value)) = (object.heap_index(), value.heap_index()) else {
+            return;
+        };
+        if !self.is_young(object.get()) && self.is_young(value.get()) {
+            self.remember_slot(object.get() + offset);
+        }
     }
 
     fn protect_null_guard(&mut self) -> Result<()> {
@@ -1284,11 +1610,62 @@ impl CopyingCollection<'_, '_> {
                 continue;
             }
             let old_index = gc_ref.heap_index()?.get();
-            debug_assert!(self.heap.is_in_idle_space(old_index));
+            if !self.heap.is_in_from_space(old_index) {
+                // An old object, which a minor collection leaves in place.
+                debug_assert!(self.heap.collecting_minor);
+                continue;
+            }
             let new_ref = self.heap.forward(&gc_ref, &mut self.marking)?;
             root.set(new_ref);
         }
         log::trace!("End processing GC roots");
+        Ok(())
+    }
+
+    /// The minor collection's other roots: old-space slots the write barriers
+    /// recorded, objects allocated directly old since the last collection,
+    /// and, when the recorded slots overflowed, every old object.
+    fn process_remembered(&mut self, old_end: u32) -> Result<()> {
+        let mut trace_infos = mem::take(&mut self.heap.trace_infos);
+        let inner = self.heap.vmctx_data.inner.get_mut();
+        let len = usize::try_from(inner.remembered_len)?;
+        let overflowed = inner.remembered_overflow != 0;
+        if len > self.heap.remembered.len() {
+            bail_bug!("remembered slot count exceeds the buffer");
+        }
+        if overflowed {
+            // Old objects are contiguous from the space's first object.
+            let mut index = self.heap.active_space_start;
+            while index < old_end {
+                let Some(object) = NonZeroU32::new(index).and_then(VMGcRef::from_heap_index)
+                else {
+                    bail_bug!("corrupt old space walk");
+                };
+                let size = self.heap.index(copying_ref(&object))?.object_size();
+                if size == 0 {
+                    bail_bug!("zero-sized object in old space");
+                }
+                self.heap
+                    .scan(&object, &mut trace_infos, self.trace_state, &mut self.marking)?;
+                index += size;
+            }
+        } else {
+            for i in 0..len {
+                let slot = self.heap.remembered[i];
+                let start = usize::try_from(slot)?;
+                self.heap.scan_field(start, 0, &mut self.marking)?;
+            }
+            for i in 0..self.heap.direct_old.len() {
+                let index = self.heap.direct_old[i];
+                let Some(object) = NonZeroU32::new(index).and_then(VMGcRef::from_heap_index)
+                else {
+                    bail_bug!("corrupt direct-old index");
+                };
+                self.heap
+                    .scan(&object, &mut trace_infos, self.trace_state, &mut self.marking)?;
+            }
+        }
+        self.heap.trace_infos = trace_infos;
         Ok(())
     }
 
@@ -1307,12 +1684,25 @@ impl CopyingCollection<'_, '_> {
 
         // Complete every allocation and the checked cache epoch change before
         // moving any object. Collection-local indices do not retain referents.
-        self.marking = EphemeronMarking::new(self.trace_state.weak_gc)?;
-        self.trace_state.weak_gc.advance_epoch()?;
-        self.heap.flip();
-        self.heap.initialize_worklist();
-
-        self.process_roots()?;
+        if self.heap.collecting_minor {
+            // Old owners and keys are live for a minor collection.
+            let nursery_end = self.heap.nursery_end;
+            self.marking =
+                EphemeronMarking::new(self.trace_state.weak_gc, |raw| raw >= nursery_end)?;
+            self.trace_state.weak_gc.advance_epoch()?;
+            // Promoted objects are copied after the old space's objects and
+            // scanned from there.
+            let old_end = self.heap.bump_ptr();
+            self.heap.initialize_worklist();
+            self.process_roots()?;
+            self.process_remembered(old_end)?;
+        } else {
+            self.marking = EphemeronMarking::new(self.trace_state.weak_gc, |_| false)?;
+            self.trace_state.weak_gc.advance_epoch()?;
+            self.heap.flip();
+            self.heap.initialize_worklist();
+            self.process_roots()?;
+        }
 
         self.phase = CopyingCollectionPhase::ProcessWorklist;
         Ok(GcProgress::Continue)
@@ -1358,10 +1748,22 @@ impl CopyingCollection<'_, '_> {
     /// linked list and deallocating host data for any that were not forwarded.
     fn sweep_extern_refs(&mut self) -> Result<()> {
         log::trace!("Begin sweeping `externref`s");
-        let mut link = self.heap.idle_extern_ref_set_head.take();
+        let young = self.heap.young_extern_ref_set_head.take();
+        self.sweep_extern_ref_list(young)?;
+        if !self.heap.collecting_minor {
+            let old = self.heap.idle_extern_ref_set_head.take();
+            self.sweep_extern_ref_list(old)?;
+        }
+        log::trace!("End sweeping `externref`s");
+        Ok(())
+    }
+
+    /// Deallocates the host data of every uncopied `externref` on a list of
+    /// evacuated ones.
+    fn sweep_extern_ref_list(&mut self, mut link: Option<VMExternRef>) -> Result<()> {
         while let Some(externref) = link {
             let gc_ref = externref.as_gc_ref();
-            debug_assert!(self.heap.is_in_idle_space(gc_ref.heap_index()?.get()));
+            debug_assert!(self.heap.is_in_from_space(gc_ref.heap_index()?.get()));
             let header = self.heap.index(copying_ref(gc_ref))?;
             if !header.copied() {
                 let typed: &TypedGcRef<VMCopyingExternRef> = gc_ref.as_typed_unchecked();
@@ -1375,7 +1777,6 @@ impl CopyingCollection<'_, '_> {
                 .as_ref()
                 .map(|e| e.unchecked_copy());
         }
-        log::trace!("End sweeping `externref`s");
         Ok(())
     }
 
@@ -1393,6 +1794,12 @@ impl CopyingCollection<'_, '_> {
         );
 
         self.sweep_extern_refs()?;
+        if self.heap.collecting_minor {
+            self.heap.finish_young_generation()?;
+            log::trace!("End minor copying collection");
+            self.phase = CopyingCollectionPhase::Done;
+            return Ok(GcProgress::Complete);
+        }
         self.heap.resize_semi_spaces();
 
         debug_assert_eq!(
@@ -1421,6 +1828,8 @@ impl CopyingCollection<'_, '_> {
                 }
             }
         }
+        // With the semi-spaces final, the nursery's window can be sized.
+        self.heap.finish_young_generation()?;
 
         log::trace!("End copying collection");
         self.phase = CopyingCollectionPhase::Done;
@@ -1579,6 +1988,37 @@ mod tests {
             copying_heap_data::func_refs(core::mem::size_of::<usize>() as u32) as usize,
             core::mem::offset_of!(VMCopyingHeapDataInner, func_refs),
         );
+        let pointer = core::mem::size_of::<usize>() as u32;
+        assert_eq!(
+            copying_heap_data::remembered_len(pointer) as usize,
+            core::mem::offset_of!(VMCopyingHeapDataInner, remembered_len),
+        );
+        assert_eq!(
+            copying_heap_data::remembered_cap(pointer) as usize,
+            core::mem::offset_of!(VMCopyingHeapDataInner, remembered_cap),
+        );
+        assert_eq!(
+            copying_heap_data::remembered_overflow(pointer) as usize,
+            core::mem::offset_of!(VMCopyingHeapDataInner, remembered_overflow),
+        );
+        assert_eq!(
+            copying_heap_data::remembered(pointer) as usize,
+            core::mem::offset_of!(VMCopyingHeapDataInner, remembered),
+        );
+    }
+
+    #[cfg(feature = "cranelift")]
+    #[test]
+    fn compiled_code_and_runtime_agree_on_the_nursery() {
+        for size in [0, 64 << 10, 1 << 20, 2 << 20, 16 << 20, 64 << 20, 1 << 32] {
+            assert_eq!(
+                super::nursery_end_for_initial_size(size),
+                wasmtime_cranelift::copying_heap_data::nursery_end(size),
+                "{size}"
+            );
+        }
+        assert_eq!(super::nursery_end_for_initial_size(16 << 20), 2 << 20);
+        assert_eq!(super::nursery_end_for_initial_size(1 << 20), 0);
     }
 
     #[test]
@@ -1619,7 +2059,7 @@ mod tests {
 
     #[test]
     fn allocation_growth_policy_uses_active_space_and_allocation_bytes() {
-        let mut heap = CopyingHeap::new(0).unwrap();
+        let mut heap = CopyingHeap::new(0, 0).unwrap();
         assert!(!heap.should_collect_before_growth(0, 0));
         assert!(!heap.should_collect_before_growth(32, 0));
 
@@ -2025,5 +2465,265 @@ mod global_root_tests {
             store.gc(None).unwrap();
             assert_eq!(read.call(&mut store, ()).unwrap(), 20 + 11 + 3 + 9);
         }
+    }
+}
+
+#[cfg(all(
+    test,
+    feature = "std",
+    feature = "cranelift",
+    feature = "wat",
+    not(miri),
+    not(gc_zeal)
+))]
+mod generational_tests {
+    use crate::prelude::*;
+    use crate::{
+        AsContext, Collector, Config, Engine, Instance, Module, RootScope, Store, StructRef,
+        StructRefPre, Val, WeakAnyRef,
+    };
+
+    /// A 2 MiB initial heap: a 256 KiB nursery and two 896 KiB semi-spaces.
+    fn engine(initial: u64) -> Engine {
+        let mut config = Config::new();
+        config
+            .wasm_gc(true)
+            .wasm_function_references(true)
+            .collector(Collector::Copying)
+            .gc_heap_initial_size(initial);
+        Engine::new(&config).unwrap()
+    }
+
+    const WAT: &str = r#"
+        (module
+          (type $s (struct (field (mut anyref)) (field (mut i32))))
+          (type $a (array (mut anyref)))
+          (elem $e anyref (item (ref.i31 (i32.const 5))))
+          (global $old (mut (ref null $s)) (ref.null $s))
+          (global $arr (mut (ref null $a)) (ref.null $a))
+          (global $big (mut (ref null $a)) (ref.null $a))
+          (func (export "make_old") (param i32)
+            (global.set $old (struct.new $s (ref.null any) (i32.const 0)))
+            (global.set $arr (array.new_default $a (local.get 0))))
+          ;; Allocate about 4 MiB of garbage: many minor collections.
+          (func (export "churn")
+            (local i32)
+            (loop $l
+              (drop (struct.new $s (ref.null any) (local.get 0)))
+              (local.set 0 (i32.add (local.get 0) (i32.const 1)))
+              (br_if $l (i32.lt_u (local.get 0) (i32.const 200000)))))
+          (func $child (param i32) (result (ref $s))
+            (struct.new $s (ref.null any) (local.get 0)))
+          (func (export "struct_set") (param i32)
+            (struct.set $s 0 (global.get $old) (call $child (local.get 0))))
+          (func (export "struct_read") (result i32)
+            (struct.get $s 1
+              (ref.cast (ref $s) (struct.get $s 0 (global.get $old)))))
+          (func (export "array_set_all") (param i32)
+            (local $i i32)
+            (loop $l
+              (array.set $a (global.get $arr) (local.get $i)
+                (call $child (i32.add (local.get 0) (local.get $i))))
+              (local.set $i (i32.add (local.get $i) (i32.const 1)))
+              (br_if $l (i32.lt_u (local.get $i) (array.len (global.get $arr))))))
+          (func (export "array_fill") (param i32)
+            (array.fill $a (global.get $arr) (i32.const 0) (call $child (local.get 0))
+              (array.len (global.get $arr))))
+          (func (export "array_copy") (param i32)
+            (local $src (ref $a))
+            (local.set $src (array.new $a (call $child (local.get 0))
+              (array.len (global.get $arr))))
+            (array.copy $a $a (global.get $arr) (i32.const 0) (local.get $src) (i32.const 0)
+              (array.len (global.get $arr))))
+          (func (export "array_init_elem")
+            (array.init_elem $a $e (global.get $arr) (i32.const 0) (i32.const 0) (i32.const 1)))
+          (func (export "array_sum") (result i32)
+            (local $i i32) (local $sum i32)
+            (loop $l
+              (local.set $sum (i32.add (local.get $sum)
+                (struct.get $s 1 (ref.cast (ref $s)
+                  (array.get $a (global.get $arr) (local.get $i))))))
+              (local.set $i (i32.add (local.get $i) (i32.const 1)))
+              (br_if $l (i32.lt_u (local.get $i) (array.len (global.get $arr)))))
+            (local.get $sum))
+          (func (export "array_first_i31") (result i32)
+            (i31.get_s (ref.cast (ref i31) (array.get $a (global.get $arr) (i32.const 0)))))
+          ;; A large array is allocated in the old space and initialized
+          ;; there without barriers.
+          (func (export "make_big") (param i32) (param i32)
+            (global.set $big (array.new $a (call $child (local.get 1)) (local.get 0))))
+          (func (export "big_sum") (result i32)
+            (local $i i32) (local $sum i32)
+            (loop $l
+              (local.set $sum (i32.add (local.get $sum)
+                (struct.get $s 1 (ref.cast (ref $s)
+                  (array.get $a (global.get $big) (local.get $i))))))
+              (local.set $i (i32.add (local.get $i) (i32.const 1)))
+              (br_if $l (i32.lt_u (local.get $i) (array.len (global.get $big)))))
+            (local.get $sum))
+          (func (export "old") (result (ref null $s)) (global.get $old))
+        )
+    "#;
+
+    struct Fixture {
+        store: Store<()>,
+        instance: Instance,
+    }
+
+    impl Fixture {
+        fn new(initial: u64) -> Self {
+            let engine = engine(initial);
+            let module = Module::new(&engine, WAT).unwrap();
+            let mut store = Store::new(&engine, ());
+            let instance = Instance::new(&mut store, &module, &[]).unwrap();
+            Fixture { store, instance }
+        }
+
+        fn call(&mut self, name: &str, args: &[Val], results: usize) -> Vec<Val> {
+            let mut out = vec![Val::I32(0); results];
+            self.instance
+                .get_func(&mut self.store, name)
+                .unwrap()
+                .call(&mut self.store, args, &mut out)
+                .unwrap();
+            out
+        }
+
+        fn i32(&mut self, name: &str) -> i32 {
+            self.call(name, &[], 1)[0].unwrap_i32()
+        }
+
+        /// Collects garbage until a minor collection has run.
+        fn churn(&mut self) {
+            self.call("churn", &[], 0);
+            assert!(self.last_minor(), "churn should end in minor collections");
+        }
+
+        fn last_minor(&mut self) -> bool {
+            self.store
+                .as_context()
+                .0
+                .optional_gc_store()
+                .unwrap()
+                .gc_heap
+                .last_collection_was_minor()
+        }
+    }
+
+    #[test]
+    fn the_nursery_is_an_eighth_of_the_initial_heap() {
+        assert_eq!(super::nursery_end(engine(2 << 20).tunables()), 256 << 10);
+        assert_eq!(super::nursery_end(engine(16 << 20).tunables()), 2 << 20);
+        assert_eq!(super::nursery_end(engine(1 << 20).tunables()), 0);
+    }
+
+    #[test]
+    fn old_to_young_stores_survive_minor_collections() {
+        let mut f = Fixture::new(2 << 20);
+        f.call("make_old", &[Val::I32(64)], 0);
+        f.churn();
+        // Compiled struct.set into an old object.
+        f.call("struct_set", &[Val::I32(7)], 0);
+        f.churn();
+        assert_eq!(f.i32("struct_read"), 7);
+        // Compiled array.set into an old array.
+        f.call("array_set_all", &[Val::I32(100)], 0);
+        f.churn();
+        assert_eq!(f.i32("array_sum"), (100..164).sum::<i32>());
+        // array.fill, array.copy and array.init_elem into an old array.
+        f.call("array_fill", &[Val::I32(3)], 0);
+        f.churn();
+        assert_eq!(f.i32("array_sum"), 3 * 64);
+        f.call("array_copy", &[Val::I32(2)], 0);
+        f.churn();
+        assert_eq!(f.i32("array_sum"), 2 * 64);
+        f.call("array_init_elem", &[], 0);
+        f.churn();
+        assert_eq!(f.i32("array_first_i31"), 5);
+    }
+
+    /// The young value's struct type, from the old object.
+    fn young_struct(
+        scope: &mut RootScope<&mut Store<()>>,
+        like: &crate::Rooted<StructRef>,
+        value: i32,
+    ) -> crate::Rooted<StructRef> {
+        let ty = like.ty(&*scope).unwrap();
+        let pre = StructRefPre::new(&mut *scope, ty);
+        StructRef::new(&mut *scope, &pre, &[Val::AnyRef(None), Val::I32(value)]).unwrap()
+    }
+
+    #[test]
+    fn host_stores_into_old_objects_survive_minor_collections() {
+        let mut f = Fixture::new(2 << 20);
+        f.call("make_old", &[Val::I32(4)], 0);
+        f.churn();
+        let old = f.call("old", &[], 1).remove(0);
+        {
+            let mut scope = RootScope::new(&mut f.store);
+            let old = old.unwrap_anyref().unwrap().unwrap_struct(&scope).unwrap();
+            let young = young_struct(&mut scope, &old, 9);
+            old.set_field(&mut scope, 0, Val::AnyRef(Some(young.to_anyref())))
+                .unwrap();
+        }
+        f.churn();
+        assert_eq!(f.i32("struct_read"), 9);
+    }
+
+    #[test]
+    fn an_overflowing_remembered_buffer_scans_the_old_space() {
+        // More old-to-young stores than the buffer's 4096 slots.
+        let mut f = Fixture::new(4 << 20);
+        f.call("make_old", &[Val::I32(10_000)], 0);
+        f.churn();
+        f.call("array_set_all", &[Val::I32(1)], 0);
+        f.churn();
+        assert_eq!(f.i32("array_sum"), (1..10_001).sum::<i32>());
+    }
+
+    #[test]
+    fn large_objects_allocated_old_keep_their_young_initializers() {
+        let mut f = Fixture::new(2 << 20);
+        f.call("make_old", &[Val::I32(1)], 0);
+        // 64 Ki elements of 4 bytes: larger than a quarter of the nursery.
+        f.call("make_big", &[Val::I32(65_536), Val::I32(1)], 0);
+        f.churn();
+        assert_eq!(f.i32("big_sum"), 65_536);
+    }
+
+    #[test]
+    fn weak_references_follow_young_targets_through_minor_collections() {
+        let mut f = Fixture::new(2 << 20);
+        f.call("make_old", &[Val::I32(1)], 0);
+        f.churn();
+        let old = f.call("old", &[], 1).remove(0);
+        let (weak_dead, weak_kept) = {
+            let mut scope = RootScope::new(&mut f.store);
+            let owner = *old.unwrap_anyref().unwrap();
+            let old = owner.unwrap_struct(&scope).unwrap();
+            let dead = young_struct(&mut scope, &old, 1).to_anyref();
+            let kept = young_struct(&mut scope, &old, 2).to_anyref();
+            // Only the old owner reaches `kept`.
+            old.set_field(&mut scope, 0, Val::AnyRef(Some(kept))).unwrap();
+            (
+                WeakAnyRef::new(&mut scope, &owner, &dead).unwrap(),
+                WeakAnyRef::new(&mut scope, &owner, &kept).unwrap(),
+            )
+        };
+        f.churn();
+        assert!(weak_dead.upgrade(&mut f.store).unwrap().is_none());
+        let mut scope = RootScope::new(&mut f.store);
+        let kept = weak_kept.upgrade(&mut scope).unwrap().unwrap();
+        let kept = kept.unwrap_struct(&scope).unwrap();
+        assert_eq!(kept.field(&mut scope, 1).unwrap().unwrap_i32(), 2);
+    }
+
+    #[test]
+    fn a_module_compiled_for_another_nursery_is_rejected() {
+        let small = engine(2 << 20);
+        let large = engine(4 << 20);
+        let bytes = Module::new(&small, WAT).unwrap().serialize().unwrap();
+        let error = unsafe { Module::deserialize(&large, &bytes) }.unwrap_err();
+        assert!(format!("{error:?}").contains("GC heap initial size"), "{error:?}");
     }
 }
