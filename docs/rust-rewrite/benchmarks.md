@@ -378,6 +378,7 @@ They do not refresh the published panel.
 | Inline interned funcref reads, plain references and cached embedding bridges (ABI 69), on the row above | 6.61M | 7.20M |
 | [Identifier cells, truncation and single casts](#identifier-cells-truncation-and-single-casts-2026-11-13) (ABI 69), on the row above | 6.44M | 7.02M |
 | [GC access code](#gc-access-code-2026-11-14): implicit null checks, wrapping element offsets (ABI 69), on the row above | 5.11M | 5.59M |
+| [Captured cells without import links](#request-census-and-import-free-cells-2026-11-14) (ABI 69), on the row above | 5.09M | 5.57M |
 | Node 24 `--jitless` | 4.38M | — |
 | Node 24 with its JIT | 2.62M | — |
 
@@ -986,6 +987,49 @@ request (medians; means 5.60M and 6.24M, the difference being collections),
 with exact Flight output. Median cycles on the same loaded machine were 2.57M
 sync and 3.01M async.
 
+
+### Request census and import-free cells (2026-11-14)
+
+Counted on the combined source `62b358212` (ABI 69) with a frame-pointer
+profile of 200 retained sync requests, one `cycles:u` sample per 25,000
+cycles (40,140 samples; the shares match the coarser profile).
+
+The three largest JavaScript bodies, by the kind of native instruction their
+leaf samples land on (cycle-weighted, so a stalled load's cost often shows on
+the instruction after it):
+
+| Body (own share) | Stack reloads | Spills | Compares | Register moves | Heap loads | Heap stores | Branches | ALU |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `vn` (12.1%) | 26% | 9% | 21% | 12% | 10% | 2% | 8% | 8% |
+| `ft` (6.2%) | 25% | 16% | 22% | 11% | 6% | 2% | 8% | 5% |
+| `f42` (4.3%) | 18% | 8% | 21% | 9% | 15% | 12% | 7% | 5% |
+
+A third of `vn`'s and four tenths of `ft`'s own cycles move values between
+registers and the stack: these bodies keep many values live across helper
+calls. Their native code is 543 KB (`vn`), 176 KB (`ft`) and 75 KB (`f42`).
+
+Read and `instanceof` helpers by calling site (the caller's return address):
+
+| Helper | Samples | Calling sites | Top sites |
+| --- | ---: | ---: | --- |
+| `cached_property_read` | 2,098 | 79 | two `f42` (createElement) sites 19%, `vn` six sites 23%, `jn`, `et`, `ft` one each 13% |
+| `cached_property_read_miss` | 149 | 15 | four `f304` sites 60%, `Ln` 21%, `C` 8% |
+| `object_read` | 2,020 | 71 | `f304`, `json_stringify_value`, `ft`, `or`, `rr`, `C`, `Array.prototype.splice` twice, `Ln` (each 3-8%) |
+| `instanceof_entry` | 1,277 | 37 | all in `vn`, 52 to 102 samples each |
+
+`vn` tests each value against 21 builtin constructors (`Date` twice, `Map`,
+`Set`, `FormData`, `Error`, `ArrayBuffer`, eleven typed arrays, `DataView`,
+`Blob`, `ReadableStream`); for a plain object or Array every test is false.
+P reads a cell's import TARGET 1,368 times statically (68 in `vn`).
+
+Module linking sets a cell's TARGET only for an import binding, so a source
+body of a program whose IR declares no import binding now reads its captured
+cells without that indirection (the RSC bundle exports but imports nothing).
+Instructions per request: sync 5.111M to 5.089M (median) and 5.597M to
+5.575M (mean), async 5.593M to 5.569M and 6.238M to 6.215M; P 4,793,590 to
+4,738,997 bytes. Cycles were not comparable (load average 24 during the run).
+Not counted yet: which property each read site names, and allocations per
+site.
 ### Descriptor work and physical allocation
 
 Compiler-created, already validated descriptors now call canonical ordinary/Array definition directly when admitted, retaining the exotic Reflect fallback. Known source accessor descriptors bypass the inline Array algorithm to control code growth. Public descriptor conversion and validation remain intact.
