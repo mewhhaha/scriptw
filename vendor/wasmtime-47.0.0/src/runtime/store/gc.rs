@@ -27,6 +27,12 @@ use wasmtime_environ::packed_option::ReservedValue;
 pub(crate) struct StoreGcData {
     gc_roots: RootSet,
     gc_roots_list: GcRootsList,
+    /// The reference-typed global definitions of the first
+    /// `global_roots_instances` instances: an instance's globals and their
+    /// addresses are fixed once it exists, so each collection reads this list
+    /// instead of every module's global types.
+    global_roots: crate::prelude::Vec<SendSyncPtr<vm::VMGlobalDefinition>>,
+    global_roots_instances: usize,
     // Types for which the embedder has created an allocator for.
     gc_host_alloc_types: StoreGcHostAllocTypes,
     /// Pending exception, if any. This is also a GC root, because it
@@ -837,8 +843,9 @@ impl StoreOpaque {
             global.trace_root(self, gc_roots_list);
         }
         // A module may define thousands of globals. Decide from each one's
-        // module-level type, without building a typed handle per global.
-        for id in self.instances.keys() {
+        // module-level type, once per instance, without building a typed
+        // handle per global.
+        for id in self.instances.keys().skip(self.gc_data.global_roots_instances) {
             let module = self.instance(id).env_module().clone();
             for (index, global) in module.globals.iter() {
                 let Some(index) = module.defined_global_index(index) else {
@@ -850,13 +857,17 @@ impl StoreOpaque {
                 if !ty.heap_type.is_vmgcref_type_and_not_i31() || ty.heap_type.is_bottom() {
                     continue;
                 }
-                let mut definition = self.instance(id).global_ptr(index);
-                // SAFETY: the definition belongs to a live instance of this
-                // store and holds a GC reference, per its type.
-                if let Some(gc_ref) = unsafe { definition.as_mut().as_gc_ref_mut() } {
-                    unsafe {
-                        gc_roots_list.add_vmgcref_root(gc_ref.into(), "Wasm global");
-                    }
+                let definition = self.instance(id).global_ptr(index);
+                self.gc_data.global_roots.push(SendSyncPtr::new(definition));
+            }
+            self.gc_data.global_roots_instances += 1;
+        }
+        for definition in &self.gc_data.global_roots {
+            // SAFETY: the definition belongs to a live instance of this store
+            // and holds a GC reference, per its type.
+            if let Some(gc_ref) = unsafe { (*definition.as_ptr()).as_gc_ref_mut() } {
+                unsafe {
+                    gc_roots_list.add_vmgcref_root(gc_ref.into(), "Wasm global");
                 }
             }
         }

@@ -72,14 +72,23 @@ impl VMGcHeader {
     }
 
     /// Get the kind of GC object that this is.
+    #[inline]
     pub fn kind(&self) -> VMGcKind {
         VMGcKind::from_high_bits_of_u32(self.kind)
+    }
+
+    /// Whether this header's kind bits match `kind`, as `kind().matches(kind)`
+    /// does, without validating the rest of the word.
+    #[inline]
+    pub fn raw_kind_matches(&self, kind: VMGcKind) -> bool {
+        (self.kind & kind.as_u32()) == kind.as_u32()
     }
 
     /// Get the reserved 26 bits in this header.
     ///
     /// These are bits are reserved for `GcRuntime` implementations to make use
     /// of however they see fit.
+    #[inline]
     pub fn reserved_u26(&self) -> u32 {
         self.kind & VMGcKind::UNUSED_MASK
     }
@@ -89,6 +98,7 @@ impl VMGcHeader {
     /// # Panics
     ///
     /// Panics if the given `value` has any of the upper 6 bits set.
+    #[inline]
     pub fn set_reserved_u26(&mut self, value: u32) {
         assert!(
             VMGcKind::value_fits_in_unused_bits(value),
@@ -105,6 +115,7 @@ impl VMGcHeader {
     ///
     /// The given `value` must only use the lower 26 bits; its upper 6 bits must
     /// be unset.
+    #[inline]
     pub unsafe fn unchecked_set_reserved_u26(&mut self, value: u32) {
         debug_assert_eq!(value & VMGcKind::MASK, 0);
         self.kind &= VMGcKind::MASK;
@@ -112,6 +123,7 @@ impl VMGcHeader {
     }
 
     /// Get this object's specific concrete type.
+    #[inline]
     pub fn ty(&self) -> Option<VMSharedTypeIndex> {
         if self.ty.is_reserved_value() {
             None
@@ -191,6 +203,7 @@ impl VMGcRef {
     /// The given index should point to a valid GC-managed object within this
     /// reference's associated heap. Failure to uphold this will be memory safe,
     /// but will lead to general failures such as panics or incorrect results.
+    #[inline]
     pub fn from_raw_u32(raw: u32) -> Option<Self> {
         Some(Self::from_raw_non_zero_u32(NonZeroU32::new(raw)?))
     }
@@ -203,6 +216,7 @@ impl VMGcRef {
     ///
     /// Returns `None` when the index is not 2-byte aligned and therefore
     /// conflicts with the `i31ref` discriminant.
+    #[inline]
     pub fn from_heap_index(index: NonZeroU32) -> Option<Self> {
         if (index.get() & Self::I31_REF_DISCRIMINANT) == 0 {
             Some(Self::from_raw_non_zero_u32(index))
@@ -214,6 +228,7 @@ impl VMGcRef {
     /// Create a new `VMGcRef` from the given raw value.
     ///
     /// Does not discriminate between indices into a GC heap and `i31ref`s.
+    #[inline]
     pub fn from_raw_non_zero_u32(raw: NonZeroU32) -> Self {
         VMGcRef(raw)
     }
@@ -235,6 +250,7 @@ impl VMGcRef {
     /// Failure to run GC barriers when they would otherwise be necessary can
     /// lead to leaks, panics, and wrong results. It cannot lead to memory
     /// unsafety, however.
+    #[inline]
     pub fn unchecked_copy(&self) -> Self {
         VMGcRef(self.0)
     }
@@ -250,6 +266,7 @@ impl VMGcRef {
     /// Get this GC reference as a u32 index into its GC heap.
     ///
     /// Panics when called for `i31ref`s.
+    #[inline]
     pub fn heap_index(&self) -> Result<NonZeroU32> {
         if self.is_i31() {
             bail_bug!("attempted to get heap index of i31")
@@ -260,12 +277,14 @@ impl VMGcRef {
 
     /// Get this GC reference as a raw, non-zero u32 value, regardless whether
     /// it is actually a reference to a GC object or is an `i31ref`.
+    #[inline]
     pub fn as_raw_non_zero_u32(&self) -> NonZeroU32 {
         self.0
     }
 
     /// Get this GC reference as a raw u32 value, regardless whether it is
     /// actually a reference to a GC object or is an `i31ref`.
+    #[inline]
     pub fn as_raw_u32(&self) -> u32 {
         self.0.get()
     }
@@ -297,6 +316,7 @@ impl VMGcRef {
     /// `self` should point to a `T` object. Failure to uphold this invariant is
     /// memory safe, but will lead to general incorrectness such as panics or
     /// wrong results.
+    #[inline]
     pub fn into_typed_unchecked<T>(self) -> TypedGcRef<T>
     where
         T: GcHeapObject,
@@ -354,6 +374,7 @@ impl VMGcRef {
     /// `self` should point to a `T` object. Failure to uphold this invariant is
     /// memory safe, but will lead to general incorrectness such as panics or
     /// wrong results.
+    #[inline]
     pub fn as_typed_unchecked<T>(&self) -> &TypedGcRef<T>
     where
         T: GcHeapObject,
@@ -688,6 +709,7 @@ where
     /// Failure to run GC barriers when they would otherwise be necessary can
     /// lead to leaks, panics, and wrong results. It cannot lead to memory
     /// unsafety, however.
+    #[inline]
     pub fn unchecked_copy(&self) -> Self {
         Self {
             gc_ref: self.gc_ref.unchecked_copy(),
@@ -698,6 +720,7 @@ where
 
 impl<T> TypedGcRef<T> {
     /// Get the untyped version of this GC reference.
+    #[inline]
     pub fn as_untyped(&self) -> &VMGcRef {
         &self.gc_ref
     }

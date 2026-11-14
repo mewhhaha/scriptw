@@ -2,20 +2,9 @@
 use super::*;
 use crate::vm::WeakGcEdge;
 
-impl CopyingHeap {
-    fn weak_forwarded(&self, reference: &VMGcRef) -> Result<Option<VMGcRef>> {
-        // Objects the collection does not move are live: copies in the active
-        // semi-space, and old objects during a minor collection.
-        if reference.is_i31() || !self.is_in_from_space(reference.heap_index()?.get()) {
-            return Ok(Some(reference.unchecked_copy()));
-        }
-        self.index(header_and_forwarding_ref(reference))?
-            .forwarding_ref()
-    }
-}
-
 impl CopyingCollection<'_, '_> {
     pub(super) fn process_ephemerons_increment(&mut self) -> Result<GcProgress> {
+        let mut evacuation = Evacuation::new(self.heap);
         for _ in 0..OBJECTS_PER_INCREMENT {
             let Some(index) = self.marking.pop() else {
                 break;
@@ -28,20 +17,21 @@ impl CopyingCollection<'_, '_> {
             else {
                 unreachable!("conditional edges are stable until weak update");
             };
-            debug_assert!(self.heap.weak_forwarded(owner)?.is_some());
-            debug_assert!(self.heap.weak_forwarded(key)?.is_some());
-            let value = value.unchecked_copy();
-            let forwarded = match self.heap.weak_forwarded(&value)? {
+            debug_assert!(evacuation.forwarded(owner.as_raw_u32())?.is_some());
+            debug_assert!(evacuation.forwarded(key.as_raw_u32())?.is_some());
+            let value = value.as_raw_u32();
+            let forwarded = match evacuation.forwarded(value)? {
                 Some(forwarded) => forwarded,
-                None => self.heap.forward(&value, &mut self.marking)?,
+                None => evacuation.forward(value, &mut self.marking)?,
             };
             let Some(WeakGcEdge::Ephemeron { value, .. }) =
                 self.trace_state.weak_gc.slots[index].edge.as_mut()
             else {
                 unreachable!();
             };
-            *value = Some(forwarded);
+            *value = VMGcRef::from_raw_u32(forwarded);
         }
+        drop(evacuation);
         if self.marking.is_empty() {
             self.weak_cursor = 0;
             self.phase = if self.heap.worklist_ptr < self.heap.bump_ptr() {
@@ -57,10 +47,27 @@ impl CopyingCollection<'_, '_> {
     }
 
     pub(super) fn update_weak_increment(&mut self) -> Result<GcProgress> {
-        let end =
-            (self.weak_cursor + OBJECTS_PER_INCREMENT).min(self.trace_state.weak_gc.slots.len());
+        // A minor collection updates only the edges set since the last
+        // collection; every other edge names old objects alone.
+        let minor = self.heap.collecting_minor;
+        let total = if minor {
+            self.trace_state.weak_gc.touched.len()
+        } else {
+            self.trace_state.weak_gc.slots.len()
+        };
+        let end = (self.weak_cursor + OBJECTS_PER_INCREMENT).min(total);
+        let evacuation = Evacuation::new(self.heap);
+        let forwarded = |reference: &VMGcRef| -> Result<Option<VMGcRef>> {
+            Ok(evacuation
+                .forwarded(reference.as_raw_u32())?
+                .and_then(VMGcRef::from_raw_u32))
+        };
         while self.weak_cursor < end {
-            let index = self.weak_cursor;
+            let index = if minor {
+                self.trace_state.weak_gc.touched[self.weak_cursor] as usize
+            } else {
+                self.weak_cursor
+            };
             self.weak_cursor += 1;
             let Some(edge) = self.trace_state.weak_gc.slots[index].edge.as_mut() else {
                 continue;
@@ -68,23 +75,23 @@ impl CopyingCollection<'_, '_> {
             let owner = match edge {
                 WeakGcEdge::Target { owner, .. } | WeakGcEdge::Ephemeron { owner, .. } => owner,
             };
-            let Some(forwarded) = self.heap.weak_forwarded(owner)? else {
+            let Some(owner_forwarded) = forwarded(owner)? else {
                 self.trace_state.weak_gc.retire(index);
                 continue;
             };
-            *owner = forwarded;
+            *owner = owner_forwarded;
             match edge {
                 WeakGcEdge::Target { target, .. } => {
                     *target = target
                         .as_ref()
-                        .map(|r| self.heap.weak_forwarded(r))
+                        .map(forwarded)
                         .transpose()?
                         .flatten();
                 }
                 WeakGcEdge::Ephemeron { key, value, .. } => {
                     *key = key
                         .as_ref()
-                        .map(|r| self.heap.weak_forwarded(r))
+                        .map(forwarded)
                         .transpose()?
                         .flatten();
                     if key.is_none() {
@@ -92,14 +99,16 @@ impl CopyingCollection<'_, '_> {
                     } else {
                         *value = value
                             .as_ref()
-                            .map(|r| self.heap.weak_forwarded(r))
+                            .map(forwarded)
                             .transpose()?
                             .flatten();
                     }
                 }
             }
         }
-        if self.weak_cursor == self.trace_state.weak_gc.slots.len() {
+        drop(evacuation);
+        if self.weak_cursor == total {
+            self.trace_state.weak_gc.clear_touched();
             self.phase = CopyingCollectionPhase::SweepExternRefs;
         }
         Ok(GcProgress::Continue)

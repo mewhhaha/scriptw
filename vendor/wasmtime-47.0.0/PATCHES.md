@@ -228,11 +228,38 @@ The copying collector is generational when the GC heap starts at 2 MiB or more
   compatibility check already compares, so a module compiled for another
   boundary is rejected. Below a 2 MiB initial heap there is no nursery and the
   collector behaves as before.
+- A minor collection's work follows what it moves: roots, remembered slots,
+  survivors and the weak edges set since the last collection. On the
+  retained request it went from 0.95M to 0.47M instructions, and a full
+  collection from about 7.4M to about 5M.
+  - `src/runtime/vm/gc/weak.rs`: the weak registry lists the slots whose
+    edges were set since the last collection (`insert`, `get_mut`). After
+    any collection every edge names only old objects, so a minor collection
+    marks, processes and updates just the listed slots; a full collection
+    still walks every slot. Both clear the list.
+  - `copying/marking.rs`: a first copy finds the conditional edges waiting
+    for its object through an open-addressing table keyed by the original
+    index, instead of a sorted dependency array, a granule filter and a
+    binary search.
+  - `copying.rs`: an `Evacuation` holds one phase's copying state: the heap's
+    base and length, every access checked against the length as a slice
+    index would be; the bounds of what the collection moves; and the copies'
+    bump pointer and `externref` list, written back when it is dropped. An
+    object is bounds-checked once and its edges against its size, and
+    forwarding reads a header once.
+  - `src/runtime/vm/gc/gc_ref.rs`: the small `VMGcRef` and `VMGcHeader`
+    accessors are `#[inline]`; they were calls across codegen units in the
+    collector's loop. `raw_kind_matches` tests kind bits without validating
+    the whole word.
+  - `src/runtime/store/gc.rs`: each instance's reference-typed global
+    definitions are listed when a collection first meets the instance; their
+    addresses are fixed for its life.
 - Tests: `generational_tests` in `copying.rs` (old-to-young stores through
   compiled `struct.set`, `array.set`, `array.fill`, `array.copy` and
   `array.init_elem`, and through the host API, survive minor collections; an
   overflowing slot buffer; large objects allocated old with young
-  initializers; weak references to young targets; rejection of a module
+  initializers; weak references to young targets; a young value set on an
+  ephemeron no minor collection visits any more; rejection of a module
   compiled for another nursery).
 
 Three upstream test feature guards are corrected so the collector control can
