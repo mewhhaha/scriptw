@@ -209,3 +209,61 @@ fn many_stores_are_interrupted_independently() {
         thread.join().unwrap();
     }
 }
+
+/// A deadline and a null check share the fault path but not their addresses:
+/// a request never publishes the GC heap's null guard. Compiled code that
+/// reaches a null access before its next watched access traps on the null
+/// reference, exactly as an explicit check (which accesses no memory) did, and
+/// the request is delivered at the next entry. Code that reaches watched memory
+/// first stops for the deadline.
+#[test]
+fn a_null_access_and_a_request_are_told_apart_by_address() {
+    let engine = engine();
+    let module = Module::new(
+        &engine,
+        r#"
+        (module
+          (type $cell (struct (field (mut i32))))
+          (import "" "request" (func $request))
+          (global $cell (ref $cell) (struct.new $cell (i32.const 7)))
+          (func (export "null_after_request") (result i32)
+            (call $request)
+            (struct.get $cell 0 (ref.null $cell)))
+          (func (export "heap_then_null_after_request") (result i32)
+            (call $request)
+            (drop (struct.get $cell 0 (global.get $cell)))
+            (struct.get $cell 0 (ref.null $cell)))
+          (func (export "null") (result i32)
+            (struct.get $cell 0 (ref.null $cell)))
+          (func (export "read") (result i32)
+            (struct.get $cell 0 (global.get $cell))))
+        "#,
+    )
+    .unwrap();
+    let mut store = Store::new(&engine, ());
+    let handle = store.interrupt_handle();
+    let request = Func::wrap(&mut store, {
+        let handle = handle.clone();
+        move || handle.interrupt()
+    });
+    let instance = Instance::new(&mut store, &module, &[request.into()]).unwrap();
+    let call = |store: &mut Store<()>, name: &str| {
+        instance
+            .get_typed_func::<(), i32>(&mut *store, name)
+            .unwrap()
+            .call(&mut *store, ())
+    };
+    let trap = |result: Result<i32>| *result.unwrap_err().downcast_ref::<Trap>().unwrap();
+
+    assert_eq!(trap(call(&mut store, "null_after_request")), Trap::NullReference);
+    assert!(handle.is_pending());
+    assert_eq!(trap(call(&mut store, "read")), Trap::Interrupt);
+
+    assert_eq!(trap(call(&mut store, "heap_then_null_after_request")), Trap::Interrupt);
+    assert!(!handle.is_pending());
+
+    handle.interrupt();
+    handle.cancel();
+    assert_eq!(trap(call(&mut store, "null")), Trap::NullReference);
+    assert_eq!(call(&mut store, "read").unwrap(), 7);
+}

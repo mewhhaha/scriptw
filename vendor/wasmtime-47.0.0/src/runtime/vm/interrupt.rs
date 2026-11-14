@@ -79,9 +79,10 @@ pub struct StoreInterrupt {
 
 struct Heap {
     /// The store's GC heap definition and its registered linear memories,
-    /// each with the slot that publishes its range. Empty once the store is
+    /// each with the slot that publishes its range and the length of the
+    /// prefix that stays inaccessible regardless. Empty once the store is
     /// gone.
-    memories: Vec<(SendSyncPtr<VMMemoryDefinition>, Option<usize>)>,
+    memories: Vec<(SendSyncPtr<VMMemoryDefinition>, Option<usize>, usize)>,
 }
 
 impl StoreInterrupt {
@@ -96,15 +97,17 @@ impl StoreInterrupt {
 
     /// Adds a memory definition whose address stays valid until `retire`:
     /// the store's GC heap once the store has its final address, or one of
-    /// the store's own unshared linear memories.
-    pub(crate) fn watch(&self, memory: SendSyncPtr<VMMemoryDefinition>) {
+    /// the store's own unshared linear memories. Its first `inaccessible`
+    /// bytes (a GC heap's null guard) are never made accessible, so they are
+    /// not published either: a fault there is not an interrupt.
+    pub(crate) fn watch(&self, memory: SendSyncPtr<VMMemoryDefinition>, inaccessible: usize) {
         let mut heap = self.lock();
         if !heap
             .memories
             .iter()
-            .any(|(known, _)| known.as_ptr() == memory.as_ptr())
+            .any(|(known, _, _)| known.as_ptr() == memory.as_ptr())
         {
-            heap.memories.push((memory, None));
+            heap.memories.push((memory, None, inaccessible));
         }
     }
 
@@ -123,7 +126,7 @@ impl StoreInterrupt {
                 return;
             }
             let owner = self as *const Self as usize;
-            for (memory, slot) in heap.memories.iter_mut() {
+            for (memory, slot, inaccessible) in heap.memories.iter_mut() {
                 // SAFETY: the list is cleared under this lock before the
                 // definitions are freed. These are racy word reads of fields
                 // the store's own thread writes; any value read was a real
@@ -135,6 +138,10 @@ impl StoreInterrupt {
                         (*memory).current_length.load(Ordering::Relaxed),
                     )
                 };
+                let Some(len) = len.checked_sub(*inaccessible) else {
+                    continue;
+                };
+                let base = base + *inaccessible;
                 let Some(range) = pack(base, len) else {
                     continue;
                 };
@@ -176,7 +183,7 @@ impl StoreInterrupt {
     }
 
     fn release(heap: &mut Heap) {
-        for (_, slot) in heap.memories.iter_mut() {
+        for (_, slot, _) in heap.memories.iter_mut() {
             let Some(slot) = slot.take() else {
                 continue;
             };

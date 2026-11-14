@@ -2873,6 +2873,7 @@ impl FuncEnvironment<'_> {
         struct_type_index: TypeIndex,
         field_index: u32,
         struct_ref: ir::Value,
+        non_null: bool,
         extension: Option<Extension>,
     ) -> WasmResult<ir::Value> {
         gc::translate_struct_get(
@@ -2881,6 +2882,7 @@ impl FuncEnvironment<'_> {
             struct_type_index,
             field_index,
             struct_ref,
+            non_null,
             extension,
         )
     }
@@ -2891,6 +2893,7 @@ impl FuncEnvironment<'_> {
         struct_type_index: TypeIndex,
         field_index: u32,
         struct_ref: ir::Value,
+        non_null: bool,
         value: ir::Value,
     ) -> WasmResult<()> {
         gc::translate_struct_set(
@@ -2899,6 +2902,7 @@ impl FuncEnvironment<'_> {
             struct_type_index,
             field_index,
             struct_ref,
+            non_null,
             value,
         )
     }
@@ -3110,8 +3114,9 @@ impl FuncEnvironment<'_> {
         &mut self,
         builder: &mut FunctionBuilder,
         array: ir::Value,
+        non_null: bool,
     ) -> WasmResult<ir::Value> {
-        gc::translate_array_len(self, builder, array)
+        gc::translate_array_len(self, builder, array, non_null)
     }
 
     pub fn translate_array_get(
@@ -3119,10 +3124,19 @@ impl FuncEnvironment<'_> {
         builder: &mut FunctionBuilder,
         array_type_index: TypeIndex,
         array: ir::Value,
+        non_null: bool,
         index: ir::Value,
         extension: Option<Extension>,
     ) -> WasmResult<ir::Value> {
-        gc::translate_array_get(self, builder, array_type_index, array, index, extension)
+        gc::translate_array_get(
+            self,
+            builder,
+            array_type_index,
+            array,
+            non_null,
+            index,
+            extension,
+        )
     }
 
     pub fn translate_array_set(
@@ -3130,10 +3144,11 @@ impl FuncEnvironment<'_> {
         builder: &mut FunctionBuilder,
         array_type_index: TypeIndex,
         array: ir::Value,
+        non_null: bool,
         index: ir::Value,
         value: ir::Value,
     ) -> WasmResult<()> {
-        gc::translate_array_set(self, builder, array_type_index, array, index, value)
+        gc::translate_array_set(self, builder, array_type_index, array, non_null, index, value)
     }
 
     pub fn translate_ref_test(
@@ -4032,7 +4047,7 @@ impl FuncEnvironment<'_> {
                         0,
                     );
                 } else if initialized {
-                    gc::write_field_at_addr(self, builder, elem_ty, elem_addr, value)?
+                    gc::write_field_at_addr(self, builder, elem_ty, elem_addr, None, value)?
                 } else {
                     gc::init_field_at_addr(self, builder, elem_ty, elem_addr, value)?
                 }
@@ -4421,7 +4436,7 @@ impl FuncEnvironment<'_> {
                 None => builder.ins().iconst(pointer_type, 0),
             },
             CheckedEntity::Array { array, .. } => {
-                let len = self.translate_array_len(builder, array)?;
+                let len = self.translate_array_len(builder, array, false)?;
                 self.unchecked_cast_wasm_addr_to_native_addr(&mut builder.cursor(), len, idx_type)
             }
         };
@@ -4737,7 +4752,7 @@ impl FuncEnvironment<'_> {
                     CheckedEntity::Array { initialized, .. } => {
                         assert!(initialized);
                         let read_ty = src_entity.storage_type(this);
-                        gc::read_field_at_addr(this, builder, read_ty, src, None)?
+                        gc::read_field_at_addr(this, builder, read_ty, src, None, None)?
                     }
                     CheckedEntity::Elem(_) => {
                         let WasmStorageType::Val(WasmValType::Ref(ty)) = write_ty else {
@@ -4778,7 +4793,7 @@ impl FuncEnvironment<'_> {
                     }
                     CheckedEntity::Array { initialized, .. } => {
                         if initialized {
-                            gc::write_field_at_addr(this, builder, write_ty, dst, val)?
+                            gc::write_field_at_addr(this, builder, write_ty, dst, None, val)?
                         } else {
                             gc::init_field_at_addr(this, builder, write_ty, dst, val)?
                         }

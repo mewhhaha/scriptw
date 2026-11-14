@@ -87,3 +87,40 @@ signatures and Wasm semantics.
   then singly, instead of calling the `memory.fill` libcall. Longer fills keep
   the libcall. Bounds checks precede both paths, and memories and tables are
   unchanged.
+
+## GC access code
+
+These change the code for GC struct and array accesses and type tests
+([measurements](../../docs/rust-rewrite/benchmarks.md#gc-access-code-2026-11-14));
+Wasm semantics and trap codes are unchanged.
+
+- `src/translate/code_translator.rs`, `src/func_environ{.rs,/gc.rs}`:
+  `struct.get`/`struct.set` and `array.len`/`array.get`/`array.set` learn
+  whether their reference operand's validated type is non-nullable. Such an
+  access needs no null check.
+- `src/func_environ/gc.rs`, `src/lib.rs`: otherwise, with the copying
+  collector, signal-based traps, a GC heap that cannot move and whose
+  reservation plus guard covers every 32-bit reference (the condition under
+  which field accesses already omit heap-bound checks), an access whose bytes
+  end within `copying_heap_data::NULL_GUARD_BYTES` (4096) of the object start
+  is its own null check. It carries the null-reference trap code, and through
+  reference 0 it faults in the heap's null guard, which the vendored runtime
+  keeps inaccessible ([its notes](../wasmtime-47.0.0/PATCHES.md)). That
+  access is the struct field access, or the array length load that precedes
+  every element access. A `funcref` store keeps its explicit check, since the
+  value is interned by a libcall first. So do `ref.test`, `ref.cast`,
+  `br_on_cast` and `ref.is_null`, whose null outcome is a value.
+- `src/func_environ/gc.rs`: after the `index < length` check, an array
+  element's address is the heap base plus `ref + base_size + index *
+  elem_size`, computed in wrapping 32-bit arithmetic and then zero-extended.
+  The product and both sums wrap at 2^32, so whatever a corrupt length let
+  `index` be, the element starts below 2^32 and the access, at most 16
+  bytes, ends below 2^32 + 16: inside the 4 GiB reservation plus its guard,
+  where every byte is heap or faults. For an intact heap nothing wraps, since
+  the array lies inside the 32-bit heap. This replaces the object-size
+  computation, its overflow traps and the backwards offset from the object's
+  end; it applies when the reservation plus guard is at least 2^32 plus the
+  element size, and the original code remains otherwise.
+- `src/func_environ/gc.rs`: `ref.test` and the casts test for `i31` only when
+  the operand's static heap type is `any`, `eq` or `i31`; a struct or array
+  reference never holds one.

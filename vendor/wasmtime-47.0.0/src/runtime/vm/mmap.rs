@@ -415,6 +415,34 @@ impl<T> Mmap<T> {
                 .context("failed to make memory read-write")
         }
     }
+
+    /// Makes the specified page-aligned `range` within this `Mmap`
+    /// inaccessible. Returns `false`, changing nothing, where the platform
+    /// backend does not support it.
+    pub unsafe fn make_inaccessible(&self, range: Range<usize>) -> Result<bool> {
+        assert!(range.start <= range.end && range.end <= self.len());
+        let page = crate::runtime::vm::host_page_size();
+        assert!(
+            range.start % page == 0 && range.end % page == 0,
+            "changing of protections isn't page-aligned",
+        );
+        if range.start == range.end {
+            return Ok(true);
+        }
+        #[cfg(all(unix, feature = "std", not(miri)))]
+        {
+            unsafe {
+                self.sys
+                    .make_inaccessible(range)
+                    .context("failed to make memory inaccessible")?;
+            }
+            Ok(true)
+        }
+        #[cfg(not(all(unix, feature = "std", not(miri))))]
+        {
+            Ok(false)
+        }
+    }
 }
 
 fn _assert() {

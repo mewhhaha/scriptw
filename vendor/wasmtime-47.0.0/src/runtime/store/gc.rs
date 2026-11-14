@@ -957,6 +957,16 @@ impl StoreOpaque {
                 },
             };
         heap.attach(mem);
+        if let Err(e) = heap.protect_null_guard() {
+            let mem = heap.detach();
+            unsafe {
+                let mem_alloc_index = engine.allocator().deallocate_gc_heap(index, heap);
+                engine
+                    .allocator()
+                    .deallocate_memory(None, mem_alloc_index, mem);
+            }
+            return Err(e);
+        }
 
         let gc_store = GcStore::new(index, heap, engine.tunables().gc_zeal_alloc_counter);
         *self.vm_store_context.gc_heap.get_mut() = gc_store.vmmemory_definition();
@@ -1218,7 +1228,25 @@ mod tests {
         };
 
         const INITIAL_CAPACITY: usize = 64 * 1024;
-        const ALLOCATION_CAPACITY: usize = INITIAL_CAPACITY / 2;
+
+        /// One semi-space: half of what the null guard leaves.
+        fn allocation_capacity(engine: &Engine) -> usize {
+            (INITIAL_CAPACITY - null_guard(engine)) / 2
+        }
+
+        fn null_guard(engine: &Engine) -> usize {
+            engine.gc_runtime().unwrap().null_guard_bytes(engine)
+        }
+
+        /// What an empty semi-space reports as allocated: the `ALIGN` bytes
+        /// skipped to keep index 0 free, unless a null guard keeps it free.
+        fn empty_allocation(engine: &Engine) -> usize {
+            if null_guard(engine) == 0 {
+                wasmtime_environ::copying::ALIGN as usize
+            } else {
+                0
+            }
+        }
 
         fn engine() -> Result<Engine> {
             let mut config = Config::new();
@@ -1242,13 +1270,14 @@ mod tests {
         #[test]
         fn retained_headroom_bounds_copying_without_growing_reusable_heaps() -> Result<()> {
             let engine = engine()?;
+            let allocation_capacity = allocation_capacity(&engine);
             for (numerator, denominator, expect_growth) in [(3, 4, false), (15, 16, true)] {
                 let mut store = Store::new(&engine, ());
                 {
                     let mut roots = RootScope::new(&mut store);
                     let mut live = Vec::new();
                     live.push(ExternRef::new(&mut roots, 0usize)?);
-                    while heap_state(&mut roots).1 < ALLOCATION_CAPACITY * numerator / denominator {
+                    while heap_state(&mut roots).1 < allocation_capacity * numerator / denominator {
                         live.push(ExternRef::new(&mut roots, live.len())?);
                     }
                     assert_eq!(heap_state(&mut roots).0, INITIAL_CAPACITY);
@@ -1286,7 +1315,7 @@ mod tests {
                 store.gc(None)?;
                 assert_eq!(
                     heap_state(&mut store).1,
-                    wasmtime_environ::copying::ALIGN as usize,
+                    empty_allocation(&engine),
                 );
             }
             Ok(())
@@ -1324,13 +1353,15 @@ mod tests {
 
         #[test]
         fn growth_denial_collects_then_reports_oom_and_heap_remains_reusable() -> Result<()> {
-            let mut store = Store::new(&engine()?, HeapLimit::default());
+            let engine = engine()?;
+            let allocation_capacity = allocation_capacity(&engine);
+            let mut store = Store::new(&engine, HeapLimit::default());
             store.limiter(|limit| limit);
             {
                 let mut roots = RootScope::new(&mut store);
                 let mut live = Vec::new();
                 live.push(ExternRef::new(&mut roots, 0usize)?);
-                while heap_state(&mut roots).1 < ALLOCATION_CAPACITY * 15 / 16 {
+                while heap_state(&mut roots).1 < allocation_capacity * 15 / 16 {
                     live.push(ExternRef::new(&mut roots, live.len())?);
                 }
 
@@ -1354,7 +1385,7 @@ mod tests {
                             break;
                         }
                     }
-                    assert!(live.len() < ALLOCATION_CAPACITY);
+                    assert!(live.len() < allocation_capacity);
                 }
                 for (marker, reference) in live.iter().enumerate() {
                     assert_eq!(
@@ -1368,7 +1399,7 @@ mod tests {
             assert_eq!(heap_state(&mut store).0, INITIAL_CAPACITY);
             assert_eq!(
                 heap_state(&mut store).1,
-                wasmtime_environ::copying::ALIGN as usize,
+                empty_allocation(&engine),
             );
             let reference = ExternRef::new(&mut store, 42usize)?;
             assert_eq!(

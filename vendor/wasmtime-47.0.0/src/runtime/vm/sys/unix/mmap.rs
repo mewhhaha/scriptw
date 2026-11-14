@@ -251,6 +251,17 @@ impl Mmap {
         Ok(())
     }
 
+    pub unsafe fn make_inaccessible(&self, range: Range<usize>) -> Result<()> {
+        let base = unsafe { self.memory.as_ptr().byte_add(range.start).cast() };
+        let len = range.end - range.start;
+
+        unsafe {
+            mprotect(base, len, MprotectFlags::empty())?;
+        }
+
+        Ok(())
+    }
+
     pub unsafe fn map_image_at(
         &self,
         image_source: &MemoryImageSource,

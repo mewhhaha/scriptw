@@ -333,6 +333,7 @@ impl GcCompiler for NullCompiler {
             builder,
             WasmStorageType::Val(WasmValType::I32),
             instance_id_addr,
+            None,
             instance_id,
         )?;
         let tag_addr = builder
@@ -343,6 +344,7 @@ impl GcCompiler for NullCompiler {
             builder,
             WasmStorageType::Val(WasmValType::I32),
             tag_addr,
+            None,
             tag,
         )?;
 
@@ -394,6 +396,6 @@ impl GcCompiler for NullCompiler {
         field_addr: ir::Value,
         val: ir::Value,
     ) -> WasmResult<()> {
-        write_field_at_addr(func_env, builder, ty, field_addr, val)
+        write_field_at_addr(func_env, builder, ty, field_addr, None, val)
     }
 }

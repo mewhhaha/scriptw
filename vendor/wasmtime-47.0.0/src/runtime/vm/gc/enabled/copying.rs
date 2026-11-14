@@ -28,7 +28,8 @@ use wasmtime_environ::copying::{
     ALIGN, ARRAY_LENGTH_OFFSET, CopyingTypeLayouts, HEADER_COPIED_BIT, HEADER_SIZE, InlineTraceInfo,
 };
 use wasmtime_environ::{
-    GcArrayLayout, GcStructLayout, GcTypeLayouts, POISON, VMGcKind, VMSharedTypeIndex, gc_assert,
+    GcArrayLayout, GcStructLayout, GcTypeLayouts, MemoryKind, MemoryTunables, POISON, Tunables,
+    VMGcKind, VMSharedTypeIndex, gc_assert,
 };
 
 #[expect(clippy::cast_possible_truncation, reason = "known to not overflow")]
@@ -45,10 +46,37 @@ unsafe impl GcRuntime for CopyingCollector {
         &self.layouts
     }
 
-    fn new_gc_heap(&self, _engine: &Engine) -> Result<Box<dyn GcHeap>> {
-        let heap = CopyingHeap::new()?;
+    fn new_gc_heap(&self, engine: &Engine) -> Result<Box<dyn GcHeap>> {
+        let heap = CopyingHeap::new(null_guard_bytes(engine.tunables()))?;
         Ok(Box::new(heap) as _)
     }
+
+    fn null_guard_bytes(&self, engine: &Engine) -> usize {
+        usize::try_from(null_guard_bytes(engine.tunables())).unwrap()
+    }
+}
+
+/// The bytes from the start of the heap within which compiled code may let an
+/// access through a null reference (index 0) fault instead of testing the
+/// reference: `wasmtime_cranelift::copying_heap_data::NULL_GUARD_BYTES`.
+const COMPILED_NULL_GUARD_BYTES: u32 = 4096;
+
+/// The bytes at the start of a copying heap that are never allocated and kept
+/// inaccessible: the span compiled code relies on, in whole host pages. Zero
+/// when the engine does not use signal-based traps, or when the heap may move
+/// (growth would copy the protected page); compiled code then tests every
+/// reference explicitly.
+fn null_guard_bytes(tunables: &Tunables) -> u32 {
+    let memory_tunables = MemoryTunables::new(tunables, MemoryKind::GcHeap);
+    if !tunables.signals_based_traps
+        || tunables
+            .gc_heap_memory_type()
+            .memory_may_move(&memory_tunables)
+    {
+        return 0;
+    }
+    let page = u32::try_from(crate::runtime::vm::host_page_size()).unwrap();
+    COMPILED_NULL_GUARD_BYTES.next_multiple_of(page)
 }
 
 /// The common header for all objects in the copying collector.
@@ -355,10 +383,17 @@ struct CopyingHeap {
 
     /// Like `active_extern_ref_set_head` but for the idle semi-space.
     idle_extern_ref_set_head: Option<VMExternRef>,
+
+    /// The bytes at the start of the heap that belong to neither semi-space
+    /// and are kept inaccessible (see `null_guard_bytes`).
+    null_guard: u32,
+
+    /// Whether the first `null_guard` bytes of the memory are inaccessible.
+    null_guard_protected: bool,
 }
 
 impl CopyingHeap {
-    fn new() -> Result<Self> {
+    fn new(null_guard: u32) -> Result<Self> {
         log::trace!("allocating new copying heap");
         Ok(Self {
             trace_infos: TraceInfos::new(),
@@ -372,8 +407,32 @@ impl CopyingHeap {
             worklist_ptr: 0,
             active_extern_ref_set_head: None,
             idle_extern_ref_set_head: None,
+            null_guard,
+            null_guard_protected: false,
         })
     }
+
+    /// Makes the first `null_guard` bytes of the memory inaccessible, once
+    /// they exist. Returns `false` where the backing cannot protect them.
+    fn protect_null_guard_pages(&mut self) -> Result<bool> {
+        let len = usize::try_from(self.null_guard).unwrap();
+        if len == 0 || self.null_guard_protected {
+            return Ok(true);
+        }
+        // A memory without these bytes yet only reports whether its backing
+        // supports this; they are still inaccessible reservation.
+        let memory = self.memory.as_mut().unwrap();
+        let len = if memory.byte_size() >= len { len } else { 0 };
+        // SAFETY: nothing is ever allocated in these bytes, so no reference
+        // into them exists; host code reaches heap bytes only through
+        // allocated objects.
+        if !unsafe { memory.set_prefix_access(len, false)? } {
+            return Ok(false);
+        }
+        self.null_guard_protected = len != 0;
+        Ok(true)
+    }
+
 
     fn bump_ptr(&self) -> u32 {
         self.vmctx_data.bump_ptr()
@@ -423,13 +482,23 @@ impl CopyingHeap {
             return;
         }
 
+        // The null guard at the start of the heap belongs to neither
+        // semi-space: they split the rest equally. (Both multiples of
+        // `2 * ALIGN`, so each half is a multiple of `ALIGN`.)
         let capacity = self.capacity();
-        let halfway = capacity / 2;
+        let floor = self.null_guard.min(capacity);
+        let halfway = floor + (capacity - floor) / 2;
 
         debug_assert!(self.bump_ptr() <= halfway);
         debug_assert!(self.idle_space_start <= halfway);
         debug_assert!(self.active_space_end() <= halfway);
 
+        // The first semi-space is empty whenever its start moves: it moves
+        // only while the heap is smaller than the guard.
+        self.active_space_start = floor;
+        if self.bump_ptr() < floor {
+            self.set_bump_ptr(floor);
+        }
         self.set_active_space_end(halfway);
         self.idle_space_start = halfway;
         self.idle_space_end = capacity;
@@ -451,8 +520,11 @@ impl CopyingHeap {
         // skip the first `ALIGN` bytes. This ensures that the active and idle
         // spaces are always equally sized, which is required to guarantee that
         // evacuating objects from one to the other will succeed.
+        //
+        // A null guard already keeps the first semi-space away from index 0,
+        // so then neither skips.
         let mut bp = self.active_space_start;
-        if self.active_space_end() - self.active_space_start >= ALIGN {
+        if self.null_guard == 0 && self.active_space_end() - self.active_space_start >= ALIGN {
             bp += ALIGN;
         }
         self.set_bump_ptr(bp);
@@ -785,6 +857,16 @@ unsafe impl GcHeap for CopyingHeap {
         // The next Store publishes its own table.
         self.vmctx_data.set_func_refs(crate::vm::FuncRefTableView { base: 0, len: 0 });
 
+        // The memory's next owner (e.g. a pooling allocator resetting it) may
+        // access every byte again.
+        if self.null_guard_protected {
+            let len = usize::try_from(self.null_guard).unwrap();
+            // SAFETY: restoring access cannot invalidate any reference.
+            let restored = unsafe { self.memory.as_mut().unwrap().set_prefix_access(len, true) };
+            restored.expect("restoring access to the GC heap's null guard");
+            self.null_guard_protected = false;
+        }
+
         let CopyingHeap {
             no_gc_count,
             memory,
@@ -797,6 +879,8 @@ unsafe impl GcHeap for CopyingHeap {
             active_extern_ref_set_head,
             idle_extern_ref_set_head,
             trace_infos,
+            null_guard: _,
+            null_guard_protected: _,
         } = self;
 
         *no_gc_count = 0;
@@ -1128,6 +1212,33 @@ unsafe impl GcHeap for CopyingHeap {
             let delta_bytes_grown = usize::try_from(delta_bytes_grown).unwrap();
             slice[len - delta_bytes_grown..].fill(POISON);
         }
+
+        // Growth from a heap smaller than the null guard made it accessible.
+        // `protect_null_guard` already established that the backing supports
+        // protection, so only an OS failure can fail here, and compiled code
+        // must not run without the guard.
+        let protected = self.protect_null_guard_pages();
+        assert!(
+            matches!(protected, Ok(true)),
+            "protecting the GC heap's null guard after growth: {protected:?}"
+        );
+    }
+
+    fn protect_null_guard(&mut self) -> Result<()> {
+        if !self.protect_null_guard_pages()? {
+            bail!(
+                "the GC heap's memory cannot keep its first {:#x} bytes inaccessible, \
+                 which compiled code relies on to detect null references",
+                self.null_guard
+            );
+        }
+        Ok(())
+    }
+
+    fn null_guard_len(&self) -> usize {
+        // Protected, or (in a heap still without memory there) not yet
+        // accessible: `protect_null_guard` succeeded for every attached heap.
+        usize::try_from(self.null_guard).unwrap()
     }
 
     #[inline]
@@ -1508,7 +1619,7 @@ mod tests {
 
     #[test]
     fn allocation_growth_policy_uses_active_space_and_allocation_bytes() {
-        let mut heap = CopyingHeap::new().unwrap();
+        let mut heap = CopyingHeap::new(0).unwrap();
         assert!(!heap.should_collect_before_growth(0, 0));
         assert!(!heap.should_collect_before_growth(32, 0));
 
@@ -1626,5 +1737,230 @@ mod reclamation_tests {
         assert_eq!(drops.load(Ordering::SeqCst), 1);
         store.gc(None).unwrap();
         assert_eq!(drops.load(Ordering::SeqCst), 1);
+    }
+}
+
+#[cfg(all(
+    test,
+    feature = "std",
+    feature = "cranelift",
+    feature = "wat",
+    target_os = "linux",
+    not(miri),
+    not(gc_zeal)
+))]
+mod null_guard_tests {
+    use crate::{
+        AsContext, AsContextMut, Collector, Config, Engine, FieldType, Instance, Module,
+        Mutability, RootScope, StorageType, Store, StructRef, StructRefPre, StructType, Trap, Val,
+        ValType,
+    };
+
+    const WAT: &str = r#"
+        (module
+          (type $s (struct (field (mut i32)) (field (mut anyref))))
+          (type $a (array (mut i32)))
+          (func (export "struct_get") (param (ref null $s)) (result i32)
+            (struct.get $s 0 (local.get 0)))
+          (func (export "struct_get_ref") (param (ref null $s)) (result anyref)
+            (struct.get $s 1 (local.get 0)))
+          (func (export "struct_set") (param (ref null $s))
+            (struct.set $s 0 (local.get 0) (i32.const 1)))
+          (func (export "array_len") (param (ref null $a)) (result i32)
+            (array.len (local.get 0)))
+          (func (export "array_get") (param (ref null $a) i32) (result i32)
+            (array.get $a (local.get 0) (local.get 1)))
+          (func (export "array_set") (param (ref null $a) i32)
+            (array.set $a (local.get 0) (local.get 1) (i32.const 7)))
+          (func (export "new_array") (param i32) (result (ref $a))
+            (array.new_default $a (local.get 0)))
+          (global $g (ref $s) (struct.new $s (i32.const 5) (ref.null any)))
+          (func (export "global_read") (result i32)
+            (struct.get $s 0 (global.get $g)))
+          (func (export "null_read") (result i32)
+            (struct.get $s 0 (ref.null $s)))
+        )
+    "#;
+
+    /// The product's GC heap configuration: a non-moving heap whose 32-bit
+    /// reservation plus guard covers every reference, so compiled code leaves
+    /// null checks to the heap's null guard. `guard: false` gives the heap a
+    /// small reservation it may move out of, which turns the guard off and
+    /// the explicit null and heap-bound checks back on.
+    fn engine(guard: bool) -> Engine {
+        let mut config = Config::new();
+        config
+            .wasm_gc(true)
+            .wasm_function_references(true)
+            .collector(Collector::Copying)
+            .gc_heap_reservation(if guard { 1 << 32 } else { 64 << 20 })
+            .gc_heap_guard_size(32 << 20)
+            .gc_heap_reservation_for_growth(0)
+            .gc_heap_may_move(!guard);
+        Engine::new(&config).unwrap()
+    }
+
+    fn trap_of(error: crate::Error) -> Trap {
+        // An access that faults in the guard reports no memory address,
+        // exactly like an explicit check.
+        assert!(error.downcast_ref::<crate::runtime::vm::WasmFault>().is_none());
+        *error.downcast_ref::<Trap>().unwrap()
+    }
+
+    #[test]
+    fn compiled_code_and_runtime_agree_on_the_null_guard() {
+        assert_eq!(
+            super::COMPILED_NULL_GUARD_BYTES,
+            wasmtime_cranelift::copying_heap_data::NULL_GUARD_BYTES
+        );
+        assert!(super::null_guard_bytes(engine(true).tunables()) >= super::COMPILED_NULL_GUARD_BYTES);
+        assert_eq!(super::null_guard_bytes(engine(false).tunables()), 0);
+    }
+
+    #[test]
+    fn null_and_out_of_range_accesses_keep_their_trap_codes() {
+        for guard in [true, false] {
+            let engine = engine(guard);
+            let module = Module::new(&engine, WAT).unwrap();
+            let mut store = Store::new(&engine, ());
+            let instance = Instance::new(&mut store, &module, &[]).unwrap();
+            let null = Val::AnyRef(None);
+            let mut call = |name: &str, args: &[Val], results: usize| {
+                let mut out = vec![Val::I32(0); results];
+                instance
+                    .get_func(&mut store, name)
+                    .unwrap()
+                    .call(&mut store, args, &mut out)
+                    .map(|()| out)
+            };
+            for (name, results) in [
+                ("struct_get", 1),
+                ("struct_get_ref", 1),
+                ("struct_set", 0),
+                ("array_len", 1),
+            ] {
+                let error = call(name, &[null.clone()], results).unwrap_err();
+                assert_eq!(trap_of(error), Trap::NullReference, "{name}, guard: {guard}");
+            }
+            for name in ["array_get", "array_set"] {
+                let results = usize::from(name == "array_get");
+                let error = call(name, &[null.clone(), Val::I32(0)], results).unwrap_err();
+                assert_eq!(trap_of(error), Trap::NullReference, "{name}, guard: {guard}");
+                let array = call("new_array", &[Val::I32(3)], 1).unwrap().remove(0);
+                for index in [3, -1, i32::MAX] {
+                    let args = [array.clone(), Val::I32(index)];
+                    let error = call(name, &args, results).unwrap_err();
+                    assert_eq!(trap_of(error), Trap::ArrayOutOfBounds, "{name}[{index}]");
+                }
+                assert!(call(name, &[array, Val::I32(2)], results).is_ok());
+            }
+            let heap = store.as_context().0.optional_gc_store().unwrap();
+            let expected = if guard {
+                super::null_guard_bytes(engine.tunables())
+            } else {
+                0
+            };
+            assert_eq!(heap.gc_heap.null_guard_len(), expected as usize);
+        }
+    }
+
+    /// An access through the 32-bit element offset wraps at 2^32: with the
+    /// stored length corrupted to `u32::MAX`, index 2^30 of an `i32` array
+    /// addresses element 0 again (4 * 2^30 = 2^32), not 4 GiB past it. (The
+    /// other configuration keeps the original object-size check, which
+    /// reports the corruption as a bug.)
+    #[test]
+    fn a_corrupt_array_length_cannot_leave_the_reservation() {
+        let engine = engine(true);
+        let module = Module::new(&engine, WAT).unwrap();
+        let mut store = Store::new(&engine, ());
+        let instance = Instance::new(&mut store, &module, &[]).unwrap();
+        let call = |store: &mut Store<()>, name: &str, args: &[Val], results: usize| {
+            let mut out = vec![Val::I32(0); results];
+            instance
+                .get_func(&mut *store, name)
+                .unwrap()
+                .call(&mut *store, args, &mut out)
+                .map(|()| out)
+        };
+        let array = call(&mut store, "new_array", &[Val::I32(3)], 1).unwrap().remove(0);
+        call(&mut store, "array_set", &[array.clone(), Val::I32(0)], 0).unwrap();
+        let index = array
+            .unwrap_anyref()
+            .unwrap()
+            .try_gc_ref(store.as_context().0)
+            .unwrap()
+            .as_raw_u32();
+        let length = usize::try_from(index + wasmtime_environ::copying::ARRAY_LENGTH_OFFSET)
+            .unwrap();
+        store
+            .as_context_mut()
+            .0
+            .unwrap_gc_store_mut()
+            .gc_heap
+            .heap_slice_mut()[length..length + 4]
+            .copy_from_slice(&u32::MAX.to_le_bytes());
+        let read = |store: &mut Store<()>, index: u32| {
+            let args = [array.clone(), Val::I32(index.cast_signed())];
+            call(store, "array_get", &args, 1).map(|mut out| out.remove(0).unwrap_i32())
+        };
+        assert_eq!(read(&mut store, 1 << 30).unwrap(), 7);
+        assert_eq!(read(&mut store, (1 << 30) + 2).unwrap(), 0);
+        assert_eq!(read(&mut store, 3 << 30).unwrap(), 7);
+    }
+
+    /// Withdrawing an interrupt request restores access to the heap but not
+    /// to its null guard (see also `tests/interrupt_handle.rs`).
+    #[test]
+    fn a_withdrawn_interrupt_leaves_the_null_guard_inaccessible() {
+        let engine = engine(true);
+        let module = Module::new(&engine, WAT).unwrap();
+        let mut store = Store::new(&engine, ());
+        let instance = Instance::new(&mut store, &module, &[]).unwrap();
+        let null_read = instance
+            .get_typed_func::<(), i32>(&mut store, "null_read")
+            .unwrap();
+        let global_read = instance
+            .get_typed_func::<(), i32>(&mut store, "global_read")
+            .unwrap();
+        let handle = store.interrupt_handle();
+        handle.interrupt();
+        handle.cancel();
+        let error = null_read.call(&mut store, ()).unwrap_err();
+        assert_eq!(trap_of(error), Trap::NullReference);
+        assert_eq!(global_read.call(&mut store, ()).unwrap(), 5);
+    }
+
+    #[test]
+    fn the_null_guard_is_never_handed_out() {
+        let engine = engine(true);
+        let guard = super::null_guard_bytes(engine.tunables());
+        assert!(guard >= super::COMPILED_NULL_GUARD_BYTES);
+        let ty = StructType::new(
+            &engine,
+            [FieldType::new(
+                Mutability::Var,
+                StorageType::ValType(ValType::I32),
+            )],
+        )
+        .unwrap();
+        let mut store = Store::new(&engine, ());
+        let pre = StructRefPre::new(&mut store, ty);
+        // The first object after the heap is attached, and the first after
+        // each flip, in both semi-spaces, lies past the guard.
+        for _ in 0..4 {
+            {
+                let mut roots = RootScope::new(&mut store);
+                let first = StructRef::new(&mut roots, &pre, &[Val::I32(1)]).unwrap();
+                let index = first
+                    .try_gc_ref(roots.as_context().0)
+                    .unwrap()
+                    .as_raw_u32();
+                assert!(index >= guard, "object at {index:#x} inside the guard");
+            }
+            store.gc(None).unwrap();
+        }
+        let heap = store.as_context().0.optional_gc_store().unwrap();
+        assert_eq!(heap.gc_heap.null_guard_len(), guard as usize);
     }
 }

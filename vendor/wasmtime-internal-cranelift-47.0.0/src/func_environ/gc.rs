@@ -264,6 +264,81 @@ fn emit_gc_raw_alloc(
     gc_ref
 }
 
+/// Null-check `gc_ref` for a GC access to its bytes `..access_end`.
+///
+/// Nothing is emitted when validation proves the operand non-null
+/// (`non_null`: its static type is a non-nullable reference). When the access
+/// is the first through `gc_ref` and lies within the heap's inaccessible null
+/// guard (`access_end`, see `implicit_null_check`), the access itself is the
+/// check: the returned trap code is the one it must carry. Otherwise this
+/// emits an explicit check.
+fn emit_null_check(
+    func_env: &mut FuncEnvironment<'_>,
+    builder: &mut FunctionBuilder<'_>,
+    gc_ref: ir::Value,
+    non_null: bool,
+    access_end: Option<u32>,
+) -> Option<ir::TrapCode> {
+    if non_null {
+        return None;
+    }
+    if access_end.is_some_and(|end| implicit_null_check(func_env, end)) {
+        return Some(crate::TRAP_NULL_REFERENCE);
+    }
+    func_env.trapz(builder, gc_ref, crate::TRAP_NULL_REFERENCE);
+    None
+}
+
+/// Whether a field of this storage type holds a `funcref`, which is interned
+/// before it is stored.
+fn is_func_ref_storage(ty: &WasmStorageType) -> bool {
+    matches!(
+        ty,
+        WasmStorageType::Val(WasmValType::Ref(r)) if r.heap_type.top() == WasmHeapTopType::Func
+    )
+}
+
+/// Whether an access to bytes `..end` of a GC object may leave its null check
+/// to the fault an access through a null reference (index 0) takes in the
+/// copying heap's inaccessible null guard. That needs: signal-based traps,
+/// no explicit heap bounds check before the access (the address is computed
+/// directly from the reference, as it is when the 32-bit reservation plus
+/// guard covers every reference), a heap that never moves (the runtime then
+/// keeps the guard), and the access within the guard.
+fn implicit_null_check(func_env: &mut FuncEnvironment<'_>, end: u32) -> bool {
+    let memory_tunables =
+        wasmtime_environ::MemoryTunables::new(func_env.tunables, MemoryKind::GcHeap);
+    func_env.tunables.collector == Some(Collector::Copying)
+        && end <= crate::copying_heap_data::NULL_GUARD_BYTES
+        && gc_heap_confinement_limit(func_env).is_some()
+        && !func_env
+            .tunables
+            .gc_heap_memory_type()
+            .memory_may_move(&memory_tunables)
+}
+
+/// The exclusive end, in bytes from the GC heap base, of the address range in
+/// which every byte is either GC heap or traps when accessed: the heap's
+/// reservation plus its guard. `None` when accesses beyond the heap's length
+/// cannot be relied on to fault (no signal-based traps, a 32-bit host, or
+/// pages larger than the heap's), in which case callers keep explicit
+/// checks against the heap's current bound.
+fn gc_heap_confinement_limit(func_env: &mut FuncEnvironment<'_>) -> Option<u64> {
+    if func_env.pointer_type() != ir::types::I64 || !func_env.clif_memory_traps_enabled() {
+        return None;
+    }
+    let memory = func_env.tunables.gc_heap_memory_type();
+    let memory_tunables =
+        wasmtime_environ::MemoryTunables::new(func_env.tunables, MemoryKind::GcHeap);
+    let page_size_log2 = func_env.target_config().page_size_align_log2;
+    // The same condition under which `bounds_check_field_access` already
+    // omits checks for a 32-bit reference plus a static offset.
+    if !memory.can_elide_bounds_check(&memory_tunables, page_size_log2) {
+        return None;
+    }
+    Some(memory_tunables.reservation() + memory_tunables.guard_size())
+}
+
 /// Emit inline CLIF code that asserts an object's `VMGcKind` matches the
 /// expected kind. Only emits code when `cfg(gc_zeal)` is enabled.
 ///
@@ -317,6 +392,7 @@ pub fn read_field_at_addr(
     builder: &mut FunctionBuilder<'_>,
     ty: WasmStorageType,
     addr: ir::Value,
+    null_trap: Option<ir::TrapCode>,
     extension: Option<Extension>,
 ) -> WasmResult<ir::Value> {
     assert_eq!(extension.is_none(), matches!(ty, WasmStorageType::Val(_)));
@@ -325,10 +401,14 @@ pub fn read_field_at_addr(
         matches!(ty, WasmStorageType::I8 | WasmStorageType::I16)
     );
 
-    // Data inside GC objects is always little endian.
-    let flags = func_env
+    // Data inside GC objects is always little endian. An access that is its
+    // reference's null check carries that check's trap code.
+    let mut flags = func_env
         .gc_memflags(&mut builder.func)
         .with_endianness(ir::Endianness::Little);
+    if let Some(code) = null_trap {
+        flags = flags.with_trap_code(Some(code));
+    }
 
     let value = match ty {
         WasmStorageType::I8 => builder.ins().load(ir::types::I8, flags, addr, 0),
@@ -480,12 +560,19 @@ pub fn write_field_at_addr(
     builder: &mut FunctionBuilder<'_>,
     field_ty: WasmStorageType,
     field_addr: ir::Value,
+    null_trap: Option<ir::TrapCode>,
     new_val: ir::Value,
 ) -> WasmResult<()> {
-    // Data inside GC objects is always little endian.
-    let flags = func_env
+    // Data inside GC objects is always little endian. An access that is its
+    // reference's null check carries that check's trap code; a `funcref` is
+    // interned before it is stored, so it never is one.
+    let mut flags = func_env
         .gc_memflags(&mut builder.func)
         .with_endianness(ir::Endianness::Little);
+    if let Some(code) = null_trap {
+        debug_assert!(!is_func_ref_storage(&field_ty));
+        flags = flags.with_trap_code(Some(code));
+    }
 
     match field_ty {
         WasmStorageType::I8 => {
@@ -575,18 +662,12 @@ pub fn translate_struct_get(
     struct_type_index: TypeIndex,
     field_index: u32,
     struct_ref: ir::Value,
+    non_null: bool,
     extension: Option<Extension>,
 ) -> WasmResult<ir::Value> {
     log::trace!(
         "translate_struct_get({struct_type_index:?}, {field_index:?}, {struct_ref:?}, {extension:?})"
     );
-
-    // TODO: If we know we have a `(ref $my_struct)` here, instead of maybe a
-    // `(ref null $my_struct)`, we could omit the `trapz`. But plumbing that
-    // type info from `wasmparser` and through to here is a bit funky.
-    func_env.trapz(builder, struct_ref, crate::TRAP_NULL_REFERENCE);
-
-    emit_gc_kind_assert(func_env, builder, struct_ref, VMGcKind::StructRef);
 
     let field_index = usize::try_from(field_index).unwrap();
     let interned_type_index = func_env.module.types[struct_type_index].unwrap_module_type_index();
@@ -598,6 +679,17 @@ pub fn translate_struct_get(
     let field_ty = &func_env.types.unwrap_struct(interned_type_index)?.fields[field_index];
     let field_size = wasmtime_environ::byte_size_of_wasm_ty_in_gc_heap(&field_ty.element_type);
     assert!(field_offset + field_size <= struct_size);
+    let field_ty = field_ty.element_type;
+
+    let null_trap = emit_null_check(
+        func_env,
+        builder,
+        struct_ref,
+        non_null,
+        Some(field_offset + field_size),
+    );
+
+    emit_gc_kind_assert(func_env, builder, struct_ref, VMGcKind::StructRef);
 
     let field_addr = func_env.prepare_gc_ref_access(
         builder,
@@ -609,13 +701,7 @@ pub fn translate_struct_get(
         },
     );
 
-    let result = read_field_at_addr(
-        func_env,
-        builder,
-        field_ty.element_type,
-        field_addr,
-        extension,
-    );
+    let result = read_field_at_addr(func_env, builder, field_ty, field_addr, null_trap, extension);
     log::trace!("translate_struct_get(..) -> {result:?}");
     result
 }
@@ -626,16 +712,12 @@ pub fn translate_struct_set(
     struct_type_index: TypeIndex,
     field_index: u32,
     struct_ref: ir::Value,
+    non_null: bool,
     new_val: ir::Value,
 ) -> WasmResult<()> {
     log::trace!(
         "translate_struct_set({struct_type_index:?}, {field_index:?}, struct_ref: {struct_ref:?}, new_val: {new_val:?})"
     );
-
-    // TODO: See comment in `translate_struct_get` about the `trapz`.
-    func_env.trapz(builder, struct_ref, crate::TRAP_NULL_REFERENCE);
-
-    emit_gc_kind_assert(func_env, builder, struct_ref, VMGcKind::StructRef);
 
     let field_index = usize::try_from(field_index).unwrap();
     let interned_type_index = func_env.module.types[struct_type_index].unwrap_module_type_index();
@@ -647,6 +729,17 @@ pub fn translate_struct_set(
     let field_ty = &func_env.types.unwrap_struct(interned_type_index)?.fields[field_index];
     let field_size = wasmtime_environ::byte_size_of_wasm_ty_in_gc_heap(&field_ty.element_type);
     assert!(field_offset + field_size <= struct_size);
+    let field_ty = field_ty.element_type;
+
+    let null_trap = emit_null_check(
+        func_env,
+        builder,
+        struct_ref,
+        non_null,
+        (!is_func_ref_storage(&field_ty)).then_some(field_offset + field_size),
+    );
+
+    emit_gc_kind_assert(func_env, builder, struct_ref, VMGcKind::StructRef);
 
     let field_addr = func_env.prepare_gc_ref_access(
         builder,
@@ -658,13 +751,7 @@ pub fn translate_struct_set(
         },
     );
 
-    write_field_at_addr(
-        func_env,
-        builder,
-        field_ty.element_type,
-        field_addr,
-        new_val,
-    )?;
+    write_field_at_addr(func_env, builder, field_ty, field_addr, null_trap, new_val)?;
 
     log::trace!("translate_struct_set: finished");
     Ok(())
@@ -713,7 +800,7 @@ pub fn translate_exn_unbox(
             },
         );
 
-        let value = read_field_at_addr(func_env, builder, field_ty, field_addr, None)?;
+        let value = read_field_at_addr(func_env, builder, field_ty, field_addr, None, None)?;
         result.push(value);
     }
 
@@ -857,7 +944,7 @@ pub fn translate_array_new_fixed(
         let index = builder
             .ins()
             .iconst(ir::types::I32, i64::try_from(i).unwrap());
-        let addr = array_elem_addr(func_env, builder, ty, result, index)?;
+        let addr = array_elem_addr(func_env, builder, ty, result, true, index)?;
         gc_compiler(func_env)?.init_field(
             func_env,
             builder,
@@ -873,12 +960,19 @@ pub fn translate_array_len(
     func_env: &mut FuncEnvironment<'_>,
     builder: &mut FunctionBuilder,
     array_ref: ir::Value,
+    non_null: bool,
 ) -> WasmResult<ir::Value> {
     log::trace!("translate_array_len({array_ref:?})");
 
-    func_env.trapz(builder, array_ref, crate::TRAP_NULL_REFERENCE);
-
     let len_offset = gc_compiler(func_env)?.layouts().array_length_field_offset();
+    let null_trap = emit_null_check(
+        func_env,
+        builder,
+        array_ref,
+        non_null,
+        Some(len_offset + ir::types::I32.bytes()),
+    );
+
     let len_field = func_env.prepare_gc_ref_access(
         builder,
         array_ref,
@@ -889,7 +983,10 @@ pub fn translate_array_len(
             access_size: u8::try_from(ir::types::I32.bytes()).unwrap(),
         },
     );
-    let flags = func_env.gc_memflags(&mut builder.func).with_readonly();
+    let mut flags = func_env.gc_memflags(&mut builder.func).with_readonly();
+    if let Some(code) = null_trap {
+        flags = flags.with_trap_code(Some(code));
+    }
     let result = builder.ins().load(ir::types::I32, flags, len_field, 0);
     log::trace!("translate_array_len(..) -> {result:?}");
     Ok(result)
@@ -963,6 +1060,7 @@ fn array_elem_addr(
     builder: &mut FunctionBuilder<'_>,
     array_type_index: ModuleInternedTypeIndex,
     array_ref: ir::Value,
+    non_null: bool,
     index: ir::Value,
 ) -> WasmResult<ir::Value> {
     // First, assert that `index < array.length`.
@@ -975,10 +1073,35 @@ fn array_elem_addr(
     // code in `bounds_check.rs` to implement these bounds checks. That is all
     // planned, but not yet implemented.
 
-    let len = translate_array_len(func_env, builder, array_ref).unwrap();
+    let len = translate_array_len(func_env, builder, array_ref, non_null).unwrap();
 
     let in_bounds = builder.ins().icmp(IntCC::UnsignedLessThan, index, len);
     func_env.trapz(builder, in_bounds, TRAP_ARRAY_OUT_OF_BOUNDS);
+
+    // Then the element's address, without trusting the length the check
+    // above read from the heap.
+    let (elem_size, base_size) = {
+        let layout = func_env.array_layout(array_type_index)?;
+        (layout.elem_size, layout.base_size)
+    };
+    if gc_heap_confinement_limit(func_env)
+        .is_some_and(|limit| limit >= (1 << 32) + u64::from(elem_size))
+    {
+        // The element's heap offset is `ref + base_size + index * elem_size`,
+        // computed in 32 bits: the product and both sums wrap at 2^32, so the
+        // offset is below 2^32 whatever a corrupt length let `index` be. The
+        // access then adds at most `elem_size` (at most 16) bytes, so it ends
+        // below 2^32 + 16: inside the heap's 4 GiB reservation plus its guard,
+        // where every byte is heap or faults. For an intact heap nothing
+        // wraps, since the whole array lies inside the 32-bit heap, and the
+        // offset is exact.
+        let elems = builder.ins().imul_imm_u(index, i64::from(elem_size));
+        let offset = builder.ins().iadd(array_ref, elems);
+        let offset = builder.ins().iadd_imm_u(offset, i64::from(base_size));
+        let offset = builder.ins().uextend(func_env.pointer_type(), offset);
+        let base = func_env.get_gc_heap_base(builder)?;
+        return Ok(builder.ins().iadd(base, offset));
+    }
 
     // Compute the size (in bytes) of the whole array object.
     let ArraySizeInfo {
@@ -1026,6 +1149,7 @@ pub fn translate_array_get(
     builder: &mut FunctionBuilder,
     array_type_index: TypeIndex,
     array_ref: ir::Value,
+    non_null: bool,
     index: ir::Value,
     extension: Option<Extension>,
 ) -> WasmResult<ir::Value> {
@@ -1034,12 +1158,13 @@ pub fn translate_array_get(
     emit_gc_kind_assert(func_env, builder, array_ref, VMGcKind::ArrayRef);
 
     let array_type_index = func_env.module.types[array_type_index].unwrap_module_type_index();
-    let elem_addr = array_elem_addr(func_env, builder, array_type_index, array_ref, index)?;
+    let elem_addr =
+        array_elem_addr(func_env, builder, array_type_index, array_ref, non_null, index)?;
 
     let array_ty = func_env.types.unwrap_array(array_type_index)?;
     let elem_ty = array_ty.0.element_type;
 
-    let result = read_field_at_addr(func_env, builder, elem_ty, elem_addr, extension)?;
+    let result = read_field_at_addr(func_env, builder, elem_ty, elem_addr, None, extension)?;
     log::trace!("translate_array_get(..) -> {result:?}");
     Ok(result)
 }
@@ -1049,6 +1174,7 @@ pub fn translate_array_set(
     builder: &mut FunctionBuilder,
     array_type_index: TypeIndex,
     array_ref: ir::Value,
+    non_null: bool,
     index: ir::Value,
     value: ir::Value,
 ) -> WasmResult<()> {
@@ -1057,12 +1183,13 @@ pub fn translate_array_set(
     emit_gc_kind_assert(func_env, builder, array_ref, VMGcKind::ArrayRef);
 
     let array_type_index = func_env.module.types[array_type_index].unwrap_module_type_index();
-    let elem_addr = array_elem_addr(func_env, builder, array_type_index, array_ref, index)?;
+    let elem_addr =
+        array_elem_addr(func_env, builder, array_type_index, array_ref, non_null, index)?;
 
     let array_ty = func_env.types.unwrap_array(array_type_index)?;
     let elem_ty = array_ty.0.element_type;
 
-    write_field_at_addr(func_env, builder, elem_ty, elem_addr, value)?;
+    write_field_at_addr(func_env, builder, elem_ty, elem_addr, None, value)?;
 
     log::trace!("translate_array_set: finished");
     Ok(())
@@ -1153,7 +1280,13 @@ pub fn translate_ref_test(
     // for `i31` references that don't point to GC objects.
     builder.switch_to_block(non_null_block);
     log::trace!("translate_ref_test: non-null ref block");
-    if is_any_hierarchy {
+    // Only `anyref`, `eqref` and `i31ref` operands can hold an `i31`: a
+    // value statically typed as a struct or array reference never does.
+    let val_might_be_i31 = matches!(
+        val_ty.heap_type,
+        WasmHeapType::Any | WasmHeapType::Eq | WasmHeapType::I31
+    );
+    if is_any_hierarchy && val_might_be_i31 {
         let i31_mask = builder.ins().iconst(
             ir::types::I32,
             i64::from(wasmtime_environ::I31_DISCRIMINANT),

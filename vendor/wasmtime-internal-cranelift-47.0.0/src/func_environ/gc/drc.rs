@@ -925,7 +925,7 @@ impl GcCompiler for DrcCompiler {
             return self.translate_init_gc_reference(func_env, builder, r, field_addr, val, flags);
         }
 
-        write_field_at_addr(func_env, builder, ty, field_addr, val)?;
+        write_field_at_addr(func_env, builder, ty, field_addr, None, val)?;
 
         Ok(())
     }

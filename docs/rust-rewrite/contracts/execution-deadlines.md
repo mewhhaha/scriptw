@@ -34,6 +34,13 @@ memory. Only memory that cannot relocate is watched: the product configuration
 sets `gc_heap_may_move(false)` and `memory_may_move(false)`, and the linear
 memory reservation already equals the Store limit.
 
+The GC heap's first page is its null guard: compiled code lets an access
+through a null reference fault there instead of testing the reference. A
+request never publishes, removes or restores access to that page, so a fault
+is told apart by its address: a null access traps on the null reference, as
+the explicit test it replaces did, and a pending request is delivered at the
+next watched access or entry.
+
 ## What compiled code must do
 
 Code that can run without bound must reach watched memory. Two rules give
@@ -94,11 +101,11 @@ retried request. Nothing faults before a deadline.
 
 `vendor/wasmtime-47.0.0/tests/interrupt_handle.rs` covers a GC-heap loop, a
 linear-memory loop, host code that reaches protected memory, a request made
-while idle, cancellation, Store drop and concurrent Stores. Engine's
-`aot_execution_deadlines` tests stop an empty loop, a scalar loop, recursion
-and a generator loop through the poll; a sparse array search through the GC
-heap; a backtracking regular expression through linear memory; and a builtin
-that calls source code on every step. They also run a script within its budget
+while idle, cancellation, Store drop, concurrent Stores and a null access next
+to a request. Engine's `aot_execution_deadlines` tests stop an empty loop, a
+scalar loop, recursion and a generator loop through the poll; a sparse array
+search through the GC heap; a backtracking regular expression through linear
+memory; and a builtin that calls source code on every step. They also run a script within its budget
 before and after a timeout. `wasm_backend_wasm_aot_deadline_bounds_infinite_loop`
 and `scalar_chunks_keep_deadlines_between_bounded_groups` remain.
 

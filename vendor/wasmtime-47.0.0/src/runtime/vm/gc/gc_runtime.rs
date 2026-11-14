@@ -41,6 +41,16 @@ pub unsafe trait GcRuntime: 'static + Send + Sync {
     /// Construct a new GC heap.
     #[cfg(feature = "gc")]
     fn new_gc_heap(&self, engine: &crate::Engine) -> Result<Box<dyn GcHeap>>;
+
+    /// The bytes at the start of this collector's heaps that it never
+    /// allocates and keeps inaccessible under `engine`'s configuration, so
+    /// that compiled code may let an access through a null reference fault
+    /// there. Zero by default.
+    #[cfg(feature = "gc")]
+    fn null_guard_bytes(&self, engine: &crate::Engine) -> usize {
+        let _ = engine;
+        0
+    }
 }
 
 /// A heap that manages garbage-collected objects.
@@ -482,6 +492,19 @@ pub unsafe trait GcHeap: 'static + Send + Sync {
     /// not have been used at all since the memory was taken. The memory must be
     /// the same size or larger than it was.
     unsafe fn replace_memory(&mut self, memory: crate::vm::Memory, delta_bytes_grown: u64);
+
+    /// Makes the null guard (see `GcRuntime::null_guard_bytes`) of a just
+    /// attached heap inaccessible. Fails, leaving the heap unusable, where
+    /// the backing memory cannot be protected.
+    fn protect_null_guard(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    /// The bytes at the start of the heap that are currently kept
+    /// inaccessible: an access there is a null-reference access.
+    fn null_guard_len(&self) -> usize {
+        0
+    }
 
     /// Get a raw `VMMemoryDefinition` for this heap's underlying memory storage.
     ///

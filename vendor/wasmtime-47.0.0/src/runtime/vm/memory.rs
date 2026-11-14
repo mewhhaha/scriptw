@@ -447,6 +447,37 @@ impl Memory {
         }
     }
 
+    /// Sets the access of the first `len` bytes of this memory: inaccessible
+    /// when `accessible` is false, otherwise read-write again. `len` is a
+    /// multiple of the host page size within `byte_size()`. Returns `false`,
+    /// changing nothing, for a backing whose pages this cannot protect.
+    ///
+    /// # Safety
+    /// While the prefix is inaccessible, nothing may access it.
+    pub(crate) unsafe fn set_prefix_access(&mut self, len: usize, accessible: bool) -> Result<bool> {
+        assert!(len <= self.byte_size());
+        let Memory::Local(memory) = self else {
+            return Ok(false);
+        };
+        if memory.memory_image.is_some() {
+            return Ok(false);
+        }
+        match memory.alloc.base() {
+            #[cfg(has_virtual_memory)]
+            MemoryBase::Mmap(base) => {
+                let start = base.offset().byte_count();
+                let range = start..start + len;
+                if accessible {
+                    unsafe { base.mmap().make_readwrite(range)? };
+                    Ok(true)
+                } else {
+                    unsafe { base.mmap().make_inaccessible(range) }
+                }
+            }
+            MemoryBase::Raw(_) => Ok(false),
+        }
+    }
+
     /// Returns whether or not this memory needs initialization. It
     /// may not if it already has initial content thanks to a CoW
     /// mechanism.

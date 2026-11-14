@@ -138,6 +138,49 @@ These are in `src/runtime/vm/{gc.rs,libcalls.rs}`,
 `src/runtime/vm/gc/{func_ref.rs,gc_ref.rs,gc_runtime.rs,enabled/copying.rs}`
 and `src/runtime/gc/enabled/externref.rs`.
 
+## GC heap null guard
+
+The vendored translator lets a GC access through a nullable reference be its
+own null check ([its notes](../wasmtime-internal-cranelift-47.0.0/PATCHES.md)):
+through reference 0 the access lands in the heap's first bytes. The runtime
+keeps those bytes faulting
+([measurements](../../docs/rust-rewrite/benchmarks.md#gc-access-code-2026-11-14)).
+
+- `src/runtime/vm/gc/enabled/copying.rs`: when the engine uses signal-based
+  traps and the GC heap cannot move, the first 4 KiB of the heap (the
+  translator's `copying_heap_data::NULL_GUARD_BYTES`, rounded up to whole host
+  pages) are a null guard. They belong to neither semi-space: the two split the
+  rest equally, so each loses 2,032 bytes (0.02% of the product's 8 MiB
+  semi-spaces; collections come that much earlier). Neither semi-space then
+  needs its `ALIGN` skip, which the guard replaces at reference 0. The heap
+  makes the guard inaccessible once it is attached (or once growth from a
+  smaller heap reaches it) and accessible again before it is detached.
+  Allocation of the heap fails when its memory cannot be protected, and no
+  heap is ever used without its guard.
+- `src/runtime/store/gc.rs`: GC heap allocation protects the guard
+  (`GcHeap::protect_null_guard`); `GcRuntime::null_guard_bytes` and
+  `GcHeap::null_guard_len` report it (none for other collectors).
+  `src/runtime/vm/{memory.rs,mmap.rs,sys/unix/mmap.rs}`:
+  `Memory::set_prefix_access` changes the access of an mmap-backed memory's
+  first pages; other backings report that they cannot.
+- `src/runtime/store.rs`: `wasm_fault` accepts a fault inside the GC heap's
+  guard as a null access and, like an explicit check, attaches no memory
+  address to the trap.
+- `src/runtime/vm/interrupt.rs`, `src/runtime/store.rs`: the Store watches its
+  GC heap without the guard. A request never publishes, removes or restores
+  access to it, so a fault there is never an interrupt and a withdrawn request
+  leaves it inaccessible. Compiled code that reaches a null access before its
+  next watched access traps on the null reference, as the explicit check
+  (which accessed no memory) did; the request is then delivered at the next
+  entry.
+- Tests: `null_guard_tests` in `copying.rs` (trap codes for null struct reads
+  and writes, null array lengths and accesses, and out-of-range indices, with
+  the guard and without; the guard is never allocated, in either semi-space;
+  a corrupted array length cannot address outside the reservation; a
+  withdrawn interrupt keeps the guard), the growth tests in `store/gc.rs`
+  count the guard out of a semi-space, and `tests/interrupt_handle.rs` tells a
+  null access and a request apart.
+
 Three upstream test feature guards are corrected so the collector control can
 compile with the product's narrow feature set plus `wat`: Linux copy-on-write
 tests in `src/runtime/vm/cow.rs` require `pooling-allocator`, and the hash-key

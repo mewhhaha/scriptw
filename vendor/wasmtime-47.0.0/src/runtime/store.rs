@@ -781,12 +781,22 @@ impl<T> Store<T> {
         inner.inner.vm_store_context.store_data = store_data.into();
         // The boxed store no longer moves, so its GC heap definition has its
         // final address. A heap that may relocate is left unwatched: a range
-        // published for it could outlive the mapping.
+        // published for it could outlive the mapping. An interrupt never
+        // touches the heap's null guard, which stays inaccessible.
         #[cfg(feature = "std")]
         if !engine.tunables().gc_heap_may_move {
-            inner.inner.interrupt.watch(crate::runtime::vm::SendSyncPtr::new(
-                NonNull::new(inner.inner.vm_store_context.gc_heap.get()).unwrap(),
-            ));
+            #[cfg(feature = "gc")]
+            let null_guard = engine
+                .gc_runtime()
+                .map_or(0, |runtime| runtime.null_guard_bytes(engine));
+            #[cfg(not(feature = "gc"))]
+            let null_guard = 0;
+            inner.inner.interrupt.watch(
+                crate::runtime::vm::SendSyncPtr::new(
+                    NonNull::new(inner.inner.vm_store_context.gc_heap.get()).unwrap(),
+                ),
+                null_guard,
+            );
         }
 
         inner.traitobj = StorePtr(Some(NonNull::from(&mut *inner)));
@@ -1093,7 +1103,7 @@ impl<T> Store<T> {
         let definition = memory.vmimport(&self.inner).from.as_non_null();
         self.inner
             .interrupt
-            .watch(crate::runtime::vm::SendSyncPtr::new(definition));
+            .watch(crate::runtime::vm::SendSyncPtr::new(definition), 0);
         Ok(())
     }
 
@@ -2064,6 +2074,18 @@ impl StoreOpaque {
                 assert!(mem::size_of::<VMFuncRef>() <= 512);
             };
             return None;
+        }
+
+        // An access through a null GC reference faults in the GC heap's
+        // inaccessible null guard. Like an explicit null check, the trap
+        // carries no address.
+        #[cfg(feature = "gc")]
+        if let Some(gc_store) = self.optional_gc_store() {
+            let guard = gc_store.gc_heap.null_guard_len();
+            let base = gc_store.gc_heap.vmmemory().base.as_ptr() as usize;
+            if addr.wrapping_sub(base) < guard {
+                return None;
+            }
         }
 
         // Search all known instances in this store for this address. Note that

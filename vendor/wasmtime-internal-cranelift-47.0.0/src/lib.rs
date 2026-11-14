@@ -46,6 +46,12 @@ pub mod copying_heap_data {
     pub const fn func_refs(pointer_bytes: u32) -> u32 {
         (FUNC_REFS_LEN + 4).next_multiple_of(pointer_bytes)
     }
+
+    /// Bytes from the start of the heap that the copying heap keeps
+    /// inaccessible whenever compiled code may rely on it, so that an access
+    /// within this distance of a null reference faults. The runtime rounds
+    /// it up to whole host pages.
+    pub const NULL_GUARD_BYTES: u32 = 4096;
 }
 mod obj;
 pub use obj::*;

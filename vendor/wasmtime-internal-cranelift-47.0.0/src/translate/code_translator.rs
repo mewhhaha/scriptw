@@ -117,6 +117,16 @@ macro_rules! unwrap_or_return_unreachable_state {
     };
 }
 
+/// Whether the operator's first operand is statically a non-nullable
+/// reference. Validation proves such a value is never null, so a GC access
+/// through it needs no null check.
+fn first_operand_is_non_null_ref(operand_types: &[WasmValType]) -> bool {
+    matches!(
+        operand_types.first(),
+        Some(WasmValType::Ref(reference)) if !reference.nullable
+    )
+}
+
 /// Translates wasm operators into Cranelift IR instructions.
 pub fn translate_operator(
     validator: &mut FuncValidator<impl WasmModuleResources>,
@@ -2772,6 +2782,7 @@ pub fn translate_operator(
                 struct_type_index,
                 *field_index,
                 struct_ref,
+                first_operand_is_non_null_ref(operand_types),
                 val,
             )?;
         }
@@ -2787,6 +2798,7 @@ pub fn translate_operator(
                 struct_type_index,
                 *field_index,
                 struct_ref,
+                first_operand_is_non_null_ref(operand_types),
                 Some(Extension::Sign),
             )?;
             environ.stacks.push1(val);
@@ -2803,6 +2815,7 @@ pub fn translate_operator(
                 struct_type_index,
                 *field_index,
                 struct_ref,
+                first_operand_is_non_null_ref(operand_types),
                 Some(Extension::Zero),
             )?;
             environ.stacks.push1(val);
@@ -2819,6 +2832,7 @@ pub fn translate_operator(
                 struct_type_index,
                 *field_index,
                 struct_ref,
+                first_operand_is_non_null_ref(operand_types),
                 None,
             )?;
             environ.stacks.push1(val);
@@ -2938,14 +2952,24 @@ pub fn translate_operator(
         }
         Operator::ArrayLen => {
             let array = environ.stacks.pop1();
-            let len = environ.translate_array_len(builder, array)?;
+            let len = environ.translate_array_len(
+                builder,
+                array,
+                first_operand_is_non_null_ref(operand_types),
+            )?;
             environ.stacks.push1(len);
         }
         Operator::ArrayGet { array_type_index } => {
             let array_type_index = TypeIndex::from_u32(*array_type_index);
             let (array, index) = environ.stacks.pop2();
-            let elem =
-                environ.translate_array_get(builder, array_type_index, array, index, None)?;
+            let elem = environ.translate_array_get(
+                builder,
+                array_type_index,
+                array,
+                first_operand_is_non_null_ref(operand_types),
+                index,
+                None,
+            )?;
             environ.stacks.push1(elem);
         }
         Operator::ArrayGetS { array_type_index } => {
@@ -2955,6 +2979,7 @@ pub fn translate_operator(
                 builder,
                 array_type_index,
                 array,
+                first_operand_is_non_null_ref(operand_types),
                 index,
                 Some(Extension::Sign),
             )?;
@@ -2967,6 +2992,7 @@ pub fn translate_operator(
                 builder,
                 array_type_index,
                 array,
+                first_operand_is_non_null_ref(operand_types),
                 index,
                 Some(Extension::Zero),
             )?;
@@ -2975,7 +3001,14 @@ pub fn translate_operator(
         Operator::ArraySet { array_type_index } => {
             let array_type_index = TypeIndex::from_u32(*array_type_index);
             let (array, index, elem) = environ.stacks.pop3();
-            environ.translate_array_set(builder, array_type_index, array, index, elem)?;
+            environ.translate_array_set(
+                builder,
+                array_type_index,
+                array,
+                first_operand_is_non_null_ref(operand_types),
+                index,
+                elem,
+            )?;
         }
         Operator::RefEq => {
             let (r1, r2) = environ.stacks.pop2();
