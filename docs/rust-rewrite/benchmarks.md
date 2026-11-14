@@ -1030,7 +1030,9 @@ Instructions per request: sync 5.111M to 5.089M (median) and 5.597M to
 5.575M (mean), async 5.593M to 5.569M and 6.238M to 6.215M; P 4,793,590 to
 4,738,997 bytes. Cycles were not comparable (load average 24 during the run).
 Not counted yet: which property each read site names, and allocations per
-site.
+site. Later the same rule drops the TARGET test from a numeric body's
+captured-cell checks and from captured call roots in programs that import
+nothing; the retained P emits neither, so its bytes and counts are unchanged.
 
 ### `instanceof` site records (2026-11-14)
 

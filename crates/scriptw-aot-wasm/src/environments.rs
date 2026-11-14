@@ -337,6 +337,15 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Link the already allocated importing cell to its ultimate exporter.
     /// The importing binding is initialized independently of exporter TDZ.
+    /// Whether a cell this body reads may be linked to another module's
+    /// cell. Module linking sets a cell's TARGET for import bindings alone,
+    /// so a source body of a program that declares none reads only unlinked
+    /// cells; runtime helpers read the cells of any program.
+    pub(crate) fn cells_may_be_linked(&self) -> bool {
+        !self.has_source_execution_environment()
+            || self.functions.declares_module_import_bindings()
+    }
+
     pub(crate) fn emit_initialize_indirect_binding(
         &mut self,
         local_slot: u32,
@@ -372,12 +381,7 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> I32Local {
         let schema = self.runtime_schema();
-        // A source body of a program that declares no import binding reads
-        // only cells whose TARGET is never linked: module linking sets it
-        // for import bindings alone.
-        if self.has_source_execution_environment()
-            && !self.functions.declares_module_import_bindings()
-        {
+        if !self.cells_may_be_linked() {
             let initialized = schema.reserve_i32_local(function);
             schema
                 .struct_type::<BindingCell>()

@@ -329,12 +329,14 @@ impl FunctionBuilder<'_> {
             cell_mutable.load(function);
             cell_flag.load(function);
             function.instruction(&Instruction::I32And);
-            schema
-                .field(BindingCellSchema::TARGET)
-                .read(&cell, schema, function)
-                .reference()
-                .is_null(function);
-            function.instruction(&Instruction::I32And);
+            if self.cells_may_be_linked() {
+                schema
+                    .field(BindingCellSchema::TARGET)
+                    .read(&cell, schema, function)
+                    .reference()
+                    .is_null(function);
+                function.instruction(&Instruction::I32And);
+            }
             cell.clear(function);
             function.instruction(&Instruction::I32Eqz);
             self.emit_branch_if_to_target(declined, function);

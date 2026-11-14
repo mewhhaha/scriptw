@@ -247,13 +247,15 @@ impl CapturedCalls {
                         .as_ref()
                         .expect("captured slot");
                     root.replace(cell.load(s, function).nullable(), function);
-                    s.field(BindingCellSchema::TARGET)
-                        .read(&cell, s, function)
-                        .reference()
-                        .is_null(function);
                     s.field(BindingCellSchema::INITIALIZED)
                         .read(&cell, s, function);
-                    function.instruction(&Instruction::I32And);
+                    if builder.cells_may_be_linked() {
+                        s.field(BindingCellSchema::TARGET)
+                            .read(&cell, s, function)
+                            .reference()
+                            .is_null(function);
+                        function.instruction(&Instruction::I32And);
+                    }
                     if *written {
                         s.field(BindingCellSchema::MUTABLE).read(&cell, s, function);
                         function.instruction(&Instruction::I32And);
