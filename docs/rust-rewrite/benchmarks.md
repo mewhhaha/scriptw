@@ -379,6 +379,7 @@ They do not refresh the published panel.
 | [Identifier cells, truncation and single casts](#identifier-cells-truncation-and-single-casts-2026-11-13) (ABI 69), on the row above | 6.44M | 7.02M |
 | [GC access code](#gc-access-code-2026-11-14): implicit null checks, wrapping element offsets (ABI 69), on the row above | 5.11M | 5.59M |
 | [Captured cells without import links](#request-census-and-import-free-cells-2026-11-14) (ABI 69), on the row above | 5.09M | 5.57M |
+| [`instanceof` site records in P](#instanceof-site-records-2026-11-14) (ABI 70), on the row above | 5.01M | 5.49M |
 | Node 24 `--jitless` | 4.38M | — |
 | Node 24 with its JIT | 2.62M | — |
 
@@ -1030,6 +1031,43 @@ Instructions per request: sync 5.111M to 5.089M (median) and 5.597M to
 4,738,997 bytes. Cycles were not comparable (load average 24 during the run).
 Not counted yet: which property each read site names, and allocations per
 site.
+
+### `instanceof` site records (2026-11-14)
+
+Each source `instanceof` site now keeps a record in a P global (ABI 70),
+made by the new R helper `instanceof_record` the first time the site runs,
+for the right-hand side C it meets then. A usable record names a function
+whose own "prototype" is a non-writable, non-configurable data property
+holding an object (every builtin constructor and class), and whose
+[[Prototype]] was a Realm's %Function.prototype% or one function object
+whose [[Prototype]] was (%TypedArray% for the typed array constructors, or a
+parent class). At each use the site checks that C is the record's function,
+that those [[Prototype]] edges are unchanged and that @@hasInstance has never
+been hashed, so no dictionary holds it; it then answers a primitive V false
+and walks an ordinary, function or Array V's chain inline. Everything else
+goes on to the call-free entry and the HasInstance helper as before, having
+observed nothing: another right-hand side, a writable "prototype" (an
+ordinary `function`), a deeper chain, a Proxy candidate, a bound,
+Proxy or non-callable C. A site whose first right-hand side is declined
+keeps a declined record.
+
+On the retained request, `vn` tests each value against 21 builtin
+constructors; eleven of them are typed arrays, which a record of the direct
+edge alone declined (sync 5.073M then).
+
+| Retained RSC, Speed, user instructions per request | median | mean |
+| --- | ---: | ---: |
+| sync, before (`f72b39596`) | 5.089M | 5.575M |
+| sync, after | 5.010M | 5.497M |
+| async, before | 5.569M | 6.215M |
+| async, after | 5.486M | 6.132M |
+
+Sync cycles median 2.533M (mean 2.748M) on the after build. P grows from
+4,738,997 to 4,763,949 bytes and R by 1,099 bytes. `instanceof_entry`'s own
+share of sync cycles falls from 3.2% to 1.6% with the direct edge alone, and
+out of the top forty own entries (under 0.3%) once one function object between
+C and %Function.prototype% is proved; `vn`'s own share rises from 12.1% to
+14.6%, where the answers now run.
 ### Descriptor work and physical allocation
 
 Compiler-created, already validated descriptors now call canonical ordinary/Array definition directly when admitted, retaining the exotic Reflect fallback. Known source accessor descriptors bypass the inline Array algorithm to control code growth. Public descriptor conversion and validation remain intact.

@@ -17,9 +17,10 @@ accepts `--case <file.js>`.
   call-free `instanceof` entry (ABI 68), with the host-side reductions,
   static site records kept in P globals (ABI 69), inline funcref reads,
   identifier cells, rounding-free truncation, single casts and shorter GC
-  access code (implicit null checks, wrapping element offsets), and captured
-  cells read without import links in programs that import nothing,
-  runs a Speed sync request in 5.09M user instructions (median) against 4.38M
+  access code (implicit null checks, wrapping element offsets), captured
+  cells read without import links in programs that import nothing, and
+  `instanceof` site records in P (ABI 70),
+  runs a Speed sync request in 5.01M user instructions (median) against 4.38M
   (and 2.68M cycles) for Node 24
   `--jitless`
   ([per-operation costs](benchmarks.md#read-records-and-per-operation-costs-2026-11-11),
