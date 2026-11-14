@@ -150,9 +150,10 @@ fn number_remainder_guards_integer_conversion_and_retains_exact_significand_fall
                      Operator::I64And, Operator::LocalSet { local_index: target }]
                     if *source == input && *target == magnitude)), "the bound uses the actual input's absolute bits");
                 assert!(
-                    guard.windows(7).any(|ops| matches!(ops,
+                    guard.windows(8).any(|ops| matches!(ops,
                     [Operator::LocalGet { local_index: first }, Operator::F64ReinterpretI64,
-                     Operator::F64Trunc, Operator::LocalGet { local_index: second },
+                     Operator::I64TruncSatF64S, Operator::F64ConvertI64S,
+                     Operator::LocalGet { local_index: second },
                      Operator::F64ReinterpretI64, Operator::F64Eq, Operator::I32And]
                     if *first == input && *second == input)),
                     "each converted input must equal its truncation"

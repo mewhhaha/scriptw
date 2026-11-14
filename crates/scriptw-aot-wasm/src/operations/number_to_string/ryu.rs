@@ -1155,11 +1155,15 @@ impl<'a> FunctionBuilder<'a> {
             9_007_199_254_740_991.0,
         )));
         function.instruction(&Instruction::F64Le);
+        // A nonnegative value's floor is its truncation; within the bound
+        // above, the saturating i64 truncation converted back is exact and
+        // needs no rounding operator (a host call on the baseline target).
         absolute.load(function);
         function.instruction(&Instruction::F64ReinterpretI64);
         absolute.load(function);
         function.instruction(&Instruction::F64ReinterpretI64);
-        function.instruction(&Instruction::F64Floor);
+        function.instruction(&Instruction::I64TruncSatF64S);
+        function.instruction(&Instruction::F64ConvertI64S);
         function.instruction(&Instruction::F64Eq);
         function.instruction(&Instruction::I32And);
         function.instruction(&Instruction::If(BlockType::Empty));

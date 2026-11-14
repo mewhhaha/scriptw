@@ -7611,9 +7611,9 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I64Const(0));
         out_local.store(function);
         function.instruction(&Instruction::Else);
+        // The saturating conversion itself truncates toward zero.
         number_payload_local.load(function);
         function.instruction(&Instruction::F64ReinterpretI64);
-        function.instruction(&Instruction::F64Trunc);
         function.instruction(&Instruction::I64TruncSatF64S);
         out_local.store(function);
         out_local.load(function);
@@ -7668,9 +7668,9 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I64Const(0));
         out_local.store(function);
         function.instruction(&Instruction::Else);
+        // The saturating conversion itself truncates toward zero.
         number_payload_local.load(function);
         function.instruction(&Instruction::F64ReinterpretI64);
-        function.instruction(&Instruction::F64Trunc);
         function.instruction(&Instruction::I64TruncSatF64S);
         out_local.store(function);
         out_local.load(function);

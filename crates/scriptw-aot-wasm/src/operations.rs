@@ -1823,9 +1823,24 @@ impl<'a> FunctionBuilder<'a> {
         number_payload_local.load(function);
         out_payload_local.store(function);
         function.instruction(&Instruction::Else);
+        // trunc of a finite nonzero value without a rounding operator: below
+        // 2^63 in magnitude the saturating i64 truncation converted back,
+        // otherwise the value itself, already integral. Adding +0 gives -0's
+        // and a negative fraction's truncation the same +0 either way.
         number_payload_local.load(function);
         function.instruction(&Instruction::F64ReinterpretI64);
-        function.instruction(&Instruction::F64Trunc);
+        function.instruction(&Instruction::I64TruncSatF64S);
+        function.instruction(&Instruction::F64ConvertI64S);
+        number_payload_local.load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        number_payload_local.load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        function.instruction(&Instruction::F64Abs);
+        function.instruction(&Instruction::F64Const(Ieee64::from(
+            9_223_372_036_854_775_808.0,
+        )));
+        function.instruction(&Instruction::F64Lt);
+        function.instruction(&Instruction::Select);
         function.instruction(&Instruction::F64Const(Ieee64::from(0.0)));
         function.instruction(&Instruction::F64Add);
         function.instruction(&Instruction::I64ReinterpretF64);
@@ -2221,9 +2236,9 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I64Const(MAX_SAFE_INTEGER as i64));
         output.store(function);
         function.instruction(&Instruction::Else);
+        // The conversion itself truncates toward zero.
         number.load(function);
         function.instruction(&Instruction::F64ReinterpretI64);
-        function.instruction(&Instruction::F64Trunc);
         function.instruction(&Instruction::I64TruncF64U);
         output.store(function);
         function.instruction(&Instruction::End);
@@ -5267,10 +5282,23 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I64ExtendI32U);
         sign_local.store(function);
 
-        // int_f = trunc(abs); frac_f = abs - int_f (in [0, 1)).
+        // int_f = trunc(abs); frac_f = abs - int_f (in [0, 1)). Below 2^63
+        // the saturating i64 truncation converted back is trunc; from there
+        // abs is already integral. No rounding operator (a host call on the
+        // baseline target) is needed.
         abs_local.load(function);
         function.instruction(&Instruction::F64ReinterpretI64);
-        function.instruction(&Instruction::F64Trunc);
+        function.instruction(&Instruction::I64TruncSatF64S);
+        function.instruction(&Instruction::F64ConvertI64S);
+        abs_local.load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        abs_local.load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        function.instruction(&Instruction::F64Const(Ieee64::from(
+            9_223_372_036_854_775_808.0,
+        )));
+        function.instruction(&Instruction::F64Lt);
+        function.instruction(&Instruction::Select);
         function.instruction(&Instruction::I64ReinterpretF64);
         int_f_local.store(function);
         abs_local.load(function);
@@ -6580,6 +6608,25 @@ pub(crate) fn emit_number_to_uint32_payload(
     out_local: crate::gc_types::I64Local,
     function: &mut Function,
 ) {
+    // Below 2^63 in magnitude the saturating i64 truncation is trunc(x)
+    // exactly, and ToUint32 is its low 32 bits. NaN, larger magnitudes and
+    // the infinities take the modular kernel, whose rounding operators call
+    // the host on the baseline x86-64 target.
+    number_payload_local.load(function);
+    function.instruction(&Instruction::F64ReinterpretI64);
+    function.instruction(&Instruction::F64Abs);
+    function.instruction(&Instruction::F64Const(Ieee64::from(
+        9_223_372_036_854_775_808.0,
+    )));
+    function.instruction(&Instruction::F64Lt);
+    function.instruction(&Instruction::If(BlockType::Empty));
+    number_payload_local.load(function);
+    function.instruction(&Instruction::F64ReinterpretI64);
+    function.instruction(&Instruction::I64TruncSatF64S);
+    function.instruction(&Instruction::I64Const(0xFFFF_FFFF));
+    function.instruction(&Instruction::I64And);
+    out_local.store(function);
+    function.instruction(&Instruction::Else);
     number_payload_local.load(function);
     function.instruction(&Instruction::F64ReinterpretI64);
     function.instruction(&Instruction::F64Trunc);
@@ -6598,6 +6645,7 @@ pub(crate) fn emit_number_to_uint32_payload(
     function.instruction(&Instruction::F64Sub);
     function.instruction(&Instruction::I64TruncSatF64U);
     out_local.store(function);
+    function.instruction(&Instruction::End);
 }
 
 pub(crate) fn emit_number_bitwise_payload(

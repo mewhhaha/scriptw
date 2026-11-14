@@ -504,9 +504,13 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::F64Const(Ieee64::from(0.0)));
         function.instruction(&Instruction::F64Gt);
         self.open_frame(ControlFrameKind::If, function);
+        // For a positive length the saturating i64 truncation converted back
+        // is f64.trunc wherever the clamp below can tell them apart: both
+        // exceed 2^53 - 1 from 2^63 on. It needs no rounding operator.
         pending.value().scalar().load(function);
         function.instruction(&Instruction::F64ReinterpretI64);
-        function.instruction(&Instruction::F64Trunc);
+        function.instruction(&Instruction::I64TruncSatF64S);
+        function.instruction(&Instruction::F64ConvertI64S);
         function.instruction(&Instruction::F64Const(Ieee64::from(
             9_007_199_254_740_991.0,
         )));

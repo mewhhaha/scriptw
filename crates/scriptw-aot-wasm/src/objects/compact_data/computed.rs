@@ -126,9 +126,13 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32And);
         key.scalar().load(f);
         f.instruction(&Instruction::F64ReinterpretI64);
+        // An integral value equals its saturating i64 truncation converted
+        // back; the bounds above make that exact, and no rounding operator
+        // (a host call on the baseline x86-64 target) is needed.
         key.scalar().load(f);
         f.instruction(&Instruction::F64ReinterpretI64);
-        f.instruction(&Instruction::F64Trunc);
+        f.instruction(&Instruction::I64TruncSatF64S);
+        f.instruction(&Instruction::F64ConvertI64S);
         f.instruction(&Instruction::F64Eq);
         f.instruction(&Instruction::I32And);
         f.instruction(&Instruction::I32Eqz);

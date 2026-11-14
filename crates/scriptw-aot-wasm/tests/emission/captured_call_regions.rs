@@ -122,10 +122,12 @@ fn call_domains_remove_only_redundant_number_modulo_and_singleton_dispatch() {
                     modulo,
                     "only arbitrary Number operands retain full ToUint32: {step}"
                 );
+                // Each retained full ToUint32 first takes its saturating
+                // truncation below 2^63, one branch of its own.
                 assert_eq!(
                     region.iter().filter(|op| matches!(op, Operator::If { .. })).count(),
-                    branches,
-                    "only actual source branches remain after singleton admission: {step}"
+                    branches + modulo,
+                    "only actual source branches and full ToUint32 fast paths remain after singleton admission: {step}"
                 );
                 assert!(body.iter().any(|op| matches!(op, Operator::CallRef { .. })));
             }

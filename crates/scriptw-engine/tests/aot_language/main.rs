@@ -115,3 +115,4 @@ mod aot_compact_for_in;
 
 mod aot_shape_transitions;
 mod aot_static_site_records;
+mod aot_identifier_cells_and_truncation;

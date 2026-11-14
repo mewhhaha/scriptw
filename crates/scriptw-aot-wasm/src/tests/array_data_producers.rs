@@ -197,9 +197,14 @@ fn integer_decimal_helper_keeps_private_unsigned_domain_without_float_rounding()
         .position(|op| matches!(op, Operator::I64TruncF64U))
         .expect("guarded magnitude conversion");
     assert!(bound < truncation);
+    // Within the safe-integer bound the integrality test is the saturating
+    // i64 truncation converted back; no rounding operator remains.
     assert!(number[bound..truncation]
         .iter()
-        .any(|op| matches!(op, Operator::F64Floor)));
+        .any(|op| matches!(op, Operator::I64TruncSatF64S)));
+    assert!(!number[bound..truncation]
+        .iter()
+        .any(|op| matches!(op, Operator::F64Floor | Operator::F64Trunc)));
     let (_, push) = named_body(runtime.bytes(), "builtin::Array.prototype.push");
     assert!(
         calls(&push, formatter),

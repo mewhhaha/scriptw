@@ -52,9 +52,12 @@ impl FunctionBuilder<'_> {
             function.instruction(&Instruction::I64Const(MAX_SAFE_INTEGER_BITS));
             function.instruction(&Instruction::I64LeU);
             function.instruction(&Instruction::I32And);
+            // Within that bound the saturating i64 truncation converted back
+            // is f64.trunc, without its host call on the baseline target.
             input.load(function);
             function.instruction(&Instruction::F64ReinterpretI64);
-            function.instruction(&Instruction::F64Trunc);
+            function.instruction(&Instruction::I64TruncSatF64S);
+            function.instruction(&Instruction::F64ConvertI64S);
             input.load(function);
             function.instruction(&Instruction::F64ReinterpretI64);
             function.instruction(&Instruction::F64Eq);

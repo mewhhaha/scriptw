@@ -128,7 +128,11 @@ fn computed_getv_hits_leave_before_boxing_conversion_and_full_lookup() {
                     }
                     let branch = &operators[guard + 4..end];
                     if *value == WasmRuntimeValueTag::Number as i32 {
-                        assert!(branch.iter().any(|op| matches!(op, Operator::F64Trunc)));
+                        // The integral-index test needs no rounding operator.
+                        assert!(branch
+                            .iter()
+                            .any(|op| matches!(op, Operator::I64TruncSatF64S)));
+                        assert!(!branch.iter().any(|op| matches!(op, Operator::F64Trunc)));
                         assert!(branch
                             .iter()
                             .any(|op| matches!(op, Operator::ArrayGet { .. })));

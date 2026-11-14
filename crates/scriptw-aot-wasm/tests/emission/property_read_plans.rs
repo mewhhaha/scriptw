@@ -245,7 +245,8 @@ fn assert_numeric_probe_before_conversion(
     assert!(
         guard.iter().any(|op| matches!(op, Operator::F64Ge))
             && guard.iter().any(|op| matches!(op, Operator::F64Lt))
-            && guard.iter().any(|op| matches!(op, Operator::F64Trunc))
+            && guard.iter().any(|op| matches!(op, Operator::I64TruncSatF64S))
+            && guard.iter().any(|op| matches!(op, Operator::F64ConvertI64S))
             && guard.iter().any(|op| matches!(op, Operator::F64Eq)),
         "finite integral index guards precede the trapping cast"
     );

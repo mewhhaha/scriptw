@@ -369,9 +369,12 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::F64Const((u32::MAX as f64).into()));
         f.instruction(&Instruction::F64Le);
         f.instruction(&Instruction::I32And);
+        // Within [0, 2^32] floor is the saturating i64 truncation converted
+        // back, which needs no rounding operator.
         number.load(f);
         number.load(f);
-        f.instruction(&Instruction::F64Floor);
+        f.instruction(&Instruction::I64TruncSatF64S);
+        f.instruction(&Instruction::F64ConvertI64S);
         f.instruction(&Instruction::F64Eq);
         f.instruction(&Instruction::I32And);
         f.instruction(&Instruction::I32Eqz);
