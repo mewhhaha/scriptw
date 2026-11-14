@@ -380,6 +380,7 @@ They do not refresh the published panel.
 | [GC access code](#gc-access-code-2026-11-14): implicit null checks, wrapping element offsets (ABI 69), on the row above | 5.11M | 5.59M |
 | [Captured cells without import links](#request-census-and-import-free-cells-2026-11-14) (ABI 69), on the row above | 5.09M | 5.57M |
 | [`instanceof` site records in P](#instanceof-site-records-2026-11-14) (ABI 70), on the row above | 5.01M | 5.49M |
+| [Young generation](#young-generation-2026-11-14): 2 MiB nursery, direct global-root tracing, on the row above; means over 900 requests 5.17M and 5.66M (over 100, 5.15M and 5.64M, were 5.50M and 6.13M) | 5.05M | 5.53M |
 | Node 24 `--jitless` | 4.38M | — |
 | Node 24 with its JIT | 2.62M | — |
 
@@ -1070,6 +1071,112 @@ share of sync cycles falls from 3.2% to 1.6% with the direct edge alone, and
 out of the top forty own entries (under 0.3%) once one function object between
 C and %Function.prototype% is proved; `vn`'s own share rises from 12.1% to
 14.6%, where the answers now run.
+
+### Young generation (2026-11-14)
+
+The rows above are medians, and the median request never collected: the
+copying collector ran a full collection about every 14 requests (6.5 MB of
+allocation), recopying a stable 1.72 MB live set (15.6K objects) for about
+7.4M instructions, which put the sync mean 10% and the async mean 11% above
+the median (Node's mean is 0.04M above its median on this request). Of the
+6.5 MB allocated between two collections only 39 KB (median; 5–57 KB) was
+still live.
+
+Three vendored changes address it
+([runtime](../../vendor/wasmtime-47.0.0/PATCHES.md),
+[translator](../../vendor/wasmtime-internal-cranelift-47.0.0/PATCHES.md)):
+
+- Root tracing reads reference-typed globals from each module's global types
+  instead of building a typed handle for each of P's 1,691 globals: 0.17–0.22
+  ms per collection becomes about 0.02 ms (about 460 roots: ~130 stack, 338
+  globals and tables, the rest host).
+- A young generation: a nursery of one eighth of the initial heap (2 MiB of
+  16 MiB) after the null guard, minor collections that promote survivors into
+  the old semi-spaces, a write barrier on reference stores into existing
+  objects, and the existing full collection and collect-or-grow rule for the
+  old space. At 480 KB per request the nursery spans about 4.3 requests. The
+  size is a fixed fraction of the heap, not fitted to this request.
+- Minor collections whose work follows what they move. As first built, one
+  cost 0.95M instructions for 1,040 survivors (56 KB), 457 roots, 119
+  remembered slots and 462 weak edges set since the last collection; now it
+  costs 0.47M, counted with a per-thread instruction counter around each
+  phase (median of 46):
+
+  | Part | First build | Now | Proportional to |
+  | --- | ---: | ---: | --- |
+  | Root tracing | 108K | 34K | roots, chiefly the stack walk |
+  | Ephemeron setup | 166K | 66K | weak edges set since the last collection |
+  | Root forwarding | 20K | 16K | roots |
+  | Remembered slots | 11K | 6K | remembered slots |
+  | Worklist | 427K | 273K | survivors, about 263 per object |
+  | Ephemerons | 64K | 8K | weak edges set since the last collection |
+  | Weak update | 132K | 37K | weak edges set since the last collection |
+  | Finish | 3K | 3K | young `externref`s |
+
+  The first build walked the whole weak registry three times and copied
+  through helpers that re-validated the heap for every field; nothing now
+  walks the old space, the registry, the nursery or the type-trace table. A
+  full collection shares the copying loop and costs about 5M instructions.
+
+Sync and async Speed requests on `6c000d027` (before the `instanceof` site
+records), instructions, 900 measured after 100 warmups in one process; a
+request "collects" when it exceeds the fastest by more than 3%, and the last
+column counts requests at least 3M above the median, which are full
+collections:
+
+| | Mean | Median | p90 | Max | Requests that collect | Full collections |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Sync, direct global roots only | 5.588M | 5.088M | 5.089M | 12.703M | 7% | 61 |
+| Sync, young generation | 5.232M | 5.121M | 5.602M | 10.206M | 22% | 3 |
+| Async, direct global roots only | 6.177M | 5.568M | 5.570M | 13.199M | 8% | 74 |
+| Async, young generation | 5.734M | 5.604M | 6.083M | 10.593M | 25% | 4 |
+
+The usual window of 100 requests after 100 warmups holds no full collection
+of the young generation, which flatters its mean by roughly 0.02–0.03M:
+
+| | Mean | Median | p90 | Max | Requests that collect |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Sync, direct global roots only | 5.534M | 5.088M | 5.089M | 12.703M | 6% |
+| Sync, young generation | 5.217M | 5.121M | 5.552M | 5.727M | 23% |
+| Async, direct global roots only | 6.161M | 5.568M | 5.570M | 13.200M | 8% |
+| Async, young generation | 5.706M | 5.604M | 6.087M | 6.095M | 22% |
+
+On the combined source with the `instanceof` site records (ABI 70), 900
+requests run at 5.167M mean, 5.054M median, 5.534M p90 and 10.115M max (sync;
+23% collect, 3 full collections) and 5.664M, 5.533M, 6.015M and 10.512M
+(async; 25%, 4); over 100 requests the means are 5.150M and 5.636M, against
+5.497M and 6.132M (medians 5.010M and 5.486M) for that source without these
+changes.
+
+The barrier costs the median 33K–36K instructions (0.65%): two instructions
+per reference store into an existing object, plus a slow path for stores into
+old objects. A minor collection promotes about 55 KB, so a full collection
+follows when the old space has less than a nursery free, about every 260–300
+requests. The mean is still 0.11M (sync) and 0.13M (async) above the median,
+against Node's 0.04M. Of a minor collection's 0.47M, about 110K process the
+WeakMap entries React Flight creates (about 460 per nursery, most of them
+dead by the collection), and the worklist's 263 instructions per survivor are
+bounds and kind checks the copying loop keeps against heap corruption plus
+the copy itself.
+
+Sensitivity to the nursery's size, measured on the first build of minor
+collections (before the table above), with P and R compiled at run time
+under a temporary override (not committed), 100 requests after 100 warmups:
+
+| Nursery | Requests per minor collection | Sync mean / median / p90 / max | Requests that collect | Async mean / median / max | Requests that collect |
+| --- | ---: | --- | ---: | --- | ---: |
+| none | — | 5.619 / 5.111 / 5.112 / 13.813M | 6% | 6.268 / 5.592 / 14.317M | 8% |
+| 512 KiB | ~1.1 | 6.182 / 6.169 / 6.529 / 14.380M | 90% | 6.744 / 6.653 / 15.127M | 92% |
+| 1 MiB | ~2.2 | 5.750 / 5.146 / 6.513 / 14.531M | 44% | 6.238 / 6.117 / 14.471M | 51% |
+| 2 MiB | ~4.3 | 5.370 / 5.144 / 6.179 / 6.479M | 23% | 5.877 / 5.628 / 6.917M | 22% |
+| 4 MiB | ~8.7 | 5.387 / 5.143 / 5.145 / 13.477M | 10% | 5.906 / 5.628 / 14.197M | 13% |
+
+The smaller nurseries promote more often and fill the old space within the
+window (each of their maxima is a full collection); the 4 MiB nursery leaves
+6 MiB semi-spaces, which reach the full-collection threshold (less than a
+nursery free) after a few minor collections. Cycles were not settled: other
+projects' builds ran throughout.
+
 ### Descriptor work and physical allocation
 
 Compiler-created, already validated descriptors now call canonical ordinary/Array definition directly when admitted, retaining the exotic Reflect fallback. Known source accessor descriptors bypass the inline Array algorithm to control code growth. Public descriptor conversion and validation remain intact.

@@ -19,7 +19,8 @@ or not the instruction is a registered trap site. Engine reports that trap as
 `EngineExecutionFailure::Timeout`, as it did for an epoch deadline.
 
 Host code inside the Store that reaches the memory first, such as the
-collector, a host import or an embedder read, gets access back and continues.
+collector (a minor collection as much as a full one), a host import or an
+embedder read, gets access back and continues.
 A requester therefore repeats the request. A request still pending when the
 host next enters compiled code is delivered at that entry.
 

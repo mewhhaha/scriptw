@@ -18,10 +18,11 @@ accepts `--case <file.js>`.
   static site records kept in P globals (ABI 69), inline funcref reads,
   identifier cells, rounding-free truncation, single casts and shorter GC
   access code (implicit null checks, wrapping element offsets), captured
-  cells read without import links in programs that import nothing, and
-  `instanceof` site records in P (ABI 70),
-  runs a Speed sync request in 5.01M user instructions (median) against 4.38M
-  (and 2.68M cycles) for Node 24
+  cells read without import links in programs that import nothing,
+  `instanceof` site records in P (ABI 70) and a young generation,
+  runs a Speed sync request in 5.05M user instructions (median; mean 5.17M
+  over 900 requests, 0.11M above the median against Node's 0.04M) against
+  4.38M (and 2.68M cycles) for Node 24
   `--jitless`
   ([per-operation costs](benchmarks.md#read-records-and-per-operation-costs-2026-11-11),
   [hit entries](benchmarks.md#record-hit-entries-2026-11-12),
@@ -29,7 +30,8 @@ accepts `--case <file.js>`.
   [host-side costs](benchmarks.md#host-side-costs-2026-11-13),
   [site records](benchmarks.md#site-records-in-p-2026-11-13),
   [identifier cells and truncation](benchmarks.md#identifier-cells-truncation-and-single-casts-2026-11-13),
-  [GC access code](benchmarks.md#gc-access-code-2026-11-14)).
+  [GC access code](benchmarks.md#gc-access-code-2026-11-14),
+  [young generation](benchmarks.md#young-generation-2026-11-14)).
   Decide whether static read sites keep their inline own-slot read: on this
   request it saves about 17K instructions (0.2%) for 272 KB of P (6%) and
   1.6 s of native preparation, while inline writes pay for themselves.
@@ -38,8 +40,11 @@ accepts `--case <file.js>`.
   about twenty per plain object;
   WeakMap operations, which still cross into the host (about 1,000
   instructions of a `has`, most of it Wasmtime's typed host-call boundary;
-  about 5% of profiled cycles); the collector (about 4–6%, carried by the
-  requests that collect); the embedding's remaining per-call type checks
+  about 5% of profiled cycles); the collector, now a minor collection of
+  about 0.47M instructions every 4.3 requests (a quarter of requests collect;
+  about 110K of it for the WeakMap entries React Flight creates, and 263
+  instructions per survivor in the copying loop) and a full one of about 5M
+  every 260–300 requests; the embedding's remaining per-call type checks
   (dynamic argument checks, struct field type checks, `RegisteredType` roots;
   about 2%);
   accessors, which no record covers (typed-array `byteLength`, Set `size`,
