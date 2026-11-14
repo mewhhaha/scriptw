@@ -15,15 +15,17 @@ accepts `--case <file.js>`.
 - Bring retained RSC sync and async below 1 ms, and at least to V8 without its
   JIT. The source with chain walks, the computed-key write kernel and the
   call-free `instanceof` entry (ABI 68), with the host-side reductions,
-  static site records kept in P globals (ABI 69) and inline funcref reads,
-  runs a Speed sync request in 6.61M user instructions (median) against 4.38M
+  static site records kept in P globals (ABI 69), inline funcref reads,
+  identifier cells, rounding-free truncation and single casts,
+  runs a Speed sync request in 6.44M user instructions (median) against 4.38M
   (and 2.68M cycles) for Node 24
   `--jitless`
   ([per-operation costs](benchmarks.md#read-records-and-per-operation-costs-2026-11-11),
   [hit entries](benchmarks.md#record-hit-entries-2026-11-12),
   [chain walks](benchmarks.md#chain-walks-and-computed-keys-2026-11-13),
   [host-side costs](benchmarks.md#host-side-costs-2026-11-13),
-  [site records](benchmarks.md#site-records-in-p-2026-11-13)).
+  [site records](benchmarks.md#site-records-in-p-2026-11-13),
+  [identifier cells and truncation](benchmarks.md#identifier-cells-truncation-and-single-casts-2026-11-13)).
   Decide whether static read sites keep their inline own-slot read: on this
   request it saves about 17K instructions (0.2%) for 272 KB of P (6%) and
   1.6 s of native preparation, while inline writes pay for themselves.

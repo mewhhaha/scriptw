@@ -376,6 +376,7 @@ They do not refresh the published panel.
 | [Host-side](#host-side-costs-2026-11-13) weak lookups, funcref reads, root scopes and collector copies (ABI 68) | 7.26M | 7.88M |
 | [Site records in P](#site-records-in-p-2026-11-13) (ABI 69), on the row above | 6.72M | 7.32M |
 | Inline interned funcref reads, plain references and cached embedding bridges (ABI 69), on the row above | 6.61M | 7.20M |
+| [Identifier cells, truncation and single casts](#identifier-cells-truncation-and-single-casts-2026-11-13) (ABI 69), on the row above | 6.44M | 7.02M |
 | Node 24 `--jitless` | 4.38M | — |
 | Node 24 with its JIT | 2.62M | — |
 
@@ -855,6 +856,61 @@ site leaves to the entry: answered at the site it measured 246; through the
 entry it gains from the record global and the removed key operand alone. A
 `t += lit.b` iteration now executes as many instructions as under V8's
 interpreter (260 against 258), whose loop alone costs 197 against 81.
+
+### Identifier cells, truncation and single casts (2026-11-13)
+
+Still ABI 69 (no layout or helper signature changes), measured as above
+against `8f96ffedf` (6.72M sync, 7.32M async). Both Flight outputs stay
+exact. Rebased onto the host-side round (`83b634089`, 6.61M and 7.20M), the
+change measures 6,438,519 sync and 7,017,781 async instructions per request
+(3.04M and 3.76M cycles on a quiet machine), with P 4,793,590 bytes.
+
+- A compound, update, logical or plain assignment to an identifier whose
+  binding the compiler proves to be one cell reads and writes that cell
+  inline: GetBindingValue and SetMutableBinding's checks run on the cell's
+  own initialization, mutability and strict-immutability words, where they
+  built a by-name Reference and called `environment_identifier_get_strict`
+  and `environment_identifier_put_strict`.
+- Wasmtime compiles `f64.floor`, `f64.trunc`, `f64.ceil` and `f64.nearest` as
+  host calls on the baseline x86-64 target. ToInt32 and ToUint32 (every
+  bitwise operator) take the low 32 bits of the saturating i64 truncation
+  below 2^63 in magnitude; the integrality tests of array, computed and
+  remainder operands, the Ryū integer path, `Array(n)`, ToLength,
+  ToIntegerOrInfinity, string position clamps, `apply` lengths and the integer
+  part of `Number#toString(radix)` use the saturating truncation (converted
+  back where a Number is needed) inside the ranges those paths already prove.
+- One `br_on_cast` proves a layout where a `ref.test` was followed by a
+  `ref.cast` of the same value: ToBoolean's test of the HTMLDDA slot (2,125
+  of the 3,177 such pairs in the program's own functions), the OrdinaryObject
+  header projection, Array `.length` and the Array arm of ObjectRead.
+- A source body memoizes the root of its environment chain (its global
+  environment) on first use in each invocation, instead of walking the chain
+  at every global read and every read of its execution Realm.
+
+| Speed, user instructions per request | Sync | Async | P bytes |
+| --- | ---: | ---: | ---: |
+| `8f96ffedf` | 6,719,594 | 7,316,792 | 4,755,827 |
+| Cells, truncation, IsHTMLDDA and header casts | 6,594,210 | 7,183,772 | 4,775,239 |
+| With the memoized root and the Array casts | 6,555,543 | 7,142,936 | 4,793,590 |
+
+| Loop body | `8f96ffedf` | now | Node 24 `--jitless` |
+| --- | ---: | ---: | ---: |
+| `s += i` (captured `var`) | 406 | 191 | 312 |
+| `t += arr[i & 63]` | 558 | 354 | 329 |
+| `arr[i & 63] = i` | 704 | 501 | 296 |
+| `u = Map` | 311 | 258 | 156 |
+| `u = Array.isArray` | 578 | 526 | 212 |
+| `if (plain instanceof Map) t++` | 685 | 633 | 433 |
+| `u = { a: i, b: 2 }` | 770 | 721 | 356 |
+| `u = "k" + ":" + i` | 1,223 | 1,189 | 658 |
+| `t += arr.length` | 237 | 221 | 257 |
+
+Not done in this round: a captured read still follows its cell's import
+TARGET even in a program without import bindings (the compiler has no such
+summary yet); a global read still loads its key String and re-proves its
+remembered entry with several dependent loads; the remaining test-and-cast
+pairs (StoredValue, two record kinds, scalar-loop entry guards) and the
+cached-read entry's arms on the request are uncounted.
 
 ### Descriptor work and physical allocation
 
