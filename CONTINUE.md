@@ -47,12 +47,35 @@ hardware counts on the same source):
 | Arguments reads without the object | 4.911M | 4.995M | 5.390M | 5.498M |
 | Arrow functions read proven cells | 4.844M | 4.928M | 5.324M | 5.431M |
 
-- The two changes remove 4.9% of sync and 4.7% of async. Sync is then about
-  1.10 times Node in instructions, if the 0.8% offset holds.
-- No cycles and no Node control were measured after it: the cloud machine has
-  no counters and Node 24 could not be installed there. Re-measure both
-  engines together on a quiet machine with counters before claiming the
-  comparison. The work started at 20.12M instructions per sync request.
+- The two changes remove 4.9% of sync and 4.7% of async.
+
+**The comparison with Node does not hold on the cloud machine.** Measured
+there on the tree above with Node 24.22.1 `--jitless` (the same fixture
+through `react-driver.cjs retained-module`), eight fresh processes per engine
+and case, interleaved and pinned to one CPU, 100 warmups and 101 requests:
+
+| Wall clock per request | Scriptw median | Node median | Scriptw mean | Node mean |
+| --- | ---: | ---: | ---: | ---: |
+| Sync | 457 µs | 306 µs | 482 µs | 350 µs |
+| Async | 580 µs | 448 µs | 666 µs | 481 µs |
+
+- Scriptw is 1.49 times Node on the sync median and 1.38 times on the mean;
+  1.29 and 1.38 times on async (Node's async processes varied from 326 to
+  about 450 µs).
+- Node's whole process, counted with Valgrind by differencing 1 and 201
+  requests, runs 3.82M instructions per sync request and 3.94M per async
+  request, its out-of-clock output validation included. Scriptw's request
+  alone is 4.84M and 5.32M: at least 1.27 and 1.35 times Node.
+- The first handoff's hardware table (Node at 4.37M instructions and 2.59M
+  cycles, Scriptw ahead in sync cycles) came from another machine, Node 24.12
+  and helper scripts that are gone. Nothing here reproduces it. Treat the
+  goal as open by about a third in instructions and in time.
+- A Scriptw request without a collection takes about 375 µs; one in four
+  runs a minor collection and takes 110 to 200 µs longer for 0.47M more
+  instructions, and times drift up between collections as the nursery's
+  cold memory is touched. Allocation volume (480 KB a request) costs more in
+  time than its instruction count shows.
+- The work started at 20.12M instructions per sync request.
 
 ## Done since the first handoff
 
