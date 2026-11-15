@@ -25,6 +25,7 @@ mod relational_comparison;
 mod scalar_number;
 mod strict_singleton;
 mod string_trim;
+mod string_unit_comparison;
 pub(crate) use string_trim::EcmaTrimMode;
 mod to_object;
 mod typeof_comparison;
@@ -500,9 +501,19 @@ impl<'a> FunctionBuilder<'a> {
                         &operands[1],
                         function,
                     )?
+                    || self.try_compile_string_unit_comparison_i32(
+                        &operands[0],
+                        &operands[1],
+                        function,
+                    )?
             }
             SpecOperationIr::IsLooselyEqual => {
                 self.try_compile_typeof_comparison_i32(&operands[0], &operands[1], function)?
+                    || self.try_compile_loose_nullish_comparison_i32(
+                        &operands[0],
+                        &operands[1],
+                        function,
+                    )?
             }
             _ => false,
         };
@@ -1599,7 +1610,11 @@ impl<'a> FunctionBuilder<'a> {
         let pending = self.runtime_schema().reserve_completion(function);
         self.compile_expr_to_value(lhs, left, function)?;
         self.compile_expr_to_value(rhs, right, function)?;
-        for value in [left, right] {
+        for (value, operand) in [(left, lhs), (right, rhs)] {
+            // ToNumeric of a Number literal is the literal.
+            if matches!(&operand.expr, ExprIr::Number(_)) {
+                continue;
+            }
             self.emit_value_to_numeric_locals(value, &pending, function)?;
             self.finish_to_primitive_operation(
                 ToPrimitiveAbruptRoute::ActiveHandler,
@@ -1850,6 +1865,13 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         if self.outline_value_to_numeric {
+            // ToNumeric of a Number is the Number itself.
+            input.tag().load(function);
+            function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
+            function.instruction(&Instruction::I32Eq);
+            self.open_frame(ControlFrameKind::If, function);
+            result.set_normal(input, function);
+            function.instruction(&Instruction::Else);
             schema
                 .call_helper(
                     crate::runtime_helpers::ValueToNumericArguments::new(
@@ -1861,6 +1883,8 @@ impl<'a> FunctionBuilder<'a> {
                     function,
                 )
                 .store(result, function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
             return Ok(());
         }
         let primitive = schema.reserve_completion(function);
@@ -3714,7 +3738,9 @@ impl<'a> FunctionBuilder<'a> {
         rhs: &TypedExpr,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        if self.try_compile_typeof_comparison_i32(lhs, rhs, function)? {
+        if self.try_compile_typeof_comparison_i32(lhs, rhs, function)?
+            || self.try_compile_loose_nullish_comparison_i32(lhs, rhs, function)?
+        {
             return Ok(());
         }
         let schema = self.runtime_schema();
@@ -6178,6 +6204,8 @@ impl<'a> FunctionBuilder<'a> {
                 // The same String object is equal, with or without ASCII case
                 // folding; everything else enters the outlined comparison,
                 // which rejects different lengths before reading code units.
+                // A body compiled from source rejects them here: Strings of
+                // different lengths are unequal with or without folding.
                 let _ = left.load(schema, function);
                 let _ = right.load(schema, function);
                 function.instruction(&Instruction::RefEq);
@@ -6185,6 +6213,18 @@ impl<'a> FunctionBuilder<'a> {
                 result.load(function);
                 function.instruction(&Instruction::I32Eqz);
                 function.instruction(&Instruction::If(BlockType::Empty));
+                if self.compares_string_lengths_inline {
+                    for string in [left, right] {
+                        let _ = schema
+                            .struct_type::<StringValue>()
+                            .field(StringValueSchema::CODE_UNITS)
+                            .read(string, schema, function)
+                            .reference();
+                        function.instruction(&Instruction::ArrayLen);
+                    }
+                    function.instruction(&Instruction::I32Eq);
+                    function.instruction(&Instruction::If(BlockType::Empty));
+                }
                 schema
                     .call_helper(
                         crate::runtime_helpers::StringEqualityArguments::new(left, right, fold),
@@ -6192,6 +6232,9 @@ impl<'a> FunctionBuilder<'a> {
                         function,
                     )
                     .store(result, function);
+                if self.compares_string_lengths_inline {
+                    function.instruction(&Instruction::End);
+                }
                 function.instruction(&Instruction::End);
             } else {
                 self.emit_gc_string_equality(left, right, fold, result, function);
@@ -6379,6 +6422,7 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Result<(), EmitError> {
         if self.try_compile_typeof_comparison_i32(left, right, function)?
             || self.try_compile_strict_singleton_comparison_i32(left, right, function)?
+            || self.try_compile_string_unit_comparison_i32(left, right, function)?
         {
             self.set_completion_kind(CompletionKind::Normal, function);
             return Ok(());

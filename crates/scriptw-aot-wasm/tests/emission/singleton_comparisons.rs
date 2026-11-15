@@ -5,7 +5,7 @@ use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::{EqualityBinaryOp, ExprIr, SpecOperationIr, StatementIr, lower};
 use wasmparser::{Operator, Validator, WasmFeatures};
 
-const SOURCE_FUNCTIONS: [&str; 9] = [
+const SOURCE_FUNCTIONS: [&str; 10] = [
     "specNull",
     "specVoidRight",
     "specVoidLeft",
@@ -14,6 +14,7 @@ const SOURCE_FUNCTIONS: [&str; 9] = [
     "dynamic",
     "shadowed",
     "looseNull",
+    "looseDynamic",
     "number",
 ];
 
@@ -47,6 +48,7 @@ fn strict_singletons_omit_all_kind_dispatch_and_keep_dynamic_and_loose_controls(
                 export function dynamic(value, other, extra) { return value === other; }
                 export function shadowed(value, undefined, extra) { return value === undefined; }
                 export function looseNull(value, unused, extra) { return value == null; }
+                export function looseDynamic(value, other, extra) { return value == other; }
                 export function number(value, unused, extra) { return value === 0; }
             "#, ParseOptions::module()).unwrap();
             let mut program = lower(&parsed);
@@ -96,7 +98,7 @@ fn strict_singletons_omit_all_kind_dispatch_and_keep_dynamic_and_loose_controls(
                     let ExprIr::SpecOperation { operation, operands } = &result.expr else {
                         panic!("{} reaches the actual SpecOperation route", function.name);
                     };
-                    let expected = if function.name == "looseNull" {
+                    let expected = if matches!(function.name.as_str(), "looseNull" | "looseDynamic") {
                         SpecOperationIr::IsLooselyEqual
                     } else {
                         SpecOperationIr::StrictEqualityComparison
@@ -110,7 +112,7 @@ fn strict_singletons_omit_all_kind_dispatch_and_keep_dynamic_and_loose_controls(
                         "shadowed" => assert!(!matches!(right.expr,
                             ExprIr::Null | ExprIr::Undefined | ExprIr::Void { .. }
                         ), "an identifier named undefined is not singleton syntax"),
-                        "dynamic" | "number" => {},
+                        "dynamic" | "looseDynamic" | "number" => {},
                         _ => unreachable!(),
                     }
                 }
@@ -171,10 +173,35 @@ fn strict_singletons_omit_all_kind_dispatch_and_keep_dynamic_and_loose_controls(
                 );
                 assert_eq!(calls(body, loose_equality), 0);
             }
-            "looseNull" => assert_eq!(
+            "looseNull" => {
+                // Neither operand of `== null` is ever converted: the site
+                // answers both nullish tags and reads the [[IsHTMLDDA]]
+                // slot of a function without the general kernel.
+                for helper in [string_equality, bigint_equality, loose_equality] {
+                    assert_eq!(calls(body, helper), 0, "loose null converts nothing");
+                }
+                assert!(
+                    compares_tag(body, WasmRuntimeValueTag::Null)
+                        && compares_tag(body, WasmRuntimeValueTag::Undefined),
+                    "loose null answers both nullish tags"
+                );
+                assert!(
+                    body.windows(2).any(|ops| matches!(
+                        ops,
+                        [
+                            Operator::BrOnCastFail { .. },
+                            Operator::StructGet { .. }
+                                | Operator::StructGetU { .. }
+                                | Operator::StructGetS { .. }
+                        ]
+                    )),
+                    "loose null retains HTMLDDA semantics"
+                );
+            }
+            "looseDynamic" => assert_eq!(
                 calls(body, loose_equality),
                 1,
-                "loose null retains HTMLDDA semantics"
+                "two unknown operands retain the loose kernel"
             ),
             _ => unreachable!(),
         }

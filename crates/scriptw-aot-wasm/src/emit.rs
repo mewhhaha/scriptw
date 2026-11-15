@@ -440,6 +440,12 @@ pub(crate) struct FunctionBuilder<'a> {
     /// arithmetic expressions, so outlining it keeps user functions below
     /// Cranelift's per-function virtual-register limit.
     pub(crate) outline_value_to_numeric: bool,
+    /// When true, a String comparison answers Strings of different lengths at
+    /// its site, before the shared string-equality helper. True only for
+    /// bodies compiled from source: their comparisons are mostly of unequal
+    /// lengths (a key against a literal, a `switch` over names), while the
+    /// builtin bodies' thousands of sites stay the size they were.
+    pub(crate) compares_string_lengths_inline: bool,
     /// When `Some(local)`, `emit_object_write` is being emitted as the shared
     /// outlined write helper and must decide sloppy/strict `[[Set]]` failure
     /// behavior from the runtime value of `local` (a helper parameter carrying
@@ -1684,6 +1690,7 @@ impl<'a> FunctionBuilder<'a> {
             runtime_bootstrap_plan,
             runtime_helper_base,
         );
+        builder.compares_string_lengths_inline = true;
         builder.module_prelude_id = script.module_prelude.as_ref().map(|unit| unit.id);
         builder.script_entry_after_prelude_id = script
             .script_entry_after_prelude
@@ -1702,7 +1709,7 @@ impl<'a> FunctionBuilder<'a> {
         runtime_bootstrap_plan: RuntimeBootstrapPlan,
         runtime_helper_base: Option<crate::runtime_helpers::RuntimeHelperFunctionBase>,
     ) -> Self {
-        Self::new(
+        let mut builder = Self::new(
             schema,
             &unit.body,
             unit.template_source,
@@ -1730,7 +1737,9 @@ impl<'a> FunctionBuilder<'a> {
             false,
             runtime_bootstrap_plan,
             runtime_helper_base,
-        )
+        );
+        builder.compares_string_lengths_inline = true;
+        builder
     }
 
     fn new_function(
@@ -1773,6 +1782,7 @@ impl<'a> FunctionBuilder<'a> {
             runtime_bootstrap_plan,
             runtime_helper_base,
         );
+        builder.compares_string_lengths_inline = true;
         builder.numeric_body = crate::functions::NumericBodyPlan::admit(function);
         builder.strict_arguments_projection =
             crate::arguments_protocol::StrictArgumentsProjection::admit(function);
@@ -2104,6 +2114,7 @@ impl<'a> FunctionBuilder<'a> {
             outline_value_to_string: true,
             outline_value_to_number: true,
             outline_value_to_numeric: true,
+            compares_string_lengths_inline: false,
             object_write_strict_flag_local: None,
         }
     }
