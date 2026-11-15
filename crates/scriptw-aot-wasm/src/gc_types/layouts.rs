@@ -1038,6 +1038,17 @@ gc_layout_registry! {
             ADD_HOLDER: I32Value, Mutable, NonNullable;
             ADD_HOLDER_SHAPE: GcRef<CompactDataShape>, Mutable, Nullable;
             ADD_TAIL: I32Value, Mutable, NonNullable;
+            // A read site that meets several receivers keeps a bounded
+            // chain of records from the one in its global, each a complete
+            // set of proofs for the site's key. On that first record, HINT
+            // is the receiver layout the miss kernel last met, which the
+            // hit entry tests first, and BUDGET counts the visits the miss
+            // kernel may still spend learning nothing before the entry
+            // answers unrecorded receivers through the call-free walk.
+            // Neither word proves anything. See `cache/entry.rs`.
+            NEXT: GcRef<OwnDataReadCache>, Mutable, Nullable;
+            HINT: I32Value, Mutable, NonNullable;
+            BUDGET: I32Value, Mutable, NonNullable;
         }
         // One flat table per ProgramInstance, indexed by site.
         array OwnDataReadCacheTable => OwnDataReadCacheTableSchema { ELEMENT: GcRef<OwnDataReadCache>, Mutable, Nullable; }

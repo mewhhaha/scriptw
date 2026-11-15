@@ -702,7 +702,7 @@ impl FunctionBuilder<'_> {
     /// `absent` when its key index proves there is none and to `decline`
     /// when an entry with an equal hash holds another String object.
     #[allow(clippy::too_many_arguments)]
-    fn emit_walk_dictionary_entry_or_branch(
+    pub(super) fn emit_walk_dictionary_entry_or_branch(
         &mut self,
         dictionary: &GcLocal<OrdinaryPropertyStorage>,
         key: ChainKey<'_>,

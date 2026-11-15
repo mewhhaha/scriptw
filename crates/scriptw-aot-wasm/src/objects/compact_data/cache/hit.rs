@@ -115,6 +115,103 @@ impl FunctionBuilder<'_> {
         value.clear(f);
     }
 
+    /// Branches to `fail` unless the chain above `object` is the closed
+    /// tail a record registered as `mode`: a null [[Prototype]], or an
+    /// actual ordinary [[Prototype]] with the immutable %Object.prototype%
+    /// layout and count, whose own [[Prototype]] is null and immutable. This
+    /// is `emit_negative_cache_mode`'s proof for a header the caller has
+    /// already admitted, decided against the record's word instead of
+    /// computed: the registration proved that the layout's rows lack the
+    /// key, and a use re-proves that the live prototype still has exactly
+    /// those rows. Any other word, the unvisited one included, fails.
+    pub(super) fn emit_recorded_closed_tail_or_branch(
+        &mut self,
+        object: &GcLocal<OrdinaryObject>,
+        mode: I32Local,
+        fail: crate::emit::ControlTarget,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let prototype = s.reserve_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(object, s, f)
+                .reference(),
+            f,
+        );
+        prototype.load(s, f).is_null(f);
+        self.open_frame(ControlFrameKind::If, f);
+        mode.load(f);
+        f.instruction(&Instruction::I32Const(
+            NegativeCacheMode::NullPrototype.word(),
+        ));
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(fail, f);
+        f.instruction(&Instruction::Else);
+        mode.load(f);
+        f.instruction(&Instruction::I32Const(
+            NegativeCacheMode::ObjectPrototype.word(),
+        ));
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(fail, f);
+        if self.strings.has_intrinsic_property_layout(
+            crate::intrinsics::IntrinsicPropertyLayoutId::ObjectPrototype,
+        )? {
+            let span = self.strings.intrinsic_property_layout_span(
+                crate::intrinsics::IntrinsicPropertyLayoutId::ObjectPrototype,
+            )?;
+            let parent = s.reserve_gc_local(f).initialize(
+                prototype.sealed_subtype_or_branch::<OrdinaryObject>(
+                    s,
+                    self.local_branch_label(fail),
+                    f,
+                ),
+                f,
+            );
+            s.field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(&parent, s, f)
+                .reference()
+                .is_null(f);
+            s.field(OrdinaryObjectSchema::IMMUTABLE_PROTOTYPE)
+                .read(&parent, s, f);
+            f.instruction(&Instruction::I32And);
+            f.instruction(&Instruction::I32Eqz);
+            self.emit_branch_if_to_target(fail, f);
+            let base = s.reserve_gc_local(f).initialize(
+                s.field(OrdinaryObjectSchema::PROPERTIES)
+                    .read(&parent, s, f)
+                    .reference(),
+                f,
+            );
+            parent.clear(f);
+            let storage = s.reserve_gc_local(f).initialize(
+                base.sealed_subtype_or_branch::<IntrinsicPropertyStorage>(
+                    s,
+                    self.local_branch_label(fail),
+                    f,
+                ),
+                f,
+            );
+            base.clear(f);
+            for (field, expected) in [
+                (IntrinsicPropertyStorageSchema::ADDRESS, span.address()),
+                (IntrinsicPropertyStorageSchema::COUNT, span.count()),
+            ] {
+                s.field(field).read(&storage, s, f);
+                f.instruction(&Instruction::I32Const(expected as i32));
+                f.instruction(&Instruction::I32Ne);
+                self.emit_branch_if_to_target(fail, f);
+            }
+            storage.clear(f);
+        } else {
+            // Without the layout no record registers this tail.
+            self.emit_branch_to_target(fail, f);
+        }
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        prototype.clear(f);
+        Ok(())
+    }
+
     /// A missing compact own key can be cached only across these two closed
     /// prototype tails. No object/Realm edge is retained in cache metadata.
     /// Registration additionally proves absence in the sealed intrinsic rows;

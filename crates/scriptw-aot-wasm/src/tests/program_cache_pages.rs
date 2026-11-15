@@ -93,7 +93,7 @@ fn static_sites_keep_records_in_program_globals_that_only_r_allocates() {
                     } else {
                         assert_eq!(
                             record_allocations, 0,
-                            "the miss kernel fills the record it is given"
+                            "the miss kernel fills the site's records and asks the helper for another"
                         );
                     }
                     checked += 1;
