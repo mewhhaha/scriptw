@@ -88,8 +88,15 @@ has the per-body table and the listing findings. Sync request, 4.997M mean:
    and `type.defaultProps`, which are absent or on another shape each time).
    Records cannot hold a proven absence or a second receiver shape.
 4. **By-name identifier helpers, 130K.** `typeof` of a missing global in `vn`
-   (70 calls, 48K) and free identifiers in the fixture's arrow functions
-   (86K), which are not module-local owners.
+   (70 calls, 48K), and 86K in the fixture's own components: the arrow
+   `(_, i) => e(Row, {key: i, id: i})` and `function Row({id})` read the
+   captured bindings `e` and `Row` by name on every call. A proven binding
+   cell (`ProvenBindingCellIr::analyze` in `analysis/module_locals.rs`) is
+   only granted to an ordinary function with simple parameters, so an arrow
+   function or a destructured parameter, both everywhere in component code,
+   pays a named lookup for each captured read. Extending the proof to them
+   needs the capture walk and the emitter's hop counting checked for an owner
+   without its own activation record; not started.
 5. **`createElement`'s activation record, about 30K.** An admitted function
    still allocates its environment for the `arguments` cell (about 480
    instructions before its first call, 68 calls). A strict function cannot
