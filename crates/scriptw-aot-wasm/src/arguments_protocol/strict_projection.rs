@@ -438,6 +438,12 @@ impl ReadOnlyUses<'_> {
                     | SpecOperationIr::IsLooselyEqual,
                 operands,
             } => operands.iter().all(|value| self.expression(value, reads)),
+            // A method call keeps its receiver in a temporary that the call
+            // names as its property base and `this`. The receiver follows
+            // the retained-receiver rule above.
+            ExprIr::MaterializeBinding { name, value, body } => {
+                other_name(name) && self.expression(value, false) && self.expression(body, reads)
+            }
             _ => false,
         }
     }
@@ -522,6 +528,8 @@ mod tests {
             "async function make(a) { return arguments[0]; }",
             "function* make(a) { return arguments[0]; }",
             "function make(a) { 'use strict'; try { return arguments[0]; } finally { a(); } }",
+            "function make(a) { 'use strict'; return arguments.hasOwnProperty(0); }",
+            "function make(a) { 'use strict'; return arguments[0].call(a) + arguments.length; }",
         ] {
             let function = function(source, ParseOptions::module());
             assert!(
@@ -539,6 +547,9 @@ mod tests {
             "function make(a) { 'use strict'; return arguments.callee; }",
             "function make(a) { 'use strict'; for (var i = 0; i < arguments.length; i++) a(arguments[i]); }",
             "function make(t, c, d) { 'use strict'; var p = {}, n = arguments.length - 2, k; for (k in c) p[k] = c[k]; if (n === 1) p.children = d; else if (n > 1) { var a = Array(n); for (var i = 0; i < n; i++) a[i] = arguments[i + 2]; p.children = a; } return p; }",
+            // A method call on another receiver, as createElement's own-key test.
+            "function make(t, c) { 'use strict'; var p = {}, k; for (k in c) t.call(c, k) && (p[k] = c[k]); return arguments.length; }",
+            "function make(t, c) { 'use strict'; return t.call(c, arguments[1], arguments.length); }",
         ] {
             let function = function(source, ParseOptions::module());
             assert!(
@@ -588,21 +599,5 @@ mod tests {
         duplicate.name = "alias".into();
         alias.owned_env_bindings.push(duplicate);
         assert!(StrictArgumentsProjection::admit(&alias).is_none());
-    }
-
-    #[test]
-    fn zz_probe_constructs() {
-        let wrap = |body: &str| format!("var Mt = Object.prototype.hasOwnProperty, jn = function(){{}}; function make(n,t,r){{'use strict';{body}}}");
-        for body in [
-            "Mt.call(t,1);return arguments.length",
-            "var o={};t&&(o.a=1);return arguments.length",
-            "var o={};(o.a=1);return arguments.length",
-            "var o={};o.a=1;return arguments.length",
-            "jn.call(t,1);return arguments.length",
-        ] {
-            let source = wrap(body);
-            let function = function(&source, ParseOptions::script());
-            eprintln!("PROBE {} {}", StrictArgumentsProjection::admit(&function).is_some(), &body[..body.len().min(60)]);
-        }
     }
 }
