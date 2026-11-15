@@ -709,6 +709,25 @@ impl FunctionBuilder<'_> {
             let at=s.reserve_i32_local(f);
             let next=b.open_frame(ControlFrameKind::Loop,f);
             cursor.load(f); length.load(f); needle_length.load(f); f.instruction(&Instruction::I64Sub); f.instruction(&Instruction::I64GtU); b.emit_branch_if_to_target(searched,f);
+            if matches!(&operation,StringSearchOperation::IndexOf|StringSearchOperation::Includes) {
+                // A forward search first finds the next position that holds the
+                // needle's first unit, in a leaf kernel, and compares the
+                // whole needle only there. Every position it passes over
+                // differs from the needle in that unit, and positions past
+                // the last one that leaves room for the needle hold no match.
+                needle_length.load(f); f.instruction(&Instruction::I64Eqz); f.instruction(&Instruction::I32Eqz);
+                b.open_frame(ControlFrameKind::If,f);
+                let first=s.reserve_i32_local(f); let last=s.reserve_i32_local(f);
+                f.instruction(&Instruction::I32Const(0)); at.store(f);
+                s.array_type::<CodeUnitArray>().read(&needle_units,at,s,f).store(first,f);
+                length.load(f); needle_length.load(f); f.instruction(&Instruction::I64Sub); f.instruction(&Instruction::I64Const(1)); f.instruction(&Instruction::I64Add); f.instruction(&Instruction::I32WrapI64); last.store(f);
+                cursor.load(f); f.instruction(&Instruction::I32WrapI64); at.store(f);
+                s.call_helper(crate::runtime_helpers::CodeUnitFindArguments::new(&string_units,at,last,first),b.runtime_helper_base()?,f).store(at,f);
+                at.load(f); f.instruction(&Instruction::I64ExtendI32U); cursor.store(f);
+                at.load(f); last.load(f); f.instruction(&Instruction::I32GeU); b.emit_branch_if_to_target(searched,f);
+                s.release_i32_local(last,f); s.release_i32_local(first,f);
+                b.pop_control(ControlFrameKind::If); f.instruction(&Instruction::End);
+            }
             f.instruction(&Instruction::I32Const(1)); equal.store(f);
             f.instruction(&Instruction::I64Const(0)); offset.store(f);
             let compared=b.open_frame(ControlFrameKind::Block,f); let compare=b.open_frame(ControlFrameKind::Loop,f);

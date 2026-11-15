@@ -1,5 +1,9 @@
 use super::*;
 
+/// Byte copies shorter than this stay an inline loop: a bulk `array.copy` of
+/// a dynamic length is a host `memmove` call with a fixed transition cost.
+const BULK_BYTE_COPY_MINIMUM: i64 = 16;
+
 /// A current byte-store witness contains collector/native resources, never a
 /// semantic pointer. It is acquired only after the operation's callbacks.
 #[must_use]
@@ -476,6 +480,61 @@ impl FunctionBuilder<'_> {
         let source_index = s.reserve_i64_local(f);
         let target_index = s.reserve_i64_local(f);
         let byte = s.reserve_i32_local(f);
+        let copied = self.open_frame(ControlFrameKind::Block, f);
+        let bytewise = self.open_frame(ControlFrameKind::Block, f);
+        // Two distinct collector-owned backings copy in one bulk move: with
+        // no shared memory and no aliasing, the ascending byte loop below
+        // stores exactly these bytes. A shared block keeps its ordered
+        // host-memory accesses, one backing keeps the ascending order that
+        // an overlapping range observes, and a short copy is cheaper inline
+        // than the engine's bulk transition.
+        source.shared.load(f);
+        target.shared.load(f);
+        f.instruction(&Instruction::I32Or);
+        self.emit_branch_if_to_target(bytewise, f);
+        count.load(f);
+        f.instruction(&Instruction::I64Const(BULK_BYTE_COPY_MINIMUM));
+        f.instruction(&Instruction::I64LtU);
+        self.emit_branch_if_to_target(bytewise, f);
+        source.bytes.load(s, f).is_null(f);
+        self.emit_branch_if_to_target(bytewise, f);
+        target.bytes.load(s, f).is_null(f);
+        self.emit_branch_if_to_target(bytewise, f);
+        let _ = source.bytes.load(s, f);
+        let _ = target.bytes.load(s, f);
+        f.instruction(&Instruction::RefEq);
+        self.emit_branch_if_to_target(bytewise, f);
+        let destination = s
+            .reserve_gc_local(f)
+            .initialize(target.bytes.load(s, f).require_non_null(f), f);
+        let destination_start = s.reserve_i32_local(f);
+        let source_start = s.reserve_i32_local(f);
+        let extent = s.reserve_i32_local(f);
+        for (wide, narrow) in [
+            (to, destination_start),
+            (from, source_start),
+            (count, extent),
+        ] {
+            wide.load(f);
+            f.instruction(&Instruction::I32WrapI64);
+            narrow.store(f);
+        }
+        s.array_type::<ByteArray>().copy_range_from(
+            &destination,
+            destination_start,
+            &source.bytes,
+            source_start,
+            extent,
+            s,
+            f,
+        );
+        for local in [extent, source_start, destination_start] {
+            s.release_i32_local(local, f);
+        }
+        destination.clear(f);
+        self.emit_branch_to_target(copied, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         f.instruction(&Instruction::I64Const(0));
         cursor.store(f);
         let done = self.open_frame(ControlFrameKind::Block, f);
@@ -497,6 +556,8 @@ impl FunctionBuilder<'_> {
         self.emit_increment_local(cursor, 1, f);
         self.emit_branch_to_target(next, f);
         self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);

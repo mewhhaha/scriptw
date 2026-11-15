@@ -8,15 +8,24 @@
 //! The cycle stack holds the enclosing containers: its live prefix is
 //! exactly `indent` entries long, so entering a container overwrites the
 //! slot its previous sibling used.
+//!
+//! A holder is observable only as a replacer function's receiver. Without
+//! one, the container walk performs each member's Get itself and passes the
+//! value as `fetched`: a plain data object's members come from its compact
+//! storage while that storage is still the object's, primitive members are
+//! appended in place, and only the remaining values enter the helper.
 use super::*;
 
 impl FunctionBuilder<'_> {
     /// Calls SerializeJSONProperty and leaves the appended flag in `out`:
-    /// Undefined when nothing was appended.
+    /// Undefined when nothing was appended. With `fetched` set, `holder` is
+    /// already the result of Get(holder, key), which only a caller without a
+    /// replacer function may pass.
     fn emit_json_stringify_call(
         &mut self,
         holder: &ValueLocals,
         key: &ValueLocals,
+        fetched: I32Local,
         context: &GcLocal<JsonStringifyContext>,
         indent: I64Local,
         out: &ValueLocals,
@@ -25,7 +34,14 @@ impl FunctionBuilder<'_> {
         let s = self.runtime_schema();
         let result = s.reserve_completion(f);
         s.call_helper(
-            JsonStringifyValueArguments::new(holder, key, context, indent, self.current_program()),
+            JsonStringifyValueArguments::new(
+                holder,
+                key,
+                fetched,
+                context,
+                indent,
+                self.current_program(),
+            ),
             self.runtime_helper_base()?,
             f,
         )
@@ -44,6 +60,7 @@ impl FunctionBuilder<'_> {
         self.emit_json_serialize_property(
             &parameters.holder,
             &parameters.key,
+            parameters.fetched,
             &parameters.context,
             parameters.indent,
             &result,
@@ -448,25 +465,29 @@ impl FunctionBuilder<'_> {
             f,
         );
         // The wrapper object is observable only as a replacer's receiver.
-        // Without one, SerializeJSONProperty starts from the value itself
-        // (an Undefined key), and Get(wrapper, "") is never observable.
+        // Without one, SerializeJSONProperty starts from the value itself,
+        // already fetched: Get(wrapper, "") is never observable.
+        let empty = self.emit_json_string("", f)?;
+        key.set_reference(&empty, s, f);
         callable.load(f);
         self.open_frame(ControlFrameKind::If, f);
         let root = self.emit_json_plain_object(&realm, f)?;
         holder.set_reference(&root, s, f);
-        let empty = self.emit_json_string("", f)?;
         self.emit_json_define(&holder, &empty, &value, false, f)?;
-        key.set_reference(&empty, s, f);
-        empty.clear(f);
         root.clear(f);
         f.instruction(&Instruction::Else);
         holder.copy_from(&value, f);
-        key.set_undefined(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        empty.clear(f);
+        let fetched = s.reserve_i32_local(f);
+        callable.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        fetched.store(f);
         let indent = s.reserve_i64_local(f);
         json_i64(indent, 0, f);
-        self.emit_json_stringify_call(&holder, &key, &context, indent, &appended, f)?;
+        self.emit_json_stringify_call(&holder, &key, fetched, &context, indent, &appended, f)?;
+        s.release_i32_local(fetched, f);
         output.set_undefined(f);
         self.emit_json_tag_test(&appended, WasmRuntimeValueTag::Undefined, f);
         f.instruction(&Instruction::I32Eqz);
@@ -497,8 +518,8 @@ impl FunctionBuilder<'_> {
         value.clear(f);
         Ok(())
     }
-    /// The String form of a SerializeJSONProperty key: the actual String,
-    /// the decimal spelling of an array index Number, or "" for the root.
+    /// The String form of a SerializeJSONProperty key: the actual String or
+    /// the decimal spelling of an array index Number.
     fn emit_json_key_string(
         &mut self,
         key: &ValueLocals,
@@ -512,13 +533,6 @@ impl FunctionBuilder<'_> {
         let text = s
             .reserve_gc_local(f)
             .initialize(self.emit_number_to_string_payload(key.scalar(), f)?, f);
-        out.set_reference(&text, s, f);
-        text.clear(f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        self.emit_json_tag_test(key, WasmRuntimeValueTag::Undefined, f);
-        self.open_frame(ControlFrameKind::If, f);
-        let text = self.emit_json_string("", f)?;
         out.set_reference(&text, s, f);
         text.clear(f);
         self.pop_control(ControlFrameKind::If);
@@ -590,6 +604,7 @@ impl FunctionBuilder<'_> {
         &mut self,
         holder: &ValueLocals,
         key: &ValueLocals,
+        fetched: I32Local,
         context: &GcLocal<JsonStringifyContext>,
         indent: I64Local,
         out: &ValueLocals,
@@ -602,7 +617,7 @@ impl FunctionBuilder<'_> {
         let key_value = s.reserve_value_local(f);
         let appended = s.reserve_i32_local(f);
         json_i32(appended, 1, f);
-        self.emit_json_tag_test(key, WasmRuntimeValueTag::Undefined, f);
+        fetched.load(f);
         self.open_frame(ControlFrameKind::If, f);
         value.copy_from(holder, f);
         f.instruction(&Instruction::Else);
@@ -614,7 +629,23 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Or);
         self.open_frame(ControlFrameKind::If, f);
         let to_json = self.emit_json_string("toJSON", f)?;
+        // Get(value, "toJSON"). The call-free walk answers from the live
+        // chain exactly when OrdinaryGet finds a data property or none
+        // without running anything; every other value uses Get.
+        key_value.set_reference(&to_json, s, f);
+        let walked = s.reserve_completion(f);
+        let read = self.open_frame(ControlFrameKind::Block, f);
+        let answered = self.open_frame(ControlFrameKind::Block, f);
+        self.emit_computed_read_walk(&value, &key_value, &walked, answered, f);
         self.emit_json_get(&value, &to_json, &method, f)?;
+        self.emit_branch_to_target(read, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        method.copy_from(walked.value(), f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        walked.clear(f);
+        key_value.set_undefined(f);
         to_json.clear(f);
         self.emit_is_callable_i32(&method, f)?;
         self.open_frame(ControlFrameKind::If, f);
@@ -667,57 +698,7 @@ impl FunctionBuilder<'_> {
             f,
         );
         let serialized = self.open_frame(ControlFrameKind::Block, f);
-        self.emit_json_tag_test(&value, WasmRuntimeValueTag::String, f);
-        self.open_frame(ControlFrameKind::If, f);
-        let text = s
-            .reserve_gc_local(f)
-            .initialize(value.cast_reference::<StringValue>(s, f), f);
-        self.emit_json_quote_into(&accumulator, &text, f)?;
-        text.clear(f);
-        self.emit_branch_to_target(serialized, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        self.emit_json_tag_test(&value, WasmRuntimeValueTag::Number, f);
-        self.open_frame(ControlFrameKind::If, f);
-        value.scalar().load(f);
-        f.instruction(&Instruction::F64ReinterpretI64);
-        f.instruction(&Instruction::F64Abs);
-        f.instruction(&Instruction::F64Const(f64::INFINITY.into()));
-        f.instruction(&Instruction::F64Lt);
-        self.open_frame(ControlFrameKind::If, f);
-        let text = s
-            .reserve_gc_local(f)
-            .initialize(self.emit_number_to_string_payload(value.scalar(), f)?, f);
-        let output = StringAccumulatorCursor::open(&accumulator, s, f);
-        output.append_string(&accumulator, &text, s, f);
-        output.close(&accumulator, s, f);
-        text.clear(f);
-        f.instruction(&Instruction::Else);
-        self.emit_json_append_literal(&accumulator, "null", f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        self.emit_branch_to_target(serialized, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        self.emit_json_tag_test(&value, WasmRuntimeValueTag::Null, f);
-        self.open_frame(ControlFrameKind::If, f);
-        self.emit_json_append_literal(&accumulator, "null", f);
-        self.emit_branch_to_target(serialized, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        self.emit_json_tag_test(&value, WasmRuntimeValueTag::Boolean, f);
-        self.open_frame(ControlFrameKind::If, f);
-        value.scalar().load(f);
-        f.instruction(&Instruction::I64Eqz);
-        self.open_frame(ControlFrameKind::If, f);
-        self.emit_json_append_literal(&accumulator, "false", f);
-        f.instruction(&Instruction::Else);
-        self.emit_json_append_literal(&accumulator, "true", f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        self.emit_branch_to_target(serialized, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
+        self.emit_json_serialize_primitive(&value, &accumulator, serialized, f)?;
         self.emit_json_tag_test(&value, WasmRuntimeValueTag::BigInt, f);
         self.open_frame(ControlFrameKind::If, f);
         self.emit_json_error(
@@ -774,6 +755,106 @@ impl FunctionBuilder<'_> {
         replacement.clear(f);
         method.clear(f);
         value.clear(f);
+        Ok(())
+    }
+    /// Appends a String, Number, null or Boolean value and branches to
+    /// `serialized`; every other value falls through with nothing appended.
+    fn emit_json_serialize_primitive(
+        &mut self,
+        value: &ValueLocals,
+        accumulator: &GcLocal<StringAccumulator>,
+        serialized: ControlTarget,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        self.emit_json_tag_test(value, WasmRuntimeValueTag::String, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let text = s
+            .reserve_gc_local(f)
+            .initialize(value.cast_reference::<StringValue>(s, f), f);
+        self.emit_json_quote_into(accumulator, &text, f)?;
+        text.clear(f);
+        self.emit_branch_to_target(serialized, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.emit_json_tag_test(value, WasmRuntimeValueTag::Number, f);
+        self.open_frame(ControlFrameKind::If, f);
+        value.scalar().load(f);
+        f.instruction(&Instruction::F64ReinterpretI64);
+        f.instruction(&Instruction::F64Abs);
+        f.instruction(&Instruction::F64Const(f64::INFINITY.into()));
+        f.instruction(&Instruction::F64Lt);
+        self.open_frame(ControlFrameKind::If, f);
+        // An integral Number in the nonnegative I32 range, either zero
+        // included, is spelled by its decimal digits alone, which are
+        // appended without a String; every other finite Number converts.
+        let integer = s.reserve_i32_local(f);
+        integer.set_constant(-1, f);
+        value.scalar().load(f);
+        f.instruction(&Instruction::F64ReinterpretI64);
+        f.instruction(&Instruction::F64Abs);
+        f.instruction(&Instruction::F64Const(2147483648.0.into()));
+        f.instruction(&Instruction::F64Lt);
+        self.open_frame(ControlFrameKind::If, f);
+        value.scalar().load(f);
+        f.instruction(&Instruction::F64ReinterpretI64);
+        f.instruction(&Instruction::I32TruncF64S);
+        integer.store(f);
+        integer.load(f);
+        f.instruction(&Instruction::F64ConvertI32S);
+        value.scalar().load(f);
+        f.instruction(&Instruction::F64ReinterpretI64);
+        f.instruction(&Instruction::F64Ne);
+        self.open_frame(ControlFrameKind::If, f);
+        integer.set_constant(-1, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        integer.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32GeS);
+        self.open_frame(ControlFrameKind::If, f);
+        let output = StringAccumulatorCursor::open(accumulator, s, f);
+        output.push_decimal(accumulator, integer, s, f);
+        output.close(accumulator, s, f);
+        f.instruction(&Instruction::Else);
+        let text = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_number_to_string_payload(value.scalar(), f)?, f);
+        let output = StringAccumulatorCursor::open(accumulator, s, f);
+        output.append_string(accumulator, &text, s, f);
+        output.close(accumulator, s, f);
+        text.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(integer, f);
+        f.instruction(&Instruction::Else);
+        self.emit_json_append_literal(accumulator, "null", f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.emit_branch_to_target(serialized, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.emit_json_tag_test(value, WasmRuntimeValueTag::Null, f);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_json_append_literal(accumulator, "null", f);
+        self.emit_branch_to_target(serialized, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.emit_json_tag_test(value, WasmRuntimeValueTag::Boolean, f);
+        self.open_frame(ControlFrameKind::If, f);
+        value.scalar().load(f);
+        f.instruction(&Instruction::I64Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_json_append_literal(accumulator, "false", f);
+        f.instruction(&Instruction::Else);
+        self.emit_json_append_literal(accumulator, "true", f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.emit_branch_to_target(serialized, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         Ok(())
     }
     fn emit_json_append_literal(
@@ -934,6 +1015,32 @@ impl FunctionBuilder<'_> {
         let replacer_keys = s
             .reserve_gc_local::<ValueArray, Nullable>(f)
             .initialize_null(s, f);
+        // A plain data object's own keys and values: its compact storage as
+        // captured here and that storage's immutable shape keys.
+        let plain = s
+            .reserve_gc_local::<CompactDataStorage, Nullable>(f)
+            .initialize_null(s, f);
+        let plain_keys = s
+            .reserve_gc_local::<CompactShapeKeys, Nullable>(f)
+            .initialize_null(s, f);
+        let member = s.reserve_value_local(f);
+        let fetched = s.reserve_i32_local(f);
+        let direct = s.reserve_i32_local(f);
+        // Without a replacer function no holder is observable, so this walk
+        // performs each member's Get itself.
+        let stored = s.reserve_gc_local(f).initialize(
+            s.struct_type::<JsonStringifyContext>()
+                .field(JsonStringifyContextSchema::REPLACER)
+                .read(context, s, f)
+                .reference(),
+            f,
+        );
+        s.struct_type::<StoredValue>()
+            .read_into(&stored, &entry, s, f);
+        stored.clear(f);
+        self.emit_json_tag_test(&entry, WasmRuntimeValueTag::Undefined, f);
+        direct.store(f);
+        entry.set_undefined(f);
         self.emit_is_array_i32(value, is_array, &pending, f)?;
         self.completion().copy_from(&pending, f);
         self.emit_propagate_current_throw_if_needed(f);
@@ -970,12 +1077,31 @@ impl FunctionBuilder<'_> {
         );
         property_list.load(s, f).is_null(f);
         self.open_frame(ControlFrameKind::If, f);
+        let captured = self.emit_plain_data_object_storage(value, f);
+        plain.replace(captured.load(s, f), f);
+        captured.clear(f);
+        plain.load(s, f).is_null(f);
+        self.open_frame(ControlFrameKind::If, f);
         let snapshot = self.emit_json_enumerable_key_table(value, item, f)?;
         keys.replace(snapshot.load(s, f).nullable(), f);
         snapshot.clear(f);
         item.load(f);
         f.instruction(&Instruction::I64ExtendI32U);
         length.store(f);
+        f.instruction(&Instruction::Else);
+        // The shape's keys, in order, are EnumerableOwnProperties(value, key).
+        let storage = s
+            .reserve_gc_local(f)
+            .initialize(plain.load(s, f).require_non_null(f), f);
+        let shape_keys = self.emit_compact_shape_keys(&storage, f);
+        s.array_type::<CompactShapeKeys>().length(&shape_keys, s, f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        length.store(f);
+        plain_keys.replace(shape_keys.load(s, f).nullable(), f);
+        shape_keys.clear(f);
+        storage.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         f.instruction(&Instruction::Else);
         replacer_keys.replace(property_list.load(s, f), f);
         let list = s
@@ -1025,6 +1151,22 @@ impl FunctionBuilder<'_> {
         key_value.scalar().store(f);
         key_value.set_number(key_value.scalar(), f);
         f.instruction(&Instruction::Else);
+        plain_keys.load(s, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let shape_keys = s
+            .reserve_gc_local(f)
+            .initialize(plain_keys.load(s, f).require_non_null(f), f);
+        let name = s.reserve_gc_local(f).initialize(
+            s.array_type::<CompactShapeKeys>()
+                .read(&shape_keys, item, s, f)
+                .reference(),
+            f,
+        );
+        key_value.set_reference(&name, s, f);
+        name.clear(f);
+        shape_keys.clear(f);
+        f.instruction(&Instruction::Else);
         keys.load(s, f).is_null(f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
@@ -1050,6 +1192,8 @@ impl FunctionBuilder<'_> {
         list.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         let name = s
             .reserve_gc_local(f)
             .initialize(key_value.cast_reference::<StringValue>(s, f), f);
@@ -1065,7 +1209,53 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        self.emit_json_stringify_call(value, &key_value, context, child_depth, &result, f)?;
+        let serialized = self.open_frame(ControlFrameKind::Block, f);
+        member.copy_from(value, f);
+        json_i32(fetched, 0, f);
+        direct.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        // Get(value, key): the captured storage's slot while it is still
+        // the object's storage, and otherwise the general own-data read or
+        // Get, which is what a member of any other holder uses.
+        let got = self.open_frame(ControlFrameKind::Block, f);
+        let changed = self.open_frame(ControlFrameKind::Block, f);
+        plain.load(s, f).is_null(f);
+        self.emit_branch_if_to_target(changed, f);
+        let storage = s
+            .reserve_gc_local(f)
+            .initialize(plain.load(s, f).require_non_null(f), f);
+        self.emit_plain_data_object_value_or_branch(value, &storage, item, &entry, changed, f);
+        storage.clear(f);
+        self.emit_branch_to_target(got, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        self.emit_json_property_get(value, &key_value, &entry, f)?;
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        // A primitive has no toJSON lookup and, here, no replacer call:
+        // SerializeJSONProperty only appends it, or returns undefined.
+        json_i32(fetched, 1, f);
+        result.set_boolean(fetched, f);
+        self.emit_json_serialize_primitive(&entry, accumulator, serialized, f)?;
+        result.set_undefined(f);
+        self.emit_json_tag_test(&entry, WasmRuntimeValueTag::Undefined, f);
+        self.emit_branch_if_to_target(serialized, f);
+        member.copy_from(&entry, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.emit_json_stringify_call(
+            &member,
+            &key_value,
+            fetched,
+            context,
+            child_depth,
+            &result,
+            f,
+        )?;
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        member.set_undefined(f);
+        entry.set_undefined(f);
         self.emit_json_tag_test(&result, WasmRuntimeValueTag::Undefined, f);
         self.open_frame(ControlFrameKind::If, f);
         is_array.load(f);
@@ -1105,6 +1295,11 @@ impl FunctionBuilder<'_> {
         self.emit_json_append_literal(accumulator, "}", f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        s.release_i32_local(direct, f);
+        s.release_i32_local(fetched, f);
+        member.clear(f);
+        plain_keys.clear(f);
+        plain.clear(f);
         replacer_keys.clear(f);
         keys.clear(f);
         s.release_i32_local(item, f);

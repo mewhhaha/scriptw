@@ -50,6 +50,11 @@ impl StringAccumulatorCursor {
         Self { units, length }
     }
 
+    /// The live backing, for the sibling kernel that appends a plain run.
+    pub(super) fn units(&self) -> &GcLocal<CodeUnitArray> {
+        &self.units
+    }
+
     /// The used length, usable as a later `truncate` mark.
     pub(crate) fn length(&self) -> I32Local {
         self.length
@@ -185,6 +190,76 @@ impl StringAccumulatorCursor {
         ));
         function.instruction(&Instruction::I32Add);
         self.length.store(function);
+    }
+
+    /// Append the decimal digits of a nonnegative I32, which is how
+    /// Number::toString spells an integral Number of that range.
+    pub(crate) fn push_decimal(
+        &self,
+        owner: &GcLocal<StringAccumulator>,
+        value: I32Local,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) {
+        let array = schema.array_type::<CodeUnitArray>();
+        let digits = schema.reserve_i32_local(function);
+        let rest = schema.reserve_i32_local(function);
+        let at = schema.reserve_i32_local(function);
+        // Ten digits spell every nonnegative I32.
+        digits.set_constant(10, function);
+        self.reserve(owner, digits, schema, function);
+        digits.set_constant(1, function);
+        value.load(function);
+        rest.store(function);
+        function.instruction(&Instruction::Block(BlockType::Empty));
+        function.instruction(&Instruction::Loop(BlockType::Empty));
+        rest.load(function);
+        function.instruction(&Instruction::I32Const(10));
+        function.instruction(&Instruction::I32LtU);
+        function.instruction(&Instruction::BrIf(1));
+        rest.load(function);
+        function.instruction(&Instruction::I32Const(10));
+        function.instruction(&Instruction::I32DivU);
+        rest.store(function);
+        digits.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Add);
+        digits.store(function);
+        function.instruction(&Instruction::Br(0));
+        function.instruction(&Instruction::End);
+        function.instruction(&Instruction::End);
+        self.length.load(function);
+        digits.load(function);
+        function.instruction(&Instruction::I32Add);
+        self.length.store(function);
+        // The digits are written from the last one back.
+        self.length.load(function);
+        at.store(function);
+        value.load(function);
+        rest.store(function);
+        function.instruction(&Instruction::Loop(BlockType::Empty));
+        at.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Sub);
+        at.store(function);
+        self.units.access(function);
+        at.load(function);
+        rest.load(function);
+        function.instruction(&Instruction::I32Const(10));
+        function.instruction(&Instruction::I32RemU);
+        function.instruction(&Instruction::I32Const(i32::from(b'0')));
+        function.instruction(&Instruction::I32Add);
+        array.emit_set(function);
+        rest.load(function);
+        function.instruction(&Instruction::I32Const(10));
+        function.instruction(&Instruction::I32DivU);
+        rest.store(function);
+        rest.load(function);
+        function.instruction(&Instruction::BrIf(0));
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(at, function);
+        schema.release_i32_local(rest, function);
+        schema.release_i32_local(digits, function);
     }
 
     /// Append every unit of a published String.

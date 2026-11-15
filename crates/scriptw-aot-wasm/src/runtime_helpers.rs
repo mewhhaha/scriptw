@@ -1366,7 +1366,11 @@ runtime_helper_domain! {
     GlobalVarDeclarationCheck / GlobalVarDeclarationCheckArguments / GlobalVarDeclarationCheckParameters / "global_var_declaration_check" { object:Value,key:Key,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     GlobalVarDeclarationInstall / GlobalVarDeclarationInstallArguments / GlobalVarDeclarationInstallParameters / "global_var_declaration_install" { object:Value,key:Key,deletable:I32,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     NativeConstructorHeaderAllocate / NativeConstructorHeaderAllocateArguments / NativeConstructorHeaderAllocateParameters / "native_constructor_header_allocate" { prototype:Value,name:(Ref StringValue NonNullable),length_bits:I64,configurable:I32 } => (Ref OrdinaryObject NonNullable);
-    JsonStringifyValue / JsonStringifyValueArguments / JsonStringifyValueParameters / "json_stringify_value" { holder:Value,key:Value,context:(Ref JsonStringifyContext NonNullable),indent:I64,caller_program:Program } => Completion;
+    AsciiNarrow / AsciiNarrowArguments / AsciiNarrowParameters / "ascii_narrow" { units:(Ref CodeUnitArray NonNullable),start:I32,end:I32,bytes:(Ref ByteArray NonNullable),at:I32 } => I32;
+    AsciiWiden / AsciiWidenArguments / AsciiWidenParameters / "ascii_widen" { bytes:(Ref ByteArray NonNullable),start:I32,end:I32,units:(Ref CodeUnitArray NonNullable),at:I32 } => I32;
+    CodeUnitFind / CodeUnitFindArguments / CodeUnitFindParameters / "code_unit_find" { units:(Ref CodeUnitArray NonNullable),start:I32,end:I32,unit:I32 } => I32;
+    JsonPlainRun / JsonPlainRunArguments / JsonPlainRunParameters / "json_plain_run" { source:(Ref CodeUnitArray NonNullable),start:I32,end:I32,target:(Ref CodeUnitArray NonNullable),at:I32 } => I32;
+    JsonStringifyValue / JsonStringifyValueArguments / JsonStringifyValueParameters / "json_stringify_value" { holder:Value,key:Value,fetched:I32,context:(Ref JsonStringifyContext NonNullable),indent:I64,caller_program:Program } => Completion;
 }
 
 impl RuntimeHelperId {
@@ -1561,6 +1565,9 @@ impl RuntimeHelperId {
             Self::GlobalLexicalDeclarationCheck => HelperOwner::Runtime,
             Self::GlobalVarDeclarationCheck => HelperOwner::Runtime,
             Self::GlobalVarDeclarationInstall => HelperOwner::Runtime,
+            Self::AsciiNarrow | Self::AsciiWiden | Self::CodeUnitFind | Self::JsonPlainRun => {
+                HelperOwner::Runtime
+            }
             Self::JsonStringifyValue => HelperOwner::Runtime,
             Self::CompactArrayLiteral => HelperOwner::Program,
             Self::InitializeInstanceElements => HelperOwner::ContextHook,
@@ -1739,6 +1746,7 @@ impl RuntimeHelperId {
             Self::GlobalLexicalDeclarationCheck => true,
             Self::GlobalVarDeclarationCheck => true,
             Self::GlobalVarDeclarationInstall => true,
+            Self::AsciiNarrow | Self::AsciiWiden | Self::CodeUnitFind | Self::JsonPlainRun => true,
             Self::JsonStringifyValue => emission.holds(RuntimeHelperFact::UsesJsonStringify),
             Self::CompactArrayLiteral => true,
             Self::InitializeInstanceElements => true,

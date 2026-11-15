@@ -127,7 +127,10 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // mutable) and gives up its descriptor when its property is deleted.
 // Version 72 chains a static read site's records: a record gains its next
 // record, a receiver layout hint and a learning budget.
-const LAYOUT_VERSION: u32 = 72;
+// Version 73 adds four leaf R helpers over code units and bytes (ASCII
+// narrowing and widening, a code-unit find and JSON's plain run) and gives
+// the JSON.stringify value helper a `fetched` operand.
+const LAYOUT_VERSION: u32 = 73;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.
