@@ -33,10 +33,10 @@ instructions and 100 for cycles):
 
 | | Scriptw sync | Node sync | Scriptw async | Node async |
 | --- | ---: | ---: | ---: | ---: |
-| Instructions, median | 5.05M | 4.37M | 5.53M | 4.62M |
-| Instructions, mean | 5.17M | 4.41M | 5.66M | 4.64M |
-| Cycles, median | 2.42M | 2.59M | 2.80M | 2.79M |
-| Cycles, mean | 2.49M | 2.61M | 2.91M | 2.81M |
+| Instructions, median | 4.87M | 4.37M | 5.34M | 4.62M |
+| Instructions, mean | 4.95M | 4.41M | 5.44M | 4.64M |
+| Cycles, median | 2.42M to 2.54M | 2.59M | 2.80M | 2.79M |
+| Cycles, mean | 2.49M to 2.65M | 2.61M | 2.91M | 2.81M |
 
 Callgrind instruction references per request, Speed policy, on a cloud
 machine without hardware counters (97 requests; about 0.8% above the

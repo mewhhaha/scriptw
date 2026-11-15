@@ -1,11 +1,17 @@
-//! Real vector bodies guard object construction and every projected read.
+//! Real vector bodies build no arguments object at entry and guard every
+//! projected read on whether a read has needed the object yet.
 use crate::{property_read_plans::Module, scalar_masked_rows::type_group_sizes};
 use scriptw_aot_wasm::{GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot};
 use scriptw_front::{ParseOptions, parse};
 use scriptw_ir::lower;
 use wasmparser::{Operator, Validator, WasmFeatures};
 
-fn if_arms<'a>(body: &'a [Operator<'a>], start: usize) -> (&'a [Operator<'a>], &'a [Operator<'a>]) {
+/// The arms of the `if` at `start`: its then-arm and, when present, its
+/// else-arm.
+fn if_parts<'a>(
+    body: &'a [Operator<'a>],
+    start: usize,
+) -> (&'a [Operator<'a>], Option<&'a [Operator<'a>]>) {
     assert!(matches!(body[start], Operator::If { .. }));
     let mut depth = 1;
     let mut otherwise = None;
@@ -19,9 +25,13 @@ fn if_arms<'a>(body: &'a [Operator<'a>], start: usize) -> (&'a [Operator<'a>], &
             Operator::End => {
                 depth -= 1;
                 if depth == 0 {
-                    let otherwise =
-                        otherwise.expect("both nonempty and absent-index paths are encoded");
-                    return (&body[start + 1..otherwise], &body[otherwise + 1..index]);
+                    return match otherwise {
+                        Some(otherwise) => (
+                            &body[start + 1..otherwise],
+                            Some(&body[otherwise + 1..index]),
+                        ),
+                        None => (&body[start + 1..index], None),
+                    };
                 }
             }
             _ => {}
@@ -34,7 +44,9 @@ fn allocations(body: &[Operator<'_>], ty: u32) -> usize {
     body.iter().filter(|op| matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == ty)).count()
 }
 
-fn projected_count(body: &[Operator<'_>], arguments: u32) -> Option<(u32, usize)> {
+/// The entry's count guard: the argument count stored once and tested to
+/// snapshot index zero, with no object built on either side.
+fn projected_entry(body: &[Operator<'_>], arguments: u32) -> Option<usize> {
     let guards = body
         .windows(4)
         .enumerate()
@@ -55,8 +67,11 @@ fn projected_count(body: &[Operator<'_>], arguments: u32) -> Option<(u32, usize)
             if stored != loaded {
                 return None;
             }
-            let (_, absent) = if_arms(body, index + 3);
-            (allocations(absent, arguments) == 1).then_some((*stored, index + 3))
+            let (snapshot, otherwise) = if_parts(body, index + 3);
+            (otherwise.is_none()
+                && allocations(snapshot, arguments) == 0
+                && snapshot.iter().any(|op| matches!(op, Operator::ArrayGet { .. })))
+            .then_some(index + 3)
         })
         .collect::<Vec<_>>();
     assert!(guards.len() <= 1, "one invocation count decides all reads");
@@ -64,47 +79,39 @@ fn projected_count(body: &[Operator<'_>], arguments: u32) -> Option<(u32, usize)
 }
 
 fn check_projection(body: &[Operator<'_>], arguments: u32, stored: u32) {
-    let (count, entry) = projected_count(body, arguments).expect("real entry projects arguments");
-    let (present, absent) = if_arms(body, entry);
-    assert_eq!(allocations(body, arguments), 1);
-    assert_eq!(
-        allocations(present, arguments),
-        0,
-        "nonempty calls never construct the arguments object"
-    );
-    assert_eq!(
-        allocations(absent, arguments),
-        1,
-        "empty calls eagerly retain the real object"
-    );
-    assert!(
-        present
-            .iter()
-            .any(|op| matches!(op, Operator::ArrayGet { .. })),
-        "first value is snapshotted from actual input before formals/body"
-    );
-    assert_eq!(present.iter().filter(|op| matches!(op, Operator::StructGet { struct_type_index, .. } if *struct_type_index == stored)).count(), 3, "snapshot preserves complete tag/scalar/reference");
-    let reads = body
-        .windows(2)
-        .enumerate()
-        .filter_map(|(index, ops)| match ops {
-            [Operator::LocalGet { local_index }, Operator::If { .. }]
-                if *local_index == count && index + 1 != entry =>
+    let entry = projected_entry(body, arguments).expect("real entry projects arguments");
+    let (snapshot, _) = if_parts(body, entry);
+    assert_eq!(snapshot.iter().filter(|op| matches!(op, Operator::StructGet { struct_type_index, .. } if *struct_type_index == stored)).count(), 3, "snapshot preserves complete tag/scalar/reference");
+    // Each read tests whether the real object exists (its local's tag
+    // against Undefined) before answering from the vector.
+    let mut guards = std::collections::BTreeMap::<u32, Vec<usize>>::new();
+    for (index, ops) in body.windows(3).enumerate() {
+        if let [Operator::LocalGet { local_index }, Operator::I32Const { .. }, Operator::I32Eq] = ops {
+            if let Some(offset) = body[index + 3..(index + 8).min(body.len())]
+                .iter()
+                .position(|op| matches!(op, Operator::If { .. }))
             {
-                Some(index + 1)
+                let start = index + 3 + offset;
+                if let (_, Some(slow)) = if_parts(body, start) {
+                    if allocations(slow, arguments) == 1 {
+                        guards.entry(*local_index).or_default().push(start);
+                    }
+                }
             }
-            _ => None,
-        })
-        .collect::<Vec<_>>();
+        }
+    }
+    assert_eq!(guards.len(), 1, "one materialized-object word guards every read");
+    let reads = guards.into_values().next().unwrap();
+    assert_eq!(reads.len(), 2, "index zero and length share that guard");
     assert_eq!(
+        allocations(body, arguments),
         reads.len(),
-        2,
-        "index zero and length use the same invocation discriminator"
+        "the object is built only on a read's slow arm, never at entry"
     );
     for index in reads {
-        let (present, absent) = if_arms(body, index);
+        let (fast, slow) = if_parts(body, index);
         assert!(
-            present.iter().all(|op| !matches!(
+            fast.iter().all(|op| !matches!(
                 op,
                 Operator::Call { .. }
                     | Operator::CallRef { .. }
@@ -113,11 +120,11 @@ fn check_projection(body: &[Operator<'_>], arguments: u32, stored: u32) {
                     | Operator::StructGet { .. }
                     | Operator::ArrayGet { .. }
             )),
-            "snapshot reads have no lookup, allocation or callback"
+            "vector reads have no lookup, allocation or callback"
         );
         assert!(
-            absent.iter().any(|op| matches!(op, Operator::Call { .. })),
-            "every empty-call read retains the original operation"
+            slow.unwrap().iter().any(|op| matches!(op, Operator::Call { .. })),
+            "a read that needs the object retains the original operation"
         );
     }
 }
@@ -159,7 +166,7 @@ fn actual_observed_workload_and_five_formals_keep_vector_abi_with_count_guarded_
                 for name in ["escaped","reference"] {
                     let (_,body)=program.named(&format!("js::{name}#"));
                     assert_eq!(allocations(body,arguments),1);
-                    assert!(projected_count(body,arguments).is_none(),"{name} retains unconditional materialization");
+                    assert!(projected_entry(body,arguments).is_none(),"{name} retains unconditional materialization");
                 }
             }
         }

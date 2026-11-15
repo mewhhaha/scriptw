@@ -340,6 +340,11 @@ impl ReadOnlyUses<'_> {
             ExprIr::PropertyRead { target, key } => {
                 self.expression(target, reads) && self.key(key, reads)
             }
+            // A method call's receiver bound to a temporary: walked as a
+            // receiver, where reads refuse.
+            ExprIr::MaterializeBinding { name, value, body } => {
+                other_name(name) && self.expression(value, false) && self.expression(body, reads)
+            }
             // A write's target is walked like any operand: the binding itself
             // as a target refuses, a value read from it does not.
             ExprIr::PropertyWrite {
@@ -438,12 +443,6 @@ impl ReadOnlyUses<'_> {
                     | SpecOperationIr::IsLooselyEqual,
                 operands,
             } => operands.iter().all(|value| self.expression(value, reads)),
-            // A method call keeps its receiver in a temporary that the call
-            // names as its property base and `this`. The receiver follows
-            // the retained-receiver rule above.
-            ExprIr::MaterializeBinding { name, value, body } => {
-                other_name(name) && self.expression(value, false) && self.expression(body, reads)
-            }
             _ => false,
         }
     }
@@ -550,6 +549,8 @@ mod tests {
             // A method call on another receiver, as createElement's own-key test.
             "function make(t, c) { 'use strict'; var p = {}, k; for (k in c) t.call(c, k) && (p[k] = c[k]); return arguments.length; }",
             "function make(t, c) { 'use strict'; return t.call(c, arguments[1], arguments.length); }",
+            // React's createElement, as the retained bundle compiles it.
+            "var Mt = Object.prototype.hasOwnProperty, jn = function () {}; function make(n,t,r){'use strict';var i,o={},e=null;if(t!=null)for(i in t.key!==void 0&&(e=\"\"+t.key),t)Mt.call(t,i)&&i!==\"key\"&&i!==\"__self\"&&i!==\"__source\"&&(o[i]=t[i]);var f=arguments.length-2;if(f===1)o.children=r;else if(1<f){for(var l=Array(f),c=0;c<f;c++)l[c]=arguments[c+2];o.children=l}return jn(n,e,o)}",
         ] {
             let function = function(source, ParseOptions::module());
             assert!(

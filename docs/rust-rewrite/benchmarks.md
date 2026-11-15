@@ -381,6 +381,7 @@ They do not refresh the published panel.
 | [Captured cells without import links](#request-census-and-import-free-cells-2026-11-14) (ABI 69), on the row above | 5.09M | 5.57M |
 | [`instanceof` site records in P](#instanceof-site-records-2026-11-14) (ABI 70), on the row above | 5.01M | 5.49M |
 | [Young generation](#young-generation-2026-11-14): 2 MiB nursery, direct global-root tracing, on the row above; means over 900 requests 5.17M and 5.66M (over 100, 5.15M and 5.64M, were 5.50M and 6.13M) | 5.05M | 5.53M |
+| [Arguments reads without the object](#arguments-reads-without-the-object-2026-11-15), strict functions, on the row above | 4.87M | 5.34M |
 | Node 24 `--jitless` | 4.38M | — |
 | Node 24 with its JIT | 2.62M | — |
 
@@ -1176,6 +1177,37 @@ window (each of their maxima is a full collection); the 4 MiB nursery leaves
 6 MiB semi-spaces, which reach the full-collection threshold (less than a
 nursery free) after a few minor collections. Cycles were not settled: other
 projects' builds ran throughout.
+
+### Arguments reads without the object (2026-11-15)
+
+A strict function whose own `arguments` binding is used only as
+`arguments.length` and `arguments[key]` reads, with no direct eval, arrow
+capture or own lexical environment, no longer builds its arguments object at
+entry. On the retained request the three property appends of that
+construction (length, callee, @@iterator) were about 2.5% of sync cycles,
+from createElement, cloneElement and one argument-count check.
+
+An unmapped object's own index below the argument count is a writable data
+property holding the passed value, and its `length` holds the count. While
+no object exists nothing can write them, and building the object later from
+the unchanged argument vector makes the same object. So `.length` reads the
+count, and a key that is a Number integer index below the count reads the
+passed value. Every other key ("callee", a Symbol, an index at or past the
+count, a fraction, an object to convert) builds the real object once per
+invocation and reads it through [[Get]] after ToPropertyKey, with the key
+evaluated once. After that every read goes to the object, which an inherited
+getter may have changed. Sloppy functions keep their mapped object. The
+admission walk now admits loops and for-in without lexical environments,
+property writes, declaration evaluation and bound method receivers.
+
+| Retained RSC, Speed, user instructions per request | median | mean |
+| --- | ---: | ---: |
+| sync, before (main `aefe8a9b0`) | 5.054M | 5.150M |
+| sync, after | 4.869M | 4.953M |
+| async, before | 5.534M | 5.636M |
+| async, after | 5.336M | 5.439M |
+
+Sync cycles median 2.541M (mean 2.651M). P grows to 4,771,822 bytes.
 
 ### Arguments reads and instruction attribution (2026-11-15)
 
