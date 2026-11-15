@@ -87,7 +87,7 @@ impl FunctionBuilder<'_> {
         );
         function.instruction(&Instruction::I32Const(0));
         destination_index.store(function);
-        output.copy_units_from(
+        output.copy_concatenated_units_from(
             destination_index,
             &left_units,
             left_length,
@@ -96,7 +96,7 @@ impl FunctionBuilder<'_> {
         );
         left_length.load(function);
         destination_index.store(function);
-        output.copy_units_from(
+        output.copy_concatenated_units_from(
             destination_index,
             &right_units,
             right_length,
@@ -115,6 +115,70 @@ impl FunctionBuilder<'_> {
         let value = result.load(schema, function);
         result.clear(function);
         value
+    }
+
+    /// Three Strings' exact UTF-16 units in one immutable StringValue.
+    pub(crate) fn emit_concat_three_gc_strings(
+        &self,
+        parts: [&GcLocal<StringValue>; 3],
+        function: &mut Function,
+    ) -> GcStackReference<StringValue> {
+        let schema = self.runtime_schema();
+        let units = schema.array_type::<CodeUnitArray>();
+        let sources = parts.map(|part| {
+            schema.reserve_gc_local(function).initialize(
+                schema
+                    .struct_type::<StringValue>()
+                    .field(StringValueSchema::CODE_UNITS)
+                    .read(part, schema, function)
+                    .reference(),
+                function,
+            )
+        });
+        let lengths = [(); 3].map(|()| schema.reserve_i32_local(function));
+        let total = schema.reserve_i32_local(function);
+        let position = schema.reserve_i32_local(function);
+        total.set_constant(0, function);
+        for (source, length) in sources.iter().zip(lengths) {
+            units.length(source, schema, function);
+            length.store(function);
+            total.load(function);
+            length.load(function);
+            function.instruction(&Instruction::I32Add);
+            position.store(function);
+            position.load(function);
+            total.load(function);
+            function.instruction(&Instruction::I32LtU);
+            function.instruction(&Instruction::If(BlockType::Empty));
+            function.instruction(&Instruction::Unreachable);
+            function.instruction(&Instruction::End);
+            position.load(function);
+            total.store(function);
+        }
+        let output = StringConstruction::allocate(
+            schema,
+            schema.reserve_gc_local(function),
+            total,
+            function,
+        );
+        position.set_constant(0, function);
+        for (source, length) in sources.iter().zip(lengths) {
+            output.copy_concatenated_units_from(position, source, length, schema, function);
+            position.load(function);
+            length.load(function);
+            function.instruction(&Instruction::I32Add);
+            position.store(function);
+        }
+        let result = output.publish(schema, function);
+        schema.release_i32_local(position, function);
+        schema.release_i32_local(total, function);
+        for length in lengths.into_iter().rev() {
+            schema.release_i32_local(length, function);
+        }
+        for source in sources.into_iter().rev() {
+            source.clear(function);
+        }
+        result
     }
 
     /// SymbolDescriptiveString is distinct from implicit ToString, which

@@ -130,7 +130,10 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 73 finds weak collection entries by KEY_HASH_ID identities: four
 // weak entry imports replace the WeakMap and WeakSet resource imports, and
 // the two objects no longer hold a host resource.
-const LAYOUT_VERSION: u32 = 73;
+// Version 74 adds the two String concatenation helpers (two and three
+// Strings) that P calls from an addition whose live operands are Strings
+// and Numbers.
+const LAYOUT_VERSION: u32 = 74;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

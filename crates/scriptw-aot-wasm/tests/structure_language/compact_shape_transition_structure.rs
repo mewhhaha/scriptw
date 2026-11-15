@@ -124,8 +124,25 @@ fn transition_kernel_guards_precede_every_mutation() {
     );
     assert!(lookup.contains("self.emit_compact_transition_scan("));
     for creation in ["construct(", "spend_compact_shape_budget", ".write("] {
-        assert!(!lookup.contains(creation) && !scan.contains(creation));
+        assert!(!lookup.contains(creation));
     }
+    for creation in ["construct(", "spend_compact_shape_budget", "TRANSITIONS"] {
+        assert!(!scan.contains(creation));
+    }
+    // The scan's only writes exchange the found child with the entry before
+    // it: both operands are entries the table already holds.
+    ordered(
+        scan,
+        &[
+            "self.emit_compact_key_matches_i32(&candidate_key, name, hash, f);",
+            "child.replace(candidate.load(s, f).nullable(), f);",
+            "table_type.read(&present, before, s, f)",
+            "table_type.write(&present, used, GcOperand::reference(&earlier, s), s, f);",
+            "table_type.write(&present, before, GcOperand::reference(&entry, s), s, f);",
+        ],
+    );
+    assert_eq!(scan.matches(".write(").count(), 2);
+    assert_eq!(scan.matches("table_type.write(").count(), 2);
     // Storage is published only after the replacement owns the new value.
     let extend = between(
         TRANSITION,

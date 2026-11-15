@@ -1454,6 +1454,8 @@ fn emit_script_module_with_factory(
         );
         register_runtime_helper!(ValueToObject, compile_value_to_object_helper);
         register_runtime_helper!(CoerciveAdd, compile_coercive_add_helper);
+        register_runtime_helper!(StringConcat, compile_string_concat_helper);
+        register_runtime_helper!(StringConcatThree, compile_string_concat_three_helper);
         register_runtime_helper!(
             LexicalBindingUninitialized,
             compile_lexical_binding_uninitialized_helper

@@ -220,6 +220,8 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::RuntimeErrorForThrow
             | RuntimeHelperId::PooledStringResolve
             | RuntimeHelperId::IntegerDecimalString
+            | RuntimeHelperId::StringConcat
+            | RuntimeHelperId::StringConcatThree
             | RuntimeHelperId::PooledStringsInitialize
             | RuntimeHelperId::GlobalLexicalDeclarationCheck
             | RuntimeHelperId::GlobalVarDeclarationCheck

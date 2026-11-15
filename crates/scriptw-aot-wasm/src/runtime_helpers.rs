@@ -1265,6 +1265,8 @@ runtime_helper_domain! {
     StringEquality / StringEqualityArguments / StringEqualityParameters / "string_equality" { left:(Ref StringValue NonNullable),right:(Ref StringValue NonNullable),ascii_fold:I32 } => I32;
     IntegerDecimalString / IntegerDecimalStringArguments / IntegerDecimalStringParameters / "integer_decimal_string" { magnitude:I64,negative:I32 } => (Ref StringValue NonNullable);
     NumberToString / NumberToStringArguments / NumberToStringParameters / "number_to_string" { bits:I64 } => (Ref StringValue NonNullable);
+    StringConcat / StringConcatArguments / StringConcatParameters / "string_concat" { left:(Ref StringValue NonNullable),right:(Ref StringValue NonNullable) } => (Ref StringValue NonNullable);
+    StringConcatThree / StringConcatThreeArguments / StringConcatThreeParameters / "string_concat_three" { first:(Ref StringValue NonNullable),second:(Ref StringValue NonNullable),third:(Ref StringValue NonNullable) } => (Ref StringValue NonNullable);
     StringToNumber / StringToNumberArguments / StringToNumberParameters / "string_to_number" { input:(Ref StringValue NonNullable) } => I64;
     ValueToString / ValueToStringArguments / ValueToStringParameters / "value_to_string" { input:Value,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ValueToNumber / ValueToNumberArguments / ValueToNumberParameters / "value_to_number" { input:Value,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1461,6 +1463,8 @@ impl RuntimeHelperId {
             Self::StringEquality => HelperOwner::Runtime,
             Self::IntegerDecimalString => HelperOwner::Runtime,
             Self::NumberToString => HelperOwner::Runtime,
+            Self::StringConcat => HelperOwner::Runtime,
+            Self::StringConcatThree => HelperOwner::Runtime,
             Self::StringToNumber => HelperOwner::Runtime,
             Self::ValueToString => HelperOwner::Runtime,
             Self::ValueToNumber => HelperOwner::Runtime,
@@ -1641,6 +1645,8 @@ impl RuntimeHelperId {
             Self::StringEquality => true,
             Self::IntegerDecimalString => true,
             Self::NumberToString => true,
+            Self::StringConcat => true,
+            Self::StringConcatThree => true,
             Self::StringToNumber => true,
             Self::ValueToString => true,
             Self::ValueToNumber => true,

@@ -153,16 +153,11 @@ impl FunctionBuilder<'_> {
         s.array_type::<CodeUnitArray>().length(&units, s, f);
         f.instruction(&Instruction::I32LtU);
         self.open_frame(ControlFrameKind::If, f);
-        let length = s.reserve_i32_local(f);
-        let zero = s.reserve_i32_local(f);
         let unit = s.reserve_i32_local(f);
-        length.set_constant(1, f);
-        zero.set_constant(0, f);
         s.array_type::<CodeUnitArray>()
             .read(&units, index, s, f)
             .store(unit, f);
-        let construction = StringConstruction::allocate(s, s.reserve_gc_local(f), length, f);
-        construction.write(zero, unit, s, f);
+        let construction = StringConstruction::from_code_unit(s, s.reserve_gc_local(f), unit, f);
         let character = s
             .reserve_gc_local(f)
             .initialize(construction.publish(s, f), f);
@@ -173,8 +168,6 @@ impl FunctionBuilder<'_> {
         value.clear(f);
         character.clear(f);
         s.release_i32_local(unit, f);
-        s.release_i32_local(zero, f);
-        s.release_i32_local(length, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         units.clear(f);

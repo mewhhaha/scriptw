@@ -3448,6 +3448,11 @@ where
 /// `array.copy` of a dynamic length is a host `memmove` call whose fixed
 /// transition cost exceeds a short inline loop.
 const INLINE_CODE_UNIT_COPY_LIMIT: i32 = 8;
+/// The same limit for the parts of a concatenation. One unit of the inline
+/// loop runs 22 or 23 native instructions (two null checks, two bounds
+/// checks and the reloads between them), and a bulk copy about 85 whatever
+/// its length, so four units already cost more inline.
+const INLINE_CONCATENATION_COPY_LIMIT: i32 = 3;
 /// Backings at or below this length are zero-filled inline. A constant zero
 /// fill operand makes the engine call its host `memset` for any length.
 const INLINE_CODE_UNIT_FILL_LIMIT: i32 = 16;
@@ -3484,6 +3489,7 @@ fn emit_code_unit_copy(
     source: &GcLocal<CodeUnitArray>,
     source_index: Option<I32Local>,
     length: I32Local,
+    inline_limit: i32,
     schema: &RuntimeSchema,
     function: &mut Function,
 ) {
@@ -3495,7 +3501,7 @@ fn emit_code_unit_copy(
         }
     };
     length.load(function);
-    function.instruction(&Instruction::I32Const(INLINE_CODE_UNIT_COPY_LIMIT));
+    function.instruction(&Instruction::I32Const(inline_limit));
     function.instruction(&Instruction::I32LeU);
     function.instruction(&Instruction::If(BlockType::Empty));
     let offset = schema.reserve_i32_local(function);
@@ -3577,6 +3583,25 @@ impl StringConstruction {
         }
     }
 
+    /// Construct two exact UTF-16 units without a fill followed by a copy.
+    pub(crate) fn from_code_unit_pair(
+        schema: &RuntimeSchema,
+        slot: GcLocalSlot<CodeUnitArray>,
+        first: I32Local,
+        second: I32Local,
+        function: &mut Function,
+    ) -> Self {
+        Self {
+            units: slot.initialize(
+                schema.array_type::<CodeUnitArray>().fixed(
+                    [GcOperand::i32_local(first), GcOperand::i32_local(second)],
+                    function,
+                ),
+                function,
+            ),
+        }
+    }
+
     pub(crate) fn allocate(
         schema: &RuntimeSchema,
         slot: GcLocalSlot<CodeUnitArray>,
@@ -3616,6 +3641,27 @@ impl StringConstruction {
             source,
             None,
             length,
+            INLINE_CODE_UNIT_COPY_LIMIT,
+            schema,
+            function,
+        );
+    }
+    /// Copy one part of a concatenation into the unpublished backing array.
+    pub(crate) fn copy_concatenated_units_from(
+        &self,
+        destination_index: I32Local,
+        source: &GcLocal<CodeUnitArray>,
+        length: I32Local,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) {
+        emit_code_unit_copy(
+            &self.units,
+            Some(destination_index),
+            source,
+            None,
+            length,
+            INLINE_CONCATENATION_COPY_LIMIT,
             schema,
             function,
         );
@@ -3637,6 +3683,7 @@ impl StringConstruction {
             source,
             Some(source_index),
             length,
+            INLINE_CODE_UNIT_COPY_LIMIT,
             schema,
             function,
         );
