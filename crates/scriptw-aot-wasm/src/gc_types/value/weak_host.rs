@@ -1,4 +1,5 @@
-//! Typed weak host calls; references never travel as numeric identities.
+//! Typed weak host calls. References travel as references; the identities
+//! beside a weak collection entry's references only say where to look.
 use super::*;
 mod finalization;
 
@@ -26,65 +27,67 @@ fn bind_resource(
     resource
 }
 
+/// The objects that own weak collection entries.
+pub(crate) trait WeakCollectionObject: GcHeapType {}
+impl WeakCollectionObject for WeakMapObject {}
+impl WeakCollectionObject for WeakSetObject {}
+
+/// The stable identities of a weak collection and of a key, in that order:
+/// what the host hashes to find their entry.
+#[derive(Clone, Copy)]
+pub(crate) struct WeakEntryIdentities {
+    pub(crate) owner: I64Local,
+    pub(crate) key: I64Local,
+}
+impl WeakEntryIdentities {
+    fn load(self, f: &mut Function) {
+        self.owner.load(f);
+        self.key.load(f);
+    }
+}
+
 impl DeclaredGcHostImport {
-    pub(crate) fn allocate_weak_map(
+    /// `WeakMap.prototype.set`'s store, or with no value a WeakSet's `add`.
+    /// Both identities must already be minted.
+    pub(crate) fn put_weak_entry<Owner: WeakCollectionObject>(
         self,
+        owner: &GcLocal<Owner>,
+        key: &ValueLocals,
+        value: Option<&GcLocal<StoredValue>>,
+        identities: WeakEntryIdentities,
         s: &RuntimeSchema,
         f: &mut Function,
-    ) -> GcStackReference<HostResource> {
-        assert_eq!(self.import(), GcHostImport::WeakMapAllocate);
+    ) {
+        assert_eq!(self.import(), GcHostImport::WeakEntryPut);
+        owner.load(s, f);
+        key.reference().load(f);
+        match value {
+            Some(value) => {
+                value.load(s, f);
+            }
+            None => {
+                f.instruction(&Instruction::RefNull(wasm_encoder::HeapType::Abstract {
+                    shared: false,
+                    ty: wasm_encoder::AbstractHeapType::Eq,
+                }));
+            }
+        }
+        identities.load(f);
         self.emit_call_instruction(f);
-        bind_resource(HostResourceKind::WeakMap, s, f)
     }
-    pub(crate) fn allocate_weak_set(
-        self,
-        s: &RuntimeSchema,
-        f: &mut Function,
-    ) -> GcStackReference<HostResource> {
-        assert_eq!(self.import(), GcHostImport::WeakSetAllocate);
-        self.emit_call_instruction(f);
-        bind_resource(HostResourceKind::WeakSet, s, f)
-    }
-    pub(crate) fn put_weak_map(
+    /// The stored value of a WeakMap entry, or null without one.
+    pub(crate) fn get_weak_entry(
         self,
         owner: &GcLocal<WeakMapObject>,
-        resource: &GcLocal<HostResource>,
         key: &ValueLocals,
-        value: &GcLocal<StoredValue>,
-        s: &RuntimeSchema,
-        f: &mut Function,
-    ) {
-        assert_eq!(self.import(), GcHostImport::WeakMapSet);
-        owner.load(s, f);
-        resource_operand(resource, s, f);
-        key.reference().load(f);
-        value.load(s, f);
-        self.emit_call_instruction(f);
-    }
-    pub(crate) fn add_weak_set(
-        self,
-        owner: &GcLocal<WeakSetObject>,
-        resource: &GcLocal<HostResource>,
-        key: &ValueLocals,
-        s: &RuntimeSchema,
-        f: &mut Function,
-    ) {
-        assert_eq!(self.import(), GcHostImport::WeakSetAdd);
-        owner.load(s, f);
-        resource_operand(resource, s, f);
-        key.reference().load(f);
-        self.emit_call_instruction(f);
-    }
-    pub(crate) fn get_weak_map(
-        self,
-        resource: &GcLocal<HostResource>,
-        key: &ValueLocals,
+        identities: WeakEntryIdentities,
         s: &RuntimeSchema,
         f: &mut Function,
     ) -> GcStackReference<StoredValue, Nullable> {
-        assert_eq!(self.import(), GcHostImport::WeakMapGet);
-        resource_operand(resource, s, f);
+        assert_eq!(self.import(), GcHostImport::WeakEntryGet);
+        owner.load(s, f);
         key.reference().load(f);
+        identities.load(f);
         self.emit_call_instruction(f);
         f.instruction(&Instruction::RefCastNullable(
             s.reference_type::<StoredValue>(GcNullability::Nullable)
@@ -92,37 +95,24 @@ impl DeclaredGcHostImport {
         ));
         GcStackReference::new()
     }
-    pub(crate) fn weak_map_membership(
+    /// Whether a weak collection has the key, for `has`, or had it before
+    /// this call removed it, for `delete`.
+    pub(crate) fn weak_entry_membership<Owner: WeakCollectionObject>(
         self,
-        resource: &GcLocal<HostResource>,
+        owner: &GcLocal<Owner>,
         key: &ValueLocals,
+        identities: WeakEntryIdentities,
         result: I32Local,
         s: &RuntimeSchema,
         f: &mut Function,
     ) {
         assert!(matches!(
             self.import(),
-            GcHostImport::WeakMapHas | GcHostImport::WeakMapDelete
+            GcHostImport::WeakEntryHas | GcHostImport::WeakEntryDelete
         ));
-        resource_operand(resource, s, f);
+        owner.load(s, f);
         key.reference().load(f);
-        self.emit_call_instruction(f);
-        result.store(f);
-    }
-    pub(crate) fn weak_set_membership(
-        self,
-        resource: &GcLocal<HostResource>,
-        key: &ValueLocals,
-        result: I32Local,
-        s: &RuntimeSchema,
-        f: &mut Function,
-    ) {
-        assert!(matches!(
-            self.import(),
-            GcHostImport::WeakSetHas | GcHostImport::WeakSetDelete
-        ));
-        resource_operand(resource, s, f);
-        key.reference().load(f);
+        identities.load(f);
         self.emit_call_instruction(f);
         result.store(f);
     }

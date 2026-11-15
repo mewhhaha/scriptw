@@ -110,6 +110,47 @@ These are in `src/runtime/vm/{libcalls.rs,instance.rs,gc/func_ref.rs}`.
   by size instead of a `memmove` call; larger objects still call it. The
   semi-spaces are disjoint, and an overlap keeps `memmove` semantics.
 
+## Raw weak operands
+
+`src/runtime/gc/enabled/weakref.rs`: a host function made with
+`Func::new_unchecked` receives each GC reference as the raw `u32` of a
+`ValRaw`. Until that call returns or the Store collects, the raw value is the
+reference itself, so an operation that cannot collect needs no root for it.
+The product's WeakMap and WeakSet imports are such functions.
+
+- `GcEphemeron::new_raw` and `set_value_raw` register and replace from raw
+  operands. They are `unsafe`: the caller promises references that Wasm passed
+  to the running host call, with no collection since. Null and `i31` owners
+  and keys are rejected as `new` rejects them; a zero value is no value.
+  Registration and replacement go through the same `WeakGcRegistry::insert`
+  and `get_mut` as the rooted forms, so the slot is listed for the next minor
+  collection.
+- `GcEphemeron::matches_raw` says whether a live entry's owner and key are
+  both exactly the objects two raw references name. It compares identities
+  only and follows no reference, so it is safe; a retired entry matches
+  nothing.
+- `GcEphemeron::value_raw` returns the surviving value as a raw reference for
+  a host function to return to Wasm at once, through `clone_gc_ref` and
+  `expose_gc_ref_to_wasm` as a rooted result is stored; zero for no value or
+  a retired entry.
+- None of these enters a no-GC scope: registration, replacement and reads
+  allocate no GC object and cannot collect. `insert` takes the `StoreOpaque`
+  for that reason; the rooted constructors still hold their `AutoAssertNoGc`
+  guard around it.
+- `WeakHandle::{check, live}`, `WeakGcRegistry::live`, `GcEphemeron::is_live`
+  and `StoreOpaque::id` are `#[inline]`: an index that probes several handles
+  per lookup pays a call per accessor without it (`src/runtime/store.rs`,
+  `src/runtime/vm/gc/weak.rs`).
+
+Handles, generations, the foreign-Store check, the collector's processing of
+weak edges and every rooted operation are unchanged. The engine's
+`weak_gc_facility` test `raw_operands_name_the_same_entries_as_rooted_ones_until_the_next_collection`
+covers the raw forms against the rooted ones across collections.
+`GcWeakHeapEpoch`, `GcWeakKeyFingerprint`, `GcEphemeron::matches_fingerprint`
+and `key_fingerprint` no longer have a product user: the product finds weak
+collection entries by stable identities that compiled code mints, not by heap
+indices that change with every collection.
+
 ## Inline funcref reads and plain references
 
 - The interned funcref table is a dense vector of nullable `VMFuncRef`

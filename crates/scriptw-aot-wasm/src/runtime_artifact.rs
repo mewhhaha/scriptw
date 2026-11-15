@@ -125,7 +125,10 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 71 keeps global identifier read site records in P globals, made by
 // a new R helper; a dictionary entry record moves in place (its POSITION is
 // mutable) and gives up its descriptor when its property is deleted.
-const LAYOUT_VERSION: u32 = 71;
+// Version 72 finds weak collection entries by KEY_HASH_ID identities: four
+// weak entry imports replace the WeakMap and WeakSet resource imports, and
+// the two objects no longer hold a host resource.
+const LAYOUT_VERSION: u32 = 72;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.
