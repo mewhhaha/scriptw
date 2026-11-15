@@ -401,12 +401,14 @@ fn own_data_cache_type(module: &Module<'_>, storage: u32) -> u32 {
                 && r.heap_type() == HeapType::Concrete(UnpackedIndex::Module(target)))
             };
             // After the key, shape and slot the record adds only further
-            // nullable shapes and integers: no object, value or callable.
+            // nullable shapes, integers and a read site's next record: no
+            // object, value or callable.
             (reference(0, string, false)
                 && reference(1, shape, true)
                 && fields.fields[2].element_type == StorageType::Val(ValType::I32)
                 && (3..fields.fields.len()).all(|field| {
                     reference(field, shape, true)
+                        || reference(field, index as u32, true)
                         || fields.fields[field].element_type == StorageType::Val(ValType::I32)
                 }))
             .then_some(index as u32)
@@ -415,7 +417,7 @@ fn own_data_cache_type(module: &Module<'_>, storage: u32) -> u32 {
     assert_eq!(
         cache_types.len(),
         1,
-        "one canonical read record: a primitive key, then shapes and integers only"
+        "one canonical read record: a primitive key, then shapes, integers and its next record only"
     );
     cache_types[0]
 }

@@ -67,6 +67,7 @@ mod aot_property_flow_boundaries;
 mod aot_property_write_records;
 mod aot_prototype_read_records;
 mod aot_public_class_fields;
+mod aot_read_site_record_chains;
 mod aot_remaining_invocation_references;
 mod aot_runtime_error_for_throw;
 mod aot_scalar_execution;

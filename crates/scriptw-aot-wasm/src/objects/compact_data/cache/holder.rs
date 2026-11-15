@@ -5,8 +5,10 @@
 //! layout row, a compact shape slot or a dictionary position. It retains no
 //! object, value or Realm, only shapes and integers, and it names no
 //! particular prototype: each use proves again that the receiver has no own
-//! property for the key and that its live [[Prototype]] holds the property
-//! at that place. An absence record instead re-proves that the prototype's
+//! property for the key (by its compact shape, by a dictionary that never
+//! held an entry, or by asking the key index of a dictionary that holds
+//! entries) and that its live [[Prototype]] holds the property at that
+//! place. An absence record instead re-proves that the prototype's
 //! immutable layout or shape lacks the key and that its own chain is one of
 //! the two closed tails of the own-data cache: null, or an unmodified
 //! %Object.prototype%. Nothing invalidates a record from outside: a use that
@@ -47,6 +49,10 @@ pub(super) enum HolderReceiverKind {
     String,
     /// A Number primitive: it has no own keys.
     Number,
+    /// An object of the same layouts on a dictionary that holds entries: no
+    /// shape proves that it lacks the key, so each use asks the live
+    /// dictionary's key index. The record names only the place.
+    Probed,
 }
 
 impl HolderReceiverKind {
@@ -56,6 +62,7 @@ impl HolderReceiverKind {
             Self::Object => 1,
             Self::String => 2,
             Self::Number => 3,
+            Self::Probed => 4,
         }
     }
 }
@@ -204,7 +211,9 @@ impl FunctionBuilder<'_> {
             f,
         );
         position.load(f);
-        schema.array_type::<PropertyTable>().length(&table, schema, f);
+        schema
+            .array_type::<PropertyTable>()
+            .length(&table, schema, f);
         f.instruction(&Instruction::I32LtU);
         f.instruction(&Instruction::If(BlockType::Empty));
         let entry = schema
@@ -270,10 +279,10 @@ impl FunctionBuilder<'_> {
                         .reference(),
                     f,
                 );
-                data.is_subtype::<StoredValue>(schema, f);
-                f.instruction(&Instruction::If(BlockType::Empty));
+                f.instruction(&Instruction::Block(BlockType::Empty));
+                let recipe = f.label_depth();
                 let stored = schema.reserve_gc_local(f).initialize(
-                    data.load(schema, f).cast_subtype::<StoredValue>(schema, f),
+                    data.sealed_subtype_or_branch::<StoredValue>(schema, recipe, f),
                     f,
                 );
                 self.emit_stored_value_to_locals(&stored, value, f);
@@ -299,10 +308,9 @@ impl FunctionBuilder<'_> {
     /// prototype record because Arrays and Strings own them outside the header.
     fn emit_key_starts_with_digit_i32(&self, key: &PropertyKeyLocals, f: &mut Function) {
         let schema = self.runtime_schema();
-        let string = schema.reserve_gc_local(f).initialize(
-            key.value().cast_reference::<StringValue>(schema, f),
-            f,
-        );
+        let string = schema
+            .reserve_gc_local(f)
+            .initialize(key.value().cast_reference::<StringValue>(schema, f), f);
         let units = schema.reserve_gc_local(f).initialize(
             schema
                 .field(StringValueSchema::CODE_UNITS)
@@ -313,7 +321,9 @@ impl FunctionBuilder<'_> {
         string.clear(f);
         let first = schema.reserve_i32_local(f);
         first.set_constant(0, f);
-        schema.array_type::<CodeUnitArray>().length(&units, schema, f);
+        schema
+            .array_type::<CodeUnitArray>()
+            .length(&units, schema, f);
         f.instruction(&Instruction::If(BlockType::Empty));
         let zero = schema.reserve_i32_local(f);
         zero.set_constant(0, f);
@@ -420,11 +430,21 @@ impl FunctionBuilder<'_> {
             .store(length, f);
         dictionary.clear(f);
         // Every live entry sits below the insertion extent: zero means the
-        // dictionary has no entries now.
+        // dictionary has no entries now. A dictionary with entries is asked
+        // for the key: only one without an own property for it, data or
+        // accessor, reads through its prototype.
         length.load(f);
         f.instruction(&Instruction::I32Eqz);
-        f.instruction(&Instruction::If(BlockType::Empty));
+        self.open_frame(ControlFrameKind::If, f);
         live_kind.set_constant(HolderReceiverKind::Object.word(), f);
+        f.instruction(&Instruction::Else);
+        let own = self.emit_ordinary_property_entry(&object, key, f)?;
+        own.load(schema, f).is_null(f);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        live_kind.set_constant(HolderReceiverKind::Probed.word(), f);
+        f.instruction(&Instruction::End);
+        own.clear(f);
+        self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         schema.release_i32_local(length, f);
         self.pop_control(ControlFrameKind::If);
@@ -524,10 +544,9 @@ impl FunctionBuilder<'_> {
 
         // Record: "length" and index keys are owned outside the header by
         // Arrays and Strings, so they never get a record.
-        let length_key = schema.reserve_gc_local(f).initialize(
-            self.emit_interned_string_reference("length", f)?,
-            f,
-        );
+        let length_key = schema
+            .reserve_gc_local(f)
+            .initialize(self.emit_interned_string_reference("length", f)?, f);
         let _ = length_key.load(schema, f);
         key.value().reference().load(f);
         f.instruction(&Instruction::RefEq);
@@ -609,15 +628,7 @@ impl FunctionBuilder<'_> {
         );
         // A found row records its value group, where the layout keeps the
         // materialized value.
-        self.emit_intrinsic_row_data_value(
-            &intrinsic,
-            key,
-            &value,
-            holder_slot,
-            found,
-            absent,
-            f,
-        )?;
+        self.emit_intrinsic_row_data_value(&intrinsic, key, &value, holder_slot, found, absent, f)?;
         schema
             .field(IntrinsicPropertyStorageSchema::ADDRESS)
             .read(&intrinsic, schema, f)
@@ -825,13 +836,11 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local(f)
             .initialize(group.load(schema, f).require_non_null(f), f);
         // A group still holding its recipe is left to the record path,
-        // which materializes it.
-        present.is_subtype::<StoredValue>(schema, f);
-        f.instruction(&Instruction::If(BlockType::Empty));
+        // which materializes it. One cast test proves the stored value.
+        f.instruction(&Instruction::Block(BlockType::Empty));
+        let recipe = f.label_depth();
         let stored = schema.reserve_gc_local(f).initialize(
-            present
-                .load(schema, f)
-                .cast_subtype::<StoredValue>(schema, f),
+            present.sealed_subtype_or_branch::<StoredValue>(schema, recipe, f),
             f,
         );
         self.emit_stored_value_to_locals(&stored, value, f);
