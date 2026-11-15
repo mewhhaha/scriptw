@@ -5,7 +5,7 @@ use scriptw_ir::{
     BindingMode, BlockIr, ClassElementExecutionKind, EnvironmentBindingMutabilityIr,
     EnvironmentIdentifierOperationIr, EnvironmentIdentifierResolutionStart,
     EvalBindingDeclarationIr, EvalDeclarativeEnvironmentKindIr, EvalEnvironmentRoleIr, ExprIr,
-    ObjectPropertyIr, PropertyKeyIr, SpecOperationIr, Strictness, TypedExpr,
+    ForInitIr, ObjectPropertyIr, PropertyKeyIr, SpecOperationIr, Strictness, TypedExpr,
     LEXICAL_ARGUMENTS_NAME,
 };
 
@@ -18,6 +18,11 @@ pub(crate) struct StrictArgumentsProjection {
 pub(crate) enum ArgumentsProjectionRead {
     First,
     Length,
+    /// `arguments[key]` for any other key expression: the passed value at an
+    /// integer index below the count, otherwise the real object's [[Get]].
+    Index,
+    /// Any other static key, "callee" included: the real object's [[Get]].
+    Other,
 }
 
 impl StrictArgumentsProjection {
@@ -102,11 +107,15 @@ impl StrictArgumentsProjection {
 
     pub(crate) fn read(&self, value: &TypedExpr) -> Option<ArgumentsProjectionRead> {
         match &value.expr {
-            ExprIr::PropertyRead { target, key } if self.own_binding(target) => match key {
-                PropertyKeyIr::ArrayLength => Some(ArgumentsProjectionRead::Length),
-                PropertyKeyIr::StaticString(key) => Self::string_key(key),
-                PropertyKeyIr::ArrayIndex(key) | PropertyKeyIr::StringExpr(key) => Self::key(key),
-            },
+            ExprIr::PropertyRead { target, key } if self.own_binding(target) => Some(match key {
+                PropertyKeyIr::ArrayLength => ArgumentsProjectionRead::Length,
+                PropertyKeyIr::StaticString(key) => {
+                    Self::string_key(key).unwrap_or(ArgumentsProjectionRead::Other)
+                }
+                PropertyKeyIr::ArrayIndex(key) | PropertyKeyIr::StringExpr(key) => {
+                    Self::key(key).unwrap_or(ArgumentsProjectionRead::Index)
+                }
+            }),
             ExprIr::SpecOperation {
                 operation: SpecOperationIr::GetV,
                 operands,
@@ -115,13 +124,37 @@ impl StrictArgumentsProjection {
                     return None;
                 };
                 if self.own_binding(target) {
-                    Self::key(key)
+                    Some(Self::key(key).unwrap_or(ArgumentsProjectionRead::Index))
                 } else {
                     None
                 }
             }
             _ => None,
         }
+    }
+
+    /// The key expression a computed own read evaluates, if any.
+    pub(crate) fn read_key<'a>(&self, value: &'a TypedExpr) -> Option<&'a TypedExpr> {
+        match &value.expr {
+            ExprIr::PropertyRead {
+                target,
+                key: PropertyKeyIr::ArrayIndex(key) | PropertyKeyIr::StringExpr(key),
+            } if self.own_binding(target) => Some(key),
+            ExprIr::SpecOperation {
+                operation: SpecOperationIr::GetV,
+                operands,
+            } => match operands.as_slice() {
+                [target, key] if self.own_binding(target) => Some(key),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// The unmapped construction protocol a late read materializes with: the
+    /// projection admits only strict functions, whose objects are unmapped.
+    pub(crate) fn unmapped_protocol(&self) -> PresentArgumentsObjectProtocol {
+        PresentArgumentsObjectProtocol::Unmapped(UnmappedArgumentsPlan { _private: () })
     }
 
     fn own_binding(&self, value: &TypedExpr) -> bool {
@@ -183,6 +216,7 @@ impl ReadOnlyUses<'_> {
         match statement {
             StatementIr::Empty => true,
             StatementIr::Expression(value)
+            | StatementIr::DeclarationEvaluation(value)
             | StatementIr::Return(value)
             | StatementIr::Throw(value) => self.expression(value, true),
             StatementIr::Var(declarations) => declarations.iter().all(|declaration| {
@@ -193,6 +227,44 @@ impl ReadOnlyUses<'_> {
                         .is_none_or(|value| self.expression(value, true))
             }),
             StatementIr::Block(block) => self.block(block),
+            StatementIr::Break { .. } | StatementIr::Continue { .. } => true,
+            // Loops without their own lexical environment keep every read in
+            // the function's single environment.
+            StatementIr::While { condition, body } | StatementIr::DoWhile { condition, body } => {
+                self.expression(condition, true) && self.statement(body)
+            }
+            StatementIr::For {
+                init,
+                test,
+                update,
+                body,
+                lexical_environment: None,
+            } => {
+                init.as_ref().is_none_or(|init| match init {
+                    ForInitIr::Expression(value) => self.expression(value, true),
+                    ForInitIr::Var(declarations) => declarations.iter().all(|declaration| {
+                        other_name(&declaration.name)
+                            && declaration
+                                .init
+                                .as_ref()
+                                .is_none_or(|value| self.expression(value, true))
+                    }),
+                    _ => false,
+                }) && test
+                    .as_ref()
+                    .is_none_or(|value| self.expression(value, true))
+                    && update
+                        .as_ref()
+                        .is_none_or(|value| self.expression(value, true))
+                    && self.statement(body)
+            }
+            StatementIr::ForInObject {
+                name,
+                target,
+                body,
+                lexical_environment: None,
+                ..
+            } => other_name(name) && self.expression(target, true) && self.statement(body),
             StatementIr::If {
                 condition,
                 then_branch,
@@ -220,7 +292,13 @@ impl ReadOnlyUses<'_> {
     fn expression(&mut self, value: &TypedExpr, reads: bool) -> bool {
         if self.proof.read(value).is_some() {
             self.reads += 1;
-            return reads;
+            // A computed key is evaluated first and may itself read the
+            // binding.
+            return reads
+                && self
+                    .proof
+                    .read_key(value)
+                    .is_none_or(|key| self.expression(key, reads));
         }
         match &value.expr {
             ExprIr::Undefined
@@ -261,6 +339,24 @@ impl ReadOnlyUses<'_> {
             }
             ExprIr::PropertyRead { target, key } => {
                 self.expression(target, reads) && self.key(key, reads)
+            }
+            // A write's target is walked like any operand: the binding itself
+            // as a target refuses, a value read from it does not.
+            ExprIr::PropertyWrite {
+                target, key, value, ..
+            } => {
+                self.expression(target, reads)
+                    && self.key(key, reads)
+                    && self.expression(value, reads)
+            }
+            ExprIr::OrdinaryPropertyAssignment(assignment) => {
+                self.expression(assignment.base_and_receiver(), reads)
+                    && self.key(assignment.referenced_name(), reads)
+                    && self.expression(assignment.rhs(), reads)
+            }
+            ExprIr::OrdinaryPropertyNumericUpdate(update) => {
+                self.expression(update.base_and_receiver(), reads)
+                    && self.key(update.referenced_name(), reads)
             }
             ExprIr::ArrayLiteral(values) => {
                 values.iter().all(|value| self.expression(value, reads))
@@ -411,16 +507,12 @@ mod tests {
     fn incomplete_or_exposing_uses_refuse_the_entire_function() {
         for source in [
             "function make(a) { 'use strict'; return arguments; }",
-            "function make(a) { 'use strict'; return arguments[1]; }",
-            "function make(a) { 'use strict'; return arguments[a]; }",
-            "function make(a) { 'use strict'; return arguments[(a(),0)]; }",
             "function make(a) { 'use strict'; arguments[0]=a; return arguments.length; }",
             "function make(a) { 'use strict'; arguments.length=0; return arguments[0]; }",
             "function make(a) { 'use strict'; delete arguments[0]; return arguments.length; }",
             "function make(a) { 'use strict'; return arguments[0](); }",
             "function make(a) { 'use strict'; return arguments[0]?.(); }",
             "function make(a) { 'use strict'; return arguments[0]`value`; }",
-            "function make(a) { 'use strict'; return arguments.callee; }",
             "function make(a) { 'use strict'; return eval('arguments[0]'); }",
             "function make(a) { 'use strict'; return () => arguments[0]; }",
             "function make(a) { 'use strict'; function child(){return a;} return arguments.length; }",
@@ -434,6 +526,23 @@ mod tests {
             let function = function(source, ParseOptions::module());
             assert!(
                 StrictArgumentsProjection::admit(&function).is_none(),
+                "{source}"
+            );
+        }
+        // Any computed key and any other static key read the real object
+        // when the vector cannot answer them; they expose nothing.
+        for source in [
+            "function make(a) { 'use strict'; return arguments[1]; }",
+            "function make(a) { 'use strict'; return arguments[a]; }",
+            "function make(a) { 'use strict'; return arguments[(a(),0)]; }",
+            "function make(a) { 'use strict'; return arguments[arguments.length - 1]; }",
+            "function make(a) { 'use strict'; return arguments.callee; }",
+            "function make(a) { 'use strict'; for (var i = 0; i < arguments.length; i++) a(arguments[i]); }",
+            "function make(t, c, d) { 'use strict'; var p = {}, n = arguments.length - 2, k; for (k in c) p[k] = c[k]; if (n === 1) p.children = d; else if (n > 1) { var a = Array(n); for (var i = 0; i < n; i++) a[i] = arguments[i + 2]; p.children = a; } return p; }",
+        ] {
+            let function = function(source, ParseOptions::module());
+            assert!(
+                StrictArgumentsProjection::admit(&function).is_some(),
                 "{source}"
             );
         }
@@ -479,5 +588,21 @@ mod tests {
         duplicate.name = "alias".into();
         alias.owned_env_bindings.push(duplicate);
         assert!(StrictArgumentsProjection::admit(&alias).is_none());
+    }
+
+    #[test]
+    fn zz_probe_constructs() {
+        let wrap = |body: &str| format!("var Mt = Object.prototype.hasOwnProperty, jn = function(){{}}; function make(n,t,r){{'use strict';{body}}}");
+        for body in [
+            "Mt.call(t,1);return arguments.length",
+            "var o={};t&&(o.a=1);return arguments.length",
+            "var o={};(o.a=1);return arguments.length",
+            "var o={};o.a=1;return arguments.length",
+            "jn.call(t,1);return arguments.length",
+        ] {
+            let source = wrap(body);
+            let function = function(&source, ParseOptions::script());
+            eprintln!("PROBE {} {}", StrictArgumentsProjection::admit(&function).is_some(), &body[..body.len().min(60)]);
+        }
     }
 }
