@@ -238,6 +238,8 @@ def callers(args):
 def function(args):
     names = Symbols(args.output)
     found = [row for row in names.rows if args.symbol in row[2] and "adapter" not in row[2]]
+    # A whole name wins over the longer names that contain it.
+    found = [row for row in found if row[2] == args.symbol] or found
     if len(found) != 1:
         sys.exit(f"{len(found)} native bodies match {args.symbol!r}")
     start, size, name = found[0]
