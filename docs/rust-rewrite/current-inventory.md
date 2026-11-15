@@ -19,7 +19,8 @@ accepts `--case <file.js>`.
   identifier cells, rounding-free truncation, single casts and shorter GC
   access code (implicit null checks, wrapping element offsets), captured
   cells read without import links in programs that import nothing,
-  `instanceof` site records in P (ABI 70) and a young generation,
+  `instanceof` site records in P (ABI 70), a young generation and strict
+  `arguments` reads without the object (4.87M median since),
   runs a Speed sync request in 5.05M user instructions (median; mean 5.17M
   over 900 requests, 0.11M above the median against Node's 0.04M) against
   4.38M (and 2.68M cycles) for Node 24

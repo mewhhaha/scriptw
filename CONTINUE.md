@@ -25,22 +25,23 @@ The rules for getting there:
 
 | | Scriptw sync | Node sync | Scriptw async | Node async |
 | --- | ---: | ---: | ---: | ---: |
-| Instructions, median | 5.05M | 4.37M | 5.53M | 4.62M |
-| Instructions, mean | 5.17M | 4.41M | 5.66M | 4.64M |
-| Cycles, median | 2.42M | 2.59M | 2.80M | 2.79M |
-| Cycles, mean | 2.49M | 2.61M | 2.91M | 2.81M |
+| Instructions, median | 4.87M | 4.37M | 5.34M | 4.62M |
+| Instructions, mean | 4.95M | 4.41M | 5.44M | 4.64M |
+| Cycles, median | 2.42M to 2.54M | 2.59M | 2.80M | 2.79M |
+| Cycles, mean | 2.49M to 2.65M | 2.61M | 2.91M | 2.81M |
 
-Scriptw instruction counts are over 900 requests and its cycle counts over 100,
-both with the young generation. The work started at 20.12M instructions per
-sync request.
+Scriptw counts are over 100 requests after 100 warm-ups. Instructions are from
+the current head. The work started at 20.12M instructions per sync request.
 
-- Sync is ahead of Node in cycles on the median and the mean, and 1.16 times
-  Node in instructions.
+- Sync is 1.11 times Node in instructions and about level with it in cycles.
+  The two sync cycle figures are two runs: the lower before the `arguments`
+  change on a quieter machine, the higher after it on a busier one. The async
+  cycles are from before that change.
 - On an unchanged base, the young generation cut the sync mean from 5.59M to
   5.23M instructions by removing most full collections. Its write barrier costs
   under 1% on the median.
 - Async is level with Node in median cycles, about 4% behind in the mean, and
-  1.20 times Node in median instructions.
+  1.16 times Node in median instructions.
 - Cycle counts need a quiet machine. These were taken at a load average of 3
   to 4 and the Node figures in an earlier run, so re-measure both together
   before claiming the comparison.
@@ -69,26 +70,16 @@ On `main` as the five commits ending "Let a limited GC heap grow to its limit".
 
 ### Emitter round 6
 
-Step 1 is on `main` as the commit "WIP: read arguments.length and arguments[i]
-without the arguments object". **It is unfinished and not fully verified:**
-
-- It compiles, its targeted unit and engine tests pass, and the RSC Flight
-  output is exact.
-- The full engine suite and Test262 `language/arguments-object` and
-  `language/function-code` have not been run with it. Run them first; revert
-  the commit if they fail and the cause is not quick to fix.
-- It gives no gain yet. `createElement` is still refused by the closed walk in
-  `arguments_protocol/strict_projection.rs`; the last probe showed
-  `Mt.call(t,1)&&(o.a=1)` refused.
-- The unit test `zz_probe_constructs` in that file is a temporary probe.
-  Remove it before calling the step done.
+Step 1 (strict `arguments` reads without the object) is finished: the WIP
+commit plus the one after it, which admits loops, for-in, property writes,
+declaration evaluation and bound method receivers in the closed walk, so
+`createElement`, `cloneElement` and one argument-count check are admitted.
+Retained RSC sync 5.054M -> 4.869M instructions (median), async 5.534M ->
+5.336M; see benchmarks.md, "Arguments reads without the object".
 
 The planned order:
 
-1. **`arguments` object.** `createElement` only reads `arguments.length` and
-   `arguments[i]`, yet a full object is built on every call (142 per request).
-   Skip the object where every reference is one of those two reads, and build
-   the real object on the spot for anything else.
+1. Done: the `arguments` object (above).
 2. **Read records.** Prototype hits with a builtin holder (`fn.call`,
    `str.indexOf`, `map.get`) still call the helper (17.6% of
    `cached_property_read`). Records also cannot hold a proven absence or more
