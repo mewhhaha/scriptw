@@ -28,13 +28,44 @@ const NO_INSTANCEOF_SITE: i32 = -1;
 /// through at most this many function objects, C included.
 const MAX_DEFAULT_HAS_INSTANCE_HOPS: i32 = 3;
 
+/// A right-hand side that is nothing but a read of a global binding: one
+/// that starts at the Global Environment Record.
+enum GlobalReadOperand<'a> {
+    Identifier(&'a scriptw_ir::EnvironmentIdentifierIr),
+    Name(&'a str),
+}
+
+impl<'a> GlobalReadOperand<'a> {
+    fn of(expr: &'a TypedExpr) -> Option<Self> {
+        match &expr.expr {
+            ExprIr::EnvironmentIdentifier(identifier)
+                if matches!(
+                    identifier.operation,
+                    scriptw_ir::EnvironmentIdentifierOperationIr::Read
+                ) && matches!(
+                    identifier.resolution_start(),
+                    scriptw_ir::EnvironmentIdentifierResolutionStart::GlobalEnvironment
+                ) =>
+            {
+                Some(Self::Identifier(identifier))
+            }
+            ExprIr::GlobalIdentifierRead { name } => Some(Self::Name(name)),
+            _ => None,
+        }
+    }
+}
+
 /// These two entry algorithms have different hook and non-callable policies.
 /// Borrowed whole values preserve the specification roles without raw slots.
 enum HasInstanceRequest<'value> {
     InstanceofOperator {
         object: &'value ValueLocals,
         constructor: &'value ValueLocals,
-        site: Option<crate::emit::ProgramSiteId>,
+        /// A source site's entry site and the global of its record.
+        site: Option<(
+            crate::emit::ProgramSiteId,
+            crate::gc_types::SiteRecordGlobal<crate::gc_types::InstanceofSiteRecord>,
+        )>,
     },
     OrdinaryHasInstance {
         constructor: &'value ValueLocals,
@@ -140,6 +171,11 @@ impl FunctionBuilder<'_> {
         right: &TypedExpr,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        if self.has_source_execution_environment() {
+            if let Some(operand) = GlobalReadOperand::of(right) {
+                return self.emit_instanceof_global_i32(left, operand, function);
+            }
+        }
         let schema = self.runtime_schema();
         let object = schema.reserve_value_local(function);
         let constructor = schema.reserve_value_local(function);
@@ -163,6 +199,92 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
+    /// `V instanceof G` where G is a read of a global binding. The site
+    /// first answers from its records without reading G: the global read
+    /// site's record, the value cell kept for it and the `instanceof` site's
+    /// record. Otherwise it reads G at that same read site and applies the
+    /// operator at that same `instanceof` site, exactly as the two
+    /// expressions would on their own, and then keeps the cell when those
+    /// two records agree.
+    fn emit_instanceof_global_i32(
+        &mut self,
+        left: &TypedExpr,
+        operand: GlobalReadOperand<'_>,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        use crate::environments::environment_reference::EnvironmentIdentifierRead;
+        let schema = self.runtime_schema();
+        let object = schema.reserve_value_local(function);
+        self.compile_expr_to_value(left, &object, function)?;
+        let read = self.next_site_record::<crate::gc_types::GlobalReadSiteRecord>()?;
+        let cell = self.next_site_record::<StoredValue>()?;
+        let site = self.next_program_site(crate::emit::ProgramSiteKind::InstanceofPrototype)?;
+        let instance = self.next_site_record::<crate::gc_types::InstanceofSiteRecord>()?;
+        let answer = schema.reserve_i32_local(function);
+        let source = self.emit_source_global_environment_to_local(function);
+        let global = schema
+            .reserve_gc_local::<crate::gc_types::Environment, Nullable>(function)
+            .initialize(source.load(schema, function).nullable(), function);
+        source.clear(function);
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        let slow = self.open_frame(ControlFrameKind::Block, function);
+        self.emit_instanceof_global_answer(
+            read, cell, instance, &global, &object, answer, slow, function,
+        );
+        self.emit_branch_to_target(done, function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        let constructor = schema.reserve_value_local(function);
+        match operand {
+            GlobalReadOperand::Identifier(identifier) => self
+                .emit_environment_identifier_read_value_at(
+                    Some(read),
+                    identifier,
+                    EnvironmentIdentifierRead::Value,
+                    &constructor,
+                    function,
+                )?,
+            GlobalReadOperand::Name(name) => self.emit_global_identifier_read_at(
+                read,
+                name,
+                EnvironmentIdentifierRead::Value,
+                &constructor,
+                function,
+            )?,
+        }
+        let result = schema.reserve_completion(function);
+        self.emit_has_instance_request(
+            HasInstanceRequest::InstanceofOperator {
+                object: &object,
+                constructor: &constructor,
+                site: Some((site, instance)),
+            },
+            &result,
+            function,
+        )?;
+        result.kind().load(function);
+        function.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
+        function.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, function);
+        self.completion().copy_from(&result, function);
+        self.emit_propagate_current_throw(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        result.value().scalar().load(function);
+        function.instruction(&Instruction::I32WrapI64);
+        answer.store(function);
+        result.clear(function);
+        constructor.clear(function);
+        self.emit_instanceof_global_cell(read, cell, instance, &global, function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        global.clear(function);
+        answer.load(function);
+        schema.release_i32_local(answer, function);
+        object.clear(function);
+        Ok(())
+    }
+
     pub(crate) fn emit_instanceof_operator_from_locals(
         &mut self,
         object: &ValueLocals,
@@ -173,7 +295,10 @@ impl FunctionBuilder<'_> {
         // A source operator site keeps a record of where its constructor's
         // own "prototype" lives; operators outside source code have none.
         let site = if self.has_source_execution_environment() {
-            Some(self.next_program_site(crate::emit::ProgramSiteKind::InstanceofPrototype)?)
+            Some((
+                self.next_program_site(crate::emit::ProgramSiteKind::InstanceofPrototype)?,
+                self.next_site_record::<crate::gc_types::InstanceofSiteRecord>()?,
+            ))
         } else {
             None
         };
@@ -222,9 +347,8 @@ impl FunctionBuilder<'_> {
             HasInstanceRequest::InstanceofOperator {
                 object,
                 constructor,
-                site: Some(site),
+                site: Some((site, global)),
             } => {
-                let global = self.next_site_record::<crate::gc_types::InstanceofSiteRecord>()?;
                 let done = self.open_frame(ControlFrameKind::Block, function);
                 let slow = self.open_frame(ControlFrameKind::Block, function);
                 self.emit_instanceof_record_answer(

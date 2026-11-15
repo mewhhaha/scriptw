@@ -149,6 +149,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::HasInstance
             | RuntimeHelperId::InstanceofEntry
             | RuntimeHelperId::InstanceofRecord
+            | RuntimeHelperId::GlobalReadRecord
             | RuntimeHelperId::ForInAdvance
             | RuntimeHelperId::ObjectOwnKeys
             | RuntimeHelperId::ObjectGetOwnProperty

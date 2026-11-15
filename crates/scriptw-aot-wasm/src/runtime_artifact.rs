@@ -122,7 +122,10 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 69 keeps static property site records in P globals and passes the
 // record, not the site and key, to the cached read helpers.
 // Version 70 keeps instanceof site records in P globals, made by a new R helper.
-const LAYOUT_VERSION: u32 = 70;
+// Version 71 keeps global identifier read site records in P globals, made by
+// a new R helper; a dictionary entry record moves in place (its POSITION is
+// mutable) and gives up its descriptor when its property is deleted.
+const LAYOUT_VERSION: u32 = 71;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

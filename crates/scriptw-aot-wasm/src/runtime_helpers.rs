@@ -1353,6 +1353,7 @@ runtime_helper_domain! {
     HasInstance / HasInstanceArguments / HasInstanceParameters / "has_instance" { entry:I32,object:Value,constructor:Value,site:I32,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     InstanceofEntry / InstanceofEntryArguments / InstanceofEntryParameters / "instanceof_entry" { object_tag:I32,object:EqRef,constructor:EqRef,site:I32,caller_execution_realm:(Ref RealmRecord NonNullable),caller_program:Program } => I32;
     InstanceofRecord / InstanceofRecordArguments / InstanceofRecordParameters / "instanceof_record" { constructor:EqRef,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => (Ref InstanceofSiteRecord NonNullable);
+    GlobalReadRecord / GlobalReadRecordArguments / GlobalReadRecordParameters / "global_read_record" { name:(Ref StringValue NonNullable),global_environment:(Ref Environment Nullable),remakes:I32 } => (Ref GlobalReadSiteRecord NonNullable);
     ForInAdvance / ForInAdvanceArguments / ForInAdvanceParameters / "for_in_advance" { record:(Ref ForInEnumerationRecord NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ObjectOwnKeys / ObjectOwnKeysArguments / ObjectOwnKeysParameters / "object_own_keys" { target:Value,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => OwnPropertyKeys;
     ObjectGetOwnProperty / ObjectGetOwnPropertyArguments / ObjectGetOwnPropertyParameters / "object_get_own_property" { target:Value,key:Key,caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => OwnPropertyDescriptor;
@@ -1471,6 +1472,7 @@ impl RuntimeHelperId {
             Self::HasInstance => HelperOwner::Runtime,
             Self::InstanceofEntry => HelperOwner::Runtime,
             Self::InstanceofRecord => HelperOwner::Runtime,
+            Self::GlobalReadRecord => HelperOwner::Runtime,
             Self::ForInAdvance => HelperOwner::Runtime,
             Self::ObjectOwnKeys => HelperOwner::Runtime,
             Self::ObjectGetOwnProperty => HelperOwner::Runtime,
@@ -1650,6 +1652,7 @@ impl RuntimeHelperId {
             Self::HasInstance => true,
             Self::InstanceofEntry => true,
             Self::InstanceofRecord => true,
+            Self::GlobalReadRecord => true,
             Self::ForInAdvance => true,
             Self::ObjectOwnKeys => true,
             Self::ObjectGetOwnProperty => true,

@@ -17,6 +17,7 @@ mod eval_declaration_instantiation;
 mod function_body_environment;
 mod global_declaration_instantiation;
 pub(crate) mod global_environment;
+mod global_read_site;
 mod immutable_global_read;
 mod lexical_binding_uninitialized;
 mod named_binding_mutation;

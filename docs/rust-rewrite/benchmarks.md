@@ -1271,6 +1271,83 @@ crate's unit tests (2,403 passed), the source guards, and Test262
 script-goal Test262 cases do not reach the change. No hardware cycles were
 measured; the comparison with V8 above is not refreshed.
 
+### Global read, `typeof` and `instanceof` site records (2026-11-15)
+
+Callgrind instruction references per request, measured as in the section
+above (Speed, 97 requests, exact Flight output), on its last row re-measured
+the same day.
+
+| Speed, Callgrind instructions per request | Sync median | Sync mean | Async median | Async mean | P bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Arrow functions read proven cells | 4,843,980 | 4,928,486 | 5,323,638 | 5,430,756 | 4,778,557 |
+| Global read site records | 4,766,407 | 4,853,803 | — | — | 4,800,526 |
+| Absence witnesses and one-branch `instanceof` records, on the row above | 4,712,817 | 4,800,332 | — | — | 4,801,872 |
+| `instanceof` against a global read, on the row above (ABI 71) | 4,674,835 | 4,762,625 | 5,143,815 | 5,248,968 | 4,836,577 |
+
+The four steps remove 3.5% of sync and 3.4% of async. `vn` runs 4,577
+instructions for each plain object where it ran 7,480 (5,829 and 5,694 after
+the first two steps), and 605,992 a request where it ran 713,870. P grows by
+58 KB: each site carries its record answer and the calls it makes on a miss.
+
+A read that starts at the Global Environment Record keeps a record in a P
+global, made by the new R helper `global_read_record`: the global object's
+dictionary entry record for the name. The site checks that it runs for the
+record's Environment, that the Environment has no declarative names, and that
+the entry's descriptor is a data descriptor holding a value, then reads the
+value: eleven loads where the remembered-position read made twenty-six. The
+name's String is loaded only on a miss. Three facts make the entry enough:
+
+- A Global Environment Record keeps its Realm and a Realm its global object,
+  and an ordinary header keeps its dictionary once it has one.
+- A property keeps one entry record while it lives. Compaction used to
+  replace a moved entry; it now writes the entry's position in place.
+  Redefinition changes the descriptor in place or replaces it in the entry.
+- Deletion, the only place a live entry leaves its table, replaces the
+  entry's descriptor with a fresh accessor descriptor that no property owns.
+
+So a data descriptor in the entry is the live own data property, whatever
+its current value. Every other case (an accessor, a deleted or absent name, a
+value still held as a recipe, another Realm, any global lexical declaration)
+misses, having observed nothing, and calls the by-name helpers as before. A
+site asks for a new record on a miss at most eight times in its life, so a
+name defined or defined again after the site first ran is answered inline
+again. A call of a global identifier takes its callee the same way, with an
+undefined receiver; it resolved a Reference through two helper calls.
+
+A `typeof` site also answers a name that is nowhere. Its record then holds a
+witness: the global object's dictionary had no entry for the name at one
+table and insertion length, its [[Prototype]] was one ordinary object with a
+null [[Prototype]], and that object had no such property in immutable
+intrinsic rows or in a dictionary at one table and length. An insertion grows
+a dictionary's length or replaces its table, and the site reads both edges
+again, so while the witness holds HasProperty finds nothing and observes
+nothing. `typeof FormData` and `typeof Blob` in `vn` take about 75
+instructions where the by-name helper took 685.
+
+An `instanceof` site's record now decides its three facts (the constructor's
+[[Prototype]] edge, the edge from a function object between it and
+%Function.prototype%, and @@hasInstance never hashed) in one branch: a
+declined record names no constructor, a direct edge repeats the constructor's
+header, and the record holds the Symbol. Each branch to the slow path cost
+five register reloads in `vn`; there were five such branches and are two.
+
+`V instanceof G`, where G is a read of a global binding, first answers
+without reading G. The site keeps the value cell that G's property held when
+its `instanceof` record was made for that very value. A value cell is
+immutable, so while the read site's record still answers the read and the
+property's current cell is that one, the value is the record's function.
+Otherwise the site reads G at the same read site and applies the operator at
+the same `instanceof` site, as the two expressions would on their own. One
+test in `vn` takes about 145 instructions where it took about 310.
+
+Verified: the engine binaries `aot_language` (560 passed, six new Node-checked
+tests among them, each run as a Script, as function code and as a module),
+`aot_builtins` (619) and `aot_realm_modules` (467), and Test262
+`language/expressions/instanceof`, `language/expressions/typeof`,
+`language/global-code` and `language/identifier-resolution`. Not run: the
+other engine binaries, the emitter's unit tests and any other Test262
+subtree.
+
 ### GC heap base home slot (2026-11-15)
 
 Measured the same way as the section above (Callgrind instruction references
