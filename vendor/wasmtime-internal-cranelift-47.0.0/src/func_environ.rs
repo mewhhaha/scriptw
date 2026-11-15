@@ -162,6 +162,10 @@ pub struct FuncEnvironment<'module_environment> {
 
     gc_heap: Option<Heap>,
 
+    /// This function's home slot for the GC heap base, once it has read the
+    /// base of a heap that cannot move.
+    gc_heap_base_home: Option<gc::GcHeapBaseHome>,
+
     translation: &'module_environment ModuleTranslation<'module_environment>,
 
     /// Heaps implementing WebAssembly linear memories.
@@ -281,6 +285,7 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
 
             ty_to_gc_layout: std::collections::HashMap::new(),
             gc_heap: None,
+            gc_heap_base_home: None,
 
             heaps: PrimaryMap::default(),
             fact_sync_call_slot: None,

@@ -120,6 +120,13 @@ enum AliasRegionKey {
 
     /// An access of the bytes inside a data segment.
     DataSegment,
+
+    /// An access of a function's home slot for the GC heap base (see
+    /// `func_environ::gc::base_home`). A function has at most one such slot;
+    /// an inlined callee's home shares the region with its caller's, which
+    /// only makes Cranelift's own analysis conservative across the callee's
+    /// store.
+    GcHeapBaseHome,
 }
 
 impl AliasRegionKey {
@@ -174,6 +181,7 @@ impl AliasRegionKey {
     const ELEMENT_SEGMENT_KIND: u32 = Self::new_kind(0b011111);
     const DATA_SEGMENT_KIND: u32 = Self::new_kind(0b100000);
     const REMEMBERED_SLOTS_KIND: u32 = Self::new_kind(0b100001);
+    const GC_HEAP_BASE_HOME_KIND: u32 = Self::new_kind(0b100010);
 
     /// Encode this key into a raw `u32` suitable for use as an
     /// `AliasRegionData::user_id`.
@@ -249,6 +257,7 @@ impl AliasRegionKey {
             AliasRegionKey::UnsafeIntrinsicMemory => Self::UNSAFE_INTRINSIC_MEMORY_KIND,
             AliasRegionKey::ElementSegment => Self::ELEMENT_SEGMENT_KIND,
             AliasRegionKey::DataSegment => Self::DATA_SEGMENT_KIND,
+            AliasRegionKey::GcHeapBaseHome => Self::GC_HEAP_BASE_HOME_KIND,
         }
     }
 }
@@ -274,6 +283,7 @@ impl fmt::Debug for AliasRegionKey {
             AliasRegionKey::UnsafeIntrinsicMemory => write!(f, "UnsafeIntrinsicMemory"),
             AliasRegionKey::ElementSegment => write!(f, "ElementSegment"),
             AliasRegionKey::DataSegment => write!(f, "DataSegment"),
+            AliasRegionKey::GcHeapBaseHome => write!(f, "GcHeapBaseHome"),
         }
     }
 }
@@ -323,6 +333,11 @@ impl<Offsets> AliasRegions<Offsets> {
         slot: ir::StackSlot,
     ) -> ir::AliasRegion {
         self.region(func, AliasRegionKey::Stack { slot })
+    }
+
+    /// Get the alias region for a function's GC heap base home slot.
+    pub fn gc_heap_base_home_region(&mut self, func: &mut ir::Function) -> ir::AliasRegion {
+        self.region(func, AliasRegionKey::GcHeapBaseHome)
     }
 
     /// Get the alias region for the given key.

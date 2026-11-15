@@ -11,7 +11,8 @@ versions, target/ISA settings and generated machine-code policy are unchanged.
 
 The idle scratch policy modifies `src/compiler.rs`; the added private
 `src/compiler/context_pool.rs` and its tests own it. The translation changes
-below modify `src/func_environ{.rs,/gc.rs}`.
+below modify `src/func_environ{.rs,/gc.rs}`; the heap base's home slot adds
+`src/func_environ/gc/base_home.rs`.
 Registry installation markers were omitted; all other release files are kept.
 The license text is unchanged; its trailing empty line is normalized.
 
@@ -139,3 +140,86 @@ appended to the remembered-slot buffer the runtime publishes in
 `VMCopyingHeapData`, or the buffer's overflow flag is set. Those paths are
 cold blocks. Initializing stores, table and global stores need none: tables
 and globals are roots, and new objects are young or remembered whole.
+
+## GC heap base home slot
+
+`src/func_environ/gc{.rs,/base_home.rs}`, `src/bounds_checks.rs`,
+`src/alias_region.rs`, `src/translate/func_translator.rs`
+([measurements](../../docs/rust-rewrite/benchmarks.md#gc-heap-base-home-slot-2026-11-15)).
+This changes where a function reads the GC heap base, not what it reads:
+Wasm semantics, trap codes, the `VMContext` and store-context layouts, target
+and ISA settings and calling conventions are unchanged, so a module compiled
+with it is interchangeable with one compiled without it.
+
+Upstream loads the base of a GC heap that cannot move with a `readonly` load,
+which Cranelift makes one value for the whole function. That value is live
+across every call between the function's first and last heap access. In a
+large function the register allocator spills it and, after the two splits
+`regalloc2` allows a value (`MAX_SPLITS_PER_SPILLSET`), reloads it from its
+spill slot before every single use: 48,126 of the 713,870 instructions the
+largest compiled JavaScript body of the retained request ran.
+
+- A function that reads the base of an immovable GC heap now loads it at the
+  top of its entry block, as before from the store context, and stores it to
+  a stack slot of its own, the home. Every use of the base, including the
+  field address computed by `bounds_checks::compute_addr`, is first translated
+  to a load from the home. A heap that may move keeps the upstream load from
+  the store context at every use.
+- After translation, `GcHeapBaseHome::split_at_calls` rewrites those loads.
+  Up to the first call on a path the base is the entry block's value. After a
+  call outside a loop it is loaded from the home again, right after the call
+  and only when a use can be reached from there without another call. Where
+  paths with different such values meet, a block parameter selects between
+  them (minimal SSA: the iterated dominance frontier of the defining blocks),
+  so a path that made no call passes its value on without a load. The
+  successors of a call that ends its block (`try_call`) load at their start.
+- A call inside a loop does not split. A loop keeps the value it is entered
+  with, so what it computes from the base stays loop-invariant and its
+  iterations load nothing; an edge that leaves a loop containing a call ends
+  that value, and the block it enters loads the base again when it is wanted.
+- When no load from the home remains (the function makes no call outside a
+  loop before a use), the store is removed and the slot's size set to zero:
+  such a function is compiled exactly as upstream compiles it.
+- Each remaining load addresses the slot through its own `stack_addr`, at a
+  distinct distance past the slot with the opposite load offset. The x64
+  backend folds that into `[rsp + offset]`; when it instead merges the load
+  into the instruction that uses it, it computes the address into a register,
+  and a `stack_addr` shared by every load would be computed in the entry
+  block and held in a callee-saved register or a spill slot from there.
+
+What this relies on, none of it new:
+
+- The base is the same for the whole activation. Upstream's `readonly` and
+  `can_move` flags on the load already state that, and the entry block's load
+  keeps them. A module whose functions touch the GC heap needs one
+  (`needs_gc_heap`), and the store allocates it before the module is
+  instantiated, so it exists before any such function is entered; the product
+  configures a heap that cannot move (`gc_heap_may_move: false` with a 4 GiB
+  reservation).
+- The home is written once, in the entry block, before any load from it, and
+  only through its own alias region (`AliasRegionKey::GcHeapBaseHome`), so
+  every load yields the stored value. The rewrite is therefore only a choice
+  of where to load, and any choice that is valid SSA is correct; calls and
+  loops decide where a load is worth its instruction. Native code that is
+  entered or resumed (host-to-Wasm trampolines, returns from host calls and
+  libcalls, exception handlers, signal-based traps) finds the base where any
+  other stack value of the frame is; no register carries it across a call.
+- Blocks that take the parameter are joins whose every incoming edge can pass
+  an argument; a block entered from an unreachable predecessor or from a call
+  that ends its block loads instead.
+
+The pass computes a control-flow graph, a dominator tree, loops and dominance
+frontiers for each function that reads the base; functions that do not are
+untouched. Unreachable blocks keep their loads from the home. On targets whose
+backend does not fold a stack-slot address into a load, each remaining load
+costs an address computation as well; only x86-64 was measured.
+
+A function with several calls in a row that each use the base afterwards pays
+a load per call where upstream, when the base won a callee-saved register,
+paid nothing; a small runtime helper of that shape runs up to 4.5% more
+instructions, while the request as a whole runs 1.4% fewer.
+
+Tests: `func_environ::gc::base_home::tests::` (functions without calls,
+straight-line calls, joins with and without different values, loops with and
+without calls and with two entering values, `try_call` successors, jump
+tables), each verified by Cranelift's verifier after the rewrite.

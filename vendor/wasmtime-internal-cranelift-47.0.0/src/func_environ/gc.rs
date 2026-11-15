@@ -10,7 +10,7 @@ use crate::trap::TranslateTrap;
 use crate::{Reachability, TRAP_GC_HEAP_CORRUPT, TRAP_INTERNAL_ASSERT};
 use cranelift_codegen::ir::{BlockArg, ExceptionTableData, ExceptionTableItem};
 use cranelift_codegen::{
-    cursor::FuncCursor,
+    cursor::{Cursor as _, FuncCursor},
     ir::{self, InstBuilder, condcodes::IntCC},
 };
 use cranelift_entity::packed_option::ReservedValue;
@@ -184,9 +184,12 @@ pub trait GcCompiler {
     ) -> WasmResult<()>;
 }
 
+mod base_home;
 mod copying;
 mod drc;
 mod null;
+
+pub(crate) use base_home::GcHeapBaseHome;
 
 /// Get the default GC compiler.
 pub fn gc_compiler(func_env: &mut FuncEnvironment<'_>) -> WasmResult<Box<dyn GcCompiler>> {
@@ -1586,34 +1589,81 @@ impl FuncEnvironment<'_> {
         result
     }
 
-    /// Get or create the global for our GC heap's base pointer.
+    /// Whether the GC heap's base pointer can change while a function runs.
+    fn gc_heap_may_move(&self) -> bool {
+        let memory_tunables =
+            wasmtime_environ::MemoryTunables::new(self.tunables, MemoryKind::GcHeap);
+        self.tunables
+            .gc_heap_memory_type()
+            .memory_may_move(&memory_tunables)
+    }
+
     /// Get the GC heap's base.
     pub(crate) fn get_gc_heap_base(
         &mut self,
         builder: &mut FunctionBuilder,
     ) -> WasmResult<ir::Value> {
-        let mut flags = ir::MemFlagsData::trusted();
-        let memory_tunables =
-            wasmtime_environ::MemoryTunables::new(self.tunables, MemoryKind::GcHeap);
+        Ok(self.gc_heap_base(builder))
+    }
 
-        // If the memory cannot move (i.e. its base pointer cannot change across
-        // calls) then the base pointer is readonly and this load instruction
-        // can move (i.e. can be LICM'd out of a loop body).
-        if !self
-            .tunables
-            .gc_heap_memory_type()
-            .memory_may_move(&memory_tunables)
-        {
-            flags.set_readonly();
-            flags.set_can_move();
+    /// Get the GC heap's base at the builder's position.
+    ///
+    /// A base that cannot move is read from the function's home slot for it,
+    /// which this creates on first use; `split_gc_heap_base_at_calls` then
+    /// decides where the function really loads it. A base that can move is
+    /// loaded from the store context every time.
+    pub(crate) fn gc_heap_base(&mut self, builder: &mut FunctionBuilder) -> ir::Value {
+        if self.gc_heap_may_move() {
+            let store_context_ptr = self.get_vmstore_context_ptr(builder);
+            return self.alias_regions.vmstore_context_gc_heap_base(
+                &mut builder.cursor(),
+                ir::MemFlagsData::trusted(),
+                store_context_ptr,
+            );
         }
+        let home = match self.gc_heap_base_home {
+            Some(home) => home,
+            None => {
+                let home = self.create_gc_heap_base_home(builder.func);
+                self.gc_heap_base_home = Some(home);
+                home
+            }
+        };
+        home.load(&mut builder.cursor())
+    }
 
-        let store_context_ptr = self.get_vmstore_context_ptr(builder);
-        Ok(self.alias_regions.vmstore_context_gc_heap_base(
-            &mut builder.cursor(),
-            flags,
-            store_context_ptr,
-        ))
+    /// Load the immovable GC heap base at the top of `func`'s entry block and
+    /// store it to a new home slot there, ahead of every use.
+    fn create_gc_heap_base_home(&mut self, func: &mut ir::Function) -> GcHeapBaseHome {
+        let entry = func
+            .layout
+            .entry_block()
+            .expect("the entry block is inserted before any translation");
+        let vmctx = func
+            .special_param(ir::ArgumentPurpose::VMContext)
+            .expect("Missing vmctx parameter");
+        let region = self.alias_regions.gc_heap_base_home_region(func);
+        let pointer_type = self.pointer_type();
+        let mut pos = FuncCursor::new(func).at_first_insertion_point(entry);
+        let store_context_ptr = self.alias_regions.vmctx_store_context(&mut pos, vmctx);
+        // The base pointer never changes, so its load is `readonly` and can
+        // move.
+        let mut flags = ir::MemFlagsData::trusted();
+        flags.set_readonly();
+        flags.set_can_move();
+        let base =
+            self.alias_regions
+                .vmstore_context_gc_heap_base(&mut pos, flags, store_context_ptr);
+        GcHeapBaseHome::store_at_entry(&mut pos, region, pointer_type, base)
+    }
+
+    /// After `func` is completely translated, make its GC heap base a value
+    /// that is loaded from the home slot after a call and, outside loops, is
+    /// never live across one.
+    pub(crate) fn split_gc_heap_base_at_calls(&mut self, func: &mut ir::Function) {
+        if let Some(home) = self.gc_heap_base_home.take() {
+            home.split_at_calls(func);
+        }
     }
 
     /// Get the GC heap's bound.
@@ -1636,15 +1686,11 @@ impl FuncEnvironment<'_> {
         let store_ctx = self.alias_regions.vmctx_store_context_load(func);
 
         // The base pointer's load is `can_move` and `readonly` when the GC
-        // heap's base can never move.
-        let memory_tunables =
-            wasmtime_environ::MemoryTunables::new(self.tunables, MemoryKind::GcHeap);
+        // heap's base can never move. `bounds_checks::compute_addr` does not
+        // emit this chain for the GC heap: it asks `gc_heap_base`, which
+        // reads an immovable base from its home slot.
         let mut base_flags = ir::MemFlagsData::trusted();
-        if !self
-            .tunables
-            .gc_heap_memory_type()
-            .memory_may_move(&memory_tunables)
-        {
+        if !self.gc_heap_may_move() {
             base_flags.set_readonly();
             base_flags.set_can_move();
         }

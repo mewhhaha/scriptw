@@ -22,7 +22,7 @@
 use crate::{
     Reachability,
     func_environ::FuncEnvironment,
-    translate::{HeapData, TargetEnvironment},
+    translate::{HeapData, MemoryKind, TargetEnvironment},
     trap::TranslateTrap,
 };
 use Reachability::*;
@@ -305,7 +305,8 @@ fn bounds_check_field_access(
             "static memories require the ability to use virtual memory"
         );
         return Reachable(compute_addr(
-            &mut builder.cursor(),
+            builder,
+            env,
             heap,
             env.pointer_type(),
             index,
@@ -317,7 +318,8 @@ fn bounds_check_field_access(
     // in-bounds on this memory, no bounds checks necessary.
     if statically_in_bounds {
         return Reachable(compute_addr(
-            &mut builder.cursor(),
+            builder,
+            env,
             heap,
             env.pointer_type(),
             index,
@@ -594,7 +596,7 @@ fn explicit_check_oob_condition_and_compute_addr(
     }
     let addr_ty = env.pointer_type();
 
-    let mut addr = compute_addr(&mut builder.cursor(), heap, addr_ty, index, offset);
+    let mut addr = compute_addr(builder, env, heap, addr_ty, index, offset);
 
     if let OobBehavior::ConditionallyLoadFromZero {
         select_spectre_guard,
@@ -626,22 +628,31 @@ fn explicit_check_oob_condition_and_compute_addr(
 ///
 /// Arguments are:
 ///
-/// * `pos` - where to generate instructions
+/// * `builder` - where to generate instructions
+/// * `env` - the function's environment, which owns the GC heap's base
 /// * `heap` - the memory being accessed
 /// * `addr_ty` - the host's pointer type
 /// * `index` - the raw wasm index, of type `addr_ty`
 /// * `offset` - a static offset to add to `index`
 pub fn compute_addr(
-    pos: &mut FuncCursor,
+    builder: &mut FunctionBuilder,
+    env: &mut FuncEnvironment<'_>,
     heap: &HeapData,
     addr_ty: ir::Type,
     index: ir::Value,
     offset: u32,
 ) -> ir::Value {
-    debug_assert_eq!(pos.func.dfg.value_type(index), addr_ty);
+    debug_assert_eq!(builder.func.dfg.value_type(index), addr_ty);
 
-    let vmctx = vmctx(pos);
-    let heap_base = heap.base.emit(pos, vmctx);
+    let heap_base = match heap.kind {
+        MemoryKind::GcHeap => env.gc_heap_base(builder),
+        MemoryKind::LinearMemory => {
+            let pos = &mut builder.cursor();
+            let vmctx = vmctx(pos);
+            heap.base.emit(pos, vmctx)
+        }
+    };
+    let pos = &mut builder.cursor();
     let base_and_index = pos.ins().iadd(heap_base, index);
 
     if offset == 0 {

@@ -1271,6 +1271,72 @@ crate's unit tests (2,403 passed), the source guards, and Test262
 script-goal Test262 cases do not reach the change. No hardware cycles were
 measured; the comparison with V8 above is not refreshed.
 
+### GC heap base home slot (2026-11-15)
+
+Measured the same way as the section above (Callgrind instruction references
+per request, Speed policy, 97 requests after 100 warmups and 3 discarded
+windows, exact Flight output), on its last row.
+
+Compiled code read the GC heap base as one value per function. In a large
+body that value is live across hundreds of calls; the register allocator
+spills it and then reloads it before each use. The vendored translator now
+stores the base once to a stack slot of the function and loads it again only
+after a call outside a loop, when a use follows before the next call; paths
+that made no call pass their value on through a block parameter, and a loop
+keeps the value it is entered with
+([translator notes](../../vendor/wasmtime-internal-cranelift-47.0.0/PATCHES.md#gc-heap-base-home-slot)).
+
+| Speed, Callgrind instructions per request | Sync median | Sync mean | Async median | Async mean |
+| --- | ---: | ---: | ---: | ---: |
+| Arrow functions read proven cells | 4,843,994 | 4,928,467 | 5,323,657 | 5,430,751 |
+| Heap base home slot | 4,776,738 | 4,861,290 | 5,253,851 | 5,360,948 |
+
+- 1.4% of sync and 1.3% of async. The program is the same Wasm (4,778,557
+  bytes); its native image goes from 13,704,728 to 13,647,384 bytes and the
+  runtime's from 47,146,224 to 46,911,680.
+- `vn` runs 670,255 instructions a sync request instead of 713,870, and its
+  plain-object path 6,847 instead of 7,480. Loads of the heap base from the
+  frame go from 48,126 a request to 1,757, and on the plain-object path from
+  662 to 11, one after each of its calls. Its native body shrinks from
+  587,488 to 546,480 bytes; its frame grows from 3,616 to 3,856 bytes.
+- By body, per sync request: `vn` −43,615, `ft` −16,946,
+  `json_stringify_value` −6,615, `TextDecoder.prototype.decode` −6,226,
+  `compact_data_store` −2,261. The bodies that lose are small ones that make
+  several calls in a row and use the heap after each, where the base used to
+  keep a callee-saved register: `object_read` +5,259 (2.3%),
+  `array_indexed_publish_default_data` +3,520 (4.5%), `f42` +1,487 (0.8%),
+  `ordinary_property_append` +1,285 (1.8%). All bodies that gain sum to
+  −86.6K and all that lose to +19.4K.
+- What did not hold up on the way, each measured on the whole request.
+  Loading at the first use after a call instead of right after it, with a
+  fresh load at every join that a call can reach, removed `vn`'s reloads but
+  cost as much elsewhere (net 0). Block parameters placed by a conservative
+  data-flow pass instead of dominance frontiers left 7,276 of them in `vn`
+  (1,369 are needed); Cranelift does not remove the redundant ones, and they
+  stop loop-invariant addresses from being hoisted. Splitting at calls
+  inside loops as well gave the same total (−69K against −67K) with larger
+  swings per body, so loops are left as they were. Cranelift's pinned
+  register was not used: `get_pinned_reg` lowers to a register copy per
+  read, so it saves no instruction over a load from the frame, takes a
+  register from every function, and has to be set on every entry to native
+  code.
+- The instance pointer is reloaded the same way (17,710 times a request in
+  `vn`, 187 on the plain-object path) and is untouched. So are the reloads of
+  GC references that the frontend's safepoint spiller inserts, which
+  Cranelift merges only up to the next trapping instruction.
+- Compilation pays for the pass: for every function that reads the base it
+  computes a control-flow graph, a dominator tree, loops and dominance
+  frontiers. One whole host process (engine setup, compiling the program,
+  one warmup and one request) runs 125.65G instructions under Callgrind
+  instead of 122.64G, 2.4% more. Wall-clock compile times were not
+  comparable on the shared machine.
+
+Verified: the translator's library tests (24, ten of them
+`func_environ::gc::base_home::tests::`, each of which runs Cranelift's
+verifier on the rewritten function), and the engine's `aot_gc_entries` and
+`weak_gc_facility` test binaries. Not run: the rest of the engine suite and
+Test262. No wall-clock or hardware-counter measurement.
+
 ### Descriptor work and physical allocation
 
 Compiler-created, already validated descriptors now call canonical ordinary/Array definition directly when admitted, retaining the exotic Reflect fallback. Known source accessor descriptors bypass the inline Array algorithm to control code growth. Public descriptor conversion and validation remain intact.

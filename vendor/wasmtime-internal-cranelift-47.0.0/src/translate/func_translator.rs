@@ -118,6 +118,7 @@ impl FuncTranslator {
         parse_function_body(validator, reader, &mut builder, environ)?;
 
         builder.finalize(environ.target_config());
+        environ.split_gc_heap_base_at_calls(func);
         crate::alias_region::debug_assert_all_mem_insts_have_alias_regions(func);
         log::trace!("translated Wasm to CLIF:\n{}", func.display());
         Ok(())
@@ -141,6 +142,7 @@ impl FuncTranslator {
         environ.after_translate_function(&mut builder)?;
         builder.ins().return_(&[]);
         builder.finalize(environ.target_config());
+        environ.split_gc_heap_base_at_calls(func);
         crate::alias_region::debug_assert_all_mem_insts_have_alias_regions(func);
         Ok(())
     }
