@@ -1446,6 +1446,120 @@ verifier on the rewritten function), and the engine's `aot_gc_entries` and
 `weak_gc_facility` test binaries. Not run: the rest of the engine suite and
 Test262. No wall-clock or hardware-counter measurement.
 
+### Read record chains, weak entries and operand tests (2026-11-15)
+
+Callgrind instruction references per request, measured as in the sections
+above (Speed, 97 requests, exact Flight output). The three middle rows were
+each measured alone on the first row; the weak-entry row also holds the heap
+base home slot, and its own baseline was 4,628,492 / 4,716,231 / 5,095,707 /
+5,200,995. The last row is all of them together on main `f85bc4a8c`.
+
+| Speed, Callgrind instructions per request | Sync median | Sync mean | Async median | Async mean | P bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Site records for global reads (ABI 71) | 4,674,967 | 4,762,612 | 5,143,819 | 5,249,002 | 4,836,577 |
+| Chained read records (ABI 72) | 4,604,037 | 4,692,123 | 5,032,049 | 5,140,889 | 4,836,585 |
+| Weak entries by identity, with the heap base home slot (ABI 73) | 4,387,075 | 4,481,493 | 4,832,312 | 4,944,512 | 4,824,719 |
+| Operand tests before the generic kernels (ABI 74) | 4,373,993 | 4,461,145 | 4,832,198 | 4,956,277 | 4,873,269 |
+| All of the above | 4,016,534 | 4,108,399 | 4,410,779 | 4,537,816 | 4,861,633 |
+
+Together with the site records and the home slot the day removes 17.1% of
+sync and 17.1% of async from the arrow-cell row (4,843,994 and 5,323,657).
+Node 24.22.1 `--jitless` runs about 3.82M and 3.94M on the same machine,
+counted for its whole process.
+
+**Read records.** A static read site answered one receiver shape. Of 1,171
+calls of the hit entry a request, 461 took the general walk because the walk
+answers without recording, and most of the rest were single-shape hits that
+are long: a method found on a prototype cost about 303 instructions.
+
+- A site keeps a chain of up to eight records. The miss kernel fills one per
+  visit, and the entry tries each; every record is a complete proof for its
+  receiver as before, so which record holds a proof does not matter, and a
+  failed proof observes nothing.
+- A receiver no record answers goes to the kernel while the site's learning
+  budget lasts (eight visits that record nothing new) and to the walk after
+  it, so a receiver that cannot be recorded does not pin a site on the
+  general Get.
+- A receiver on a non-empty dictionary is asked for the key as the walk asks
+  it; when it has no own property, any record's closed tail or prototype
+  place answers, proved again on the live chain.
+- The hit entry runs 283,879 instructions a request where it ran 358,702
+  (366,148 inclusive, from 437,038). A prototype-place hit still takes about
+  240: proving it through untyped prototype edges needs four to six cast
+  tests. Eighteen reads a request still fall to the general Get (71K): typed
+  array accessors, a Set's `size`, a stream controller's methods.
+
+**Weak collections.** `WeakMap` `get`, `set` and `has` cost 364K a request
+(285 calls at 870 to 1,550 each), nearly all of it below the host
+trampoline: rooting and re-checking typed parameters, the externref to
+`Arc` to `Mutex` chain to the map's table, a fingerprint lookup with two
+epoch checks, and a table rebuilt after every collection because it was
+keyed by heap index.
+
+- Entries are still collector ephemerons of (collection, key, value). A
+  store mints the existing `KEY_HASH_ID` identity on the key and on the
+  collection, and one Store-wide open-addressing index maps the hash of the
+  two identities to the ephemeron handle. A hit is decided by the collector
+  comparing the entry's current owner and key with the operands, so two
+  objects that share an identity are still two keys. The index holds no
+  reference and needs no rebuild when objects move.
+- `get`, `has` and `delete` read both identities without minting; when
+  either is zero nothing was ever stored for that pair, and compiled code
+  answers without a host call. 71 of 144 `get`s and all 34 `has` calls a
+  request end there.
+- The four imports take raw operands
+  ([vendor note](../../vendor/wasmtime-47.0.0/PATCHES.md#raw-weak-operands)):
+  their types are fixed by the import signature that instantiation checks,
+  and no operation allocates a GC object or can collect, so nothing is
+  rooted.
+- `get` takes 345 instructions where it took 1,175, `set` 640 from 1,548,
+  `has` 219 from 874; the three together 127K a request from 367K.
+  Collection work is unchanged within 1%.
+
+**Operands of unknown type.** Additions, comparisons and equality in
+React's copy loop called the generic kernels for operands that were Strings,
+Numbers or `null` every time.
+
+- `+` at a site whose syntax expects a String (a literal, a concatenation,
+  a proven String on one side) tests the live tags: String with String or
+  Number goes to a concatenation helper, and everything else, Number with
+  Number included, to the old kernel with the operands as evaluated.
+  ToPrimitive of a String or Number calls nothing, so the order of
+  observable steps is the kernel's. `"" + x` returns the other operand's
+  String without a copy, `(a + b) + c` copies once, and Number to String
+  writes 0 to 99 directly. `coercive_add` runs twice a request where it ran
+  420 times (139K own).
+- A Number operand is tested inline before the numeric conversion helper
+  (340 calls gone), and a Number literal is not converted at all.
+- `== null` and `== undefined` compare the two nullish tags and read the
+  `[[IsHTMLDDA]]` slot inline (171 calls of the loose kernel gone).
+- Source bodies compare two Strings' lengths before the equality helper
+  (776 calls to 276), and `s[i] === "c"` with a literal index compares the
+  code unit when the base is a String primitive and the index is in range.
+- A named add looked for its shape transition by scanning the parent's
+  table, about six entries at fifty instructions each; a found child now
+  swaps with the entry before it, and a request scans 1.06 entries.
+- Not done: `for_in_advance` (54K) and `hasOwnProperty.call` (43K), which
+  are already specialised and whose cost is straight-line type checks.
+
+Verified on the merged tree: the engine suite in release (4,231 passed and
+the doctest; the one failure is
+`runtime_cache::embedded_runtime_executes_fresh_programs_without_a_native_runtime_compile`,
+which fails on this machine without the work), the emitter's `emission` (83),
+`modules_realms` (69), `runtime_link` (30), `structure_async` (116),
+`structure_builtins` (159) and `structure_language` (140) binaries, and the
+source guards. On the separate trees, Test262 with the wasm-aot backend, all
+passing: `language/expressions` `property-accessors`, `member-expression`,
+`addition`, `equals`, `does-not-equals`, `strict-equals`,
+`strict-does-not-equals`, `less-than`, `subtraction`, `multiplication`,
+`compound-assignment` and `assignment`; `language/statements/for-in`;
+`annexB/language/expressions`; `built-ins/Object/defineProperty`,
+`Object/setPrototypeOf`, `Object/prototype/hasOwnProperty`, `Proxy/get`,
+`String/prototype/concat`, `Number/prototype/toString`, `WeakMap`,
+`WeakSet`, `WeakRef` and `FinalizationRegistry`. Not run: the emitter's
+`--lib` suite and any Test262 subtree on the merged tree, the vendored
+Wasmtime's own tests, and wall clock.
+
 ### Descriptor work and physical allocation
 
 Compiler-created, already validated descriptors now call canonical ordinary/Array definition directly when admitted, retaining the exotic Reflect fallback. Known source accessor descriptors bypass the inline Array algorithm to control code growth. Public descriptor conversion and validation remain intact.

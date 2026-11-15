@@ -65,6 +65,11 @@ accepts `--case <file.js>`.
   of them the global read of its constructor, and a third of `vn`'s
   plain-object path is stack traffic
   ([attribution](benchmarks.md#arguments-reads-and-instruction-attribution-2026-11-15)).
+  Site records for global reads and `instanceof`, a home slot for the GC heap
+  base, chained read records, weak collection entries found by identity and
+  operand tests before the generic add and equality kernels then take it to
+  4.017M and 4.411M; Node 24 `--jitless` runs about 3.82M and 3.94M there
+  ([measurement](benchmarks.md#read-record-chains-weak-entries-and-operand-tests-2026-11-15)).
  Source `89a934d06891`
   screens at 2.871/3.349 ms Fast and 2.298/2.486 ms Speed, with four fresh
   processes per actor/case rather than final qualification; qualify it against

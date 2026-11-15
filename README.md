@@ -99,14 +99,16 @@ Scoped verification (**2026-11-11**, source `89a934d06891`): 8,582 selected nati
 - **Bounded Web APIs:** UTF-8 codecs, byte streams with default readers, events,
   abort signals and tasks support the tested RSC fixtures. Fetch/Request/URL,
   DOM nodes and full WHATWG conformance remain unsupported or unverified.
-- **Runtime ABI 71:** compiled code has no deadline checks. An execution timeout
+- **Runtime ABI 74:** compiled code has no deadline checks. An execution timeout
   removes access to the Store's GC heap and private linear memory, and the fault
   stops the code; this needs Unix signal handling and is exercised on Linux
   x86-64 ([contract](docs/rust-rewrite/contracts/execution-deadlines.md)).
-  ABIs 58 to 71 add per-site read, write, `instanceof` and global read
+  ABIs 58 to 74 add per-site read, write, `instanceof` and global read
   records, a dictionary position hint on Strings, further native call
   entries, one JSON output accumulator, compact shape transitions, a
-  computed-key write kernel and static site records kept in P globals.
+  computed-key write kernel, static site records kept in P globals and
+  chained per read site, weak collection entries found by identity, and
+  String concatenation helpers.
   Rebuild older Portable bundles and native images.
 
 [Development and verification](CONTRIBUTING.md) ·

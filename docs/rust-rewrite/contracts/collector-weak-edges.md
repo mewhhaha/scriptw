@@ -2,8 +2,11 @@
 
 The selected Wasmtime 47.0.0 copying collector has a local weak-edge patch in
 [`vendor/wasmtime-47.0.0`](../../../vendor/wasmtime-47.0.0/PATCHES.md).
-`WeakAnyRef` and `GcEphemeron` expose Store-scoped generational handles, never
-unrooted references. Only the copying collector accepts these registrations.
+`WeakAnyRef` and `GcEphemeron` expose Store-scoped generational handles. Their
+rooted operations never expose an unrooted reference; the raw forms take and
+return the references of a running host call that cannot collect
+([raw weak operands](../../../vendor/wasmtime-47.0.0/PATCHES.md#raw-weak-operands)).
+Only the copying collector accepts these registrations.
 Owner, target and key must be actual heap references; values may also be i31 or
 null. A foreign Store is an error, and retiring a slot increments its generation
 without wraparound or reuse at generation exhaustion.
@@ -31,10 +34,14 @@ monotonic collection epoch and the current heap index. Every copying cycle
 advances the epoch before movement, including cycles without weak entries.
 Other collectors reject tokens unless they explicitly provide this capability.
 Foreign Stores, non-heap keys and uninitialized heaps produce errors.
-The product's WeakMap and WeakSet resources use these tokens for hash lookup,
-retain the collector's identity check on hits, and transactionally rebuild from
-surviving handles once per epoch. Tokens never replace collector handles or
-retain keys and values strongly.
+Tokens never replace collector handles or retain keys and values strongly,
+and the product no longer uses them. Its WeakMap and WeakSet entries are
+ephemerons of (collection, key, value) found through one Store-wide index
+keyed by the hash of two `KEY_HASH_ID` identities that compiled code mints on
+the collection and the key before a store. The index holds handles, not
+references; a hit is the collector's comparison of the entry's current owner
+and key with the operands, and a lookup whose collection or key has no
+identity yet is answered in compiled code as absent.
 
 An upgrade reads its slot and creates a Wasmtime root under one `AutoAssertNoGc`
 guard. JavaScript's separate keep-during-job rule must retain successful

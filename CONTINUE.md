@@ -48,8 +48,11 @@ hardware counts on the same source):
 | Arguments reads without the object | 4.911M | 4.995M | 5.390M | 5.498M |
 | Arrow functions read proven cells | 4.844M | 4.928M | 5.324M | 5.431M |
 | Global read, `typeof` and `instanceof` site records (ABI 71) | 4.675M | 4.763M | 5.144M | 5.249M |
+| Heap base home slot, chained read records, weak entries by identity, operand tests (ABI 74, main `f85bc4a8c`) | 4.017M | 4.108M | 4.411M | 4.538M |
 
-- The three changes remove 8.2% of sync and 7.9% of async.
+- The day's changes remove 21% of sync and of async. Node's whole process
+  runs about 3.82M and 3.94M, so 0.2M (5%) is left on sync and 0.47M (12%)
+  on async in instructions.
 
 **The comparison with Node does not hold on the cloud machine.** Measured
 there on the tree above with Node 24.22.1 `--jitless` (the same fixture
@@ -68,8 +71,10 @@ and case, interleaved and pinned to one CPU, 100 warmups and 101 requests:
   requests, runs 3.82M instructions per sync request and 3.94M per async
   request, its out-of-clock output validation included. Scriptw's request
   alone was 4.84M and 5.32M when the wall clock above was taken, at least
-  1.27 and 1.35 times Node; with the site records it is 4.67M and 5.14M,
-  1.22 and 1.31 times. The wall clock was not taken again.
+  1.27 and 1.35 times Node; it is now 4.02M and 4.41M, 1.05 and 1.12 times.
+  The wall clock was not taken again. When it was taken Node ran more
+  instructions per microsecond than Scriptw on sync (12.5 against 10.6) and
+  about the same on async, so sync needs more than instruction parity.
 - The first handoff's hardware table (Node at 4.37M instructions and 2.59M
   cycles, Scriptw ahead in sync cycles) came from another machine, Node 24.12
   and helper scripts that are gone. Nothing here reproduces it. Treat the
@@ -128,52 +133,58 @@ fails on a body this work does not change); and Test262
 `language/identifier-resolution` (22 of 22). Not run: the other engine
 binaries, the emitter's `--lib` suite and any other Test262 subtree.
 
+Chained read records, weak collection entries by identity, operand tests
+before the generic kernels and the GC heap base home slot (ABIs 72 to 74),
+all on main `f85bc4a8c` with main's own finish of the arguments projection
+merged in.
+[Their section](docs/rust-rewrite/benchmarks.md#read-record-chains-weak-entries-and-operand-tests-2026-11-15)
+has what each proves. Verified on the merged tree: the engine suite (4,231
+passed and the doctest, the same one `runtime_cache` failure), six emitter
+integration binaries (`emission` now 83 of 83) and the source guards. Test262
+subtrees ran on each change's own tree, not on the merged one.
+
 ## What to do next, by measured size
 
-[The attribution section](docs/rust-rewrite/benchmarks.md#arguments-reads-and-instruction-attribution-2026-11-15)
-has the per-body table and the listing findings. Sync request, 4.997M mean:
+Sync request on main `f85bc4a8c`, 4.108M mean, own instructions unless
+marked ([the day's sections](docs/rust-rewrite/benchmarks.md#read-record-chains-weak-entries-and-operand-tests-2026-11-15)
+have the reasoning for what is done):
 
-1. **`instanceof` against a global constructor: done, about 100K left in
-   `vn`.** One test takes about 145 instructions where it took 310: about 45
-   check the read site's record and the value cell, about 25 the
-   `instanceof` record, about 55 walk the candidate's chain, and the rest
-   joins the answer. What is left is the nineteen walks of the same
-   candidate; sharing them needs a proof that nothing between two tests can
-   change the chain.
-2. **Stack traffic in large bodies.** A third of `vn`'s plain-object path
-   reloads or spills, 662 of 7,480 instructions for the GC heap base alone
-   (`vn` is 587 KB of native code and keeps the base in a stack slot). This
-   is the structural lever the first handoff listed; it now has a number.
-3. **Read records, 438K inclusive in `cached_property_read`** over 1,171
-   entries, 568 of them from `vn` and 260 from `createElement` (`config.key`
-   and `type.defaultProps`, which are absent or on another shape each time).
-   Records cannot hold a proven absence or a second receiver shape.
-4. **By-name identifier helpers, about 40K left.** `typeof` of a missing
-   global is answered at the site now. `function Row({id})` in the fixture
-   (64 reads and 32 resolves) and the fixture's request function (17 reads)
-   remain: a proven binding cell
-   (`ProvenBindingCellIr::analyze` in `analysis/module_locals.rs`) is granted
-   to ordinary and arrow functions with plain parameters, not to a function
-   with a destructured parameter, which component code uses everywhere. Its
-   parameter and body records are the open question there. A Script with a
-   top-level `let`, `const` or `class` answers no global read from a site
-   record, because the site only proves that the Global Environment Record
-   has no declarative names at all.
-5. **`createElement`'s activation record, about 30K.** An admitted function
-   still allocates its environment for the `arguments` cell (about 480
-   instructions before its first call, 68 calls). A strict function cannot
-   assign or redeclare `arguments`, so when no nested function names it the
-   binding could be a module-local like any unobserved one
-   (`analysis/module_locals.rs` keeps it a cell whenever the body names it).
-6. `computed_property_write` (225K inclusive, 241 entries from `ft`),
-   `coercive_add` (207K, 420 entries), then the first handoff's remaining
-   steps: write records for non-ordinary receivers, dense
-   `Array.prototype.splice`, and eliding temporal-dead-zone checks.
+1. **Built-ins that are native in Node.** `JSON.stringify` (one call, about
+   350K inclusive for 242 values: `json_stringify_value` 233K own,
+   `object_own_keys` 38K), `TextEncoder.encode` 104K, `TextDecoder.decode`
+   71K, `TypedArray.prototype.set` 77K and one `String.prototype.includes`
+   52K: per-value and per-byte loops.
+2. **Read records, 284K in the hit entry.** A prototype-place hit takes
+   about 240 instructions; going lower needs identity witnesses or a typed
+   prototype edge. Eighteen reads a request fall to the general Get (71K):
+   typed-array accessors, a Set's `size`, stream controller methods.
+3. **`vn` 571K, `ft` 435K, `createElement` 182K of their own code.** In
+   `vn` the nineteen `instanceof` tests walk one candidate's chain nineteen
+   times (about 100K); sharing them needs a proof that nothing between two
+   tests changes the chain. The instance pointer is reloaded per use as the
+   heap base was (17,710 times a request in `vn`).
+4. **Stores.** Array append `c[f] = v` (176 calls at about 490 between
+   `computed_property_write` and `array_indexed_publish_default_data`: each
+   element is boxed and a two-prototype walk proves no indexed property), a
+   named add (131 calls at about 480), `ordinary_property_append` 74K.
+5. **`for_in_advance` 54K, `hasOwnProperty.call` 43K** and the read of
+   `.call` before it (about 238 an iteration in `ft`).
+6. **Allocation and collection.** The mean is 92K above the median: a minor
+   collection every fourth request. The three object-allocation helpers make
+   461 `is_subtype` libcalls a request (43K).
+7. **By-name identifier helpers, about 37K.** `function Row({id})` in the
+   fixture and the fixture's request function: a proven binding cell
+   (`ProvenBindingCellIr::analyze` in `analysis/module_locals.rs`) is not
+   granted to a function with a destructured parameter.
+8. **`createElement`'s activation record, about 30K.** An admitted function
+   still allocates its environment for the `arguments` cell.
 
-Not started, from the first handoff: growth of the weak-key table and
-`FuncRefTable::intern` on the host side of async, the duplicate `index <
-length` compare, function environments at six objects each, and the builtin
-call site (895 instructions against Node's 392).
+Not started, from the first handoff: `FuncRefTable::intern` on the host side
+(144 calls a request), the duplicate `index < length` compare, function
+environments at six objects each, and the builtin call site (`proxy_call`,
+49K over 160 calls). The host's own allocator grows about 5 KB a request
+through a run (the `mprotect` calls seen under `strace`); what allocates it
+is not traced.
 
 ## How to measure
 
@@ -228,9 +239,6 @@ python3 -B scripts/limited_verification.py --cloud --cloud-cpus auto -- \
 - Four emitter `--lib` tests: `bootstrap_compact_metadata`,
   `error_demand_initialization`, `intrinsic_property_layout_allocation`,
   `ordered_bootstrap_allocation`.
-- The emitter's emission test
-  `strict_arguments_projection::actual_observed_workload_and_five_formals_keep_vector_abi_with_count_guarded_reads`
-  ("both nonempty and absent-index paths are encoded").
 - Five vendored `pagemap::tests::*`.
 - Test262 `language/function-code/S10.2.1_A4_T2.js` crashes (listed in current
   work).
