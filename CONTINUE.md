@@ -21,56 +21,56 @@ The rules for getting there:
 
 ## Where it stands
 
-`main` holds everything verified so far. Per request, Speed policy, 100 measured
-requests after 100 warm-ups, user-mode counts:
+`main` holds everything below. Per request, Speed policy, user-mode counts:
 
 | | Scriptw sync | Node sync | Scriptw async | Node async |
 | --- | ---: | ---: | ---: | ---: |
-| Instructions, median | 5.01M | 4.37M | 5.49M | 4.62M |
-| Instructions, mean | 5.50M | 4.41M | 6.13M | 4.64M |
-| Cycles, median | 2.53M | 2.59M | not re-measured | 2.79M |
-| Cycles, mean | 2.75M | 2.61M | not re-measured | 2.81M |
+| Instructions, median | 5.05M | 4.37M | 5.53M | 4.62M |
+| Instructions, mean | 5.17M | 4.41M | 5.66M | 4.64M |
+| Cycles, median | 2.53M before the young generation | 2.59M | not measured | 2.79M |
+| Cycles, mean | 2.75M before the young generation | 2.61M | not measured | 2.81M |
 
-The work started at 20.12M instructions per sync request.
+The Scriptw instruction counts are over 900 requests with the young generation,
+measured one emitter commit before the current head. The work started at 20.12M
+instructions per sync request.
 
-- Sync median is level with Node in cycles and 1.15 times Node in instructions.
-- The sync mean is about 5% behind in cycles. The gap between Scriptw's median
-  and mean is collection pauses, which the young generation below removes.
-- Async is further behind, 1.19 times Node in median instructions.
-- Cycle counts need a quiet machine. The async cycles of the current head have
-  not been measured on one.
+- Sync median was level with Node in cycles before the young generation, and is
+  1.16 times Node in instructions.
+- On an unchanged base, the young generation cut the sync mean from 5.59M to
+  5.23M instructions by removing most full collections. Its write barrier costs under 1% on the
+  median.
+- Async is further behind, 1.20 times Node in median instructions.
+- Cycle counts need a quiet machine. Neither case has been measured in cycles
+  with the young generation.
 
 ## In flight when this was written
 
 ### Young generation for the copying collector
 
-Branch `claude/nursery-collector` on the remote: five commits on top of `main`,
-**not yet verified on that base**, which is why they are not on `main`.
+On `main` as the five commits ending "Let a limited GC heap grow to its limit".
 
 - 2 MiB nursery taken out of the 16 MiB initial heap, a write barrier in
   compiled code and in the host, a remembered buffer, and full collections under
   Appel's rule.
-- Measured on its original base over 900 requests: sync mean 5.59M to 5.23M
-  instructions, async mean 6.18M to 5.73M, medians up by under 1% from the
-  barrier, worst request roughly halved.
 - The last commit lets a limited heap grow to its limit when doubling is
   refused. It fixes `aot_gc_virtual_reservation`, which the nursery broke by
   taking 1 MiB from each semi-space.
-- Verified on the original base `3dacf6024`: vendored collector tests, and the
-  engine suite before the growth fix. Still running at handoff on that base: the
-  engine suite with the growth fix, a 2 MiB-heap stress run, and Test262 for
-  `WeakRef`, `WeakMap`, `WeakSet`, `FinalizationRegistry` and `built-ins/Array`.
-
-To land it: run the engine suite and the RSC measurement on the branch head,
-confirm the two patch logs (`vendor/*/PATCHES.md`,
-`docs/rust-rewrite/vendor-patches.md`) describe it, then fast-forward `main`.
+- Verified one emitter commit earlier (`3dacf6024` plus the five): engine suite
+  4,209 passed and 0 failed, the vendored collector tests, a 2 MiB-heap stress
+  run, and Test262 `WeakRef`, `WeakMap`, `WeakSet`, `FinalizationRegistry` and
+  the `built-ins/Array` directories that had finished.
+- **Not yet run on the exact tree now on `main`.** The difference is the commit
+  "Skip the import link test in numeric rows of programs that import nothing",
+  which was verified on its own. Run the engine suite once on `main` to close
+  this.
 
 ### Emitter round 6
 
-Uncommitted and local only, in the sibling worktree `../scriptw-loadic`
-(`arguments_protocol/strict_projection.rs`, `environments/arguments_projection.rs`
-and a new engine test `aot_arguments_projection_reads.rs`). Nothing from it is
-verified. The planned order:
+Branch `claude/emitter-arguments-wip` on the remote holds one snapshot commit of
+unfinished work on step 1 (`arguments_protocol/strict_projection.rs`,
+`environments/arguments_projection.rs` and a new engine test
+`aot_arguments_projection_reads.rs`). It has not been built or tested as
+committed. The planned order:
 
 1. **`arguments` object.** `createElement` only reads `arguments.length` and
    `arguments[i]`, yet a full object is built on every call (142 per request).
@@ -102,6 +102,9 @@ verified. The planned order:
 
 Fixtures, the `perf` binary and the helper scripts live under `target/`, which
 is git-ignored, so they exist only on the machine this work was done on.
+Elsewhere, start from `scripts/benchmark-rsc.py` and
+[CONTRIBUTING.md](CONTRIBUTING.md), which build the fixtures and report request
+times; the commands below need the local helpers.
 
 ```sh
 # Build the retained host, check Flight output, print medians (CPU 14 here).
