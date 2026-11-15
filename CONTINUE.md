@@ -66,11 +66,21 @@ On `main` as the five commits ending "Let a limited GC heap grow to its limit".
 
 ### Emitter round 6
 
-Branch `claude/emitter-arguments-wip` on the remote holds one snapshot commit of
-unfinished work on step 1 (`arguments_protocol/strict_projection.rs`,
-`environments/arguments_projection.rs` and a new engine test
-`aot_arguments_projection_reads.rs`). It has not been built or tested as
-committed. The planned order:
+Step 1 is on `main` as the commit "WIP: read arguments.length and arguments[i]
+without the arguments object". **It is unfinished and not fully verified:**
+
+- It compiles, its targeted unit and engine tests pass, and the RSC Flight
+  output is exact.
+- The full engine suite and Test262 `language/arguments-object` and
+  `language/function-code` have not been run with it. Run them first; revert
+  the commit if they fail and the cause is not quick to fix.
+- It gives no gain yet. `createElement` is still refused by the closed walk in
+  `arguments_protocol/strict_projection.rs`; the last probe showed
+  `Mt.call(t,1)&&(o.a=1)` refused.
+- The unit test `zz_probe_constructs` in that file is a temporary probe.
+  Remove it before calling the step done.
+
+The planned order:
 
 1. **`arguments` object.** `createElement` only reads `arguments.length` and
    `arguments[i]`, yet a full object is built on every call (142 per request).
