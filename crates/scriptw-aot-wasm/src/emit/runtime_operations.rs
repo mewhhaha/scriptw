@@ -156,8 +156,8 @@ impl<'a> FunctionBuilder<'a> {
     pub(super) fn compile_ascii_narrow_helper(&mut self) -> Result<Function, EmitError> {
         let mut function = self.begin_helper_body(RuntimeHelperId::AsciiNarrow);
         let schema = self.runtime_schema();
-        let parameters = self
-            .helper_parameters::<crate::runtime_helpers::AsciiNarrowParameters>(&mut function);
+        let parameters =
+            self.helper_parameters::<crate::runtime_helpers::AsciiNarrowParameters>(&mut function);
         crate::gc_types::emit_ascii_narrow_kernel(
             &parameters.units,
             parameters.start,
@@ -175,8 +175,8 @@ impl<'a> FunctionBuilder<'a> {
     pub(super) fn compile_ascii_widen_helper(&mut self) -> Result<Function, EmitError> {
         let mut function = self.begin_helper_body(RuntimeHelperId::AsciiWiden);
         let schema = self.runtime_schema();
-        let parameters = self
-            .helper_parameters::<crate::runtime_helpers::AsciiWidenParameters>(&mut function);
+        let parameters =
+            self.helper_parameters::<crate::runtime_helpers::AsciiWidenParameters>(&mut function);
         crate::gc_types::emit_ascii_widen_helper_body(&parameters, schema, &mut function);
         parameters.release(&mut function);
         function.instruction(&Instruction::End);
@@ -186,8 +186,8 @@ impl<'a> FunctionBuilder<'a> {
     pub(super) fn compile_code_unit_find_helper(&mut self) -> Result<Function, EmitError> {
         let mut function = self.begin_helper_body(RuntimeHelperId::CodeUnitFind);
         let schema = self.runtime_schema();
-        let parameters = self
-            .helper_parameters::<crate::runtime_helpers::CodeUnitFindParameters>(&mut function);
+        let parameters =
+            self.helper_parameters::<crate::runtime_helpers::CodeUnitFindParameters>(&mut function);
         crate::gc_types::emit_code_unit_find_kernel(
             &parameters.units,
             parameters.start,
@@ -204,8 +204,8 @@ impl<'a> FunctionBuilder<'a> {
     pub(super) fn compile_json_plain_run_helper(&mut self) -> Result<Function, EmitError> {
         let mut function = self.begin_helper_body(RuntimeHelperId::JsonPlainRun);
         let schema = self.runtime_schema();
-        let parameters = self
-            .helper_parameters::<crate::runtime_helpers::JsonPlainRunParameters>(&mut function);
+        let parameters =
+            self.helper_parameters::<crate::runtime_helpers::JsonPlainRunParameters>(&mut function);
         crate::gc_types::emit_json_plain_run_helper_body(&parameters, schema, &mut function);
         parameters.release(&mut function);
         function.instruction(&Instruction::End);
