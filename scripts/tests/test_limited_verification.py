@@ -168,6 +168,72 @@ class CloudBudgetTests(unittest.TestCase):
                                         lambda pid, cpus: affinity.__setitem__(0, cpus), create=True))
         return stack
 
+    def hybrid(self, memory, cpu=None, allowed_cpus=(0, 1, 2, 3)):
+        """A cgroup-v1 memory and CPU hierarchy beside an empty unified root."""
+        files = {"/proc/self/cgroup":
+                 "4:memory:/api/task\n1:cpu,cpuacct:/api\n0::/\n"}
+        for group, limit in memory.items():
+            files[str(Path("/sys/fs/cgroup/memory") / group.lstrip("/")
+                      / "memory.limit_in_bytes")] = limit
+        for group, (quota, period) in (cpu or {}).items():
+            base = Path("/sys/fs/cgroup/cpu") / group.lstrip("/")
+            files[str(base / "cpu.cfs_quota_us")] = quota
+            files[str(base / "cpu.cfs_period_us")] = period
+        def read(path):
+            try:
+                return files[str(path)]
+            except KeyError:
+                raise FileNotFoundError(str(path)) from None
+        stack = ExitStack()
+        stack.enter_context(patch.object(launcher.sys, "platform", "linux"))
+        stack.enter_context(patch.object(launcher.Path, "read_text", read))
+        stack.enter_context(patch.object(launcher.os, "sysconf", lambda name: 4096))
+        affinity = [set(allowed_cpus)]
+        stack.enter_context(patch.object(launcher.os, "sched_getaffinity",
+                                        lambda pid: affinity[0], create=True))
+        stack.enter_context(patch.object(launcher.os, "sched_setaffinity",
+                                        lambda pid, cpus: affinity.__setitem__(0, cpus), create=True))
+        return stack
+
+    def test_hybrid_machine_uses_the_tightest_legacy_memory_limit(self):
+        unlimited = "9223372036854771712"
+        with self.hybrid({"/api/task": "14338772992", "/api": unlimited, "/": unlimited}):
+            self.assertEqual(launcher.require_cloud_budget(), 14338772992)
+        with self.hybrid({"/api/task": unlimited, "/api": "1073741824", "/": unlimited}):
+            self.assertEqual(launcher.require_cloud_budget(), 1073741824)
+        # The controller root alone may lack its limit file.
+        with self.hybrid({"/api/task": "14338772992", "/api": unlimited}):
+            self.assertEqual(launcher.require_cloud_budget(), 14338772992)
+
+    def test_hybrid_machine_without_a_finite_legacy_limit_never_executes(self):
+        unlimited = "9223372036854771712"
+        for memory in (
+            {"/api/task": unlimited, "/api": unlimited, "/": unlimited},
+            {"/api/task": "0", "/api": unlimited, "/": unlimited},
+            {"/api/task": "garbage", "/api": unlimited, "/": unlimited},
+            {"/api": "1073741824", "/": unlimited},
+        ):
+            with self.subTest(memory=memory), self.hybrid(memory), \
+                    patch.object(launcher.os, "execvpe") as execute:
+                self.assertEqual(launcher.main(["--cloud", "--", "payload"]), 2)
+                execute.assert_not_called()
+
+    def test_hybrid_machine_respects_the_legacy_cpu_quota(self):
+        memory = {"/api/task": "14338772992", "/api": "9223372036854771712"}
+        with self.hybrid(memory, {"/api": ("-1", "100000"), "/": ("-1", "100000")}):
+            self.assertEqual(launcher.cloud_native_affinity(), 4)
+        with self.hybrid(memory, {"/api": ("250000", "100000"), "/": ("-1", "100000")}):
+            self.assertEqual(launcher.cloud_native_affinity(), 2)
+        with self.hybrid(memory, {"/api": ("-1", "100000")}):
+            self.assertEqual(launcher.cloud_native_affinity(), 4)
+        for cpu in ({"/api": ("0", "100000")}, {"/api": ("-2", "100000")},
+                    {"/api": ("100000", "0")}, {"/": ("-1", "100000")}):
+            with self.subTest(cpu=cpu), self.hybrid(memory, cpu), \
+                    patch.object(launcher.os, "execvpe") as execute:
+                self.assertEqual(
+                    launcher.main(["--cloud", "--cloud-cpus", "auto", "--", "payload"]), 2)
+                execute.assert_not_called()
+
     def test_cloud_uses_finite_machine_cap_without_scope_manager(self):
         argv = ["payload", "two words", "$HOME", "*"]
         with self.cloud(), patch.object(launcher.shutil, "which") as manager, \

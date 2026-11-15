@@ -3,10 +3,12 @@
 
 Local scopes use at most 4096 MiB, no swap and grouped OOM termination.
 An explicit --cloud invocation uses the managed machine's inherited finite
-cap instead. Cargo builds and test execution remain serial. Cloud callers may
-opt into CPU-quota-bound native compilation with --cloud-cpus auto, or give
-explicit payload workers a quota-bound CPU set with --cloud-worker-cpus auto
-while native compilation stays serial. Payload worker counts are preserved.
+cap instead, read from cgroup v2 and from the cgroup-v1 memory and CPU
+hierarchies of a hybrid machine. Cargo builds and test execution remain
+serial. Cloud callers may opt into CPU-quota-bound native compilation with
+--cloud-cpus auto, or give explicit payload workers a quota-bound CPU set with
+--cloud-worker-cpus auto while native compilation stays serial. Payload worker
+counts are preserved.
 """
 
 import argparse
@@ -144,6 +146,54 @@ def cgroup_ancestors():
         group = group.parent
 
 
+def legacy_ancestors(controller: str):
+    """Yield the cgroup-v1 groups of one controller, innermost first.
+
+    A hybrid machine keeps a unified membership with no memory or CPU
+    controller and enforces its limits in the v1 hierarchies. Nothing is
+    yielded when the controller has no v1 membership.
+    """
+    memberships = []
+    for entry in Path("/proc/self/cgroup").read_text().splitlines():
+        fields = entry.split(":", 2)
+        if len(fields) == 3 and controller in fields[1].split(","):
+            memberships.append(fields[2])
+    if not memberships:
+        return
+    if len(memberships) != 1 or not memberships[0].startswith("/"):
+        raise ValueError(f"invalid cgroup-v1 {controller} membership")
+    relative = Path(memberships[0].lstrip("/"))
+    if ".." in relative.parts:
+        raise ValueError(f"invalid cgroup-v1 {controller} membership")
+    root = Path("/sys/fs/cgroup") / controller
+    group = root / relative
+    while True:
+        yield group
+        if group == root:
+            break
+        group = group.parent
+
+
+def legacy_value(group: Path, name: str) -> int | None:
+    """Read one cgroup-v1 integer. Only the controller root may lack the file."""
+    try:
+        raw = (group / name).read_text().strip()
+    except FileNotFoundError:
+        if group.parent == Path("/sys/fs/cgroup"):
+            return None
+        raise
+    digits = raw[1:] if raw.startswith("-") else raw
+    if not digits.isascii() or not digits.isdecimal():
+        raise ValueError(f"invalid inherited cloud {name}")
+    return int(raw)
+
+
+def legacy_unlimited_bytes() -> int:
+    """The v1 memory limit that means no limit: LONG_MAX rounded to a page."""
+    page = os.sysconf("SC_PAGE_SIZE")
+    return (2**63 - 1) // page * page
+
+
 def require_cloud_budget(*, serial: bool = True) -> int:
     """Inspect the actual inherited cap, including tighter visible ancestors."""
     limits = []
@@ -161,6 +211,14 @@ def require_cloud_budget(*, serial: bool = True) -> int:
             if not limit.isascii() or not limit.isdecimal() or int(limit) <= 0:
                 raise ValueError("invalid inherited cloud memory.max")
             limits.append(int(limit))
+    for group in legacy_ancestors("memory"):
+        limit = legacy_value(group, "memory.limit_in_bytes")
+        if limit is None:
+            continue
+        if limit <= 0:
+            raise ValueError("invalid inherited cloud memory.limit_in_bytes")
+        if limit < legacy_unlimited_bytes():
+            limits.append(limit)
     if not limits:
         raise ValueError("a finite inherited cloud memory.max is required")
     if serial:
@@ -190,6 +248,15 @@ def cloud_affinity(*, native_limits: bool) -> int:
             if not quota.isascii() or not quota.isdecimal() or int(quota) <= 0:
                 raise ValueError("invalid inherited cloud cpu.max quota")
             capacity = min(capacity, max(1, int(quota) // int(period)))
+    for group in legacy_ancestors("cpu"):
+        quota = legacy_value(group, "cpu.cfs_quota_us")
+        period = legacy_value(group, "cpu.cfs_period_us")
+        if quota is None and period is None:
+            continue
+        if quota is None or period is None or period <= 0 or quota == 0 or quota < -1:
+            raise ValueError("invalid inherited cloud cpu.cfs_quota_us")
+        if quota != -1:
+            capacity = min(capacity, max(1, quota // period))
     if native_limits:
         for name in ("SCRIPTW_JOBS", "RAYON_NUM_THREADS"):
             capacity = inherited_limit(os.environ, name, capacity)
