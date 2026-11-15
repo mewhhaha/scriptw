@@ -442,7 +442,7 @@ fn authority_has_twenty_six_scalar_roles_and_one_required_role_plus_gc_imports()
     }
     let host = rust_code(GC_HOST_SOURCE).normalized;
     let domain = bounded(&host, "gc_host_imports!{", "}");
-    assert_eq!(domain.matches("=>(").count(), 37);
+    assert_eq!(domain.matches("=>(").count(), 32);
     for marker in [
         "CollectGc=>(\"collect_gc\",HostCollectGc)",
         "ByteArrayAllocate=>(\"byte_array_allocate\",HostByteArrayAllocate)",
@@ -459,15 +459,10 @@ fn authority_has_twenty_six_scalar_roles_and_one_required_role_plus_gc_imports()
         "IntlProviderCall=>(\"intl_provider_call\",HostIntlProviderCall)",
         "SystemTimeZoneSnapshot=>(\"system_time_zone_snapshot\",HostSystemTimeZoneSnapshot)",
         "SharedBufferWait=>(\"shared_buffer_wait\",HostSharedBufferWait)",
-        "WeakMapAllocate=>(\"weak_map_allocate\",HostWeakMapAllocate)",
-        "WeakSetAllocate=>(\"weak_set_allocate\",HostWeakSetAllocate)",
-        "WeakMapSet=>(\"weak_map_set\",HostWeakMapSet)",
-        "WeakMapGet=>(\"weak_map_get\",HostWeakMapGet)",
-        "WeakMapHas=>(\"weak_map_has\",HostWeakMapHas)",
-        "WeakMapDelete=>(\"weak_map_delete\",HostWeakMapDelete)",
-        "WeakSetAdd=>(\"weak_set_add\",HostWeakSetAdd)",
-        "WeakSetHas=>(\"weak_set_has\",HostWeakSetHas)",
-        "WeakSetDelete=>(\"weak_set_delete\",HostWeakSetDelete)",
+        "WeakEntryPut=>(\"weak_entry_put\",HostWeakEntryPut)",
+        "WeakEntryGet=>(\"weak_entry_get\",HostWeakEntryGet)",
+        "WeakEntryHas=>(\"weak_entry_has\",HostWeakEntryHas)",
+        "WeakEntryDelete=>(\"weak_entry_delete\",HostWeakEntryDelete)",
         "WeakRefAllocate=>(\"weak_ref_allocate\",HostWeakRefAllocate)",
         "WeakRefDeref=>(\"weak_ref_deref\",HostWeakRefDeref)",
         "WeakJobFinish=>(\"weak_job_finish\",HostWeakJobFinish)",

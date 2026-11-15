@@ -1557,6 +1557,7 @@ fn set_fuel(
 
 #[doc(hidden)]
 impl StoreOpaque {
+    #[inline]
     pub fn id(&self) -> StoreId {
         self.store_data.id()
     }

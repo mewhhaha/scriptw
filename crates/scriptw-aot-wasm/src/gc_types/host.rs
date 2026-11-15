@@ -513,15 +513,10 @@ gc_host_imports! {
     IntlProviderCall => ("intl_provider_call", HostIntlProviderCall),
     SystemTimeZoneSnapshot => ("system_time_zone_snapshot", HostSystemTimeZoneSnapshot),
     SharedBufferWait => ("shared_buffer_wait", HostSharedBufferWait),
-    WeakMapAllocate => ("weak_map_allocate", HostWeakMapAllocate),
-    WeakSetAllocate => ("weak_set_allocate", HostWeakSetAllocate),
-    WeakMapSet => ("weak_map_set", HostWeakMapSet),
-    WeakMapGet => ("weak_map_get", HostWeakMapGet),
-    WeakMapHas => ("weak_map_has", HostWeakMapHas),
-    WeakMapDelete => ("weak_map_delete", HostWeakMapDelete),
-    WeakSetAdd => ("weak_set_add", HostWeakSetAdd),
-    WeakSetHas => ("weak_set_has", HostWeakSetHas),
-    WeakSetDelete => ("weak_set_delete", HostWeakSetDelete),
+    WeakEntryPut => ("weak_entry_put", HostWeakEntryPut),
+    WeakEntryGet => ("weak_entry_get", HostWeakEntryGet),
+    WeakEntryHas => ("weak_entry_has", HostWeakEntryHas),
+    WeakEntryDelete => ("weak_entry_delete", HostWeakEntryDelete),
     WeakRefAllocate => ("weak_ref_allocate", HostWeakRefAllocate),
     WeakRefDeref => ("weak_ref_deref", HostWeakRefDeref),
     WeakJobFinish => ("weak_job_finish", HostWeakJobFinish),
@@ -617,15 +612,10 @@ impl GcHostImports {
                 GcHostImport::SharedBufferWait => wait_sync,
                 GcHostImport::IntlProviderCall => intl_provider,
                 GcHostImport::SystemTimeZoneSnapshot => system_time_zone,
-                GcHostImport::WeakMapAllocate
-                | GcHostImport::WeakSetAllocate
-                | GcHostImport::WeakMapSet
-                | GcHostImport::WeakMapGet
-                | GcHostImport::WeakMapHas
-                | GcHostImport::WeakMapDelete
-                | GcHostImport::WeakSetAdd
-                | GcHostImport::WeakSetHas
-                | GcHostImport::WeakSetDelete
+                GcHostImport::WeakEntryPut
+                | GcHostImport::WeakEntryGet
+                | GcHostImport::WeakEntryHas
+                | GcHostImport::WeakEntryDelete
                 | GcHostImport::WeakRefAllocate
                 | GcHostImport::WeakRefDeref
                 | GcHostImport::WeakJobFinish

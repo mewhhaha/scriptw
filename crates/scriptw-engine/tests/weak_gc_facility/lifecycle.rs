@@ -98,3 +98,110 @@ fn membership_and_nullable_values_have_distinct_lifetimes() {
     assert!(entry.matches_key(&mut store, &key).unwrap());
     assert!(weak.upgrade(&mut store).unwrap().is_none());
 }
+
+#[test]
+fn raw_operands_name_the_same_entries_as_rooted_ones_until_the_next_collection() {
+    let (mut store, pre) = heap();
+    let owner = object(&mut store, &pre, 1);
+    let key = {
+        let mut roots = RootScope::new(&mut store);
+        object(&mut roots, &pre, 10)
+            .to_owned_rooted(&mut roots)
+            .unwrap()
+    };
+    let other = object(&mut store, &pre, 11);
+    fn raw(store: &mut Store<()>, reference: &AnyRef) -> u32 {
+        reference.to_raw(store).unwrap()
+    }
+    let (entry, watched) = {
+        let mut roots = RootScope::new(&mut store);
+        let value = object(&mut roots, &pre, 20);
+        let (owner_raw, key_raw, value_raw) = (
+            owner.to_raw(&mut roots).unwrap(),
+            key.to_raw(&mut roots).unwrap(),
+            value.to_raw(&mut roots).unwrap(),
+        );
+        // SAFETY: the three references are rooted and nothing has collected
+        // since their raw values were taken.
+        let entry =
+            unsafe { GcEphemeron::new_raw(&mut roots, owner_raw, key_raw, value_raw) }.unwrap();
+        assert!(entry.matches_key(&roots, &key).unwrap());
+        assert!(entry.matches_raw(&roots, owner_raw, key_raw).unwrap());
+        assert_eq!(entry.value_raw(&mut roots).unwrap(), value_raw);
+        let stored = entry.value(&mut roots).unwrap().unwrap();
+        assert!(Rooted::ref_eq(&roots, &stored, &value).unwrap());
+        (entry, WeakAnyRef::new(&mut roots, &owner, &value).unwrap())
+    };
+    // Owner and key are both part of an entry's identity.
+    let (owner_raw, key_raw, other_raw) = (
+        raw(&mut store, &owner),
+        raw(&mut store, &key),
+        raw(&mut store, &other),
+    );
+    assert!(!entry.matches_raw(&store, key_raw, owner_raw).unwrap());
+    assert!(!entry.matches_raw(&store, owner_raw, other_raw).unwrap());
+    assert!(!entry.matches_raw(&store, other_raw, key_raw).unwrap());
+    assert!(!entry.matches_raw(&store, owner_raw, 0).unwrap());
+    // A collection moves every object. The entry follows its owner, key and
+    // value; raw values taken before it name nothing any more.
+    store.gc(None).unwrap();
+    let (moved_owner, moved_key) = (raw(&mut store, &owner), raw(&mut store, &key));
+    assert_ne!((moved_owner, moved_key), (owner_raw, key_raw));
+    assert!(entry.matches_raw(&store, moved_owner, moved_key).unwrap());
+    assert!(!entry.matches_raw(&store, owner_raw, key_raw).unwrap());
+    {
+        let mut roots = RootScope::new(&mut store);
+        let value = watched.upgrade(&mut roots).unwrap().unwrap();
+        assert_eq!(marker(&mut roots, value), 20);
+        let value_raw = value.to_raw(&mut roots).unwrap();
+        assert_eq!(entry.value_raw(&mut roots).unwrap(), value_raw);
+        // Replacing and clearing the value through raw operands.
+        let replacement = object(&mut roots, &pre, 30);
+        let replacement_raw = replacement.to_raw(&mut roots).unwrap();
+        // SAFETY: rooted, and nothing has collected since.
+        unsafe { entry.set_value_raw(&mut roots, replacement_raw) }.unwrap();
+        assert_eq!(entry.value_raw(&mut roots).unwrap(), replacement_raw);
+    }
+    store.gc(None).unwrap();
+    assert!(watched.upgrade(&mut store).unwrap().is_none());
+    {
+        let mut roots = RootScope::new(&mut store);
+        let replacement = entry.value(&mut roots).unwrap().unwrap();
+        assert_eq!(marker(&mut roots, replacement), 30);
+    }
+    // SAFETY: zero is no reference.
+    unsafe { entry.set_value_raw(&mut store, 0) }.unwrap();
+    assert_eq!(entry.value_raw(&mut store).unwrap(), 0);
+    assert!(entry.value(&mut store).unwrap().is_none());
+    assert!(entry.is_live(&store).unwrap());
+    // Null and i31 owners and keys are rejected; a null or i31 value is not.
+    let (owner_raw, key_raw) = (raw(&mut store, &owner), raw(&mut store, &key));
+    let immediate = AnyRef::from_i31(&mut store, I31::wrapping_u32(7))
+        .to_raw(&mut store)
+        .unwrap();
+    // SAFETY: rooted references, null and an i31.
+    unsafe {
+        assert!(GcEphemeron::new_raw(&mut store, 0, key_raw, 0).is_err());
+        assert!(GcEphemeron::new_raw(&mut store, owner_raw, 0, 0).is_err());
+        assert!(GcEphemeron::new_raw(&mut store, immediate, key_raw, 0).is_err());
+        assert!(GcEphemeron::new_raw(&mut store, owner_raw, immediate, 0).is_err());
+        let small = GcEphemeron::new_raw(&mut store, owner_raw, key_raw, immediate).unwrap();
+        assert_eq!(small.value_raw(&mut store).unwrap(), immediate);
+        small.remove(&mut store).unwrap();
+        assert!(!small.matches_raw(&store, owner_raw, key_raw).unwrap());
+        assert_eq!(small.value_raw(&mut store).unwrap(), 0);
+    }
+    // A foreign Store's handle is an error, not a miss.
+    let (mut foreign, _) = heap();
+    assert!(entry.matches_raw(&foreign, owner_raw, key_raw).is_err());
+    assert!(entry.value_raw(&mut foreign).is_err());
+    // The entry retires with its key, whatever raw operands then say.
+    drop(key);
+    store.gc(None).unwrap();
+    assert!(!entry.is_live(&store).unwrap());
+    let owner_raw = raw(&mut store, &owner);
+    assert!(!entry.matches_raw(&store, owner_raw, key_raw).unwrap());
+    assert_eq!(entry.value_raw(&mut store).unwrap(), 0);
+    // SAFETY: zero is no reference.
+    assert!(unsafe { entry.set_value_raw(&mut store, 0) }.is_err());
+}

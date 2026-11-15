@@ -12,6 +12,7 @@ struct WeakHandle {
 }
 
 impl WeakHandle {
+    #[inline]
     fn check(&self, store: &StoreOpaque) -> Result<()> {
         ensure!(
             self.store == store.id(),
@@ -23,6 +24,7 @@ impl WeakHandle {
     /// The live edge this handle names, or `None` once it has been retired.
     /// Readers take a shared Store borrow, which cannot collect, so they need
     /// no no-GC scope and allocate nothing on a miss.
+    #[inline]
     fn live<'a>(&self, store: &'a StoreOpaque) -> Result<Option<&'a WeakGcEdge>> {
         self.check(store)?;
         Ok(store.unwrap_gc_store().weak_gc.live(self.slot))
@@ -46,7 +48,18 @@ fn heap_reference(store: &StoreOpaque, value: &AnyRef) -> Result<VMGcRef> {
     Ok(reference)
 }
 
-fn insert(store: &mut AutoAssertNoGc<'_>, edge: WeakGcEdge) -> Result<WeakHandle> {
+/// The heap object a raw reference names. Null and `i31` have no identity a
+/// weak edge can follow.
+#[inline]
+fn raw_heap_reference(raw: u32) -> Result<VMGcRef> {
+    match VMGcRef::from_raw_u32(raw) {
+        Some(reference) if !reference.is_i31() => Ok(reference),
+        _ => bail!("weak owners and targets require heap objects"),
+    }
+}
+
+/// Registration allocates no GC object and cannot collect.
+fn insert(store: &mut StoreOpaque, edge: WeakGcEdge) -> Result<WeakHandle> {
     let id = store.id();
     let gc = store.unwrap_gc_store_mut();
     ensure!(
@@ -128,6 +141,7 @@ pub struct GcEphemeron {
 
 impl GcEphemeron {
     /// Whether the entry still has a surviving owner and key after collection.
+    #[inline]
     pub fn is_live(&self, store: impl AsContext) -> Result<bool> {
         Ok(self.handle.live(store.as_context().0)?.is_some())
     }
@@ -244,6 +258,109 @@ impl GcEphemeron {
         let gc = guard.unwrap_gc_store_mut();
         if gc.weak_gc.contains(self.handle.slot) {
             gc.weak_gc.remove(self.handle.slot)?;
+        }
+        Ok(())
+    }
+}
+
+/// Unrooted operands, for host functions made with `Func::new_unchecked`.
+///
+/// Such a function receives each GC reference as the raw `u32` of a `ValRaw`
+/// (`ValRaw::get_anyref`). Until the call returns or the Store collects, that
+/// value is the reference itself, so an operation that cannot collect needs
+/// no root for it. None of these operations allocates a GC object or
+/// collects, and none enters a no-GC scope.
+impl GcEphemeron {
+    /// [`GcEphemeron::new`] for raw operands; a zero `value` is no value.
+    ///
+    /// # Safety
+    ///
+    /// `owner`, `key` and a nonzero `value` must be references that Wasm
+    /// passed to the host call now running in this Store, which must not have
+    /// collected since it was entered.
+    pub unsafe fn new_raw(
+        mut store: impl AsContextMut,
+        owner: u32,
+        key: u32,
+        value: u32,
+    ) -> Result<Self> {
+        Self::register_raw(store.as_context_mut().0, owner, key, value)
+    }
+
+    /// Not generic, so that the registry's small accessors inline here.
+    fn register_raw(store: &mut StoreOpaque, owner: u32, key: u32, value: u32) -> Result<Self> {
+        let owner = raw_heap_reference(owner)?;
+        let key = raw_heap_reference(key)?;
+        Ok(Self {
+            handle: insert(
+                store,
+                WeakGcEdge::Ephemeron {
+                    owner,
+                    key: Some(key),
+                    value: VMGcRef::from_raw_u32(value),
+                },
+            )?,
+        })
+    }
+
+    /// Whether this entry is live and its owner and key are exactly the
+    /// objects the raw references name. Only identities are compared; no
+    /// reference is followed.
+    #[inline]
+    pub fn matches_raw(&self, store: impl AsContext, owner: u32, key: u32) -> Result<bool> {
+        match self.handle.live(store.as_context().0)? {
+            None | Some(WeakGcEdge::Ephemeron { key: None, .. }) => Ok(false),
+            Some(WeakGcEdge::Ephemeron {
+                owner: edge_owner,
+                key: Some(edge_key),
+                ..
+            }) => Ok(edge_owner.as_raw_u32() == owner && edge_key.as_raw_u32() == key),
+            Some(WeakGcEdge::Target { .. }) => {
+                unreachable!("typed ephemeron handle cannot name target")
+            }
+        }
+    }
+
+    /// The surviving value as a raw reference a host function may return to
+    /// Wasm at once, or zero for none or a retired entry.
+    pub fn value_raw(&self, mut store: impl AsContextMut) -> Result<u32> {
+        self.exposed_value(store.as_context_mut().0)
+    }
+
+    /// Not generic, for the same reason as `register_raw`.
+    fn exposed_value(&self, store: &mut StoreOpaque) -> Result<u32> {
+        let value = match self.handle.live(store)? {
+            Some(WeakGcEdge::Ephemeron {
+                key: Some(_),
+                value: Some(value),
+                ..
+            }) => value.unchecked_copy(),
+            None | Some(WeakGcEdge::Ephemeron { .. }) => return Ok(0),
+            Some(WeakGcEdge::Target { .. }) => {
+                unreachable!("typed ephemeron handle cannot name target")
+            }
+        };
+        let gc = store.unwrap_gc_store_mut();
+        let value = gc.clone_gc_ref(&value);
+        Ok(gc.expose_gc_ref_to_wasm(value)?.get())
+    }
+
+    /// [`GcEphemeron::set_value`] for a raw operand; zero clears the value.
+    ///
+    /// # Safety
+    ///
+    /// As for [`GcEphemeron::new_raw`].
+    pub unsafe fn set_value_raw(&self, mut store: impl AsContextMut, value: u32) -> Result<()> {
+        let store: &mut StoreOpaque = store.as_context_mut().0;
+        self.handle.check(store)?;
+        match store.unwrap_gc_store_mut().weak_gc.get_mut(self.handle.slot)? {
+            WeakGcEdge::Ephemeron {
+                key: Some(_),
+                value: slot,
+                ..
+            } => *slot = VMGcRef::from_raw_u32(value),
+            WeakGcEdge::Ephemeron { key: None, .. } => bail!("ephemeron key has been cleared"),
+            WeakGcEdge::Target { .. } => unreachable!("typed ephemeron handle cannot name target"),
         }
         Ok(())
     }

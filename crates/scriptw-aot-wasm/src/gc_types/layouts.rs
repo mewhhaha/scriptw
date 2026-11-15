@@ -335,8 +335,6 @@ pub(crate) enum ArrayFromAsyncSourceMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum HostResourceKind {
     SharedBuffer,
-    WeakMap,
-    WeakSet,
     WeakRef,
     FinalizationCell,
 }
@@ -1730,14 +1728,13 @@ gc_layout_registry! {
             NEXT_ORDINAL: I64Value, Mutable, NonNullable;
             VERSION: I64Value, Mutable, NonNullable;
         }
-        // Native resources contain collector slot IDs, never strong JS keys.
+        // A weak collection holds nothing: its entries are collector
+        // ephemerons it owns, found by its header's KEY_HASH_ID and the key's.
         struct WeakMapObject: JavaScriptObject => WeakMapObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
-            RESOURCE: GcRef<HostResource>, Immutable, NonNullable;
         }
         struct WeakSetObject: JavaScriptObject => WeakSetObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
-            RESOURCE: GcRef<HostResource>, Immutable, NonNullable;
         }
         // Prepared unpublished records acquire their weak resource before use.
         struct WeakRefObject: JavaScriptObject => WeakRefObjectSchema {

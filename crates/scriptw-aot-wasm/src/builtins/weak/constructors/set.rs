@@ -38,22 +38,11 @@ impl FunctionBuilder<'_> {
             self.emit_alloc_plain_object_with_prototype(Some(pending.value()), f)?,
             f,
         );
-        let resource = s.reserve_gc_local(f).initialize(
-            self.weak_import(GcHostImport::WeakSetAllocate)?
-                .allocate_weak_set(s, f),
-            f,
-        );
         let record = s.reserve_gc_local(f).initialize(
-            s.struct_type::<WeakSetObject>().construct(
-                (
-                    GcOperand::reference(&header, s),
-                    GcOperand::reference(&resource, s),
-                ),
-                f,
-            ),
+            s.struct_type::<WeakSetObject>()
+                .construct((GcOperand::reference(&header, s),), f),
             f,
         );
-        resource.clear(f);
         receiver.set_reference(&record, s, f);
         output.set_normal(&receiver, f);
         let exit = self.open_frame(ControlFrameKind::Block, f);

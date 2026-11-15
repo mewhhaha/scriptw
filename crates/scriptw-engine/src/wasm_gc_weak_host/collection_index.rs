@@ -1,126 +1,223 @@
-//! Epoch-scoped non-rooting lookup for one native weak collection resource.
+//! One Store's weak collection entries, found by stable identities.
+//!
+//! An entry is a collector ephemeron owned by its WeakMap or WeakSet. The
+//! index only finds it: it holds no reference, keeps nothing alive and needs
+//! no rebuilding when objects move. Compiled code mints one stable nonzero
+//! identity per object or Symbol (`KEY_HASH_ID`) before it stores an entry;
+//! the pair of identities is the hash, and the collector's own owner and key
+//! decide a hit, so two objects that share an identity are still two keys.
 use super::*;
-use std::collections::HashMap;
-use std::hash::{BuildHasherDefault, Hasher};
-use wasmtime::{AsContext, GcWeakHeapEpoch, GcWeakKeyFingerprint};
+use wasmtime::AsContext;
 
-/// A fingerprint hashes as one `write_u32` of its heap index. Indices are
-/// collector offsets, not caller-supplied bytes, so a keyed SipHash bought
-/// nothing per lookup; the murmur3 finalizer is a bijection on `u64` that
-/// spreads the aligned indices over hashbrown's bucket and control bits.
-#[derive(Default)]
-struct HeapIndexHasher(u64);
+/// One operation's collection and key: the raw references of the running
+/// host call, and the hash of their identities.
+#[derive(Clone, Copy)]
+pub(super) struct Operands {
+    owner: u32,
+    key: u32,
+    hash: u64,
+}
 
-impl Hasher for HeapIndexHasher {
-    fn write(&mut self, bytes: &[u8]) {
-        for &byte in bytes {
-            self.0 = self.0.rotate_left(8) ^ u64::from(byte);
+impl Operands {
+    /// Compiled code answers a lookup itself when either object has no
+    /// identity yet, and mints both before it stores.
+    pub(super) fn new(owner: u32, key: u32, owner_id: i64, key_id: i64) -> wasmtime::Result<Self> {
+        if owner_id == 0 || key_id == 0 {
+            return Err(wasmtime::Error::msg("weak operand has no identity"));
         }
-    }
-
-    fn write_u32(&mut self, index: u32) {
-        self.0 = self.0.rotate_left(32) ^ u64::from(index);
-    }
-
-    fn finish(&self) -> u64 {
-        let mut hash = self.0;
+        // The murmur3 finalizer over both identities: they are small
+        // counters, and the low bits pick the cell.
+        let mut hash = (owner_id as u64)
+            .wrapping_mul(0x9e37_79b9_7f4a_7c15)
+            .rotate_left(32)
+            ^ key_id as u64;
         hash ^= hash >> 33;
         hash = hash.wrapping_mul(0xff51_afd7_ed55_8ccd);
         hash ^= hash >> 33;
         hash = hash.wrapping_mul(0xc4ce_b9fe_1a85_ec53);
-        hash ^ (hash >> 33)
-    }
-}
-
-type Table = HashMap<GcWeakKeyFingerprint, GcEphemeron, BuildHasherDefault<HeapIndexHasher>>;
-
-#[derive(Default)]
-pub(super) struct Entries {
-    entries: Table,
-    epoch: Option<GcWeakHeapEpoch>,
-}
-
-/// A key's token in the current epoch and its entry, if the collection has one.
-/// Valid only until the Store can next collect.
-pub(super) struct Lookup {
-    fingerprint: GcWeakKeyFingerprint,
-    pub(super) entry: Option<GcEphemeron>,
-}
-
-impl Entries {
-    /// Finds `key` under a shared Store borrow, which cannot collect, so no
-    /// operand is rooted or upgraded here. A hit is confirmed by the
-    /// collector's identity check before it is returned.
-    pub(super) fn lookup(
-        &mut self,
-        store: impl AsContext,
-        key: &Rooted<AnyRef>,
-    ) -> wasmtime::Result<Lookup> {
-        let store = store.as_context();
-        let wanted = GcWeakKeyFingerprint::new(&store, key)?;
-        if self.epoch != Some(wanted.epoch()) {
-            // GC updates the registry's weak references before the mutator
-            // resumes. Rebuild once from surviving handles, transactionally:
-            // allocation/validation failure preserves the existing table.
-            let mut next = Table::default();
-            next.try_reserve(self.entries.len())
-                .map_err(wasmtime::Error::new)?;
-            for entry in self.entries.values() {
-                if let Some(current) = entry.key_fingerprint(&store)? {
-                    if next.insert(current, *entry).is_some() {
-                        return Err(wasmtime::Error::msg("duplicate weak collection key"));
-                    }
-                }
-            }
-            self.entries = next;
-            self.epoch = Some(wanted.epoch());
-        }
-        let entry = self.entries.get(&wanted).copied();
-        if let Some(entry) = entry {
-            if !entry.matches_fingerprint(&store, wanted)? {
-                return Err(wasmtime::Error::msg(
-                    "weak collection key index identity mismatch",
-                ));
-            }
-        }
-        Ok(Lookup {
-            fingerprint: wanted,
-            entry,
+        Ok(Self {
+            owner,
+            key,
+            hash: hash ^ (hash >> 33),
         })
     }
+}
 
-    pub(super) fn insert(
-        &mut self,
-        caller: &mut WasmtimeCaller<'_, WasmHostState>,
-        owner: &Rooted<AnyRef>,
-        key: &Rooted<AnyRef>,
-        value: Option<&Rooted<AnyRef>>,
-    ) -> wasmtime::Result<()> {
-        let found = self.lookup(&*caller, key)?;
-        if let Some(entry) = found.entry {
-            return entry.set_value(&mut *caller, value.map(|value| &**value));
+#[derive(Clone, Copy, Default)]
+struct Cell {
+    hash: u64,
+    /// `None` is an empty cell. An entry stays after the collector retires
+    /// it (its owner or key died, or it was deleted) until the next rebuild:
+    /// a retired handle matches nothing, so it only lengthens a probe.
+    entry: Option<GcEphemeron>,
+}
+
+/// Where a missing key's entry would go.
+#[derive(Clone, Copy)]
+pub(super) enum Vacancy {
+    /// The table has no cells yet.
+    Unallocated,
+    Empty(usize),
+    /// A retired entry of the same hash, replaced in place.
+    Retired(usize),
+}
+
+/// A key's entry, or where one would go. Valid only until the Store can next
+/// collect or the index next changes.
+pub(super) enum Found {
+    Entry(GcEphemeron),
+    Missing(Vacancy),
+}
+
+impl Found {
+    pub(super) fn entry(self) -> Option<GcEphemeron> {
+        match self {
+            Self::Entry(entry) => Some(entry),
+            Self::Missing(_) => None,
         }
-        // Reserve before registering a conditional edge, so allocation cannot
-        // orphan a value-retaining collector slot. Registration cannot collect,
-        // so the token taken by the lookup stays current.
-        self.entries.try_reserve(1).map_err(wasmtime::Error::new)?;
-        let entry = GcEphemeron::new(&mut *caller, owner, key, value.map(|value| &**value))?;
-        let previous = self.entries.insert(found.fingerprint, entry);
-        debug_assert!(previous.is_none());
+    }
+}
+
+/// Open addressing with linear probing over a power-of-two table that always
+/// has an empty cell.
+#[derive(Default)]
+pub(super) struct Entries {
+    cells: Vec<Cell>,
+    /// Occupied cells, live or retired.
+    used: usize,
+}
+
+const MINIMUM_CELLS: usize = 16;
+
+impl Entries {
+    /// Finds the entry under a shared Store borrow, which cannot collect, so
+    /// the raw references stay the objects' identities throughout.
+    pub(super) fn find(&self, store: impl AsContext, at: Operands) -> wasmtime::Result<Found> {
+        let store = store.as_context();
+        let Some(mask) = self.cells.len().checked_sub(1) else {
+            return Ok(Found::Missing(Vacancy::Unallocated));
+        };
+        let mut index = at.hash as usize & mask;
+        let mut retired = None;
+        loop {
+            let cell = self.cells[index];
+            let Some(entry) = cell.entry else {
+                return Ok(Found::Missing(
+                    retired.map_or(Vacancy::Empty(index), Vacancy::Retired),
+                ));
+            };
+            if cell.hash == at.hash {
+                if entry.matches_raw(&store, at.owner, at.key)? {
+                    return Ok(Found::Entry(entry));
+                }
+                if retired.is_none() && !entry.is_live(&store)? {
+                    retired = Some(index);
+                }
+            }
+            index = (index + 1) & mask;
+        }
+    }
+
+    /// Whether one more cell may be occupied: at most five eighths are.
+    fn has_room(&self) -> bool {
+        (self.used + 1) * 8 <= self.cells.len() * 5
+    }
+
+    /// Moves the live entries to a fresh table, which drops the retired
+    /// ones. The table doubles when more than three eighths of its cells
+    /// hold a live entry, so at least a quarter of them can be filled before
+    /// the next rebuild, and gives up half its cells when fewer than a
+    /// sixteenth do: entries that die together at each collection then keep
+    /// one capacity instead of shrinking and growing again. Nothing changes
+    /// when an allocation fails.
+    fn rebuild(&mut self, store: impl AsContext) -> wasmtime::Result<()> {
+        let store = store.as_context();
+        let mut live = Vec::new();
+        live.try_reserve_exact(self.used)
+            .map_err(wasmtime::Error::new)?;
+        for cell in &self.cells {
+            if cell.entry.map(|entry| entry.is_live(&store)).transpose()? == Some(true) {
+                live.push(*cell);
+            }
+        }
+        let needed = live
+            .len()
+            .checked_add(1)
+            .and_then(|cells| cells.checked_mul(2))
+            .and_then(usize::checked_next_power_of_two)
+            .ok_or_else(|| wasmtime::Error::msg("weak collection index is too large"))?
+            .max(MINIMUM_CELLS);
+        let current = self.cells.len();
+        let capacity = if live.len() < current / 16 {
+            needed.max(current / 2)
+        } else if live.len() > current / 8 * 3 {
+            needed.max(current.saturating_mul(2))
+        } else {
+            needed.max(current)
+        };
+        let mut cells = Vec::new();
+        cells
+            .try_reserve_exact(capacity)
+            .map_err(wasmtime::Error::new)?;
+        cells.resize(capacity, Cell::default());
+        for cell in &live {
+            let empty = Self::first_empty(&cells, cell.hash);
+            cells[empty] = *cell;
+        }
+        self.cells = cells;
+        self.used = live.len();
         Ok(())
     }
 
-    /// Removes the entry a lookup found. Removal cannot collect, so the
-    /// lookup's token is still the table key.
-    pub(super) fn remove(
-        &mut self,
-        caller: &mut WasmtimeCaller<'_, WasmHostState>,
-        found: Lookup,
-    ) -> wasmtime::Result<()> {
-        if let Some(entry) = found.entry {
-            entry.remove(&mut *caller)?;
-            self.entries.remove(&found.fingerprint);
+    fn first_empty(cells: &[Cell], hash: u64) -> usize {
+        let mask = cells.len() - 1;
+        let mut index = hash as usize & mask;
+        while cells[index].entry.is_some() {
+            index = (index + 1) & mask;
         }
+        index
+    }
+
+    /// Stores `value` under the operands' key, replacing the value of an
+    /// existing entry. A zero `value` is a WeakSet's membership.
+    ///
+    /// # Safety
+    ///
+    /// The operands and a nonzero `value` are references that compiled code
+    /// passed to the host call now running in `caller`'s Store, which has not
+    /// collected since.
+    pub(super) unsafe fn put(
+        caller: &mut WasmtimeCaller<'_, WasmHostState>,
+        at: Operands,
+        value: u32,
+    ) -> wasmtime::Result<()> {
+        let vacancy = match caller.data().weak.index.find(&*caller, at)? {
+            // SAFETY: the caller's contract; nothing above collects.
+            Found::Entry(entry) => return unsafe { entry.set_value_raw(&mut *caller, value) },
+            Found::Missing(vacancy) => vacancy,
+        };
+        // Make room before registering the conditional edge, so a failed
+        // allocation cannot leave a value-retaining slot the index does not
+        // know. Registration cannot collect, so the references stay current.
+        let cell = match vacancy {
+            Vacancy::Retired(cell) => cell,
+            Vacancy::Empty(cell) if caller.data().weak.index.has_room() => cell,
+            Vacancy::Empty(_) | Vacancy::Unallocated => {
+                let mut index = std::mem::take(&mut caller.data_mut().weak.index);
+                let rebuilt = index.rebuild(&*caller);
+                caller.data_mut().weak.index = index;
+                rebuilt?;
+                Self::first_empty(&caller.data().weak.index.cells, at.hash)
+            }
+        };
+        // SAFETY: the caller's contract; nothing above collects.
+        let entry = unsafe { GcEphemeron::new_raw(&mut *caller, at.owner, at.key, value)? };
+        let index = &mut caller.data_mut().weak.index;
+        index.used += usize::from(index.cells[cell].entry.is_none());
+        index.cells[cell] = Cell {
+            hash: at.hash,
+            entry: Some(entry),
+        };
         Ok(())
     }
 }

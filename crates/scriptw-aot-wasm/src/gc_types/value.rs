@@ -25,6 +25,7 @@ mod runtime_string_descriptors;
 pub(crate) use program_string_descriptors::ProgramStringDescriptorTable;
 pub(crate) use runtime_string_descriptors::RuntimeStringDescriptorRowLocals;
 mod weak_host;
+pub(crate) use weak_host::WeakEntryIdentities;
 
 macro_rules! scalar_local {
     ($name:ident, $ty:ident) => {
@@ -617,7 +618,7 @@ enum_i32_codec!(PrivateElementKind; Brand => 0, Field => 1, Method => 2, Accesso
 enum_i32_codec!(AwaitCompletionKind; Normal => 0, Throw => 1);
 enum_i32_codec!(AsyncGeneratorReturnStage; Unawaited => 0, Awaited => 1);
 enum_i32_codec!(GeneratorDelegatePending; Normal => 0, Return => 1, Throw => 2, MissingThrowClose => 3, ReturnValue => 4, YieldValue => 5);
-enum_i32_codec!(HostResourceKind; SharedBuffer => 0, WeakMap => 1, WeakSet => 2, WeakRef => 3, FinalizationCell => 4);
+enum_i32_codec!(HostResourceKind; SharedBuffer => 0, WeakRef => 3, FinalizationCell => 4);
 enum_i32_codec!(BufferOwnerKind; ArrayBuffer => 0, SharedArrayBuffer => 1);
 enum_i32_codec!(IteratorBufferMode; Chunks => 0, WindowsOnlyFull => 1, WindowsAllowPartial => 2);
 enum_i32_codec!(IteratorZipMode; Shortest => 0, Longest => 1, Strict => 2);

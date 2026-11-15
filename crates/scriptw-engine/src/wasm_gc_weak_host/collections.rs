@@ -1,171 +1,160 @@
+//! WeakMap and WeakSet entries: collector ephemerons behind raw host calls.
+//!
+//! These imports take their references unrooted. A lookup allocates nothing
+//! and cannot collect, and a store only registers a collector edge, so the
+//! raw references compiled code passes stay valid for the whole call; no
+//! operand is rooted, type-checked again or upgraded.
 use super::*;
 
-use super::collection_index::Entries;
-use std::sync::MutexGuard;
+use super::collection_index::{Entries, Operands};
+use std::mem::MaybeUninit;
+use wasmtime::{FuncType, ValRaw, ValType};
 
-struct WeakMapResource(Mutex<Entries>);
-struct WeakSetResource(Mutex<Entries>);
+type Arguments = [MaybeUninit<ValRaw>];
 
-fn entries(table: &Mutex<Entries>) -> MutexGuard<'_, Entries> {
-    table.lock().unwrap_or_else(|e| e.into_inner())
-}
-
-/// Lookups borrow the resource from the Store instead of cloning its `Arc`:
-/// they run entirely under a shared Store borrow.
-fn borrowed_resource<'a, T: Send + Sync + 'static>(
-    caller: &'a WasmtimeCaller<'_, WasmHostState>,
-    reference: &Rooted<ExternRef>,
-) -> wasmtime::Result<&'a T> {
-    reference
-        .data(caller)?
-        .and_then(|data| data.downcast_ref::<Arc<T>>())
-        .map(|resource| &**resource)
-        .ok_or_else(|| wasmtime::Error::msg("weak resource has the wrong native brand"))
-}
-
-/// Shared membership for WeakMap and WeakSet `has` and `delete`.
-fn membership<T: Send + Sync + 'static>(
-    mut caller: WasmtimeCaller<'_, WasmHostState>,
-    native: Rooted<ExternRef>,
-    key: Option<Rooted<EqRef>>,
-    table: fn(&T) -> &Mutex<Entries>,
-    delete: bool,
-) -> wasmtime::Result<i32> {
-    if !delete {
-        let resource = borrowed_resource::<T>(&caller, &native)?;
-        let found = entries(table(resource)).lookup(&caller, &required(key)?)?;
-        return Ok(i32::from(found.entry.is_some()));
+/// The collection and key in the first two parameters and their identities
+/// in the two starting at `identities`.
+///
+/// # Safety
+///
+/// The import's type gives those four parameters these types.
+unsafe fn operands(arguments: &Arguments, identities: usize) -> wasmtime::Result<Operands> {
+    // SAFETY: Wasmtime initialized every parameter of the import's type.
+    unsafe {
+        Operands::new(
+            arguments[0].assume_init().get_anyref(),
+            arguments[1].assume_init().get_anyref(),
+            arguments[identities].assume_init().get_i64(),
+            arguments[identities + 1].assume_init().get_i64(),
+        )
     }
-    let resource = resource::<T>(&caller, native)?;
-    let mut guard = entries(table(&resource));
-    let found = guard.lookup(&caller, &required(key)?)?;
-    let present = found.entry.is_some();
-    guard.remove(&mut caller, found)?;
-    Ok(i32::from(present))
+}
+
+fn find(
+    caller: &WasmtimeCaller<'_, WasmHostState>,
+    at: Operands,
+) -> wasmtime::Result<Option<GcEphemeron>> {
+    Ok(caller.data().weak.index.find(caller, at)?.entry())
+}
+
+/// Defines `row` with exactly the type the emitter declares for it, which
+/// instantiation checks against the module's import.
+///
+/// # Safety
+///
+/// `operation` reads its parameters and writes its results as `parameters`
+/// and `results` type them.
+unsafe fn define(
+    linker: &mut WasmtimeLinker<WasmHostState>,
+    row: GcHostImport,
+    parameters: &[ValType],
+    results: &[ValType],
+    operation: impl Fn(WasmtimeCaller<'_, WasmHostState>, &mut Arguments) -> wasmtime::Result<()>
+        + Send
+        + Sync
+        + 'static,
+) -> Result<(), EngineError> {
+    let ty = FuncType::new(
+        linker.engine(),
+        parameters.iter().cloned(),
+        results.iter().cloned(),
+    );
+    // SAFETY: this function's contract.
+    unsafe { linker.func_new_unchecked(row.module(), row.name(), ty, operation) }
+        .map(drop)
+        .map_err(bind_error)
+}
+
+/// `(owner, key, value, owner identity, key identity)`: stores the value, or
+/// with a null value a WeakSet's membership.
+fn put(
+    mut caller: WasmtimeCaller<'_, WasmHostState>,
+    arguments: &mut Arguments,
+) -> wasmtime::Result<()> {
+    // SAFETY: the import's type, and references passed by the compiled code
+    // that is calling.
+    unsafe {
+        let at = operands(arguments, 3)?;
+        let value = arguments[2].assume_init().get_anyref();
+        Entries::put(&mut caller, at, value)
+    }
+}
+
+/// `(owner, key, owner identity, key identity) -> value`, null without an
+/// entry.
+fn get(
+    mut caller: WasmtimeCaller<'_, WasmHostState>,
+    arguments: &mut Arguments,
+) -> wasmtime::Result<()> {
+    // SAFETY: the import's type.
+    let at = unsafe { operands(arguments, 2)? };
+    let value = match find(&caller, at)? {
+        // Returned to compiled code at once, before anything can collect.
+        Some(entry) => entry.value_raw(&mut caller)?,
+        None => 0,
+    };
+    arguments[0].write(ValRaw::anyref(value));
+    Ok(())
+}
+
+/// `(owner, key, owner identity, key identity) -> i32`: whether the entry
+/// exists.
+fn has(
+    caller: WasmtimeCaller<'_, WasmHostState>,
+    arguments: &mut Arguments,
+) -> wasmtime::Result<()> {
+    // SAFETY: the import's type.
+    let at = unsafe { operands(arguments, 2)? };
+    let present = find(&caller, at)?.is_some();
+    arguments[0].write(ValRaw::i32(i32::from(present)));
+    Ok(())
+}
+
+/// `(owner, key, owner identity, key identity) -> i32`: removes the entry
+/// and says whether it existed.
+fn delete(
+    mut caller: WasmtimeCaller<'_, WasmHostState>,
+    arguments: &mut Arguments,
+) -> wasmtime::Result<()> {
+    // SAFETY: the import's type.
+    let at = unsafe { operands(arguments, 2)? };
+    let entry = find(&caller, at)?;
+    if let Some(entry) = entry {
+        // The index keeps the retired handle until it next rebuilds; it can
+        // match nothing.
+        entry.remove(&mut caller)?;
+    }
+    arguments[0].write(ValRaw::i32(i32::from(entry.is_some())));
+    Ok(())
 }
 
 pub(super) fn link(linker: &mut WasmtimeLinker<WasmHostState>) -> Result<(), EngineError> {
-    let row = GcHostImport::WeakMapAllocate;
-    linker
-        .func_wrap(
-            row.module(),
-            row.name(),
-            |mut caller: WasmtimeCaller<'_, WasmHostState>| -> wasmtime::Result<Rooted<ExternRef>> {
-                ExternRef::new(
-                    &mut caller,
-                    Arc::new(WeakMapResource(Mutex::new(Entries::default()))),
-                )
-            },
+    const EQ: ValType = ValType::EQREF;
+    const LOOKUP: [ValType; 4] = [EQ, EQ, ValType::I64, ValType::I64];
+    // SAFETY: each operation reads the parameters and writes the result its
+    // documentation lists, which are the types given here.
+    unsafe {
+        define(
+            linker,
+            GcHostImport::WeakEntryPut,
+            &[EQ, EQ, EQ, ValType::I64, ValType::I64],
+            &[],
+            put,
+        )?;
+        define(linker, GcHostImport::WeakEntryGet, &LOOKUP, &[EQ], get)?;
+        define(
+            linker,
+            GcHostImport::WeakEntryHas,
+            &LOOKUP,
+            &[ValType::I32],
+            has,
+        )?;
+        define(
+            linker,
+            GcHostImport::WeakEntryDelete,
+            &LOOKUP,
+            &[ValType::I32],
+            delete,
         )
-        .map_err(bind_error)?;
-    let row = GcHostImport::WeakSetAllocate;
-    linker
-        .func_wrap(
-            row.module(),
-            row.name(),
-            |mut caller: WasmtimeCaller<'_, WasmHostState>| -> wasmtime::Result<Rooted<ExternRef>> {
-                ExternRef::new(
-                    &mut caller,
-                    Arc::new(WeakSetResource(Mutex::new(Entries::default()))),
-                )
-            },
-        )
-        .map_err(bind_error)?;
-    let row = GcHostImport::WeakMapSet;
-    linker
-        .func_wrap(
-            row.module(),
-            row.name(),
-            |mut caller: WasmtimeCaller<'_, WasmHostState>,
-             owner: Option<Rooted<EqRef>>,
-             native: Rooted<ExternRef>,
-             key: Option<Rooted<EqRef>>,
-             value: Option<Rooted<EqRef>>|
-             -> wasmtime::Result<()> {
-                let resource = resource::<WeakMapResource>(&caller, native)?;
-                let mut guard = entries(&resource.0);
-                guard.insert(
-                    &mut caller,
-                    &required(owner)?,
-                    &required(key)?,
-                    Some(&required(value)?),
-                )
-            },
-        )
-        .map_err(bind_error)?;
-    let row = GcHostImport::WeakSetAdd;
-    linker
-        .func_wrap(
-            row.module(),
-            row.name(),
-            |mut caller: WasmtimeCaller<'_, WasmHostState>,
-             owner: Option<Rooted<EqRef>>,
-             native: Rooted<ExternRef>,
-             key: Option<Rooted<EqRef>>|
-             -> wasmtime::Result<()> {
-                let resource = resource::<WeakSetResource>(&caller, native)?;
-                let mut guard = entries(&resource.0);
-                guard.insert(&mut caller, &required(owner)?, &required(key)?, None)
-            },
-        )
-        .map_err(bind_error)?;
-    let row = GcHostImport::WeakMapGet;
-    linker
-        .func_wrap(
-            row.module(),
-            row.name(),
-            |mut caller: WasmtimeCaller<'_, WasmHostState>,
-             native: Rooted<ExternRef>,
-             key: Option<Rooted<EqRef>>|
-             -> wasmtime::Result<Option<Rooted<EqRef>>> {
-                let found = {
-                    let resource = borrowed_resource::<WeakMapResource>(&caller, &native)?;
-                    entries(&resource.0).lookup(&caller, &required(key)?)?.entry
-                };
-                let Some(entry) = found else {
-                    return Ok(None);
-                };
-                entry
-                    .value(&mut caller)?
-                    .map(|v| v.as_eqref(&mut caller))
-                    .transpose()
-                    .map(Option::flatten)
-            },
-        )
-        .map_err(bind_error)?;
-    for (row, delete) in [
-        (GcHostImport::WeakMapHas, false),
-        (GcHostImport::WeakMapDelete, true),
-    ] {
-        linker
-            .func_wrap(
-                row.module(),
-                row.name(),
-                move |caller: WasmtimeCaller<'_, WasmHostState>,
-                      native: Rooted<ExternRef>,
-                      key: Option<Rooted<EqRef>>|
-                      -> wasmtime::Result<i32> {
-                    membership(caller, native, key, |r: &WeakMapResource| &r.0, delete)
-                },
-            )
-            .map_err(bind_error)?;
     }
-    for (row, delete) in [
-        (GcHostImport::WeakSetHas, false),
-        (GcHostImport::WeakSetDelete, true),
-    ] {
-        linker
-            .func_wrap(
-                row.module(),
-                row.name(),
-                move |caller: WasmtimeCaller<'_, WasmHostState>,
-                      native: Rooted<ExternRef>,
-                      key: Option<Rooted<EqRef>>|
-                      -> wasmtime::Result<i32> {
-                    membership(caller, native, key, |r: &WeakSetResource| &r.0, delete)
-                },
-            )
-            .map_err(bind_error)?;
-    }
-    Ok(())
 }

@@ -127,7 +127,10 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // mutable) and gives up its descriptor when its property is deleted.
 // Version 72 chains a static read site's records: a record gains its next
 // record, a receiver layout hint and a learning budget.
-const LAYOUT_VERSION: u32 = 72;
+// Version 73 finds weak collection entries by KEY_HASH_ID identities: four
+// weak entry imports replace the WeakMap and WeakSet resource imports, and
+// the two objects no longer hold a host resource.
+const LAYOUT_VERSION: u32 = 73;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

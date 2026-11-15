@@ -11,6 +11,7 @@ mod reporting;
 
 #[derive(Default)]
 pub(super) struct WeakGcState {
+    index: collection_index::Entries,
     kept: Vec<OwnedRooted<AnyRef>>,
     registries: Vec<WeakAnyRef>,
     poll_cursor: usize,
