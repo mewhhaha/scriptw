@@ -1744,37 +1744,57 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let exit = self.open_frame(ControlFrameKind::Block, function);
-        // Ordinary and function objects answer Get along their chain here,
-        // without a helper entry per hop: their own lookup and
-        // [[GetPrototypeOf]] observe nothing. The walk stops at the first
-        // accessor or other object kind. A later object then runs its
-        // complete [[Get]] with the original receiver; the first object
-        // continues below.
+        // The objects whose own lookup for the key is the ordinary one in
+        // their header (`emit_object_get_probe`) answer Get along their
+        // chain here, without a helper entry per hop: their own lookup and
+        // [[GetPrototypeOf]] observe nothing. A data property is the
+        // result, and a getter is called with the original receiver, as
+        // OrdinaryGet does wherever on the chain it finds one. The walk
+        // stops at the first other object kind: a later object then runs
+        // its complete [[Get]] with the original receiver, and the first
+        // object continues below.
         let cursor = schema.reserve_value_local(function);
         let advanced = schema.reserve_i32_local(function);
+        let header = schema
+            .reserve_gc_local::<OrdinaryObject, Nullable>(function)
+            .initialize_null(schema, function);
         cursor.copy_from(target, function);
         function.instruction(&Instruction::I32Const(0));
         advanced.store(function);
         let leave = self.open_frame(ControlFrameKind::Block, function);
         let hop = self.open_frame(ControlFrameKind::Loop, function);
-        let step = self.emit_ordinary_get_probe(&cursor, key, function)?;
+        let step = self.emit_object_get_probe(&cursor, key, &header, function)?;
         step.emit_found_i32(function);
-        step.emit_getter_i32(function);
-        function.instruction(&Instruction::I32Eqz);
-        function.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, function);
+        step.emit_getter_i32(function);
+        self.open_frame(ControlFrameKind::If, function);
+        self.emit_found_getter_call(step.value(), receiver, result, function)?;
+        function.instruction(&Instruction::Else);
         result.set_normal(step.value(), function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         self.emit_branch_to_target(exit, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         step.emit_supported_i32(function);
-        step.emit_found_i32(function);
-        function.instruction(&Instruction::I32Eqz);
-        function.instruction(&Instruction::I32And);
         function.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(leave, function);
         let parent = schema.reserve_value_local(function);
-        self.emit_ordinary_get_prototype_of(&cursor, &parent, function);
+        let object = schema.reserve_gc_local(function).initialize(
+            header.load(schema, function).require_non_null(function),
+            function,
+        );
+        let prototype = schema.reserve_gc_local(function).initialize(
+            schema
+                .struct_type::<OrdinaryObject>()
+                .field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(&object, schema, function)
+                .reference(),
+            function,
+        );
+        schema.prototype_reference_into(&prototype, &parent, function);
+        prototype.clear(function);
+        object.clear(function);
         parent.tag().load(function);
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Null as i32));
         function.instruction(&Instruction::I32Eq);
@@ -1812,6 +1832,7 @@ impl<'a> FunctionBuilder<'a> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         schema.release_i32_local(advanced, function);
+        header.clear(function);
         cursor.clear(function);
         let probe = self.emit_ordinary_get_probe(target, key, function)?;
         probe.emit_supported_i32(function);
@@ -1830,26 +1851,7 @@ impl<'a> FunctionBuilder<'a> {
         self.open_frame(ControlFrameKind::If, function);
         probe.emit_getter_i32(function);
         self.open_frame(ControlFrameKind::If, function);
-        value.tag().load(function);
-        function.instruction(&Instruction::I32Const(
-            WasmRuntimeValueTag::Undefined as i32,
-        ));
-        function.instruction(&Instruction::I32Eq);
-        self.open_frame(ControlFrameKind::If, function);
-        result.initialize(function);
-        function.instruction(&Instruction::Else);
-        let arguments = self.emit_pre_evaluated_arg_vector(&[], function);
-        self.emit_function_handle_call_with_argv_inner(
-            value,
-            Some(receiver),
-            &arguments,
-            result,
-            PropagateCallThrow::LeaveInCompletion,
-            function,
-        )?;
-        arguments.clear(function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
+        self.emit_found_getter_call(value, receiver, result, function)?;
         function.instruction(&Instruction::Else);
         result.set_normal(value, function);
         self.pop_control(ControlFrameKind::If);
@@ -1908,6 +1910,39 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::End);
         schema.release_i32_local(handled, function);
         probe.clear(schema, function);
+        Ok(())
+    }
+
+    /// The result of Get for an accessor property whose [[Get]] is
+    /// `getter`: undefined without one, and otherwise the completion of
+    /// calling it with the original receiver.
+    fn emit_found_getter_call(
+        &mut self,
+        getter: &ValueLocals,
+        receiver: &ValueLocals,
+        result: &CompletionLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        getter.tag().load(function);
+        function.instruction(&Instruction::I32Const(
+            WasmRuntimeValueTag::Undefined as i32,
+        ));
+        function.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, function);
+        result.initialize(function);
+        function.instruction(&Instruction::Else);
+        let arguments = self.emit_pre_evaluated_arg_vector(&[], function);
+        self.emit_function_handle_call_with_argv_inner(
+            getter,
+            Some(receiver),
+            &arguments,
+            result,
+            PropagateCallThrow::LeaveInCompletion,
+            function,
+        )?;
+        arguments.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         Ok(())
     }
 

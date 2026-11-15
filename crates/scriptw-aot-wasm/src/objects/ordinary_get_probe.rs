@@ -292,6 +292,194 @@ impl FunctionBuilder<'_> {
         Ok(probe)
     }
 
+    /// One step of OrdinaryGet for the kinds whose [[GetOwnProperty]] for
+    /// `key` is the ordinary lookup in their header, which `header` then
+    /// holds for the caller's [[GetPrototypeOf]]: besides an ordinary object
+    /// and a function, a Map, Set, WeakMap, WeakSet or Promise, a
+    /// TextEncoder, TextDecoder, ReadableStream, its default reader or its
+    /// byte controller, and a typed array for a key that cannot be a
+    /// canonical numeric String. The non-Proxy [[GetOwnProperty]]
+    /// (`emit_non_proxy_own_descriptor`) answers every object from its
+    /// header first and has a further answer only for a module namespace, an
+    /// Array, an arguments object, a String wrapper and a typed array, whose
+    /// only further keys are the canonical numeric Strings; none of the
+    /// kinds admitted here but the typed array is one of those, and none
+    /// overrides [[Get]]. Every other value leaves the probe unsupported and
+    /// `header` null, having observed nothing.
+    pub(super) fn emit_object_get_probe(
+        &mut self,
+        target: &ValueLocals,
+        key: &PropertyKeyLocals,
+        header: &GcLocal<OrdinaryObject, Nullable>,
+        f: &mut Function,
+    ) -> Result<OrdinaryGetProbe, EmitError> {
+        let schema = self.runtime_schema();
+        let probe = OrdinaryGetProbe::new(schema, f);
+        header.set_null(schema, f);
+        let selected = self.open_frame(ControlFrameKind::Block, f);
+        let next = self.open_frame(ControlFrameKind::Block, f);
+        header.replace(
+            target
+                .sealed_reference_or_branch::<OrdinaryObject>(
+                    schema,
+                    self.local_branch_label(next),
+                    f,
+                )
+                .nullable(),
+            f,
+        );
+        self.emit_branch_to_target(selected, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        macro_rules! composite {
+            ($layout:ty, $field:expr) => {{
+                let next = self.open_frame(ControlFrameKind::Block, f);
+                let composite = schema.reserve_gc_local(f).initialize(
+                    target.sealed_reference_or_branch::<$layout>(
+                        schema,
+                        self.local_branch_label(next),
+                        f,
+                    ),
+                    f,
+                );
+                header.replace(
+                    schema
+                        .field($field)
+                        .read(&composite, schema, f)
+                        .reference()
+                        .nullable(),
+                    f,
+                );
+                composite.clear(f);
+                self.emit_branch_to_target(selected, f);
+                self.pop_control(ControlFrameKind::Block);
+                f.instruction(&Instruction::End);
+            }};
+        }
+        composite!(FunctionObject, FunctionObjectSchema::OBJECT);
+        // An Array, the commonest remaining kind, is never admitted.
+        target.reference().load(f);
+        f.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<ArrayObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.emit_branch_if_to_target(selected, f);
+        composite!(TypedArrayObject, TypedArrayObjectSchema::OBJECT);
+        composite!(SetObject, SetObjectSchema::OBJECT);
+        composite!(MapObject, MapObjectSchema::OBJECT);
+        composite!(PromiseObject, PromiseObjectSchema::OBJECT);
+        composite!(
+            ReadableByteStreamControllerObject,
+            ReadableByteStreamControllerObjectSchema::OBJECT
+        );
+        composite!(TextEncoderObject, TextEncoderObjectSchema::OBJECT);
+        composite!(TextDecoderObject, TextDecoderObjectSchema::OBJECT);
+        composite!(ReadableStreamObject, ReadableStreamObjectSchema::OBJECT);
+        composite!(
+            ReadableStreamDefaultReaderObject,
+            ReadableStreamDefaultReaderObjectSchema::OBJECT
+        );
+        composite!(WeakMapObject, WeakMapObjectSchema::OBJECT);
+        composite!(WeakSetObject, WeakSetObjectSchema::OBJECT);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        // A typed array answers a canonical numeric String itself and never
+        // from its header or its prototype.
+        target.reference().load(f);
+        f.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<TypedArrayObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_key_never_canonical_numeric_i32(key, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        header.set_null(schema, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        header.load(schema, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let object = schema
+            .reserve_gc_local(f)
+            .initialize(header.load(schema, f).require_non_null(f), f);
+        self.emit_ordinary_get_from_header(&object, key, &probe, f)?;
+        object.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        Ok(probe)
+    }
+
+    /// Leaves on the stack whether CanonicalNumericIndexString(key) is
+    /// certainly undefined: a Symbol, or a nonempty String whose first code
+    /// unit starts no Number spelling. ToString of a Number begins with a
+    /// decimal digit, with '-', or is "Infinity" or "NaN", and "-0" begins
+    /// with '-'. Every other key reports false, undecided.
+    fn emit_key_never_canonical_numeric_i32(&mut self, key: &PropertyKeyLocals, f: &mut Function) {
+        let schema = self.runtime_schema();
+        let never = schema.reserve_i32_local(f);
+        never.set_constant(0, f);
+        key.value().tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Symbol as i32));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        never.set_constant(1, f);
+        f.instruction(&Instruction::Else);
+        key.value().tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        let name = schema
+            .reserve_gc_local(f)
+            .initialize(key.value().cast_reference::<StringValue>(schema, f), f);
+        let units = schema.reserve_gc_local(f).initialize(
+            schema
+                .field(StringValueSchema::CODE_UNITS)
+                .read(&name, schema, f)
+                .reference(),
+            f,
+        );
+        schema
+            .array_type::<CodeUnitArray>()
+            .length(&units, schema, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let first = schema.reserve_i32_local(f);
+        let at = schema.reserve_i32_local(f);
+        at.set_constant(0, f);
+        schema
+            .array_type::<CodeUnitArray>()
+            .read(&units, at, schema, f)
+            .store(first, f);
+        first.load(f);
+        f.instruction(&Instruction::I32Const(i32::from(b'0')));
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Const(10));
+        f.instruction(&Instruction::I32GeU);
+        for start in [b'-', b'I', b'N'] {
+            first.load(f);
+            f.instruction(&Instruction::I32Const(i32::from(start)));
+            f.instruction(&Instruction::I32Ne);
+            f.instruction(&Instruction::I32And);
+        }
+        never.store(f);
+        schema.release_i32_local(at, f);
+        schema.release_i32_local(first, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        units.clear(f);
+        name.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        never.load(f);
+        schema.release_i32_local(never, f);
+    }
+
     fn emit_ordinary_get_from_header(
         &mut self,
         object: &GcLocal<OrdinaryObject>,

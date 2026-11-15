@@ -56,6 +56,7 @@ mod aot_number_string_hook_invocation;
 mod aot_number_to_bigint;
 mod aot_numeric_bitwise;
 mod aot_numeric_native_caller_effects;
+mod aot_object_get_composite_receivers;
 mod aot_ordinary_get_probe;
 mod aot_ordinary_set_normalized_descriptor;
 mod aot_parse_int_radix;
