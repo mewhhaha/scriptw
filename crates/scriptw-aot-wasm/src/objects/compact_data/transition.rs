@@ -430,6 +430,25 @@ impl FunctionBuilder<'_> {
         self.emit_compact_key_matches_i32(&candidate_key, name, hash, f);
         self.open_frame(ControlFrameKind::If, f);
         child.replace(candidate.load(s, f).nullable(), f);
+        // The table is an unordered set of children, scanned from its start.
+        // A found child changes places with the entry before it, so the
+        // children that are asked for most are found soonest.
+        used.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let before = s.reserve_i32_local(f);
+        used.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Sub);
+        before.store(f);
+        let earlier = s
+            .reserve_gc_local::<CompactDataShape, Nullable>(f)
+            .initialize(table_type.read(&present, before, s, f).reference(), f);
+        table_type.write(&present, used, GcOperand::reference(&earlier, s), s, f);
+        table_type.write(&present, before, GcOperand::reference(&entry, s), s, f);
+        earlier.clear(f);
+        s.release_i32_local(before, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         self.emit_branch_to_target(scanned, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
