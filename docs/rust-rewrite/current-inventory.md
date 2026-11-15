@@ -68,8 +68,13 @@ accepts `--case <file.js>`.
   Site records for global reads and `instanceof`, a home slot for the GC heap
   base, chained read records, weak collection entries found by identity and
   operand tests before the generic add and equality kernels then take it to
-  4.017M and 4.411M; Node 24 `--jitless` runs about 3.82M and 3.94M there
-  ([measurement](benchmarks.md#read-record-chains-weak-entries-and-operand-tests-2026-11-15)).
+  4.017M and 4.411M
+  ([measurement](benchmarks.md#read-record-chains-weak-entries-and-operand-tests-2026-11-15)),
+  and direct JSON members, ASCII run kernels, bulk typed-array copies and a
+  chain walk for composite receivers to 3.646M and 4.011M
+  ([measurement](benchmarks.md#json-byte-runs-and-composite-receivers-2026-11-15)).
+  Node 24 `--jitless` runs about 3.82M and 3.94M there; the wall clock is
+  not retaken.
  Source `89a934d06891`
   screens at 2.871/3.349 ms Fast and 2.298/2.486 ms Speed, with four fresh
   processes per actor/case rather than final qualification; qualify it against

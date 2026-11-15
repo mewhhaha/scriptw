@@ -50,9 +50,11 @@ hardware counts on the same source):
 | Global read, `typeof` and `instanceof` site records (ABI 71) | 4.675M | 4.763M | 5.144M | 5.249M |
 | Heap base home slot, chained read records, weak entries by identity, operand tests (ABI 74, main `f85bc4a8c`) | 4.017M | 4.108M | 4.411M | 4.538M |
 
-- The day's changes remove 21% of sync and of async. Node's whole process
-  runs about 3.82M and 3.94M, so 0.2M (5%) is left on sync and 0.47M (12%)
-  on async in instructions.
+| JSON members, byte runs and composite receivers (ABI 75, main `bd8e98ca6`) | 3.646M | 3.742M | 4.011M | 4.118M |
+
+- The day's changes remove 28% of sync and of async. Node's whole process
+  runs about 3.82M and 3.94M: sync is 4.6% below it in instructions and
+  async 1.8% above. The wall clock is the goal and is not retaken.
 
 **The comparison with Node does not hold on the cloud machine.** Measured
 there on the tree above with Node 24.22.1 `--jitless` (the same fixture
@@ -71,7 +73,7 @@ and case, interleaved and pinned to one CPU, 100 warmups and 101 requests:
   requests, runs 3.82M instructions per sync request and 3.94M per async
   request, its out-of-clock output validation included. Scriptw's request
   alone was 4.84M and 5.32M when the wall clock above was taken, at least
-  1.27 and 1.35 times Node; it is now 4.02M and 4.41M, 1.05 and 1.12 times.
+  1.27 and 1.35 times Node; it is now 3.65M and 4.01M, 0.95 and 1.02 times.
   The wall clock was not taken again. When it was taken Node ran more
   instructions per microsecond than Scriptw on sync (12.5 against 10.6) and
   about the same on async, so sync needs more than instruction parity.
@@ -143,21 +145,29 @@ passed and the doctest, the same one `runtime_cache` failure), six emitter
 integration binaries (`emission` now 83 of 83) and the source guards. Test262
 subtrees ran on each change's own tree, not on the merged one.
 
+JSON members read directly, ASCII run kernels, bulk typed-array copies and
+a chain walk for composite receivers in the general Get (ABI 75, main
+`bd8e98ca6`):
+[their section](docs/rust-rewrite/benchmarks.md#json-byte-runs-and-composite-receivers-2026-11-15).
+Verified on the merged tree: the engine suite (4,236 passed and the doctest,
+the same one failure).
+
 ## What to do next, by measured size
 
-Sync request on main `f85bc4a8c`, 4.108M mean, own instructions unless
+Sync request on main `bd8e98ca6`, 3.742M mean, own instructions unless
 marked ([the day's sections](docs/rust-rewrite/benchmarks.md#read-record-chains-weak-entries-and-operand-tests-2026-11-15)
 have the reasoning for what is done):
 
-1. **Built-ins that are native in Node.** `JSON.stringify` (one call, about
-   350K inclusive for 242 values: `json_stringify_value` 233K own,
-   `object_own_keys` 38K), `TextEncoder.encode` 104K, `TextDecoder.decode`
-   71K, `TypedArray.prototype.set` 77K and one `String.prototype.includes`
-   52K: per-value and per-byte loops.
+1. **Built-ins that are native in Node: mostly done.** `JSON.stringify`
+   is 202K inclusive without the collection that lands in it (about 600 own
+   a container in the value helper, `toJSON` walk included; a per-shape "no
+   `toJSON`" fact with the closed-tail proof could replace the walk). The
+   encoders run 16.5 instructions a unit, near the floor of two bounds
+   checks a unit on GC arrays.
 2. **Read records, 284K in the hit entry.** A prototype-place hit takes
    about 240 instructions; going lower needs identity witnesses or a typed
-   prototype edge. Eighteen reads a request fall to the general Get (71K):
-   typed-array accessors, a Set's `size`, stream controller methods.
+   prototype edge. Eighteen reads a request still pass the miss kernel to the general Get
+   (32K): a record cannot hold an accessor.
 3. **`vn` 571K, `ft` 435K, `createElement` 182K of their own code.** In
    `vn` the nineteen `instanceof` tests walk one candidate's chain nineteen
    times (about 100K); sharing them needs a proof that nothing between two

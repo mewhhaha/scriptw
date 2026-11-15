@@ -1560,6 +1560,80 @@ passing: `language/expressions` `property-accessors`, `member-expression`,
 `--lib` suite and any Test262 subtree on the merged tree, the vendored
 Wasmtime's own tests, and wall clock.
 
+### JSON, byte runs and composite receivers (2026-11-15)
+
+Callgrind instruction references per request, measured as in the sections
+above. The second row was measured alone on its own baseline (4,557,719 /
+4,645,847 / 4,983,574 / 5,092,361, the chained read records with the heap
+base home slot); the last is main `bd8e98ca6`.
+
+| Speed, Callgrind instructions per request | Sync median | Sync mean | Async median | Async mean | P bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Read chains, weak entries and operand tests (ABI 74) | 4,016,534 | 4,108,399 | 4,410,779 | 4,537,816 | 4,861,633 |
+| JSON members, byte runs and composite receivers, alone | 4,181,829 | 4,283,132 | 4,580,289 | 4,678,571 | 4,836,635 |
+| Both (ABI 75) | 3,645,562 | 3,741,638 | 4,010,966 | 4,118,446 | 4,861,683 |
+
+The sync request is below Node 24.22.1 `--jitless` on the same machine
+(about 3.82M for its whole process) and the async request 1.8% above it
+(about 3.94M). These are instruction counts; the wall clock was not retaken.
+
+| Per sync request, inclusive | Calls | Before | After |
+| --- | ---: | ---: | ---: |
+| `JSON.stringify` | 1 | 332,033 | 286,301 (202,233 without the collection that now lands in it) |
+| `TextEncoder.prototype.encode` | 1 | 109,457 | 43,284 |
+| `TextDecoder.prototype.decode` | 2 | 84,989 | 49,881 |
+| `TypedArray.prototype.set` | 1 | 76,793 | 898 |
+| `String.prototype.includes` | 1 | 51,736 | 26,951 |
+| Read misses that reach the general Get | 18 | 71,805 | 32,309 |
+
+- **JSON.stringify.** The value helper ran 990 instructions a value: the
+  quote loops cost 44 a code unit, nearly all spill reloads in a body with
+  a 960-byte frame, and each object member about 560 for a generic own-data
+  lookup, beside an own-keys list per object and a `toJSON` Get per value.
+  Without a replacer function the container walk now reads each member
+  itself. A plain data object (an actual ordinary object with compact
+  storage, ordered own keys and the uniform data attribute word, which is
+  the proof for-in's compact phase already uses) gives its keys from its
+  shape and its values from its slots, and each read checks that the
+  captured storage record is still the object's, since every add, delete or
+  redefinition publishes a new record. Primitive members are appended in
+  place, an integral Number below 2^31 as digits; `toJSON` is read by the
+  call-free chain walk; and the plain run of QuoteJSONString is a leaf
+  kernel. Entries to the value helper go from 242 to 72.
+- **Byte and code-unit runs.** The output is 2,027 code units and 2,059
+  bytes. Encoding ran a counting pass and a write pass at 51 instructions a
+  unit; it is one pass with an ASCII run kernel at 16.5. Decoding ran 36 a
+  byte and widens ASCII runs at 16.5. A typed array `set` between distinct
+  non-shared backings of sixteen bytes or more is one `array.copy`, where
+  it ran 37 a byte; the same copy serves `ArrayBuffer.prototype.slice`,
+  `transfer`, `resize` and typed `slice`. `includes` and `indexOf` scan for
+  the needle's first unit at about 10 a unit before a full compare. The
+  kernels keep everything in registers but pay two bounds checks a unit on
+  GC arrays, so 10 to 17 a unit is about their floor.
+- **The general Get on composite receivers.** A read of a typed array's
+  `byteLength` or a Set's `size` cost about 4,000 instructions: the first
+  object was not ordinary to the chain loop, so it took a descriptor
+  snapshot, each further prototype re-entered the helper, and a getter was
+  probed twice. The loop's probe now also admits Map, Set, WeakMap, WeakSet,
+  Promise, the text codecs and the byte stream objects, and a typed array
+  for a key that cannot be a canonical numeric String; a getter found on
+  the chain is called there with the original receiver. None of the
+  admitted kinds overrides [[Get]]. These reads still go through the miss
+  kernel, at about 1,800 each: a record cannot hold an accessor.
+- A minor collection every fifth request now falls inside `JSON.stringify`;
+  collector work a request went from 86.6K to 100.3K and is in the totals.
+- Not done: the native call path (`proxy_call`, 49K own over 160 calls).
+
+Verified on the merged tree: the engine suite in release (4,236 passed and
+the doctest, the same one `runtime_cache` failure). On the change's own
+tree: the emitter's `structure_builtins` (159) and `emission` (83), and
+Test262 with the wasm-aot backend, all passing: `built-ins/JSON` (332),
+`TypedArray/prototype/set` (220), `TypedArrayConstructors` (1,446),
+`String/prototype/includes` (54) and `indexOf` (94), `TypedArray/prototype`
+`slice`, `byteLength`, `length` and `buffer`, `ArrayBuffer/prototype/slice`,
+`Set` (764) and `Map` (405). Not run: the emitter's `--lib` suite and its
+other integration binaries on the merged tree, and wall clock.
+
 ### Descriptor work and physical allocation
 
 Compiler-created, already validated descriptors now call canonical ordinary/Array definition directly when admitted, retaining the exotic Reflect fallback. Known source accessor descriptors bypass the inline Array algorithm to control code growth. Public descriptor conversion and validation remain intact.
