@@ -7,8 +7,16 @@ use super::*;
 pub(crate) struct ModuleCellOwners(BTreeSet<FunctionId>);
 
 impl ModuleCellOwners {
+    /// A cell's identity needs static scoping around its reader, not the
+    /// reader's own local storage: an arrow function with the same plain
+    /// parameter list reads its own and its captured cells like an ordinary
+    /// function. It has no `this`, `arguments` or `new.target` cell of its
+    /// own, and the synthetic ones it captures are never source names here.
     pub(super) fn collect(builder: &AnalysisBuilder<'_>) -> Self {
-        Self(builder.ordinary_module_owner_ids())
+        Self(builder.plain_module_owner_ids(&[
+            FunctionProtocolIr::OrdinaryCallAndConstruct,
+            FunctionProtocolIr::Arrow,
+        ]))
     }
 }
 
@@ -49,7 +57,10 @@ impl ProvenBindingCellIr {
             return None;
         }
         let function = analysis.function_plans.get(owner_id)?;
-        if function.protocol != FunctionProtocolIr::OrdinaryCallAndConstruct {
+        if !matches!(
+            function.protocol,
+            FunctionProtocolIr::OrdinaryCallAndConstruct | FunctionProtocolIr::Arrow
+        ) {
             return None;
         }
         let Some(capture) = function.captures.get(storage_name) else {
@@ -195,12 +206,18 @@ impl ProvenBindingCellIr {
 
 impl AnalysisBuilder<'_> {
     fn ordinary_module_owner_ids(&self) -> BTreeSet<FunctionId> {
+        self.plain_module_owner_ids(&[FunctionProtocolIr::OrdinaryCallAndConstruct])
+    }
+
+    /// Strict owners of one of `protocols` with one activation record, no
+    /// enclosing `with` and a list of plain identifier parameters.
+    fn plain_module_owner_ids(&self, protocols: &[FunctionProtocolIr]) -> BTreeSet<FunctionId> {
         self.function_plans
             .values()
             .filter(|function| {
                 let owner = &self.owner_plans[&function.id];
                 function.strict
-                    && function.protocol == FunctionProtocolIr::OrdinaryCallAndConstruct
+                    && protocols.contains(&function.protocol)
                     && owner.body_environment_id.is_none()
                     && self
                         .surrounding_with_object_environment_ids(&function.id)

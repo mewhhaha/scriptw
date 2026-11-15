@@ -1201,8 +1201,18 @@ optional fourth and fifth arguments; the functions that pass `arguments` to
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `b6f536be0` | 5,095,083 | 5,194,989 | 5,587,559 | 5,690,369 | 4,765,631 |
 | Method calls admitted | 4,910,744 | 4,995,321 | 5,390,385 | 5,497,537 | 4,771,822 |
+| Arrow functions read proven cells | 4,843,994 | 4,928,467 | 5,323,657 | 5,430,751 | 4,778,557 |
 
-Own instructions per sync request after the change, from
+The second change follows from the attribution below. A program without
+`eval` or `with` gives an ordinary function with plain parameters a proven
+cell for each binding it owns or captures, read inline. An arrow function
+with the same plain parameter list now gets the same proof, where every read
+of a parameter or a captured binding called a by-name helper: the fixture's
+`(_, i) => e(Row, {key: i, id: i})` made 96 by-name reads and 32 resolves a
+request. A function with a destructured parameter (`function Row({id})`)
+still reads by name (64 reads and 32 resolves).
+
+Own instructions per sync request after the first change, from
 `scripts/rsc_instruction_counts.py symbols` over 40 requests (mean 4.997M,
 minor collections included); native code is named through the host's perf
 map:
@@ -1249,12 +1259,16 @@ What the per-instruction listing (`function --listing`) shows:
   from `ft` and 66 from `f42` (224,645 inclusive), and `coercive_add` 420
   times (207,062 inclusive).
 
-Verified on this tree: the engine suite binary by binary (4,210 passed; one
-`runtime_cache` test fails on this machine with and without the change), the
-engine doctest, the emitter's arguments-protocol unit tests, the source
-guards, and Test262 `language/arguments-object` (460 of 460) and
+Verified for the first change: the engine suite binary by binary (4,210
+passed; one `runtime_cache` test fails on this machine with and without the
+change), the engine doctest, the emitter's arguments-protocol unit tests, the
+source guards, and Test262 `language/arguments-object` (460 of 460) and
 `language/function-code` (279 of 281; both failures are
-`S10.2.1_A4_T2.js`, listed in current work). No hardware cycles were
+`S10.2.1_A4_T2.js`, listed in current work). For the second: the engine suite
+again (4,211 passed and the doctest, with the same one failure), the IR
+crate's unit tests (2,403 passed), the source guards, and Test262
+`language/module-code` (602 of 602); proven cells exist only in a module, so
+script-goal Test262 cases do not reach the change. No hardware cycles were
 measured; the comparison with V8 above is not refreshed.
 
 ### Descriptor work and physical allocation

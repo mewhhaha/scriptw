@@ -56,9 +56,9 @@ accepts `--case <file.js>`.
   `index < length` trap that repeats the source's own bounds branch on every
   array element read, and the `is_subtype` libcall a cast to a non-final type
   takes on a mismatch (about 0.6% of profiled cycles).
-  Arguments reads without the object then take the sync request from 5.095M
-  to 4.911M and async from 5.588M to 5.390M, in Callgrind instruction
-  references on a machine without hardware counters (about 0.8% above the
+  Arguments reads without the object and proven cells for arrow functions
+  then take the sync request from 5.095M to 4.844M and async from 5.588M to
+  5.324M, in Callgrind instruction references on a machine without hardware counters (about 0.8% above the
   hardware counts), and the same tool attributes the rest by native
   instruction: one `instanceof` test in `vn` is about 390 instructions, 150
   of them the global read of its constructor, and a third of `vn`'s

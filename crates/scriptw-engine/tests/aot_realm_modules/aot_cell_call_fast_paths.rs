@@ -142,3 +142,59 @@ print(first);print(held);print(after());print(evaluated());print(trace.join('|')
         ],
     );
 }
+
+#[test]
+fn arrow_functions_read_their_own_and_captured_cells_with_live_values_and_tdz() {
+    // An arrow function with plain parameters reads proven cells like an
+    // ordinary function: replaced callees, a binding in its temporal dead
+    // zone, shadowing parameters, per-iteration loop bindings, a const
+    // write, later declarations, class and catch bindings, and cells of an
+    // enclosing function and generator. Expectations are Node's.
+    let source = r##"
+let log = [];
+let step = (value) => "old:" + value;
+const read = (value) => step(value);
+const replace = (next) => { step = next; };
+log.push(read(1));
+replace((value) => "new:" + value);
+log.push(read(2));
+// A captured binding read before its initialization throws, and reads its value after.
+const early = () => late;
+try { early(); log.push("no error"); } catch (error) { log.push(error.constructor === ReferenceError); }
+let late = "late";
+log.push(early(), typeof early);
+// Own parameters shadow captured names; nested arrows read every level.
+const shadow = (step, late) => ((inner) => step + late + inner + log.length)("i");
+log.push(shadow("s", "l"));
+// Each loop iteration has its own binding, and a closure sees later writes to it.
+const each = [];
+for (let i = 0; i < 3; i++) { each.push(() => i); i += 10; each.push(() => i); i -= 10; }
+log.push(each.map((f) => f()).join(","));
+// A write through an arrow to a captured const throws; to a let it assigns.
+const fixed = 1;
+let counter = 0;
+const bump = () => { counter += 2; return counter; };
+const clobber = () => { fixed = 2; };
+try { clobber(); log.push("no error"); } catch (error) { log.push(error.constructor === TypeError, fixed); }
+log.push(bump(), bump(), counter);
+// A function declared later, a class binding, a catch parameter and a compound call.
+const callsLater = (value) => later(value) + Holder.tag;
+function later(value) { return "later:" + value; }
+class Holder { static tag = "#"; static make() { return () => Holder.tag + Holder.name; } }
+log.push(callsLater(3), Holder.make()());
+try { throw "caught"; } catch (reason) { log.push((() => reason)()); }
+// An arrow inside an ordinary function reads that function's own and captured cells.
+function outer(a) { let b = a + 1; const f = (c) => a + b + c + counter; b += 10; return f; }
+log.push(outer(1)(100));
+// An arrow under a generator reads through it.
+function* generate(seed) { const add = (n) => seed + n + counter; yield add(1); seed += 5; yield add(2); }
+log.push([...generate(10)].join(","));
+print(log.join(" | "));
+"##;
+    check(
+        source,
+        true,
+        options(),
+        &["old:1 | new:2 | true | late | function | sli5 | 0,0,1,1,2,2 | true | 1 | 2 | 4 | 4 | later:3# | #Holder | caught | 117 | 15,21"],
+    );
+}

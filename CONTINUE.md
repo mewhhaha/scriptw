@@ -45,9 +45,10 @@ hardware counts on the same source):
 | --- | ---: | ---: | ---: | ---: |
 | `b6f536be0`, before the arguments work | 5.095M | 5.195M | 5.588M | 5.690M |
 | Arguments reads without the object | 4.911M | 4.995M | 5.390M | 5.498M |
+| Arrow functions read proven cells | 4.844M | 4.928M | 5.324M | 5.431M |
 
-- The arguments work removes 3.6% of sync and 3.5% of async. Sync is then
-  about 1.11 times Node in instructions, if the 0.8% offset holds.
+- The two changes remove 4.9% of sync and 4.7% of async. Sync is then about
+  1.10 times Node in instructions, if the 0.8% offset holds.
 - No cycles and no Node control were measured after it: the cloud machine has
   no counters and Node 24 could not be installed there. Re-measure both
   engines together on a quiet machine with counters before claiming the
@@ -69,6 +70,13 @@ arguments-protocol unit tests, the source guards, Test262
 281, both `S10.2.1_A4_T2.js`). Not run: the emitter's whole `--lib` suite and
 any other Test262 subtree.
 
+Proven cells for arrow functions. `analysis/module_locals.rs` granted a
+proven binding cell only to ordinary functions; an arrow function with plain
+parameters now gets one for its own and its captured bindings. Verified: the
+engine suite (4,211 passed and the doctest, same one failure), the IR crate's
+unit tests (2,403), the source guards and Test262 `language/module-code` (602
+of 602). Script-goal Test262 cases have no proven cells and were not rerun.
+
 ## What to do next, by measured size
 
 [The attribution section](docs/rust-rewrite/benchmarks.md#arguments-reads-and-instruction-attribution-2026-11-15)
@@ -87,16 +95,13 @@ has the per-body table and the listing findings. Sync request, 4.997M mean:
    entries, 568 of them from `vn` and 260 from `createElement` (`config.key`
    and `type.defaultProps`, which are absent or on another shape each time).
    Records cannot hold a proven absence or a second receiver shape.
-4. **By-name identifier helpers, 130K.** `typeof` of a missing global in `vn`
-   (70 calls, 48K), and 86K in the fixture's own components: the arrow
-   `(_, i) => e(Row, {key: i, id: i})` and `function Row({id})` read the
-   captured bindings `e` and `Row` by name on every call. A proven binding
-   cell (`ProvenBindingCellIr::analyze` in `analysis/module_locals.rs`) is
-   only granted to an ordinary function with simple parameters, so an arrow
-   function or a destructured parameter, both everywhere in component code,
-   pays a named lookup for each captured read. Extending the proof to them
-   needs the capture walk and the emitter's hop counting checked for an owner
-   without its own activation record; not started.
+4. **By-name identifier helpers, about 86K left.** `typeof` of a missing
+   global in `vn` (70 calls, 48K), and `function Row({id})` in the fixture
+   (64 reads and 32 resolves, 28K): a proven binding cell
+   (`ProvenBindingCellIr::analyze` in `analysis/module_locals.rs`) is granted
+   to ordinary and arrow functions with plain parameters, not to a function
+   with a destructured parameter, which component code uses everywhere. Its
+   parameter and body records are the open question there.
 5. **`createElement`'s activation record, about 30K.** An admitted function
    still allocates its environment for the `arguments` cell (about 480
    instructions before its first call, 68 calls). A strict function cannot
