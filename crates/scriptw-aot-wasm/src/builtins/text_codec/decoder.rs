@@ -377,6 +377,7 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
+        let base = self.runtime_helper_base()?;
         let old_stream = s.reserve_i32_local(f);
         let fatal = s.reserve_i32_local(f);
         let ignore_bom = s.reserve_i32_local(f);
@@ -516,24 +517,16 @@ impl FunctionBuilder<'_> {
         total.load(f);
         f.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(decoded, f);
-        // An ASCII byte after the BOM decision is its own scalar and code unit.
-        s.array_type::<ByteArray>()
-            .read(&bytes, index, s, f)
-            .store(byte, f);
-        byte.load(f);
-        f.instruction(&Instruction::I32Const(0x80));
-        f.instruction(&Instruction::I32LtU);
+        // An ASCII byte after the BOM decision is its own scalar and code
+        // unit, so a leaf kernel copies each such run. The backing holds a
+        // unit for every byte, and no sequence yields more units than bytes.
         bom_seen.load(f);
-        f.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, f);
-        construction.write(written, byte, s, f);
-        for local in [written, index] {
-            local.load(f);
-            f.instruction(&Instruction::I32Const(1));
-            f.instruction(&Instruction::I32Add);
-            local.store(f);
-        }
-        self.emit_branch_to_target(next, f);
+        construction.widen_ascii_from(written, &bytes, index, total, base, s, f);
+        index.load(f);
+        total.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(decoded, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         index.load(f);

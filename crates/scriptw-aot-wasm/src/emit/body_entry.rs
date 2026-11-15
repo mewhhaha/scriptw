@@ -227,6 +227,10 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::GlobalVarDeclarationCheck
             | RuntimeHelperId::GlobalVarDeclarationInstall
             | RuntimeHelperId::JsonStringifyValue
+            | RuntimeHelperId::AsciiNarrow
+            | RuntimeHelperId::AsciiWiden
+            | RuntimeHelperId::CodeUnitFind
+            | RuntimeHelperId::JsonPlainRun
             | RuntimeHelperId::CompactArrayLiteral
             | RuntimeHelperId::InitializeInstanceElements
             | RuntimeHelperId::NativeDirectEvalFactory => {}

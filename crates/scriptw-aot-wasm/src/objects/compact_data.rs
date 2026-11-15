@@ -11,6 +11,7 @@ mod cache;
 mod chain;
 mod computed;
 mod native_function;
+mod plain_snapshot;
 mod shape;
 mod transition;
 use chain::{ChainAnswer, ChainKey};

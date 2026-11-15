@@ -11,6 +11,7 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
+        let base = self.runtime_helper_base()?;
         let units = s.reserve_gc_local(f).initialize(
             s.struct_type::<StringValue>()
                 .field(StringValueSchema::CODE_UNITS)
@@ -39,6 +40,10 @@ impl FunctionBuilder<'_> {
         json_i32(index, 0, f);
         let done = self.open_frame(ControlFrameKind::Block, f);
         let next = self.open_frame(ControlFrameKind::Loop, f);
+        // Common units (at least U+0020, not '"' or '\\', not a surrogate)
+        // are copied as themselves by the leaf kernel, a run at a time. The
+        // room reserved so far holds every unread unit and the closing quote.
+        output.append_json_plain_run(&units, index, length, base, s, f);
         index.load(f);
         length.load(f);
         f.instruction(&Instruction::I32GeU);
@@ -50,29 +55,6 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(1));
         f.instruction(&Instruction::I32Add);
         index.store(f);
-        // Common units: at least U+0020, not '"' or '\\', not a surrogate.
-        unit.load(f);
-        f.instruction(&Instruction::I32Const(32));
-        f.instruction(&Instruction::I32GeU);
-        unit.load(f);
-        f.instruction(&Instruction::I32Const(34));
-        f.instruction(&Instruction::I32Ne);
-        f.instruction(&Instruction::I32And);
-        unit.load(f);
-        f.instruction(&Instruction::I32Const(92));
-        f.instruction(&Instruction::I32Ne);
-        f.instruction(&Instruction::I32And);
-        unit.load(f);
-        f.instruction(&Instruction::I32Const(0xd800));
-        f.instruction(&Instruction::I32Sub);
-        f.instruction(&Instruction::I32Const(0x7ff));
-        f.instruction(&Instruction::I32GtU);
-        f.instruction(&Instruction::I32And);
-        self.open_frame(ControlFrameKind::If, f);
-        output.push(unit, s, f);
-        self.emit_branch_to_target(next, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
         // A well-formed surrogate pair is copied as two units.
         unit.load(f);
         f.instruction(&Instruction::I32Const(0xd800));

@@ -97,15 +97,27 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    /// encode(input): the UTF-8 length is counted first, so the result's
-    /// ArrayBuffer backing is allocated exactly once and written directly.
+    /// encode(input) writes the result's ArrayBuffer backing in one pass.
+    ///
     /// The Uint8Array and its ArrayBuffer take the current function Realm's
     /// %Uint8Array.prototype% and %ArrayBuffer.prototype%, exactly what
     /// constructing that Realm's %Uint8Array% with the length would select:
     /// both constructors' "prototype" properties are non-writable and
     /// non-configurable, and the fresh view is unobservable until returned.
+    ///
+    /// An input of at most `SCRATCH_ENCODE_UNITS` code units is encoded once
+    /// into a private scratch array that grows on demand, and the exact
+    /// backing is then one bulk copy of the bytes written. A longer input
+    /// keeps the two passes that count the exact UTF-8 length first, so its
+    /// largest allocation is the result itself. Both write through the same
+    /// loop: a leaf kernel copies each ASCII run, and every other scalar is
+    /// encoded here.
     pub(crate) fn emit_text_encoder_encode(&mut self, f: &mut Function) -> Result<(), EmitError> {
+        /// The longest input encoded through the scratch array, whose
+        /// capacity stays below four bytes a unit plus a constant.
+        const SCRATCH_ENCODE_UNITS: i32 = 1 << 20;
         let s = self.runtime_schema();
+        let base = self.runtime_helper_base()?;
         let argument = s.reserve_value_local(f);
         let pending = s.reserve_completion(f);
         let output = s.reserve_completion(f);
@@ -134,12 +146,43 @@ impl FunctionBuilder<'_> {
         let unit = s.reserve_i32_local(f);
         let next_unit = s.reserve_i32_local(f);
         let byte = s.reserve_i32_local(f);
+        let exact = s.reserve_i32_local(f);
+        let capacity = s.reserve_i32_local(f);
+        let needed = s.reserve_i32_local(f);
+        let zero = s.reserve_i32_local(f);
+        let fixed = s.reserve_i32_local(f);
         let byte_length = s.reserve_i64_local(f);
         input.length.load(f);
         f.instruction(&Instruction::I32WrapI64);
         count.store(f);
-        // Pass 1: the exact UTF-8 length. Lone surrogates become U+FFFD,
-        // which, like every other BMP scalar from U+0800, takes three bytes.
+        f.instruction(&Instruction::I32Const(0));
+        zero.store(f);
+        f.instruction(&Instruction::I32Const(0));
+        fixed.store(f);
+        let realm = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_current_function_realm(f), f);
+        let buffer_prototype = s.reserve_value_local(f);
+        self.emit_load_non_array_realm_intrinsic(
+            &realm,
+            NonArrayRealmIntrinsicSlot::ArrayBufferPrototype,
+            &buffer_prototype,
+            f,
+        );
+        let allocated = s
+            .reserve_gc_local::<ArrayBuffer, Nullable>(f)
+            .initialize_null(s, f);
+        let target = s
+            .reserve_gc_local::<ByteArray, Nullable>(f)
+            .initialize_null(s, f);
+        count.load(f);
+        f.instruction(&Instruction::I32Const(SCRATCH_ENCODE_UNITS));
+        f.instruction(&Instruction::I32GtU);
+        exact.store(f);
+        exact.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        // The exact UTF-8 length. Lone surrogates become U+FFFD, which, like
+        // every other BMP scalar from U+0800, takes three bytes.
         f.instruction(&Instruction::I64Const(0));
         byte_length.store(f);
         f.instruction(&Instruction::I32Const(0));
@@ -203,19 +246,6 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        let realm = s
-            .reserve_gc_local(f)
-            .initialize(self.emit_current_function_realm(f), f);
-        let buffer_prototype = s.reserve_value_local(f);
-        self.emit_load_non_array_realm_intrinsic(
-            &realm,
-            NonArrayRealmIntrinsicSlot::ArrayBufferPrototype,
-            &buffer_prototype,
-            f,
-        );
-        let fixed = s.reserve_i32_local(f);
-        f.instruction(&Instruction::I32Const(0));
-        fixed.store(f);
         let buffer = self.emit_binary_allocate_array_buffer(
             &buffer_prototype,
             byte_length,
@@ -226,36 +256,112 @@ impl FunctionBuilder<'_> {
             exit,
             f,
         )?;
-        let bytes = s.reserve_gc_local(f).initialize(
+        target.replace(
             s.field(ArrayBufferSchema::BYTES)
                 .read(&buffer, s, f)
-                .reference()
-                .require_non_null(f),
+                .reference(),
             f,
         );
-        // Pass 2: write the bytes into the fresh private backing.
+        allocated.replace(buffer.load(s, f).nullable(), f);
+        buffer.clear(f);
+        // The exact backing never grows: no unsigned demand exceeds this.
+        f.instruction(&Instruction::I32Const(-1));
+        capacity.store(f);
+        f.instruction(&Instruction::Else);
+        // Room for an all-ASCII input and a share of longer scalars.
+        count.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32Const(3));
+        f.instruction(&Instruction::I32ShrU);
+        f.instruction(&Instruction::I32Add);
+        f.instruction(&Instruction::I32Const(16));
+        f.instruction(&Instruction::I32Add);
+        capacity.store(f);
+        target.replace(
+            s.array_type::<ByteArray>()
+                .filled(GcOperand::i32(0), capacity, f)
+                .nullable(),
+            f,
+        );
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        let bytes = s
+            .reserve_gc_local(f)
+            .initialize(target.load(s, f).require_non_null(f), f);
+        // Every scalar is written at `written`. Before each ASCII run the
+        // array has a byte for every unread unit: the exact backing by its
+        // length, the scratch array by the growth below.
         f.instruction(&Instruction::I32Const(0));
         read.store(f);
         f.instruction(&Instruction::I32Const(0));
         written.store(f);
         let encoded = self.open_frame(ControlFrameKind::Block, f);
         let encode_next = self.open_frame(ControlFrameKind::Loop, f);
+        s.call_helper(
+            crate::runtime_helpers::AsciiNarrowArguments::new(
+                &input.units,
+                read,
+                count,
+                &bytes,
+                written,
+            ),
+            base,
+            f,
+        )
+        .store(unit, f);
+        written.load(f);
+        unit.load(f);
+        read.load(f);
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Add);
+        written.store(f);
+        unit.load(f);
+        read.store(f);
         read.load(f);
         count.load(f);
         f.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(encoded, f);
+        // The scalar at `read` takes at most four bytes and at least one
+        // unit, and each unit after it needs a byte for the next ASCII run.
+        written.load(f);
+        f.instruction(&Instruction::I32Const(3));
+        f.instruction(&Instruction::I32Add);
+        count.load(f);
+        read.load(f);
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Add);
+        needed.store(f);
+        needed.load(f);
+        capacity.load(f);
+        f.instruction(&Instruction::I32GtU);
+        self.open_frame(ControlFrameKind::If, f);
+        capacity.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Shl);
+        capacity.store(f);
+        capacity.load(f);
+        needed.load(f);
+        f.instruction(&Instruction::I32LtU);
+        self.open_frame(ControlFrameKind::If, f);
+        needed.load(f);
+        capacity.store(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        let grown = s.reserve_gc_local(f).initialize(
+            s.array_type::<ByteArray>()
+                .filled(GcOperand::i32(0), capacity, f),
+            f,
+        );
+        s.array_type::<ByteArray>()
+            .copy_range_from(&grown, zero, &bytes, zero, written, s, f);
+        bytes.replace(grown.load(s, f), f);
+        grown.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         s.array_type::<CodeUnitArray>()
             .read(&input.units, read, s, f)
             .store(unit, f);
         encoder_increment(read, f);
-        unit.load(f);
-        f.instruction(&Instruction::I32Const(0x80));
-        f.instruction(&Instruction::I32LtU);
-        self.open_frame(ControlFrameKind::If, f);
-        self.emit_text_encoder_put(&bytes, written, unit, f);
-        self.emit_branch_to_target(encode_next, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
         unit.load(f);
         f.instruction(&Instruction::I32Const(0x800));
         f.instruction(&Instruction::I32LtU);
@@ -359,7 +465,41 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
+        exact.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        // The scratch prefix is the whole result.
+        written.load(f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        byte_length.store(f);
+        let buffer = self.emit_binary_allocate_array_buffer(
+            &buffer_prototype,
+            byte_length,
+            byte_length,
+            fixed,
+            false,
+            &output,
+            exit,
+            f,
+        )?;
+        let backing = s.reserve_gc_local(f).initialize(
+            s.field(ArrayBufferSchema::BYTES)
+                .read(&buffer, s, f)
+                .reference()
+                .require_non_null(f),
+            f,
+        );
+        s.array_type::<ByteArray>()
+            .copy_range_from(&backing, zero, &bytes, zero, written, s, f);
+        backing.clear(f);
+        allocated.replace(buffer.load(s, f).nullable(), f);
+        buffer.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         bytes.clear(f);
+        let buffer = s
+            .reserve_gc_local(f)
+            .initialize(allocated.load(s, f).require_non_null(f), f);
         let owner = s.reserve_gc_local(f).initialize(
             s.struct_type::<BufferOwner>().construct(
                 (
@@ -399,11 +539,14 @@ impl FunctionBuilder<'_> {
         prototype.clear(f);
         owner.clear(f);
         buffer.clear(f);
-        s.release_i32_local(fixed, f);
+        target.clear(f);
+        allocated.clear(f);
         buffer_prototype.clear(f);
         realm.clear(f);
         s.release_i64_local(byte_length, f);
-        for local in [byte, next_unit, unit, written, read, count] {
+        for local in [
+            fixed, zero, needed, capacity, exact, byte, next_unit, unit, written, read, count,
+        ] {
             s.release_i32_local(local, f);
         }
         input.clear(s, f);

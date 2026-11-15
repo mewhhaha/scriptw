@@ -133,7 +133,10 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 74 adds the two String concatenation helpers (two and three
 // Strings) that P calls from an addition whose live operands are Strings
 // and Numbers.
-const LAYOUT_VERSION: u32 = 74;
+// Version 75 adds four leaf R helpers over code units and bytes (ASCII
+// narrowing and widening, a code-unit find and JSON's plain run) and gives
+// the JSON.stringify value helper a `fetched` operand.
+const LAYOUT_VERSION: u32 = 75;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.
