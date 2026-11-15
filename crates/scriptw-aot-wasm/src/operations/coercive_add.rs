@@ -1,6 +1,75 @@
 use super::*;
 use crate::runtime_helpers::{CoerciveAddArguments, CoerciveAddParameters, HelperParameters};
 
+#[derive(Clone, Copy)]
+enum StringAddSide {
+    Left,
+    Right,
+}
+
+/// An addition whose syntax expects a String operand. The expectation
+/// selects the emitted test and nothing else: the test itself reads the live
+/// tags, so a wrong expectation only reaches the general kernel.
+enum StringAddSite<'a> {
+    /// One operand is the empty String literal, which contributes no code
+    /// units: the other operand's String is the whole result.
+    Empty { literal: StringAddSide },
+    /// One operand is expected to be a String.
+    Expected { side: StringAddSide },
+    /// `(a + b) + c` whose inner addition is an `Expected` site: three
+    /// Strings concatenate into one result without the intermediate one.
+    Chain {
+        inner_lhs: &'a TypedExpr,
+        inner_rhs: &'a TypedExpr,
+        inner_side: StringAddSide,
+    },
+}
+
+impl<'a> StringAddSite<'a> {
+    fn for_operands(lhs: &'a TypedExpr, rhs: &'a TypedExpr) -> Option<Self> {
+        let string = |operand: &TypedExpr| operand.kind == ValueKind::String;
+        let empty =
+            |operand: &TypedExpr| matches!(&operand.expr, ExprIr::String(text) if text.is_empty());
+        if empty(lhs) {
+            return Some(Self::Empty {
+                literal: StringAddSide::Left,
+            });
+        }
+        if empty(rhs) {
+            return Some(Self::Empty {
+                literal: StringAddSide::Right,
+            });
+        }
+        if string(lhs) {
+            if let ExprIr::StringConcat {
+                lhs: inner_lhs,
+                rhs: inner_rhs,
+            }
+            | ExprIr::CoerciveAdd {
+                lhs: inner_lhs,
+                rhs: inner_rhs,
+            } = &lhs.expr
+            {
+                if let Some(StringAddSite::Expected { side }) =
+                    StringAddSite::for_operands(inner_lhs, inner_rhs)
+                {
+                    return Some(Self::Chain {
+                        inner_lhs,
+                        inner_rhs,
+                        inner_side: side,
+                    });
+                }
+            }
+            return Some(Self::Expected {
+                side: StringAddSide::Left,
+            });
+        }
+        string(rhs).then_some(Self::Expected {
+            side: StringAddSide::Right,
+        })
+    }
+}
+
 impl FunctionBuilder<'_> {
     /// Evaluation stays in P; non-Number pairs retain R's complete coercion owner.
     pub(crate) fn compile_coercive_add_to_locals(
@@ -23,10 +92,18 @@ impl FunctionBuilder<'_> {
         let left = schema.reserve_value_local(function);
         let right = schema.reserve_value_local(function);
         let result = schema.reserve_completion(function);
-        // Both GetValue operations complete before the first ToPrimitive call.
-        self.compile_expr_to_value(lhs, &left, function)?;
-        self.compile_expr_to_value(rhs, &right, function)?;
-        self.emit_coercive_add_completion_from_values(&left, &right, &result, function)?;
+        match StringAddSite::for_operands(lhs, rhs) {
+            Some(site) => {
+                self.compile_string_add_site(site, lhs, rhs, &left, &right, &result, function)?
+            }
+            None => {
+                // Both GetValue operations complete before the first
+                // ToPrimitive call.
+                self.compile_expr_to_value(lhs, &left, function)?;
+                self.compile_expr_to_value(rhs, &right, function)?;
+                self.emit_coercive_add_completion_from_values(&left, &right, &result, function)?;
+            }
+        }
         right.clear(function);
         left.clear(function);
         self.finish_coercive_add_completion(&result, function)?;
@@ -81,6 +158,396 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         Ok(())
+    }
+
+    /// A site whose syntax expects a String operand. The emitted test reads
+    /// the live tags: with a String on the expected side and a String or a
+    /// Number on the other, ToPrimitive returns both operands unchanged and
+    /// calls nothing, ToString of the Number is Number::toString, and the
+    /// result is the concatenation. Every other pair of tags, the Number
+    /// pair included, enters the general kernel with the operands as they
+    /// were evaluated.
+    #[allow(clippy::too_many_arguments)]
+    fn compile_string_add_site(
+        &mut self,
+        site: StringAddSite<'_>,
+        lhs: &TypedExpr,
+        rhs: &TypedExpr,
+        left: &ValueLocals,
+        right: &ValueLocals,
+        result: &CompletionLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        match site {
+            StringAddSite::Empty { literal } => {
+                // The literal has no evaluation to order against the other
+                // operand; only the general kernel needs its value.
+                let (literal_operand, literal_value, other_operand, other_value) = match literal {
+                    StringAddSide::Left => (lhs, left, rhs, right),
+                    StringAddSide::Right => (rhs, right, lhs, left),
+                };
+                self.compile_expr_to_value(other_operand, other_value, function)?;
+                let done = self.open_frame(ControlFrameKind::Block, function);
+                let general = self.open_frame(ControlFrameKind::Block, function);
+                let text = schema
+                    .reserve_gc_local::<StringValue, crate::gc_types::Nullable>(function)
+                    .initialize_null(schema, function);
+                self.emit_string_add_operand_or_branch(other_value, &text, general, function)?;
+                self.emit_string_add_result(&text, result, function);
+                text.clear(function);
+                self.emit_branch_to_target(done, function);
+                self.pop_control(ControlFrameKind::Block);
+                function.instruction(&Instruction::End);
+                self.compile_expr_to_value(literal_operand, literal_value, function)?;
+                self.emit_coercive_add_kernel_call(left, right, result, function)?;
+                self.pop_control(ControlFrameKind::Block);
+                function.instruction(&Instruction::End);
+            }
+            StringAddSite::Expected { side } => {
+                // Both GetValue operations complete before either conversion.
+                self.compile_expr_to_value(lhs, left, function)?;
+                self.compile_expr_to_value(rhs, right, function)?;
+                let done = self.open_frame(ControlFrameKind::Block, function);
+                let general = self.open_frame(ControlFrameKind::Block, function);
+                let first = schema
+                    .reserve_gc_local::<StringValue, crate::gc_types::Nullable>(function)
+                    .initialize_null(schema, function);
+                let second = schema
+                    .reserve_gc_local::<StringValue, crate::gc_types::Nullable>(function)
+                    .initialize_null(schema, function);
+                self.emit_string_add_pair_or_branch(
+                    side, left, right, &first, &second, general, function,
+                )?;
+                let text = schema
+                    .reserve_gc_local::<StringValue, crate::gc_types::Nullable>(function)
+                    .initialize(
+                        self.emit_string_concat_call(&[&first, &second], function)?
+                            .nullable(),
+                        function,
+                    );
+                self.emit_string_add_result(&text, result, function);
+                text.clear(function);
+                second.clear(function);
+                first.clear(function);
+                self.emit_branch_to_target(done, function);
+                self.pop_control(ControlFrameKind::Block);
+                function.instruction(&Instruction::End);
+                self.emit_coercive_add_kernel_call(left, right, result, function)?;
+                self.pop_control(ControlFrameKind::Block);
+                function.instruction(&Instruction::End);
+            }
+            StringAddSite::Chain {
+                inner_lhs,
+                inner_rhs,
+                inner_side,
+            } => {
+                let inner_left = schema.reserve_value_local(function);
+                let inner_right = schema.reserve_value_local(function);
+                let first = schema
+                    .reserve_gc_local::<StringValue, crate::gc_types::Nullable>(function)
+                    .initialize_null(schema, function);
+                let second = schema
+                    .reserve_gc_local::<StringValue, crate::gc_types::Nullable>(function)
+                    .initialize_null(schema, function);
+                // The inner addition completes before the third operand is
+                // evaluated. Its admitted conversions call nothing, so their
+                // Strings wait for the third operand; otherwise its general
+                // kernel leaves the inner result in `left` and both Strings
+                // null.
+                self.compile_expr_to_value(inner_lhs, &inner_left, function)?;
+                self.compile_expr_to_value(inner_rhs, &inner_right, function)?;
+                let inner_done = self.open_frame(ControlFrameKind::Block, function);
+                let inner_general = self.open_frame(ControlFrameKind::Block, function);
+                self.emit_string_add_pair_or_branch(
+                    inner_side,
+                    &inner_left,
+                    &inner_right,
+                    &first,
+                    &second,
+                    inner_general,
+                    function,
+                )?;
+                self.emit_branch_to_target(inner_done, function);
+                self.pop_control(ControlFrameKind::Block);
+                function.instruction(&Instruction::End);
+                self.emit_coercive_add_kernel_call(&inner_left, &inner_right, result, function)?;
+                inner_right.reference().clear(function);
+                inner_left.reference().clear(function);
+                self.finish_coercive_add_completion(result, function)?;
+                left.copy_from(result.value(), function);
+                self.pop_control(ControlFrameKind::Block);
+                function.instruction(&Instruction::End);
+                inner_right.clear(function);
+                inner_left.clear(function);
+                self.compile_expr_to_value(rhs, right, function)?;
+                let done = self.open_frame(ControlFrameKind::Block, function);
+                let general = self.open_frame(ControlFrameKind::Block, function);
+                first.load(schema, function).is_null(function);
+                self.open_frame(ControlFrameKind::If, function);
+                left.tag().load(function);
+                function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+                function.instruction(&Instruction::I32Ne);
+                self.emit_branch_if_to_target(general, function);
+                first.replace(
+                    left.cast_reference::<StringValue>(schema, function)
+                        .nullable(),
+                    function,
+                );
+                self.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
+                let third = schema
+                    .reserve_gc_local::<StringValue, crate::gc_types::Nullable>(function)
+                    .initialize_null(schema, function);
+                let text = schema
+                    .reserve_gc_local::<StringValue, crate::gc_types::Nullable>(function)
+                    .initialize_null(schema, function);
+                right.tag().load(function);
+                function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+                function.instruction(&Instruction::I32Eq);
+                self.open_frame(ControlFrameKind::If, function);
+                third.replace(
+                    right
+                        .cast_reference::<StringValue>(schema, function)
+                        .nullable(),
+                    function,
+                );
+                function.instruction(&Instruction::Else);
+                right.tag().load(function);
+                function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
+                function.instruction(&Instruction::I32Eq);
+                self.open_frame(ControlFrameKind::If, function);
+                // ToString(Number) is Number::toString, which cannot throw.
+                third.replace(
+                    self.emit_number_to_string_payload(right.scalar(), function)?
+                        .nullable(),
+                    function,
+                );
+                function.instruction(&Instruction::Else);
+                // The kernel takes the inner result as its left operand.
+                second.load(schema, function).is_null(function);
+                function.instruction(&Instruction::I32Eqz);
+                self.open_frame(ControlFrameKind::If, function);
+                text.replace(
+                    self.emit_string_concat_call(&[&first, &second], function)?
+                        .nullable(),
+                    function,
+                );
+                let inner = schema.reserve_gc_local(function).initialize(
+                    text.load(schema, function).require_non_null(function),
+                    function,
+                );
+                left.set_reference(&inner, schema, function);
+                inner.clear(function);
+                self.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
+                self.emit_branch_to_target(general, function);
+                self.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
+                self.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
+                second.load(schema, function).is_null(function);
+                self.open_frame(ControlFrameKind::If, function);
+                text.replace(
+                    self.emit_string_concat_call(&[&first, &third], function)?
+                        .nullable(),
+                    function,
+                );
+                function.instruction(&Instruction::Else);
+                text.replace(
+                    self.emit_string_concat_call(&[&first, &second, &third], function)?
+                        .nullable(),
+                    function,
+                );
+                self.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
+                self.emit_string_add_result(&text, result, function);
+                text.clear(function);
+                third.clear(function);
+                self.emit_branch_to_target(done, function);
+                self.pop_control(ControlFrameKind::Block);
+                function.instruction(&Instruction::End);
+                self.emit_coercive_add_kernel_call(left, right, result, function)?;
+                self.pop_control(ControlFrameKind::Block);
+                function.instruction(&Instruction::End);
+                second.clear(function);
+                first.clear(function);
+            }
+        }
+        Ok(())
+    }
+
+    /// The Strings of an `Expected` pair in source order, or a branch to
+    /// `general` before either is assigned: the expected side must be a
+    /// String, the other a String or a Number.
+    #[allow(clippy::too_many_arguments)]
+    fn emit_string_add_pair_or_branch(
+        &mut self,
+        side: StringAddSide,
+        left: &ValueLocals,
+        right: &ValueLocals,
+        first: &GcLocal<StringValue, crate::gc_types::Nullable>,
+        second: &GcLocal<StringValue, crate::gc_types::Nullable>,
+        general: crate::emit::ControlTarget,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let (expected, expected_text, other, other_text) = match side {
+            StringAddSide::Left => (left, first, right, second),
+            StringAddSide::Right => (right, second, left, first),
+        };
+        expected.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+        function.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(general, function);
+        self.emit_string_add_operand_or_branch(other, other_text, general, function)?;
+        expected_text.replace(
+            expected
+                .cast_reference::<StringValue>(schema, function)
+                .nullable(),
+            function,
+        );
+        Ok(())
+    }
+
+    /// The String an operand contributes when it is a String or a Number;
+    /// every other operand branches to `general` with `text` unassigned.
+    fn emit_string_add_operand_or_branch(
+        &mut self,
+        value: &ValueLocals,
+        text: &GcLocal<StringValue, crate::gc_types::Nullable>,
+        general: crate::emit::ControlTarget,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        value.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+        function.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, function);
+        text.replace(
+            value
+                .cast_reference::<StringValue>(schema, function)
+                .nullable(),
+            function,
+        );
+        function.instruction(&Instruction::Else);
+        value.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
+        function.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(general, function);
+        // ToString(Number) is Number::toString, which cannot throw.
+        text.replace(
+            self.emit_number_to_string_payload(value.scalar(), function)?
+                .nullable(),
+            function,
+        );
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        Ok(())
+    }
+
+    fn emit_string_add_result(
+        &mut self,
+        text: &GcLocal<StringValue, crate::gc_types::Nullable>,
+        result: &CompletionLocals,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        let string = schema.reserve_gc_local(function).initialize(
+            text.load(schema, function).require_non_null(function),
+            function,
+        );
+        result.value().set_reference(&string, schema, function);
+        string.clear(function);
+        result.set_normal(result.value(), function);
+    }
+
+    /// One String holding the code units of two or three Strings in order.
+    fn emit_string_concat_call<const N: usize>(
+        &mut self,
+        parts: &[&GcLocal<StringValue, crate::gc_types::Nullable>; N],
+        function: &mut Function,
+    ) -> Result<crate::gc_types::GcStackReference<StringValue>, EmitError> {
+        let schema = self.runtime_schema();
+        let base = self.runtime_helper_base()?;
+        let strings = parts.map(|part| {
+            schema.reserve_gc_local(function).initialize(
+                part.load(schema, function).require_non_null(function),
+                function,
+            )
+        });
+        let result = match &strings[..] {
+            [left, right] => schema.helper_reference_on_stack(schema.call_helper(
+                crate::runtime_helpers::StringConcatArguments::new(left, right),
+                base,
+                function,
+            )),
+            [first, second, third] => schema.helper_reference_on_stack(schema.call_helper(
+                crate::runtime_helpers::StringConcatThreeArguments::new(first, second, third),
+                base,
+                function,
+            )),
+            _ => unreachable!("two or three Strings concatenate"),
+        };
+        for string in strings {
+            string.clear(function);
+        }
+        Ok(result)
+    }
+
+    fn emit_coercive_add_kernel_call(
+        &mut self,
+        left: &ValueLocals,
+        right: &ValueLocals,
+        result: &CompletionLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let realm = self.emit_execution_realm(function);
+        self.runtime_schema()
+            .call_helper(
+                CoerciveAddArguments::new(
+                    left,
+                    right,
+                    &realm,
+                    self.current_environment(),
+                    self.current_program(),
+                ),
+                self.runtime_helper_base()?,
+                function,
+            )
+            .store(result, function);
+        realm.clear(function);
+        Ok(())
+    }
+
+    /// Concatenation of two Strings: one allocation, no conversion.
+    pub(crate) fn compile_string_concat_helper(&mut self) -> Result<Function, EmitError> {
+        let mut function = self.begin_helper_body(RuntimeHelperId::StringConcat);
+        let parameters =
+            self.helper_parameters::<crate::runtime_helpers::StringConcatParameters>(&mut function);
+        let result =
+            self.emit_concat_gc_strings(&parameters.left, &parameters.right, &mut function);
+        parameters.release(&mut function);
+        let _result = result;
+        function.instruction(&Instruction::End);
+        Ok(self.finish_function(function))
+    }
+
+    /// Concatenation of three Strings: one allocation, no intermediate.
+    pub(crate) fn compile_string_concat_three_helper(&mut self) -> Result<Function, EmitError> {
+        let mut function = self.begin_helper_body(RuntimeHelperId::StringConcatThree);
+        let parameters = self
+            .helper_parameters::<crate::runtime_helpers::StringConcatThreeParameters>(
+                &mut function,
+            );
+        let result = self.emit_concat_three_gc_strings(
+            [&parameters.first, &parameters.second, &parameters.third],
+            &mut function,
+        );
+        parameters.release(&mut function);
+        let _result = result;
+        function.instruction(&Instruction::End);
+        Ok(self.finish_function(function))
     }
 
     pub(crate) fn finish_coercive_add_completion(

@@ -1099,6 +1099,76 @@ impl<'a> FunctionBuilder<'a> {
         let output = schema
             .reserve_gc_local::<StringValue, crate::gc_types::Nullable>(function)
             .initialize_null(schema, function);
+        // An integer from 0 to 99 is one or two decimal digits, written into
+        // a fixed backing before any other case is examined: no digit count,
+        // no fill and no second call. The saturating truncation of every
+        // other Number, NaN included, differs from the Number or is at
+        // least 100; -0 truncates to 0 and equals it, and its String is "0".
+        let small = schema.reserve_i32_local(function);
+        bits.load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        function.instruction(&Instruction::I32TruncSatF64U);
+        small.store(function);
+        small.load(function);
+        function.instruction(&Instruction::F64ConvertI32U);
+        bits.load(function);
+        function.instruction(&Instruction::F64ReinterpretI64);
+        function.instruction(&Instruction::F64Eq);
+        small.load(function);
+        function.instruction(&Instruction::I32Const(100));
+        function.instruction(&Instruction::I32LtU);
+        function.instruction(&Instruction::I32And);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        let high = schema.reserve_i32_local(function);
+        let low = schema.reserve_i32_local(function);
+        small.load(function);
+        function.instruction(&Instruction::I32Const(10));
+        function.instruction(&Instruction::I32LtU);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        small.load(function);
+        function.instruction(&Instruction::I32Const(48));
+        function.instruction(&Instruction::I32Add);
+        low.store(function);
+        output.replace(
+            crate::gc_types::StringConstruction::from_code_unit(
+                schema,
+                schema.reserve_gc_local(function),
+                low,
+                function,
+            )
+            .publish(schema, function)
+            .nullable(),
+            function,
+        );
+        function.instruction(&Instruction::Else);
+        small.load(function);
+        function.instruction(&Instruction::I32Const(10));
+        function.instruction(&Instruction::I32DivU);
+        function.instruction(&Instruction::I32Const(48));
+        function.instruction(&Instruction::I32Add);
+        high.store(function);
+        small.load(function);
+        function.instruction(&Instruction::I32Const(10));
+        function.instruction(&Instruction::I32RemU);
+        function.instruction(&Instruction::I32Const(48));
+        function.instruction(&Instruction::I32Add);
+        low.store(function);
+        output.replace(
+            crate::gc_types::StringConstruction::from_code_unit_pair(
+                schema,
+                schema.reserve_gc_local(function),
+                high,
+                low,
+                function,
+            )
+            .publish(schema, function)
+            .nullable(),
+            function,
+        );
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(low, function);
+        schema.release_i32_local(high, function);
+        function.instruction(&Instruction::Else);
         let absolute = schema.reserve_i64_local(function);
         let sign = schema.reserve_i64_local(function);
         let mantissa = schema.reserve_i64_local(function);
@@ -1206,6 +1276,8 @@ impl<'a> FunctionBuilder<'a> {
         schema.release_i64_local(mantissa, function);
         schema.release_i64_local(sign, function);
         schema.release_i64_local(absolute, function);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(small, function);
         let result = output.load(schema, function).require_non_null(function);
         output.clear(function);
         Ok(result)
