@@ -27,21 +27,23 @@ The rules for getting there:
 | --- | ---: | ---: | ---: | ---: |
 | Instructions, median | 5.05M | 4.37M | 5.53M | 4.62M |
 | Instructions, mean | 5.17M | 4.41M | 5.66M | 4.64M |
-| Cycles, median | 2.53M before the young generation | 2.59M | not measured | 2.79M |
-| Cycles, mean | 2.75M before the young generation | 2.61M | not measured | 2.81M |
+| Cycles, median | 2.42M | 2.59M | 2.80M | 2.79M |
+| Cycles, mean | 2.49M | 2.61M | 2.91M | 2.81M |
 
-The Scriptw instruction counts are over 900 requests with the young generation,
-measured one emitter commit before the current head. The work started at 20.12M
-instructions per sync request.
+Scriptw instruction counts are over 900 requests and its cycle counts over 100,
+both with the young generation. The work started at 20.12M instructions per
+sync request.
 
-- Sync median was level with Node in cycles before the young generation, and is
-  1.16 times Node in instructions.
+- Sync is ahead of Node in cycles on the median and the mean, and 1.16 times
+  Node in instructions.
 - On an unchanged base, the young generation cut the sync mean from 5.59M to
-  5.23M instructions by removing most full collections. Its write barrier costs under 1% on the
-  median.
-- Async is further behind, 1.20 times Node in median instructions.
-- Cycle counts need a quiet machine. Neither case has been measured in cycles
-  with the young generation.
+  5.23M instructions by removing most full collections. Its write barrier costs
+  under 1% on the median.
+- Async is level with Node in median cycles, about 4% behind in the mean, and
+  1.20 times Node in median instructions.
+- Cycle counts need a quiet machine. These were taken at a load average of 3
+  to 4 and the Node figures in an earlier run, so re-measure both together
+  before claiming the comparison.
 
 ## In flight when this was written
 
@@ -55,14 +57,15 @@ On `main` as the five commits ending "Let a limited GC heap grow to its limit".
 - The last commit lets a limited heap grow to its limit when doubling is
   refused. It fixes `aot_gc_virtual_reservation`, which the nursery broke by
   taking 1 MiB from each semi-space.
-- Verified one emitter commit earlier (`3dacf6024` plus the five): engine suite
-  4,209 passed and 0 failed, the vendored collector tests, a 2 MiB-heap stress
-  run, and Test262 `WeakRef`, `WeakMap`, `WeakSet`, `FinalizationRegistry` and
-  the `built-ins/Array` directories that had finished.
-- **Not yet run on the exact tree now on `main`.** The difference is the commit
-  "Skip the import link test in numeric rows of programs that import nothing",
-  which was verified on its own. Run the engine suite once on `main` to close
-  this.
+- Verified on the exact tree of that last commit: engine suite 4,209 passed and
+  0 failed, the vendored collector tests, and Test262 `WeakRef`, `WeakMap`,
+  `WeakSet` and `FinalizationRegistry`. `built-ins/Array` passed 6,119 of 6,119
+  across that tree and the one emitter commit before it.
+- Not rerun on that tree: the source guards and the engine doctest, which
+  passed before the growth fix.
+- A minor collection costs about 0.47M instructions and runs every 4.3
+  requests. About 0.11M of it is the roughly 460 WeakMap entries React Flight
+  creates per nursery, most of them dead by the collection.
 
 ### Emitter round 6
 
