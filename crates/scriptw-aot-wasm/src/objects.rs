@@ -3429,6 +3429,40 @@ impl<'a> FunctionBuilder<'a> {
         schema.release_i32_local(position, function);
         table.clear(function);
         storage.clear(function);
+        // The entry record outlives its property in whoever holds it: a
+        // global read site's record does. It gives up the descriptor for a
+        // fresh accessor descriptor that no property owns, so the record
+        // alone says the property is gone. This is the only place a live
+        // entry leaves its table.
+        let absent = schema
+            .reserve_gc_local(function)
+            .initialize(schema.stored_undefined(function), function);
+        let dead = schema.reserve_gc_local(function).initialize(
+            schema.struct_type::<PropertyDescriptor>().construct(
+                (
+                    GcOperand::descriptor_word(
+                        StoredPropertyAttributes::Accessor {
+                            enumerable: false,
+                            configurable: false,
+                        }
+                        .descriptor_word(),
+                    ),
+                    GcOperand::subtype_reference(&absent, schema),
+                    GcOperand::reference(&absent, schema),
+                    GcOperand::reference(&absent, schema),
+                ),
+                function,
+            ),
+            function,
+        );
+        schema.field(PropertyEntrySchema::DESCRIPTOR).write(
+            &entry,
+            GcOperand::reference(&dead, schema),
+            schema,
+            function,
+        );
+        dead.clear(function);
+        absent.clear(function);
         entry.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);

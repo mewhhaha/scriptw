@@ -1,4 +1,5 @@
 use super::*;
+use crate::gc_types::{GlobalReadSiteRecord, SiteRecordGlobal};
 use crate::runtime_helpers::{
     GlobalIdentifierReadSloppyArguments, GlobalIdentifierReadSloppyParameters,
     GlobalIdentifierReadStrictArguments, GlobalIdentifierReadStrictParameters,
@@ -41,21 +42,41 @@ impl FunctionBuilder<'_> {
         value: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        let site = self.next_site_record::<GlobalReadSiteRecord>()?;
+        self.emit_global_identifier_read_at(site, name, read, value, function)
+    }
+
+    /// `emit_global_identifier_read` at a record global the caller took.
+    pub(crate) fn emit_global_identifier_read_at(
+        &mut self,
+        site: SiteRecordGlobal<GlobalReadSiteRecord>,
+        name: &str,
+        read: EnvironmentIdentifierRead,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
+        // Only the source caller can select its lexical Global Environment.
+        // Error construction separately retains that caller's execution Realm.
+        let global = self.emit_source_global_environment_to_local(function);
+        let record = schema
+            .reserve_gc_local::<Environment, Nullable>(function)
+            .initialize(global.load(schema, function).nullable(), function);
+        // The site's record answers an own data property of the global
+        // object; the name itself is needed only when it does not.
+        let found =
+            self.emit_global_read_site_with_i32(site, &record, name, read, value, function)?;
+        record.clear(function);
+        found.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        schema.release_i32_local(found, function);
+        self.open_frame(ControlFrameKind::If, function);
         let key = schema
             .reserve_gc_local::<StringValue, NonNullable>(function)
             .initialize(
                 self.emit_interned_string_reference(name, function)?,
                 function,
             );
-        // Only the source caller can select its lexical Global Environment.
-        // Error construction separately retains that caller's execution Realm.
-        let global = self.emit_source_global_environment_to_local(function);
-        let found = self.emit_global_object_hint_read_i32(&global, &key, value, function)?;
-        found.load(function);
-        function.instruction(&Instruction::I32Eqz);
-        schema.release_i32_local(found, function);
-        self.open_frame(ControlFrameKind::If, function);
         let realm = self.emit_execution_realm(function);
         let base = self.runtime_helper_base()?;
         let strictness = if self.is_current_function_strict() {
@@ -95,12 +116,12 @@ impl FunctionBuilder<'_> {
             }
         }
         realm.clear(function);
+        key.clear(function);
         self.emit_propagate_current_throw_if_needed(function);
         value.copy_from(self.completion().value(), function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         global.clear(function);
-        key.clear(function);
         Ok(())
     }
 

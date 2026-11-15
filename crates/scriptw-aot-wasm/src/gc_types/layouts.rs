@@ -942,7 +942,8 @@ gc_layout_registry! {
             KEY: GcRef<StoredValue>, Immutable, NonNullable;
             DESCRIPTOR: GcRef<PropertyDescriptor>, Mutable, NonNullable;
             HASH: I64Value, Immutable, NonNullable;
-            POSITION: I32Value, Immutable, NonNullable;
+            // Compaction moves a live entry record; nothing else writes this.
+            POSITION: I32Value, Mutable, NonNullable;
         }
         array PropertyTable => PropertyTableSchema { ELEMENT: GcRef<PropertyEntry>, Mutable, Nullable; }
         // Logical insertion extent is independent of spare capacity and holes.
@@ -1046,7 +1047,10 @@ gc_layout_registry! {
         // holding an object, and whose [[Prototype]] EDGE was a Realm's
         // %Function.prototype%, or a function object (EDGE_HEADER its
         // header) whose [[Prototype]] was: its header, those edges and that
-        // value. A declined record has a null HEADER. See
+        // value. A direct edge repeats C's header as EDGE_HEADER, so a usable
+        // record has both headers. HAS_INSTANCE is the well-known Symbol,
+        // whose hash identity the site reads. A declined record names no
+        // CONSTRUCTOR and holds nothing else. See
         // `operations/has_instance/site.rs`.
         struct InstanceofSiteRecord => InstanceofSiteRecordSchema {
             CONSTRUCTOR: AnyGcRef, Immutable, Nullable;
@@ -1055,6 +1059,7 @@ gc_layout_registry! {
             EDGE_HEADER: GcRef<OrdinaryObject>, Immutable, Nullable;
             FUNCTION_PROTOTYPE: GcRef<JavaScriptObject>, Immutable, Nullable;
             PROTOTYPE: GcRef<JavaScriptObject>, Immutable, Nullable;
+            HAS_INSTANCE: GcRef<SymbolValue>, Immutable, Nullable;
         }
         struct OrdinaryPropertyStorage: ObjectPropertyStorage => OrdinaryPropertyStorageSchema {
             ENTRIES: GcRef<PropertyTable>, Mutable, NonNullable;
@@ -2475,6 +2480,43 @@ gc_layout_registry! {
         // Unlike construction-only mutable metadata bytes, this data crosses
         // the typed host boundary and is physically immutable in Wasm.
         array NativeSourcePayloadArray => NativeSourcePayloadArraySchema { ELEMENT: I8Value, Immutable, NonNullable; }
+        // A global identifier read site's record, made by R for the Global
+        // Environment Record the site met: the global object's dictionary
+        // entry for the name, when it had one. An entry holds its property's
+        // descriptor for as long as the property lives, and a deleted
+        // property's entry holds a dead accessor descriptor instead, so the
+        // entry's own descriptor says whether it still answers. A record
+        // without an entry has a null ENVIRONMENT, and an ABSENCE when the
+        // name was provably nowhere on the global object's chain. REMAKES
+        // counts the records the site made before this one. See
+        // `environments/global_read_site.rs`.
+        struct GlobalReadSiteRecord => GlobalReadSiteRecordSchema {
+            ENVIRONMENT: GcRef<Environment>, Immutable, Nullable;
+            ENTRY: GcRef<PropertyEntry>, Immutable, Nullable;
+            ABSENCE: GcRef<GlobalAbsenceWitness>, Immutable, Nullable;
+            REMAKES: I32Value, Immutable, NonNullable;
+        }
+        // What proved a name absent from a Global Environment Record's
+        // object record: the global object HEADER's dictionary held no entry
+        // for it at this TABLE and insertion LENGTH, its [[Prototype]] was
+        // the ordinary object PARENT, whose own [[Prototype]] was null and
+        // whose PARENT_STORAGE held no such property either: immutable
+        // intrinsic rows, or a dictionary at PARENT_TABLE and
+        // PARENT_LENGTH. An insertion grows a dictionary's LENGTH or
+        // replaces its table, so the same table at the same length holds
+        // the same keys or fewer.
+        struct GlobalAbsenceWitness => GlobalAbsenceWitnessSchema {
+            ENVIRONMENT: GcRef<Environment>, Immutable, Nullable;
+            DICTIONARY: GcRef<OrdinaryPropertyStorage>, Immutable, Nullable;
+            TABLE: GcRef<PropertyTable>, Immutable, Nullable;
+            LENGTH: I32Value, Immutable, NonNullable;
+            HEADER: GcRef<OrdinaryObject>, Immutable, Nullable;
+            PARENT: GcRef<OrdinaryObject>, Immutable, Nullable;
+            PARENT_STORAGE: GcRef<ObjectPropertyStorage>, Immutable, Nullable;
+            PARENT_DICTIONARY: GcRef<OrdinaryPropertyStorage>, Immutable, Nullable;
+            PARENT_TABLE: GcRef<PropertyTable>, Immutable, Nullable;
+            PARENT_LENGTH: I32Value, Immutable, NonNullable;
+        }
 }
 
 impl GcLayout {

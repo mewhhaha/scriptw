@@ -22,9 +22,10 @@ The rules for getting there:
 
 ## Where it stands
 
-`main` holds the first handoff's work. The arguments work below is on the
-branch `claude/festive-johnson-n50tm4`, verified and waiting for the owner to
-fast-forward `main`. Two kinds of count appear; do not mix them.
+`main` holds the first handoff's work. The arguments work and the site
+records below are on the branch `claude/festive-johnson-n50tm4`; the site
+records (ABI 71) still need the whole engine suite. Two kinds of count
+appear; do not mix them.
 
 Hardware user-mode counts per request, Speed policy, taken on the first
 machine before the arguments work (Scriptw over 900 requests for
@@ -46,8 +47,9 @@ hardware counts on the same source):
 | `b6f536be0`, before the arguments work | 5.095M | 5.195M | 5.588M | 5.690M |
 | Arguments reads without the object | 4.911M | 4.995M | 5.390M | 5.498M |
 | Arrow functions read proven cells | 4.844M | 4.928M | 5.324M | 5.431M |
+| Global read, `typeof` and `instanceof` site records (ABI 71) | 4.675M | 4.763M | 5.144M | 5.249M |
 
-- The two changes remove 4.9% of sync and 4.7% of async.
+- The three changes remove 8.2% of sync and 7.9% of async.
 
 **The comparison with Node does not hold on the cloud machine.** Measured
 there on the tree above with Node 24.22.1 `--jitless` (the same fixture
@@ -65,7 +67,9 @@ and case, interleaved and pinned to one CPU, 100 warmups and 101 requests:
 - Node's whole process, counted with Valgrind by differencing 1 and 201
   requests, runs 3.82M instructions per sync request and 3.94M per async
   request, its out-of-clock output validation included. Scriptw's request
-  alone is 4.84M and 5.32M: at least 1.27 and 1.35 times Node.
+  alone was 4.84M and 5.32M when the wall clock above was taken, at least
+  1.27 and 1.35 times Node; with the site records it is 4.67M and 5.14M,
+  1.22 and 1.31 times. The wall clock was not taken again.
 - The first handoff's hardware table (Node at 4.37M instructions and 2.59M
   cycles, Scriptw ahead in sync cycles) came from another machine, Node 24.12
   and helper scripts that are gone. Nothing here reproduces it. Treat the
@@ -100,16 +104,42 @@ engine suite (4,211 passed and the doctest, same one failure), the IR crate's
 unit tests (2,403), the source guards and Test262 `language/module-code` (602
 of 602). Script-goal Test262 cases have no proven cells and were not rerun.
 
+Site records for global reads (ABI 71). A read that starts at the Global
+Environment Record keeps the global object's dictionary entry record for its
+name in a P global and reads the value from it when the entry's descriptor
+is a data descriptor; a property keeps one entry record while it lives
+(compaction moves it in place) and deletion gives it a dead accessor
+descriptor. A `typeof` site also answers a name that is nowhere from a
+witness of the global object's dictionary and its one ordinary prototype. An
+`instanceof` record decides its facts in one branch, and `V instanceof G`
+for a global read G answers without reading G while G's property holds the
+value cell the record was made for.
+[The record section](docs/rust-rewrite/benchmarks.md#global-read-typeof-and-instanceof-site-records-2026-11-15)
+has the reasoning and the steps. `vn` runs 4,577 instructions for a plain
+object where it ran 7,480.
+
+Verified on that tree: the engine binaries `aot_language` (560, with six new
+Node-checked tests), `aot_builtins` (619) and `aot_realm_modules` (467); the
+emitter's integration tests but `intl_temporal` (five binaries pass, and in
+`emission` 82 of 83: `strict_arguments_projection::actual_observed_workload_and_five_formals_keep_vector_abi_with_count_guarded_reads`
+fails on a body this work does not change); and Test262
+`language/expressions/instanceof` (85 of 85), `language/expressions/typeof`
+(32 of 32), `language/global-code` (75 of 75) and
+`language/identifier-resolution` (22 of 22). Not run: the other engine
+binaries, the emitter's `--lib` suite and any other Test262 subtree.
+
 ## What to do next, by measured size
 
 [The attribution section](docs/rust-rewrite/benchmarks.md#arguments-reads-and-instruction-attribution-2026-11-15)
 has the per-body table and the listing findings. Sync request, 4.997M mean:
 
-1. **`instanceof` against a global constructor, about 260K.** `vn` runs
-   nineteen tests for each of 35 plain objects at about 390 instructions a
-   test: about 150 for the global read of the constructor, about 130 to
-   re-prove the site record and walk the chain. A global read that proves its
-   entry with fewer dependent loads helps every global read, not only these.
+1. **`instanceof` against a global constructor: done, about 100K left in
+   `vn`.** One test takes about 145 instructions where it took 310: about 45
+   check the read site's record and the value cell, about 25 the
+   `instanceof` record, about 55 walk the candidate's chain, and the rest
+   joins the answer. What is left is the nineteen walks of the same
+   candidate; sharing them needs a proof that nothing between two tests can
+   change the chain.
 2. **Stack traffic in large bodies.** A third of `vn`'s plain-object path
    reloads or spills, 662 of 7,480 instructions for the GC heap base alone
    (`vn` is 587 KB of native code and keeps the base in a stack slot). This
@@ -118,13 +148,17 @@ has the per-body table and the listing findings. Sync request, 4.997M mean:
    entries, 568 of them from `vn` and 260 from `createElement` (`config.key`
    and `type.defaultProps`, which are absent or on another shape each time).
    Records cannot hold a proven absence or a second receiver shape.
-4. **By-name identifier helpers, about 86K left.** `typeof` of a missing
-   global in `vn` (70 calls, 48K), and `function Row({id})` in the fixture
-   (64 reads and 32 resolves, 28K): a proven binding cell
+4. **By-name identifier helpers, about 40K left.** `typeof` of a missing
+   global is answered at the site now. `function Row({id})` in the fixture
+   (64 reads and 32 resolves) and the fixture's request function (17 reads)
+   remain: a proven binding cell
    (`ProvenBindingCellIr::analyze` in `analysis/module_locals.rs`) is granted
    to ordinary and arrow functions with plain parameters, not to a function
    with a destructured parameter, which component code uses everywhere. Its
-   parameter and body records are the open question there.
+   parameter and body records are the open question there. A Script with a
+   top-level `let`, `const` or `class` answers no global read from a site
+   record, because the site only proves that the Global Environment Record
+   has no declarative names at all.
 5. **`createElement`'s activation record, about 30K.** An admitted function
    still allocates its environment for the `arguments` cell (about 480
    instructions before its first call, 68 calls). A strict function cannot
@@ -194,6 +228,9 @@ python3 -B scripts/limited_verification.py --cloud --cloud-cpus auto -- \
 - Four emitter `--lib` tests: `bootstrap_compact_metadata`,
   `error_demand_initialization`, `intrinsic_property_layout_allocation`,
   `ordered_bootstrap_allocation`.
+- The emitter's emission test
+  `strict_arguments_projection::actual_observed_workload_and_five_formals_keep_vector_abi_with_count_guarded_reads`
+  ("both nonempty and absent-index paths are encoded").
 - Five vendored `pagemap::tests::*`.
 - Test262 `language/function-code/S10.2.1_A4_T2.js` crashes (listed in current
   work).

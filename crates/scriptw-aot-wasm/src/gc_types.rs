@@ -378,6 +378,12 @@ impl GlobalLedger {
                 SiteRecordKind::Instanceof => {
                     schema.reference_type::<InstanceofSiteRecord>(GcNullability::Nullable)
                 }
+                SiteRecordKind::GlobalRead => {
+                    schema.reference_type::<GlobalReadSiteRecord>(GcNullability::Nullable)
+                }
+                SiteRecordKind::GlobalValueCell => {
+                    schema.reference_type::<StoredValue>(GcNullability::Nullable)
+                }
             };
             section.global(
                 GlobalType {
@@ -392,12 +398,15 @@ impl GlobalLedger {
     }
 }
 
-/// What a site record global holds: a static property site's record, or an
-/// `instanceof` site's.
+/// What a site record global holds: a static property site's record, an
+/// `instanceof` site's, a global identifier read site's, or the value cell
+/// of the global constructor an `instanceof` site's record was made for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SiteRecordKind {
     Property,
     Instanceof,
+    GlobalRead,
+    GlobalValueCell,
 }
 
 /// A record type a site global may hold, tied to its global's declared kind.
@@ -409,6 +418,12 @@ impl SiteRecordType for OwnDataReadCache {
 }
 impl SiteRecordType for InstanceofSiteRecord {
     const KIND: SiteRecordKind = SiteRecordKind::Instanceof;
+}
+impl SiteRecordType for GlobalReadSiteRecord {
+    const KIND: SiteRecordKind = SiteRecordKind::GlobalRead;
+}
+impl SiteRecordType for StoredValue {
+    const KIND: SiteRecordKind = SiteRecordKind::GlobalValueCell;
 }
 
 /// The global that holds one site's record: null until the site's first

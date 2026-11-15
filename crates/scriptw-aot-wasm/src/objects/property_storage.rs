@@ -276,7 +276,7 @@ impl FunctionBuilder<'_> {
     }
 
     /// Sole physical table-compaction body. No JS callback can observe its
-    /// unpublished replacement, and immutable entry positions are rebuilt.
+    /// unpublished replacement; a moved entry record takes its new position.
     pub(crate) fn compile_ordinary_property_prepare_helper(
         &mut self,
     ) -> Result<Function, EmitError> {
@@ -372,44 +372,23 @@ impl FunctionBuilder<'_> {
         let entry = schema
             .reserve_gc_local(&mut f)
             .initialize(maybe.load(schema, &mut f).require_non_null(&mut f), &mut f);
-        let key = schema.reserve_gc_local(&mut f).initialize(
-            schema
-                .field(PropertyEntrySchema::KEY)
-                .read(&entry, schema, &mut f)
-                .reference(),
-            &mut f,
-        );
-        let descriptor = schema.reserve_gc_local(&mut f).initialize(
-            schema
-                .field(PropertyEntrySchema::DESCRIPTOR)
-                .read(&entry, schema, &mut f)
-                .reference(),
-            &mut f,
-        );
         schema
             .field(PropertyEntrySchema::HASH)
             .read(&entry, schema, &mut f)
             .store_i64(hash, &mut f);
-        // A dense growth keeps its existing immutable entry records. Only a
-        // moved live property needs a new POSITION; descriptor/key records
-        // remain shared in both cases.
-        let replacement = schema
-            .reserve_gc_local(&mut f)
-            .initialize(entry.load(schema, &mut f), &mut f);
+        // A property keeps its one entry record for as long as it lives, so
+        // a holder of the record can tell a live property from a deleted one
+        // by the record alone: a moved entry takes its new POSITION in
+        // place. The abandoned table still names the record; no reader pairs
+        // that table with a POSITION.
         source.load(&mut f);
         destination.load(&mut f);
         f.instruction(&Instruction::I32Ne);
         self.open_frame(ControlFrameKind::If, &mut f);
-        replacement.replace(
-            schema.struct_type::<PropertyEntry>().construct(
-                (
-                    GcOperand::reference(&key, schema),
-                    GcOperand::reference(&descriptor, schema),
-                    GcOperand::i64_local(hash),
-                    GcOperand::i32_local(destination),
-                ),
-                &mut f,
-            ),
+        schema.field(PropertyEntrySchema::POSITION).write(
+            &entry,
+            GcOperand::i32_local(destination),
+            schema,
             &mut f,
         );
         self.pop_control(ControlFrameKind::If);
@@ -417,7 +396,7 @@ impl FunctionBuilder<'_> {
         schema.array_type::<PropertyTable>().write(
             &table,
             destination,
-            GcOperand::nullable_reference(&replacement, schema),
+            GcOperand::nullable_reference(&entry, schema),
             schema,
             &mut f,
         );
@@ -426,9 +405,6 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(1));
         f.instruction(&Instruction::I32Add);
         destination.store(&mut f);
-        replacement.clear(&mut f);
-        descriptor.clear(&mut f);
-        key.clear(&mut f);
         entry.clear(&mut f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);

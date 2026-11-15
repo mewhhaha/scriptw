@@ -1,7 +1,7 @@
 use super::*;
 use crate::environments::environment_reference::EnvironmentIdentifierRead;
 use crate::functions::CallContinuation;
-use crate::gc_types::Environment;
+use crate::gc_types::{Environment, GlobalReadSiteRecord, SiteRecordGlobal};
 use scriptw_ir::{
     EnvironmentCompoundOperationIr, EnvironmentIdentifierIr, EnvironmentIdentifierOperationIr,
     EnvironmentIdentifierResolutionStart,
@@ -64,46 +64,73 @@ impl FunctionBuilder<'_> {
     }
 
     /// ResolveBinding and GetValue of a dynamic identifier read. A read that
-    /// starts at the Global Environment Record first tries the global
-    /// object's remembered entry; the shared runtime owns everything else.
+    /// starts at the Global Environment Record first asks its site's record
+    /// of the global object's entry; the shared runtime owns everything
+    /// else, and only then is the name itself needed.
     fn emit_environment_identifier_read_value(
         &mut self,
         identifier: &EnvironmentIdentifierIr,
-        key: &GcLocal<StringValue>,
         read: EnvironmentIdentifierRead,
         value: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        let record = self.environment_identifier_read_record(identifier, function)?;
-        if !matches!(
+        let site = if matches!(
             identifier.resolution_start(),
             EnvironmentIdentifierResolutionStart::GlobalEnvironment
         ) {
-            return self.emit_environment_identifier_read_from_record(
-                key,
-                identifier.strictness,
+            Some(self.next_site_record::<GlobalReadSiteRecord>()?)
+        } else {
+            None
+        };
+        self.emit_environment_identifier_read_value_at(site, identifier, read, value, function)
+    }
+
+    /// `emit_environment_identifier_read_value` at the record global the
+    /// caller took for a read that starts at the Global Environment Record.
+    pub(crate) fn emit_environment_identifier_read_value_at(
+        &mut self,
+        site: Option<SiteRecordGlobal<GlobalReadSiteRecord>>,
+        identifier: &EnvironmentIdentifierIr,
+        read: EnvironmentIdentifierRead,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let record = self.environment_identifier_read_record(identifier, function)?;
+        let global = site.is_some();
+        if let Some(site) = site {
+            let found = self.emit_global_read_site_with_i32(
+                site,
+                &record,
+                &identifier.name,
                 read,
-                record,
                 value,
                 function,
-            );
+            )?;
+            found.load(function);
+            function.instruction(&Instruction::I32Eqz);
+            schema.release_i32_local(found, function);
+            self.open_frame(ControlFrameKind::If, function);
         }
-        let schema = self.runtime_schema();
-        let found = self.emit_global_object_hint_read_i32(&record, key, value, function)?;
-        found.load(function);
-        function.instruction(&Instruction::I32Eqz);
-        schema.release_i32_local(found, function);
-        self.open_frame(ControlFrameKind::If, function);
+        let key = schema
+            .reserve_gc_local::<StringValue, NonNullable>(function)
+            .initialize(
+                self.emit_interned_string_reference(&identifier.name, function)?,
+                function,
+            );
         self.emit_environment_identifier_read_from_record(
-            key,
+            &key,
             identifier.strictness,
             read,
             record,
             value,
             function,
         )?;
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
+        key.clear(function);
+        if global {
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        }
         Ok(())
     }
 
@@ -167,22 +194,12 @@ impl FunctionBuilder<'_> {
                         function,
                     );
                 }
-                let schema = self.runtime_schema();
-                let key = schema
-                    .reserve_gc_local::<StringValue, NonNullable>(function)
-                    .initialize(
-                        self.emit_interned_string_reference(&identifier.name, function)?,
-                        function,
-                    );
                 self.emit_environment_identifier_read_value(
                     identifier,
-                    &key,
                     EnvironmentIdentifierRead::Typeof,
                     value,
                     function,
-                )?;
-                key.clear(function);
-                Ok(())
+                )
             }
             _ => Err(EmitError::unsupported(
                 "compiler invariant: a typeof Reference operand is an identifier",
@@ -275,6 +292,86 @@ impl FunctionBuilder<'_> {
                 return Ok(());
             }
         }
+        if let (
+            EnvironmentIdentifierResolutionStart::GlobalEnvironment,
+            Operation::Call {
+                args,
+                direct_eval: None,
+                callee_targets,
+            },
+        ) = (&resolution, &identifier.operation)
+        {
+            // The callee is read before any argument runs. A binding that
+            // the Global Environment Record's object record holds has no
+            // base object, so the site's record gives the whole Reference:
+            // its value, called with an undefined receiver. Every other case
+            // resolves the Reference and takes both from it.
+            let callee = schema.reserve_value_local(function);
+            let receiver = schema.reserve_value_local(function);
+            receiver.set_undefined(function);
+            let record = self.environment_identifier_read_record(identifier, function)?;
+            let found = self.emit_global_read_site_i32(
+                &record,
+                &identifier.name,
+                EnvironmentIdentifierRead::Value,
+                &callee,
+                function,
+            )?;
+            record.clear(function);
+            found.load(function);
+            function.instruction(&Instruction::I32Eqz);
+            schema.release_i32_local(found, function);
+            self.open_frame(ControlFrameKind::If, function);
+            let key = schema
+                .reserve_gc_local::<StringValue, NonNullable>(function)
+                .initialize(
+                    self.emit_interned_string_reference(&identifier.name, function)?,
+                    function,
+                );
+            let reference =
+                self.emit_resolve_global_identifier(&key, identifier.strictness, function)?;
+            self.emit_environment_identifier_get(
+                &reference,
+                EnvironmentIdentifierRead::Value,
+                &callee,
+                function,
+            )?;
+            self.emit_environment_identifier_call_base(&reference, &receiver, function);
+            self.release_environment_identifier_reference(reference, function);
+            key.clear(function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+            self.emit_resolved_identifier_call(
+                &callee,
+                &receiver,
+                args,
+                callee_targets,
+                continuation,
+                output,
+                function,
+            )?;
+            receiver.clear(function);
+            callee.clear(function);
+            return Ok(());
+        }
+        if matches!(identifier.operation, Operation::Read | Operation::Typeof) {
+            let read = if matches!(identifier.operation, Operation::Typeof) {
+                EnvironmentIdentifierRead::Typeof
+            } else {
+                EnvironmentIdentifierRead::Value
+            };
+            // No source evaluation separates ResolveBinding and GetValue.
+            // Dynamic names keep both steps inside the shared runtime.
+            let value = schema.reserve_value_local(function);
+            self.emit_environment_identifier_read_value(identifier, read, &value, function)?;
+            if matches!(identifier.operation, Operation::Typeof) {
+                self.emit_typeof_value(&value, output, function)?;
+            } else {
+                output.copy_from(&value, function);
+            }
+            value.clear(function);
+            return Ok(());
+        }
         let key = schema
             .reserve_gc_local::<StringValue, NonNullable>(function)
             .initialize(
@@ -345,24 +442,7 @@ impl FunctionBuilder<'_> {
                 return Ok(());
             }
             Operation::Read | Operation::Typeof => {
-                let read = if matches!(identifier.operation, Operation::Typeof) {
-                    EnvironmentIdentifierRead::Typeof
-                } else {
-                    EnvironmentIdentifierRead::Value
-                };
-                // No source evaluation separates ResolveBinding and GetValue.
-                // Dynamic names keep both steps inside the shared runtime.
-                self.emit_environment_identifier_read_value(
-                    identifier, &key, read, &value, function,
-                )?;
-                if matches!(identifier.operation, Operation::Typeof) {
-                    self.emit_typeof_value(&value, output, function)?;
-                } else {
-                    output.copy_from(&value, function);
-                }
-                value.clear(function);
-                key.clear(function);
-                return Ok(());
+                unreachable!("a dynamic read returned before its name was pooled")
             }
             Operation::CaptureCallReference { .. }
             | Operation::Assign { .. }

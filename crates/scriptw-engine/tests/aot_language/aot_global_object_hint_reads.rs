@@ -1,9 +1,11 @@
 //! A global read that starts at the Global Environment Record answers from
-//! the global object's dictionary entry that the name's String remembers,
-//! without a call, only while that record has no declarative names and the
-//! entry is a data property keyed by that very String. Module code reads
-//! globals this way, Script code too. Each script changes one of those facts
-//! between executions of the same sites. Expectations are Node 24's.
+//! its site's record of the global object's dictionary entry, without a
+//! call, only while that record has no declarative names and the entry is a
+//! live data property; the shared runtime answers every other read, first
+//! from the position the name's String remembers, when the entry there is
+//! keyed by that very String. Module code reads globals this way, Script
+//! code too. Each script changes one of those facts between executions of
+//! the same sites. Expectations are Node 24's.
 use scriptw_engine::{
     CompileOptions, Engine, ExecutionBackend, HostOutputEvent, HostSurfacePolicy,
     ObservedCompletion, RealmBuilder, RunOptions,

@@ -18,7 +18,10 @@
 //! writable "prototype", a bound or non-callable C, goes on to the entry and
 //! the HasInstance helper having observed nothing: every step only reads.
 use super::*;
-use crate::gc_types::{InstanceofSiteRecord, InstanceofSiteRecordSchema, SiteRecordGlobal};
+use crate::gc_types::{
+    Environment, GlobalReadSiteRecord, InstanceofSiteRecord, InstanceofSiteRecordSchema,
+    SiteRecordGlobal,
+};
 use crate::runtime_helpers::{InstanceofRecordArguments, InstanceofRecordParameters};
 
 impl FunctionBuilder<'_> {
@@ -68,55 +71,190 @@ impl FunctionBuilder<'_> {
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
         let record = self.emit_instanceof_site_record(global, constructor, f)?;
+        // A declined record names no constructor, and a right-hand side
+        // without a reference is not a function either.
         s.field(InstanceofSiteRecordSchema::CONSTRUCTOR)
             .read(&record, s, f);
         constructor.reference().load(f);
         f.instruction(&Instruction::RefEq);
+        constructor.reference().load(f);
+        f.instruction(&Instruction::RefIsNull);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32And);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(slow, f);
-        // A declined record has no header.
+        let answer = s.reserve_i32_local(f);
+        self.emit_instanceof_usable_record_answer(&record, object, answer, slow, f);
+        record.clear(f);
+        result.initialize(f);
+        result.value().set_boolean(answer, f);
+        s.release_i32_local(answer, f);
+        Ok(())
+    }
+
+    /// Answers `V instanceof G` into `answer` for a right-hand side that is
+    /// a read of the global binding G, without reading G's value, or
+    /// branches to `slow` having observed nothing. The site keeps the value
+    /// cell the global's property held when its `instanceof` record was made
+    /// for that very value. A value cell never changes, so while the global
+    /// read site's record still answers the read and the property's current
+    /// cell is that one, the read's value is the record's function, and the
+    /// record's own proof decides the rest.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn emit_instanceof_global_answer(
+        &mut self,
+        read: SiteRecordGlobal<GlobalReadSiteRecord>,
+        cell: SiteRecordGlobal<StoredValue>,
+        instance: SiteRecordGlobal<InstanceofSiteRecord>,
+        global: &GcLocal<Environment, Nullable>,
+        object: &ValueLocals,
+        answer: I32Local,
+        slow: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let stored = s
+            .reserve_gc_local::<StoredValue, Nullable>(f)
+            .initialize(cell.load(s, f), f);
+        stored.load(s, f).is_null(f);
+        self.emit_branch_if_to_target(slow, f);
+        let record = s
+            .reserve_gc_local::<GlobalReadSiteRecord, Nullable>(f)
+            .initialize(read.load(s, f), f);
+        record.load(s, f).is_null(f);
+        self.emit_branch_if_to_target(slow, f);
+        let data = self.emit_global_read_record_data_or_branch(&record, global, slow, f);
+        record.clear(f);
+        let _ = data.load(s, f);
+        let _ = stored.load(s, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(slow, f);
+        stored.clear(f);
+        data.clear(f);
+        // The cell is kept only beside a usable record for its value.
+        let record = s
+            .reserve_gc_local::<InstanceofSiteRecord, Nullable>(f)
+            .initialize(instance.load(s, f), f);
+        self.emit_instanceof_usable_record_answer(&record, object, answer, slow, f);
+        record.clear(f);
+    }
+
+    /// Keeps, once, the value cell that the global read site's record now
+    /// answers with, when the `instanceof` site's usable record was made for
+    /// that cell's value. Every step only reads.
+    pub(super) fn emit_instanceof_global_cell(
+        &mut self,
+        read: SiteRecordGlobal<GlobalReadSiteRecord>,
+        cell: SiteRecordGlobal<StoredValue>,
+        instance: SiteRecordGlobal<InstanceofSiteRecord>,
+        global: &GcLocal<Environment, Nullable>,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        cell.load(s, f).is_null(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let skip = self.open_frame(ControlFrameKind::Block, f);
+        let label = self.local_branch_label(skip);
+        let made = s
+            .reserve_gc_local::<InstanceofSiteRecord, Nullable>(f)
+            .initialize(instance.load(s, f), f);
+        made.load(s, f).is_null(f);
+        self.emit_branch_if_to_target(skip, f);
+        // A declined record names no constructor.
+        s.field(InstanceofSiteRecordSchema::CONSTRUCTOR)
+            .read(&made, s, f);
+        f.instruction(&Instruction::RefIsNull);
+        self.emit_branch_if_to_target(skip, f);
+        let record = s
+            .reserve_gc_local::<GlobalReadSiteRecord, Nullable>(f)
+            .initialize(read.load(s, f), f);
+        record.load(s, f).is_null(f);
+        self.emit_branch_if_to_target(skip, f);
+        let data = self.emit_global_read_record_data_or_branch(&record, global, skip, f);
+        record.clear(f);
+        let stored = s
+            .reserve_gc_local::<StoredValue, NonNullable>(f)
+            .initialize(data.sealed_subtype_or_branch::<StoredValue>(s, label, f), f);
+        data.clear(f);
+        s.field(StoredValueSchema::REFERENCE).read(&stored, s, f);
+        s.field(InstanceofSiteRecordSchema::CONSTRUCTOR)
+            .read(&made, s, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(skip, f);
+        made.clear(f);
+        cell.store(stored.load(s, f), f);
+        stored.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+    }
+
+    /// Answers `V instanceof C` into `answer` from a usable record of C, or
+    /// branches to `slow`, having observed nothing.
+    fn emit_instanceof_usable_record_answer(
+        &mut self,
+        record: &GcLocal<InstanceofSiteRecord, Nullable>,
+        object: &ValueLocals,
+        answer: I32Local,
+        slow: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        // A usable record holds everything below, so the three facts that
+        // keep GetMethod(C, @@hasInstance) the default method are read
+        // without a test between them and decide one branch: C's
+        // [[Prototype]] edge, the edge from the function object it may name
+        // to the recorded %Function.prototype% (C's own edge again when
+        // there is none between), and @@hasInstance never hashed.
         let header = s
             .reserve_gc_local::<OrdinaryObject, Nullable>(f)
             .initialize(
                 s.field(InstanceofSiteRecordSchema::HEADER)
-                    .read(&record, s, f)
+                    .read(record, s, f)
                     .reference(),
                 f,
             );
-        header.load(s, f).is_null(f);
-        self.emit_branch_if_to_target(slow, f);
         s.field(OrdinaryObjectSchema::PROTOTYPE).read(&header, s, f);
-        s.field(InstanceofSiteRecordSchema::EDGE)
-            .read(&record, s, f);
+        s.field(InstanceofSiteRecordSchema::EDGE).read(record, s, f);
         f.instruction(&Instruction::RefEq);
         f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(slow, f);
         header.clear(f);
-        // An edge that is a function object still inherits from the
-        // recorded %Function.prototype%.
         let edge = s
             .reserve_gc_local::<OrdinaryObject, Nullable>(f)
             .initialize(
                 s.field(InstanceofSiteRecordSchema::EDGE_HEADER)
-                    .read(&record, s, f)
+                    .read(record, s, f)
                     .reference(),
                 f,
             );
-        edge.load(s, f).is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, f);
         s.field(OrdinaryObjectSchema::PROTOTYPE).read(&edge, s, f);
         s.field(InstanceofSiteRecordSchema::FUNCTION_PROTOTYPE)
-            .read(&record, s, f);
+            .read(record, s, f);
         f.instruction(&Instruction::RefEq);
         f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(slow, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::I32Or);
         edge.clear(f);
-        self.emit_has_instance_never_hashed_or_branch(slow, f);
+        // Every dictionary entry stores its key's hash, and a Symbol is
+        // given its hash identity the first time it is hashed, so until
+        // then no dictionary holds it.
+        let symbol = s
+            .reserve_gc_local::<SymbolValue, Nullable>(f)
+            .initialize(
+                s.field(InstanceofSiteRecordSchema::HAS_INSTANCE)
+                    .read(record, s, f)
+                    .reference(),
+                f,
+            );
+        s.field(SymbolValueSchema::KEY_HASH_ID).read(&symbol, s, f);
+        symbol.clear(f);
+        f.instruction(&Instruction::I64Const(0));
+        f.instruction(&Instruction::I64Ne);
+        f.instruction(&Instruction::I32Or);
+        self.emit_branch_if_to_target(slow, f);
         let answered = self.open_frame(ControlFrameKind::Block, f);
-        let answer = s.reserve_i32_local(f);
         answer.set_constant(0, f);
         // OrdinaryHasInstance step 3: a primitive V is false.
         emit_is_object_tag_i32(object.tag(), f);
@@ -126,11 +264,10 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local::<JavaScriptObject, Nullable>(f)
             .initialize(
                 s.field(InstanceofSiteRecordSchema::PROTOTYPE)
-                    .read(&record, s, f)
+                    .read(record, s, f)
                     .reference(),
                 f,
             );
-        record.clear(f);
         let next = s
             .reserve_gc_local::<JavaScriptObject, Nullable>(f)
             .initialize_null(s, f);
@@ -164,10 +301,6 @@ impl FunctionBuilder<'_> {
         current.clear(f);
         next.clear(f);
         prototype.clear(f);
-        result.initialize(f);
-        result.value().set_boolean(answer, f);
-        s.release_i32_local(answer, f);
-        Ok(())
     }
 
     /// Makes an `instanceof` site's record for the right-hand side C it
@@ -175,8 +308,8 @@ impl FunctionBuilder<'_> {
     /// is this Realm's %Function.prototype%, or a function object whose
     /// [[Prototype]] is, @@hasInstance has never been
     /// hashed, and C's own "prototype" is a non-writable, non-configurable
-    /// data property holding an object; declined, with no header, for every
-    /// other C. Only [[GetOwnProperty]] of a function object runs, which
+    /// data property holding an object; declined, naming no constructor,
+    /// for every other C. Only [[GetOwnProperty]] of a function object runs, which
     /// observes nothing.
     pub(crate) fn compile_instanceof_record_helper(&mut self) -> Result<Function, EmitError> {
         let mut body = self.begin_helper_body(RuntimeHelperId::InstanceofRecord);
@@ -219,9 +352,11 @@ impl FunctionBuilder<'_> {
         let reached = s
             .reserve_gc_local::<JavaScriptObject, Nullable>(f)
             .initialize(edge.load(s, f), f);
+        // A direct edge has no function object between: the record then
+        // repeats C's own header.
         let edge_header = s
             .reserve_gc_local::<OrdinaryObject, Nullable>(f)
-            .initialize_null(s, f);
+            .initialize(header.load(s, f), f);
         let direct = self.open_frame(ControlFrameKind::Block, f);
         let _ = edge.load(s, f);
         s.field(StoredValueSchema::REFERENCE)
@@ -316,6 +451,11 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local::<JavaScriptObject, Nullable>(f)
             .initialize(s.prototype_reference(&value, f), f);
         value.clear(f);
+        let symbol = s.reserve_gc_local::<SymbolValue, Nullable>(f).initialize(
+            s.well_known_symbol_reference(scriptw_ir::WellKnownSymbol::HasInstance, f)
+                .nullable(),
+            f,
+        );
         let _ = s.struct_type::<InstanceofSiteRecord>().construct(
             (
                 GcOperand::eq_reference(&p.constructor),
@@ -324,10 +464,12 @@ impl FunctionBuilder<'_> {
                 GcOperand::reference(&edge_header, s),
                 GcOperand::reference(&reached, s),
                 GcOperand::reference(&prototype, s),
+                GcOperand::reference(&symbol, s),
             ),
             f,
         );
         f.instruction(&Instruction::Return);
+        symbol.clear(f);
         prototype.clear(f);
         reached.clear(f);
         edge_header.clear(f);
@@ -337,7 +479,8 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         let _ = s.struct_type::<InstanceofSiteRecord>().construct(
             (
-                GcOperand::eq_reference(&p.constructor),
+                GcOperand::null_eq(),
+                GcOperand::null(s),
                 GcOperand::null(s),
                 GcOperand::null(s),
                 GcOperand::null(s),
