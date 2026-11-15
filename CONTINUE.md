@@ -1,6 +1,7 @@
 # Continue here
 
-Handoff for the React Server Components (RSC) performance work, written 2026-11-15.
+Handoff for the React Server Components (RSC) performance work, last updated
+2026-11-15.
 Delete this file when the work below has landed; the lasting record is
 [benchmark details](docs/rust-rewrite/benchmarks.md) and
 [current work](docs/rust-rewrite/current-inventory.md).
@@ -21,7 +22,13 @@ The rules for getting there:
 
 ## Where it stands
 
-`main` holds everything below. Per request, Speed policy, user-mode counts:
+`main` holds the first handoff's work. The arguments work below is on the
+branch `claude/festive-johnson-n50tm4`, verified and waiting for the owner to
+fast-forward `main`. Two kinds of count appear; do not mix them.
+
+Hardware user-mode counts per request, Speed policy, taken on the first
+machine before the arguments work (Scriptw over 900 requests for
+instructions and 100 for cycles):
 
 | | Scriptw sync | Node sync | Scriptw async | Node async |
 | --- | ---: | ---: | ---: | ---: |
@@ -30,125 +37,122 @@ The rules for getting there:
 | Cycles, median | 2.42M | 2.59M | 2.80M | 2.79M |
 | Cycles, mean | 2.49M | 2.61M | 2.91M | 2.81M |
 
-Scriptw instruction counts are over 900 requests and its cycle counts over 100,
-both with the young generation. The work started at 20.12M instructions per
-sync request.
+Callgrind instruction references per request, Speed policy, on a cloud
+machine without hardware counters (97 requests; about 0.8% above the
+hardware counts on the same source):
 
-- Sync is ahead of Node in cycles on the median and the mean, and 1.16 times
-  Node in instructions.
-- On an unchanged base, the young generation cut the sync mean from 5.59M to
-  5.23M instructions by removing most full collections. Its write barrier costs
-  under 1% on the median.
-- Async is level with Node in median cycles, about 4% behind in the mean, and
-  1.20 times Node in median instructions.
-- Cycle counts need a quiet machine. These were taken at a load average of 3
-  to 4 and the Node figures in an earlier run, so re-measure both together
-  before claiming the comparison.
+| | Sync median | Sync mean | Async median | Async mean |
+| --- | ---: | ---: | ---: | ---: |
+| `b6f536be0`, before the arguments work | 5.095M | 5.195M | 5.588M | 5.690M |
+| Arguments reads without the object | 4.911M | 4.995M | 5.390M | 5.498M |
 
-## In flight when this was written
+- The arguments work removes 3.6% of sync and 3.5% of async. Sync is then
+  about 1.11 times Node in instructions, if the 0.8% offset holds.
+- No cycles and no Node control were measured after it: the cloud machine has
+  no counters and Node 24 could not be installed there. Re-measure both
+  engines together on a quiet machine with counters before claiming the
+  comparison. The work started at 20.12M instructions per sync request.
 
-### Young generation for the copying collector
+## Done since the first handoff
 
-On `main` as the five commits ending "Let a limited GC heap grow to its limit".
+Emitter round 6, step 1 (`arguments` object). The closed walk in
+`arguments_protocol/strict_projection.rs` refused every method call, because
+`recv.m(a)` lowers to a `MaterializeBinding` temporary. It now admits one
+whose receiver is not the `arguments` binding or a read of it, which admits
+`createElement`, `cloneElement`, the error formatter and `Ct` (which reads
+its optional fourth and fifth arguments). The probe test is gone.
 
-- 2 MiB nursery taken out of the 16 MiB initial heap, a write barrier in
-  compiled code and in the host, a remembered buffer, and full collections under
-  Appel's rule.
-- The last commit lets a limited heap grow to its limit when doubling is
-  refused. It fixes `aot_gc_virtual_reservation`, which the nursery broke by
-  taking 1 MiB from each semi-space.
-- Verified on the exact tree of that last commit: engine suite 4,209 passed and
-  0 failed, the vendored collector tests, and Test262 `WeakRef`, `WeakMap`,
-  `WeakSet` and `FinalizationRegistry`. `built-ins/Array` passed 6,119 of 6,119
-  across that tree and the one emitter commit before it.
-- Not rerun on that tree: the source guards and the engine doctest, which
-  passed before the growth fix.
-- A minor collection costs about 0.47M instructions and runs every 4.3
-  requests. About 0.11M of it is the roughly 460 WeakMap entries React Flight
-  creates per nursery, most of them dead by the collection.
+Verified on that tree: the engine suite (4,210 passed, and the one
+`runtime_cache` failure below), the engine doctest, the emitter's
+arguments-protocol unit tests, the source guards, Test262
+`language/arguments-object` (460 of 460) and `language/function-code` (279 of
+281, both `S10.2.1_A4_T2.js`). Not run: the emitter's whole `--lib` suite and
+any other Test262 subtree.
 
-### Emitter round 6
+## What to do next, by measured size
 
-Step 1 is on `main` as the commit "WIP: read arguments.length and arguments[i]
-without the arguments object". **It is unfinished and not fully verified:**
+[The attribution section](docs/rust-rewrite/benchmarks.md#arguments-reads-and-instruction-attribution-2026-11-15)
+has the per-body table and the listing findings. Sync request, 4.997M mean:
 
-- It compiles, its targeted unit and engine tests pass, and the RSC Flight
-  output is exact.
-- The full engine suite and Test262 `language/arguments-object` and
-  `language/function-code` have not been run with it. Run them first; revert
-  the commit if they fail and the cause is not quick to fix.
-- It gives no gain yet. `createElement` is still refused by the closed walk in
-  `arguments_protocol/strict_projection.rs`; the last probe showed
-  `Mt.call(t,1)&&(o.a=1)` refused.
-- The unit test `zz_probe_constructs` in that file is a temporary probe.
-  Remove it before calling the step done.
+1. **`instanceof` against a global constructor, about 260K.** `vn` runs
+   nineteen tests for each of 35 plain objects at about 390 instructions a
+   test: about 150 for the global read of the constructor, about 130 to
+   re-prove the site record and walk the chain. A global read that proves its
+   entry with fewer dependent loads helps every global read, not only these.
+2. **Stack traffic in large bodies.** A third of `vn`'s plain-object path
+   reloads or spills, 662 of 7,480 instructions for the GC heap base alone
+   (`vn` is 587 KB of native code and keeps the base in a stack slot). This
+   is the structural lever the first handoff listed; it now has a number.
+3. **Read records, 438K inclusive in `cached_property_read`** over 1,171
+   entries, 568 of them from `vn` and 260 from `createElement` (`config.key`
+   and `type.defaultProps`, which are absent or on another shape each time).
+   Records cannot hold a proven absence or a second receiver shape.
+4. **By-name identifier helpers, 130K.** `typeof` of a missing global in `vn`
+   (70 calls, 48K) and free identifiers in the fixture's arrow functions
+   (86K), which are not module-local owners.
+5. **`createElement`'s activation record, about 30K.** An admitted function
+   still allocates its environment for the `arguments` cell (about 480
+   instructions before its first call, 68 calls). A strict function cannot
+   assign or redeclare `arguments`, so when no nested function names it the
+   binding could be a module-local like any unobserved one
+   (`analysis/module_locals.rs` keeps it a cell whenever the body names it).
+6. `computed_property_write` (225K inclusive, 241 entries from `ft`),
+   `coercive_add` (207K, 420 entries), then the first handoff's remaining
+   steps: write records for non-ordinary receivers, dense
+   `Array.prototype.splice`, and eliding temporal-dead-zone checks.
 
-The planned order:
-
-1. **`arguments` object.** `createElement` only reads `arguments.length` and
-   `arguments[i]`, yet a full object is built on every call (142 per request).
-   Skip the object where every reference is one of those two reads, and build
-   the real object on the spot for anything else.
-2. **Read records.** Prototype hits with a builtin holder (`fn.call`,
-   `str.indexOf`, `map.get`) still call the helper (17.6% of
-   `cached_property_read`). Records also cannot hold a proven absence or more
-   than one receiver shape, so `config.key` and `type.defaultProps` always take
-   the walk (39.6%).
-3. **Write records for non-ordinary receivers.** `r.status = …` and
-   `r.value = …` on Promise objects always miss, about 2.7% of async.
-4. **Dense `Array.prototype.splice`**, then eliding temporal-dead-zone checks
-   by declaration kind.
-
-## Further levers, not started
-
-- Host side of async: growth of the weak-key table and `FuncRefTable::intern`.
-- A duplicate `index < length` compare in array element access.
-- Cranelift spills every GC reference that is live across a call and reloads it
-  at each use. Spills and reloads are 35 to 41% of the cycle samples inside the
-  two hottest compiled functions. This is structural; measure it in instructions
-  before committing to a design.
-- Function environments cost six objects each.
-- About 600 test-then-cast pairs, the builtin call site (895 instructions
-  against Node's 392) and the remainder of global reads (258 against 156).
+Not started, from the first handoff: growth of the weak-key table and
+`FuncRefTable::intern` on the host side of async, the duplicate `index <
+length` compare, function environments at six objects each, and the builtin
+call site (895 instructions against Node's 392).
 
 ## How to measure
 
-Fixtures, the `perf` binary and the helper scripts live under `target/`, which
-is git-ignored, so they exist only on the machine this work was done on.
-Elsewhere, start from `scripts/benchmark-rsc.py` and
-[CONTRIBUTING.md](CONTRIBUTING.md), which build the fixtures and report request
-times; the commands below need the local helpers.
+Build the fixtures and the retained host:
 
 ```sh
-# Build the retained host, check Flight output, print medians (CPU 14 here).
-target/agents/tools/ic_measure.sh <repo> <cargo-target-dir> <tag> 14
-
-# Medians and means from the same run.
-python3 target/agents/tools/pmu_means.py <cargo-target-dir>/ic-measure/<tag>/pmu-{sync,async}
-
-# Frame-pointer profile of 100 sync requests.
-target/agents/tools/ic_profile.sh <host> <host's rsc-sync.json> <outdir> 14
+pnpm --dir target/application-tools add --save-exact --ignore-scripts \
+  react@19.3.1 react-dom@19.3.1 react-server-dom-webpack@19.3.1 esbuild@0.28.2 playwright@1.64.1
+mkdir -p target/rsc-fixtures
+node crates/scriptw-cli/tests/fixtures/edge_rendering/react-driver.cjs build \
+  "$PWD/target/application-tools" "$PWD/crates/scriptw-cli/tests/fixtures/edge_rendering" "$PWD/target/rsc-fixtures"
+python3 -B scripts/limited_verification.py --cloud --cloud-cpus auto -- \
+  cargo build -j 4 --release --locked -p scriptw-cli --example rsc_baseline
 ```
 
-- Fixtures: `target/application-benchmarks-20261102/generated-v2/{rsc.js,support.json}`.
-- Node control: `target/agents/tools/node-jitless` passed as `--node` to
-  `target/rsc-20261109/attribution/count_request_pmu.py --engine node`.
-- Everything expensive runs through `python3 scripts/limited_verification.py --`.
-  Pin each job with `taskset -c N`, or two wrapped jobs share CPU 0.
-- Instructions are repeatable to about 0.1%. Use them to judge a change, and
-  cycles only to compare against Node.
+- With hardware counters, use the attribution drivers described in
+  [CONTRIBUTING.md](CONTRIBUTING.md). The first handoff's helper scripts
+  lived under the git-ignored `target/` of the first machine and are gone.
+- Without them, `scripts/rsc_instruction_counts.py` gives the Callgrind
+  counts above, a per-body table, callers of a helper and the executed
+  native instructions of one body. One count takes about two minutes, of
+  which the host's setup under Valgrind is 70 seconds. Pin each run with
+  `taskset -c N`.
+- Copy the host out of `target/release/examples` before the next build
+  replaces it. For a baseline, restore the old source in place, build, copy
+  the host, restore the new source and build again: a second build tree does
+  not fit the cloud disk allowance beside the engine test binaries.
+- Instructions judge a change. Only cycles on a quiet machine compare with
+  Node.
 
-## Local state
+## Running on the cloud machine
 
-- Worktrees `../scriptw-loadic` (emitter, target `target/agents/loadic`) and
-  `../scriptw-integ` (host side, target `target/agents/integ`). Reuse them
-  rather than adding a third: `/home` is btrfs with its metadata nearly full,
-  and a new build tree fails with "No space left on device" while `df` still
-  shows free space. `sudo btrfs balance start -dusage=50 /home` gives it room.
-- To remove when the work is done: both worktrees, `target/agents/`, the stale
-  worktree `target/performance-climb-20261103/env-prune-source`, and the local
-  branches `worktree-agent-a24338a241a8153ce`, `worktree-agent-a297918255736d5f7`
-  and `worktree-agent-a5cf54d0a36ac730a`.
+- The owner allows all four CPUs there as long as the machine does not run
+  out of memory (13.4 GiB cap). Pass `-j 4` to Cargo and `--test-threads=3`
+  to test binaries explicitly; the wrapper's own defaults stay serial.
+- Build with `--cloud --cloud-cpus auto`. Run test binaries with `--cloud
+  --cloud-worker-cpus auto`: the first form exports four compilation jobs,
+  and tests that configure a one-job pool then fail with "Wasm compilation
+  pool already configured for 4 jobs".
+- `cargo test -p scriptw-engine` stops at the first failing binary. Pass
+  `--no-fail-fast`, or name the remaining `--test` targets.
+- The engine suite takes about 25 minutes that way, a release build after an
+  emitter edit 3 to 5, and one Test262 case about 8 seconds on one thread.
+- A Test262 run writes `test262/snapshots/latest-*` files. Delete them
+  instead of committing them.
+- Do not edit a source file while a build or a suite is in flight: the
+  runtime image and the emitter must come from one source state, or the host
+  stops with "immutable runtime receipt failed admission".
 
 ## Failures that predate this work
 
@@ -160,6 +164,13 @@ target/agents/tools/ic_profile.sh <host> <host's rsc-sync.json> <outdir> 14
   work).
 - In strict code, a write to a top-level `var` whose global property was deleted
   re-creates the property instead of throwing (listed in current work).
+- On the cloud machine only, with and without this work:
+  `runtime_cache::embedded_runtime_executes_fresh_programs_without_a_native_runtime_compile`
+  (its trace has no "runtime-native-bundle hit" line there) and
+  `scripts/intl_source_identities.py` ("non-reproducible
+  crates/scriptw-intl/data/segmenter-icu-2/kernel-source-manifest.json").
+  `cargo fmt --all -- --check` also reports differences in files this work
+  does not touch.
 
 ## Decisions left to the owner
 

@@ -56,6 +56,14 @@ accepts `--case <file.js>`.
   `index < length` trap that repeats the source's own bounds branch on every
   array element read, and the `is_subtype` libcall a cast to a non-final type
   takes on a mismatch (about 0.6% of profiled cycles).
+  Arguments reads without the object then take the sync request from 5.095M
+  to 4.911M and async from 5.588M to 5.390M, in Callgrind instruction
+  references on a machine without hardware counters (about 0.8% above the
+  hardware counts), and the same tool attributes the rest by native
+  instruction: one `instanceof` test in `vn` is about 390 instructions, 150
+  of them the global read of its constructor, and a third of `vn`'s
+  plain-object path is stack traffic
+  ([attribution](benchmarks.md#arguments-reads-and-instruction-attribution-2026-11-15)).
  Source `89a934d06891`
   screens at 2.871/3.349 ms Fast and 2.298/2.486 ms Speed, with four fresh
   processes per actor/case rather than final qualification; qualify it against
@@ -112,8 +120,14 @@ accepts `--case <file.js>`.
   global records, eval/prelude modes, captures and arguments; Module-only lookup
   and cell authorities must remain scoped to Modules. Owner: IR storage planning.
 - Expand strict read-only arguments snapshots only with complete observer proofs
-  and measured gains. Missing own indices can expose the real object through a
-  prototype getter; preserve actual count, rooted snapshots and complete fallback.
+  and measured gains. Length and index reads now answer from the argument
+  vector, the object is built when another use needs it, and method calls on
+  other receivers are admitted
+  ([measurement](benchmarks.md#arguments-reads-and-instruction-attribution-2026-11-15)).
+  Still refused: passing `arguments` to `apply`, and a `try` statement. An
+  admitted function still allocates its activation record for the
+  `arguments` cell (about 480 instructions at `createElement`'s entry).
+  Preserve actual count, the unchanged vector and complete fallback.
   Owner: arguments binding and source-call planning.
 - Classify property-cache fallback families before widening coverage. Current source `9f2788b4af9f` request windows still count 2,548/2,698 cached-helper entries and 1,275/1,362 generic fallbacks (sync/async); other exits are not a hit count. Separate eligibility, cold/evicted sites, compact/dictionary receivers, computed/static keys, inherited and absent results. Preserve live guards and the complete exotic fallback. [Counters](react-architecture-current.json). Owner: ordinary object storage.
 - Attribute StoredValue decoding and binding writes before another list-storage

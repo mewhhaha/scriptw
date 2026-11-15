@@ -40,8 +40,13 @@ python3 -B scripts/limited_verification.py -- ./scripts/dev.sh build
 The local wrapper enforces one CPU, at most 4 GiB, no swap, grouped OOM termination,
 serial Cargo/libtest and bounded retained-module caches. On a managed cloud
 machine, explicit `--cloud` uses its finite inherited cgroup budget; serial
-defaults remain. Optional cloud CPU settings never authorize changing a campaign's
-workers, deadlines or cache policy. Missing resource controls must fail clearly.
+defaults remain. The cap is read from cgroup v2 and, on a hybrid machine, from
+the cgroup-v1 memory and CPU hierarchies. Optional cloud CPU settings never
+authorize changing a campaign's workers, deadlines or cache policy. Missing
+resource controls must fail clearly. `--cloud-cpus auto` exports the CPU count
+as the native compilation job count, which engine tests that require a one-job
+pool reject; run test binaries with `--cloud-worker-cpus auto` and an explicit
+`--test-threads` instead.
 
 Prefer persistent Cargo output directories. If filesystem pressure requires
 temporary tmpfs outputs, restore verified persistent copies before runtime tests.
@@ -399,6 +404,28 @@ known-count controls. Drivers require a qualified frozen host and its matching
 baseline JSON; rebuilding requires a new baseline identity. These diagnostics
 include caller control edges, exclude setup/output checks and never supply scored
 request timings. Binary perf data and native executables are not in the archive.
+
+Where no hardware counter is available (a virtual machine without a PMU),
+`scripts/rsc_instruction_counts.py` counts instructions per retained request
+with Callgrind instead, bounding each request at the same host barrier:
+
+```sh
+python3 -B scripts/limited_verification.py --cloud -- python3 -B scripts/rsc_instruction_counts.py \
+  count target/rsc-candidate/host target/new-application-fixtures target/new-rsc-counts --mode sync
+```
+
+It reports the median and mean over 97 requests after 100 warmups. With
+`--profile` it keeps the per-request dumps, which `symbols`, `callers
+<helper>` and `function <program.cwasm> <symbol> --listing <file>` read:
+own instructions per native body, calls and inclusive cost by caller, and the
+executed native instructions of one body with their counts. Native code is
+named through the host's perf map; `program.cwasm` is the image the host
+writes under `SCRIPTW_RSC_ARTIFACT_DIR`. These are Callgrind instruction
+references: exact and repeatable, about 0.8% above hardware user-instruction
+counts on the retained sync request, and never a time or a cycle count.
+Compare two hosts only through the same tool, and build the baseline host in
+the same Cargo target directory before or after the candidate rather than in
+a second build tree when disk is short.
 
 Each reference uses two blocks, eight fresh processes and seven measured calls
 after three checked warmups. Record Chromium and Node/V8 identities. Standalone

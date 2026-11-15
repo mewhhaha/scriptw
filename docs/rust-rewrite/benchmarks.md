@@ -1177,6 +1177,86 @@ window (each of their maxima is a full collection); the 4 MiB nursery leaves
 nursery free) after a few minor collections. Cycles were not settled: other
 projects' builds ran throughout.
 
+### Arguments reads and instruction attribution (2026-11-15)
+
+Measured on a cloud machine without hardware counters, so these are Callgrind
+instruction references per request, not the hardware counts of the rows
+above: `scripts/rsc_instruction_counts.py count` runs the retained host under
+Valgrind 3.22 and bounds each request at the host's ready/done barrier. The
+counts repeat exactly between runs. On `b6f536be0` they read 5.095M (sync
+median) where the hardware count was 5.05M, about 0.8% higher. Speed policy,
+97 requests after 100 warmups and 3 discarded windows, exact Flight output.
+
+A strict function that only reads `arguments.length` and `arguments[i]`
+answers them from its argument vector and builds the object when another use
+needs it. The closed walk that admits such a function refused any method call,
+because a call `recv.m(a)` lowers to a temporary holding its receiver. It now
+admits the temporary when the receiver is not the `arguments` binding or a
+read of it. In the bundle that admits `createElement` (68 calls per sync
+request), `cloneElement`, the error formatter and `Ct`, which reads its
+optional fourth and fifth arguments; the functions that pass `arguments` to
+`apply` keep the object.
+
+| Speed, Callgrind instructions per request | Sync median | Sync mean | Async median | Async mean | P bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `b6f536be0` | 5,095,083 | 5,194,989 | 5,587,559 | 5,690,369 | 4,765,631 |
+| Method calls admitted | 4,910,744 | 4,995,321 | 5,390,385 | 5,497,537 | 4,771,822 |
+
+Own instructions per sync request after the change, from
+`scripts/rsc_instruction_counts.py symbols` over 40 requests (mean 4.997M,
+minor collections included); native code is named through the host's perf
+map:
+
+| Body | Instructions | Share |
+| --- | ---: | ---: |
+| `vn` (Flight's model serializer) | 713,874 | 14.3% |
+| `ft` | 455,938 | 9.1% |
+| `helper::cached_property_read` | 358,702 | 7.2% |
+| `helper::json_stringify_value` | 239,419 | 4.8% |
+| `helper::object_read` | 226,754 | 4.5% |
+| `f42` (`createElement`) | 183,944 | 3.7% |
+| `helper::computed_property_write` | 169,296 | 3.4% |
+| `helper::coercive_add` | 139,298 | 2.8% |
+| `TextEncoder.prototype.encode` | 104,136 | 2.1% |
+| By-name identifier helpers (read, resolve, typeof) | 129,710 | 2.6% |
+
+What the per-instruction listing (`function --listing`) shows:
+
+- `vn` runs 7,480 instructions for each of the 35 plain objects of a request
+  (261,800 in all), nearly all of it the nineteen `instanceof` tests and
+  three `typeof` guards that precede the plain-object return. One test is
+  about 390 instructions: about 150 read the global constructor (the
+  remembered entry is re-proved through the environment root, the global
+  object, its dictionary, two bounds checks, a key compare, the flags and a
+  sealed-type test), about 130 re-prove the site's record and walk the chain,
+  and the rest moves values.
+- Of those 7,480 instructions, 662 reload the GC heap base from the stack,
+  187 reload the instance pointer, 998 are other stack loads and 567 are
+  stack stores: a third of the path. `vn`'s native body is 587 KB and keeps
+  the heap base in a stack slot; `f42` (68 KB) keeps it in a register.
+- `f42` runs about 480 instructions before its first call. They bind three
+  parameters and build the activation record that still holds the
+  `arguments` cell; the object itself is no longer built.
+- The by-name helpers are called from few places (`callers`): `typeof
+  FormData` and `typeof Blob` in `vn`, both missing globals (70 calls,
+  47,950 instructions), and reads in the fixture's own arrow functions
+  (`f307` 96 reads and 32 resolves, `to` 64 and 32; 86,196 instructions).
+  Arrow functions are not module-local owners, so their free identifiers
+  start at the current environment.
+- `cached_property_read` is entered 1,171 times (437,607 instructions
+  inclusive): 568 from `vn`, 260 from `f42`, 68 each from `jn` and `rr`, 67
+  from `ft`, 66 from `et`. `computed_property_write` is entered 241 times
+  from `ft` and 66 from `f42` (224,645 inclusive), and `coercive_add` 420
+  times (207,062 inclusive).
+
+Verified on this tree: the engine suite binary by binary (4,210 passed; one
+`runtime_cache` test fails on this machine with and without the change), the
+engine doctest, the emitter's arguments-protocol unit tests, the source
+guards, and Test262 `language/arguments-object` (460 of 460) and
+`language/function-code` (279 of 281; both failures are
+`S10.2.1_A4_T2.js`, listed in current work). No hardware cycles were
+measured; the comparison with V8 above is not refreshed.
+
 ### Descriptor work and physical allocation
 
 Compiler-created, already validated descriptors now call canonical ordinary/Array definition directly when admitted, retaining the exotic Reflect fallback. Known source accessor descriptors bypass the inline Array algorithm to control code growth. Public descriptor conversion and validation remain intact.
