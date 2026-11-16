@@ -18,7 +18,8 @@ import stat
 import sys
 
 from benchmark_metrics import digest, measure_process
-from limited_verification import kernel_group, limited_environment, require_kernel_budget
+from limited_verification import (kernel_group, limited_environment, require_cloud_budget,
+                                  require_kernel_budget)
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = 'scriptw-situation-benchmarks-v1'
@@ -26,6 +27,8 @@ SAMPLES, WARMUPS, BLOCKS, ROUNDS = 21, 100, 2, 4
 ADAPTER = 'crates/scriptw-cli/tests/fixtures/v8_baseline/node-situations.cjs'
 HOST_SOURCE = 'crates/scriptw-cli/examples/compiler_precompiled_baseline.rs'
 IDENTITY_FIELDS = ('source_commit', 'source_fingerprint', 'compiler_identity_scheme', 'executable_sha256')
+# The adapter checks the same exact release; published V8 scores name it.
+NODE_VERSION = 'v24.22.1'
 POLICIES = {'fast': ('None', 'SinglePass', 'single-pass'),
             'speed': ('Speed', 'Backtracking', 'backtracking')}
 
@@ -248,7 +251,7 @@ def validate_execution(raw, case, actor, source_sha, identity, prepared=None):
     if actor == 'v8':
         require(raw.get('schema') == 'scriptw-v8-retained-situations-v1'
                 and raw.get('file') == case['file'] and raw.get('source_sha256') == source_sha
-                and raw.get('node') == 'v24.12.0' and isinstance(raw.get('v8'), str)
+                and raw.get('node') == NODE_VERSION and isinstance(raw.get('v8'), str)
                 and raw.get('native_syntax_absent') is True
                 and raw.get('execution_policy') == {'jit': 'normal', 'gc': 'natural'},
                 'V8 source/version/runtime policy differs')
@@ -323,7 +326,13 @@ def reduce_runtime(rows, operations):
 
 
 def run(args):
-    require_kernel_budget(4 * 1024**3)
+    # A managed cloud machine has no delegated cgroup-v2 scope to cap at 4 GiB.
+    # --cloud admits its inherited finite cap instead and records that scope.
+    cloud_cap = None
+    if args.cloud:
+        cloud_cap = require_cloud_budget()
+    else:
+        require_kernel_budget(4 * 1024**3)
     require(len(os.sched_getaffinity(0)) == 1, 'one inherited CPU required')
     environment = limited_environment()
     require(not environment.get('NODE_OPTIONS'), 'unset NODE_OPTIONS')
@@ -385,7 +394,16 @@ def run(args):
                            sha256=sha(data), bytes=len(data)))
     workloads = [dict(case, source_sha256=digest(output / 'sources' / case['file'])) for case in cases]
     actors = ['scriptw-' + policy for policy in args.policies] + ['v8']
-    group = kernel_group()
+    if cloud_cap is None:
+        group = kernel_group()
+        resource_scope = dict(cgroup=str(group),
+            memory_max=(group / 'memory.max').read_text().strip(),
+            memory_swap_max=(group / 'memory.swap.max').read_text().strip(),
+            memory_oom_group=(group / 'memory.oom.group').read_text().strip())
+    else:
+        resource_scope = dict(cloud=dict(inherited_memory_cap_bytes=cloud_cap,
+            scope='managed cloud machine: shared virtual CPUs, inherited memory cap, '
+                  'no kernel-enforced 4 GiB budget and no cgroup OOM event record'))
     report = dict(schema=SCHEMA, status='incomplete', complete=False, started_at=stamp(),
         workloads=workloads, cases=[], rows=[], preparations=[], commands=[], inputs=inputs,
         tools=dict(host=dict(path='bin/compiler_precompiled_baseline', sha256=digest(host), cargo_producer=producer),
@@ -401,14 +419,14 @@ def run(args):
             scriptc=dict(status='unavailable', reason='Scriptc WASI _start has no compatible retained-module prepare/run ABI'),
             timeout_seconds=60, preparation_timeout_seconds=300,
             caveats='descriptive same-host observations; not conformance, statistical confidence or universal application performance'),
-        resources=dict(cgroup=str(group), affinity=sorted(os.sched_getaffinity(0)),
-            memory_max=(group / 'memory.max').read_text().strip(),
-            memory_swap_max=(group / 'memory.swap.max').read_text().strip(),
-            memory_oom_group=(group / 'memory.oom.group').read_text().strip(),
+        resources=dict(resource_scope, affinity=sorted(os.sched_getaffinity(0)),
             environment={key: environment.get(key) for key in ('CARGO_BUILD_JOBS', 'SCRIPTW_JOBS',
                 'RUST_TEST_THREADS', 'RAYON_NUM_THREADS', 'SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES',
                 'SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES', 'NODE_OPTIONS', 'NODE_DISABLE_COMPILE_CACHE')}),
-        machine=dict(system=platform.system(), kernel=platform.release(), architecture=platform.machine()),
+        machine=dict(system=platform.system(), kernel=platform.release(), architecture=platform.machine(),
+                     cpu_models=sorted({line.partition(':')[2].strip() for line in
+                                        Path('/proc/cpuinfo').read_text().splitlines()
+                                        if line.startswith('model name')})),
         tooling=[dict(original=str(ROOT / name), path='tooling/' + name,
                       sha256=digest(output / 'tooling' / name)) for name in tooling])
     if receipt_path is not None:
@@ -520,9 +538,9 @@ def run(args):
         report['source_identity'] = {field: identity[field] for field in IDENTITY_FIELDS}
         report['tools']['host']['identity'] = identity
         event = invoke('node-version', 'v8', 'version', [node, '--version'], 60)
-        require(event['status'] == 'ok' and (output / event['stdout']).read_text().strip() == 'v24.12.0',
-                'pinned Node v24.12.0 required')
-        report['tools']['node']['version'] = 'v24.12.0'
+        require(event['status'] == 'ok' and (output / event['stdout']).read_text().strip() == NODE_VERSION,
+                'pinned Node ' + NODE_VERSION + ' required')
+        report['tools']['node']['version'] = NODE_VERSION
         event = invoke('time-version', 'time', 'version', [time_binary, '--version'], 60)
         require(event['status'] == 'ok' and 'GNU' in (output / event['stdout']).read_text(), 'GNU time required')
         for policy in args.policies:
@@ -604,6 +622,8 @@ def main():
     parser.add_argument('--time', type=Path, required=True)
     parser.add_argument('--case', dest='cases', action='append')
     parser.add_argument('--policies', type=lambda text: text.split(','), default=['fast', 'speed'])
+    parser.add_argument('--cloud', action='store_true',
+                        help='admit a managed cloud machine\'s inherited memory cap; the report records that scope')
     args = parser.parse_args()
     if not run(args):
         raise SystemExit(1)

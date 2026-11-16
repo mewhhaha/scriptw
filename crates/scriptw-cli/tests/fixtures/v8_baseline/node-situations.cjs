@@ -14,7 +14,7 @@ async function main() {
       !Number.isInteger(warmups) || warmups < 1 || warmups > 1000) {
     throw new Error('usage: node-situations.cjs FIXTURES CASE SAMPLES WARMUPS');
   }
-  if (process.version !== 'v24.12.0') throw new Error('Node v24.12.0 is required');
+  if (process.version !== 'v24.22.1') throw new Error('Node v24.22.1 is required');
   const flags = [...process.execArgv, process.env.NODE_OPTIONS || ''].join(' ');
   if (/--(?:allow[-_]natives[-_]syntax|jitless|expose[-_]gc|no[-_]opt|no[-_]turbo|no[-_]sparkplug)/.test(flags)) {
     throw new Error('normal JIT and natural GC are required; special runtime flags are forbidden');

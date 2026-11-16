@@ -50,7 +50,7 @@ def native(producer=False):
 def execution(actor='v8'):
     c = case()
     row = dict(schema='scriptw-v8-retained-situations-v1', file=c['file'], source_sha256='d' * 64,
-               node='v24.12.0', v8='14.1', samples=m.SAMPLES, warmups=m.WARMUPS,
+               node=m.NODE_VERSION, v8='14.1', samples=m.SAMPLES, warmups=m.WARMUPS,
                native_syntax_absent=True, execution_policy=dict(jit='normal', gc='natural'),
                phase_ns=dict(parse=1, link=2, init=3), observations=[])
     if actor != 'v8':

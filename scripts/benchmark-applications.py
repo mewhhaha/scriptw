@@ -8,11 +8,11 @@ from pathlib import Path
 import shutil
 import subprocess
 
-from application_benchmarks import (ACTORS, SAMPLES, WARMUPS, SCHEMA, checked_identity,
-    checked_observations, process_plan, require, successful_process, summarize, validate_manifest)
+from application_benchmarks import (ACTORS, SAMPLES, WARMUPS, SCHEMA, checked_identity, checked_observations,
+    machine_identity, process_plan, require, successful_process, summarize, validate_manifest)
 from benchmark_metrics import digest, measure_process
 from compilation_comparison import ADAPTER, process_environment, scriptc_companions
-from limited_verification import kernel_group, limited_environment, require_kernel_budget
+from limited_verification import kernel_group, limited_environment, require_cloud_budget, require_kernel_budget
 
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = ROOT / 'crates/scriptw-cli/tests/fixtures/v8_baseline/node-runtime.cjs'
@@ -35,11 +35,16 @@ def stamp():
     return datetime.now(timezone.utc).isoformat()
 
 
-def resource_snapshot():
+def resource_snapshot(cloud):
+    # A managed cloud machine has no delegated cgroup-v2 scope; its inherited cap is recorded once instead.
+    if cloud:
+        return None
     return {field: (kernel_group() / field).read_text().strip() for field in FIELDS}
 
 
 def check_resources(before, after):
+    if before is None:
+        return
     require(all(before[field] == after[field] for field in FIELDS if field != 'memory.events'),
             'resource policy changed during child execution')
     left = dict(line.split() for line in before['memory.events'].splitlines())
@@ -54,8 +59,17 @@ def main():
         parser.add_argument('--' + name, type=Path, required=True)
     parser.add_argument('--node', default='node')
     parser.add_argument('--timeout', type=float, default=120)
+    parser.add_argument('--cloud', action='store_true',
+                        help="admit a managed cloud machine's inherited memory cap; the report records that scope")
     args = parser.parse_args()
-    require_kernel_budget(4 * 1024**3)
+    resources = dict(policy='Sequential children; one CPU; at most4GiB; no swap; grouped OOM; module cache1/64MiB.')
+    if args.cloud:
+        resources = dict(policy='Sequential children; one inherited CPU; inherited cloud memory cap; module cache1/64MiB.',
+            cloud=dict(inherited_memory_cap_bytes=require_cloud_budget(),
+                scope='managed cloud machine: shared virtual CPUs, inherited memory cap, '
+                      'no kernel-enforced 4 GiB budget and no cgroup OOM event record'))
+    else:
+        require_kernel_budget(4 * 1024**3)
     require(len(os.sched_getaffinity(0)) == 1, 'one CPU required')
     require(args.timeout > 0, 'positive child deadline required')
     frozen, fixtures, output = args.frozen.resolve(), args.fixtures.resolve(), args.output.resolve()
@@ -162,8 +176,9 @@ def main():
             statistics='Two balanced blocks; four fresh processes per available actor/case/block; process is the unit. No cross-runtime CPU ratios, speed acceptance or conformance claim.',
             failures='Every selected case has all three actor statuses. Failures retain their command stage, raw logs, exit code and timeout. Missing cases are never speed wins or permanent skips.',
             source='Original synchronous print fixtures shared by Scriptw/V8; Scriptc alone receives canonical print adapter.',
-            resources='Sequential children; one CPU; at most4GiB; no swap; grouped OOM; module cache1/64MiB.'),
-        machine=dict(affinity=sorted(os.sched_getaffinity(0)), resources=resource_snapshot()), timeout_seconds=args.timeout)
+            resources=resources['policy']),
+        machine=dict(machine_identity(), affinity=sorted(os.sched_getaffinity(0)), resources=resources.get('cloud') or resource_snapshot(False)),
+        timeout_seconds=args.timeout)
 
     def invoke(stem, stage, argv, child_env=env, cwd=ROOT):
         stdout_path, stderr_path = output / 'logs' / (stem + '.stdout'), output / 'logs' / (stem + '.stderr')
@@ -172,12 +187,12 @@ def main():
                       environment={key: value for key, value in child_env.items()
                                    if key.startswith(('SCRIPTW_', 'SCRIPTC_', 'ZIG_', 'NODE_')) or key == 'TMPDIR'})
         record['resources'] = dict(exit_code=None, timed_out=False, not_launched=True)
-        resources_before = resource_snapshot()
+        resources_before = resource_snapshot(args.cloud)
         try:
             with stdout_path.open('xb') as stdout, stderr_path.open('xb') as stderr:
                 record['resources'] = measure_process(argv, cwd=cwd, env=child_env, stdout=stdout,
                     stderr=stderr, timeout=args.timeout, time_binary=timer)
-            check_resources(resources_before, resource_snapshot())
+            check_resources(resources_before, resource_snapshot(args.cloud))
             require(successful_process(record['resources']), 'child failed or timed out')
             record['status'] = 'succeeded'
         except (ValueError, OSError, subprocess.SubprocessError) as error:

@@ -200,3 +200,89 @@ class ApplicationBenchmarkTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+def script(name):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(name.replace('-', '_'), ROOT / 'scripts' / name)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def runtime_manifest(source, package, native, target=b'x86_64-unknown-linux-gnu'):
+    """The Cargo producer's v5 encoding (crates/scriptw-engine/src/embedded_runtime/manifest.rs)."""
+    return (b'SCRWNR01' + (5).to_bytes(4, 'little') + (7).to_bytes(4, 'little') + bytes([1, 3, 1])
+            + len(target).to_bytes(2, 'little') + target + bytes.fromhex(source) + b'\x11' * 32
+            + bytes.fromhex(package) + bytes.fromhex(native))
+
+
+class CohortAndPublicationTests(unittest.TestCase):
+    def runtime_receipt(self, *, source='a' * 64, corrupt_package=False):
+        freeze = script('freeze-application-cohort.py')
+        with tempfile.TemporaryDirectory() as directory:
+            out, output = Path(directory) / 'out', Path(directory) / 'cohort'
+            out.mkdir()
+            output.mkdir()
+            for prefix in ('scriptw-runtime', 'scriptw-runtime-portable'):
+                (out / f'{prefix}-package.bin').write_bytes(prefix.encode() + b' package')
+                (out / f'{prefix}-native.bin').write_bytes(prefix.encode() + b' native')
+                package = digest(out / f'{prefix}-package.bin')
+                if corrupt_package:
+                    package = 'f' * 64
+                (out / f'{prefix}-manifest.bin').write_bytes(
+                    runtime_manifest(source, package, digest(out / f'{prefix}-native.bin')))
+            identity = dict(source_fingerprint='a' * 64,
+                            shared_configuration=dict(target_triple='x86_64-unknown-linux-gnu'))
+            return freeze.runtime_receipt(output, dict(out_dir=str(out)), identity)
+
+    def test_frozen_runtime_images_must_come_from_the_host_source(self):
+        files = self.runtime_receipt()
+        package = files['scriptw-runtime-portable-package.bin']['package']
+        self.assertEqual(package['package_source_fingerprint'], 'a' * 64)
+        self.assertEqual(package['runtime_key'], '11' * 32)
+        with self.assertRaisesRegex(ValueError, 'source differs'):
+            self.runtime_receipt(source='b' * 64)
+        with self.assertRaisesRegex(ValueError, 'does not bind'):
+            self.runtime_receipt(corrupt_package=True)
+
+    def test_publication_refuses_binary_evidence_instead_of_dropping_it(self):
+        publish = script('publish-application-benchmarks.py')
+        with tempfile.TemporaryDirectory() as directory:
+            for value in (b'\0asm\1\0\0\0', b'\x7fELF', b'text\0more', b'\xff\xfe'):
+                path = Path(directory) / 'log.stdout'
+                path.write_bytes(value)
+                with self.assertRaises((ValueError, UnicodeDecodeError)):
+                    publish.inert_text(path)
+
+    def test_renderer_reads_exactly_the_archive_the_publisher_writes(self):
+        publish, render = script('publish-application-benchmarks.py'), script('render-application-benchmarks.py')
+        selected = {'evidence/target/campaign/report.json': b'{}\n', 'evidence/scripts/tool.py': b'print(1)\n'}
+        index = dict(schema='scriptw-inert-evidence-index-v1', members=[
+            dict(path=name, bytes=len(value), sha256=digest_bytes(value)) for name, value in sorted(selected.items())])
+        with tempfile.TemporaryDirectory() as directory:
+            receipt = publish.write_archive(Path(directory) / 'evidence.tar.xz', selected, index)
+            files = render.read_archive(dict(archive=receipt), Path(directory))
+            self.assertEqual({name: files[name] for name in selected}, selected)
+            tampered = dict(receipt, regular_utf8_members=receipt['regular_utf8_members'] + 1)
+            with self.assertRaisesRegex(ValueError, 'inventory'):
+                render.read_archive(dict(archive=tampered), Path(directory))
+
+    def test_failure_diagnostic_names_the_deadline_or_the_last_log_line(self):
+        render = script('render-application-benchmarks.py')
+        files = {'evidence/run/logs/a.stderr': b'/w/input.js:2:5 - error SC0001: types\n  2 | code\n2 errors.\n\n',
+                 'evidence/run/logs/a.stdout': b'', 'evidence/run/logs/c.stdout': b'',
+                 'evidence/run/logs/c.stderr': b'uncaught throw: ReferenceError: Request is not defined\n',
+                 'evidence/run/logs/b.stderr': b'', 'evidence/run/logs/b.stdout': b''}
+        failed = dict(stdout='logs/a.stdout', stderr='logs/a.stderr', resources=dict(exit_code=1, timed_out=False))
+        self.assertEqual(render.failure_line(files, Path('run'), failed, 60), 'exit 1: error SC0001: types')
+        thrown = dict(stdout='logs/c.stdout', stderr='logs/c.stderr', resources=dict(exit_code=1, timed_out=False))
+        self.assertEqual(render.failure_line(files, Path('run'), thrown, 60),
+                         'exit 1: uncaught throw: ReferenceError: Request is not defined')
+        timed_out = dict(stdout='logs/b.stdout', stderr='logs/b.stderr', resources=dict(exit_code=None, timed_out=True))
+        self.assertEqual(render.failure_line(files, Path('run'), timed_out, 60), 'timed out (60 s)')
+
+
+def digest_bytes(value):
+    import hashlib
+    return hashlib.sha256(value).hexdigest()

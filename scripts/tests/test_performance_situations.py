@@ -137,7 +137,7 @@ class SituationTests(unittest.TestCase):
                     self.assertIn(f'switch (index & {sites - 1})', entry['source'])
 
     @unittest.skipUnless(os.environ.get('SCRIPTW_SITUATIONS_NODE'),
-                         'set SCRIPTW_SITUATIONS_NODE to pinned Node v24.12.0 for V8 checks')
+                         'set SCRIPTW_SITUATIONS_NODE to the pinned Node (benchmark-situations.py NODE_VERSION) for V8 checks')
     def test_all_seed_checksums_on_pinned_node(self):
         node = os.environ['SCRIPTW_SITUATIONS_NODE']
         adapter = ROOT / 'crates/scriptw-cli/tests/fixtures/v8_baseline/node-situations.cjs'

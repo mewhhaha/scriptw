@@ -9,7 +9,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from benchmark_metrics import digest
-from compilation_comparison import ACTORS, ADAPTER, FIXTURES, POLICY, SCHEMA, SCRIPTC_COMPANIONS, load_report, process_environment, process_plan, summarize
+from compilation_comparison import ACTORS, ADAPTER, FIXTURES, POLICY, SCHEMA, SCRIPTC_COMPANIONS, load_report, measurement_policy, process_environment, process_plan, summarize
 
 spec = importlib.util.spec_from_file_location('compilation_benchmark', ROOT / 'scripts/benchmark-compilation.py')
 runner = importlib.util.module_from_spec(spec)
@@ -118,6 +118,34 @@ class CompilationComparisonTests(unittest.TestCase):
         report = load_report(self.save())
         self.assertEqual(len(report['summary']), 17)
         self.assertEqual(report['summary'][0]['actors']['scriptw']['processes'], 4)
+
+    def use_cloud_scope(self, policy):
+        machine = self.report['plan']['machine']
+        machine.pop('resources', None)
+        machine['cloud'] = dict(inherited_memory_cap_bytes=14 * 1024**3, scope='managed cloud machine')
+        self.report['policy'] = dict(policy)
+        self.report['plan']['policy'] = dict(policy)
+        (self.root / 'plan.json').write_text(json.dumps(self.report['plan']))
+
+    def test_cloud_scope_is_admitted_only_with_its_own_resource_policy(self):
+        self.use_cloud_scope(measurement_policy(True))
+        self.assertNotEqual(measurement_policy(True)['resources'], POLICY['resources'])
+        self.assertEqual(load_report(self.save())['plan']['machine']['cloud']['inherited_memory_cap_bytes'], 14 * 1024**3)
+        self.use_cloud_scope(POLICY)
+        with self.assertRaisesRegex(ValueError, 'measurement policy differs'):
+            load_report(self.save())
+
+    def test_cloud_scope_cannot_also_claim_or_omit_its_recorded_cap(self):
+        self.use_cloud_scope(measurement_policy(True))
+        self.report['plan']['machine']['cloud']['inherited_memory_cap_bytes'] = 0
+        (self.root / 'plan.json').write_text(json.dumps(self.report['plan']))
+        with self.assertRaisesRegex(ValueError, 'cloud resource scope differs'):
+            load_report(self.save())
+        self.report['plan']['machine']['cloud']['inherited_memory_cap_bytes'] = 1
+        self.report['plan']['machine']['resources'] = {'memory.max': '1'}
+        (self.root / 'plan.json').write_text(json.dumps(self.report['plan']))
+        with self.assertRaisesRegex(ValueError, 'cloud resource scope differs'):
+            load_report(self.save())
 
     def test_missing_or_reordered_process_cannot_be_reduced(self):
         for rows in (self.report['rows'][:-1], self.report['rows'][::-1]):

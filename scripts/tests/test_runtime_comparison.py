@@ -1,8 +1,11 @@
 """The three-runtime reference must retain source, outputs and process units."""
 import copy
+import hashlib
 import importlib.util
+import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -104,6 +107,82 @@ class RuntimeComparisonTests(unittest.TestCase):
             bench.reduce_rows(rows[:-1], names)
         with self.assertRaises(AssertionError):
             bench.reduce_rows([rows[1], rows[0], *rows[2:]], names)
+
+
+    def summary(self, scriptw, other):
+        names = [f'case{index}.js' for index in range(17)]
+        products = lambda: {'scriptw': dict(wall_ns=dict(median=scriptw, mean=scriptw)),
+                            'scriptc': dict(wall_ns=dict(median=other, mean=other)),
+                            'v8': dict(wall_ns=dict(median=other, mean=other))}
+        return [dict(case=name, blocks=[dict(block=block, products=products()) for block in range(2)]) for name in names]
+
+    def test_published_comparisons_need_wins_in_both_statistics_and_blocks(self):
+        summary = self.summary(1.0, 2.0)
+        result = bench.comparisons(summary)
+        self.assertEqual(len(result['scriptc']['wins_in_both_statistics_and_blocks']), 17)
+        self.assertAlmostEqual(result['v8']['geomeans'][1]['median'], 0.5)
+        summary[0]['blocks'][1]['products']['scriptw']['wall_ns']['mean'] = 3.0
+        self.assertEqual(len(bench.comparisons(summary)['v8']['wins_in_both_statistics_and_blocks']), 16)
+
+    def test_cohort_qualification_is_bound_to_its_receipt_and_claims_no_aa_gate(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            frozen = Path(temporary)
+            (frozen / 'native-qualified.json').write_text('{"status": "complete"}\n')
+            receipt = dict(schema=bench.COHORT_QUALIFICATION, status='complete', publication_commit='a' * 40,
+                           source_fingerprint='b' * 64, aa_gates='not-applicable',
+                           native=dict(receipt=dict(path='native-qualified.json',
+                                                    sha256=bench.digest(frozen / 'native-qualified.json'))))
+            (frozen / 'qualification.json').write_text(json.dumps(receipt))
+            authority, qualification = bench.scriptw_qualification(frozen, None, 'cohort')
+            self.assertEqual((authority['publication_commit'], qualification['kind']), ('a' * 40, 'cohort'))
+            for change in ('receipt', 'aa'):
+                changed = copy.deepcopy(receipt)
+                if change == 'receipt':
+                    changed['native']['receipt']['sha256'] = 'c' * 64
+                else:
+                    changed['aa_gates'] = {}
+                (frozen / 'qualification.json').write_text(json.dumps(changed))
+                with self.subTest(change=change), self.assertRaises(AssertionError):
+                    bench.scriptw_qualification(frozen, None, 'cohort')
+
+    def test_runtime_manifest_must_frame_its_bound_outputs(self):
+        target = b'x86_64-unknown-linux-gnu'
+        fields = bytes(range(32)) + b'k' * 32 + b'p' * 32 + b'n' * 32
+        manifest = bench.RUNTIME_MANIFEST_MAGIC + (5).to_bytes(4, 'little') + bytes(7) + len(target).to_bytes(2, 'little') + target + fields
+        decoded = bench.decode_runtime_manifest(manifest)
+        self.assertEqual((decoded['version'], decoded['target']), (5, target.decode()))
+        self.assertEqual(decoded['package_sha256'], (b'p' * 32).hex())
+        for invalid in (b'SCRWNR02' + manifest[8:], manifest[:-1]):
+            with self.subTest(length=len(invalid)), self.assertRaises(ValueError):
+                bench.decode_runtime_manifest(invalid)
+
+    def test_inert_publication_admits_text_only_and_the_renderer_reads_it(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            campaign, root = Path(temporary) / 'campaign', Path(temporary)
+            (campaign / 'candidate').mkdir(parents=True)
+            (campaign / 'tmp').mkdir()
+            (campaign / 'tmp/ignored.wasm').write_bytes(b'\0asm\1\0\0\0')
+            (campaign / 'analysis.json').write_text('{"schema": "analysis"}\n')
+            (campaign / 'candidate/identity.json').write_text('{"source_fingerprint": "' + 'f' * 64 + '"}\n')
+            members = bench.inert_members(campaign, 'evidence/cohort')
+            self.assertEqual(set(members), {'evidence/cohort/analysis.json', 'evidence/cohort/candidate/identity.json'})
+            index = dict(schema='scriptw-inert-evidence-index-v1',
+                         members=[dict(path=name, bytes=len(data), sha256=hashlib.sha256(data).hexdigest())
+                                  for name, data in members.items()])
+            archive = root / 'evidence-inert.tar.xz'
+            count, expanded = bench.write_archive(archive, members, index)
+            self.assertEqual(archive.stat().st_mode & 0o777, 0o644)
+            checkpoint = dict(source_fingerprint='f' * 64,
+                              reference17=dict(evidence=dict(path='analysis.json', sha256=bench.digest(campaign / 'analysis.json'))),
+                              evidence=dict(archive=str(archive), sha256=bench.digest(archive), bytes=archive.stat().st_size,
+                                            regular_utf8_members=count, expanded_utf8_bytes=expanded))
+            analysis, identity = renderer.load_analysis(checkpoint)
+            self.assertEqual((analysis['schema'], identity['source_fingerprint']), ('analysis', 'f' * 64))
+            with self.assertRaises(FileExistsError):
+                bench.write_archive(archive, members, index)
+            (campaign / 'program.wasm').write_bytes(b'\0asm\1\0\0\0')
+            with self.assertRaises(AssertionError):
+                bench.inert_members(campaign, 'evidence/cohort')
 
 
 if __name__ == '__main__':

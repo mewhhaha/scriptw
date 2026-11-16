@@ -8,10 +8,10 @@ from pathlib import Path
 import shutil
 import subprocess
 
-from application_benchmarks import require, checked_identity, successful_process, checked_product_stdout
+from application_benchmarks import require, checked_identity, machine_identity, successful_process, checked_product_stdout
 from benchmark_metrics import digest, measure_process, summary
 from compilation_comparison import ADAPTER, process_environment, scriptc_companions
-from limited_verification import kernel_group, limited_environment, require_kernel_budget
+from limited_verification import kernel_group, limited_environment, require_cloud_budget, require_kernel_budget
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'crates/scriptw-cli/tests/fixtures/edge_rendering'
@@ -29,11 +29,21 @@ def executable(value):
     return Path(shutil.which(str(value)) or value).resolve(strict=True)
 
 
+CLOUD = None  # the inherited cap on a managed cloud machine, which has no delegated cgroup-v2 scope
+
+
 def resources():
+    if CLOUD is not None:
+        return dict(cloud=dict(inherited_memory_cap_bytes=CLOUD,
+            scope='managed cloud machine: shared virtual CPUs, inherited memory cap, '
+                  'no kernel-enforced 4 GiB budget and no cgroup OOM event record'))
     return {name: (kernel_group() / name).read_text().strip() for name in FIELDS}
 
 
 def unchanged(left, right):
+    if 'cloud' in left:
+        require(left == right, 'resource scope changed')
+        return
     require(all(left[name] == right[name] for name in FIELDS if name != 'memory.events'), 'resource policy changed')
     before, after = [dict(line.split() for line in value['memory.events'].splitlines()) for value in (left, right)]
     require(all(before.get(key) == after.get(key) for key in ('oom', 'oom_kill', 'oom_group_kill')), 'cgroup OOM event')
@@ -49,8 +59,14 @@ def main():
     parser.add_argument('--node', default='node')
     parser.add_argument('--time', default='/usr/bin/time')
     parser.add_argument('--timeout', type=float, default=120)
+    parser.add_argument('--cloud', action='store_true',
+                        help="admit a managed cloud machine's inherited memory cap; the report records that scope")
     args = parser.parse_args()
-    require_kernel_budget(4 * 1024**3)
+    global CLOUD
+    if args.cloud:
+        CLOUD = require_cloud_budget()
+    else:
+        require_kernel_budget(4 * 1024**3)
     require(len(os.sched_getaffinity(0)) == 1 and 0 < args.timeout <= 120, 'one CPU and positive deadline at most120s required')
     output, tools = args.output.resolve(), args.tools.resolve(strict=True)
     output.mkdir(parents=True, exist_ok=False)
@@ -76,7 +92,8 @@ def main():
     tracked.update(path.resolve() for path in tools.rglob('*') if path.is_file())
     report = dict(schema='scriptw-react-benchmark-v1', status='incomplete', mode=args.mode,
         started_at=datetime.now(timezone.utc).isoformat(), samples=7, warmups=3, commands=[], references=[], capability=[],
-        resources_before=resources(), affinity=sorted(os.sched_getaffinity(0)), policy=dict(
+        resources_before=resources(), affinity=sorted(os.sched_getaffinity(0)), machine=machine_identity(),
+        timeout_seconds=args.timeout, policy=dict(
             server='One vm.Context initialized once per fresh process; parse and initialization outside entry wall. Await complete Flight/Web response consumption; output validation outside timer. Node genuine standard Web APIs.',
             browser='Eight fresh Chromium processes, three modes each; three checked warmups and seven checked samples per mode. React commit plus forced layout inside page clock; setup, validation, cleanup and screenshot excluded.',
             memory='GNU time lifetime child high-water RSS including accounted descendants. Browser process value covers Node plus browser descendant high-water accounting, not simultaneous tree RSS, per-case RSS or live JS heap.',

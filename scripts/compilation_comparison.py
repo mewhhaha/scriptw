@@ -25,6 +25,15 @@ POLICY = dict(
     statistics='Two blocks, ABBA per case with alternating first actor; second block reverses cases and actors. Four fresh builds per compiler/case; pooled and both block medians. Descriptive observations, no significance/conformance claim.',
     resources='Sequential children, one CPU, at most4GiB cgroup, no swap, grouped OOM; native/module caches unused by build wasm.',
     validation='Successful compilation and portable Wasm magic checked, emitted bytes retained; no output execution/checksum verification in this compilation-only measurement.')
+CLOUD_RESOURCES = ('Sequential children, one inherited CPU of a managed cloud machine, its inherited finite memory cap '
+                   '(recorded); no kernel-enforced 4GiB budget or grouped-OOM record; native/module caches unused by build wasm.')
+
+
+def measurement_policy(cloud):
+    """The declared policy; a managed cloud machine differs only in its recorded resource scope."""
+    if cloud:
+        return dict(POLICY, resources=CLOUD_RESOURCES)
+    return dict(POLICY)
 
 
 def require(condition, message):
@@ -130,10 +139,16 @@ def load_report(path):
     require(identity['source_revision'] == dict(kind='git-commit', commit=report['source_commit']),
             'compiler source revision differs')
     machine = report['plan']['machine']
-    resource = machine['resources']
-    require(len(machine['affinity']) == 1 and 0 < int(resource['memory.max']) <= 4 * 1024**3
-            and resource['memory.swap.max'] == '0' and resource['memory.oom.group'] == '1',
-            'resource scope differs')
+    cloud = machine.get('cloud')
+    if cloud is None:
+        resource = machine['resources']
+        require(len(machine['affinity']) == 1 and 0 < int(resource['memory.max']) <= 4 * 1024**3
+                and resource['memory.swap.max'] == '0' and resource['memory.oom.group'] == '1',
+                'resource scope differs')
+    else:
+        require(len(machine['affinity']) == 1 and 'resources' not in machine
+                and type(cloud.get('inherited_memory_cap_bytes')) is int and cloud['inherited_memory_cap_bytes'] > 0
+                and isinstance(cloud.get('scope'), str), 'cloud resource scope differs')
     files = {safe_path(row['path']): row for row in report['retained_files']}
     require(len(files) == len(report['retained_files']), 'duplicate retained path')
     retained = {}
@@ -163,7 +178,8 @@ def load_report(path):
     require(manifest['execution'] == report['workloads']
             and manifest == json.loads((FIXTURES / 'manifest.json').read_text()), 'canonical manifest differs')
     require(json.loads(retained['plan.json']) == report['plan'], 'retained plan differs')
-    require(report['plan']['tools'] == report['tools'] and report['plan']['policy'] == report['policy'] == POLICY,
+    require(report['plan']['tools'] == report['tools']
+            and report['plan']['policy'] == report['policy'] == measurement_policy(cloud is not None),
             'declared tools or measurement policy differs')
     inputs = json.loads(retained['inputs-before.json'])
     require(inputs == json.loads(retained['inputs-after.json']),

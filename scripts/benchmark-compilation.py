@@ -11,8 +11,12 @@ import subprocess
 import tarfile
 
 from benchmark_metrics import digest, measure_process
-from compilation_comparison import ACTORS, ADAPTER, FIXTURES, POLICY, ROOT, SCHEMA, load_report, process_environment, process_plan, render, require, scriptc_companions, summarize
-from limited_verification import kernel_group, limited_environment, require_kernel_budget
+from compilation_comparison import ACTORS, ADAPTER, FIXTURES, ROOT, SCHEMA, load_report, measurement_policy, process_environment, process_plan, render, require, scriptc_companions, summarize
+from limited_verification import kernel_group, limited_environment, require_cloud_budget, require_kernel_budget
+
+AUTHORITY = Path('docs/rust-rewrite/performance-gaps-20261101.json')
+CLOUD_SCOPE = ('managed cloud machine: shared virtual CPUs, inherited memory cap, '
+               'no kernel-enforced 4 GiB budget and no cgroup OOM event record')
 
 
 def save(path, value):
@@ -70,7 +74,13 @@ def build_invocation(actor, compiler, source, wasm, env):
 
 
 def run(args):
-    require_kernel_budget(4 * 1024**3)
+    # A managed cloud machine has no delegated cgroup-v2 scope to cap at 4 GiB.
+    # --cloud admits its inherited finite cap instead and records that scope.
+    cloud = None
+    if args.cloud:
+        cloud = dict(inherited_memory_cap_bytes=require_cloud_budget(), scope=CLOUD_SCOPE)
+    else:
+        require_kernel_budget(4 * 1024**3)
     require(len(os.sched_getaffinity(0)) == 1, 'one CPU required')
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -114,8 +124,11 @@ def run(args):
     tools['scriptc']['toolchain'], companion_inputs = retain_scriptc_toolchain(scriptc, output)
     tracked = [scriptw, scriptc, zig, timer, *companion_inputs, *[runtime_pack / name for name in runtime_inputs]]
     if args.package_lock:
-        shutil.copyfile(args.package_lock, output / 'tooling/package-lock.json')
-        tracked.append(args.package_lock.resolve())
+        # npm's package-lock.json or pnpm's pnpm-lock.yaml, retained under its own name.
+        lock = args.package_lock.resolve(strict=True)
+        require(lock.name in ('package-lock.json', 'pnpm-lock.yaml'), 'unknown Scriptc package lock')
+        shutil.copyfile(lock, output / 'tooling' / lock.name)
+        tracked.append(lock)
     for name in ('benchmark-compilation.py', 'compilation_comparison.py', 'benchmark_metrics.py', 'compiler_comparison.py', 'limited_verification.py', 'resource_numbers.py'):
         path = ROOT / 'scripts' / name
         shutil.copyfile(path, output / 'tooling' / name)
@@ -136,13 +149,17 @@ def run(args):
     tracked.append(FIXTURES / 'manifest.json')
     before = {str(path): digest(path) for path in tracked}
     save(output / 'inputs-before.json', before)
-    policy = dict(POLICY)
+    policy = measurement_policy(cloud is not None)
+    machine = dict(platform=platform.platform(), affinity=sorted(os.sched_getaffinity(0)))
+    if cloud is None:
+        machine['resources'] = {name: (kernel_group() / name).read_text().strip() for name in
+                                ('memory.max', 'memory.swap.max', 'memory.oom.group', 'cpu.max')}
+    else:
+        machine['cloud'] = cloud
     plan = dict(schema=SCHEMA + '-plan', process_plan=order, policy=policy, tools=tools,
                 work_root=str(output / 'work'),
                 zig_global_cache_dir=env['ZIG_GLOBAL_CACHE_DIR'], timeout_seconds=args.timeout,
-                machine=dict(platform=platform.platform(), affinity=sorted(os.sched_getaffinity(0)),
-                             resources={name:(kernel_group() / name).read_text().strip() for name in
-                                        ('memory.max', 'memory.swap.max', 'memory.oom.group', 'cpu.max')}))
+                machine=machine)
     save(output / 'plan.json', plan)  # Frozen before any measured compilation.
     revision = tools['scriptw']['identity']['source_revision']
     require(revision['kind'] == 'git-commit', 'frozen CLI needs a Git source revision')
@@ -211,6 +228,50 @@ def publish(args):
     print(path)
 
 
+def install(args):
+    """Install one checked publication as the current report and its authority entry."""
+    import math
+    import statistics
+    root = args.root.resolve()
+    report = load_report(args.publication)
+    require('archive' in report, 'install a publication from `publish`, not a raw measurement')
+    docs = root / 'docs/rust-rewrite'
+    current, archive = docs / 'compilation-current.json', docs / 'compilation-comparison.tar.gz'
+    shutil.copyfile(args.publication.parent / report['archive']['file'], archive)
+    shutil.copyfile(args.publication, current)
+    report = load_report(current)
+    authority_path = root / AUTHORITY
+    original = authority_path.read_bytes()
+    authority = json.loads(original)
+    require((json.dumps(authority, indent=2) + '\n').encode() == original, 'authority formatting would change')
+    rows = report['summary']
+    wins = [row['file'] for row in rows if all(row['actors']['scriptw']['block_median_ms'][block]
+                                               < row['actors']['scriptc']['block_median_ms'][block] for block in range(2))]
+    geomean = math.exp(statistics.mean(math.log(row['actors']['scriptw']['ms'] / row['actors']['scriptc']['ms']) for row in rows))
+    identity = report['tools']['scriptw']['identity']
+    previous = authority['compilation_portable_wasm']
+    entry = dict(status=previous['status'], source_fingerprint=identity['source_fingerprint'],
+                 publication_commit=report['source_commit'], embedded_base_commit=report['source_commit'],
+                 measurement_commit=report['measurement_commit'], started_at=report['started_at'],
+                 finished_at=report['finished_at'], processes=len(report['rows']), processes_per_compiler_case=4,
+                 wins_both_block_medians=wins, pooled_workload_median_geomean=geomean,
+                 report=dict(path=str(current.relative_to(root)), sha256=digest(current)),
+                 evidence=dict(path=str(archive.relative_to(root)), bytes=archive.stat().st_size, sha256=digest(archive)),
+                 policy=report['policy'], machine=report['plan']['machine'])
+    measured = datetime.fromisoformat(report['finished_at'])
+    key = 'compilation_portable_wasm_before_' + measured.strftime('%Y%m%d')
+    history = authority.setdefault('history', {})
+    require(key not in history, 'history already retains a replaced compilation reference for this date')
+    history[key] = previous
+    authority['compilation_portable_wasm'] = entry
+    temporary = authority_path.with_name('.' + authority_path.name + '.new')
+    temporary.write_bytes((json.dumps(authority, indent=2) + '\n').encode())
+    os.replace(temporary, authority_path)
+    print(f"JavaScript -> portable Wasm · {measured.date().isoformat()}: Scriptw is faster than Scriptc in "
+          f"{len(wins)}/{len(rows)} workloads (both block medians), taking {geomean:.3f}x Scriptc time by geometric mean "
+          f"of workload medians; {len(report['rows'])} processes.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
@@ -222,9 +283,14 @@ def main():
         'ZIG_GLOBAL_CACHE_DIR', str(Path(os.environ.get('XDG_CACHE_HOME', str(Path.home() / '.cache'))) / 'zig'))))
     measure.add_argument('--package-lock', type=Path)
     measure.add_argument('--timeout', type=int, default=180)
+    measure.add_argument('--cloud', action='store_true',
+                         help="admit a managed cloud machine's inherited memory cap; the plan records that scope")
     publication = commands.add_parser('publish')
     publication.add_argument('report', type=Path)
     publication.add_argument('--output', type=Path, required=True)
+    installation = commands.add_parser('install', help='copy a publication into docs/rust-rewrite and its authority entry')
+    installation.add_argument('publication', type=Path)
+    installation.add_argument('--root', type=Path, default=ROOT, help=argparse.SUPPRESS)
     chart = commands.add_parser('render')
     chart.add_argument('report', type=Path)
     chart.add_argument('--svg', type=Path, required=True)
@@ -235,6 +301,8 @@ def main():
         run(args)
     elif args.command == 'publish':
         publish(args)
+    elif args.command == 'install':
+        install(args)
     else:
         report = load_report(args.report)
         if args.png:

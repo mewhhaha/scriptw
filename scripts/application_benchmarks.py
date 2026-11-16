@@ -1,5 +1,7 @@
 """Small admission and reduction helpers for synchronous application benchmarks."""
 import json
+import os
+import platform
 import re
 from pathlib import Path
 import statistics
@@ -125,6 +127,14 @@ def checked_observations(report, actor, case, source_sha, identity, image, node)
     else:
         result['load_phases_ns'] = report['load_phases_ns']
     return result
+
+
+def machine_identity():
+    """The measured machine as the reports and published cards name it."""
+    cpuinfo = Path('/proc/cpuinfo').read_text().splitlines()
+    models = sorted({line.split(':', 1)[1].strip() for line in cpuinfo if line.startswith('model name')})
+    return dict(cpu_model=' / '.join(models), logical_cpus=os.cpu_count(), system=platform.system(),
+                kernel=platform.release(), architecture=platform.machine())
 
 
 def successful_process(resources):

@@ -291,9 +291,9 @@ def safe_path(name):
     return name
 
 
-def read_archive(authority):
+def read_archive(authority, directory=None):
     receipt = authority['archive']
-    archive_path = AUTHORITY.parent / safe_path(receipt['file'])
+    archive_path = (directory or AUTHORITY.parent) / safe_path(receipt['file'])
     require(archive_path.stat().st_size == receipt['bytes'] <= 128 * 1024**2
             and digest(archive_path) == receipt['sha256'], 'archive identity differs')
     files, expanded = {}, 0
@@ -502,6 +502,52 @@ def react_rows(files, receipt, fingerprint):
     return report, summaries
 
 
+def failure_line(files, base, command, timeout):
+    """The retained diagnostic of one failed command: its deadline or last stderr/stdout line."""
+    if command['resources'].get('timed_out'):
+        return f'timed out ({timeout:g} s)'
+    for field in ('stderr', 'stdout'):
+        lines = [line.strip() for line in encoded(files, base / command[field]).decode().splitlines() if line.strip()]
+        if lines:
+            # A compiler's first coded diagnostic names the cause; otherwise the last line does.
+            coded = [match.group(0) for match in map(re.compile(r'error [A-Z]+\d+:.*').search, lines) if match]
+            line = (coded or lines[-1:])[0]
+            if len(line) > 160:
+                line = line[:157] + '...'
+            return f"exit {command['resources'].get('exit_code')}: {line}"
+    return f"exit {command['resources'].get('exit_code')} without output"
+
+
+def failures(files, authority, portable, react):
+    """Every failed actor/case with the command that failed and its retained diagnostic."""
+    result = []
+    base = Path(authority['reports']['portable']['path']).parent
+    for item in portable['summary']:
+        for actor in ACTORS:
+            row = item['actors'][actor]
+            if row['status'] == 'sampled':
+                continue
+            commands = [command for command in portable['rows'] if command['case'] == item['file']
+                        and command['actor'] == actor and command['status'] != 'sampled']
+            if not commands:
+                commands = portable['preparations'][item['file']][actor].get('commands', [])[-1:]
+            detail = row['reason']
+            if commands:
+                detail = failure_line(files, base, commands[0], portable['timeout_seconds'])
+            result.append(dict(scope='portable', case=item['file'], actor=actor, stage=row['stage'], detail=detail))
+    base = Path(authority['reports']['react']['path']).parent
+    for attempt in react['capability']:
+        if attempt['status'] == 'checked':
+            continue
+        commands = [attempt[field] for field in ('build', 'native_preparation', 'execution') if field in attempt]
+        detail = failure_line(files, base, commands[-1], react['timeout_seconds'])
+        if commands[-1]['status'] == 'succeeded':
+            detail = attempt['reason']
+        result.append(dict(scope='standalone', case=attempt['case'], actor=attempt['actor'],
+                           stage=attempt['stage'], detail=detail))
+    return result
+
+
 def reference_chart(report, rows, title, boundary, preview):
     import matplotlib
     matplotlib.use('Agg')
@@ -538,7 +584,7 @@ def reference_chart(report, rows, title, boundary, preview):
             plt.close(fig)
 
 
-def details_section(authority, rows, react, references):
+def details_section(authority, rows, react, references, failed):
     ratios = []
     for row in rows:
         actors = row['runtimes']
@@ -560,19 +606,27 @@ def details_section(authority, rows, react, references):
                         'execution': 'Execution failed'}[attempt['stage']]
                 commands = [attempt[field] for field in ('build', 'native_preparation', 'execution') if field in attempt]
                 if any(command['resources']['timed_out'] for command in commands):
-                    text = 'Timed out (60 s)'
+                    text = f"Timed out ({react['timeout_seconds']:g} s)"
             values.append(text)
         label, host = 'React client mount', 'Chromium checked'
         if name != 'client-mount':
             label, host = LABELS[name], 'Node checked'
         matrix.append('| ' + ' | '.join([label, *values, host]) + ' |')
+    diagnosis = ['| Scope | Case | Actor | Stage | Retained diagnostic |', '| --- | --- | --- | --- | --- |']
+    for row in failed:
+        detail = row['detail'].replace('|', '\\|').replace('`', "'")
+        diagnosis.append(f"| {row['scope']} | {row['case']} | {row['actor']} | {row['stage']} | `{detail}` |")
+    if not failed:
+        diagnosis = ['No actor failed.']
     times = ['| Reference | Entry median · ms |', '| --- | ---: |']
     for row in references:
         times.append(f"| {LABELS[row['case']]} | {row['process_medians_ns']['median'] / 1e6:.3f} |")
     return f'''<!-- application-benchmarks-details:start -->
 ## Application workloads
 
-Measured **{authority['finished_at'][:10]}**, compiler `{authority['source_fingerprint'][:12]}`.
+Measured **{authority['finished_at'][:10]}**, compiler `{authority['source_fingerprint'][:12]}`, on
+{authority['machine']['summary']}; Node {authority['versions']['node']['node']} (V8 {authority['versions']['node']['v8']}),
+Chromium {authority['versions']['chromium']}.
 Six synchronous request/response kernels use plain records, without networking or
 Web APIs. The seventh case bundles real React {react['versions']['react']}
 legacy `renderToString` with hooks/context and 32 escaped rows.
@@ -610,16 +664,13 @@ Actual standalone build/execution attempts remain visible, including failures:
 Standalone run timeouts include compilation and startup; they do not isolate
 rendering time. Scriptw's portable build and ordinary NativeHost run are
 separate probes; the run recompiles source instead of loading the dumped pair.
-At this frozen benchmark revision, Scriptw lacked DOM, encoding, Web Streams,
-Fetch and URL APIs, as recorded by its capability probe. Current-source RSC
-measurements are reported in the [README](../../README.md#benchmarks).
+Current-source RSC measurements are reported in the [README](../../README.md#benchmarks).
 
-The frozen [failure diagnosis](docs/rust-rewrite/applications-current.json) records
-missing `TextEncoder` during RSC initialization. Corrected Scriptc Web probes
-reach `SC3002` (WASI API admission), and its nested-result case reports `SC2020`
-(dynamic `Array.slice` end unsupported). React bundles retain type-check errors.
-Scriptw's SSR output has a 2-MB function, triggering size-optimized native
-compilation; a debugger sample finds Cranelift optimization active at 20 seconds.
+Every failure keeps its stage and one line of its retained raw log (the first
+coded compiler error, otherwise the last line); the complete logs are in the
+evidence archive:
+
+{chr(10).join(diagnosis)}
 
 [Data, identities and diagnostics](docs/rust-rewrite/applications-current.json) ·
 [Inert raw evidence](docs/rust-rewrite/{authority['archive']['file']}) ·
@@ -637,7 +688,7 @@ def readme_section(authority, rows):
     require(bool(ratios), 'no completed application comparisons')
     date = authority['finished_at'][:10]
     return f'''<!-- application-benchmarks:start -->
-**Edge kernels · {date}**, compiler `{authority['source_fingerprint'][:12]}`:
+**Edge kernels · {date}**, compiler `{authority['source_fingerprint'][:12]}`, {authority['machine']['summary']}:
 Scriptw takes **{min(ratios):.1f}–{max(ratios):.1f}× Scriptc time** across {len(ratios)} completed comparisons.
 These use plain request/response records; networking and Web APIs are outside the workload.
 [Application charts and failed attempts](docs/rust-rewrite/benchmarks.md#application-workloads) ·
@@ -652,10 +703,57 @@ def replace_section(text, section, name):
     return text[:text.index(start)] + section.rstrip('\n') + text[text.index(end) + len(end):]
 
 
-def main():
+def verified_campaign(authority, directory):
+    """Read and verify the archive the authority names; return its reports, card rows and failures."""
     global ARCHIVED_ROOT
+    require(authority['schema'] == 'scriptw-application-charts-v1', 'foreign application chart authority')
+    ARCHIVED_ROOT = Path(authority['repository_root'])
+    require(ARCHIVED_ROOT.is_absolute(), 'absolute recorded repository root required')
+    files = read_archive(authority, directory)
+    portable, rows = portable_rows(files, authority['reports']['portable'], authority['source_fingerprint'])
+    react, references = react_rows(files, authority['reports']['react'], authority['source_fingerprint'])
+    require('machine' in authority and 'timeout_seconds' in react,
+            'authority predates recorded machine identity and child deadlines; republish the campaign')
+    return files, portable, rows, react, references, failures(files, authority, portable, react)
+
+
+def application_outputs(authority, directory, readme, details, preview_dir=None):
+    """Every generated application output, keyed by the path it is written to."""
+    files, portable, rows, react, references, failed = verified_campaign(authority, directory)
+    import matplotlib
+    report = dict(authority, consumer_identity=portable['consumer_identity'], node_identity=portable['node_identity'],
+        policy=portable['policy'], chart_panels=[('ms', 'Entry time · ms', 3), ('rss_mib', 'Peak RSS · MiB', 1)],
+        renderer=dict(matplotlib=matplotlib.__version__, script_sha256=digest(Path(__file__)),
+                      shared_renderer_sha256=digest(ROOT / 'scripts/benchmark_charts.py')))
+    assets = directory / 'assets/applications-current'
+    outputs = {}
+    for row in rows:
+        preview = None
+        if preview_dir:
+            preview = preview_dir / (Path(row['file']).stem + '.png')
+        outputs[assets / (Path(row['file']).stem + '.svg')] = render(report, row, ACTORS, preview=preview)
+    for names, stem, title, boundary in ((SERVER, 'react-server', 'Node · Flight and Web APIs', 'Complete async operation'),
+                                       (BROWSER, 'react-browser', 'Chromium · React DOM', 'Commit + forced layout')):
+        preview = None
+        if preview_dir:
+            preview = preview_dir / (stem + '.png')
+        selected = [row for row in references if row['case'] in names]
+        outputs[assets / (stem + '.svg')] = reference_chart(report, selected, title, boundary, preview)
+    outputs[readme] = replace_section(readme.read_text(), readme_section(authority, rows),
+                                      'application-benchmarks').encode()
+    section = details_section(authority, rows, react, references, failed)
+    section = section.replace('docs/rust-rewrite/', '').replace('(CONTRIBUTING.md', '(../../CONTRIBUTING.md')
+    outputs[details] = replace_section(details.read_text(), section, 'application-benchmarks-details').encode()
+    return outputs
+
+
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true')
+    parser.add_argument('--authority', type=Path, default=AUTHORITY,
+                        help='application authority JSON; its archive and assets/applications-current/ sit beside it')
+    parser.add_argument('--readme', type=Path, default=ROOT / 'README.md')
+    parser.add_argument('--details', type=Path, default=ROOT / 'docs/rust-rewrite/benchmarks.md')
     parser.add_argument('--preview-dir', type=Path)
     parser.add_argument('--rsc-json', '--rsc-current', type=Path,
                         help='render only current retained-module RSC charts from a v1, v2 or v3 report')
@@ -684,45 +782,18 @@ def main():
                 path.write_bytes(value)
         print(f'Verified {len(outputs)} current RSC charts')
         return
-    authority = json.loads(AUTHORITY.read_text())
-    require(authority['schema'] == 'scriptw-application-charts-v1', 'foreign application chart authority')
-    ARCHIVED_ROOT = Path(authority['repository_root'])
-    require(ARCHIVED_ROOT.is_absolute(), 'absolute recorded repository root required')
-    files = read_archive(authority)
-    portable, rows = portable_rows(files, authority['reports']['portable'], authority['source_fingerprint'])
-    react, references = react_rows(files, authority['reports']['react'], authority['source_fingerprint'])
-    import matplotlib
-    report = dict(authority, consumer_identity=portable['consumer_identity'], node_identity=portable['node_identity'],
-        policy=portable['policy'], chart_panels=[('ms', 'Entry time · ms', 3), ('rss_mib', 'Peak RSS · MiB', 1)],
-        renderer=dict(matplotlib=matplotlib.__version__, script_sha256=digest(Path(__file__)),
-                      shared_renderer_sha256=digest(ROOT / 'scripts/benchmark_charts.py')))
-    outputs = {}
-    for row in rows:
-        preview = None
-        if args.preview_dir:
-            preview = args.preview_dir / (Path(row['file']).stem + '.png')
-        outputs[ASSETS / (Path(row['file']).stem + '.svg')] = render(report, row, ACTORS, preview=preview)
-    for names, stem, title, boundary in ((SERVER, 'react-server', 'Node · Flight and Web APIs', 'Complete async operation'),
-                                       (BROWSER, 'react-browser', 'Chromium · React DOM', 'Commit + forced layout')):
-        preview = None
-        if args.preview_dir:
-            preview = args.preview_dir / (stem + '.png')
-        selected = [row for row in references if row['case'] in names]
-        outputs[ASSETS / (stem + '.svg')] = reference_chart(report, selected, title, boundary, preview)
-    readme = ROOT / 'README.md'
-    outputs[readme] = replace_section(readme.read_text(), readme_section(authority, rows),
-                                      'application-benchmarks').encode()
-    details = ROOT / 'docs/rust-rewrite/benchmarks.md'
-    section = details_section(authority, rows, react, references)
-    section = section.replace('docs/rust-rewrite/', '').replace('(CONTRIBUTING.md', '(../../CONTRIBUTING.md')
-    outputs[details] = replace_section(details.read_text(), section, 'application-benchmarks-details').encode()
+    authority_path = args.authority.resolve()
+    authority = json.loads(authority_path.read_text())
+    outputs = application_outputs(authority, authority_path.parent, args.readme, args.details, args.preview_dir)
     for path, value in outputs.items():
         if args.check:
-            require(path.read_bytes() == value, 'generated output differs: ' + str(path.relative_to(ROOT)))
+            require(path.is_file() and path.read_bytes() == value, 'generated output differs: ' + str(path))
         else:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(value)
-    print(f'Verified {len(rows)} application cards, two host reference charts and README')
+    rows = [path for path in outputs if path.parent.name == 'applications-current'
+            and path.stem not in ('react-server', 'react-browser')]
+    print(f'Verified {len(rows)} application cards, two host reference charts, README and details')
 
 
 if __name__ == '__main__':
