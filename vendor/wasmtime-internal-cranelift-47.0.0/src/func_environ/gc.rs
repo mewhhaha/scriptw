@@ -11,6 +11,8 @@ use crate::{Reachability, TRAP_GC_HEAP_CORRUPT, TRAP_INTERNAL_ASSERT};
 use cranelift_codegen::ir::{BlockArg, ExceptionTableData, ExceptionTableItem};
 use cranelift_codegen::{
     cursor::{Cursor as _, FuncCursor},
+    dominator_tree::DominatorTree,
+    flowgraph::ControlFlowGraph,
     ir::{self, InstBuilder, condcodes::IntCC},
 };
 use cranelift_entity::packed_option::ReservedValue;
@@ -186,10 +188,11 @@ pub trait GcCompiler {
 
 mod base_home;
 mod copying;
+mod frame_reloads;
 mod drc;
 mod null;
 
-pub(crate) use base_home::GcHeapBaseHome;
+pub(crate) use base_home::FrameHome;
 
 /// Get the default GC compiler.
 pub fn gc_compiler(func_env: &mut FuncEnvironment<'_>) -> WasmResult<Box<dyn GcCompiler>> {
@@ -282,9 +285,12 @@ fn emit_null_check(
     non_null: bool,
     access_end: Option<u32>,
 ) -> Option<ir::TrapCode> {
-    if non_null {
+    if non_null || func_env.is_proven(gc_ref, Proven::NonNull) {
         return None;
     }
+    // Either way the caller's access follows at once, on every path, so
+    // code translated after it has passed the check.
+    func_env.prove(gc_ref, Proven::NonNull);
     if access_end.is_some_and(|end| implicit_null_check(func_env, end)) {
         return Some(crate::TRAP_NULL_REFERENCE);
     }
@@ -1260,6 +1266,17 @@ pub fn translate_ref_test(
         return Ok(result);
     }
 
+    // A value that this function's code has already found to be a non-null
+    // instance of the tested type passes (see `ProvenReferences`).
+    if let WasmHeapType::ConcreteArray(ty)
+    | WasmHeapType::ConcreteStruct(ty)
+    | WasmHeapType::ConcreteExn(ty) = test_ty.heap_type
+    {
+        if func_env.is_proven(val, Proven::Cast(ty.unwrap_module_type_index())) {
+            return Ok(builder.ins().iconst(ir::types::I32, 1));
+        }
+    }
+
     // Otherwise, in the general case, we need to inspect our given object's
     // actual type, which also requires null-checking and i31-checking it.
 
@@ -1269,18 +1286,23 @@ pub fn translate_ref_test(
     let non_null_non_i31_block = builder.create_block();
     let continue_block = builder.create_block();
 
-    // Current block: check if the reference is null and branch appropriately.
-    let is_null = func_env.translate_ref_is_null(builder.cursor(), val, val_ty)?;
-    let result_when_is_null = builder
-        .ins()
-        .iconst(ir::types::I32, test_ty.nullable as i64);
-    builder.ins().brif(
-        is_null,
-        continue_block,
-        &[result_when_is_null.into()],
-        non_null_block,
-        &[],
-    );
+    // Current block: check if the reference is null and branch appropriately,
+    // unless it is known not to be.
+    if func_env.is_proven(val, Proven::NonNull) {
+        builder.ins().jump(non_null_block, &[]);
+    } else {
+        let is_null = func_env.translate_ref_is_null(builder.cursor(), val, val_ty)?;
+        let result_when_is_null = builder
+            .ins()
+            .iconst(ir::types::I32, test_ty.nullable as i64);
+        builder.ins().brif(
+            is_null,
+            continue_block,
+            &[result_when_is_null.into()],
+            non_null_block,
+            &[],
+        );
+    }
 
     // Non-null block: We know the GC ref is non-null, but we need to also check
     // for `i31` references that don't point to GC objects.
@@ -1447,7 +1469,246 @@ pub fn translate_ref_test(
     builder.seal_block(non_null_non_i31_block);
     builder.seal_block(continue_block);
 
+    // Code that runs only when `result` is not zero knows `val` to be a
+    // `test_ty`.
+    func_env.proven_references.tested = Some((result, val, test_ty));
+
     Ok(result)
+}
+
+/// Translate `ref.cast cast_ty` of `val`, whose static type is `val_ty`.
+///
+/// A cast to a non-nullable concrete struct, array or exception type is a
+/// sequence of checks that each trap: not null, not an `i31`, and the type in
+/// the object's header. It has no join of paths that each carry a truth
+/// value, which `ref.test` followed by a trap has. Any other cast is that
+/// test and a trap.
+///
+/// A cast that the function's code has already made of the same value, at a
+/// place that every path to this one passes, is not made again (see
+/// [`ProvenReferences`]).
+pub fn translate_ref_cast(
+    func_env: &mut FuncEnvironment<'_>,
+    builder: &mut FunctionBuilder<'_>,
+    cast_ty: WasmRefType,
+    val: ir::Value,
+    val_ty: WasmRefType,
+) -> WasmResult<()> {
+    log::trace!("translate_ref_cast({cast_ty:?}, {val:?})");
+    let concrete = match cast_ty.heap_type {
+        WasmHeapType::ConcreteArray(ty)
+        | WasmHeapType::ConcreteStruct(ty)
+        | WasmHeapType::ConcreteExn(ty) => Some(ty.unwrap_module_type_index()),
+        _ => None,
+    };
+    if let Some(ty) = concrete {
+        // A value known to be a non-null `ty` passes the cast to `ty`,
+        // nullable or not.
+        if func_env.is_proven(val, Proven::Cast(ty)) {
+            return Ok(());
+        }
+    }
+    let (Some(expected_interned_ty), false) = (concrete, cast_ty.nullable) else {
+        let cast_okay = translate_ref_test(func_env, builder, cast_ty, val, val_ty)?;
+        func_env.trapz(builder, cast_okay, crate::TRAP_CAST_FAILURE);
+        prove_cast(func_env, val, cast_ty);
+        return Ok(());
+    };
+
+    // The same checks, in the same order, as `translate_ref_test` makes for
+    // such a type; each failure is the cast's.
+    if !func_env.is_proven(val, Proven::NonNull) {
+        let is_null = func_env.translate_ref_is_null(builder.cursor(), val, val_ty)?;
+        func_env.trapnz(builder, is_null, crate::TRAP_CAST_FAILURE);
+    }
+    let val_might_be_i31 = matches!(
+        val_ty.heap_type,
+        WasmHeapType::Any | WasmHeapType::Eq | WasmHeapType::I31
+    );
+    if cast_ty.heap_type.top() == WasmHeapTopType::Any && val_might_be_i31 {
+        let is_i31 = builder
+            .ins()
+            .band_imm_u(val, i64::from(wasmtime_environ::I31_DISCRIMINANT));
+        func_env.trapnz(builder, is_i31, crate::TRAP_CAST_FAILURE);
+    }
+    let expected_shared_ty =
+        func_env.module_interned_to_shared_ty(&mut builder.cursor(), expected_interned_ty);
+    let ty_addr = func_env.prepare_gc_ref_access(
+        builder,
+        val,
+        BoundsCheck::StaticOffset {
+            offset: wasmtime_environ::VM_GC_HEADER_TYPE_INDEX_OFFSET,
+            access_size: func_env.offsets.size_of_vmshared_type_index(),
+        },
+    );
+    let gc_memflags = func_env.gc_memflags(&mut builder.func);
+    let actual_shared_ty =
+        builder
+            .ins()
+            .load(ir::types::I32, gc_memflags.with_readonly(), ty_addr, 0);
+    let cast_okay = func_env.is_subtype(
+        builder,
+        actual_shared_ty,
+        expected_shared_ty,
+        expected_interned_ty,
+    );
+    func_env.trapz(builder, cast_okay, crate::TRAP_CAST_FAILURE);
+    prove_cast(func_env, val, cast_ty);
+    Ok(())
+}
+
+/// Record that the code just emitted is passed only by a `value` that is a
+/// `ty`.
+pub fn prove_cast(func_env: &mut FuncEnvironment<'_>, value: ir::Value, ty: WasmRefType) {
+    // Null is a `(ref null $t)` of every type.
+    if ty.nullable {
+        return;
+    }
+    func_env.prove(value, Proven::NonNull);
+    if let WasmHeapType::ConcreteArray(concrete)
+    | WasmHeapType::ConcreteStruct(concrete)
+    | WasmHeapType::ConcreteExn(concrete) = ty.heap_type
+    {
+        func_env.prove(value, Proven::Cast(concrete.unwrap_module_type_index()));
+    }
+}
+
+/// Record what the latest `ref.test` found, for code that is entered only
+/// when `condition`, that test's result, is not zero.
+pub fn prove_tested(func_env: &mut FuncEnvironment<'_>, condition: ir::Value) {
+    if let Some((result, value, ty)) = func_env.proven_references.tested {
+        if result == condition {
+            prove_cast(func_env, value, ty);
+        }
+    }
+}
+
+/// Translate `ref.as_non_null` of `val`, whose static type is `val_ty`,
+/// unless the function's code has already checked the same value at a place
+/// that every path to this one passes (see [`ProvenReferences`]).
+pub fn translate_ref_as_non_null(
+    func_env: &mut FuncEnvironment<'_>,
+    builder: &mut FunctionBuilder<'_>,
+    val: ir::Value,
+    val_ty: WasmRefType,
+) -> WasmResult<()> {
+    if func_env.is_proven(val, Proven::NonNull) {
+        return Ok(());
+    }
+    let is_null = func_env.translate_ref_is_null(builder.cursor(), val, val_ty)?;
+    func_env.trapnz(builder, is_null, crate::TRAP_NULL_REFERENCE);
+    func_env.prove(val, Proven::NonNull);
+    Ok(())
+}
+
+/// A property that a check established of a reference value.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub(crate) enum Proven {
+    /// The reference is not null.
+    NonNull,
+    /// The reference is a non-null object whose type is a subtype of this
+    /// concrete type.
+    Cast(ModuleInternedTypeIndex),
+}
+
+/// Where a check was translated: the innermost Wasm control frame around it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct ProvenAt {
+    /// The control stack's height there.
+    depth: usize,
+    /// The block that follows the innermost frame, which names the frame:
+    /// each frame creates its own.
+    following: ir::Block,
+    /// Whether that frame was an `if` in its `else` arm.
+    in_else: bool,
+}
+
+/// The checks of GC references that the function's translated code has made,
+/// so that a later check of the same value that an earlier one implies is
+/// not translated again.
+///
+/// The emitter's Wasm reads a nullable local and applies `ref.as_non_null`
+/// or `ref.cast` at each use. Cranelift merges two such checks only when
+/// they test one SSA value, and after a call a GC reference is a value read
+/// from the frame again; a cast is also several blocks. Here the checks are
+/// compared as translated, when the operand is still the one CLIF value
+/// that the Wasm local or stack slot holds.
+///
+/// # Why this is correct
+///
+/// A fact is recorded for a CLIF value `v` at a point `P` of the Wasm
+/// function that control passes only when the fact holds: after the
+/// instructions that trap unless it does, on the path a `br_on_null` or
+/// `br_on_cast_fail` falls through to, or at the start of the consequent of
+/// an `if` on the result of a `ref.test` of `v`. It is recorded together
+/// with `P`'s innermost control frame `F` and, for an `if`, its arm. It is
+/// used at a later point `Q` of the translation only while `F` is still on
+/// the control stack in the same arm.
+///
+/// * `P` is executed before `Q` on every path. Within one arm of one frame,
+///   Wasm's structured control flow enters code after `P` only by falling
+///   through `P`, by a branch to the end of a block that starts after `P`,
+///   or by a branch to the head of a loop: one that starts after `P`, or one
+///   around `P`, whose head is before `P`. A branch that skips `P` goes to
+///   the end of a block around `P`, which is the end of `F` or of a frame
+///   around it, and `Q` is before that end. Exception handlers of
+///   `try_table` are such branches. The other arm of an `if` is not reached
+///   through `P`, which is why the arm is part of the frame's name. Code
+///   that the translator knows to be unreachable is not translated and
+///   records nothing.
+/// * `v` is an SSA value whose definition dominates `P`, and `P` dominates
+///   `Q`, so at `Q` it is the value that the check at `P` saw: had its
+///   definition run again since, control would have passed `P` again too.
+/// * What was checked cannot change. A reference is null or not for good,
+///   and an object's type is fixed when it is allocated; a collection that
+///   moves the object keeps both, and the reference the function then reads
+///   from its frame is the same Wasm value.
+///
+/// So the check at `Q` cannot fail, and leaving it out removes no trap.
+#[derive(Default)]
+pub(crate) struct ProvenReferences {
+    facts: std::collections::HashMap<(ir::Value, Proven), ProvenAt>,
+    /// The result of the latest `ref.test`, its operand and the tested type:
+    /// the result is not zero exactly when the operand is of that type, and
+    /// both are values, so that stays true wherever the result is in scope.
+    tested: Option<(ir::Value, ir::Value, WasmRefType)>,
+}
+
+impl FuncEnvironment<'_> {
+    /// The innermost control frame at the translator's position.
+    fn proven_at(&self) -> Option<ProvenAt> {
+        let frame = self.stacks.control_stack.last()?;
+        Some(ProvenAt {
+            depth: self.stacks.control_stack.len(),
+            following: frame.following_code(),
+            in_else: frame.in_else_arm(),
+        })
+    }
+
+    /// Record that the code just emitted traps unless `fact` holds of
+    /// `value`.
+    pub(crate) fn prove(&mut self, value: ir::Value, fact: Proven) {
+        if let Some(at) = self.proven_at() {
+            self.proven_references.facts.insert((value, fact), at);
+        }
+    }
+
+    /// Whether every path to the translator's position has checked `fact`
+    /// of `value`.
+    pub(crate) fn is_proven(&self, value: ir::Value, fact: Proven) -> bool {
+        let Some(at) = self.proven_references.facts.get(&(value, fact)) else {
+            return false;
+        };
+        // The frame the fact was recorded in is still open, in the same arm.
+        let Some(frame) = at
+            .depth
+            .checked_sub(1)
+            .and_then(|index| self.stacks.control_stack.get(index))
+        else {
+            return false;
+        };
+        frame.following_code() == at.following && at.in_else == frame.in_else_arm()
+    }
 }
 
 fn uextend_i32_to_pointer_type(
@@ -1609,8 +1870,8 @@ impl FuncEnvironment<'_> {
     /// Get the GC heap's base at the builder's position.
     ///
     /// A base that cannot move is read from the function's home slot for it,
-    /// which this creates on first use; `split_gc_heap_base_at_calls` then
-    /// decides where the function really loads it. A base that can move is
+    /// which this creates on first use; `place_frame_loads` then decides
+    /// where the function really loads it. A base that can move is
     /// loaded from the store context every time.
     pub(crate) fn gc_heap_base(&mut self, builder: &mut FunctionBuilder) -> ir::Value {
         if self.gc_heap_may_move() {
@@ -1634,7 +1895,7 @@ impl FuncEnvironment<'_> {
 
     /// Load the immovable GC heap base at the top of `func`'s entry block and
     /// store it to a new home slot there, ahead of every use.
-    fn create_gc_heap_base_home(&mut self, func: &mut ir::Function) -> GcHeapBaseHome {
+    fn create_gc_heap_base_home(&mut self, func: &mut ir::Function) -> FrameHome {
         let entry = func
             .layout
             .entry_block()
@@ -1654,16 +1915,37 @@ impl FuncEnvironment<'_> {
         let base =
             self.alias_regions
                 .vmstore_context_gc_heap_base(&mut pos, flags, store_context_ptr);
-        GcHeapBaseHome::store_at_entry(&mut pos, region, pointer_type, base)
+        FrameHome::store_at_entry(&mut pos, region, pointer_type, base)
     }
 
-    /// After `func` is completely translated, make its GC heap base a value
-    /// that is loaded from the home slot after a call and, outside loops, is
-    /// never live across one.
-    pub(crate) fn split_gc_heap_base_at_calls(&mut self, func: &mut ir::Function) {
-        if let Some(home) = self.gc_heap_base_home.take() {
-            home.split_at_calls(func);
-        }
+    /// After `func` is completely translated and finalized: send each edge
+    /// into a block that only branches on a truth value where that value
+    /// sends it (`branch_threading`), give the `vmctx` its home
+    /// (`base_home`), and keep, of the loads of GC references from their
+    /// stack-map slots and of the GC heap base and the `vmctx` from their
+    /// homes, one after a call instead of one at every use
+    /// (`frame_reloads`).
+    pub(crate) fn place_frame_loads(&mut self, func: &mut ir::Function) {
+        // This changes branches, so it comes before the control-flow graph.
+        super::branch_threading::thread(func);
+        let base_home = self.gc_heap_base_home.take();
+        let vmctx_home = func
+            .special_param(ir::ArgumentPurpose::VMContext)
+            .and_then(|vmctx| {
+                let region = self.alias_regions.vmctx_home_region(func);
+                FrameHome::of_parameter(func, region, vmctx)
+            });
+        let homes: SmallVec<[ir::StackSlot; 2]> = [vmctx_home, base_home]
+            .iter()
+            .flatten()
+            .map(|home| home.slot())
+            .collect();
+        let Some(reloads) = frame_reloads::Reloads::scan(func, &homes) else {
+            return;
+        };
+        let cfg = ControlFlowGraph::with_function(func);
+        let domtree = DominatorTree::with_function(func, &cfg);
+        reloads.forward(func, &cfg, &domtree);
     }
 
     /// Get the GC heap's bound.

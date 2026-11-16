@@ -38,6 +38,7 @@ mod aot_gc_sparse_array_storage;
 mod aot_gc_string_regexp_entries;
 mod aot_gc_string_unicode_entries;
 mod aot_gc_temporal_entries;
+mod aot_gc_translation_probes;
 mod aot_gc_typed_array_immutable_properties;
 mod aot_gc_typed_array_method_entries;
 mod aot_gc_uint8array_codec_entries;

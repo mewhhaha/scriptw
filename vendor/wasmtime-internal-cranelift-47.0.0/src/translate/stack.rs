@@ -133,6 +133,17 @@ impl ControlStackFrame {
         }
     }
 
+    /// Whether this is an `if` whose `else` arm has begun.
+    pub fn in_else_arm(&self) -> bool {
+        matches!(
+            self,
+            Self::If {
+                consequent_ends_reachable: Some(_),
+                ..
+            }
+        )
+    }
+
     pub fn br_destination(&self) -> Block {
         match *self {
             Self::If { destination, .. } | Self::Block { destination, .. } => destination,
