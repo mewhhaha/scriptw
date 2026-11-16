@@ -16,6 +16,9 @@ mod transition;
 use chain::{ChainAnswer, ChainKey};
 pub(crate) use transition::MAX_COMPACT_SHAPE_KEYS;
 
+/// A fresh literal of at most this many keys is born with inline slots, and
+/// every longer one with tag, scalar and reference arrays.
+pub(super) const INLINE_COMPACT_FIELDS: usize = 2;
 /// Shapes with at least this many keys probe through their derived index;
 /// shorter ones scan, which costs no more than one indexed lookup.
 const INDEXED_PROBE_MIN_KEYS: i32 = 3;
@@ -1097,6 +1100,49 @@ impl FunctionBuilder<'_> {
         references.clear(f);
         scalars.clear(f);
         tags.clear(f);
+    }
+
+    /// A store into the array-layout storage of an object that is still
+    /// being born, each of whose slots is written once. A value whose scalar
+    /// word is zero needs no scalar write: an absent scalar backing encodes
+    /// zero and a present one was filled with it. Such a value takes its
+    /// reference into the reference backing, when that exists, and its tag.
+    /// A nonzero word and a storage without a reference backing branch to
+    /// `general` having written nothing; the complete store allocates.
+    pub(super) fn emit_fresh_array_compact_store_or_branch(
+        &self,
+        storage: &GcLocal<ArrayCompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        general: crate::LabelDepth,
+        f: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        value.scalar().load(f);
+        f.instruction(&Instruction::I64Const(0));
+        f.instruction(&Instruction::I64Ne);
+        f.branch_if_to_label(general);
+        let references = schema
+            .field(ArrayCompactDataStorageSchema::REFERENCES)
+            .read(storage, schema, f)
+            .reference()
+            .non_null_or_branch(general, f);
+        schema.array_type::<CompactReferenceArray>().write_top(
+            references,
+            slot,
+            GcOperand::eq_reference(value.reference()),
+            f,
+        );
+        let tags = schema
+            .field(ArrayCompactDataStorageSchema::TAGS)
+            .read(storage, schema, f)
+            .reference();
+        schema.array_type::<CompactTagArray>().write_top(
+            tags,
+            slot,
+            GcOperand::i32_local(value.tag()),
+            f,
+        );
     }
 
     /// The shape of a compact storage, null for any other storage. Each

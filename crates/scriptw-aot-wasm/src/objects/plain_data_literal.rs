@@ -137,12 +137,37 @@ impl<'ir> PlainDataLiteral<'ir> {
         );
         let value = schema.reserve_value_local(f);
         let slot = schema.reserve_i32_local(f);
+        // The allocator chose the layout from this same key count, and the
+        // fresh storage is reachable only from here until its last store. A
+        // shape with arrays takes a value without a scalar word inline once
+        // it has its reference backing; R makes every other store, and the
+        // one that allocates a backing.
+        let array = (self.fields.len() > super::compact_data::INLINE_COMPACT_FIELDS).then(|| {
+            schema
+                .reserve_gc_local::<ArrayCompactDataStorage, NonNullable>(f)
+                .initialize(storage.load(schema, f).cast_subtype(schema, f), f)
+        });
         for (index, field) in self.fields.into_iter().enumerate() {
             builder.compile_expr_to_value(field.value, &value, f)?;
             builder.emit_propagate_current_throw_if_needed(f);
             f.instruction(&Instruction::I32Const(index as i32));
             slot.store(f);
+            let Some(array) = &array else {
+                builder.emit_compact_store_at(&storage, slot, &value, f);
+                continue;
+            };
+            f.instruction(&Instruction::Block(BlockType::Empty));
+            let stored = f.label_depth();
+            f.instruction(&Instruction::Block(BlockType::Empty));
+            let general = f.label_depth();
+            builder.emit_fresh_array_compact_store_or_branch(array, slot, &value, general, f);
+            f.branch_to_label(stored);
+            f.instruction(&Instruction::End);
             builder.emit_compact_store_at(&storage, slot, &value, f);
+            f.instruction(&Instruction::End);
+        }
+        if let Some(array) = array {
+            array.clear(f);
         }
         output.set_reference(&object, schema, f);
         schema.release_i32_local(slot, f);
