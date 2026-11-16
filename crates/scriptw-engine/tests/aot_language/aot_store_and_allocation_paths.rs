@@ -146,7 +146,7 @@ print(log.join());
 fn array_elements_publish_into_the_packed_backing_they_have_room_in() {
     // Literal elements and appends through `c[f] = v` publish into the
     // packed backing without a copy when it has room, and a first element
-    // creates the backing (one slot per index below a short length). Every
+    // creates the backing (covering every index below a short length). Every
     // site is warmed with references and then given every kind of value,
     // holes, literals longer than the born table, a value that throws, and
     // presized arrays on both sides of the bound; the arrays are then

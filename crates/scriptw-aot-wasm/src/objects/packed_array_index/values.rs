@@ -4,8 +4,9 @@ use crate::gc_types::{PackedValueTable, StoredValue};
 
 /// The capacity that the first growth of an empty packed backing reaches.
 const FIRST_PACKED_CAPACITY: i32 = 4;
-/// The longest array whose values backing is born with one slot per index
-/// below its length.
+/// The longest array whose values backing is born covering every index below
+/// its length. A backing's capacity is always a power of two, as doubling
+/// from [`FIRST_PACKED_CAPACITY`] keeps it and the rooted snapshot requires.
 const BORN_VALUES_LIMIT: i64 = 64;
 
 // Existing value reads keep their exact emitted path. Descriptor observations
@@ -191,8 +192,9 @@ impl FunctionBuilder<'_> {
     /// having changed nothing). An empty array's first element may create
     /// that backing: four slots as the first growth of either kind does, or,
     /// for a value that is not a Number and an index below a length of at
-    /// most [`BORN_VALUES_LIMIT`], one slot per index below that length, so
-    /// a fixed literal publishes its elements into one table. The caller
+    /// most [`BORN_VALUES_LIMIT`], the least power-of-two capacity covering
+    /// that length, so a fixed literal publishes its elements into one table
+    /// that growth by doubling would have reached. The caller
     /// owns CreateDataProperty semantics exactly as for the complete
     /// publication, which keeps growth, promotion and descriptor backings.
     pub(super) fn emit_packed_array_store_within_capacity(
@@ -324,8 +326,25 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I64LeU);
         f.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, f);
+        // The least power of two that covers the length, which doubling
+        // from the first capacity would reach: 1 << (32 - clz(length - 1)),
+        // and no less than that first capacity.
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Const(32));
         length.load(f);
         f.instruction(&Instruction::I32WrapI64);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Clz);
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Shl);
+        capacity.store(f);
+        f.instruction(&Instruction::I32Const(FIRST_PACKED_CAPACITY));
+        capacity.load(f);
+        capacity.load(f);
+        f.instruction(&Instruction::I32Const(FIRST_PACKED_CAPACITY));
+        f.instruction(&Instruction::I32LtU);
+        f.instruction(&Instruction::Select);
         capacity.store(f);
         f.instruction(&Instruction::Else);
         index.load(f);
