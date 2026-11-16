@@ -142,6 +142,103 @@ fn formals_carry_every_bound_name_and_patterns_write_those_names() {
     ));
 }
 
+/// Every statement that gives a binding a declared function's object, as
+/// the kind of declaration it is spelled with and the storage name.
+fn function_instantiations(statements: &[StatementIr], found: &mut Vec<(&'static str, String)>) {
+    for statement in statements {
+        match statement {
+            StatementIr::Var(declarators) => {
+                for declarator in declarators {
+                    if matches!(
+                        declarator.init.as_ref().map(|init| &init.expr),
+                        Some(ExprIr::FunctionValue(_))
+                    ) {
+                        found.push(("var", declarator.name.clone()));
+                    }
+                }
+            }
+            StatementIr::Lexical { name, init, .. }
+                if matches!(init.expr, ExprIr::FunctionValue(_)) =>
+            {
+                found.push(("lexical", name.clone()));
+            }
+            StatementIr::Block(block) => function_instantiations(&block.statements, found),
+            StatementIr::ModuleUnitOnce { block, .. } => {
+                function_instantiations(&block.statements, found);
+            }
+            StatementIr::LexicalBlock(statements) => function_instantiations(statements, found),
+            _ => {}
+        }
+    }
+}
+
+#[test]
+fn a_function_body_instantiates_its_root_functions_as_var_declarators() {
+    // FunctionDeclarationInstantiation (10.2.11) step 36 sets the binding a
+    // `var` or a parameter of the name owns, so the declaration is a
+    // declarator of that binding. A lexical declaration here would ask the
+    // backend to make `var` or parameter storage uninitialized. A block's
+    // function and a module's own top-level function are lexical bindings
+    // and stay lexical declarations.
+    let program = lower_script(
+        "function plain(a) { var x; function x() {} function a() {} function alone() {} { function inner() {} } return [x, a, alone]; }
+         function separate(a, b = a) { function a() {} return [a, b]; }
+         plain(1); separate(1);",
+    );
+    assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
+    let script = program.script.as_ref().expect("script ir should exist");
+    let instantiations = |name: &str| {
+        let function = script
+            .functions
+            .iter()
+            .find(|function| function.name == name)
+            .expect("the function should be lowered");
+        let mut found = Vec::new();
+        function_instantiations(&function.body.statements, &mut found);
+        found
+    };
+    let plain = instantiations("plain");
+    assert_eq!(
+        plain[..3],
+        [
+            ("var", "x".to_string()),
+            ("var", "a".to_string()),
+            ("var", "alone".to_string())
+        ],
+        "{plain:?}"
+    );
+    assert!(
+        matches!(&plain[3..], [("lexical", name)] if name.ends_with("inner")),
+        "{plain:?}"
+    );
+    // The body record of a list that holds an expression is a block of the
+    // body, and the declaration is a declarator inside it.
+    assert_eq!(instantiations("separate"), [("var", "a".to_string())]);
+
+    let program =
+        lower_module("export function top() { function nested() {} return nested; } top();");
+    assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
+    let script = program.script.as_ref().expect("module ir should exist");
+    let mut module = Vec::new();
+    for function in script.functions.iter().filter(|function| {
+        matches!(
+            function.protocol,
+            FunctionProtocolIr::ModuleActivation | FunctionProtocolIr::AsyncModuleActivation
+        )
+    }) {
+        function_instantiations(&function.body.statements, &mut module);
+    }
+    assert_eq!(module, [("lexical", "top".to_string())]);
+    let top = script
+        .functions
+        .iter()
+        .find(|function| function.name == "top")
+        .expect("the exported function should be lowered");
+    let mut nested = Vec::new();
+    function_instantiations(&top.body.statements, &mut nested);
+    assert_eq!(nested, [("var", "nested".to_string())]);
+}
+
 #[test]
 fn lowers_object_rest_binding_in_generator_parameters() {
     let program =

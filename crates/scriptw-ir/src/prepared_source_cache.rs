@@ -634,14 +634,16 @@ const realm = new ShadowRealm();
             );
             fn local_callable(statements: &[crate::StatementIr]) -> Option<&crate::FunctionId> {
                 statements.iter().find_map(|statement| match statement {
-                    crate::StatementIr::Lexical {
-                        init:
-                            crate::TypedExpr {
-                                expr: crate::ExprIr::FunctionValue(id),
-                                ..
-                            },
-                        ..
-                    } => Some(id),
+                    // The dispatcher's body is function code, whose own
+                    // function declaration is a var declarator.
+                    crate::StatementIr::Var(declarators) => {
+                        declarators.iter().find_map(|declarator| {
+                            match declarator.init.as_ref().map(|init| &init.expr) {
+                                Some(crate::ExprIr::FunctionValue(id)) => Some(id),
+                                _ => None,
+                            }
+                        })
+                    }
                     crate::StatementIr::Block(block) => local_callable(&block.statements),
                     crate::StatementIr::LexicalBlock(statements)
                     | crate::StatementIr::ParameterInitialization { statements, .. } => {

@@ -91,6 +91,7 @@ use prepared_function::{
 use prepared_script::compile_dynamic_script_sources;
 pub(crate) use prepared_script::lower_runtime_direct_eval_program;
 pub(crate) use prepared_script::lower_runtime_global_script_program;
+use prepared_script::RootFunctionScope;
 mod for_in;
 mod for_loop;
 mod for_of;
@@ -2605,26 +2606,35 @@ impl<'a> ScriptLowerer<'a> {
         }
     }
 
+    /// The function declarations that the statement list itself instantiates,
+    /// in source order, so that the last declaration of a name is the one
+    /// that stays (10.2.11 step 14 keeps only that one).
     fn root_function_init_statements(
         &mut self,
         root_functions: &[(String, FunctionId)],
     ) -> Vec<StatementIr> {
+        let scope = self.root_function_scope();
         root_functions
             .iter()
-            .filter(|(_, function_id)| {
-                self.root_functions_need_body_initialization()
-                    || self
-                        .analysis
-                        .module_execution
-                        .is_private_dispatcher_function(function_id)
-            })
-            .map(|(name, function_id)| StatementIr::Lexical {
-                mode: BindingMode::Let,
-                name: name.clone(),
-                init: TypedExpr::from_info(
-                    self.function_value_info(function_id),
-                    ExprIr::FunctionValue(function_id.clone()),
-                ),
+            .filter_map(|(name, function_id)| {
+                // A linker-generated dispatcher is a private lexical cell that
+                // no source declaration can name, wherever the list stands.
+                let scope = if self
+                    .analysis
+                    .module_execution
+                    .is_private_dispatcher_function(function_id)
+                {
+                    RootFunctionScope::LexicalEnvironment
+                } else {
+                    scope?
+                };
+                Some(scope.instantiate(
+                    name.clone(),
+                    TypedExpr::from_info(
+                        self.function_value_info(function_id),
+                        ExprIr::FunctionValue(function_id.clone()),
+                    ),
+                ))
             })
             .collect()
     }

@@ -380,6 +380,86 @@ impl ScriptLowerer<'_> {
         }
         self.current_owner_id != SCRIPT_OWNER_ID || !self.script_variables_are_global()
     }
+
+    /// Which Environment Record holds the function declarations of the
+    /// statement list being lowered, when the list itself instantiates them.
+    /// `None` leaves them to GlobalDeclarationInstantiation or to the
+    /// EvalDeclarationInstantiation of a sloppy direct eval.
+    pub(super) fn root_function_scope(&self) -> Option<RootFunctionScope> {
+        if !self.root_functions_need_body_initialization() {
+            return None;
+        }
+        let module_activation = self
+            .analysis
+            .function_plans
+            .get(&self.current_owner_id)
+            .is_some_and(|owner| match owner.protocol {
+                FunctionProtocolIr::ModuleActivation
+                | FunctionProtocolIr::AsyncModuleActivation => true,
+                FunctionProtocolIr::OrdinaryCallOnly
+                | FunctionProtocolIr::OrdinaryCallAndConstruct
+                | FunctionProtocolIr::Arrow
+                | FunctionProtocolIr::Generator
+                | FunctionProtocolIr::Async
+                | FunctionProtocolIr::AsyncArrow
+                | FunctionProtocolIr::AsyncGenerator
+                | FunctionProtocolIr::ObjectMethod(_)
+                | FunctionProtocolIr::ObjectGetter
+                | FunctionProtocolIr::ObjectSetter
+                | FunctionProtocolIr::ClassConstructor
+                | FunctionProtocolIr::ClassMethod(_)
+                | FunctionProtocolIr::ClassGetter
+                | FunctionProtocolIr::ClassSetter => false,
+            });
+        Some(if module_activation {
+            RootFunctionScope::LexicalEnvironment
+        } else {
+            RootFunctionScope::VariableEnvironment
+        })
+    }
+}
+
+/// The Environment Record that receives a function declaration standing at
+/// the root of a statement list whose own code instantiates it.
+///
+/// The two cases are different declarations, not two spellings of one. Only
+/// the second is a lexical binding, and lowering the first as one asked the
+/// backend to make `var` or parameter storage uninitialized.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RootFunctionScope {
+    /// A function body, or eval code with a variable environment of its own.
+    /// The declaration is var-scoped: its name is one of `varNames`, whose
+    /// binding FunctionDeclarationInstantiation (ECMA-262 10.2.11) creates
+    /// initialized in step 27 or 28, or finds among the parameters, and step
+    /// 36 sets with SetMutableBinding (EvalDeclarationInstantiation, 19.2.1.3,
+    /// for eval code). The binding is never uninitialized.
+    VariableEnvironment,
+    /// A module's top level, where the declaration is a lexically scoped
+    /// binding of the module Environment Record that InitializeEnvironment
+    /// (16.2.1.7.3.1 step 24) creates and initializes together, and the
+    /// private cell of a linker-generated dispatcher. Neither a `var` nor a
+    /// parameter can share the name.
+    LexicalEnvironment,
+}
+
+impl RootFunctionScope {
+    /// The statement that gives `name` its function object at the head of
+    /// the list. A var-scoped declaration writes the binding that `var`
+    /// instantiation or a parameter owns, so it is a declarator of that
+    /// binding and cannot be spelled as a lexical declaration.
+    pub(super) fn instantiate(self, name: String, function: TypedExpr) -> StatementIr {
+        match self {
+            Self::VariableEnvironment => StatementIr::Var(vec![VarDeclaratorIr {
+                name,
+                init: Some(function),
+            }]),
+            Self::LexicalEnvironment => StatementIr::Lexical {
+                mode: BindingMode::Let,
+                name,
+                init: function,
+            },
+        }
+    }
 }
 
 fn annex_b_admission_binding_name(name: &str) -> String {

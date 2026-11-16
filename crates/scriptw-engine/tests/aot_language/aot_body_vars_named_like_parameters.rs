@@ -139,7 +139,9 @@ function functionWins({a}) { function a() {} return typeof a; }
 function functionWinsVar({a}) { var a; function a() {} return typeof a; }
 function functionWinsArray([a]) { return typeof a; function a() {} }
 function blockFunction({a}) { { function a() {} } return typeof a; }
-log.push("functions", functionWins({a: 1}), functionWinsVar({a: 1}), functionWinsArray([1]), blockFunction({a: 38}));
+function functionWinsSimple(a) { var a; function a() {} return typeof a; }
+function functionWinsSimpleAlone(a, b) { function a() {} return typeof a + b; }
+log.push("functions", functionWins({a: 1}), functionWinsVar({a: 1}), functionWinsArray([1]), blockFunction({a: 38}), functionWinsSimple(1), functionWinsSimpleAlone(1, 2));
 // Names that the enclosing code and the function itself also spell.
 function outerObject({id}) { var id; return id + ":" + typeof id; }
 function outerInitialized({id}) { var id = 5; return id; }
@@ -156,7 +158,7 @@ var namedAlone = function self() { var self; return typeof self; };
 log.push("outer", outerObject({id: 47}), outerInitialized({id: 1}), outerArray([47, 1]), outerRest({a: 1, x: 2}, [3, 4, 5]), outerFunction({a: 1}), outerClosure({id: 49})(), named({self: 67}), namedUnrelated({a: 69}), namedAssigned({self: 66}), namedClosure({self: 72})(), namedSimple(68), namedAlone(), id, a, b, tail, others);
 print(log.join());
 "##,
-        r##"plain,1,2,4,7,6,3,5,8,9,77,1|2|3,65,3,b|c,2|3,5,8,6,9,3,7,34,36,35,37,53,function,undefined1,statements,19,3,17,q,18,99,100,21,20,44,97,96,41,40,42,22,23,94,95,closures,15,16,14,24,31,11,12,functions,function,function,function,number,outer,47:number,5,49,1x345,function,49,67,undefined69,70,72,68,undefined,outer-id,outer-a,outer-b,outer-tail,outer-others"##,
+        r##"plain,1,2,4,7,6,3,5,8,9,77,1|2|3,65,3,b|c,2|3,5,8,6,9,3,7,34,36,35,37,53,function,undefined1,statements,19,3,17,q,18,99,100,21,20,44,97,96,41,40,42,22,23,94,95,closures,15,16,14,24,31,11,12,functions,function,function,function,number,function,function2,outer,47:number,5,49,1x345,function,49,67,undefined69,70,72,68,undefined,outer-id,outer-a,outer-b,outer-tail,outer-others"##,
     );
 }
 
@@ -330,11 +332,6 @@ function evalWrites([a]) { var a; eval("a = a + 1"); return a; }
 function evalClosure({a}) { var a; return eval("(function () { return a; })"); }
 log.push("eval", evalReads({a: 83}), evalIsPresent({a: 84}), evalBefore({a: 85}), evalRedeclares({a: 86}), evalInitializes({a: 1}), evalFunction({a: 1}), evalSimple(88), evalInList({a: 45}), evalWrites([4]), evalClosure({a: 6})());
 log.push(show(function () { return (function ({a}, b = eval("var a = 3; a")) { var a; return a + b; })({a: 45}); }), show(function () { return (function (a, b = eval("var a = 3; a")) { return a + b; })(45); }));
-// A function declaration over an identifier formal. Sloppy only: the strict
-// form is the hoisted-function local-storage crash listed in current work.
-function functionWinsSimple(a) { var a; function a() {} return typeof a; }
-function functionWinsSimpleAlone(a, b) { function a() {} return typeof a + b; }
-log.push("functions", functionWinsSimple(1), functionWinsSimpleAlone(1, 2));
 // `with` and `delete` on the one binding.
 function withBody({a}) { var a; with ({}) { return a; } }
 function withShadow({a}) { with ({a: "object"}) { var a = "written"; } return a; }
@@ -343,7 +340,7 @@ function strictInner() { "use strict"; return function ({a}, [b]) { var a, b; re
 log.push("with", withBody({a: 39}), withShadow({a: 40}), deleted({a: 1}), strictInner()({a: 1}, [2]), a);
 print(log.join());
 "##,
-        r##"arguments,object11,object11,6,7,13,14,15,14,function,object1,object1,50,12,undefined1,undefined1,eval,83,84,85,86,87,function,88,90,5,6,SyntaxError,SyntaxError,functions,function,function2,with,39,40,false,3,outer-a"##,
+        r##"arguments,object11,object11,6,7,13,14,15,14,function,object1,object1,50,12,undefined1,undefined1,eval,83,84,85,86,87,function,88,90,5,6,SyntaxError,SyntaxError,with,39,40,false,3,outer-a"##,
     );
 }
 
