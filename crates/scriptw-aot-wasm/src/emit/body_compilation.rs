@@ -212,11 +212,14 @@ impl<'a> FunctionBuilder<'a> {
         self.completion
             .set_kind(CompletionKind::Normal, &mut function);
         for name in self.source_frame_var_names() {
-            // A main-frame write name always owns storage. Internal functions
-            // may instead reuse their parameter or implicit `arguments`
-            // binding, preserving their existing hoisting behavior.
+            // A main-frame write name always owns storage. In a function,
+            // FunctionDeclarationInstantiation (10.2.11 step 27) creates a
+            // `var` binding only for a name outside `parameterBindings`: a
+            // name any formal binds, through an identifier or a pattern, and
+            // the implicit `arguments` keep the binding and the value that
+            // `bind_parameters` gave them.
             let reuses_function_binding = !self.is_main()
-                && (self.params.iter().any(|param| param.name == name)
+                && (self.params.iter().any(|param| param.binds(&name))
                     || (name == LEXICAL_ARGUMENTS_NAME
                         && self.function_arguments_protocol.present().is_some()));
             if reuses_function_binding {

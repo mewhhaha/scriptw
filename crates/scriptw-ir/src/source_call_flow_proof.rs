@@ -850,12 +850,12 @@ mod tests {
 
     #[test]
     fn a_literal_parameter_default_proves_caller_flow_preservation() {
-        let params = vec![FunctionParamIr {
-            name: "value".to_string(),
-            kind: ValueKind::Dynamic,
-            default_init: Some(TypedExpr::undefined()),
-            is_rest: false,
-        }];
+        let params = vec![FunctionParamIr::identifier(
+            "value".to_string(),
+            ValueKind::Dynamic,
+            Some(TypedExpr::undefined()),
+            false,
+        )];
         let body = body_with(StatementIr::Return(TypedExpr::undefined()));
 
         assert!(
@@ -873,12 +873,12 @@ mod tests {
                 args: Vec::new(),
             },
         );
-        let params = vec![FunctionParamIr {
-            name: "value".to_string(),
-            kind: ValueKind::Dynamic,
-            default_init: Some(call),
-            is_rest: false,
-        }];
+        let params = vec![FunctionParamIr::identifier(
+            "value".to_string(),
+            ValueKind::Dynamic,
+            Some(call),
+            false,
+        )];
         let body = body_with(StatementIr::Return(TypedExpr::undefined()));
 
         assert!(

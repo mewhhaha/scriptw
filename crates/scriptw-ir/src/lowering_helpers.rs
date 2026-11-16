@@ -177,7 +177,31 @@ pub(crate) fn binding_parameter_storage_name(
 ) -> String {
     match binding {
         Binding::Identifier(identifier) => interner.resolve_expect(identifier.sym()).to_string(),
-        Binding::Pattern(_) => format!("$destructured.param.{index}"),
+        Binding::Pattern(_) => FunctionParamIr::pattern_storage_name(index),
+    }
+}
+
+/// The IR parameter of the formal at `index`, with the names it binds.
+pub(crate) fn function_parameter(
+    interner: &Interner,
+    binding: &Binding,
+    index: usize,
+    kind: ValueKind,
+    default_init: Option<TypedExpr>,
+    is_rest: bool,
+) -> FunctionParamIr {
+    match binding {
+        Binding::Identifier(identifier) => FunctionParamIr::identifier(
+            interner.resolve_expect(identifier.sym()).to_string(),
+            kind,
+            default_init,
+            is_rest,
+        ),
+        Binding::Pattern(_) => {
+            let mut bound_names = Vec::new();
+            collect_binding_names(interner, binding, &mut bound_names);
+            FunctionParamIr::pattern(index, bound_names, kind, default_init, is_rest)
+        }
     }
 }
 

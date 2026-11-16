@@ -620,13 +620,17 @@ impl<'a> ScriptLowerer<'a> {
                     default_source_candidates,
                 );
             }
-            params.push(FunctionParamIr {
-                name: name.clone(),
-                kind: param_info.kind,
+            let parameter_ir = function_parameter(
+                self.interner,
+                binding,
+                index,
+                param_info.kind,
                 default_init,
-                is_rest: parameter.is_rest_param(),
-            });
-            let binding_initializers = lowerer.lower_parameter_binding_pattern(binding, &name);
+                parameter.is_rest_param(),
+            );
+            let binding_initializers =
+                lowerer.lower_parameter_binding_pattern(binding, &parameter_ir);
+            params.push(parameter_ir);
             if !binding_initializers.is_empty() {
                 parameter_prefix_statements.push(StatementIr::ParameterInitialization {
                     parameter_index: index,

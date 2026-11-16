@@ -2744,12 +2744,74 @@ pub struct SwitchCaseIr {
     pub body: BlockIr,
 }
 
+/// One formal parameter: the storage its argument value arrives in and the
+/// names its BindingElement binds (ECMA-262 8.6.3 BoundNames).
+///
+/// The two differ for a binding pattern, whose argument value is held in
+/// compiler storage while BindingInitialization initializes the bound names.
+/// FunctionDeclarationInstantiation (10.2.11) decides which body `var`s are
+/// new bindings from `parameterNames`, the bound names of every formal, never
+/// from the storage names. Only the constructors fill `bound_names`, so no
+/// parameter can exist without them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionParamIr {
     pub name: String,
     pub kind: ValueKind,
     pub default_init: Option<TypedExpr>,
     pub is_rest: bool,
+    bound_names: Vec<String>,
+}
+
+impl FunctionParamIr {
+    /// A BindingIdentifier formal: the argument storage is the one binding.
+    pub fn identifier(
+        name: String,
+        kind: ValueKind,
+        default_init: Option<TypedExpr>,
+        is_rest: bool,
+    ) -> Self {
+        Self {
+            bound_names: vec![name.clone()],
+            name,
+            kind,
+            default_init,
+            is_rest,
+        }
+    }
+
+    /// A BindingPattern formal at `index` of the list. `bound_names` are the
+    /// BoundNames of the pattern, under the storage names its
+    /// BindingInitialization writes.
+    pub fn pattern(
+        index: usize,
+        bound_names: Vec<String>,
+        kind: ValueKind,
+        default_init: Option<TypedExpr>,
+        is_rest: bool,
+    ) -> Self {
+        Self {
+            name: Self::pattern_storage_name(index),
+            kind,
+            default_init,
+            is_rest,
+            bound_names,
+        }
+    }
+
+    /// The storage of the argument value a pattern formal destructures. No
+    /// source identifier can spell it, so it is never a bound name.
+    pub fn pattern_storage_name(index: usize) -> String {
+        format!("$destructured.param.{index}")
+    }
+
+    pub fn bound_names(&self) -> &[String] {
+        &self.bound_names
+    }
+
+    /// Whether `name` is one of this formal's `parameterNames`.
+    pub fn binds(&self, name: &str) -> bool {
+        self.bound_names.iter().any(|bound| bound == name)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

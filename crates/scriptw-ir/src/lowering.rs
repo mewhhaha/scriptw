@@ -3697,11 +3697,12 @@ impl<'a> ScriptLowerer<'a> {
     fn lower_parameter_binding_pattern(
         &mut self,
         binding: &Binding,
-        storage_name: &str,
+        parameter: &FunctionParamIr,
     ) -> Vec<StatementIr> {
         let Binding::Pattern(pattern) = binding else {
             return Vec::new();
         };
+        let storage_name = parameter.name.as_str();
         let storage_expr = TypedExpr::from_info(
             ValueInfo {
                 kind: ValueKind::Dynamic,
@@ -3718,13 +3719,28 @@ impl<'a> ScriptLowerer<'a> {
         if destructuring_may_run_user_code {
             self.invalidate_unknown_user_code_effects();
         }
+        // 10.2.11 step 21 creates one binding per name of `parameterNames`
+        // in the function's environment, and steps 27 and 36 reuse that
+        // binding for a body `var` or function declaration of the same name.
+        // Those write the source name, as an identifier formal's storage is
+        // its source name, so the pattern writes each of the formal's bound
+        // names under that name too. The reuse rule for block-scoped names
+        // would move a name that the Script also declares with `var` to a
+        // fresh `$lex` slot, which no body declaration resolves to.
+        let storage_names = parameter
+            .bound_names()
+            .iter()
+            .map(|name| (name.clone(), name.clone()))
+            .collect::<BTreeMap<_, _>>();
         let Pattern::Object(pattern) = pattern else {
             let Pattern::Array(pattern) = pattern else {
                 return Vec::new();
             };
-            let Some(pattern) =
-                self.lower_array_binding_pattern(BindingMode::Let, pattern.bindings(), None)
-            else {
+            let Some(pattern) = self.lower_array_binding_pattern(
+                BindingMode::Let,
+                pattern.bindings(),
+                Some(&storage_names),
+            ) else {
                 return Vec::new();
             };
             return vec![StatementIr::DeclarationEvaluation(TypedExpr::from_info(
@@ -3736,9 +3752,11 @@ impl<'a> ScriptLowerer<'a> {
                 },
             ))];
         };
-        let Some(pattern) =
-            self.lower_object_binding_pattern(BindingMode::Let, pattern.bindings(), None)
-        else {
+        let Some(pattern) = self.lower_object_binding_pattern(
+            BindingMode::Let,
+            pattern.bindings(),
+            Some(&storage_names),
+        ) else {
             return Vec::new();
         };
         vec![StatementIr::DeclarationEvaluation(TypedExpr::from_info(
@@ -7094,17 +7112,21 @@ impl<'a> ScriptLowerer<'a> {
                 },
             );
             lowerer.current_param_names.push(name.clone());
-            params.push(FunctionParamIr {
-                name: name.clone(),
-                kind: if parameter.is_rest_param() {
+            let parameter_ir = function_parameter(
+                self.interner,
+                binding,
+                index,
+                if parameter.is_rest_param() {
                     ValueKind::Array
                 } else {
                     ValueKind::Dynamic
                 },
                 default_init,
-                is_rest: parameter.is_rest_param(),
-            });
-            let binding_initializers = lowerer.lower_parameter_binding_pattern(binding, &name);
+                parameter.is_rest_param(),
+            );
+            let binding_initializers =
+                lowerer.lower_parameter_binding_pattern(binding, &parameter_ir);
+            params.push(parameter_ir);
             if !binding_initializers.is_empty() {
                 parameter_prefix_statements.push(StatementIr::ParameterInitialization {
                     parameter_index: index,
@@ -7801,12 +7823,12 @@ impl<'a> ScriptLowerer<'a> {
                     },
                 );
                 (
-                    vec![FunctionParamIr {
-                        name: parameter_name,
-                        kind: ValueKind::Dynamic,
-                        default_init: None,
-                        is_rest: false,
-                    }],
+                    vec![FunctionParamIr::identifier(
+                        parameter_name,
+                        ValueKind::Dynamic,
+                        None,
+                        false,
+                    )],
                     BlockIr {
                         result_kind: ValueKind::Undefined,
                         statements: vec![StatementIr::Expression(write)],

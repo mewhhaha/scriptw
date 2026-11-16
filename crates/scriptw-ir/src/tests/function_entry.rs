@@ -73,6 +73,76 @@ fn lowers_array_binding_patterns_in_function_parameters() {
 }
 
 #[test]
+fn formals_carry_every_bound_name_and_patterns_write_those_names() {
+    // FunctionDeclarationInstantiation takes `parameterNames` from the
+    // formals, and a body `var id` writes `id`. The enclosing code declares
+    // `id` and `rest` too, which must not move the pattern's names to
+    // renamed lexical slots.
+    let program = lower_script(
+        "var id, rest; function dstr(a, {id, n: [b, ...rest], ...others}, ...[c]) { var id = a; return id; } dstr(1, {n: []});",
+    );
+    assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
+    let script = program.script.as_ref().expect("script ir should exist");
+    let function = script
+        .functions
+        .iter()
+        .find(|function| function.name == "dstr")
+        .expect("dstr should be lowered");
+    let bound_names = function
+        .params
+        .iter()
+        .map(|parameter| parameter.bound_names().join(","))
+        .collect::<Vec<_>>();
+    assert_eq!(bound_names, ["a", "id,b,rest,others", "c"]);
+    assert_eq!(function.params[0].name, "a");
+    assert_eq!(
+        function.params[1].name,
+        FunctionParamIr::pattern_storage_name(1)
+    );
+    assert!(function.params[1].binds("rest"));
+    assert!(!function.params[1].binds("n"));
+    assert!(!function.params[1].binds(&function.params[1].name));
+    let StatementIr::ParameterInitialization {
+        parameter_index: 1,
+        statements,
+    } = &function.body.statements[0]
+    else {
+        panic!("expected parameter initialization marker");
+    };
+    let StatementIr::DeclarationEvaluation(TypedExpr {
+        expr: ExprIr::ObjectDestructure { pattern, .. },
+        ..
+    }) = &statements[0]
+    else {
+        panic!("expected parameter object destructuring inside the initialization marker");
+    };
+    assert!(matches!(
+        &pattern.properties[0].target,
+        DestructuringTargetIr::Binding { name, .. } if name == "id"
+    ));
+    let DestructuringTargetIr::NestedArray(nested) = &pattern.properties[1].target else {
+        panic!("expected the nested array pattern");
+    };
+    assert!(matches!(
+        nested.elements.as_slice(),
+        [
+            ArrayDestructuringElementIr::Target {
+                target: DestructuringTargetIr::Binding { name: first, .. },
+                ..
+            },
+            ArrayDestructuringElementIr::Rest {
+                target: DestructuringTargetIr::Binding { name: rest, .. },
+                ..
+            },
+        ] if first == "b" && rest == "rest"
+    ));
+    assert!(matches!(
+        &pattern.rest,
+        Some(DestructuringTargetIr::Binding { name, .. }) if name == "others"
+    ));
+}
+
+#[test]
 fn lowers_object_rest_binding_in_generator_parameters() {
     let program =
         lower_script("var f = function* ({ a, ...rest } = { a: 1, b: 2 }) {}; f().next();");

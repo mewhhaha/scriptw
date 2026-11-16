@@ -27,7 +27,14 @@ impl LocalArgumentsArity {
 }
 
 /// The existing arguments-observer proof also justifies dropping the actual
-/// argument count and all values beyond the bounded simple formal list.
+/// argument count and all values beyond the bounded formal list.
+///
+/// The proof decides which lists qualify, and this plan adds only the bound
+/// of five formals. A formal is an identifier or an object binding pattern:
+/// one slot carries the argument value of either, and a pattern's
+/// BindingInitialization reads its slot in the body like any other use of
+/// the formal. Rest parameters, initializers of the list and array patterns
+/// are refused by the proof.
 #[derive(Debug, Clone)]
 pub(crate) struct LocalArgumentsPlan {
     source: FunctionId,
@@ -89,6 +96,70 @@ mod tests {
                 expected,
                 "{source}"
             );
+        }
+    }
+
+    #[test]
+    fn object_pattern_formals_take_one_local_slot_each_under_the_same_proof() {
+        for (source, expected) in [
+            (
+                "export function make({id}) { return id; }",
+                Some(LocalArgumentsArity::Narrow),
+            ),
+            (
+                "export function make({id}, x) { return id + x; }",
+                Some(LocalArgumentsArity::Narrow),
+            ),
+            // A body `var` of a bound name is the parameter's binding, not
+            // an observer of the argument list.
+            (
+                "export function make({id}, x) { var id, x; return id + x; }",
+                Some(LocalArgumentsArity::Narrow),
+            ),
+            (
+                "export function make({a: {b}, ...others}, {c = 1}) { return b + c; }",
+                Some(LocalArgumentsArity::Narrow),
+            ),
+            (
+                "export function make({a}, b, {c}) { return a + b + c; }",
+                Some(LocalArgumentsArity::Wide),
+            ),
+            (
+                "export function make({a}, {b}, {c}, {d}, {e}) { return a + e; }",
+                Some(LocalArgumentsArity::Wide),
+            ),
+            // The bound counts formals, not the names they bind.
+            (
+                "export function make({a, b, c, d, e, f}) { return a + f; }",
+                Some(LocalArgumentsArity::Narrow),
+            ),
+            (
+                "export function make({a}, {b}, {c}, {d}, {e}, {f}) { return a + f; }",
+                None,
+            ),
+            (
+                "export function make({id}, x) { return arguments[1]; }",
+                None,
+            ),
+            ("export function make({id}, x) { return () => id; }", None),
+            ("export function make({id} = {}, x) { return id; }", None),
+            ("export function make({id}, ...x) { return id; }", None),
+            ("export function make([id], x) { return id; }", None),
+            ("export function make({id}, [x]) { return id; }", None),
+        ] {
+            let parsed = parse(source, ParseOptions::module()).unwrap();
+            let lowered = scriptw_ir::lower(&parsed);
+            let script = lowered.script.as_ref().unwrap();
+            let function = script
+                .functions
+                .iter()
+                .find(|function| function.name == "make")
+                .unwrap();
+            let plan = LocalArgumentsPlan::for_function(function);
+            assert_eq!(plan.as_ref().map(|plan| plan.arity), expected, "{source}");
+            if let Some(plan) = plan {
+                assert_eq!(plan.parameter_count, function.params.len(), "{source}");
+            }
         }
     }
 
