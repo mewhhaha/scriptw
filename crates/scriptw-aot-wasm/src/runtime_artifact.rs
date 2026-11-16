@@ -136,7 +136,10 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 75 adds four leaf R helpers over code units and bytes (ASCII
 // narrowing and widening, a code-unit find and JSON's plain run) and gives
 // the JSON.stringify value helper a `fetched` operand.
-const LAYOUT_VERSION: u32 = 75;
+// Version 76 ends each intrinsic property layout in R's static data with the
+// number of its rows that a Symbol keys, a word after the String index that
+// the chain walk in P and R reads to prove that a layout lacks a Symbol.
+const LAYOUT_VERSION: u32 = 76;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

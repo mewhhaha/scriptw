@@ -1013,37 +1013,24 @@ impl FunctionBuilder<'_> {
                 s.release_i32_local(mask, f);
             }
             ChainKey::Symbol(_) => {
-                // Symbol rows are not indexed; a layout without any lacks
-                // every Symbol.
-                let count = s.reserve_i32_local(f);
-                s.field(IntrinsicPropertyStorageSchema::COUNT)
-                    .read(intrinsic, s, f)
-                    .store(count, f);
-                row.set_constant(0, f);
-                let scan = self.open_frame(ControlFrameKind::Loop, f);
-                row.load(f);
-                count.load(f);
-                f.instruction(&Instruction::I32GeU);
-                self.emit_branch_if_to_target(done, f);
-                address.load(f);
-                row.load(f);
-                f.instruction(&Instruction::I32Const(LAYOUT_ROW_BYTES));
+                // Symbol rows are in no index. The word after the String
+                // index counts them, and a layout without any lacks every
+                // Symbol; with one, the complete search decides.
+                s.field(IntrinsicPropertyStorageSchema::INDEX_ADDRESS)
+                    .read(intrinsic, s, f);
+                s.field(IntrinsicPropertyStorageSchema::INDEX_MASK)
+                    .read(intrinsic, s, f);
+                f.instruction(&Instruction::I32Const(1));
+                f.instruction(&Instruction::I32Add);
+                f.instruction(&Instruction::I32Const(4));
                 f.instruction(&Instruction::I32Mul);
                 f.instruction(&Instruction::I32Add);
                 f.instruction(&Instruction::I32Load(wasm_encoder::MemArg {
                     offset: 0,
-                    align: 0,
+                    align: 2,
                     memory_index: 0,
                 }));
                 self.emit_branch_if_to_target(decline, f);
-                row.load(f);
-                f.instruction(&Instruction::I32Const(1));
-                f.instruction(&Instruction::I32Add);
-                row.store(f);
-                self.emit_branch_to_target(scan, f);
-                self.pop_control(ControlFrameKind::Loop);
-                f.instruction(&Instruction::End);
-                s.release_i32_local(count, f);
             }
         }
         self.pop_control(ControlFrameKind::Block);
