@@ -113,7 +113,12 @@ strict body retains that separate entry and epilogue.
 
 Strict ordinary functions also admit an arguments-only omission when their
 complete inspected body has no arguments reference, direct eval or newly created
-callable/class. Capture reads, property access, coercion and callbacks are allowed:
+class. A newly created callable is admitted only when the activation owns no
+environment slot for the binding and has no eval-visible binding of that name:
+an arrow function, or a direct eval inside one, reaches the parent's binding
+only through that slot, which capture analysis creates whenever a nested
+function names `arguments` or holds a direct eval. Capture reads, property
+access, coercion and callbacks are allowed:
 the normal strict caller barrier prevents legacy activation reflection. This
 source-bound proof retains every existing owned environment binding and normal
 entry/epilogue; it removes only the implicit object and its metadata publication.
