@@ -2,18 +2,26 @@ use super::*;
 use boa_ast::visitor::{VisitWith, Visitor};
 use core::ops::ControlFlow;
 
-fn parameters_contain_expression(parameters: &[FormalParameter]) -> bool {
-    struct ContainsExpression;
-    impl<'ast> Visitor<'ast> for ContainsExpression {
-        type BreakTy = ();
-        fn visit_expression(&mut self, _: &'ast Expression) -> ControlFlow<()> {
-            ControlFlow::Break(())
-        }
+struct ContainsExpression;
+impl<'ast> Visitor<'ast> for ContainsExpression {
+    type BreakTy = ();
+    fn visit_expression(&mut self, _: &'ast Expression) -> ControlFlow<()> {
+        ControlFlow::Break(())
     }
+}
+
+/// Whether a binding pattern holds no initializer and no computed key: the
+/// same test that decides below whether an owner needs a separate body
+/// record for its parameter expressions.
+pub(super) fn pattern_is_expression_free(pattern: &Pattern) -> bool {
+    pattern.visit_with(&mut ContainsExpression).is_continue()
+}
+
+fn parameters_contain_expression(parameters: &[FormalParameter]) -> bool {
     parameters.iter().any(|parameter| {
         parameter.init().is_some()
             || matches!(parameter.variable().binding(), Binding::Pattern(pattern)
-                if pattern.visit_with(&mut ContainsExpression).is_break())
+                if !pattern_is_expression_free(pattern))
     })
 }
 

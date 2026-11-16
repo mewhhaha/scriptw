@@ -3,7 +3,8 @@
 //! can observe it; all ordinary activation storage and entry logic stay live.
 use super::*;
 use scriptw_ir::{
-    BlockIr, ClassElementExecutionKind, EnvironmentIdentifierOperationIr, ExprIr, ForInitIr,
+    BlockIr, ClassElementExecutionKind, DestructuringPropertyKeyIr, DestructuringTargetIr,
+    EnvironmentIdentifierOperationIr, ExprIr, ForInitIr, ObjectDestructuringPatternIr,
     ObjectPropertyIr, PropertyKeyIr, SpecOperationIr, TypedExpr, LEXICAL_ARGUMENTS_NAME,
 };
 
@@ -19,7 +20,13 @@ impl<'a> UnobservedStrictArguments<'a> {
             || function.is_derived_constructor
             || function.generator_plan.is_some()
             || function.resumable_plan.is_some()
-            || !has_simple_parameter_list(function)
+            // An object binding pattern is walked with the body, as its
+            // ParameterInitialization statement. Initializers of the list
+            // itself and rest parameters stay refused.
+            || function
+                .params
+                .iter()
+                .any(|parameter| parameter.is_rest || parameter.default_init.is_some())
             || function.captures_lexical_arguments
             || function
                 .captured_bindings
@@ -117,7 +124,8 @@ impl BodyWalk {
                         .is_none_or(|value| self.expression(value))
             }),
             StatementIr::Block(body) => self.block(body),
-            StatementIr::LexicalBlock(statements) => {
+            StatementIr::LexicalBlock(statements)
+            | StatementIr::ParameterInitialization { statements, .. } => {
                 statements.iter().all(|value| self.statement(value))
             }
             StatementIr::If {
@@ -207,6 +215,37 @@ impl BodyWalk {
         }
     }
 
+    /// BindingInitialization of an object pattern reads properties of the
+    /// value, evaluates computed keys and initializers, and initializes the
+    /// bound names. The reads may run getters and Proxy traps, which are
+    /// other functions' code like any call. Only the walked expressions and
+    /// the bound names belong to this activation.
+    fn object_pattern(self, pattern: &ObjectDestructuringPatternIr) -> bool {
+        pattern.properties.iter().all(|property| {
+            (match &property.key {
+                DestructuringPropertyKeyIr::Static(_) => true,
+                DestructuringPropertyKeyIr::Computed(value) => self.expression(value),
+            }) && self.binding_target(&property.target)
+                && property
+                    .default
+                    .as_ref()
+                    .is_none_or(|value| self.expression(value))
+        }) && pattern
+            .rest
+            .as_ref()
+            .is_none_or(|target| self.binding_target(target))
+    }
+
+    fn binding_target(self, target: &DestructuringTargetIr) -> bool {
+        match target {
+            DestructuringTargetIr::Binding { name, .. } => unobserved_name(name),
+            DestructuringTargetIr::NestedObject(pattern) => self.object_pattern(pattern),
+            // Assignment targets, resolved var references and iterator
+            // patterns have no admitted walk.
+            _ => false,
+        }
+    }
+
     fn key(self, key: &PropertyKeyIr) -> bool {
         match key {
             PropertyKeyIr::StaticString(_) | PropertyKeyIr::ArrayLength => true,
@@ -256,6 +295,9 @@ impl BodyWalk {
             }
             ExprIr::MaterializeBinding { name, value, body } => {
                 unobserved_name(name) && self.expression(value) && self.expression(body)
+            }
+            ExprIr::ObjectDestructure { value, pattern } => {
+                self.expression(value) && self.object_pattern(pattern)
             }
             ExprIr::PropertyRead {
                 target,
@@ -466,6 +508,69 @@ mod tests {
     }
 
     #[test]
+    fn object_binding_patterns_are_walked_with_the_body() {
+        // The pattern's own expressions and bound names are the only part of
+        // BindingInitialization that belongs to the activation.
+        for source in [
+            "export function make({input}) { return input; }",
+            "export function make({input}, other) { return input + other; }",
+            "export function make({input: renamed, other}) { return renamed + other; }",
+            "export function make({inner: {input}}) { return input; }",
+            "export function make({input = 1}) { return input; }",
+            "var key = 'k'; export function make({[key]: input}) { return input; }",
+            "export function make({input, ...others}) { return others; }",
+        ] {
+            with_module(source, |function| {
+                assert!(
+                    function.body.statements.iter().any(|statement| matches!(
+                        statement,
+                        StatementIr::ParameterInitialization { .. }
+                    )),
+                    "{source}"
+                );
+                assert!(
+                    UnobservedStrictArguments::admit(function).is_some(),
+                    "{source}"
+                );
+                let (_, mut arguments, storage) =
+                    UserFunctionActivationPlan::for_function(function)
+                        .unwrap()
+                        .into_parts();
+                assert_eq!(storage, function.owned_env_bindings.as_slice());
+                assert!(
+                    arguments.take_for_binding().unwrap().into_present().is_none(),
+                    "{source}"
+                );
+            });
+        }
+    }
+
+    #[test]
+    fn a_pattern_owner_that_creates_a_callable_keeps_its_named_arguments_slot() {
+        // An owner with a binding pattern is not a module-local owner, so its
+        // activation record keeps a slot for the implicit binding, and a
+        // callable created in the body could name it through that record.
+        for source in [
+            "export function make({input}) { return function(){return input;}; }",
+            "export function make({input}) { return () => input; }",
+        ] {
+            with_module(source, |function| {
+                assert!(
+                    function
+                        .owned_env_bindings
+                        .iter()
+                        .any(|binding| binding.name == LEXICAL_ARGUMENTS_NAME),
+                    "{source}"
+                );
+                assert!(
+                    UnobservedStrictArguments::admit(function).is_none(),
+                    "{source}"
+                );
+            });
+        }
+    }
+
+    #[test]
     fn a_child_callable_that_names_the_binding_owns_its_environment_slot() {
         // The slot is what refuses the proof: the walk never reads a child.
         // Capture analysis also gives the slot to an activation whose
@@ -573,7 +678,17 @@ mod tests {
             "export function make(input) { return input[eval('arguments[0]')]; }",
             "export function make(input = arguments[0]) { return input; }",
             "export function make(...input) { return input; }",
-            "export function make({input}) { return input; }",
+            "export function make({input}, ...rest) { return input; }",
+            "export function make({input} = arguments[0]) { return input; }",
+            "export function make({input} = {}) { return input; }",
+            "export function make({input = arguments[0]}) { return input; }",
+            "export function make({[arguments[0]]: input}) { return input; }",
+            "export function make({input = () => arguments[0]}) { return input; }",
+            "export function make({input = eval('arguments[0]')}) { return input; }",
+            "export function make({input}) { return arguments[0]; }",
+            "export function make({input}) { return () => arguments[0]; }",
+            "export function make({inner: {input = arguments}}) { return input; }",
+            "export function make([input]) { return input; }",
             "export function* make(input) { return input.x; }",
             "export async function make(input) { return input.x; }",
         ] {

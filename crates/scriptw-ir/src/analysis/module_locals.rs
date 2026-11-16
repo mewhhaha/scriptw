@@ -12,11 +12,21 @@ impl ModuleCellOwners {
     /// parameter list reads its own and its captured cells like an ordinary
     /// function. It has no `this`, `arguments` or `new.target` cell of its
     /// own, and the synthetic ones it captures are never source names here.
+    ///
+    /// A binding pattern that holds no expression changes none of this: the
+    /// owner keeps its one activation record, which holds the names the
+    /// pattern binds, and BindingInitialization evaluates nothing of the
+    /// owner's but those initializations. A pattern with an initializer or
+    /// a computed key gives the owner a separate body record and is refused
+    /// with it.
     pub(super) fn collect(builder: &AnalysisBuilder<'_>) -> Self {
-        Self(builder.plain_module_owner_ids(&[
-            FunctionProtocolIr::OrdinaryCallAndConstruct,
-            FunctionProtocolIr::Arrow,
-        ]))
+        Self(builder.plain_module_owner_ids(
+            &[
+                FunctionProtocolIr::OrdinaryCallAndConstruct,
+                FunctionProtocolIr::Arrow,
+            ],
+            PlainParameters::ExpressionFreePatterns,
+        ))
     }
 }
 
@@ -204,14 +214,31 @@ impl ProvenBindingCellIr {
     }
 }
 
+/// The parameter lists a plain owner may have.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PlainParameters {
+    /// Identifiers only: every parameter name is an entry value.
+    Identifiers,
+    /// Identifiers and binding patterns that hold no expression.
+    ExpressionFreePatterns,
+}
+
 impl AnalysisBuilder<'_> {
     fn ordinary_module_owner_ids(&self) -> BTreeSet<FunctionId> {
-        self.plain_module_owner_ids(&[FunctionProtocolIr::OrdinaryCallAndConstruct])
+        self.plain_module_owner_ids(
+            &[FunctionProtocolIr::OrdinaryCallAndConstruct],
+            PlainParameters::Identifiers,
+        )
     }
 
     /// Strict owners of one of `protocols` with one activation record, no
-    /// enclosing `with` and a list of plain identifier parameters.
-    fn plain_module_owner_ids(&self, protocols: &[FunctionProtocolIr]) -> BTreeSet<FunctionId> {
+    /// enclosing `with` and a list of plain identifier parameters or, where
+    /// `parameters` admits them, binding patterns without an expression.
+    fn plain_module_owner_ids(
+        &self,
+        protocols: &[FunctionProtocolIr],
+        parameters: PlainParameters,
+    ) -> BTreeSet<FunctionId> {
         self.function_plans
             .values()
             .filter(|function| {
@@ -225,7 +252,15 @@ impl AnalysisBuilder<'_> {
                     && function.parameters.as_ref().iter().all(|parameter| {
                         !parameter.is_rest_param()
                             && parameter.init().is_none()
-                            && matches!(parameter.variable().binding(), Binding::Identifier(_))
+                            && match parameter.variable().binding() {
+                                Binding::Identifier(_) => true,
+                                Binding::Pattern(pattern) => {
+                                    parameters == PlainParameters::ExpressionFreePatterns
+                                        && function_environment::pattern_is_expression_free(
+                                            pattern,
+                                        )
+                                }
+                            }
                     })
             })
             .map(|function| function.id.clone())

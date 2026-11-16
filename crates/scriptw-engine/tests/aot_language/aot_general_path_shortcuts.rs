@@ -447,3 +447,123 @@ print(log.join());
         r##"plain=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],plain-again=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],own-undefined=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],own-null=TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError,own-number=TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError,own-string=TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError,own-Sub=S1[b]A2[ac] S0[]A3[abc] S3[abc]A0[] S1[b]A4[axyc] S3[abc] S3[abc] S2[bc] S4[abcc] S3[abc] S6[aabbcc],own-Array=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],own-Object=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],own-species-Sub=S1[b]A2[ac] S0[]A3[abc] S3[abc]A0[] S1[b]A4[axyc] S3[abc] S3[abc] S2[bc] S4[abcc] S3[abc] S6[aabbcc],own-species-null=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],own-species-undefined=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],own-species-not-constructor=TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError,own-get,own-get,own-get,own-get,own-get,own-get,own-get,own-get,own-get,own-get,own-accessor=S1[b]A2[ac] S0[]A3[abc] S3[abc]A0[] S1[b]A4[axyc] S3[abc] S3[abc] S2[bc] S4[abcc] S3[abc] S6[aabbcc],subclass=S1[b]S2[ac] S0[]S3[abc] S3[abc]S0[] S1[b]S4[axyc] S3[abc] S3[abc] S2[bc] S4[abcc] S3[abc] S6[aabbcc],sub-prototype=S1[b]S2[ac] S0[]S3[abc] S3[abc]S0[] S1[b]S4[axyc] S3[abc] S3[abc] S2[bc] S4[abcc] S3[abc] S6[aabbcc],null-prototype=A1[b]02[ac] A0[]03[abc] A3[abc]00[] A1[b]04[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],middle-prototype=A1[b]?2[ac] A0[]?3[abc] A3[abc]?0[] A1[b]?4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],middle-constructor=S1[b]?2[ac] S0[]?3[abc] S3[abc]?0[] S1[b]?4[axyc] S3[abc] S3[abc] S2[bc] S4[abcc] S3[abc] S6[aabbcc],array-like=A1[b]?!2[ac] A0[]?!3[abc] A3[abc]?!0[] A1[b]?!4[axyc] A3[abc] A3[abc] A2[bc] A2[[object Object]c] A3[abc] A6[aabbcc],proxy=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],10,revoked-constructor-proxy=TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError,unrelated-property=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],prototype-constructor-Sub=S1[b]A2[ac] S0[]A3[abc] S3[abc]A0[] S1[b]A4[axyc] S3[abc] S3[abc] S2[bc] S4[abcc] S3[abc] S6[aabbcc],prototype-constructor-accessor=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],10,prototype-constructor-deleted=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],species-Sub=S1[b]A2[ac] S0[]A3[abc] S3[abc]A0[] S1[b]A4[axyc] S3[abc] S3[abc] S2[bc] S4[abcc] S3[abc] S6[aabbcc],10,species-null=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],species-number=TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError,restored=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],plain=3>A3[abc] 4>A4[abcp] c>A2[ab] a>A2[bc] 3>A3[abc] 4>A4[uabc] A0[]>A3[abc] A1[b]>A2[ac] A0[]>A4[aibc] 3>A3[cba] 3>A3[fff] 3>A3[bcc],empty=0>A0[] 1>A1[p] undefined>A0[] undefined>A0[] 0>A0[] 1>A1[u] A0[]>A0[] A0[]>A0[] A0[]>A1[i] 0>A0[] 0>A0[] 0>A0[],frozen=TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc],sealed=3>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[bcc] 3>A3[abc] TypeError>A3[abc] A0[]>A3[abc] TypeError>A3[acc] TypeError>A3[abc] 3>A3[cba] 3>A3[fff] 3>A3[bcc],closed=3>A3[abc] TypeError>A3[abc] c>A2[ab] a>A2[bc] 3>A3[abc] TypeError>A3[abc] A0[]>A3[abc] A1[b]>A2[ac] TypeError>A3[abc] 3>A3[cba] 3>A3[fff] 3>A3[bcc],fixed-length=TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[ab] TypeError>A3[bc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[ac] TypeError>A3[abc] 3>A3[cba] 3>A3[fff] 3>A3[bcc],fixed-empty=TypeError>A0[] TypeError>A0[] TypeError>A0[] TypeError>A0[] TypeError>A0[] TypeError>A0[] TypeError>A0[] TypeError>A0[] TypeError>A0[] 0>A0[] 0>A0[] 0>A0[],holes=3>A3[ac] 4>A4[acp] c>A2[a] a>A2[c] 3>A3[ac] 4>A4[uac] A0[]>A3[ac] A1[]>A2[ac] A0[]>A4[aic] 3>A3[ca] 3>A3[fff] 3>A3[cc],presized=3>A3[] 4>A4[p] undefined>A2[] undefined>A2[] 3>A3[] 4>A4[u] A0[]>A3[] A1[]>A2[] A0[]>A4[i] 3>A3[] 3>A3[fff] 3>A3[],numbers=3>A3[1.52.53.5] 4>A4[1.52.53.5p] 3.5>A2[1.52.5] 1.5>A2[2.53.5] 3>A3[1.52.53.5] 4>A4[u1.52.53.5] A0[]>A3[1.52.53.5] A1[2.5]>A2[1.53.5] A0[]>A4[1.5i2.53.5] 3>A3[3.52.51.5] 3>A3[fff] 3>A3[2.53.53.5],subclass=3>S3[abc] 4>S4[abcp] c>S2[ab] a>S2[bc] 3>S3[abc] 4>S4[uabc] S0[]>S3[abc] S1[b]>S2[ac] S0[]>S4[aibc] 3>S3[cba] 3>S3[fff] 3>S3[bcc],fixed-element=3>A3[abc] 4>A4[abcp] c>A2[ab] TypeError>A3[bbc] 3>A3[abc] TypeError>A4[abbc] A0[]>A3[abc] TypeError>A3[abc] TypeError>A4[abbc] 3>A3[cba] TypeError>A3[fbc] TypeError>A3[bbc],proxy=3>A3[abc] 4>A4[abcp] c>A2[ab] a>A2[bc] 3>A3[abc] 4>A4[uabc] A0[]>A3[abc] A1[b]>A2[ac] A0[]>A4[aibc] 3>A3[cba] 3>A3[fff] 3>A3[bcc],30,length=3|3=p|length=4|-2|length=2|0=b|1=c|-2,array-like=3>?!3[abc] 4>?!4[abcp] c>?!2[ab] a>?!2[bc] 3>?!3[abc] 4>?!4[uabc] A0[]>?!3[abc] A1[b]>?!2[ac] A0[]>?!4[aibc] 3>?!3[cba] 3>?!3[fff] 3>?!3[bcc],length-setter=2>?!2[ab] 3>?!3[abp] b>?!1[a] a>?!1[b] 2>?!2[ab] 3>?!3[uab] A0[]>?!2[ab] A1[b]>?!1[a] A0[]>?!3[aib] 2>?!2[ba] 2>?!2[ff] 2>?!2[bb],len3|len2|len1|len3,4294967295,RangeError,4294967295,A1[],4294967294"##,
     );
 }
+
+#[test]
+fn strict_object_pattern_parameters_keep_binding_initialization_exact() {
+    // A strict function whose parameters are object binding patterns omits
+    // its arguments object when nothing names it, and in a module reads the
+    // names a pattern without expressions binds through their cells. The
+    // body is strict in all three forms. Patterns are read, written,
+    // captured, nested, repeated, used with `arguments` (directly, through
+    // an arrow function and through a direct eval), with defaults, a
+    // temporal dead zone, computed keys, rest properties, array patterns
+    // and list defaults; called with primitives, null and nothing; and
+    // given getters, a Proxy, inherited properties, a getter that re-enters
+    // the function and one that collects.
+    run_as_script_function_and_module(
+        r##"
+"use strict";
+var log = [];
+function show(f) { try { return String(f()); } catch (e) { return e.constructor.name; } }
+function churn() { var keep = []; for (var i = 0; i < 40000; i++) keep[i & 63] = { i: i, a: [i, i + 1] }; return keep.length; }
+var tick = 0;
+// One object pattern, read, written and captured.
+function row({ id }) { return "row" + id + ":" + id; }
+function pair({ a, b }, extra) { return a + "+" + b + "+" + extra; }
+function renamed({ a: first, b: second }) { first = first + 1; return first + "/" + second; }
+function nested({ outer: { inner }, flat }) { return inner + "|" + flat; }
+function capture({ id }) { return function () { id = id + 1; return id; }; }
+function arrowCapture({ id }) { var next = () => ++id; next(); return [id, next()].join(); }
+function count({ id }) { return arguments.length + ":" + (arguments[0].id === id) + ":" + typeof arguments[1]; }
+function own({ id }) { arguments[0] = { id: "changed" }; return id + ":" + arguments[0].id; }
+function arrowArguments({ id }) { return (() => arguments[0].id + arguments.length)(); }
+function evalArguments({ id }) { return eval("arguments[0].id + id"); }
+function shadowFunction({ id }) { function id() {} return typeof id; }
+function recursive({ n, acc }) { return n ? recursive({ n: n - 1, acc: acc + n }) : acc; }
+function reenter({ id, again }) { var mine = id; if (again) reenter({ id: id + 100, again: false }); return mine === id; }
+function twice({ id }, { id: other }) { return id + "&" + other; }
+function thisAndNew({ id }) { return (this === undefined) + ":" + (new.target === undefined) + ":" + id; }
+function Make({ id }) { this.id = id; this.read = function () { return id; }; }
+var arrow = ({ id }) => id * 2;
+var arrowNested = ({ a }) => ({ b }) => a + b;
+var method = { m({ id }) { return id + (this === method); } };
+class K { constructor({ id }) { this.id = id; } static s({ id }) { return id; } get g() { return this.id; } }
+function* generator({ id }) { yield id; yield id + 1; }
+async function asynchronous({ id }) { return id; }
+// Patterns that hold expressions keep their separate records.
+function defaults({ a = 1, b = a + 1 }) { return a + ":" + b; }
+function tdz({ a = b, b }) { return a + ":" + b; }
+function computed({ ["k" + ++tick]: v }) { return v; }
+function rest({ a, ...others }) { return a + ":" + Object.keys(others).join(""); }
+function closureDefault({ a, f = () => a }) { a = a + 1; return f(); }
+function listDefault({ id } = { id: "dflt" }) { return id; }
+function argumentsDefault({ id = arguments.length }) { return id; }
+function array([first, second]) { return first + ":" + second; }
+function mixed({ a }, [b], c = a + b, ...d) { return [a, b, c, d.length].join(); }
+for (var i = 0; i < 3; i++) {
+  log.push(row({ id: i }), pair({ a: i, b: 2 }, "e"), renamed({ a: i, b: "s" }), nested({ outer: { inner: i }, flat: "f" }), capture({ id: i })(), arrowCapture({ id: i }), count({ id: i }), count({ id: i }, 1), own({ id: i }), arrowArguments({ id: "a" }), evalArguments({ id: i }), shadowFunction({ id: i }), recursive({ n: 4, acc: i }), reenter({ id: i, again: true }), twice({ id: i }, { id: "o" }), thisAndNew({ id: i }), new Make({ id: i }).read(), arrow({ id: i }), arrowNested({ a: i })({ b: 10 }), method.m({ id: i }), new K({ id: i }).g, K.s({ id: i }), Array.from(generator({ id: i })).join(""), typeof asynchronous({ id: i }));
+  log.push(defaults({}), defaults({ a: 5 }), defaults({ b: 7 }), show(function () { return tdz({}); }), tdz({ a: 1, b: 2 }), computed({ k1: "one", k2: "two", k3: "three" }), rest({ a: 1, b: 2, c: 3 }), closureDefault({ a: i }), listDefault(), listDefault({ id: i }), argumentsDefault({}, 2, 3), array([i, "s"]), array("xy"), mixed({ a: 1 }, [2]), mixed({ a: 1 }, [2], 9, 8, 7));
+}
+churn();
+// Arguments that are not plain objects.
+log.push(show(function () { return row(); }), show(function () { return row(null); }), show(function () { return row(undefined); }), row(7), row("str"), row(true), row([]), row(function id() {}).length > 8, row(Symbol.iterator), show(function () { return nested({ flat: 1 }); }), show(function () { return nested({ outer: null }); }));
+// Getters, Proxies and prototypes on the argument run in source order, once each.
+var order = [];
+var source = { get a() { order.push("a"); return 1; }, get b() { order.push("b"); return 2; } };
+log.push(pair(source, "x"), renamed(source), order.join(""));
+var traps = [];
+var proxy = new Proxy({ id: "p", a: 1, b: 2 }, { get: function (t, k, r) { traps.push(String(k)); return Reflect.get(t, k, r); }, has: function (t, k) { traps.push("has:" + String(k)); return Reflect.has(t, k); }, ownKeys: function (t) { traps.push("keys"); return Reflect.ownKeys(t); }, getOwnPropertyDescriptor: function (t, k) { traps.push("gopd:" + String(k)); return Reflect.getOwnPropertyDescriptor(t, k); } });
+log.push(row(proxy), pair(proxy, "y"), rest(proxy), traps.join("|"));
+var inherited = Object.create({ id: "proto", a: "pa" }); inherited.b = "own";
+log.push(row(inherited), pair(inherited, "z"));
+Object.prototype.id = "object-prototype";
+log.push(row({}), row(7), row([]));
+delete Object.prototype.id;
+log.push(row({}), show(function () { return row({ get id() { throw new RangeError("r"); } }); }));
+// A getter that re-enters the same function, and one that collects.
+var depth = 0;
+var reentrant = { get id() { return depth++ < 2 ? row(reentrant) : "base"; } };
+log.push(row(reentrant), row({ get id() { churn(); return "after-collection"; } }), capture({ get id() { churn(); return 40; } })());
+// Strict functions stay opaque, and their parameters stay their own.
+log.push(show(function () { return row.arguments; }), show(function () { return row.caller; }), row.length, pair.length, mixed.length, listDefault.length, Object.hasOwn(row, "arguments"));
+var captured = capture({ id: 0 }), other = capture({ id: 100 });
+log.push(captured(), captured(), other(), captured());
+var made = new Make({ id: "kept" });
+log.push(made.id, made.read(), show(function () { return Make({ id: 1 }); }), show(function () { return new K(); }), show(function () { return K({ id: 1 }); }));
+print(log.join());
+"##,
+        r##"row0:0,0+2+e,1/s,0|f,1,1,2,1:true:undefined,2:true:number,0:changed,a1,0,function,10,true,0&o,true:true:0,0,0,10,1,0,0,01,object,1:2,5:6,1:7,ReferenceError,1:2,one,1:bc,1,dflt,0,3,0:s,x:y,1,2,3,0,1,2,9,2,row1:1,1+2+e,2/s,1|f,2,2,3,1:true:undefined,2:true:number,1:changed,a1,2,function,11,true,1&o,true:true:1,1,2,11,2,1,1,12,object,1:2,5:6,1:7,ReferenceError,1:2,two,1:bc,2,dflt,1,3,1:s,x:y,1,2,3,0,1,2,9,2,row2:2,2+2+e,3/s,2|f,3,3,4,1:true:undefined,2:true:number,2:changed,a1,4,function,12,true,2&o,true:true:2,2,4,12,3,2,2,23,object,1:2,5:6,1:7,ReferenceError,1:2,three,1:bc,3,dflt,2,3,2:s,x:y,1,2,3,0,1,2,9,2,TypeError,TypeError,TypeError,rowundefined:undefined,rowundefined:undefined,rowundefined:undefined,rowundefined:undefined,true,rowundefined:undefined,TypeError,TypeError,1+2+x,2/2,abab,rowp:p,1+2+y,1:idb,id|a|b|a|keys|gopd:id|id|gopd:b|b,rowproto:proto,pa+own+z,rowobject-prototype:object-prototype,rowobject-prototype:object-prototype,rowobject-prototype:object-prototype,rowundefined:undefined,RangeError,rowrowrowbase:base:rowbase:base:rowrowbase:base:rowbase:base,rowafter-collection:after-collection,41,TypeError,TypeError,1,2,2,0,false,1,2,101,3,kept,kept,TypeError,TypeError,TypeError"##,
+    );
+}
+
+#[test]
+fn object_pattern_parameters_in_sloppy_code_keep_their_arguments_object() {
+    // The same patterns in code that is sloppy as a Script and as function
+    // code and strict as a module; only what both modes agree on is
+    // observed.
+    run_as_script_function_and_module(
+        r##"
+var log = [];
+function show(f) { try { return String(f()); } catch (e) { return e.constructor.name; } }
+// The same patterns in code that is sloppy as a Script and as function code
+// and strict as a module: only what both modes agree on is observed.
+function row({ id }) { return "row" + id + ":" + id; }
+function count({ id }) { return arguments.length + ":" + (arguments[0].id === id); }
+function own({ id }) { arguments[0] = { id: "changed" }; id = id + "!"; return id + ":" + arguments[0].id; }
+function capture({ id }) { return function () { id = id + 1; return id; }; }
+function arrowArguments({ id }) { return (() => arguments[0].id + arguments.length)(); }
+function evalBody({ id }) { return eval("id + arguments.length"); }
+function nested({ outer: { inner }, flat }, extra) { return inner + "|" + flat + "|" + extra; }
+function defaults({ a = 1, b = a + 1 }) { return a + ":" + b; }
+function rest({ a, ...others }) { return a + ":" + Object.keys(others).join(""); }
+var arrow = ({ id }) => id * 2;
+for (var i = 0; i < 3; i++) log.push(row({ id: i }), count({ id: i }, 1), own({ id: i }), capture({ id: i })(), arrowArguments({ id: "a" }), evalBody({ id: i }), nested({ outer: { inner: i }, flat: "f" }), defaults({ b: i }), rest({ a: i, z: 1 }), arrow({ id: i }));
+var order = [];
+log.push(row({ get id() { order.push("g"); return "got"; } }), order.join(""), show(function () { return row(); }), show(function () { return nested({}); }), row(7), row.length, nested.length);
+var kept = capture({ id: 10 });
+log.push(kept(), kept(), capture({ id: 0 })(), kept());
+print(log.join());
+"##,
+        r##"row0:0,2:true,0!:changed,1,a1,1,0|f|undefined,1:0,0:z,0,row1:1,2:true,1!:changed,2,a1,2,1|f|undefined,1:1,1:z,2,row2:2,2:true,2!:changed,3,a1,3,2|f|undefined,1:2,2:z,4,rowgot:got,g,TypeError,TypeError,rowundefined:undefined,1,2,11,12,1,13"##,
+    );
+}
