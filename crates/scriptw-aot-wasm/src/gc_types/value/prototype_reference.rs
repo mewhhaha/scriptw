@@ -34,11 +34,26 @@ impl RuntimeSchema {
         f.instruction(&Instruction::If(BlockType::Empty));
         f.instruction(&Instruction::Unreachable);
         f.instruction(&Instruction::End);
+        // Null and the layouts of the usual prototypes (an ordinary object,
+        // Array.prototype, Function.prototype) each pass one inline test of
+        // a sealed layout. The cast to the open object sum is a host subtype
+        // query for every reference, so only the other layouts reach it.
+        let object = self.reference_type::<JavaScriptObject>(GcNullability::Nullable);
+        f.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(object))));
         value.reference().load(f);
-        f.instruction(&Instruction::RefCastNullable(
-            self.reference_type::<JavaScriptObject>(GcNullability::Nullable)
-                .heap_type,
-        ));
+        for sealed in [
+            self.reference_type::<OrdinaryObject>(GcNullability::Nullable),
+            self.reference_type::<ArrayObject>(GcNullability::Nullable),
+            self.reference_type::<FunctionObject>(GcNullability::Nullable),
+        ] {
+            f.instruction(&Instruction::BrOnCast {
+                relative_depth: 0,
+                from_ref_type: RefType::EQREF,
+                to_ref_type: sealed,
+            });
+        }
+        f.instruction(&Instruction::RefCastNullable(object.heap_type));
+        f.instruction(&Instruction::End);
         GcStackReference::new()
     }
 
