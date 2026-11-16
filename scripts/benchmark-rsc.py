@@ -17,7 +17,8 @@ import shutil
 import statistics
 
 from benchmark_metrics import measure_process
-from limited_verification import kernel_group, limited_environment, require_kernel_budget
+from limited_verification import (kernel_group, limited_environment, require_cloud_budget,
+                                  require_kernel_budget)
 
 ROOT = Path(__file__).resolve().parents[1]
 DRIVER = 'crates/scriptw-cli/tests/fixtures/edge_rendering/react-driver.cjs'
@@ -181,7 +182,13 @@ def stamp():
 
 
 def run(args):
-    require_kernel_budget(4 * 1024**3)
+    # A managed cloud machine has no delegated cgroup-v2 scope to cap at 4 GiB.
+    # --cloud admits its inherited finite cap instead and records that scope.
+    cloud_cap = None
+    if args.cloud:
+        cloud_cap = require_cloud_budget()
+    else:
+        require_kernel_budget(4 * 1024**3)
     require(len(os.sched_getaffinity(0)) == 1, 'one inherited CPU required')
     require(args.samples > 0 and args.warmups >= 0 and args.samples + args.warmups <= 1000,
             'require positive samples, nonnegative warmups and at most 1000 calls')
@@ -229,8 +236,15 @@ def run(args):
     node, time_binary = [Path(shutil.which(str(value)) or value).resolve(strict=True) for value in (args.node, args.time)]
     for path in (node, time_binary):
         pinned[str(path)] = dict(sha256=digest(path), stat=witness(path))
-    group = kernel_group()
-    resources = {field: (group / field).read_text().strip() for field in FIELDS}
+    group, resources = None, {}
+    if cloud_cap is None:
+        group = kernel_group()
+        resources = {field: (group / field).read_text().strip() for field in FIELDS}
+        resource_scope = dict(cgroup=str(group), before=resources)
+    else:
+        resource_scope = dict(cloud=dict(inherited_memory_cap_bytes=cloud_cap,
+            scope='managed cloud machine: shared virtual CPUs, inherited memory cap, '
+                  'no kernel-enforced 4 GiB budget and no cgroup OOM event record'))
     report = dict(schema='scriptw-retained-rsc-campaign-v1', status='incomplete', complete=False,
         started_at=stamp(), plan=plan, input_witnesses=pinned, processes=[], commands=[], summaries={}, inputs=inputs,
         tools=dict(hosts={name: dict(path=str(path), sha256=digest(path),
@@ -238,7 +252,7 @@ def run(args):
                    node=dict(path=str(node), sha256=digest(node)), time=dict(path=str(time_binary), sha256=digest(time_binary))),
         machine=dict(system=platform.system(), kernel=platform.release(), architecture=platform.machine(),
                      processor=platform.processor(), cpuinfo=Path('/proc/cpuinfo').read_text()),
-        resources=dict(cgroup=str(group), affinity=sorted(os.sched_getaffinity(0)), before=resources,
+        resources=dict(resource_scope, affinity=sorted(os.sched_getaffinity(0)),
             environment={key: environment.get(key) for key in ('SCRIPTW_JOBS', 'CARGO_BUILD_JOBS',
                 'RUST_TEST_THREADS', 'RAYON_NUM_THREADS', 'SCRIPTW_MODULE_MEMORY_CACHE_ENTRIES',
                 'SCRIPTW_MODULE_MEMORY_CACHE_LIMIT_BYTES', 'NODE_OPTIONS', 'NODE_DISABLE_COMPILE_CACHE')}),
@@ -332,15 +346,16 @@ def run(args):
                         'terminal input/tool identity differs: ' + str(path))
             except (OSError, ValueError) as error:
                 integrity_errors.append(str(error))
-        try:
-            report['resources']['after'] = {field: (group / field).read_text().strip() for field in FIELDS}
-            for field in FIELDS[:-1]:
-                require(resources[field] == report['resources']['after'][field], 'resource policy changed: ' + field)
-            before = dict(line.split() for line in resources['memory.events'].splitlines())
-            after = dict(line.split() for line in report['resources']['after']['memory.events'].splitlines())
-            require(all(before.get(key) == after.get(key) for key in ('oom', 'oom_kill', 'oom_group_kill')), 'OOM events changed')
-        except (OSError, ValueError) as error:
-            integrity_errors.append(str(error))
+        if group is not None:
+            try:
+                report['resources']['after'] = {field: (group / field).read_text().strip() for field in FIELDS}
+                for field in FIELDS[:-1]:
+                    require(resources[field] == report['resources']['after'][field], 'resource policy changed: ' + field)
+                before = dict(line.split() for line in resources['memory.events'].splitlines())
+                after = dict(line.split() for line in report['resources']['after']['memory.events'].splitlines())
+                require(all(before.get(key) == after.get(key) for key in ('oom', 'oom_kill', 'oom_group_kill')), 'OOM events changed')
+            except (OSError, ValueError) as error:
+                integrity_errors.append(str(error))
         if integrity_errors:
             report.update(status='failed', complete=False, integrity_errors=integrity_errors)
         report['finished_at'] = stamp()
@@ -364,6 +379,8 @@ def main():
     parser.add_argument('--processes-per-block', type=int, default=4)
     parser.add_argument('--timeout', type=float, default=300)
     parser.add_argument('--native-mode', choices=NATIVE_MODES, default='fast')
+    parser.add_argument('--cloud', action='store_true',
+                        help='admit a managed cloud machine\'s inherited memory cap; the report records that scope')
     parser.add_argument('--policy', action='append', default=[],
                         help='optional NAME=MODE override; keeps native-policy actors in the same balanced schedule')
     run(parser.parse_args())
