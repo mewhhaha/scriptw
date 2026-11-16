@@ -375,6 +375,25 @@ python3 -B scripts/limited_verification.py -- python3 -B scripts/benchmark-rsc.p
   --output target/new-rsc-comparison
 ```
 
+On a managed cloud machine, which has no delegated 4 GiB cgroup scope, pin one
+CPU, clear the proxy's Node settings and pass `--cloud` to both the wrapper and
+the runner; the report records the inherited cap as its resource scope:
+
+```sh
+env -u NODE_OPTIONS -u NODE_EXTRA_CA_CERTS -u NODE_PATH taskset -c 2 \
+  python3 -B scripts/limited_verification.py --cloud -- python3 -B scripts/benchmark-rsc.py --cloud \
+  --host baseline=target/rsc-baseline/host --host candidate=target/rsc-candidate/host \
+  --host candidate-speed=target/rsc-candidate/host --policy candidate-speed=speed \
+  --fixtures target/new-application-fixtures --node /path/to/node --time /usr/bin/time \
+  --samples 101 --output target/new-rsc-comparison
+```
+
+`scripts/publish-rsc-current.py --campaign target/new-rsc-comparison ...` reduces
+a complete campaign of exactly those four actors to
+`docs/rust-rewrite/rsc-current.json`, and
+`scripts/render-application-benchmarks.py --rsc-json docs/rust-rewrite/rsc-current.json`
+draws its three charts (`--check` verifies them).
+
 The maintained campaign gives each case its own process and retained Realm,
 avoiding sync-to-async warmup contamination. Defaults are 100 checked warmups,
 21 samples, and eight fresh processes per actor/case in two reversed blocks.

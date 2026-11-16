@@ -61,6 +61,19 @@ host adapters are part of the execution environment.
 These are requirements of the current backend, not a promise of support for
 every engine or a fallback implementation for engines missing Wasm GC.
 
+## Runtime ABI
+
+The runtime ABI is **77**. Portable bundles and native images built under an
+earlier ABI must be rebuilt. ABIs 58 to 77 added per-site read, write,
+`instanceof` and global read records, a dictionary position hint on Strings,
+further native call entries, one JSON output accumulator, compact shape
+transitions, a computed-key write kernel, static site records kept in P
+globals and chained per read site, weak collection entries found by identity,
+String concatenation helpers, leaf kernels over code units and bytes, a
+branch hinting section in P and R and a Symbol row count in intrinsic
+layouts. `LAYOUT_VERSION` in `crates/scriptw-aot-wasm/src/runtime_artifact.rs`
+records each step.
+
 ## Dynamic source: eval and Function constructors
 
 Dynamic code generation is **limited**, rather than wholly absent:
