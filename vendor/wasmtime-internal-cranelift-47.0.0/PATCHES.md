@@ -13,7 +13,7 @@ The idle scratch policy modifies `src/compiler.rs`; the added private
 `src/compiler/context_pool.rs` and its tests own it. The translation changes
 below modify `src/func_environ{.rs,/gc.rs}` and `src/translate/`; the last
 section adds `src/func_environ/gc/{base_home,frame_reloads}.rs` and
-`src/func_environ/branch_threading.rs`.
+`src/func_environ/{branch_threading,set_tests}.rs`.
 Registry installation markers were omitted; all other release files are kept.
 The license text is unchanged; its trailing empty line is normalized.
 
@@ -142,10 +142,10 @@ appended to the remembered-slot buffer the runtime publishes in
 cold blocks. Initializing stores, table and global stores need none: tables
 and globals are roots, and new objects are young or remembered whole.
 
-## Frame reloads, home slots, proven references and threaded branches
+## Frame reloads, home slots, proven references, threaded branches and set tests
 
 `src/func_environ/gc{.rs,/base_home.rs,/frame_reloads.rs}`,
-`src/func_environ/branch_threading.rs`, `src/func_environ.rs`,
+`src/func_environ/{branch_threading,set_tests}.rs`, `src/func_environ.rs`,
 `src/bounds_checks.rs`, `src/alias_region.rs`,
 `src/translate/{code_translator.rs,func_translator.rs,stack.rs}`. These change
 which instructions a function executes, not what it computes: Wasm semantics,
@@ -153,7 +153,7 @@ trap codes and their order, the `VMContext` and store-context layouts, stack
 maps, target and ISA settings and calling conventions are unchanged, so a
 module compiled with them is interchangeable with one compiled without.
 Callgrind instructions of one retained React Server Components request (sync,
-median of 97) went from 3,645,562 to 3,280,545 over the steps below, each
+median of 97) went from 3,645,562 to 3,246,099 over the steps below, each
 measured on top of the ones before it.
 
 ### Loads from the frame, once per call (`frame_reloads`, `base_home`)
@@ -300,3 +300,28 @@ runs hand-assembled Wasm on the product's Wasmtime configuration: checks that
 only one path, arm or loop body made, branches on fresh truth values for
 structs, `i31` and null, and reads of a field around calls whose callee
 collects, moving the object, and then stores to it.
+
+### Tests of one value against a run of constants (`set_tests`)
+
+The emitter asks whether a tag is one of several by or-ing `i32.eq` tests
+against constants, starting from zero, and whether it is none of several by
+and-ing `i32.ne` tests. Cranelift compiles each test and each `or` as
+written. The translator remembers which CLIF values are such tests of which
+value; an `i32.or` of two membership tests of one value (or an `i32.and` of
+two non-membership tests) whose constants together are the integers `low` to
+`low + count - 1` is translated as `value - low <u count` (or `>=u`), with
+the subtraction wrapping, instead of the `bor` or `band`. `0 | x` is `x`,
+and `1 & test` is the test. Constants with a gap, tests of different values
+and `i64` operations are translated as before.
+
+Why it is correct: the subtraction maps exactly the listed constants to
+`0..count`, for every `i32`, and both forms yield 0 or 1. What is remembered
+is a property of pure values, so it holds wherever they are in scope.
+
+Measured: 3,280,545 to 3,246,099.
+
+Tests: `func_environ::set_tests::tests::` (runs, runs from zero and at the
+top of the range, chains that start from their identity or complete a gap,
+inequalities, and the combinations that must stay as written), each verified
+by Cranelift's verifier; the engine probes above call such chains with values
+at and around the ends of each run.

@@ -2,11 +2,13 @@
 //!
 //! The vendored translation skips a cast or null check that an earlier one
 //! on the same value implies, reads a GC reference from the frame once after
-//! a call instead of at every use, and sends a branch on a fresh truth value
-//! straight to its target. These probes run hand-assembled Wasm on the
-//! product's Wasmtime configuration and check the cases where that would be
-//! wrong: a check that only one path made, and a reference that a moving
-//! collection replaced while the function was in a call.
+//! a call instead of at every use, sends a branch on a fresh truth value
+//! straight to its target, and compares once where a chain tests one value
+//! against consecutive constants. These probes run hand-assembled Wasm on
+//! the product's Wasmtime configuration and check the cases where that would
+//! be wrong: a check that only one path made, a reference that a moving
+//! collection replaced while the function was in a call, and values at and
+//! around the ends of a run.
 use scriptw_engine::configure_wasm_runtime;
 use wasmtime::{AnyRef, Caller, Config, Func, Instance, Module, Rooted, Store, Trap, Val};
 
@@ -66,7 +68,7 @@ const ADD_FIELD: [u8; 11] = [
     0x20, 0x02, 0x20, 0x00, 0xfb, 0x02, 0x00, 0x00, 0x6a, 0x21, 0x02,
 ];
 
-const EXPORTS: [&str; 11] = [
+const EXPORTS: [&str; 16] = [
     "new_a",
     "new_b",
     "new_i31",
@@ -78,6 +80,11 @@ const EXPORTS: [&str; 11] = [
     "read_around_calls",
     "classify",
     "field_or_zero",
+    "one_of",
+    "none_of",
+    "zero_or_one",
+    "top_two",
+    "around_zero",
 ];
 
 // (module
@@ -169,14 +176,36 @@ const EXPORTS: [&str; 11] = [
 //       br_on_cast 0 eqref (ref $a)
 //       drop i32.const 0 return
 //     end
-//     struct.get $a 0))
+//     struct.get $a 0)
+//   ;; Chains of tests of one value against constants.
+//   (func (export "one_of") (param i32) (result i32)
+//     i32.const 0
+//     local.get 0 i32.const 6 i32.eq i32.or
+//     local.get 0 i32.const 7 i32.eq i32.or
+//     local.get 0 i32.const 8 i32.eq i32.or
+//     local.get 0 i32.const 9 i32.eq i32.or)
+//   (func (export "none_of") (param i32) (result i32)
+//     local.get 0 i32.const 2 i32.ne
+//     local.get 0 i32.const 4 i32.ne i32.and
+//     local.get 0 i32.const 3 i32.ne i32.and)
+//   (func (export "zero_or_one") (param i32) (result i32)
+//     local.get 0 i32.eqz
+//     local.get 0 i32.const 1 i32.eq i32.or)
+//   (func (export "top_two") (param i32) (result i32)
+//     local.get 0 i32.const -2 i32.eq
+//     local.get 0 i32.const -1 i32.eq i32.or)
+//   ;; Consecutive as signed numbers only.
+//   (func (export "around_zero") (param i32) (result i32)
+//     local.get 0 i32.const -1 i32.eq
+//     local.get 0 i32.const 0 i32.eq i32.or
+//     local.get 0 i32.const 1 i32.eq i32.or))
 // Binary fixture avoids adding a second encoder/parser dependency to Engine.
 fn probe_bytes() -> Vec<u8> {
     let mut module = b"\0asm\x01\0\0\0".to_vec();
     section(
         &mut module,
         1,
-        8,
+        9,
         &[
             0x5f, 1, 0x7f, 1, // 0: $a
             0x5f, 1, 0x7e, 1, // 1: $b
@@ -186,10 +215,16 @@ fn probe_bytes() -> Vec<u8> {
             0x60, 2, 0x63, 0, 0x7f, 1, 0x7f, // 5: ((ref null $a), i32) -> i32
             0x60, 0, 1, 0x6d, // 6: () -> eqref
             0x60, 1, 0x7f, 1, 0x6d, // 7: (i32) -> eqref
+            0x60, 1, 0x7f, 1, 0x7f, // 8: (i32) -> i32
         ],
     );
     section(&mut module, 2, 1, b"\x04host\x02gc\x00\x02");
-    section(&mut module, 3, 12, &[3, 7, 6, 6, 4, 4, 4, 4, 5, 5, 4, 4]);
+    section(
+        &mut module,
+        3,
+        17,
+        &[3, 7, 6, 6, 4, 4, 4, 4, 5, 5, 4, 4, 8, 8, 8, 8, 8],
+    );
     let mut exports = Vec::new();
     for (index, name) in EXPORTS.iter().enumerate() {
         exports.push(name.len() as u8);
@@ -318,7 +353,43 @@ fn probe_bytes() -> Vec<u8> {
         ]
         .concat(),
     ));
-    section(&mut module, 10, 12, &code);
+    // one_of
+    code.extend(body(
+        0,
+        &[
+            0x41, 0x00, 0x20, 0x00, 0x41, 0x06, 0x46, 0x72, 0x20, 0x00, 0x41, 0x07, 0x46, 0x72,
+            0x20, 0x00, 0x41, 0x08, 0x46, 0x72, 0x20, 0x00, 0x41, 0x09, 0x46, 0x72,
+        ],
+    ));
+    // none_of
+    code.extend(body(
+        0,
+        &[
+            0x20, 0x00, 0x41, 0x02, 0x47, 0x20, 0x00, 0x41, 0x04, 0x47, 0x71, 0x20, 0x00, 0x41,
+            0x03, 0x47, 0x71,
+        ],
+    ));
+    // zero_or_one
+    code.extend(body(
+        0,
+        &[0x20, 0x00, 0x45, 0x20, 0x00, 0x41, 0x01, 0x46, 0x72],
+    ));
+    // top_two
+    code.extend(body(
+        0,
+        &[
+            0x20, 0x00, 0x41, 0x7e, 0x46, 0x20, 0x00, 0x41, 0x7f, 0x46, 0x72,
+        ],
+    ));
+    // around_zero
+    code.extend(body(
+        0,
+        &[
+            0x20, 0x00, 0x41, 0x7f, 0x46, 0x20, 0x00, 0x41, 0x00, 0x46, 0x72, 0x20, 0x00, 0x41,
+            0x01, 0x46, 0x72,
+        ],
+    ));
+    section(&mut module, 10, 17, &code);
     module
 }
 
@@ -469,5 +540,48 @@ fn a_reference_is_read_again_after_a_call_that_moved_its_object() {
         assert_eq!(watch.collections, 4 + flag as u32);
         // The probe is only worth its name if the collector moved the object.
         assert!(watch.moves > 0, "no collection moved the watched object");
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn a_chain_of_tests_against_constants_agrees_with_each_test() {
+    let mut probe = Probe::new();
+    let mut inputs: Vec<i32> = (-4..=12).collect();
+    inputs.extend([
+        i32::MIN,
+        i32::MIN + 6,
+        i32::MAX,
+        i32::MAX - 1,
+        6 + (1 << 16),
+        i32::MIN + 9,
+    ]);
+    for input in inputs {
+        let mut call = |name: &str| probe.call(name, &[Val::I32(input)]).unwrap().unwrap_i32();
+        assert_eq!(
+            call("one_of"),
+            i32::from((6..=9).contains(&input)),
+            "{input}"
+        );
+        assert_eq!(
+            call("none_of"),
+            i32::from(!(2..=4).contains(&input)),
+            "{input}"
+        );
+        assert_eq!(
+            call("zero_or_one"),
+            i32::from(input == 0 || input == 1),
+            "{input}"
+        );
+        assert_eq!(
+            call("top_two"),
+            i32::from(input == -2 || input == -1),
+            "{input}"
+        );
+        assert_eq!(
+            call("around_zero"),
+            i32::from((-1..=1).contains(&input)),
+            "{input}"
+        );
     }
 }

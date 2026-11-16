@@ -1,5 +1,6 @@
 mod branch_threading;
 mod gc;
+mod set_tests;
 pub(crate) mod stack_switching;
 
 use crate::alias_region::AliasRegions;
@@ -171,6 +172,10 @@ pub struct FuncEnvironment<'module_environment> {
     /// where (see `gc::ProvenReferences`).
     proven_references: gc::ProvenReferences,
 
+    /// The tests of one `i32` against constants among the function's values
+    /// so far (see `set_tests`).
+    pub(crate) set_tests: set_tests::SetTests,
+
     translation: &'module_environment ModuleTranslation<'module_environment>,
 
     /// Heaps implementing WebAssembly linear memories.
@@ -292,6 +297,7 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
             gc_heap: None,
             gc_heap_base_home: None,
             proven_references: gc::ProvenReferences::default(),
+            set_tests: set_tests::SetTests::default(),
 
             heaps: PrimaryMap::default(),
             fact_sync_call_slot: None,

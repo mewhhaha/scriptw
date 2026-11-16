@@ -1261,11 +1261,23 @@ pub fn translate_operator(
             let (arg1, arg2) = environ.stacks.pop2();
             environ.stacks.push1(builder.ins().iadd(arg1, arg2));
         }
-        Operator::I32And | Operator::I64And => {
+        // An `i32.and` or `i32.or` of tests of one value against a run of
+        // constants is one comparison (`func_environ::set_tests`).
+        Operator::I32And => {
+            let (arg1, arg2) = environ.stacks.pop2();
+            let value = environ.set_tests.and(builder, arg1, arg2);
+            environ.stacks.push1(value);
+        }
+        Operator::I64And => {
             let (arg1, arg2) = environ.stacks.pop2();
             environ.stacks.push1(builder.ins().band(arg1, arg2));
         }
-        Operator::I32Or | Operator::I64Or => {
+        Operator::I32Or => {
+            let (arg1, arg2) = environ.stacks.pop2();
+            let value = environ.set_tests.or(builder, arg1, arg2);
+            environ.stacks.push1(value);
+        }
+        Operator::I64Or => {
             let (arg1, arg2) = environ.stacks.pop2();
             environ.stacks.push1(builder.ins().bor(arg1, arg2));
         }
@@ -1377,11 +1389,26 @@ pub fn translate_operator(
         Operator::I32Eqz | Operator::I64Eqz => {
             let arg = environ.stacks.pop1();
             let val = builder.ins().icmp_imm_s(IntCC::Equal, arg, 0);
-            environ.stacks.push1(builder.ins().uextend(I32, val));
+            let val = builder.ins().uextend(I32, val);
+            if matches!(op, Operator::I32Eqz) {
+                environ.set_tests.zero_tested(val, arg);
+            }
+            environ.stacks.push1(val);
         }
-        Operator::I32Eq | Operator::I64Eq => translate_icmp(IntCC::Equal, builder, environ),
+        Operator::I32Eq | Operator::I32Ne => {
+            let equal = matches!(op, Operator::I32Eq);
+            let (arg0, arg1) = environ.stacks.pop2();
+            let condition = if equal { IntCC::Equal } else { IntCC::NotEqual };
+            let val = builder.ins().icmp(condition, arg0, arg1);
+            let val = builder.ins().uextend(I32, val);
+            environ
+                .set_tests
+                .compared(builder.func, val, arg0, arg1, equal);
+            environ.stacks.push1(val);
+        }
+        Operator::I64Eq => translate_icmp(IntCC::Equal, builder, environ),
         Operator::F32Eq | Operator::F64Eq => translate_fcmp(FloatCC::Equal, builder, environ),
-        Operator::I32Ne | Operator::I64Ne => translate_icmp(IntCC::NotEqual, builder, environ),
+        Operator::I64Ne => translate_icmp(IntCC::NotEqual, builder, environ),
         Operator::F32Ne | Operator::F64Ne => translate_fcmp(FloatCC::NotEqual, builder, environ),
         Operator::F32Gt | Operator::F64Gt => translate_fcmp(FloatCC::GreaterThan, builder, environ),
         Operator::F32Ge | Operator::F64Ge => {
