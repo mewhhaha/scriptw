@@ -27,7 +27,11 @@
 //! * a call ends what is known about every slot, except that a slot holding
 //!   the null reference still holds it;
 //! * where control-flow paths meet, a slot's content is known when every
-//!   path brings the same value.
+//!   path brings the same value;
+//! * the head of a loop takes the content as a parameter when the loop
+//!   reads the slot before it calls and a path back to the head knows the
+//!   content (see [`Reloads::hoist`]): the slot is then read on the way into
+//!   the loop instead of in every iteration.
 //!
 //! A load that stays addresses its slot through a `stack_addr` of its own
 //! (see [`unshare_address`]). A home that no load reads any more loses its
@@ -36,14 +40,14 @@
 //! A call also ends what is known about a home, although a home never
 //! changes: a value that stays known across a call is a value that is live
 //! across it, which the register allocator then spills and reloads at every
-//! use. Nor does a block take a parameter where paths bring different
-//! values, as SSA construction would give it: the moves into those
-//! parameters cost more than the loads they save. That was measured twice:
-//! on the GC heap base, which was first placed that way, with a call every
-//! few blocks and so a parameter at nearly every join; and for all slots of
-//! this pass with parameters only where every path onward reads the slot
-//! before it calls, and a load only on the edges that do not know its
-//! content.
+//! use. Nor does a block other than a loop's head take a parameter where
+//! paths bring different values, as SSA construction would give it: the
+//! moves into those parameters cost more than the loads they save. That was
+//! measured twice: on the GC heap base, which was first placed that way,
+//! with a call every few blocks and so a parameter at nearly every join; and
+//! for all slots of this pass with parameters only where every path onward
+//! reads the slot before it calls, and a load only on the edges that do not
+//! know its content. At a loop's head the load saved is one per iteration.
 //!
 //! # Why this is correct
 //!
@@ -65,15 +69,18 @@
 //! The pass computes, for the start of each reachable block, the slots whose
 //! content is known, as a solution of the usual forward equations: the
 //! entry block starts knowing nothing, any other block with the facts that
-//! the ends of all its reachable predecessors agree on, and a block's end
-//! follows from its start by the rules above. Take any such solution and a
+//! the ends of all its reachable predecessors agree on and the parameters
+//! [`Reloads::hoist`] gave it, whose arguments are what the slot holds at
+//! the end of each predecessor, and a block's end follows from its start by
+//! the rules above. Take any such solution and a
 //! load of slot `s` where it says `s` holds `v`, and follow any path of the
 //! function from its entry to that load backwards. The fact "`s` holds `v`"
 //! is in the solution at each point on the way until the instruction that
 //! made it: not the entry, which knows nothing, not a call, which leaves no
-//! value known, and not a store of another value, so a store of `v` to `s`
-//! or a load of `s` whose result is `v`, with no call and no other store to
-//! `s` after it on the path. The slot therefore still holds what that
+//! value known, and not a store of another value, so a store of `v` to `s`,
+//! a load of `s` whose result is `v`, or the start of a loop whose
+//! parameter for `s` is `v`, with no call and no other store to `s` after it
+//! on the path. The slot therefore still holds what that
 //! instruction stored or read: the load yields `v`. Every path to the load
 //! passes such an instruction, which `v`'s definition dominates, so `v`'s
 //! definition dominates the load and using `v` is valid SSA. No call lies
@@ -126,6 +133,12 @@ enum Event {
         inst: ir::Inst,
     },
     Call,
+    /// The block's parameter `value` holds the slot's content (see
+    /// [`Reloads::hoist`]).
+    Enter {
+        slot: u32,
+        value: ir::Value,
+    },
 }
 
 fn set(known: &mut Known, slot: u32, content: Content) {
@@ -159,6 +172,23 @@ pub(crate) struct Reloads {
     block_events: SecondaryMap<ir::Block, (u32, u32)>,
     /// The home slots among the handled slots, with their numbers.
     homes: Vec<(u32, ir::StackSlot)>,
+    /// How each handled slot is read, by its number.
+    accesses: Vec<Option<Access>>,
+    /// The parameters that `hoist` gave loop headers, as events at their
+    /// start.
+    entered: HashMap<ir::Block, Vec<Event>>,
+    /// The loads that `hoist` put at the end of blocks.
+    appended: HashMap<ir::Block, Vec<Event>>,
+}
+
+/// How the function loads a handled slot.
+#[derive(Clone, Copy)]
+struct Access {
+    slot: ir::StackSlot,
+    /// The type of every value the slot holds.
+    ty: ir::Type,
+    flags: ir::MemFlags,
+    pointer_type: ir::Type,
 }
 
 impl Reloads {
@@ -225,6 +255,7 @@ impl Reloads {
             let known = types[number as usize].get_or_insert(ty);
             *known == ty
         };
+        let mut accesses: Vec<Option<Access>> = vec![None; plain.len()];
 
         let mut events = Vec::new();
         let mut block_events: SecondaryMap<ir::Block, (u32, u32)> = SecondaryMap::new();
@@ -236,13 +267,21 @@ impl Reloads {
                         opcode: ir::Opcode::Load,
                         arg,
                         offset,
-                        ..
+                        flags,
                     } => {
                         if let Some((slot, number, address)) = address_of(arg) {
                             let ty = func.dfg.value_type(func.dfg.first_result(inst));
                             if whole_slot(slot, ty, address, offset.into()) && one_type(number, ty)
                             {
                                 events.push(Event::Load { slot: number, inst });
+                                accesses[number as usize].get_or_insert(Access {
+                                    slot,
+                                    ty,
+                                    flags,
+                                    pointer_type: func
+                                        .dfg
+                                        .value_type(func.dfg.resolve_aliases(arg)),
+                                });
                             } else {
                                 plain[number as usize] = false;
                             }
@@ -319,7 +358,7 @@ impl Reloads {
                             Event::Load { slot, .. } | Event::Store { slot, .. } => {
                                 plain[slot as usize]
                             }
-                            Event::Call => true,
+                            Event::Call | Event::Enter { .. } => true,
                         },
                     ),
                 );
@@ -342,13 +381,23 @@ impl Reloads {
             events,
             block_events,
             homes,
+            accesses,
+            entered: HashMap::new(),
+            appended: HashMap::new(),
         })
     }
 
     /// The events of `block` in the order they happen.
-    fn events(&self, block: ir::Block) -> impl Iterator<Item = Event> + '_ {
+    fn events(&self, block: ir::Block) -> impl DoubleEndedIterator<Item = Event> + '_ {
         let (start, end) = self.block_events[block];
-        self.events[start as usize..end as usize].iter().copied()
+        fn of(added: &HashMap<ir::Block, Vec<Event>>, block: ir::Block) -> &[Event] {
+            added.get(&block).map_or(&[], |events| events.as_slice())
+        }
+        of(&self.entered, block)
+            .iter()
+            .chain(&self.events[start as usize..end as usize])
+            .chain(of(&self.appended, block))
+            .copied()
     }
 
     /// What is known at the start of `block`, from what is known at the end
@@ -393,6 +442,7 @@ impl Reloads {
                     }
                 }
                 Event::Store { slot, content, .. } => set(&mut known, slot, content),
+                Event::Enter { slot, value } => set(&mut known, slot, Content::Value(value)),
                 Event::Call => known.retain(|entry| entry.1 == Content::Null),
             }
         }
@@ -429,6 +479,177 @@ impl Reloads {
         }
         None
     }
+
+    /// Read before a loop what the loop would read in every iteration.
+    /// Returns whether anything changed.
+    ///
+    /// Inside a loop that makes no call, a slot's content is known from its
+    /// first load to the loop's end. It is not known at the loop's head
+    /// unless it was known before the loop, because there the path into the
+    /// loop meets the path around it; so the first load stays and runs in
+    /// every iteration. This gives the head a parameter for the content
+    /// instead: the path into the loop reads the slot at its end, and the
+    /// paths around the loop pass what they know.
+    ///
+    /// `ends` is [`Reloads::solve`]'s answer for `func` as it is. The loads
+    /// and parameters this adds are events for the next answer; `self` then
+    /// describes the changed function.
+    ///
+    /// A block gets a parameter for a slot `s` when
+    ///
+    /// * it is the head of a loop: it dominates one of its predecessors;
+    /// * some path from its start loads `s` before any call or store to `s`
+    ///   (found by one backward pass that takes a block not yet seen to want
+    ///   nothing, so it finds less than there is, never more);
+    /// * its predecessors are all reachable and do not all agree on the
+    ///   content of `s`, and at least one predecessor inside the loop knows
+    ///   it at its end: an iteration that ends there read the slot, or
+    ///   would have, and reads nothing now;
+    /// * each predecessor that does not know it ends in a `jump`, so a load
+    ///   before that `jump` is on the edge and on no other path.
+    ///
+    /// The argument an edge passes is what the slot holds at the end of the
+    /// predecessor: the value `ends` names, a zero for the null reference, or
+    /// the result of the new load. Nothing between the end of a predecessor
+    /// and the block's first event for `s` writes the slot or calls, so the
+    /// parameter is the slot's content from the block's start to that event,
+    /// which is what [`Event::Enter`] states. A load from the frame cannot
+    /// trap, so reading on the way into a loop that then leaves before it
+    /// would have read costs that one load and changes nothing else.
+    fn hoist(
+        &mut self,
+        func: &mut ir::Function,
+        cfg: &ControlFlowGraph,
+        domtree: &DominatorTree,
+        entry: ir::Block,
+        blocks: &[ir::Block],
+        ends: &SecondaryMap<ir::Block, Option<Known>>,
+    ) -> bool {
+        // Loop heads, with their predecessors.
+        let mut heads = Vec::new();
+        for &block in blocks {
+            if block != entry
+                && cfg
+                    .pred_iter(block)
+                    .any(|predecessor| domtree.block_dominates(block, predecessor.block))
+            {
+                heads.push(block);
+            }
+        }
+        if heads.is_empty() {
+            return false;
+        }
+
+        // The slots that some path from a block's start loads before it
+        // calls or stores to them, ordered by number.
+        let mut wanted: SecondaryMap<ir::Block, Vec<u32>> = SecondaryMap::new();
+        for &block in blocks.iter().rev() {
+            let mut slots: Vec<u32> = Vec::new();
+            for successor in cfg.succ_iter(block) {
+                for &slot in &wanted[successor] {
+                    if let Err(index) = slots.binary_search(&slot) {
+                        slots.insert(index, slot);
+                    }
+                }
+            }
+            for event in self.events(block).rev() {
+                match event {
+                    Event::Load { slot, .. } => {
+                        if let Err(index) = slots.binary_search(&slot) {
+                            slots.insert(index, slot);
+                        }
+                    }
+                    Event::Store { slot, .. } | Event::Enter { slot, .. } => {
+                        if let Ok(index) = slots.binary_search(&slot) {
+                            slots.remove(index);
+                        }
+                    }
+                    Event::Call => slots.clear(),
+                }
+            }
+            wanted[block] = slots;
+        }
+
+        let mut hoisted = false;
+        let mut predecessors = Vec::new();
+        let mut contents = Vec::new();
+        for block in heads {
+            if wanted[block].is_empty() {
+                continue;
+            }
+            predecessors.clear();
+            predecessors.extend(cfg.pred_iter(block));
+            if predecessors
+                .iter()
+                .any(|predecessor| ends[predecessor.block].is_none())
+            {
+                continue;
+            }
+            let start = self.at_start(cfg, ends, entry, block);
+            for &slot in &wanted[block] {
+                let Some(access) = self.accesses[slot as usize] else {
+                    continue;
+                };
+                if get(&start, slot).is_some() {
+                    continue;
+                }
+                contents.clear();
+                contents.extend(predecessors.iter().map(|predecessor| {
+                    get(
+                        ends[predecessor.block]
+                            .as_ref()
+                            .expect("checked above to be reachable"),
+                        slot,
+                    )
+                }));
+                let mut edges = predecessors.iter().zip(&contents);
+                let known_around = edges.clone().any(|(predecessor, content)| {
+                    content.is_some() && domtree.block_dominates(block, predecessor.block)
+                });
+                let loads_on_edges = edges.all(|(predecessor, content)| {
+                    content.is_some()
+                        || func.dfg.insts[predecessor.inst].opcode() == ir::Opcode::Jump
+                });
+                if !known_around || !loads_on_edges {
+                    continue;
+                }
+
+                let parameter = func.dfg.append_block_param(block, access.ty);
+                for (predecessor, content) in predecessors.iter().zip(&contents) {
+                    let mut pos = FuncCursor::new(func).at_inst(predecessor.inst);
+                    let argument = match *content {
+                        Some(Content::Value(value)) => value,
+                        Some(Content::Null) => pos.ins().iconst(access.ty, 0),
+                        None => {
+                            let flags = pos.func.dfg.mem_flags[access.flags];
+                            let address = pos.ins().stack_addr(access.pointer_type, access.slot, 0);
+                            let loaded = pos.ins().load(access.ty, flags, address, 0);
+                            let inst = pos.func.dfg.value_def(loaded).unwrap_inst();
+                            self.appended
+                                .entry(predecessor.block)
+                                .or_default()
+                                .push(Event::Load { slot, inst });
+                            loaded
+                        }
+                    };
+                    let dfg = &mut func.dfg;
+                    for destination in dfg.insts[predecessor.inst]
+                        .branch_destination_mut(&mut dfg.jump_tables, &mut dfg.exception_tables)
+                    {
+                        if destination.block(&dfg.value_lists) == block {
+                            destination.append_argument(argument, &mut dfg.value_lists);
+                        }
+                    }
+                }
+                self.entered.entry(block).or_default().push(Event::Enter {
+                    slot,
+                    value: parameter,
+                });
+                hoisted = true;
+            }
+        }
+        hoisted
+    }
 }
 
 const NONE: u32 = u32::MAX;
@@ -458,15 +679,23 @@ impl Reloads {
         cfg: &ControlFlowGraph,
         domtree: &DominatorTree,
     ) -> usize {
-        let reloads = self;
+        let mut reloads = self;
         let Some(entry) = func.layout.entry_block() else {
             return 0;
         };
         // Reachable blocks, each after its dominators.
         let blocks: Vec<ir::Block> = domtree.cfg_rpo().copied().collect();
-        let Some(ends) = reloads.solve(func, cfg, entry, &blocks) else {
+        let Some(mut ends) = reloads.solve(func, cfg, entry, &blocks) else {
             return 0;
         };
+        if reloads.hoist(func, cfg, domtree, entry, &blocks, &ends) {
+            // Should this not be solved, the function has parameters and
+            // loads it does not need, which is harmless.
+            match reloads.solve(func, cfg, entry, &blocks) {
+                Some(again) => ends = again,
+                None => return 0,
+            }
+        }
 
         // Rewrite. The solution names only results of loads that stay.
         let mut removed = 0;
@@ -499,6 +728,7 @@ impl Reloads {
                         }
                     },
                     Event::Store { slot, content, .. } => set(&mut known, slot, content),
+                    Event::Enter { slot, value } => set(&mut known, slot, Content::Value(value)),
                     Event::Call => known.retain(|entry| entry.1 == Content::Null),
                 }
             }
@@ -506,10 +736,14 @@ impl Reloads {
 
         // A home that nothing reads any more is not written either.
         for &(number, home) in &reloads.homes {
-            let read = reloads.events.iter().any(|event| {
-                matches!(*event, Event::Load { slot, inst }
-                    if slot == number && func.layout.inst_block(inst).is_some())
-            });
+            let read = reloads
+                .events
+                .iter()
+                .chain(reloads.appended.values().flatten())
+                .any(|event| {
+                    matches!(*event, Event::Load { slot, inst }
+                        if slot == number && func.layout.inst_block(inst).is_some())
+                });
             if read {
                 continue;
             }
@@ -717,6 +951,22 @@ mod tests {
                         && self.reload(func.dfg.first_result(inst)).is_some()
                 })
                 .count()
+        }
+
+        /// The arguments `from`'s terminator passes to `to`, once resolved.
+        fn arguments(&self, from: ir::Block, to: ir::Block) -> Vec<ir::Value> {
+            let dfg = &self.func.dfg;
+            let terminator = self.func.layout.last_inst(from).unwrap();
+            dfg.insts[terminator]
+                .branch_destination(&dfg.jump_tables, &dfg.exception_tables)
+                .iter()
+                .filter(|destination| destination.block(&dfg.value_lists) == to)
+                .flat_map(|destination| destination.args(&dfg.value_lists))
+                .map(|argument| match argument {
+                    ir::BlockArg::Value(value) => self.resolve(value),
+                    other => panic!("unexpected block argument {other:?}"),
+                })
+                .collect()
         }
 
         /// The operands of the instruction that defines `value`.
@@ -944,17 +1194,20 @@ mod tests {
     }
 
     #[test]
-    fn a_loop_that_calls_loads_in_each_iteration() {
+    fn a_loop_that_calls_reads_once_in_each_iteration() {
         let mut harness = Harness::new();
         let mut body = harness.body();
         let first = body.first;
+        let entry = body.builder.current_block().unwrap();
         let header = body.block();
         let exit = body.block();
         let before = body.sum(first, first);
         body.builder.ins().jump(header, &[]);
 
         body.switch_to(header);
-        // What the back edge brings was read after the loop's call.
+        // What the back edge brings was read after the loop's call; the
+        // loop's head takes it, or the value from before the loop, as a
+        // parameter.
         let at_top = body.sum(first, first);
         body.check(at_top);
         body.call();
@@ -969,15 +1222,131 @@ mod tests {
         body.finish(after);
         harness.forward();
         assert_eq!(harness.operands(before), [first, first]);
-        let top = harness.operands(at_top)[0];
-        assert!(harness.reload(top).is_some());
-        assert_eq!(harness.operands(at_top)[1], top);
         let bottom = harness.operands(after_call)[0];
         assert!(harness.reload(bottom).is_some());
-        assert_ne!(bottom, top);
+        let &[parameter] = harness.func.dfg.block_params(header) else {
+            panic!("the loop's head takes one parameter")
+        };
+        assert_eq!(harness.operands(at_top), [parameter, parameter]);
+        assert_eq!(harness.arguments(entry, header), [first]);
+        assert_eq!(harness.arguments(header, header), [bottom]);
         // The exit is entered only from the loop's end.
         assert_eq!(harness.operands(after)[0], bottom);
-        assert_eq!(harness.reloads(), 2);
+        assert_eq!(harness.reloads(), 1);
+    }
+
+    #[test]
+    fn a_loop_reads_before_it_is_entered_what_every_iteration_uses() {
+        let mut harness = Harness::new();
+        let mut body = harness.body();
+        let first = body.first;
+        let entry = body.builder.current_block().unwrap();
+        let header = body.block();
+        let exit = body.block();
+        // Nothing is known when the loop is entered.
+        body.call();
+        body.builder.ins().jump(header, &[]);
+
+        body.switch_to(header);
+        let in_loop = body.sum(first, first);
+        body.check(in_loop);
+        body.builder
+            .ins()
+            .brif(body.condition, header, &[], exit, &[]);
+
+        body.switch_to(exit);
+        let after = body.sum(first, in_loop);
+        body.finish(after);
+        harness.forward();
+        let &[parameter] = harness.func.dfg.block_params(header) else {
+            panic!("the loop's head takes one parameter")
+        };
+        assert_eq!(harness.operands(in_loop), [parameter, parameter]);
+        // The one load is at the end of the path into the loop; the loop
+        // passes its own parameter around.
+        let &[loaded] = &harness.arguments(entry, header)[..] else {
+            unreachable!()
+        };
+        assert!(harness.reload(loaded).is_some());
+        assert_eq!(
+            harness
+                .func
+                .layout
+                .inst_block(harness.func.dfg.value_def(loaded).unwrap_inst()),
+            Some(entry)
+        );
+        assert_eq!(harness.arguments(header, header), [parameter]);
+        assert_eq!(harness.operands(after)[0], parameter);
+        assert_eq!(harness.reloads(), 1);
+    }
+
+    #[test]
+    fn a_loop_that_may_leave_before_it_reads_still_reads_once() {
+        let mut harness = Harness::new();
+        let mut body = harness.body();
+        let first = body.first;
+        let entry = body.builder.current_block().unwrap();
+        let header = body.block();
+        let turn = body.block();
+        let exit = body.block();
+        body.call();
+        body.builder.ins().jump(header, &[]);
+
+        // The head tests whether to go on before anything is read.
+        body.switch_to(header);
+        body.builder
+            .ins()
+            .brif(body.condition, turn, &[], exit, &[]);
+
+        body.switch_to(turn);
+        let in_loop = body.sum(first, first);
+        body.check(in_loop);
+        body.builder.ins().jump(header, &[]);
+
+        body.switch_to(exit);
+        let result = body.builder.ins().iconst(I32, 0);
+        body.finish(result);
+        harness.forward();
+        let &[parameter] = harness.func.dfg.block_params(header) else {
+            panic!("the loop's head takes one parameter")
+        };
+        assert_eq!(harness.operands(in_loop), [parameter, parameter]);
+        let &[loaded] = &harness.arguments(entry, header)[..] else {
+            unreachable!()
+        };
+        assert!(harness.reload(loaded).is_some());
+        assert_eq!(harness.arguments(turn, header), [parameter]);
+        assert_eq!(harness.reloads(), 1);
+    }
+
+    #[test]
+    fn a_loop_that_calls_before_it_reads_keeps_its_load() {
+        let mut harness = Harness::new();
+        let mut body = harness.body();
+        let first = body.first;
+        let header = body.block();
+        let exit = body.block();
+        let before = body.sum(first, first);
+        body.builder.ins().jump(header, &[]);
+
+        // No path from the head reads before the call.
+        body.switch_to(header);
+        body.call();
+        let in_loop = body.sum(first, before);
+        body.check(in_loop);
+        body.builder
+            .ins()
+            .brif(body.condition, header, &[], exit, &[]);
+
+        body.switch_to(exit);
+        let after = body.sum(first, before);
+        body.finish(after);
+        harness.forward();
+        assert!(harness.func.dfg.block_params(header).is_empty());
+        let loaded = harness.operands(in_loop)[0];
+        assert!(harness.reload(loaded).is_some());
+        assert_eq!(harness.operands(after)[0], loaded);
+        assert_eq!(harness.reloads(), 1);
     }
 
     #[test]

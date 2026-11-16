@@ -153,7 +153,7 @@ trap codes and their order, the `VMContext` and store-context layouts, stack
 maps, target and ISA settings and calling conventions are unchanged, so a
 module compiled with them is interchangeable with one compiled without.
 Callgrind instructions of one retained React Server Components request (sync,
-median of 97) went from 3,645,562 to 3,246,099 over the steps below, each
+median of 97) went from 3,645,562 to 3,236,556 over the steps below, each
 measured on top of the ones before it.
 
 ### Loads from the frame, once per call (`frame_reloads`, `base_home`)
@@ -182,7 +182,11 @@ through the whole function what each such slot holds: a store makes the
 stored value known, a load of a slot whose content is known is removed, any
 other load stays and makes its result known, a call ends what is known (a slot
 holding the null reference still holds it), and a join keeps what all its
-predecessors agree on. A load that stays addresses the slot through a
+predecessors agree on. The head of a loop that reads a slot before it calls,
+and whose paths back to the head know the content, takes the content as a
+block parameter (`Reloads::hoist`): the path into the loop reads the slot
+once, at its end, instead of every iteration reading it at its first use. A
+load that stays addresses the slot through a
 `stack_addr` of its own, at a distinct distance past the slot with the
 opposite load offset: the x64 backend folds a `stack_addr` into a store or
 load, but when it merges a load into the instruction that uses it, it
@@ -203,10 +207,16 @@ definition dominates the load, and no collection lies between. Stores to
 stack-map slots and the stack maps themselves are untouched. `try_call` is a
 call, so exception handlers start knowing nothing but nulls; a trap leaves the
 function. The equations are iterated at most twelve rounds, after which the
-function is left as it was.
+function is left as it was. A loop head's parameter is the slot's content
+because each edge passes what the slot holds at the end of its predecessor
+(the known value, a zero, or a load placed before a `jump`), and nothing
+writes the slot or calls before the block's first use of it; a load from the
+frame cannot trap, so reading on the way into a loop that leaves before it
+would have read costs one load and changes nothing else.
 
 A call also ends what is known of a home, although a home never changes, and
-no block parameter is added where paths bring different values. The base was
+no block other than a loop's head takes a parameter where paths bring
+different values. The base was
 first placed with SSA construction instead (a load right after each call that
 a use follows, block parameters at joins, no split inside loops); with a call
 every few blocks nearly every join took a parameter, and the moves cost more
@@ -216,21 +226,25 @@ placement applied to the `vmctx` ran 25,827 more than no `vmctx` home at all.
 A narrower form was measured for all slots of this pass and not kept either:
 a parameter only where every path onward reads the slot before it calls,
 with a load on just the edges that do not know the content, ran 11,170 more.
+At a loop's head the load saved is one per iteration: without it a scanning
+loop of `String.prototype.split` read the heap base 2,026 times a request.
 
 Measured: stack-map slots alone 3,645,562 to 3,552,613; with the `vmctx` home
 and the base moved to this pass 3,344,847 to 3,307,690 (after the two
-sections below).
+sections below); loop heads 3,246,099 to 3,236,556 (after all of them).
 
 Costs: a function with several calls in a row that each use the base or the
 `vmctx` afterwards pays a load per call where upstream, when the value won a
 callee-saved register, paid nothing. A loop that calls reads what it uses
-after the call in every iteration. On targets whose backend does not fold a
+after the call in every iteration, and a loop entered without the content
+known reads it once even when it then leaves at once. On targets whose backend does not fold a
 stack-slot address into a load, each remaining load costs an address
 computation as well; only x86-64 was measured.
 
 Tests: `func_environ::gc::frame_reloads::tests::` (no call, straight-line
 calls, joins that agree and that do not, loops with and without calls,
-`try_call` successors, null references, a slot used for two values, slots
+loop heads that take a parameter and that do not, `try_call` successors,
+null references, a slot used for two values, slots
 that escape or are read in part or as another type, home slots, the `vmctx`
 parameter), each
 verified by Cranelift's verifier after the rewrite.
