@@ -232,3 +232,218 @@ print(log.join());
         r##"warm#pending;done;v;sym;zero;3;last;0.status.value.length.@;lastwec/vwec/symwec = = = = = = = pending;done;v;sym;zero;3;last;0.length.status.value.@;lastwec/vwec/symwec pending;done;v;sym;zero;TypeError;last;0.length.name.prototype.status.value.@;lastwec/vwec/symwec pending;done;v;sym;TypeError;TypeError;last;0.length.status.value.@;lastwec/vwec/symwec,again#pending;done;v;sym;zero;3;last;0.status.value.length.@;lastwec/vwec/symwec = = = = = = = pending;done;v;sym;zero;3;last;0.length.status.value.@;lastwec/vwec/symwec pending;done;v;sym;zero;TypeError;last;0.length.name.prototype.status.value.@;lastwec/vwec/symwec pending;done;v;sym;TypeError;TypeError;last;0.length.status.value.@;lastwec/vwec/symwec,frozen#TypeError;TypeError;TypeError;TypeError;TypeError;TypeError;TypeError;;none/none/none = = = = = = = TypeError;TypeError;TypeError;TypeError;TypeError;TypeError;TypeError;length;none/none/none TypeError;TypeError;TypeError;TypeError;TypeError;TypeError;TypeError;length.name.prototype;none/none/none TypeError;TypeError;TypeError;TypeError;TypeError;TypeError;TypeError;0.length;none/none/none,sealed#pending;done;TypeError;TypeError;TypeError;TypeError;last;status;lastwe/none/none = = = = = = = pending;done;TypeError;TypeError;TypeError;3;last;length.status;lastwe/none/none pending;done;TypeError;TypeError;TypeError;TypeError;last;length.name.prototype.status;lastwe/none/none pending;done;TypeError;TypeError;TypeError;TypeError;last;0.length.status;lastwe/none/none,closed#TypeError;TypeError;v;TypeError;TypeError;TypeError;TypeError;value;none/vwec/none = = = = = = = TypeError;TypeError;v;TypeError;TypeError;3;TypeError;length.value;none/vwec/none TypeError;TypeError;v;TypeError;TypeError;TypeError;TypeError;length.name.prototype.value;none/vwec/none TypeError;TypeError;v;TypeError;TypeError;TypeError;TypeError;0.length.value;none/vwec/none,fixed#TypeError;TypeError;v;sym;zero;3;TypeError;0.status.value.length.@;roc/vwec/symwec = = = = = = = TypeError;TypeError;v;sym;zero;3;TypeError;0.length.status.value.@;roc/vwec/symwec TypeError;TypeError;v;sym;zero;TypeError;TypeError;0.length.name.prototype.status.value.@;roc/vwec/symwec TypeError;TypeError;v;sym;TypeError;TypeError;TypeError;0.length.status.value.@;roc/vwec/symwec,accessor#g;g;v;sym;zero;3;g;0.status.value.length.@;accessorc/vwec/symwec = = = = = = = g;g;v;sym;zero;3;g;0.length.status.value.@;accessorc/vwec/symwec g;g;v;sym;zero;TypeError;g;0.length.name.prototype.status.value.@;accessorc/vwec/symwec g;g;v;sym;TypeError;TypeError;g;0.length.status.value.@;accessorc/vwec/symwec,33,stringtrue|stringtrue|stringtrue,getter-only#pending;done;TypeError;sym;zero;3;last;0.value.status.length.@;lastwec/accessorc/symwec = = = = = = = pending;done;TypeError;sym;zero;3;last;0.length.value.status.@;lastwec/accessorc/symwec pending;done;TypeError;sym;zero;TypeError;last;0.length.name.prototype.value.status.@;lastwec/accessorc/symwec pending;done;TypeError;sym;TypeError;TypeError;last;0.length.value.status.@;lastwec/accessorc/symwec,prototype-setters#pending;done;undefined;sym;zero;3;last;0.status.length.@;lastwec/none/symwec pending;done;v;sym;zero;3;last;0.status.value.length.@;lastwec/vwec/symwec = = pg;pg;v;sym;zero;3;pg;0.inner.value.length.@;none/vwec/symwec = pending;done;undefined;sym;zero;3;last;0.status.length.@;lastwec/none/symwec pending;done;v;sym;zero;3;last;0.status.value.length.@;lastwec/vwec/symwec pending;done;v;sym;zero;3;last;0.length.status.value.@;lastwec/vwec/symwec pending;done;v;sym;zero;TypeError;last;0.length.name.prototype.status.value.@;lastwec/vwec/symwec pending;done;v;sym;TypeError;TypeError;last;0.length.status.value.@;lastwec/vwec/symwec,M:v|P:pending:true|P:done:true|P:last:true|P:pending:true|P:done:true|P:last:true|M:v,object-prototype-fixed#pending;done;TypeError;TypeError;zero;3;last;0.status.length;lastwec/none/none = = = = = = = pending;done;TypeError;TypeError;zero;3;last;0.length.status;lastwec/none/none pending;done;TypeError;TypeError;zero;TypeError;last;0.length.name.prototype.status;lastwec/none/none pending;done;TypeError;TypeError;TypeError;TypeError;last;0.length.status;lastwec/none/none,prototype-data#pending;done;v;sym;zero;3;last;0.status.value.length.@;lastwec/vwec/symwec = = = = = = = pending;done;v;sym;zero;3;last;0.length.status.value.@;lastwec/vwec/symwec pending;done;v;sym;zero;TypeError;last;0.length.name.prototype.status.value.@;lastwec/vwec/symwec pending;done;v;sym;TypeError;TypeError;last;0.length.status.value.@;lastwec/vwec/symwec,restored#pending;done;v;sym;zero;3;last;0.status.value.length.@;lastwec/vwec/symwec = = = = = = = pending;done;v;sym;zero;3;last;0.length.status.value.@;lastwec/vwec/symwec pending;done;v;sym;zero;TypeError;last;0.length.name.prototype.status.value.@;lastwec/vwec/symwec pending;done;v;sym;TypeError;TypeError;last;0.length.status.value.@;lastwec/vwec/symwec,proxy-prototype#pending;done;v;sym;zero;3;last;0.status.value.length.@;lastwec/vwec/symwec = = = = = = = pending;done;v;sym;zero;3;last;0.length.status.value.@;lastwec/vwec/symwec pending;done;v;sym;zero;TypeError;last;0.length.name.prototype.status.value.@;lastwec/vwec/symwec pending;done;v;sym;TypeError;TypeError;last;0.length.status.value.@;lastwec/vwec/symwec,51,status|value|Symbol(s)|0|length|status|value,refusing-proxy#TypeError;TypeError;TypeError;TypeError;TypeError;TypeError;TypeError;;none/none/none = = = = = = = TypeError;TypeError;TypeError;TypeError;TypeError;3;TypeError;length;none/none/none TypeError;TypeError;TypeError;TypeError;TypeError;TypeError;TypeError;length.name.prototype;none/none/none TypeError;TypeError;TypeError;TypeError;TypeError;TypeError;TypeError;0.length;none/none/none,array-prototype#pending;done;v;sym;zero;3;last;0.status.value.length.@;lastwec/vwec/symwec = = = = = = = pending;done;v;sym;zero;3;last;0.length.status.value.@;lastwec/vwec/symwec pending;done;v;sym;zero;TypeError;last;0.length.name.prototype.status.value.@;lastwec/vwec/symwec pending;done;v;sym;TypeError;TypeError;last;0.length.status.value.@;lastwec/vwec/symwec,typed-prototype#pending;done;v;sym;zero;TypeError;last;0.status.value.@;lastwec/vwec/symwec = = = = = = = pending;done;v;sym;zero;3;last;0.length.status.value.@;lastwec/vwec/symwec pending;done;v;sym;zero;TypeError;last;0.length.name.prototype.status.value.@;lastwec/vwec/symwec pending;done;v;sym;TypeError;TypeError;last;0.length.status.value.@;lastwec/vwec/symwec,string-prototype#pending;done;v;sym;TypeError;TypeError;last;status.value.@;lastwec/vwec/symwec = = = = = = = pending;done;v;sym;TypeError;3;last;length.status.value.@;lastwec/vwec/symwec pending;done;v;sym;TypeError;TypeError;last;length.name.prototype.status.value.@;lastwec/vwec/symwec pending;done;v;sym;TypeError;TypeError;last;0.length.status.value.@;lastwec/vwec/symwec,function-prototype#pending;done;v;sym;zero;TypeError;last;0.status.value.@;lastwec/vwec/symwec = = = = = = = pending;done;v;sym;zero;3;last;0.length.status.value.@;lastwec/vwec/symwec pending;done;v;sym;zero;TypeError;last;0.length.name.prototype.status.value.@;lastwec/vwec/symwec pending;done;v;sym;TypeError;TypeError;last;0.length.status.value.@;lastwec/vwec/symwec,null-prototype#pending;done;v;sym;zero;3;last;0.status.value.length.@;lastwec/vwec/symwec = = = = = = = pending;done;v;sym;zero;3;last;0.length.status.value.@;lastwec/vwec/symwec pending;done;v;sym;zero;TypeError;last;0.length.name.prototype.status.value.@;lastwec/vwec/symwec pending;done;v;sym;TypeError;TypeError;last;0.length.status.value.@;lastwec/vwec/symwec,collection-prototype#pending;done;v;sym;zero;3;last;0.status.value.length.@;lastwec/vwec/symwec = = = = = = = pending;done;v;sym;zero;3;last;0.length.status.value.@;lastwec/vwec/symwec pending;done;v;sym;zero;TypeError;last;0.length.name.prototype.status.value.@;lastwec/vwec/symwec pending;done;v;sym;TypeError;TypeError;last;0.length.status.value.@;lastwec/vwec/symwec,true,1,true,2,1,true,3,true,false,false,s:true:false,-1,40,k38|k39|k3,back,39,0"##,
     );
 }
+
+#[test]
+fn named_reads_on_arrays_answer_from_the_header_and_the_chain() {
+    // The general Get reads a key that is neither an array index nor
+    // "length" from an Array's ordinary header and walks on from there.
+    // Twenty-six keys, among them index-like and "length"-like Strings and
+    // Symbols, are read from fifteen receivers, twice each, and again after
+    // data properties and accessors appear on Array.prototype and
+    // Object.prototype; the inherited "constructor" is replaced, becomes an
+    // accessor and is deleted; a Proxy sits above an Array; and own named
+    // properties are added, redefined and deleted on every Array storage
+    // form across a collection.
+    run_as_script_function_and_module(
+        r##"
+var log = [];
+function show(f) { try { return String(f()); } catch (e) { return e.constructor.name; } }
+function churn() { var keep = []; for (var i = 0; i < 40000; i++) keep[i & 63] = { i: i, a: [i, i + 1] }; return keep.length; }
+function kind(v) { return v === undefined ? "u" : v === null ? "n" : typeof v === "function" ? "f" + v.name : typeof v === "object" ? "o" : typeof v === "symbol" ? "s" : String(v); }
+function read(o, k) { return o[k]; }
+function ctor(o) { return o.constructor; }
+function def(o, k, v) { Object.defineProperty(o, k, { value: v, writable: true, enumerable: true, configurable: true }); }
+var mine = Symbol("mine");
+class Sub extends Array {}
+function subjects() {
+  var own = [5, 6]; def(own, "foo", "own-foo"); def(own, "constructor", "own-ctor"); def(own, mine, "own-sym");
+  var wide = [1]; for (var n = 0; n < 40; n++) def(wide, "k" + n, n); def(wide, "foo", "wide-foo");
+  var bare = [3]; Object.setPrototypeOf(bare, null);
+  return [[], [1, 2, 3], new Array(5), Array.prototype, new Sub(1, 2), Object.create([7, 8]), own, wide, Object.freeze([9]), bare, (function () { return arguments; })(4, 5), new Uint8Array([6, 7]), Object("st"), Array.of(1.5, 2.5), [, "hole"]];
+}
+var keys = ["constructor", "length", "0", "1", "-0", "01", "1.0", "4294967294", "4294967295", "foo", "push", "toString", "at", "hasOwnProperty", "", "l", "lengthy", "k7", Symbol.iterator, Symbol.unscopables, Symbol.toStringTag, mine, 0, 1, 1.5, -1];
+function sweep(tag) {
+  var list = subjects(), rows = [];
+  for (var r = 0; r < 2; r++) {
+    rows.length = 0;
+    for (var i = 0; i < list.length; i++) {
+      var line = "";
+      for (var j = 0; j < keys.length; j++) line += show(function () { return kind(read(list[i], keys[j])); }) + (j + 1 < keys.length ? "," : "");
+      rows.push(line + "," + show(function () { return kind(ctor(list[i])); }));
+    }
+  }
+  log.push(tag + "=" + rows.join("/"));
+}
+sweep("warm");
+churn();
+// Named properties appear on the prototypes after the reads are warm.
+Array.prototype.foo = "array-foo";
+Object.prototype.k7 = "object-k7";
+Array.prototype[mine] = "array-sym";
+sweep("prototype-data");
+// An accessor on the chain sees the Array it was read from.
+var seen = [];
+Object.defineProperty(Array.prototype, "foo", { get: function () { seen.push((Array.isArray(this) ? "A" : typeof this) + this.length); return "got-foo"; }, configurable: true });
+Object.defineProperty(Object.prototype, "lengthy", { get: function () { return "lengthy:" + (this === Array.prototype); }, configurable: true });
+sweep("prototype-accessors");
+log.push(seen.length, seen.slice(0, 5).join("|"));
+delete Array.prototype.foo; delete Object.prototype.k7; delete Array.prototype[mine]; delete Object.prototype.lengthy;
+// The constructor an Array inherits is replaced, becomes an accessor, and goes.
+var original = Object.getOwnPropertyDescriptor(Array.prototype, "constructor");
+Array.prototype.constructor = Sub;
+log.push(kind(ctor([])), kind(ctor(new Sub())), kind([1].map(function (x) { return x; }).constructor));
+var count = 0;
+Object.defineProperty(Array.prototype, "constructor", { get: function () { count++; return Array; }, configurable: true });
+log.push(kind(ctor([])), kind(read([], "constructor")), count);
+delete Array.prototype.constructor;
+log.push(kind(ctor([])), kind(ctor(Array.prototype)));
+Object.defineProperty(Array.prototype, "constructor", original);
+sweep("restored");
+// A Proxy above an Array is asked for named keys only when the Array lacks them.
+var asked = [];
+var proxy = new Proxy({}, { get: function (t, k, r) { asked.push(typeof k === "symbol" ? "sym" : k); return k === "foo" ? "proxy-foo:" + Array.isArray(r) : undefined; } });
+var under = [1, 2]; Object.setPrototypeOf(under, proxy);
+log.push(read(under, "foo"), read(under, "length"), read(under, "0"), kind(read(under, "5")), kind(read(under, "constructor")), kind(read(under, mine)), asked.join("|"));
+// Own named properties on every Array storage form: added, read, redefined, deleted.
+[[], [1, 2], new Array(100), [1.5], [, 1], Object.freeze([1])].forEach(function (a, i) {
+  log.push(show(function () { "use strict"; a.name = "n" + i; return a.name; }), kind(read(a, "name")));
+  show(function () { Object.defineProperty(a, "acc", { get: function () { return "acc" + this.length; }, configurable: true }); });
+  churn();
+  log.push(kind(read(a, "acc")), show(function () { "use strict"; return delete a.name; }), kind(read(a, "name")), a.length);
+});
+// Keys that look like indices or "length" stay with the Array itself.
+var odd = [10, 11];
+odd["01"] = "padded"; odd["-0"] = "minus"; odd["1.0"] = "dotted"; odd["4294967295"] = "max"; odd[" 1"] = "spaced";
+log.push(odd.length, read(odd, "01"), read(odd, "-0"), read(odd, "1.0"), read(odd, "4294967295"), read(odd, " 1"), read(odd, "1"), read(odd, 1), read(odd, "length"), Object.keys(odd).join("|"));
+print(log.join());
+"##,
+        r##"warm=fArray,0,u,u,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,u,u,u,u,fArray/fArray,3,1,2,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,1,2,u,u,fArray/fArray,5,u,u,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,u,u,u,u,fArray/fArray,0,u,u,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,u,u,u,u,fArray/fSub,2,1,2,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,1,2,u,u,fSub/fArray,2,7,8,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,7,8,u,u,fArray/own-ctor,2,5,6,u,u,u,u,u,own-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,own-sym,5,6,u,u,own-ctor/fArray,1,1,u,u,u,u,u,u,wide-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,u,7,fvalues,o,u,u,1,u,u,u,fArray/fArray,1,9,u,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,9,u,u,u,fArray/u,1,3,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,3,u,u,u,u/fObject,2,4,5,u,u,u,u,u,u,u,ftoString,u,fhasOwnProperty,u,u,u,u,fvalues,u,u,u,4,5,u,u,fObject/fUint8Array,2,6,7,u,u,u,u,u,u,u,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,u,Uint8Array,u,6,7,u,u,fUint8Array/fString,2,s,t,u,u,u,u,u,u,u,ftoString,fat,fhasOwnProperty,u,u,u,u,f[Symbol.iterator],u,u,u,s,t,u,u,fString/fArray,2,1.5,2.5,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,1.5,2.5,u,u,fArray/fArray,2,u,hole,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,u,hole,u,u,fArray,prototype-data=fArray,0,u,u,u,u,u,u,u,array-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,u,object-k7,fvalues,o,u,array-sym,u,u,u,u,fArray/fArray,3,1,2,u,u,u,u,u,array-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,u,object-k7,fvalues,o,u,array-sym,1,2,u,u,fArray/fArray,5,u,u,u,u,u,u,u,array-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,u,object-k7,fvalues,o,u,array-sym,u,u,u,u,fArray/fArray,0,u,u,u,u,u,u,u,array-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,u,object-k7,fvalues,o,u,array-sym,u,u,u,u,fArray/fSub,2,1,2,u,u,u,u,u,array-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,u,object-k7,fvalues,o,u,array-sym,1,2,u,u,fSub/fArray,2,7,8,u,u,u,u,u,array-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,u,object-k7,fvalues,o,u,array-sym,7,8,u,u,fArray/own-ctor,2,5,6,u,u,u,u,u,own-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,u,object-k7,fvalues,o,u,own-sym,5,6,u,u,own-ctor/fArray,1,1,u,u,u,u,u,u,wide-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,u,7,fvalues,o,u,array-sym,1,u,u,u,fArray/fArray,1,9,u,u,u,u,u,u,array-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,u,object-k7,fvalues,o,u,array-sym,9,u,u,u,fArray/u,1,3,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,3,u,u,u,u/fObject,2,4,5,u,u,u,u,u,u,u,ftoString,u,fhasOwnProperty,u,u,u,object-k7,fvalues,u,u,u,4,5,u,u,fObject/fUint8Array,2,6,7,u,u,u,u,u,u,u,ftoString,fat,fhasOwnProperty,u,u,u,object-k7,fvalues,u,Uint8Array,u,6,7,u,u,fUint8Array/fString,2,s,t,u,u,u,u,u,u,u,ftoString,fat,fhasOwnProperty,u,u,u,object-k7,f[Symbol.iterator],u,u,u,s,t,u,u,fString/fArray,2,1.5,2.5,u,u,u,u,u,array-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,u,object-k7,fvalues,o,u,array-sym,1.5,2.5,u,u,fArray/fArray,2,u,hole,u,u,u,u,u,array-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,u,object-k7,fvalues,o,u,array-sym,u,hole,u,u,fArray,prototype-accessors=fArray,0,u,u,u,u,u,u,u,got-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,lengthy:false,object-k7,fvalues,o,u,array-sym,u,u,u,u,fArray/fArray,3,1,2,u,u,u,u,u,got-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,lengthy:false,object-k7,fvalues,o,u,array-sym,1,2,u,u,fArray/fArray,5,u,u,u,u,u,u,u,got-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,lengthy:false,object-k7,fvalues,o,u,array-sym,u,u,u,u,fArray/fArray,0,u,u,u,u,u,u,u,got-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,lengthy:true,object-k7,fvalues,o,u,array-sym,u,u,u,u,fArray/fSub,2,1,2,u,u,u,u,u,got-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,lengthy:false,object-k7,fvalues,o,u,array-sym,1,2,u,u,fSub/fArray,2,7,8,u,u,u,u,u,got-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,lengthy:false,object-k7,fvalues,o,u,array-sym,7,8,u,u,fArray/own-ctor,2,5,6,u,u,u,u,u,own-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,lengthy:false,object-k7,fvalues,o,u,own-sym,5,6,u,u,own-ctor/fArray,1,1,u,u,u,u,u,u,wide-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,lengthy:false,7,fvalues,o,u,array-sym,1,u,u,u,fArray/fArray,1,9,u,u,u,u,u,u,got-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,lengthy:false,object-k7,fvalues,o,u,array-sym,9,u,u,u,fArray/u,1,3,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,3,u,u,u,u/fObject,2,4,5,u,u,u,u,u,u,u,ftoString,u,fhasOwnProperty,u,u,lengthy:false,object-k7,fvalues,u,u,u,4,5,u,u,fObject/fUint8Array,2,6,7,u,u,u,u,u,u,u,ftoString,fat,fhasOwnProperty,u,u,lengthy:false,object-k7,fvalues,u,Uint8Array,u,6,7,u,u,fUint8Array/fString,2,s,t,u,u,u,u,u,u,u,ftoString,fat,fhasOwnProperty,u,u,lengthy:false,object-k7,f[Symbol.iterator],u,u,u,s,t,u,u,fString/fArray,2,1.5,2.5,u,u,u,u,u,got-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,lengthy:false,object-k7,fvalues,o,u,array-sym,1.5,2.5,u,u,fArray/fArray,2,u,hole,u,u,u,u,u,got-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,lengthy:false,object-k7,fvalues,o,u,array-sym,u,hole,u,u,fArray,18,A0|A3|A5|A0|A2,fSub,fSub,fSub,fArray,fArray,2,fObject,fObject,restored=fArray,0,u,u,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,u,u,u,u,fArray/fArray,3,1,2,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,1,2,u,u,fArray/fArray,5,u,u,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,u,u,u,u,fArray/fArray,0,u,u,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,u,u,u,u,fArray/fSub,2,1,2,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,1,2,u,u,fSub/fArray,2,7,8,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,7,8,u,u,fArray/own-ctor,2,5,6,u,u,u,u,u,own-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,own-sym,5,6,u,u,own-ctor/fArray,1,1,u,u,u,u,u,u,wide-foo,fpush,ftoString,fat,fhasOwnProperty,u,u,u,7,fvalues,o,u,u,1,u,u,u,fArray/fArray,1,9,u,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,9,u,u,u,fArray/u,1,3,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,u,3,u,u,u,u/fObject,2,4,5,u,u,u,u,u,u,u,ftoString,u,fhasOwnProperty,u,u,u,u,fvalues,u,u,u,4,5,u,u,fObject/fUint8Array,2,6,7,u,u,u,u,u,u,u,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,u,Uint8Array,u,6,7,u,u,fUint8Array/fString,2,s,t,u,u,u,u,u,u,u,ftoString,fat,fhasOwnProperty,u,u,u,u,f[Symbol.iterator],u,u,u,s,t,u,u,fString/fArray,2,1.5,2.5,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,1.5,2.5,u,u,fArray/fArray,2,u,hole,u,u,u,u,u,u,fpush,ftoString,fat,fhasOwnProperty,u,u,u,u,fvalues,o,u,u,u,hole,u,u,fArray,proxy-foo:true,2,1,u,u,u,foo|5|constructor|sym,n0,n0,acc0,true,u,0,n1,n1,acc2,true,u,2,n2,n2,acc100,true,u,100,n3,n3,acc1,true,u,1,n4,n4,acc2,true,u,2,TypeError,u,u,true,u,1,2,padded,minus,dotted,max,spaced,11,11,2,0|1|01|-0|1.0|4294967295| 1"##,
+    );
+}
+
+#[test]
+fn array_species_and_final_length_stores_keep_every_observable_step() {
+    // ArraySpeciesCreate creates a plain Array without the three lookups
+    // when the source is an Array with no own "constructor" whose prototype
+    // is the realm's untouched %Array.prototype% and whose %Array% is
+    // untouched; and the final Set of "length" is skipped when the target
+    // is an Array whose writable length already has that value. Ten
+    // species consumers run on plain Arrays and then with every kind of own
+    // "constructor", subclass instances, other prototypes, an array-like, a
+    // Proxy, and with Array.prototype.constructor and Array[@@species]
+    // replaced, made accessors, deleted and restored after warming. Twelve
+    // mutating methods run on plain, frozen, sealed and non-extensible
+    // Arrays, Arrays with a non-writable length or element, sparse and
+    // presized Arrays, a subclass, a Proxy that records every store, an
+    // array-like with a length setter and an Array of the greatest length.
+    run_as_script_function_and_module(
+        r##"
+var log = [];
+function show(f) { try { return String(f()); } catch (e) { return e.constructor.name; } }
+function churn() { var keep = []; for (var i = 0; i < 40000; i++) keep[i & 63] = { i: i, a: [i, i + 1] }; return keep.length; }
+class Sub extends Array {}
+function tag(v) {
+  var p = Object.getPrototypeOf(v);
+  return (p === Array.prototype ? "A" : p === Sub.prototype ? "S" : p === Number.prototype ? "N" : p === null ? "0" : "?") + (Array.isArray(v) ? "" : "!") + v.length + "[" + show(function () { return Array.prototype.join.call(v, ""); }) + "]";
+}
+function ops(make) {
+  var out = [];
+  out.push(show(function () { var a = make(); return tag(a.splice(1, 1)) + tag(a); }));
+  out.push(show(function () { var a = make(); return tag(a.splice(0, 0)) + tag(a); }));
+  out.push(show(function () { var a = make(); return tag(a.splice(0)) + tag(a); }));
+  out.push(show(function () { var a = make(); return tag(a.splice(1, 1, "x", "y")) + tag(a); }));
+  out.push(show(function () { return tag(make().map(function (x) { return x; })); }));
+  out.push(show(function () { return tag(make().filter(function () { return true; })); }));
+  out.push(show(function () { return tag(make().slice(1)); }));
+  out.push(show(function () { return tag(make().concat(["c"])); }));
+  out.push(show(function () { return tag(make().flat()); }));
+  out.push(show(function () { return tag(make().flatMap(function (x) { return [x, x]; })); }));
+  return out.join(" ");
+}
+function plain() { return ["a", "b", "c"]; }
+function line(name, make) { log.push(name + "=" + ops(make)); }
+line("plain", plain); line("plain-again", plain);
+churn();
+// An own "constructor" of every kind.
+function withCtor(value) { return function () { var a = plain(); a.constructor = value; return a; }; }
+var speciesHolder = {}; speciesHolder[Symbol.species] = Sub;
+var nullSpecies = {}; nullSpecies[Symbol.species] = null;
+var undefinedSpecies = function () {}; undefinedSpecies[Symbol.species] = undefined;
+var arrowSpecies = {}; arrowSpecies[Symbol.species] = function () { return [].slice; }();
+line("own-undefined", withCtor(undefined)); line("own-null", withCtor(null)); line("own-number", withCtor(5)); line("own-string", withCtor("s"));
+line("own-Sub", withCtor(Sub)); line("own-Array", withCtor(Array)); line("own-Object", withCtor(Object)); line("own-species-Sub", withCtor(speciesHolder));
+line("own-species-null", withCtor(nullSpecies)); line("own-species-undefined", withCtor(undefinedSpecies)); line("own-species-not-constructor", withCtor(arrowSpecies));
+line("own-accessor", function () { var a = plain(); Object.defineProperty(a, "constructor", { get: function () { log.push("own-get"); return Sub; } }); return a; });
+// Arrays whose prototype is not this realm's %Array.prototype%.
+line("subclass", function () { return Sub.from(plain()); });
+line("sub-prototype", function () { return Object.setPrototypeOf(plain(), Sub.prototype); });
+line("null-prototype", function () { var a = plain(); Object.setPrototypeOf(a, null); a.splice = [].splice; a.map = [].map; a.filter = [].filter; a.slice = [].slice; a.concat = [].concat; a.flat = [].flat; a.flatMap = [].flatMap; return a; });
+line("middle-prototype", function () { return Object.setPrototypeOf(plain(), Object.create(Array.prototype)); });
+line("middle-constructor", function () { var middle = Object.create(Array.prototype); middle.constructor = Sub; return Object.setPrototypeOf(plain(), middle); });
+// Receivers that are not Arrays, and a Proxy for one.
+line("array-like", function () { var o = { length: 3, 0: "a", 1: "b", 2: "c" }; ["splice", "map", "filter", "slice", "concat", "flat", "flatMap"].forEach(function (n) { o[n] = Array.prototype[n]; }); return o; });
+var traps = [];
+line("proxy", function () { return new Proxy(plain(), { get: function (t, k, r) { if (k === "constructor") traps.push("get"); return Reflect.get(t, k, r); } }); });
+log.push(traps.length);
+line("revoked-constructor-proxy", withCtor(function () { var p = Proxy.revocable(function () {}, {}); p.revoke(); return p.proxy; }()));
+// The species itself changes after every site is warm, and is restored.
+var prototypeConstructor = Object.getOwnPropertyDescriptor(Array.prototype, "constructor");
+var species = Object.getOwnPropertyDescriptor(Array, Symbol.species);
+Array.prototype.unrelated = 1;
+line("unrelated-property", plain);
+delete Array.prototype.unrelated;
+Array.prototype.constructor = Sub;
+line("prototype-constructor-Sub", plain);
+var gets = 0;
+Object.defineProperty(Array.prototype, "constructor", { get: function () { gets++; return Array; }, configurable: true });
+line("prototype-constructor-accessor", plain);
+log.push(gets);
+delete Array.prototype.constructor;
+line("prototype-constructor-deleted", plain);
+Object.defineProperty(Array.prototype, "constructor", prototypeConstructor);
+var asked = 0;
+Object.defineProperty(Array, Symbol.species, { get: function () { asked++; return Sub; }, configurable: true });
+line("species-Sub", plain);
+log.push(asked);
+Object.defineProperty(Array, Symbol.species, { value: null, configurable: true });
+line("species-null", plain);
+Object.defineProperty(Array, Symbol.species, { value: 7, configurable: true });
+line("species-number", plain);
+Object.defineProperty(Array, Symbol.species, species);
+Array.extra = 1; delete Array.extra;
+line("restored", plain);
+// The final Set of "length" in the mutating methods.
+function mutate(make) {
+  var out = [];
+  var P = Array.prototype;
+  [function (a) { return P.push.call(a); }, function (a) { return P.push.call(a, "p"); }, function (a) { return P.pop.call(a); }, function (a) { return P.shift.call(a); }, function (a) { return P.unshift.call(a); }, function (a) { return P.unshift.call(a, "u"); }, function (a) { return tag(P.splice.call(a, 0, 0)); }, function (a) { return tag(P.splice.call(a, 1, 1)); }, function (a) { return tag(P.splice.call(a, 1, 0, "i")); }, function (a) { return P.reverse.call(a).length; }, function (a) { return P.fill.call(a, "f").length; }, function (a) { return P.copyWithin.call(a, 0, 1).length; }].forEach(function (operation) {
+    var a;
+    out.push(show(function () { a = make(); return operation(a); }) + ">" + show(function () { return tag(a); }));
+  });
+  return out.join(" ");
+}
+function lengths(name, make) { log.push(name + "=" + mutate(make)); }
+lengths("plain", plain); lengths("empty", function () { return []; });
+lengths("frozen", function () { return Object.freeze(plain()); });
+lengths("sealed", function () { return Object.seal(plain()); });
+lengths("closed", function () { return Object.preventExtensions(plain()); });
+lengths("fixed-length", function () { var a = plain(); Object.defineProperty(a, "length", { writable: false }); return a; });
+lengths("fixed-empty", function () { var a = []; Object.defineProperty(a, "length", { writable: false }); return a; });
+lengths("holes", function () { return ["a", , "c"]; });
+lengths("presized", function () { return new Array(3); });
+lengths("numbers", function () { return [1.5, 2.5, 3.5]; });
+lengths("subclass", function () { return Sub.from(plain()); });
+lengths("fixed-element", function () { var a = plain(); Object.defineProperty(a, "1", { value: "b", writable: false, configurable: false }); return a; });
+var writes = [];
+lengths("proxy", function () { return new Proxy(plain(), { set: function (t, k, v, r) { writes.push(String(k) + "=" + v); return Reflect.set(t, k, v, r); }, deleteProperty: function (t, k) { writes.push("-" + String(k)); return Reflect.deleteProperty(t, k); } }); });
+log.push(writes.length, writes.slice(0, 8).join("|"));
+lengths("array-like", function () { return { length: 3, 0: "a", 1: "b", 2: "c" }; });
+lengths("length-setter", function () { var store = 2, o = { 0: "a", 1: "b" }; Object.defineProperty(o, "length", { get: function () { return store; }, set: function (v) { writes.push("len" + v); store = v; } }); return o; });
+log.push(writes.slice(-4).join("|"));
+var big = []; big.length = 4294967295;
+log.push(show(function () { return big.push(); }), show(function () { return big.push(1); }), big.length, show(function () { return tag(big.splice(4294967294, 1)); }), big.length);
+print(log.join());
+"##,
+        r##"plain=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],plain-again=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],own-undefined=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],own-null=TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError,own-number=TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError,own-string=TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError,own-Sub=S1[b]A2[ac] S0[]A3[abc] S3[abc]A0[] S1[b]A4[axyc] S3[abc] S3[abc] S2[bc] S4[abcc] S3[abc] S6[aabbcc],own-Array=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],own-Object=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],own-species-Sub=S1[b]A2[ac] S0[]A3[abc] S3[abc]A0[] S1[b]A4[axyc] S3[abc] S3[abc] S2[bc] S4[abcc] S3[abc] S6[aabbcc],own-species-null=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],own-species-undefined=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],own-species-not-constructor=TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError,own-get,own-get,own-get,own-get,own-get,own-get,own-get,own-get,own-get,own-get,own-accessor=S1[b]A2[ac] S0[]A3[abc] S3[abc]A0[] S1[b]A4[axyc] S3[abc] S3[abc] S2[bc] S4[abcc] S3[abc] S6[aabbcc],subclass=S1[b]S2[ac] S0[]S3[abc] S3[abc]S0[] S1[b]S4[axyc] S3[abc] S3[abc] S2[bc] S4[abcc] S3[abc] S6[aabbcc],sub-prototype=S1[b]S2[ac] S0[]S3[abc] S3[abc]S0[] S1[b]S4[axyc] S3[abc] S3[abc] S2[bc] S4[abcc] S3[abc] S6[aabbcc],null-prototype=A1[b]02[ac] A0[]03[abc] A3[abc]00[] A1[b]04[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],middle-prototype=A1[b]?2[ac] A0[]?3[abc] A3[abc]?0[] A1[b]?4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],middle-constructor=S1[b]?2[ac] S0[]?3[abc] S3[abc]?0[] S1[b]?4[axyc] S3[abc] S3[abc] S2[bc] S4[abcc] S3[abc] S6[aabbcc],array-like=A1[b]?!2[ac] A0[]?!3[abc] A3[abc]?!0[] A1[b]?!4[axyc] A3[abc] A3[abc] A2[bc] A2[[object Object]c] A3[abc] A6[aabbcc],proxy=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],10,revoked-constructor-proxy=TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError,unrelated-property=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],prototype-constructor-Sub=S1[b]A2[ac] S0[]A3[abc] S3[abc]A0[] S1[b]A4[axyc] S3[abc] S3[abc] S2[bc] S4[abcc] S3[abc] S6[aabbcc],prototype-constructor-accessor=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],10,prototype-constructor-deleted=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],species-Sub=S1[b]A2[ac] S0[]A3[abc] S3[abc]A0[] S1[b]A4[axyc] S3[abc] S3[abc] S2[bc] S4[abcc] S3[abc] S6[aabbcc],10,species-null=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],species-number=TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError TypeError,restored=A1[b]A2[ac] A0[]A3[abc] A3[abc]A0[] A1[b]A4[axyc] A3[abc] A3[abc] A2[bc] A4[abcc] A3[abc] A6[aabbcc],plain=3>A3[abc] 4>A4[abcp] c>A2[ab] a>A2[bc] 3>A3[abc] 4>A4[uabc] A0[]>A3[abc] A1[b]>A2[ac] A0[]>A4[aibc] 3>A3[cba] 3>A3[fff] 3>A3[bcc],empty=0>A0[] 1>A1[p] undefined>A0[] undefined>A0[] 0>A0[] 1>A1[u] A0[]>A0[] A0[]>A0[] A0[]>A1[i] 0>A0[] 0>A0[] 0>A0[],frozen=TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc],sealed=3>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[bcc] 3>A3[abc] TypeError>A3[abc] A0[]>A3[abc] TypeError>A3[acc] TypeError>A3[abc] 3>A3[cba] 3>A3[fff] 3>A3[bcc],closed=3>A3[abc] TypeError>A3[abc] c>A2[ab] a>A2[bc] 3>A3[abc] TypeError>A3[abc] A0[]>A3[abc] A1[b]>A2[ac] TypeError>A3[abc] 3>A3[cba] 3>A3[fff] 3>A3[bcc],fixed-length=TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[ab] TypeError>A3[bc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[abc] TypeError>A3[ac] TypeError>A3[abc] 3>A3[cba] 3>A3[fff] 3>A3[bcc],fixed-empty=TypeError>A0[] TypeError>A0[] TypeError>A0[] TypeError>A0[] TypeError>A0[] TypeError>A0[] TypeError>A0[] TypeError>A0[] TypeError>A0[] 0>A0[] 0>A0[] 0>A0[],holes=3>A3[ac] 4>A4[acp] c>A2[a] a>A2[c] 3>A3[ac] 4>A4[uac] A0[]>A3[ac] A1[]>A2[ac] A0[]>A4[aic] 3>A3[ca] 3>A3[fff] 3>A3[cc],presized=3>A3[] 4>A4[p] undefined>A2[] undefined>A2[] 3>A3[] 4>A4[u] A0[]>A3[] A1[]>A2[] A0[]>A4[i] 3>A3[] 3>A3[fff] 3>A3[],numbers=3>A3[1.52.53.5] 4>A4[1.52.53.5p] 3.5>A2[1.52.5] 1.5>A2[2.53.5] 3>A3[1.52.53.5] 4>A4[u1.52.53.5] A0[]>A3[1.52.53.5] A1[2.5]>A2[1.53.5] A0[]>A4[1.5i2.53.5] 3>A3[3.52.51.5] 3>A3[fff] 3>A3[2.53.53.5],subclass=3>S3[abc] 4>S4[abcp] c>S2[ab] a>S2[bc] 3>S3[abc] 4>S4[uabc] S0[]>S3[abc] S1[b]>S2[ac] S0[]>S4[aibc] 3>S3[cba] 3>S3[fff] 3>S3[bcc],fixed-element=3>A3[abc] 4>A4[abcp] c>A2[ab] TypeError>A3[bbc] 3>A3[abc] TypeError>A4[abbc] A0[]>A3[abc] TypeError>A3[abc] TypeError>A4[abbc] 3>A3[cba] TypeError>A3[fbc] TypeError>A3[bbc],proxy=3>A3[abc] 4>A4[abcp] c>A2[ab] a>A2[bc] 3>A3[abc] 4>A4[uabc] A0[]>A3[abc] A1[b]>A2[ac] A0[]>A4[aibc] 3>A3[cba] 3>A3[fff] 3>A3[bcc],30,length=3|3=p|length=4|-2|length=2|0=b|1=c|-2,array-like=3>?!3[abc] 4>?!4[abcp] c>?!2[ab] a>?!2[bc] 3>?!3[abc] 4>?!4[uabc] A0[]>?!3[abc] A1[b]>?!2[ac] A0[]>?!4[aibc] 3>?!3[cba] 3>?!3[fff] 3>?!3[bcc],length-setter=2>?!2[ab] 3>?!3[abp] b>?!1[a] a>?!1[b] 2>?!2[ab] 3>?!3[uab] A0[]>?!2[ab] A1[b]>?!1[a] A0[]>?!3[aib] 2>?!2[ba] 2>?!2[ff] 2>?!2[bb],len3|len2|len1|len3,4294967295,RangeError,4294967295,A1[],4294967294"##,
+    );
+}

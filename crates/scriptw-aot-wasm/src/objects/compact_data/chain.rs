@@ -124,6 +124,40 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32And);
     }
 
+    /// Leaves on the stack whether the header of an Array answers for a
+    /// property key: a Symbol, or a String that cannot be an array index and
+    /// whose hash differs from "length"'s. Every other key reports false.
+    pub(crate) fn emit_header_named_property_key_i32(&mut self, key: &ValueLocals, f: &mut Function) {
+        let s = self.runtime_schema();
+        let named = s.reserve_i32_local(f);
+        named.set_constant(0, f);
+        key.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Symbol as i32));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        named.set_constant(1, f);
+        f.instruction(&Instruction::Else);
+        key.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        let name = s
+            .reserve_gc_local(f)
+            .initialize(key.cast_reference::<StringValue>(s, f), f);
+        let hash = s.reserve_i64_local(f);
+        self.emit_string_key_hash(&name, hash, f);
+        self.emit_header_named_key_i32(&name, hash, f);
+        named.store(f);
+        s.release_i64_local(hash, f);
+        name.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        named.load(f);
+        s.release_i32_local(named, f);
+    }
+
     /// A Get whose String or Symbol key the walk answers from an object's
     /// live chain: sets `result` and branches to `done`. Every other case,
     /// including a key that still needs conversion, falls through without

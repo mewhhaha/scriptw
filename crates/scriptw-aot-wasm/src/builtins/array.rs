@@ -247,6 +247,39 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
+        // Set(A, "length", len, true) on an Array whose length is writable
+        // and already `len`: OrdinarySet finds the writable own data
+        // property and ArraySetLength, with newLen equal to oldLen, defines
+        // the same value and returns true. Nothing is observable, so the
+        // store is skipped. Every other target and length takes the Set.
+        let done = self.open_frame(ControlFrameKind::Block, f);
+        let general = self.open_frame(ControlFrameKind::Block, f);
+        let array = s.reserve_gc_local(f).initialize(
+            target.sealed_reference_or_branch::<crate::gc_types::ArrayObject>(
+                s,
+                self.local_branch_label(general),
+                f,
+            ),
+            f,
+        );
+        s.field(crate::gc_types::ArrayObjectSchema::LENGTH_WRITABLE)
+            .read(&array, s, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(general, f);
+        let current = s.reserve_i64_local(f);
+        s.field(crate::gc_types::ArrayObjectSchema::LENGTH)
+            .read(&array, s, f)
+            .store_i64(current, f);
+        current.load(f);
+        length.load(f);
+        f.instruction(&Instruction::I64Ne);
+        s.release_i64_local(current, f);
+        self.emit_branch_if_to_target(general, f);
+        array.clear(f);
+        pending.initialize(f);
+        self.emit_branch_to_target(done, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         let value = s.reserve_value_local(f);
         length.load(f);
         f.instruction(&Instruction::F64ConvertI64U);
@@ -281,6 +314,8 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         key.clear(f);
         value.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         Ok(())
     }
     pub(crate) fn emit_array_is_array_builtin(
@@ -897,6 +932,162 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
+    /// ArraySpeciesCreate for an Array whose species is provably this
+    /// realm's own %Array%: creates the result in `target`, completes
+    /// `pending` normally and branches to `exit`. Otherwise it falls through
+    /// having observed nothing.
+    ///
+    /// The proof reads only storage. The source is an actual Array (not a
+    /// Proxy for one) with no own "constructor", its [[Prototype]] is the
+    /// current realm's %Array.prototype%, and that object and the realm's
+    /// %Array% still have their immutable intrinsic layouts, which any
+    /// definition, deletion or redefinition of one of their properties
+    /// replaces with an ordinary table. Then Get(O, "constructor") is the
+    /// layout's %Array% of this realm without a call, it is a constructor
+    /// of the current realm, its @@species is the layout's accessor whose
+    /// getter returns its receiver, and Construct(%Array%, len) with %Array%
+    /// as NewTarget reads the constructor's non-configurable "prototype" and
+    /// is ArrayCreate(len, %Array.prototype%) for a length that is a uint32.
+    /// A greater length keeps the general path and its RangeError.
+    fn emit_array_default_species_create(
+        &mut self,
+        source: &ValueLocals,
+        length: I64Local,
+        target: &ValueLocals,
+        pending: &CompletionLocals,
+        exit: crate::emit::ControlTarget,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        use crate::gc_types::{
+            FunctionObject, FunctionObjectSchema, IntrinsicPropertyStorage,
+            IntrinsicPropertyStorageSchema, OrdinaryObject, OrdinaryObjectSchema,
+        };
+        use crate::intrinsics::IntrinsicPropertyLayoutId as Layout;
+        if !self
+            .strings
+            .has_intrinsic_property_layout(Layout::ArrayPrototype)?
+            || !self
+                .strings
+                .has_intrinsic_property_layout(Layout::ArrayConstructor)?
+        {
+            return Ok(());
+        }
+        let layouts = [
+            self.strings
+                .intrinsic_property_layout_span(Layout::ArrayPrototype)?,
+            self.strings
+                .intrinsic_property_layout_span(Layout::ArrayConstructor)?,
+        ];
+        let s = self.runtime_schema();
+        let general = self.open_frame(ControlFrameKind::Block, f);
+        let array = s.reserve_gc_local(f).initialize(
+            source.sealed_reference_or_branch::<ArrayObject>(
+                s,
+                self.local_branch_label(general),
+                f,
+            ),
+            f,
+        );
+        length.load(f);
+        f.instruction(&Instruction::I64Const(i64::from(u32::MAX)));
+        f.instruction(&Instruction::I64GtU);
+        self.emit_branch_if_to_target(general, f);
+        let header = s.reserve_gc_local(f).initialize(
+            s.field(ArrayObjectSchema::OBJECT)
+                .read(&array, s, f)
+                .reference(),
+            f,
+        );
+        let realm = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_current_function_realm(f), f);
+        let prototype = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_load_realm_array_prototype(&realm, f), f);
+        let _ = s
+            .field(OrdinaryObjectSchema::PROTOTYPE)
+            .read(&header, s, f)
+            .reference();
+        let _ = prototype.load(s, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(general, f);
+        let canonical = s.reserve_value_local(f);
+        self.emit_load_non_array_realm_intrinsic(
+            &realm,
+            crate::functions::NonArrayRealmIntrinsicSlot::ArrayConstructor,
+            &canonical,
+            f,
+        );
+        let constructor = s.reserve_gc_local(f).initialize(
+            canonical.sealed_reference_or_branch::<FunctionObject>(
+                s,
+                self.local_branch_label(general),
+                f,
+            ),
+            f,
+        );
+        let owners: [GcLocal<OrdinaryObject>; 2] = [
+            s.reserve_gc_local(f).initialize(
+                s.field(ArrayObjectSchema::OBJECT)
+                    .read(&prototype, s, f)
+                    .reference(),
+                f,
+            ),
+            s.reserve_gc_local(f).initialize(
+                s.field(FunctionObjectSchema::OBJECT)
+                    .read(&constructor, s, f)
+                    .reference(),
+                f,
+            ),
+        ];
+        for (owner, layout) in owners.iter().zip(layouts) {
+            let base = s.reserve_gc_local(f).initialize(
+                s.field(OrdinaryObjectSchema::PROPERTIES)
+                    .read(owner, s, f)
+                    .reference(),
+                f,
+            );
+            let storage = s.reserve_gc_local(f).initialize(
+                base.sealed_subtype_or_branch::<IntrinsicPropertyStorage>(
+                    s,
+                    self.local_branch_label(general),
+                    f,
+                ),
+                f,
+            );
+            s.field(IntrinsicPropertyStorageSchema::ADDRESS)
+                .read(&storage, s, f);
+            f.instruction(&Instruction::I32Const(layout.address() as i32));
+            f.instruction(&Instruction::I32Ne);
+            self.emit_branch_if_to_target(general, f);
+            storage.clear(f);
+            base.clear(f);
+        }
+        let key = self.emit_array_native_key("constructor", f)?;
+        let absent = self.emit_ordinary_header_own_property_absent_i32(&header, &key, f)?;
+        absent.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        s.release_i32_local(absent, f);
+        self.emit_branch_if_to_target(general, f);
+        self.emit_array_native_create(length, target, f)?;
+        pending.set_normal(target, f);
+        self.emit_branch_to_target(exit, f);
+        key.clear(f);
+        for owner in owners.into_iter().rev() {
+            owner.clear(f);
+        }
+        constructor.clear(f);
+        canonical.clear(f);
+        prototype.clear(f);
+        realm.clear(f);
+        header.clear(f);
+        array.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        Ok(())
+    }
+
     /// ArraySpeciesCreate preserves the full constructor and prototype identities.
     pub(crate) fn emit_array_species_create(
         &mut self,
@@ -913,6 +1104,7 @@ impl FunctionBuilder<'_> {
         let is_array = s.reserve_i32_local(f);
         constructor.set_undefined(f);
         let exit = self.open_frame(ControlFrameKind::Block, f);
+        self.emit_array_default_species_create(source, length, target, &pending, exit, f)?;
         self.emit_is_array_i32(source, is_array, &pending, f)?;
         self.emit_array_native_propagate(&pending, f);
         is_array.load(f);
