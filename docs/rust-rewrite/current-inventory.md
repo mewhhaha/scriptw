@@ -80,11 +80,36 @@ accepts `--case <file.js>`.
   vendored translation to 3.073M and 3.382M
   ([measurement](benchmarks.md#frame-reloads-proven-references-and-threaded-branches-2026-11-16)).
   Node 24 `--jitless` runs about 3.82M and 3.94M there. In wall clock the
-  sync request is level with Node (306.5 against 307.3 µs) and the async
-  request 7.8% behind (362.0 against 335.9 µs): the compiled request
-  fetches its instructions from 828 KiB of distinct code and misses the
-  instruction cache about twenty times as often as the interpreter
+  sync request was then level with Node and the async request 7.8% behind:
+  the compiled request fetches its instructions from 828 KiB of distinct
+  code and misses the instruction cache about twenty times as often as the
+  interpreter
   ([measurement](benchmarks.md#wall-clock-against-node-and-code-locality-2026-11-16)).
+  A branch hinting section that lays unlikely code out behind each
+  function, a Symbol row count in intrinsic layouts, direct stores on
+  collection and Promise receivers, direct Array species creation, object
+  pattern parameters without an arguments object and funcref stores without
+  a call (ABI 77) take it to 2.893M and 3.131M, and to the V8 goal on the
+  cloud machine: 279 to 286 µs against Node's 308 to 309 sync, and 309 to
+  315 against 329 to 335 async, with the means ahead as well, in two runs of
+  twelve processes each
+  ([measurement](benchmarks.md#branch-hints-the-async-requests-extra-work-and-node-2026-11-16)).
+  That is a diagnostic on a virtual machine without hardware counters:
+  qualify it with the eight-process campaign before refreshing the
+  published panel, and decide there whether Speed or Fast is the default
+  policy (every number above is Speed) and whether the CPU baseline stays
+  x86-64 without SSE4.1.
+  What remains, by size on that request: read record hits
+  (`cached_property_read`, 274K own for 1,259 calls),
+  `computed_property_write` (113K, about 245 an append), the general Get
+  (118K async), `for_in_advance` (45K) and `hasOwnProperty.call` (34K),
+  Promise species and construction in the async request (37K),
+  `createElement`'s environment for its `arguments` cell (30K), register
+  allocator spills and reloads (about 490K instructions a request), and
+  JavaScript-level untaken arms between hot code, which no emitter hint
+  names; the hints' own effect on time is not established. Not started:
+  function environments at six objects each and the builtin call site
+  (`proxy_call`, 40K over 160 calls).
  Source `89a934d06891`
   screens at 2.871/3.349 ms Fast and 2.298/2.486 ms Speed, with four fresh
   processes per actor/case rather than final qualification; qualify it against
@@ -298,6 +323,21 @@ accepts `--case <file.js>`.
   (`emit_global_property_write`); reads of such names are exact since the
   run-time global resolution. Owner: the local-copy-plus-mirror design of
   script `var` bindings.
+- **Body `var` over a pattern-bound parameter:** `function f({id}) { var id;
+  return id; }` returns undefined where FunctionDeclarationInstantiation
+  keeps the parameter's value (Node returns it). The same holds for an
+  array pattern, an arrow function and a `var` in a nested block; an
+  identifier parameter and a `var` with an initializer are right. It
+  predates the object pattern parameter work, which leaves it as it was.
+  Owner: function-body `var` hoisting over non-simple parameter lists.
+- Five vendored `pagemap::tests::*` unit tests fail, and the emitter's
+  `thousand_method_program_shares_only_the_native_bodies` measures a
+  method initializer of 1,441,914 bytes against its 1,400,000 limit; both
+  predate the RSC work. On the cloud machine only,
+  `runtime_cache::embedded_runtime_executes_fresh_programs_without_a_native_runtime_compile`
+  fails (its trace has no "runtime-native-bundle hit" line there). Owner:
+  vendored Wasmtime patches, native program templates and the runtime
+  cache test's host assumptions.
 
 ## Conformance boundaries
 

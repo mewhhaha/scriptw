@@ -1874,6 +1874,179 @@ machine's first-level caches) names the difference, per request:
   and 49K async (the text decoder 10K, String concatenation 11K,
   `JSON.stringify` 9K to 17K, `trimEnd` and `slice` 4K each).
 
+### Branch hints, the async request's extra work and Node (2026-11-16)
+
+Two changes on main `ec6b48c62`, measured apart and together (Callgrind
+instruction references and simulated first-level fetch misses per request,
+Speed, 97 requests):
+
+| | Sync median | Sync mean | Async median | Async mean | Sync fetch misses | Async fetch misses | P Wasm bytes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Main `ec6b48c62` | 3,072,705 | 3,163,525 | 3,382,289 | 3,484,210 | 150,157 | 161,524 | 4,886,556 |
+| Branch hints alone | 3,072,113 | 3,162,955 | 3,381,668 | 3,483,540 | 143,173 | 153,935 | 4,988,184 |
+| Async reductions alone | 2,893,350 | 2,979,278 | 3,131,548 | 3,220,081 | not measured | not measured | 4,885,759 |
+| Both (ABI 77) | 2,893,022 | 2,978,829 | 3,131,061 | 3,219,594 | 139,686 | 149,946 | 4,987,379 |
+
+**Wall clock against Node 24.22.1 `--jitless`**, the merged tree, measured
+as in the section above (twelve fresh processes per engine and case,
+interleaved, one CPU, nothing else running), twice:
+
+| Wall clock per request | Scriptw median | Node median | Scriptw mean | Node mean | Median ratio | Mean ratio |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Sync, first run | 279.3 µs | 309.4 µs | 311.0 µs | 359.2 µs | 0.903 | 0.866 |
+| Sync, second run | 285.9 µs | 307.9 µs | 324.1 µs | 340.4 µs | 0.929 | 0.952 |
+| Async, first run | 309.3 µs | 335.0 µs | 361.2 µs | 372.0 µs | 0.923 | 0.971 |
+| Async, second run | 314.7 µs | 329.0 µs | 345.7 µs | 358.2 µs | 0.957 | 0.965 |
+
+- The retained request is ahead of V8 without its JIT in both cases, in
+  medians and in means, in both runs: by 7% to 10% on the sync median and
+  4% to 8% on the async median. This is the cloud machine's diagnostic, not
+  a qualified campaign, and the published panel in the README is older.
+- Against main `ec6b48c62` in the section above, Scriptw's sync median
+  falls from 306.5 µs to between 279 and 286 and its async median from
+  362.0 to between 309 and 315, for 5.8% and 7.4% fewer instructions. Other
+  work ran on the machine during that earlier measurement, so part of the
+  difference in time is its noise.
+- The hints' own effect on time is not established. Sixteen interleaved
+  processes of the hinted host against its baseline, with a build running
+  beside them, gave 311.7 against 320.0 µs sync and 374.2 against 364.0
+  async, both inside the spread of process medians.
+
+**Branch hints.** P and R carry a `metadata.code.branch_hint` section
+(101,624 bytes and 22,890 hints in P, 233,112 and 50,901 in R; no other
+section of either changed) and the product's Wasmtime configuration
+enables branch hinting, so the vendored translation lays the unlikely side
+of a hinted branch out behind the function's other code.
+
+- The emitter's code sink records hints, so a hint can only name an
+  instruction that the sink emitted as a two-way branch. `unlikely` and
+  `likely` hint one branch; `rarely_reached` hints the one branch that
+  decides whether control reaches the code about to be emitted, when one
+  does (the `if` whose arm leads there with no exit before it, or the
+  branch that falls through to it); `rarely_taken` declares a label that
+  only misses branch to. The section is written last, from the final body
+  bytes after import compaction.
+- Hinted: the Throw test after a call, propagation and creation of a Throw
+  completion, native error construction, binding errors and the TDZ, a
+  JavaScript `throw` statement, the first use of a pooled String and of a
+  read, write, `instanceof` or global-read site record, the end of a read
+  record chain, the `instanceof` record's failed proof, the generic `+` and
+  relational kernels behind a Number-pair test, and BigInt arms of strict
+  equality, ToBoolean and numeric dispatch. The static read site's helper
+  fallback is not hinted: of 59 executed sites 13 always take it.
+- Vendored translation: hints are read at `br_if` and the four `br_on_*`
+  forms as well as `if` (the `br_on_*` forms go beyond the proposal, in the
+  standard section). A branch hinted unlikely enters a cold block of its
+  own that jumps to its target, where upstream marked the target itself,
+  which is usually the join the likely path also reaches. A last pass
+  (`cold_paths`) marks every block that control reaches only through
+  marked blocks, since Cranelift moves only the marked block. The mark is a
+  layout property: no instruction, value, edge, stack map or exception
+  table depends on it.
+- `vn` executes in 310 runs on 1,091 lines where it took 434 runs on 1,182;
+  `ft` 75 runs on 288 lines from 89 on 306. Simulated mispredicted
+  conditional branches rise 1.5% (41,858 to 42,488 sync).
+- Most never-executed code between hot code in the compiled bodies is a
+  JavaScript-level alternative, an untaken `if (x instanceof Map)` arm,
+  which no emitter rule can name: at the hinted state the ten largest
+  bodies still hold 17 such runs above 3,000 bytes (223 KB) and 986 smaller
+  ones (149 KB) inside their executed span. `vn` executes about 55 KB,
+  which is 865 lines at best. In R, never-run arms of executed `if`s total
+  287 KB of Wasm unhinted, 140 KB of it one arm of
+  `property_value_resolve`.
+- A native program template re-encodes its bodies with other operators and
+  drops the section, so code compiled at run time carries no hints.
+
+**The async request's extra work.** The async request ran 310K
+instructions more than the sync one; it now runs 238K more. Each row is
+cumulative and was built and measured on its own tree:
+
+| | Sync median | Async median |
+| --- | ---: | ---: |
+| Main `ec6b48c62` | 3,072,705 | 3,382,453 |
+| A Symbol row count per intrinsic layout (ABI 77) | 3,044,349 | 3,351,268 |
+| Stores on Map, Set, WeakMap, WeakSet and Promise receivers | 3,045,291 | 3,329,990 |
+| Named Array reads, untouched Array species, equal `length` | 3,006,681 | 3,256,617 |
+| Object pattern parameters | 2,910,027 | 3,160,316 |
+| Funcref stores without a call | 2,893,449 | 3,131,586 |
+
+- *Symbol rows.* The chain walk proved a Symbol absent from an immutable
+  intrinsic layout by reading every row's key kind, 1,684 to 1,792 loops a
+  request for `n[Symbol.iterator]` and `i[Symbol.asyncIterator]` on plain
+  objects. Each layout in R's static data now ends with the number of its
+  Symbol-keyed rows; zero is absence and anything else declines as before.
+- *Stores on collections and Promises.* React's three thenable stores on a
+  Promise went through one `ordinary_set` entry per prototype, a descriptor
+  object and `Reflect.defineProperty`, about 10K each. The receiver
+  definition takes the ordinary header of those five kinds directly, which
+  is where `Reflect.defineProperty`'s dispatch arrives for them, and the
+  call-free absence walk asks the chain above a receiver with no own
+  property: it admits ordinary objects and functions, and Arrays and
+  wrappers for keys that are neither an index nor "length", whose [[Set]]
+  is OrdinarySet; a Proxy, a typed array or a found key declines.
+- *Arrays.* `splice(0, i)` on four chunk lists per flush cost 10.7K a call.
+  The general Get's probe admits an Array for a key that is neither an
+  index nor "length", which lives only in its ordinary header.
+  ArraySpeciesCreate creates the Array itself when the source is an actual
+  Array with no own "constructor", its prototype is the current realm's
+  %Array.prototype%, that object and the realm's %Array% still have their
+  immutable intrinsic layouts (any definition on either replaces the
+  layout) and the length is a uint32. The final `Set(A, "length", len)` is
+  skipped when A is an actual Array whose writable length already equals
+  `len`.
+- *Object pattern parameters.* `function Row({id})` built its arguments
+  object on every call (31K a request for 32 calls) and resolved `id` and
+  its callee by name (31K). The strict omission proof walks a parameter
+  list of identifiers and object patterns with the body
+  ([contract](contracts/arguments-object-construction-protocol.md)), and a
+  module function or arrow whose patterns hold no initializer and no
+  computed key is a proven cell owner: it keeps its one activation record,
+  so each bound name is one existing cell.
+- *Funcref stores.* Every funcref stored into a GC struct called
+  `intern_func_ref_for_gc_heap`, about 102 instructions, eight times per
+  function object: 144 calls a sync request and 248 async. The vendored
+  runtime interns the null funcref first, so it is id zero in every table,
+  and publishes a direct-mapped cache of 256 (address, id) pairs that
+  `intern` fills; the translation stores zero for null and accepts an entry
+  whose address word equals the address stored. Ids are never reassigned,
+  and only the host writes the cache.
+
+**Zero fills are not what the previous section took them for.** Of the
+44,880 instructions a sync request spends in `memset`, 43,049 are one
+`rep stos` instruction that Callgrind counts once per byte and a hardware
+counter counts once. What is real is 82 to 88 libcalls of about 100
+instructions and about ten fills of 4 to 8 KB. Wasm has no allocation that
+does not fill.
+
+What the async request still adds: `vn` 28.5K, read records 22.0K, `ft`
+18.9K, the general Get 11.9K and `JSON.stringify` 11.3K. Still whole:
+`cached_property_read` 274K own for 1,259 calls, `computed_property_write`
+113K, `for_in_advance` 45K, `hasOwnProperty` 34K, and in the async request
+`Promise.prototype.then` 17K for two calls, `new Promise` 10K for three and
+`Promise.resolve` 10K for four.
+
+Verified on the merged tree: the engine suite (4,254 passed and the
+doctest; the one known `runtime_cache` failure of the cloud machine), the
+vendored translator's unit tests (53), six emitter integration binaries
+(`emission` 83, `modules_realms` 69, `runtime_link` 30, `structure_async`
+116, `structure_builtins` 159, `structure_language` 140) and the source
+guards. On each change's own tree, Test262 with the wasm-aot backend, all
+passing: for the hints `language/expressions/instanceof` (85),
+`language/statements/try` (388) and `language/block-scope` (287); for the
+async reductions 2,545 cases over `built-ins/Array/prototype` splice,
+push, pop, shift, unshift, slice, concat, flat and flatMap, `Array/from`,
+`Array/of`, `Reflect/set`, `Reflect/get`, `built-ins/Symbol`,
+`Promise/prototype/then`, `language/statements/function/dstr`,
+`language/expressions/arrow-function/dstr`, `language/arguments-object`
+and `language/destructuring`; with six Node-checked engine tests run as
+Script, function and module code, and hand-assembled probes for hinted
+layout and stored funcrefs. An independent read of the five async
+reductions found no program any of them gets wrong; it traced a fault that
+predates them, a body `var` over a pattern-bound parameter
+([current work](current-inventory.md)). Not run: full Test262, the Fast
+policy's request, the emitter's whole `--lib` suite and any target other
+than x86-64.
+
 ### Descriptor work and physical allocation
 
 Compiler-created, already validated descriptors now call canonical ordinary/Array definition directly when admitted, retaining the exotic Reflect fallback. Known source accessor descriptors bypass the inline Array algorithm to control code growth. Public descriptor conversion and validation remain intact.

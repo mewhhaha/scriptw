@@ -122,8 +122,15 @@ access, coercion and callbacks are allowed:
 the normal strict caller barrier prevents legacy activation reflection. This
 source-bound proof retains every existing owned environment binding and normal
 entry/epilogue; it removes only the implicit object and its metadata publication.
-Non-simple parameters, resumable/class protocols and uninspected IR forms retain
-materialization. Named Module environment metadata alone is not an eval observer.
+A parameter list of identifiers and object binding patterns is inspected with
+the body: a pattern contributes its computed keys, its initializers and the
+names it binds, and the property reads of BindingInitialization run other
+functions' code, as any call does. A rest parameter, an initializer of the list
+itself, an array pattern, a pattern expression that names `arguments` or holds
+a direct eval, and a pattern owner whose activation record keeps a slot for the
+binding and creates a callable retain materialization, as do resumable/class
+protocols and uninspected IR forms. Named Module environment metadata alone is
+not an eval observer.
 
 Strict simple parameters no longer force environment cells just to seed
 arguments mapping: strict arguments are unmapped. Capture discovery, eval

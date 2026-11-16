@@ -59,6 +59,8 @@ These use plain request/response records; networking and Web APIs are outside th
 
 Eight fresh processes per policy **and case**, in two balanced blocks; 100 warmups and 101 timed requests each. Rendering, Flight consumption and the fixture's sanity scan are timed; outer JSON encoding and exact comparison follow the clock. Fast/Speed use different optimization and register-allocation policies. The async case adds a resolved Promise and markup, with no I/O. [Means, tails, warmup curves and limits](docs/rust-rewrite/benchmarks.md#react-server-components) · [RSC identities](docs/rust-rewrite/rsc-current.json).
 
+That panel predates the per-site records, the generational collector and the translation work. An unqualified diagnostic of 2026-11-16 on a cloud machine, Speed policy, twelve processes per engine and case, measures 279 to 286 µs sync and 309 to 315 µs async against 308 to 309 and 329 to 335 µs for Node 24 with `--jitless`; the panel waits for a qualified campaign. [Measurement and limits](docs/rust-rewrite/benchmarks.md#branch-hints-the-async-requests-extra-work-and-node-2026-11-16).
+
 **Focused performance situations · 2026-11-08**, source `453a9074fcac`: 21 standalone programs compare Fast, Speed and V8.
 [Scores and workload bounds](docs/rust-rewrite/benchmarks.md#focused-performance-situations) · [Situation data](docs/rust-rewrite/situations-current.json) · [RSC data](docs/rust-rewrite/rsc-current.json).
 
@@ -99,16 +101,17 @@ Scoped verification (**2026-11-11**, source `89a934d06891`): 8,582 selected nati
 - **Bounded Web APIs:** UTF-8 codecs, byte streams with default readers, events,
   abort signals and tasks support the tested RSC fixtures. Fetch/Request/URL,
   DOM nodes and full WHATWG conformance remain unsupported or unverified.
-- **Runtime ABI 75:** compiled code has no deadline checks. An execution timeout
+- **Runtime ABI 77:** compiled code has no deadline checks. An execution timeout
   removes access to the Store's GC heap and private linear memory, and the fault
   stops the code; this needs Unix signal handling and is exercised on Linux
   x86-64 ([contract](docs/rust-rewrite/contracts/execution-deadlines.md)).
-  ABIs 58 to 75 add per-site read, write, `instanceof` and global read
+  ABIs 58 to 77 add per-site read, write, `instanceof` and global read
   records, a dictionary position hint on Strings, further native call
   entries, one JSON output accumulator, compact shape transitions, a
   computed-key write kernel, static site records kept in P globals and
   chained per read site, weak collection entries found by identity, String
-  concatenation helpers and leaf kernels over code units and bytes.
+  concatenation helpers, leaf kernels over code units and bytes, a branch
+  hinting section in P and R and a Symbol row count in intrinsic layouts.
   Rebuild older Portable bundles and native images.
 
 [Development and verification](CONTRIBUTING.md) ·

@@ -425,7 +425,40 @@ references: exact and repeatable, about 0.8% above hardware user-instruction
 counts on the retained sync request, and never a time or a cycle count.
 Compare two hosts only through the same tool, and build the baseline host in
 the same Cargo target directory before or after the candidate rather than in
-a second build tree when disk is short.
+a second build tree when disk is short. Copy a host out of
+`target/release/examples` before the next build replaces it.
+
+`count --cache` adds Valgrind's cache and branch simulation and reports the
+simulated instruction fetch misses, data misses and mispredicted branches
+per request; `symbols --event I1mr` attributes one of those events instead
+of instructions. A `rep stos` fill counts once per byte in Callgrind, so
+`memset` looks many times its hardware cost.
+
+Instructions and simulated misses judge a change; only time on a quiet
+machine compares with Node. `scripts/rsc_wall_clock_compare.py` interleaves
+fresh processes of the host and of Node `--jitless` on one CPU and reports
+the median of process medians and the mean of process means:
+
+```sh
+python3 -B scripts/limited_verification.py --cloud --cloud-worker-cpus auto -- \
+  python3 -B scripts/rsc_wall_clock_compare.py target/rsc-candidate/host \
+  target/new-application-fixtures /opt/node24/bin/node 12 2
+```
+
+Twelve processes per engine and case settle the medians on a shared virtual
+machine; eight do not, and neither does a run beside a build.
+
+On a cloud machine, build with `--cloud --cloud-cpus auto` and run test
+binaries with `--cloud --cloud-worker-cpus auto`: the first form exports
+four compilation jobs, and tests that configure a one-job pool then fail
+with "Wasm compilation pool already configured for 4 jobs". `cargo test -p
+scriptw-engine` stops at the first failing binary, so pass `--no-fail-fast`.
+Do not edit a source file while a build or a suite is in flight: the runtime
+image and the emitter must come from one source state, or a host stops with
+"immutable runtime receipt failed admission". A Test262 run writes
+`test262/snapshots/latest-*` files; delete the untracked ones, the
+git-ignored `.txt` summary together with its `.json`, because a summary left
+alone makes the next run of that subtree refuse.
 
 Each reference uses two blocks, eight fresh processes and seven measured calls
 after three checked warmups. Record Chromium and Node/V8 identities. Standalone
