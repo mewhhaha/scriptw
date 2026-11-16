@@ -179,6 +179,48 @@ These are in `src/runtime/vm/{gc.rs,libcalls.rs}`,
 `src/runtime/vm/gc/{func_ref.rs,gc_ref.rs,gc_runtime.rs,enabled/copying.rs}`
 and `src/runtime/gc/enabled/externref.rs`.
 
+## Funcref stores without a call
+
+`src/runtime/vm/gc/{func_ref.rs,enabled/copying.rs}`. A store of a `funcref`
+into the GC heap stores the id `intern_func_ref_for_gc_heap` returns. A
+function object of the JavaScript runtime holds eight such fields, so one
+closure cost eight calls of about a hundred instructions each. Two facts
+let compiled code find the id itself.
+
+- The null funcref is id zero in every table. `FuncRefTable::default`
+  interns it first (`FuncRefTableId::NULL`); a table used to give it
+  whichever id its first store reached.
+- Each table owns a direct-mapped cache of 256 entries, a `VMFuncRef`
+  address and the id the table gave it (`FuncRefCacheEntry`, two
+  pointer-sized words; the address word of an empty entry is zero).
+  `FuncRefTable::intern` writes the entry of every non-null address it is
+  asked for. The cache is a boxed array, so its address is fixed while the
+  table lives. `FuncRefTableView::cache` carries it to the heap with the
+  entries, and the copying collector publishes it in `VMCopyingHeapData`
+  after the remembered-slot buffer's address
+  (`copying_heap_data::func_ref_cache` in the vendored translator). A heap
+  that no Store has published to, at creation and after `detach`, points at
+  one static cache whose entries are all empty, so the field is never null
+  and a pooled heap never describes another Store's cache.
+
+Why it is exact. An id is assigned once and never removed or reassigned,
+so an entry that names an address holds that address's id for as long as
+the table lives, whatever was interned since. Compiled code accepts an
+entry only when its address word equals the address being stored, which no
+empty entry and no entry for another address can; everything else calls
+the libcall as before, and that call fills the entry. The cache and the
+table are host memory that only host code writes, between calls; the GC
+heap never holds either. Reads are unchanged: id zero is an entry like any
+other and holds null.
+
+Tests: `func_ref::tests::` (the null funcref is id zero before and after
+other addresses and takes no entry; with three times as many addresses as
+entries every entry names an address with its own id, the cache does not
+move as the table grows, and the entry layout is the one compiled code
+reads), `vm_copying_heap_data_func_refs_offsets` (the field offset, entry
+count and entry size against the translator's), and the engine probe
+`a_stored_funcref_is_the_function_that_was_stored`.
+
 ## GC heap null guard
 
 The vendored translator lets a GC access through a nullable reference be its

@@ -238,7 +238,6 @@ unsafe impl GcHeapObject for VMCopyingExternRef {
 ///
 /// NB: Layout is defined by constants in `wasmtime_environ::copying`. Keep in
 /// sync!
-#[derive(Default)]
 #[repr(C)]
 struct VMCopyingHeapDataInner {
     /// Current bump pointer (index into the GC heap).
@@ -265,6 +264,27 @@ struct VMCopyingHeapDataInner {
     remembered_overflow: u32,
     /// Address of the first remembered slot, a `*mut u32`.
     remembered: usize,
+    /// Address of the Store's funcref intern cache
+    /// (`FuncRefTableView::cache`), which compiled code consults before it
+    /// calls `intern_func_ref_for_gc_heap`. Never null: a heap without a
+    /// published table points at the empty cache.
+    func_ref_cache: usize,
+}
+
+impl Default for VMCopyingHeapDataInner {
+    fn default() -> Self {
+        Self {
+            bump_ptr: 0,
+            active_space_end: 0,
+            func_refs_len: 0,
+            func_refs: 0,
+            remembered_len: 0,
+            remembered_cap: 0,
+            remembered_overflow: 0,
+            remembered: 0,
+            func_ref_cache: crate::vm::FuncRefTableView::unpublished().cache,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -296,6 +316,7 @@ impl VMCopyingHeapData {
         let inner = self.inner.get_mut();
         inner.func_refs_len = view.len;
         inner.func_refs = view.base;
+        inner.func_ref_cache = view.cache;
     }
 }
 
@@ -1161,7 +1182,7 @@ unsafe impl GcHeap for CopyingHeap {
             inner.remembered_overflow = 0;
         }
         // The next Store publishes its own table.
-        self.vmctx_data.set_func_refs(crate::vm::FuncRefTableView { base: 0, len: 0 });
+        self.vmctx_data.set_func_refs(crate::vm::FuncRefTableView::unpublished());
 
         // The memory's next owner (e.g. a pooling allocator resetting it) may
         // access every byte again.
@@ -2039,6 +2060,18 @@ mod tests {
             core::mem::offset_of!(VMCopyingHeapDataInner, func_refs),
         );
         let pointer = core::mem::size_of::<usize>() as u32;
+        assert_eq!(
+            copying_heap_data::func_ref_cache(pointer) as usize,
+            core::mem::offset_of!(VMCopyingHeapDataInner, func_ref_cache),
+        );
+        assert_eq!(
+            copying_heap_data::FUNC_REF_CACHE_ENTRIES as usize,
+            crate::vm::FUNC_REF_CACHE_ENTRIES,
+        );
+        assert_eq!(
+            copying_heap_data::func_ref_cache_entry_bytes(pointer) as usize,
+            core::mem::size_of::<crate::vm::FuncRefCacheEntry>(),
+        );
         assert_eq!(
             copying_heap_data::remembered_len(pointer) as usize,
             core::mem::offset_of!(VMCopyingHeapDataInner, remembered_len),

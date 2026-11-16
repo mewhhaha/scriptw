@@ -533,6 +533,14 @@ pub fn intern_func_ref(
         func_ref
     };
 
+    // With the copying collector the null funcref and an address the
+    // runtime's cache already holds need no call.
+    if func_env.tunables.collector == Some(Collector::Copying) {
+        return Ok(copying::translate_intern_func_ref(
+            func_env, builder, func_ref,
+        ));
+    }
+
     // Convert the raw `funcref` into a `FuncRefTableId` for use in the
     // GC heap.
     let call_inst = builder

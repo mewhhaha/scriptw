@@ -255,6 +255,93 @@ pub(super) fn emit_old_to_young_barrier(
     Ok(())
 }
 
+/// The id of a `VMFuncRef` in the Store's interned funcref table, for a
+/// store into the GC heap.
+///
+/// The null funcref is id zero: the runtime's table interns it first. For
+/// any other address the runtime keeps a direct-mapped cache of ids that
+/// `intern_func_ref_for_gc_heap` has already returned, published in
+/// `VMCopyingHeapData` (`crate::copying_heap_data`). An entry whose address
+/// word equals this address holds that address's id, which never changes
+/// while the table lives. Every other case, an empty entry or one that
+/// another address took, calls the libcall, which interns and fills the
+/// entry. The cache is host memory that only the host writes.
+pub(super) fn translate_intern_func_ref(
+    func_env: &mut FuncEnvironment<'_>,
+    builder: &mut FunctionBuilder<'_>,
+    func_ref: ir::Value,
+) -> ir::Value {
+    use crate::copying_heap_data::{
+        FUNC_REF_CACHE_ENTRIES, func_ref_cache_entry_bytes, func_ref_cache_shift,
+    };
+    let pointer_type = func_env.pointer_type();
+    let pointer_bytes = pointer_type.bytes();
+
+    let lookup_block = builder.create_block();
+    let hit_block = builder.create_block();
+    let slow_block = builder.create_block();
+    let done_block = builder.create_block();
+    let result = builder.append_block_param(done_block, ir::types::I32);
+
+    let null_id = builder.ins().iconst(ir::types::I32, 0);
+    builder
+        .ins()
+        .brif(func_ref, lookup_block, &[], done_block, &[null_id.into()]);
+
+    builder.switch_to_block(lookup_block);
+    builder.seal_block(lookup_block);
+    let heap_data = CopyingCompiler::load_vmcopying_heap_data_ptr(func_env, builder);
+    let cache = func_env
+        .alias_regions
+        .vmcopying_heap_data_func_ref_cache(&mut builder.cursor(), heap_data);
+    let shifted = builder
+        .ins()
+        .ushr_imm_u(func_ref, i64::from(func_ref_cache_shift(pointer_bytes)));
+    let index = builder
+        .ins()
+        .band_imm_u(shifted, i64::from(FUNC_REF_CACHE_ENTRIES - 1));
+    let offset = builder
+        .ins()
+        .imul_imm_u(index, i64::from(func_ref_cache_entry_bytes(pointer_bytes)));
+    let entry = builder.ins().iadd(cache, offset);
+    // The host writes these words between calls; plain trusted loads are
+    // not carried across one.
+    let address = builder
+        .ins()
+        .load(pointer_type, ir::MemFlagsData::trusted(), entry, 0);
+    let hit = builder
+        .ins()
+        .icmp(ir::condcodes::IntCC::Equal, address, func_ref);
+    builder.ins().brif(hit, hit_block, &[], slow_block, &[]);
+
+    builder.switch_to_block(hit_block);
+    builder.seal_block(hit_block);
+    let cached = builder.ins().load(
+        ir::types::I32,
+        ir::MemFlagsData::trusted(),
+        entry,
+        i32::try_from(pointer_bytes).unwrap(),
+    );
+    builder.ins().jump(done_block, &[cached.into()]);
+
+    builder.switch_to_block(slow_block);
+    builder.seal_block(slow_block);
+    let vmctx = func_env.vmctx_val(&mut builder.cursor());
+    let intern_func_ref_for_gc_heap = func_env
+        .builtin_functions
+        .intern_func_ref_for_gc_heap(builder.func);
+    let call_inst = builder
+        .ins()
+        .call(intern_func_ref_for_gc_heap, &[vmctx, func_ref]);
+    let interned = builder.func.dfg.first_result(call_inst);
+    let interned = builder.ins().ireduce(ir::types::I32, interned);
+    builder.ins().jump(done_block, &[interned.into()]);
+
+    builder.switch_to_block(done_block);
+    builder.seal_block(done_block);
+    result
+}
+
 impl CopyingCompiler {
     /// Load the pointer to the `VMCopyingHeapData` from vmctx.
     fn load_vmcopying_heap_data_ptr(
