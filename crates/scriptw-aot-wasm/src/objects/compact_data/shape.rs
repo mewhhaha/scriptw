@@ -113,7 +113,7 @@ impl FunctionBuilder<'_> {
         length.load(&mut f);
         f.instruction(&Instruction::I32Const(1));
         f.instruction(&Instruction::I32Sub);
-        f.instruction(&Instruction::I32Const(2));
+        f.instruction(&Instruction::I32Const(super::INLINE_COMPACT_FIELDS as i32));
         f.instruction(&Instruction::I32LtU);
         f.instruction(&Instruction::If(BlockType::Empty));
         let undefined = WasmRuntimeValueTag::Undefined as i32;

@@ -2,6 +2,12 @@
 use super::*;
 use crate::gc_types::{PackedValueTable, StoredValue};
 
+/// The capacity that the first growth of an empty packed backing reaches.
+const FIRST_PACKED_CAPACITY: i32 = 4;
+/// The longest array whose values backing is born with one slot per index
+/// below its length.
+const BORN_VALUES_LIMIT: i64 = 64;
+
 // Existing value reads keep their exact emitted path. Descriptor observations
 // request an immutable edge, reusing PackedValues and boxing only Number bits.
 #[derive(Clone, Copy)]
@@ -178,6 +184,233 @@ impl FunctionBuilder<'_> {
         }
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+    }
+
+    /// The publication of default data at `index` when the packed backing
+    /// has room for it without a copy, leaving whether it was made (false
+    /// having changed nothing). An empty array's first element may create
+    /// that backing: four slots as the first growth of either kind does, or,
+    /// for a value that is not a Number and an index below a length of at
+    /// most [`BORN_VALUES_LIMIT`], one slot per index below that length, so
+    /// a fixed literal publishes its elements into one table. The caller
+    /// owns CreateDataProperty semantics exactly as for the complete
+    /// publication, which keeps growth, promotion and descriptor backings.
+    pub(super) fn emit_packed_array_store_within_capacity(
+        &mut self,
+        storage: &GcLocal<ArrayObject>,
+        index: I64Local,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) -> I32Local {
+        let s = self.runtime_schema();
+        let handled = s.reserve_i32_local(f);
+        handled.set_constant(0, f);
+        let slot = s.reserve_i32_local(f);
+        let capacity = s.reserve_i32_local(f);
+        let count = s.reserve_i64_local(f);
+        s.field(ArrayObjectSchema::COUNT)
+            .read(storage, s, f)
+            .store_i64(count, f);
+        s.array_storage_mode_is(storage, ArrayIndexedStorageMode::PackedNumbers, f);
+        self.open_frame(ControlFrameKind::If, f);
+        value.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        let (numbers, presence) = self.packed_backings(storage, f);
+        s.array_type::<NumberBitsI64Array>().length(&numbers, s, f);
+        capacity.store(f);
+        capacity.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        index.load(f);
+        f.instruction(&Instruction::I64Const(i64::from(FIRST_PACKED_CAPACITY)));
+        f.instruction(&Instruction::I64LtU);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        capacity.set_constant(FIRST_PACKED_CAPACITY, f);
+        let new_numbers = s.reserve_gc_local(f).initialize(
+            s.array_type::<NumberBitsI64Array>()
+                .filled(GcOperand::i64(0), capacity, f),
+            f,
+        );
+        // One presence word covers the first capacity.
+        slot.set_constant(1, f);
+        let new_presence = s.reserve_gc_local(f).initialize(
+            s.array_type::<NumberPresenceU64Array>()
+                .filled(GcOperand::i64(0), slot, f),
+            f,
+        );
+        s.field(ArrayObjectSchema::NUMBERS).write(
+            storage,
+            GcOperand::reference(&new_numbers, s),
+            s,
+            f,
+        );
+        s.field(ArrayObjectSchema::NUMBER_PRESENT).write(
+            storage,
+            GcOperand::reference(&new_presence, s),
+            s,
+            f,
+        );
+        numbers.replace(new_numbers.load(s, f), f);
+        presence.replace(new_presence.load(s, f), f);
+        new_presence.clear(f);
+        new_numbers.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        index.load(f);
+        capacity.load(f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        f.instruction(&Instruction::I64LtU);
+        self.open_frame(ControlFrameKind::If, f);
+        index.load(f);
+        f.instruction(&Instruction::I32WrapI64);
+        slot.store(f);
+        let word = s.reserve_i32_local(f);
+        let mask = s.reserve_i64_local(f);
+        let bits = s.reserve_i64_local(f);
+        self.packed_presence(&presence, slot, word, mask, bits, f);
+        bits.load(f);
+        mask.load(f);
+        f.instruction(&Instruction::I64And);
+        f.instruction(&Instruction::I64Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        count.load(f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Add);
+        count.store(f);
+        s.field(ArrayObjectSchema::COUNT)
+            .write(storage, GcOperand::i64_local(count), s, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.array_type::<NumberBitsI64Array>().write(
+            &numbers,
+            slot,
+            GcOperand::i64_local(value.scalar()),
+            s,
+            f,
+        );
+        bits.load(f);
+        mask.load(f);
+        f.instruction(&Instruction::I64Or);
+        bits.store(f);
+        s.array_type::<NumberPresenceU64Array>().write(
+            &presence,
+            word,
+            GcOperand::i64_local(bits),
+            s,
+            f,
+        );
+        handled.set_constant(1, f);
+        s.release_i64_local(bits, f);
+        s.release_i64_local(mask, f);
+        s.release_i32_local(word, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        presence.clear(f);
+        numbers.clear(f);
+        f.instruction(&Instruction::Else);
+        // No element exists, so the values backing is born holding none.
+        capacity.set_constant(0, f);
+        let length = s.reserve_i64_local(f);
+        s.field(ArrayObjectSchema::LENGTH)
+            .read(storage, s, f)
+            .store_i64(length, f);
+        index.load(f);
+        length.load(f);
+        f.instruction(&Instruction::I64LtU);
+        length.load(f);
+        f.instruction(&Instruction::I64Const(BORN_VALUES_LIMIT));
+        f.instruction(&Instruction::I64LeU);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        length.load(f);
+        f.instruction(&Instruction::I32WrapI64);
+        capacity.store(f);
+        f.instruction(&Instruction::Else);
+        index.load(f);
+        f.instruction(&Instruction::I64Const(i64::from(FIRST_PACKED_CAPACITY)));
+        f.instruction(&Instruction::I64LtU);
+        self.open_frame(ControlFrameKind::If, f);
+        capacity.set_constant(FIRST_PACKED_CAPACITY, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i64_local(length, f);
+        count.load(f);
+        f.instruction(&Instruction::I64Eqz);
+        capacity.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32Ne);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        let born = s.reserve_gc_local(f).initialize(
+            s.array_type::<PackedValueTable>()
+                .filled(GcOperand::null(s), capacity, f),
+            f,
+        );
+        self.clear_packed_backings(storage, f);
+        s.field(ArrayObjectSchema::VALUES).write(
+            storage,
+            GcOperand::nullable_reference(&born, s),
+            s,
+            f,
+        );
+        s.set_array_storage_mode(storage, ArrayIndexedStorageMode::PackedValues, f);
+        born.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.array_storage_mode_is(storage, ArrayIndexedStorageMode::PackedValues, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let values = self.packed_values(storage, f);
+        index.load(f);
+        s.array_type::<PackedValueTable>().length(&values, s, f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        f.instruction(&Instruction::I64LtU);
+        self.open_frame(ControlFrameKind::If, f);
+        index.load(f);
+        f.instruction(&Instruction::I32WrapI64);
+        slot.store(f);
+        // The immutable wrapper is rooted while the old reference is inspected.
+        let stored = s
+            .reserve_gc_local(f)
+            .initialize(s.struct_type::<StoredValue>().from_value(value, f), f);
+        s.array_type::<PackedValueTable>()
+            .read(&values, slot, s, f)
+            .reference()
+            .is_null(f);
+        self.open_frame(ControlFrameKind::If, f);
+        count.load(f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Add);
+        count.store(f);
+        s.field(ArrayObjectSchema::COUNT)
+            .write(storage, GcOperand::i64_local(count), s, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.array_type::<PackedValueTable>().write(
+            &values,
+            slot,
+            GcOperand::nullable_reference(&stored, s),
+            s,
+            f,
+        );
+        handled.set_constant(1, f);
+        stored.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        values.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i64_local(count, f);
+        s.release_i32_local(capacity, f);
+        s.release_i32_local(slot, f);
+        handled
     }
 
     /// Promote only an occupancy-bounded default-data publication. The old

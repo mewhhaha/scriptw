@@ -1,6 +1,6 @@
 //! Strict callers hide legacy activation reflection. Only source arguments
-//! access, direct eval or a newly created capturing callable can observe this
-//! implicit binding; all ordinary activation storage and entry logic stay live.
+//! access, direct eval or a newly created callable that captures the binding
+//! can observe it; all ordinary activation storage and entry logic stay live.
 use super::*;
 use scriptw_ir::{
     BlockIr, ClassElementExecutionKind, EnvironmentIdentifierOperationIr, ExprIr, ForInitIr,
@@ -25,7 +25,7 @@ impl<'a> UnobservedStrictArguments<'a> {
                 .captured_bindings
                 .iter()
                 .any(|binding| !unobserved_name(&binding.source_name))
-            || !block(&function.body)
+            || !BodyWalk::for_function(function).block(&function.body)
         {
             return None;
         }
@@ -52,220 +52,308 @@ fn unobserved_name(name: &str) -> bool {
     name != "arguments" && name != LEXICAL_ARGUMENTS_NAME
 }
 
-fn block(body: &BlockIr) -> bool {
-    body.statements.iter().all(statement)
+/// The complete walk of one admitted body.
+#[derive(Clone, Copy)]
+struct BodyWalk {
+    /// Whether a callable created in the body can reach the binding. An
+    /// arrow function, or a direct eval inside one, resolves `arguments` to
+    /// this activation's binding only through an environment slot, which
+    /// capture analysis gives the activation whenever a nested function
+    /// names `arguments` or holds a direct eval.
+    child_callables: ChildCallables,
 }
 
-fn statement(source: &StatementIr) -> bool {
-    match source {
-        StatementIr::Empty | StatementIr::Break { .. } | StatementIr::Continue { .. } => true,
-        StatementIr::Expression(value)
-        | StatementIr::DeclarationEvaluation(value)
-        | StatementIr::Return(value)
-        | StatementIr::Throw(value) => expression(value),
-        StatementIr::Lexical { name, init, .. } => unobserved_name(name) && expression(init),
-        StatementIr::Var(declarations) => declarations.iter().all(|declaration| {
-            unobserved_name(&declaration.name) && declaration.init.as_ref().is_none_or(expression)
-        }),
-        StatementIr::Block(body) => block(body),
-        StatementIr::LexicalBlock(statements) => statements.iter().all(statement),
-        StatementIr::If {
-            condition,
-            then_branch,
-            else_branch,
-        } => {
-            expression(condition)
-                && statement(then_branch)
-                && else_branch.as_deref().is_none_or(statement)
-        }
-        StatementIr::While { condition, body } | StatementIr::DoWhile { condition, body } => {
-            expression(condition) && statement(body)
-        }
-        StatementIr::For {
-            init,
-            test,
-            update,
-            body,
-            ..
-        } => {
-            init.as_ref().is_none_or(for_init)
-                && test.as_ref().is_none_or(expression)
-                && update.as_ref().is_none_or(expression)
-                && statement(body)
-        }
-        StatementIr::ForInObject {
-            name, target, body, ..
-        } => unobserved_name(name) && expression(target) && statement(body),
-        StatementIr::TryCatch {
-            try_block,
-            catch_name,
-            catch_source_name,
-            catch_block,
-            generator_plan: None,
-            async_plan: None,
-            ..
-        } => {
-            unobserved_name(catch_name)
-                && unobserved_name(catch_source_name)
-                && block(try_block)
-                && block(catch_block)
-        }
-        StatementIr::Switch {
-            discriminant,
-            lexical_declarations,
-            cases,
-            ..
-        } => {
-            expression(discriminant)
-                && lexical_declarations.iter().all(statement)
-                && cases
-                    .iter()
-                    .all(|case| case.condition.as_ref().is_none_or(expression) && block(&case.body))
-        }
-        // Refusal loses only this optimization. In particular, generated
-        // callable/class bodies, resumable protocols and opaque plans stay out.
-        _ => false,
-    }
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ChildCallables {
+    /// No environment slot holds the binding, so no closure created here,
+    /// and no direct eval running in one, can name it.
+    CannotNameArguments,
+    MayNameArguments,
 }
 
-fn for_init(init: &ForInitIr) -> bool {
-    match init {
-        ForInitIr::Expression(value) => expression(value),
-        ForInitIr::Lexical { name, init, .. } => unobserved_name(name) && expression(init),
-        ForInitIr::LexicalBlock(bindings) => bindings
+impl BodyWalk {
+    fn for_function(function: &FunctionIr) -> Self {
+        let named = function
+            .owned_env_bindings
             .iter()
-            .all(|binding| unobserved_name(&binding.name) && expression(&binding.init)),
-        ForInitIr::Var(declarations) => declarations.iter().all(|declaration| {
-            unobserved_name(&declaration.name) && declaration.init.as_ref().is_none_or(expression)
-        }),
-        ForInitIr::Statements(statements) => statements.iter().all(statement),
-        ForInitIr::SyncDisposable(_) | ForInitIr::AsyncDisposable(_) => false,
+            .any(|binding| !unobserved_name(&binding.name))
+            || function
+                .eval_environment
+                .as_ref()
+                .is_some_and(|role| match role {
+                    scriptw_ir::EvalEnvironmentRoleIr::Declarative { bindings, .. } => bindings
+                        .iter()
+                        .any(|binding| !unobserved_name(&binding.source_name)),
+                    scriptw_ir::EvalEnvironmentRoleIr::WithObject { .. } => true,
+                });
+        Self {
+            child_callables: if named {
+                ChildCallables::MayNameArguments
+            } else {
+                ChildCallables::CannotNameArguments
+            },
+        }
     }
-}
 
-fn key(key: &PropertyKeyIr) -> bool {
-    match key {
-        PropertyKeyIr::StaticString(_) | PropertyKeyIr::ArrayLength => true,
-        PropertyKeyIr::StringExpr(value) | PropertyKeyIr::ArrayIndex(value) => expression(value),
+    fn block(self, body: &BlockIr) -> bool {
+        body.statements.iter().all(|value| self.statement(value))
     }
-}
 
-fn expression(value: &TypedExpr) -> bool {
-    match &value.expr {
-        ExprIr::Undefined
-        | ExprIr::ArrayHole
-        | ExprIr::Null
-        | ExprIr::Boolean(_)
-        | ExprIr::Number(_)
-        | ExprIr::BigInt(_)
-        | ExprIr::String(_)
-        | ExprIr::WellKnownSymbol(_)
-        | ExprIr::This
-        | ExprIr::NewTarget
-        | ExprIr::ExecutionGlobalObject
-        | ExprIr::RegExpLiteral { .. } => true,
-        ExprIr::Identifier(name)
-        | ExprIr::GlobalPropertyRead { name }
-        | ExprIr::GlobalIdentifierRead { name }
-        | ExprIr::TypeOfUnresolvedIdentifier { name }
-        | ExprIr::UpdateIdentifier { name, .. } => unobserved_name(name),
-        ExprIr::EnvironmentIdentifier(reference) => {
-            unobserved_name(&reference.name)
-                && !matches!(
-                    &reference.operation,
-                    EnvironmentIdentifierOperationIr::Call {
-                        direct_eval: Some(_),
-                        ..
-                    }
-                )
-                && reference.operation.operands().all(expression)
-        }
-        ExprIr::AssignIdentifier { name, value }
-        | ExprIr::CompoundAssignIdentifier { name, value, .. }
-        | ExprIr::GlobalPropertyWrite { name, value, .. } => {
-            unobserved_name(name) && expression(value)
-        }
-        ExprIr::MaterializeBinding { name, value, body } => {
-            unobserved_name(name) && expression(value) && expression(body)
-        }
-        ExprIr::PropertyRead {
-            target,
-            key: property,
-        } => expression(target) && key(property),
-        ExprIr::PropertyWrite {
-            target,
-            key: property,
-            value,
-            ..
-        } => expression(target) && key(property) && expression(value),
-        ExprIr::OrdinaryPropertyAssignment(assignment) => {
-            expression(assignment.base_and_receiver())
-                && key(assignment.referenced_name())
-                && expression(assignment.rhs())
-        }
-        ExprIr::OrdinaryPropertyNumericUpdate(update) => {
-            expression(update.base_and_receiver()) && key(update.referenced_name())
-        }
-        ExprIr::ArrayLiteral(values) => values.iter().all(expression),
-        ExprIr::ObjectLiteral(properties) => properties.iter().all(|property| match property {
-            ObjectPropertyIr::Data { value, .. }
-            | ObjectPropertyIr::NonEnumerableData { value, .. } => expression(value),
+    fn statement(self, source: &StatementIr) -> bool {
+        match source {
+            StatementIr::Empty | StatementIr::Break { .. } | StatementIr::Continue { .. } => true,
+            StatementIr::Expression(value)
+            | StatementIr::DeclarationEvaluation(value)
+            | StatementIr::Return(value)
+            | StatementIr::Throw(value) => self.expression(value),
+            StatementIr::Lexical { name, init, .. } => {
+                unobserved_name(name) && self.expression(init)
+            }
+            StatementIr::Var(declarations) => declarations.iter().all(|declaration| {
+                unobserved_name(&declaration.name)
+                    && declaration
+                        .init
+                        .as_ref()
+                        .is_none_or(|value| self.expression(value))
+            }),
+            StatementIr::Block(body) => self.block(body),
+            StatementIr::LexicalBlock(statements) => {
+                statements.iter().all(|value| self.statement(value))
+            }
+            StatementIr::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                self.expression(condition)
+                    && self.statement(then_branch)
+                    && else_branch
+                        .as_deref()
+                        .is_none_or(|value| self.statement(value))
+            }
+            StatementIr::While { condition, body } | StatementIr::DoWhile { condition, body } => {
+                self.expression(condition) && self.statement(body)
+            }
+            StatementIr::For {
+                init,
+                test,
+                update,
+                body,
+                ..
+            } => {
+                init.as_ref().is_none_or(|value| self.for_init(value))
+                    && test.as_ref().is_none_or(|value| self.expression(value))
+                    && update.as_ref().is_none_or(|value| self.expression(value))
+                    && self.statement(body)
+            }
+            StatementIr::ForInObject {
+                name, target, body, ..
+            } => unobserved_name(name) && self.expression(target) && self.statement(body),
+            StatementIr::TryCatch {
+                try_block,
+                catch_name,
+                catch_source_name,
+                catch_block,
+                generator_plan: None,
+                async_plan: None,
+                ..
+            } => {
+                unobserved_name(catch_name)
+                    && unobserved_name(catch_source_name)
+                    && self.block(try_block)
+                    && self.block(catch_block)
+            }
+            StatementIr::Switch {
+                discriminant,
+                lexical_declarations,
+                cases,
+                ..
+            } => {
+                self.expression(discriminant)
+                    && lexical_declarations
+                        .iter()
+                        .all(|value| self.statement(value))
+                    && cases.iter().all(|case| {
+                        case.condition
+                            .as_ref()
+                            .is_none_or(|value| self.expression(value))
+                            && self.block(&case.body)
+                    })
+            }
+            // Refusal loses only this optimization. In particular, generated
+            // callable/class bodies, resumable protocols and opaque plans stay out.
             _ => false,
-        }),
-        ExprIr::CallIndirect {
-            direct_eval: None,
-            callee,
-            this_arg,
-            args,
-            ..
-        } => {
-            expression(callee)
-                && this_arg.as_deref().is_none_or(expression)
-                && args.iter().all(expression)
         }
-        ExprIr::CallNamed { name, args } => {
-            name != "eval" && unobserved_name(name) && args.iter().all(expression)
+    }
+
+    fn for_init(self, init: &ForInitIr) -> bool {
+        match init {
+            ForInitIr::Expression(value) => self.expression(value),
+            ForInitIr::Lexical { name, init, .. } => unobserved_name(name) && self.expression(init),
+            ForInitIr::LexicalBlock(bindings) => bindings
+                .iter()
+                .all(|binding| unobserved_name(&binding.name) && self.expression(&binding.init)),
+            ForInitIr::Var(declarations) => declarations.iter().all(|declaration| {
+                unobserved_name(&declaration.name)
+                    && declaration
+                        .init
+                        .as_ref()
+                        .is_none_or(|value| self.expression(value))
+            }),
+            ForInitIr::Statements(statements) => {
+                statements.iter().all(|value| self.statement(value))
+            }
+            ForInitIr::SyncDisposable(_) | ForInitIr::AsyncDisposable(_) => false,
         }
-        ExprIr::CallMethod {
-            receiver,
-            key: property,
-            args,
-        } => expression(receiver) && key(property) && args.iter().all(expression),
-        ExprIr::Construct { callee, args, .. } => expression(callee) && args.iter().all(expression),
-        ExprIr::BinaryNumber { lhs, rhs, .. }
-        | ExprIr::CoerciveBinaryNumber { lhs, rhs, .. }
-        | ExprIr::CoerciveAdd { lhs, rhs }
-        | ExprIr::BitwiseNumeric { lhs, rhs, .. }
-        | ExprIr::CompareNumber { lhs, rhs, .. }
-        | ExprIr::CompareValue { lhs, rhs, .. }
-        | ExprIr::StrictEquality { lhs, rhs, .. }
-        | ExprIr::LooseEquality { lhs, rhs, .. }
-        | ExprIr::LogicalShortCircuit { lhs, rhs, .. }
-        | ExprIr::Comma { lhs, rhs }
-        | ExprIr::StringConcat { lhs, rhs }
-        | ExprIr::In { lhs, rhs }
-        | ExprIr::InstanceOf { lhs, rhs } => expression(lhs) && expression(rhs),
-        ExprIr::UnaryPlus { expr }
-        | ExprIr::UnaryMinusNumeric { expr }
-        | ExprIr::UnaryBitwiseNumeric { expr, .. }
-        | ExprIr::LogicalNot { expr }
-        | ExprIr::Void { expr }
-        | ExprIr::TypeOf { expr } => expression(expr),
-        ExprIr::Conditional {
-            condition,
-            then_expr,
-            else_expr,
-        } => expression(condition) && expression(then_expr) && expression(else_expr),
-        ExprIr::SpecOperation {
-            operation:
-                SpecOperationIr::GetV
-                | SpecOperationIr::StrictEqualityComparison
-                | SpecOperationIr::IsLooselyEqual,
-            operands,
-        } => operands.iter().all(expression),
-        // No source arguments reads, direct eval, capturing callable creation,
-        // class execution or uninspected child plan may authorize elision.
-        _ => false,
+    }
+
+    fn key(self, key: &PropertyKeyIr) -> bool {
+        match key {
+            PropertyKeyIr::StaticString(_) | PropertyKeyIr::ArrayLength => true,
+            PropertyKeyIr::StringExpr(value) | PropertyKeyIr::ArrayIndex(value) => {
+                self.expression(value)
+            }
+        }
+    }
+
+    fn expression(self, value: &TypedExpr) -> bool {
+        match &value.expr {
+            ExprIr::Undefined
+            | ExprIr::ArrayHole
+            | ExprIr::Null
+            | ExprIr::Boolean(_)
+            | ExprIr::Number(_)
+            | ExprIr::BigInt(_)
+            | ExprIr::String(_)
+            | ExprIr::WellKnownSymbol(_)
+            | ExprIr::This
+            | ExprIr::NewTarget
+            | ExprIr::ExecutionGlobalObject
+            | ExprIr::RegExpLiteral { .. } => true,
+            ExprIr::Identifier(name)
+            | ExprIr::GlobalPropertyRead { name }
+            | ExprIr::GlobalIdentifierRead { name }
+            | ExprIr::TypeOfUnresolvedIdentifier { name }
+            | ExprIr::UpdateIdentifier { name, .. } => unobserved_name(name),
+            ExprIr::EnvironmentIdentifier(reference) => {
+                unobserved_name(&reference.name)
+                    && !matches!(
+                        &reference.operation,
+                        EnvironmentIdentifierOperationIr::Call {
+                            direct_eval: Some(_),
+                            ..
+                        }
+                    )
+                    && reference
+                        .operation
+                        .operands()
+                        .all(|value| self.expression(value))
+            }
+            ExprIr::AssignIdentifier { name, value }
+            | ExprIr::CompoundAssignIdentifier { name, value, .. }
+            | ExprIr::GlobalPropertyWrite { name, value, .. } => {
+                unobserved_name(name) && self.expression(value)
+            }
+            ExprIr::MaterializeBinding { name, value, body } => {
+                unobserved_name(name) && self.expression(value) && self.expression(body)
+            }
+            ExprIr::PropertyRead {
+                target,
+                key: property,
+            } => self.expression(target) && self.key(property),
+            ExprIr::PropertyWrite {
+                target,
+                key: property,
+                value,
+                ..
+            } => self.expression(target) && self.key(property) && self.expression(value),
+            ExprIr::OrdinaryPropertyAssignment(assignment) => {
+                self.expression(assignment.base_and_receiver())
+                    && self.key(assignment.referenced_name())
+                    && self.expression(assignment.rhs())
+            }
+            ExprIr::OrdinaryPropertyNumericUpdate(update) => {
+                self.expression(update.base_and_receiver()) && self.key(update.referenced_name())
+            }
+            ExprIr::ArrayLiteral(values) => values.iter().all(|value| self.expression(value)),
+            ExprIr::ObjectLiteral(properties) => properties.iter().all(|property| match property {
+                ObjectPropertyIr::Data { value, .. }
+                | ObjectPropertyIr::NonEnumerableData { value, .. } => self.expression(value),
+                _ => false,
+            }),
+            ExprIr::CallIndirect {
+                direct_eval: None,
+                callee,
+                this_arg,
+                args,
+                ..
+            } => {
+                self.expression(callee)
+                    && this_arg
+                        .as_deref()
+                        .is_none_or(|value| self.expression(value))
+                    && args.iter().all(|value| self.expression(value))
+            }
+            ExprIr::CallNamed { name, args } => {
+                name != "eval"
+                    && unobserved_name(name)
+                    && args.iter().all(|value| self.expression(value))
+            }
+            ExprIr::CallMethod {
+                receiver,
+                key: property,
+                args,
+            } => {
+                self.expression(receiver)
+                    && self.key(property)
+                    && args.iter().all(|value| self.expression(value))
+            }
+            ExprIr::Construct { callee, args, .. } => {
+                self.expression(callee) && args.iter().all(|value| self.expression(value))
+            }
+            ExprIr::BinaryNumber { lhs, rhs, .. }
+            | ExprIr::CoerciveBinaryNumber { lhs, rhs, .. }
+            | ExprIr::CoerciveAdd { lhs, rhs }
+            | ExprIr::BitwiseNumeric { lhs, rhs, .. }
+            | ExprIr::CompareNumber { lhs, rhs, .. }
+            | ExprIr::CompareValue { lhs, rhs, .. }
+            | ExprIr::StrictEquality { lhs, rhs, .. }
+            | ExprIr::LooseEquality { lhs, rhs, .. }
+            | ExprIr::LogicalShortCircuit { lhs, rhs, .. }
+            | ExprIr::Comma { lhs, rhs }
+            | ExprIr::StringConcat { lhs, rhs }
+            | ExprIr::In { lhs, rhs }
+            | ExprIr::InstanceOf { lhs, rhs } => self.expression(lhs) && self.expression(rhs),
+            ExprIr::UnaryPlus { expr }
+            | ExprIr::UnaryMinusNumeric { expr }
+            | ExprIr::UnaryBitwiseNumeric { expr, .. }
+            | ExprIr::LogicalNot { expr }
+            | ExprIr::Void { expr }
+            | ExprIr::TypeOf { expr } => self.expression(expr),
+            ExprIr::Conditional {
+                condition,
+                then_expr,
+                else_expr,
+            } => {
+                self.expression(condition)
+                    && self.expression(then_expr)
+                    && self.expression(else_expr)
+            }
+            ExprIr::SpecOperation {
+                operation:
+                    SpecOperationIr::GetV
+                    | SpecOperationIr::StrictEqualityComparison
+                    | SpecOperationIr::IsLooselyEqual,
+                operands,
+            } => operands.iter().all(|value| self.expression(value)),
+            // A function value closes over this activation's environment
+            // and nothing else of the invocation, and that environment has
+            // no slot for the binding.
+            ExprIr::FunctionValue(_) => self.child_callables == ChildCallables::CannotNameArguments,
+            // No source arguments reads, direct eval, class execution or
+            // uninspected child plan may authorize elision.
+            _ => false,
+        }
     }
 }
 
@@ -338,6 +426,89 @@ mod tests {
     }
 
     #[test]
+    fn child_callables_that_cannot_name_the_binding_keep_the_omission() {
+        // A child that names no `arguments` and holds no direct eval
+        // captures only the bindings it reads.
+        for source in [
+            "export function make(input) { return function(){return input;}; }",
+            "export function make(input) { return function(first){return first + input;}; }",
+            "export function make(input) { return () => input; }",
+            "export function make(input) { return () => () => input; }",
+            "export function make(input) { return async function(){return input;}; }",
+            "export function make(input) { return function*(){yield input;}; }",
+            "export function make(input, other) { other.ping = function(){return make(input, other);}; return other; }",
+            "export function make(input) { var record = {id: input, ping: function(){return record;}, next: null}; return record; }",
+            "export function make(input) { for (var name in input) return () => name; }",
+        ] {
+            with_module(source, |function| {
+                assert!(
+                    UnobservedStrictArguments::admit(function).is_some(),
+                    "{source}"
+                );
+                assert!(
+                    !function
+                        .owned_env_bindings
+                        .iter()
+                        .any(|binding| binding.name == LEXICAL_ARGUMENTS_NAME),
+                    "{source}"
+                );
+                let (_, mut arguments, storage) =
+                    UserFunctionActivationPlan::for_function(function)
+                        .unwrap()
+                        .into_parts();
+                assert_eq!(storage, function.owned_env_bindings.as_slice());
+                assert!(
+                    arguments.take_for_binding().unwrap().into_present().is_none(),
+                    "{source}"
+                );
+            });
+        }
+    }
+
+    #[test]
+    fn a_child_callable_that_names_the_binding_owns_its_environment_slot() {
+        // The slot is what refuses the proof: the walk never reads a child.
+        // Capture analysis also gives the slot to an activation whose
+        // ordinary child names its own `arguments` or holds a direct eval,
+        // so those children keep materialization too.
+        for source in [
+            "export function make(input) { return () => arguments[0]; }",
+            "export function make(input) { return () => () => arguments[0]; }",
+            "export function make(input) { return () => eval(input); }",
+            "export function make(input) { return () => () => eval(input); }",
+            "export function make(input) { return function(){return arguments[0];}; }",
+            "export function make(input) { return function(){return () => arguments[0];}; }",
+            "export function make(input) { return function(){return eval('arguments[0]');}; }",
+            "export function make(input) { return function*(){yield arguments[0];}; }",
+        ] {
+            with_module(source, |function| {
+                assert!(
+                    function
+                        .owned_env_bindings
+                        .iter()
+                        .any(|binding| binding.name == LEXICAL_ARGUMENTS_NAME),
+                    "{source}"
+                );
+                assert!(
+                    UnobservedStrictArguments::admit(function).is_none(),
+                    "{source}"
+                );
+                let (_, mut arguments, _) = UserFunctionActivationPlan::for_function(function)
+                    .unwrap()
+                    .into_parts();
+                assert!(
+                    arguments
+                        .take_for_binding()
+                        .unwrap()
+                        .into_present()
+                        .is_some(),
+                    "{source}"
+                );
+            });
+        }
+    }
+
+    #[test]
     fn ordinary_operand_walks_retain_every_nested_arguments_observer() {
         for body in [
             "return arguments[0] === row;",
@@ -355,7 +526,7 @@ mod tests {
             "for (var name in row) value += arguments[0]; return value;",
             "try { return eval('arguments[0]'); } catch (error) { return error; }",
             "try { return row[key]; } catch (error) { return () => arguments[0]; }",
-            "for (var name in row) return () => value;",
+            "for (var name in row) return () => arguments.length + value;",
             // These opaque regions still have no admitted complete child walk.
             "try { return row; } finally { row[key] = value; }",
         ] {
@@ -388,7 +559,16 @@ mod tests {
             "export function make(input) { return input[arguments[0]]; }",
             "export function make(input) { return input.call(arguments, input); }",
             "export function make(input) { return () => arguments[0]; }",
-            "export function make(input) { return function(){return input;}; }",
+            "export function make(input) { return () => () => arguments[0]; }",
+            "export function make(input) { return () => typeof arguments; }",
+            "export function make(input) { return () => eval('arguments[0]'); }",
+            "export function make(input) { return () => eval(input); }",
+            "export function make(input) { return () => () => eval(input); }",
+            "export function make(input) { return async () => arguments[0]; }",
+            "export function make(input) { return [input, {deep: () => arguments}]; }",
+            "export function make(input) { return () => function(){ return 1; } && arguments; }",
+            "export function make(input) { return class { method() { return input; } }; }",
+            "export function make(input) { return class { [arguments[0]]() {} }; }",
             "export function make(input) { return eval('arguments[0]'); }",
             "export function make(input) { return input[eval('arguments[0]')]; }",
             "export function make(input = arguments[0]) { return input; }",

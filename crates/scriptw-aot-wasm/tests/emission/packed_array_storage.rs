@@ -789,11 +789,15 @@ fn many_short_array_literals_keep_publication_cfg_in_one_runtime_body() {
                 LITERALS * ELEMENTS,
                 "every occupied source element reaches the actual R publication owner"
             );
+            // The body every element reaches stores into existing capacity;
+            // it calls R's descriptor publication for geometric growth.
+            let (grow, growth) = runtime.named("helper::array_indexed_publish");
             assert!(
-                publication
-                    .iter()
-                    .any(|op| matches!(op, Operator::Loop { .. })),
-                "the one R publication body owns geometric growth rather than deleting it"
+                calls(publication, grow)
+                    && growth
+                        .iter()
+                        .any(|op| matches!(op, Operator::Loop { .. })),
+                "the R publication owner reaches geometric growth rather than deleting it"
             );
             assert!(
                 program.body_bytes[&make_index] < SOURCE_BODY_BYTE_CEILING,
