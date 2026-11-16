@@ -2364,6 +2364,14 @@ impl<'a> FunctionBuilder<'a> {
     /// element whose own prototype is that same closed tail; the unmodified
     /// %Object.prototype% layout has no index key. Arrays answer [[Set]]
     /// ordinarily, and neither parent can be a Proxy.
+    ///
+    /// A Map, Set, WeakMap, WeakSet or Promise qualifies when the call-free
+    /// chain walk proves that every object above it lacks the key. The walk
+    /// admits only ordinary objects and functions, and Arrays and primitive
+    /// wrappers for a key that is neither an index nor "length": each
+    /// answers [[Set]] for such a key ordinarily, so with the key absent
+    /// from all of them OrdinarySet reaches the end of the chain and
+    /// defines the property on the receiver.
     fn emit_set_chain_lacks_key_i32(
         &mut self,
         target: &ValueLocals,
@@ -2475,6 +2483,22 @@ impl<'a> FunctionBuilder<'a> {
         parent_value.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
+        function.instruction(&Instruction::Else);
+        // A Map, Set, WeakMap, WeakSet or Promise: the call-free walk asks
+        // each object above it for the key, as it does for a computed add.
+        let header = self.emit_plain_composite_header(target, function);
+        header.load(schema, function).is_null(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        let composite = schema.reserve_gc_local(function).initialize(
+            header.load(schema, function).require_non_null(function),
+            function,
+        );
+        self.emit_chain_above_lacks_key(&composite, key.value(), closed, function);
+        composite.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        header.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
@@ -2781,7 +2805,30 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let incoming = definition.descriptor();
-        self.emit_define_own_property_from_descriptor(receiver, key, &incoming, result, function)
+        let schema = self.runtime_schema();
+        // A Map, Set, WeakMap, WeakSet or Promise keeps every own property
+        // in its ordinary header and has the ordinary [[DefineOwnProperty]]:
+        // the non-Proxy definition dispatch reaches the same header
+        // definition for it after its Array, arguments, module namespace,
+        // String wrapper and typed array cases decline. Defining there
+        // omits only the descriptor object and the builtin call that carry
+        // these same fields to that dispatch.
+        let header = self.emit_plain_composite_header(receiver, function);
+        header.load(schema, function).is_null(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        let object = schema.reserve_gc_local(function).initialize(
+            header.load(schema, function).require_non_null(function),
+            function,
+        );
+        self.emit_ordinary_define_own_property(&object, key, &incoming, result, function)?;
+        object.clear(function);
+        function.instruction(&Instruction::Else);
+        self.emit_define_own_property_from_descriptor(receiver, key, &incoming, result, function)?;
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        header.clear(function);
+        Ok(())
     }
 
     /// Internal definitions enter canonical storage directly. Known accessors
