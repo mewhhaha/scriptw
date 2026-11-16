@@ -186,10 +186,14 @@ def run(args):
     # --cloud admits its inherited finite cap instead and records that scope.
     cloud_cap = None
     if args.cloud:
-        cloud_cap = require_cloud_budget()
+        cloud_cap = require_cloud_budget(serial=False)
     else:
         require_kernel_budget(4 * 1024**3)
-    require(len(os.sched_getaffinity(0)) == 1, 'one inherited CPU required')
+    # V8 runs its compiler and collector on helper threads. On one CPU they
+    # preempt its main thread inside a timed entry, so a cloud campaign may
+    # give every actor the same two CPUs; the Wasm actors use one thread.
+    require(len(os.sched_getaffinity(0)) == 1 or (args.cloud and len(os.sched_getaffinity(0)) == 2),
+            'one inherited CPU required, or two on a cloud machine')
     require(args.samples > 0 and args.warmups >= 0 and args.samples + args.warmups <= 1000,
             'require positive samples, nonnegative warmups and at most 1000 calls')
     require(math.isfinite(args.timeout) and args.timeout > 0, 'positive finite process timeout required')

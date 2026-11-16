@@ -51,7 +51,7 @@ COHORT_QUALIFICATION = 'scriptw-cohort-qualification-v1'
 CLOUD_SCOPE = ('managed cloud machine: shared virtual CPUs, inherited memory cap, '
                'no kernel-enforced 4 GiB budget and no cgroup OOM event record')
 RESOURCES_LOCAL = 'One CPU, 4GiB cgroup, no swap, grouped OOM; Wasm retained modules1/64MiB. Sequential children; no profiler/barriers.'
-RESOURCES_CLOUD = ('One inherited CPU of a managed cloud machine; inherited finite memory cap (recorded), no kernel-enforced '
+RESOURCES_CLOUD = ('At most two inherited CPUs of a managed cloud machine, the same for every actor; inherited finite memory cap (recorded), no kernel-enforced '
                    '4GiB budget or OOM event record; Wasm retained modules1/64MiB. Sequential children; no profiler/barriers.')
 # Inert evidence budget, as the renderer admits it.
 MAX_FILE_BYTES, MAX_EXPANDED_BYTES, MAX_ARCHIVE_BYTES, MAX_MEMBERS = 64 * 1024**2, 768 * 1024**2, 128 * 1024**2, 20_000
@@ -85,11 +85,14 @@ def resource_scope(cloud):
     """Admit the measurement scope once; return the cloud record, or None locally."""
     if cloud:
         # A managed cloud machine has no delegated cgroup-v2 scope to cap at 4 GiB.
-        scope = dict(inherited_memory_cap_bytes=require_cloud_budget(), scope=CLOUD_SCOPE)
+        scope = dict(inherited_memory_cap_bytes=require_cloud_budget(serial=False), scope=CLOUD_SCOPE)
     else:
         require_kernel_budget(4 * 1024**3)
         scope = None
-    assert len(os.sched_getaffinity(0)) == 1
+    # V8 runs its compiler and collector on helper threads. On one CPU they
+    # preempt its main thread inside a timed entry, so a cloud campaign may
+    # give every actor the same two CPUs; the Wasm actors use one thread.
+    assert len(os.sched_getaffinity(0)) == 1 or (cloud and len(os.sched_getaffinity(0)) == 2)
     return scope
 
 

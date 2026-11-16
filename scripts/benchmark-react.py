@@ -64,10 +64,11 @@ def main():
     args = parser.parse_args()
     global CLOUD
     if args.cloud:
-        CLOUD = require_cloud_budget()
+        CLOUD = require_cloud_budget(serial=False)
     else:
         require_kernel_budget(4 * 1024**3)
-    require(len(os.sched_getaffinity(0)) == 1 and 0 < args.timeout <= 120, 'one CPU and positive deadline at most120s required')
+    require((len(os.sched_getaffinity(0)) == 1 or (args.cloud and len(os.sched_getaffinity(0)) == 2))
+            and 0 < args.timeout <= 120, 'one CPU (two on a cloud machine) and positive deadline at most120s required')
     output, tools = args.output.resolve(), args.tools.resolve(strict=True)
     output.mkdir(parents=True, exist_ok=False)
     for folder in ('logs', 'tmp', 'cache', 'work'):

@@ -64,13 +64,17 @@ def main():
     args = parser.parse_args()
     resources = dict(policy='Sequential children; one CPU; at most4GiB; no swap; grouped OOM; module cache1/64MiB.')
     if args.cloud:
-        resources = dict(policy='Sequential children; one inherited CPU; inherited cloud memory cap; module cache1/64MiB.',
-            cloud=dict(inherited_memory_cap_bytes=require_cloud_budget(),
+        resources = dict(policy='Sequential children; at most two inherited CPUs, the same for every actor; inherited cloud memory cap; module cache1/64MiB.',
+            cloud=dict(inherited_memory_cap_bytes=require_cloud_budget(serial=False), affinity=sorted(os.sched_getaffinity(0)),
                 scope='managed cloud machine: shared virtual CPUs, inherited memory cap, '
                       'no kernel-enforced 4 GiB budget and no cgroup OOM event record'))
     else:
         require_kernel_budget(4 * 1024**3)
-    require(len(os.sched_getaffinity(0)) == 1, 'one CPU required')
+    # V8 runs its compiler and collector on helper threads. On one CPU they
+    # preempt its main thread inside a timed entry, so a cloud campaign may
+    # give every actor the same two CPUs; the Wasm actors use one thread.
+    require(len(os.sched_getaffinity(0)) == 1 or (args.cloud and len(os.sched_getaffinity(0)) == 2),
+            'one CPU required, or two on a cloud machine')
     require(args.timeout > 0, 'positive child deadline required')
     frozen, fixtures, output = args.frozen.resolve(), args.fixtures.resolve(), args.output.resolve()
     manifest = load(fixtures / 'manifest.json')
