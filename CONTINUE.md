@@ -1,7 +1,7 @@
 # Continue here
 
 Handoff for the React Server Components (RSC) performance work, last updated
-2026-11-15.
+2026-11-16.
 Delete this file when the work below has landed; the lasting record is
 [benchmark details](docs/rust-rewrite/benchmarks.md) and
 [current work](docs/rust-rewrite/current-inventory.md).
@@ -22,9 +22,8 @@ The rules for getting there:
 
 ## Where it stands
 
-`main` holds the first handoff's work. The arguments work and the site
-records below are on the branch `claude/festive-johnson-n50tm4`; the site
-records (ABI 71) still need the whole engine suite. Two kinds of count
+Everything below is on `main` (`ec6b48c62`). Sync is level with Node in wall
+clock on the cloud machine; async is 7% to 8% behind. Two kinds of count
 appear; do not mix them.
 
 Hardware user-mode counts per request, Speed policy, taken on the first
@@ -51,42 +50,45 @@ hardware counts on the same source):
 | Heap base home slot, chained read records, weak entries by identity, operand tests (ABI 74, main `f85bc4a8c`) | 4.017M | 4.108M | 4.411M | 4.538M |
 
 | JSON members, byte runs and composite receivers (ABI 75, main `bd8e98ca6`) | 3.646M | 3.742M | 4.011M | 4.118M |
+| Stores, arguments objects and prototype casts (main `2be3d5542`) | 3.475M | 3.566M | 3.827M | 3.929M |
+| Frame reloads, proven references and threaded branches in the translation (main `ec6b48c62`) | 3.073M | 3.164M | 3.382M | 3.484M |
 
-- The day's changes remove 28% of sync and of async. Node's whole process
-  runs about 3.82M and 3.94M: sync is 4.6% below it in instructions and
-  async 1.8% above. The wall clock is the goal and is not retaken.
+- The work since `b6f536be0` removes 40% of sync and 39% of async. Node's
+  whole process runs about 3.82M and 3.94M (Valgrind, differencing 1 and
+  201 requests, its out-of-clock output validation included): sync is 20%
+  below it in instructions and async 14% below.
+- The work started at 20.12M instructions per sync request.
 
-**The comparison with Node does not hold on the cloud machine.** Measured
-there on the tree above with Node 24.22.1 `--jitless` (the same fixture
-through `react-driver.cjs retained-module`), eight fresh processes per engine
-and case, interleaved and pinned to one CPU, 100 warmups and 101 requests:
+**Wall clock on the cloud machine**, main `ec6b48c62` against Node 24.22.1
+`--jitless` (the same fixture through `react-driver.cjs retained-module`),
+twelve fresh processes per engine and case, interleaved and pinned to one
+CPU, 100 warmups and 101 requests:
 
 | Wall clock per request | Scriptw median | Node median | Scriptw mean | Node mean |
 | --- | ---: | ---: | ---: | ---: |
-| Sync | 457 µs | 306 µs | 482 µs | 350 µs |
-| Async | 580 µs | 448 µs | 666 µs | 481 µs |
+| Sync | 306.5 µs | 307.3 µs | 345.4 µs | 347.5 µs |
+| Async | 362.0 µs | 335.9 µs | 405.7 µs | 379.2 µs |
 
-- Scriptw is 1.49 times Node on the sync median and 1.38 times on the mean;
-  1.29 and 1.38 times on async (Node's async processes varied from 326 to
-  about 450 µs).
-- Node's whole process, counted with Valgrind by differencing 1 and 201
-  requests, runs 3.82M instructions per sync request and 3.94M per async
-  request, its out-of-clock output validation included. Scriptw's request
-  alone was 4.84M and 5.32M when the wall clock above was taken, at least
-  1.27 and 1.35 times Node; it is now 3.65M and 4.01M, 0.95 and 1.02 times.
-  The wall clock was not taken again. When it was taken Node ran more
-  instructions per microsecond than Scriptw on sync (12.5 against 10.6) and
-  about the same on async, so sync needs more than instruction parity.
-- The first handoff's hardware table (Node at 4.37M instructions and 2.59M
-  cycles, Scriptw ahead in sync cycles) came from another machine, Node 24.12
-  and helper scripts that are gone. Nothing here reproduces it. Treat the
-  goal as open by about a third in instructions and in time.
-- A Scriptw request without a collection takes about 375 µs; one in four
-  runs a minor collection and takes 110 to 200 µs longer for 0.47M more
-  instructions, and times drift up between collections as the nursery's
-  cold memory is touched. Allocation volume (480 KB a request) costs more in
-  time than its instruction count shows.
-- The work started at 20.12M instructions per sync request.
+- Sync: 0.997 of Node's median and 0.994 of its mean, which is level, not
+  ahead; process medians run from 288 to 373 µs against Node's 298 to 317.
+  Async: 1.078 and 1.070. Before the day's work the ratios were 1.49 and
+  1.38 sync, 1.29 and 1.38 async. Eight processes each do not settle the
+  median on this machine (the same host gave 363 against 309 sync).
+- **The gap is no longer instructions.** Node retires about 12.4 Callgrind
+  instructions a nanosecond here, Scriptw 10.0 sync and 9.3 async.
+  Valgrind's cache simulation gives the sync request 150K instruction
+  fetch misses where Node has 8K, with the same data misses (28K): the
+  request fetches from about 13,300 distinct 64-byte lines of native code
+  (828 KiB), 1,182 of them in `vn`, whose 527 KiB body runs in 434 separate
+  pieces
+  ([measurement](docs/rust-rewrite/benchmarks.md#wall-clock-against-node-and-code-locality-2026-11-16)).
+- The async request runs 310K instructions more than sync; Node's runs
+  about 120K more.
+- The first handoff's hardware table above (Scriptw ahead in sync cycles at
+  4.87M instructions) came from another machine, Node 24.12 and helper
+  scripts that are gone. Nothing here reproduces it.
+- One request in four or five runs a minor collection; the mean is about
+  40 µs above the median for both engines.
 
 ## Done since the first handoff
 
@@ -152,49 +154,64 @@ a chain walk for composite receivers in the general Get (ABI 75, main
 Verified on the merged tree: the engine suite (4,236 passed and the doctest,
 the same one failure).
 
-## What to do next, by measured size
+Stores, arguments objects and prototype casts (ABI unchanged, main
+`2be3d5542`), and frame reloads, proven references, threaded branches and
+set tests in the vendored translation (main `ec6b48c62`):
+[stores](docs/rust-rewrite/benchmarks.md#stores-arguments-objects-and-prototype-casts-2026-11-16)
+and
+[translation](docs/rust-rewrite/benchmarks.md#frame-reloads-proven-references-and-threaded-branches-2026-11-16).
+Verified on the merged tree: the engine suite (4,245 passed and the doctest,
+the same one failure), the translator's unit tests (48), Test262
+`built-ins/Array` (6,119) and the first 4,240 cases of
+`language/statements/class`. An independent read of the translation passes
+found one hole (`struct.get` of a `nofunc` field made no null check), fixed
+with a probe.
 
-Sync request on main `bd8e98ca6`, 3.742M mean, own instructions unless
-marked ([the day's sections](docs/rust-rewrite/benchmarks.md#read-record-chains-weak-entries-and-operand-tests-2026-11-15)
-have the reasoning for what is done):
+## What to do next
 
-1. **Built-ins that are native in Node: mostly done.** `JSON.stringify`
-   is 202K inclusive without the collection that lands in it (about 600 own
-   a container in the value helper, `toJSON` walk included; a per-shape "no
-   `toJSON`" fact with the closed-tail proof could replace the walk). The
-   encoders run 16.5 instructions a unit, near the floor of two bounds
-   checks a unit on GC arrays.
-2. **Read records, 284K in the hit entry.** A prototype-place hit takes
-   about 240 instructions; going lower needs identity witnesses or a typed
-   prototype edge. Eighteen reads a request still pass the miss kernel to the general Get
-   (32K): a record cannot hold an accessor.
-3. **`vn` 571K, `ft` 435K, `createElement` 182K of their own code.** In
-   `vn` the nineteen `instanceof` tests walk one candidate's chain nineteen
-   times (about 100K); sharing them needs a proof that nothing between two
-   tests changes the chain. The instance pointer is reloaded per use as the
-   heap base was (17,710 times a request in `vn`).
-4. **Stores.** Array append `c[f] = v` (176 calls at about 490 between
-   `computed_property_write` and `array_indexed_publish_default_data`: each
-   element is boxed and a two-prototype walk proves no indexed property), a
-   named add (131 calls at about 480), `ordinary_property_append` 74K.
-5. **`for_in_advance` 54K, `hasOwnProperty.call` 43K** and the read of
-   `.call` before it (about 238 an iteration in `ft`).
-6. **Allocation and collection.** The mean is 92K above the median: a minor
-   collection every fourth request. The three object-allocation helpers make
-   461 `is_subtype` libcalls a request (43K).
-7. **By-name identifier helpers, about 37K.** `function Row({id})` in the
-   fixture and the fixture's request function: a proven binding cell
-   (`ProvenBindingCellIr::analyze` in `analysis/module_locals.rs`) is not
-   granted to a function with a destructured parameter.
-8. **`createElement`'s activation record, about 30K.** An admitted function
-   still allocates its environment for the `arguments` cell.
+Async needs about 26 µs a request (7%); sync needs a margin. Both come from
+the same two places, on main `ec6b48c62`
+([numbers](docs/rust-rewrite/benchmarks.md#wall-clock-against-node-and-code-locality-2026-11-16)):
 
-Not started, from the first handoff: `FuncRefTable::intern` on the host side
-(144 calls a request), the duplicate `index < length` compare, function
-environments at six objects each, and the builtin call site (`proxy_call`,
-49K over 160 calls). The host's own allocator grows about 5 KB a request
-through a run (the `mprotect` calls seen under `strace`); what allocates it
-is not traced.
+1. **Distinct code per request (150K simulated fetch misses against Node's
+   8K).** Measure with `rsc_instruction_counts.py count --cache` and
+   `symbols --event I1mr`; a change here can leave the instruction count
+   alone and still pay.
+   - Slow paths are compiled in line between fast paths. Wasmtime 47 lays
+     out blocks that the Wasm branch hinting section marks unlikely at the
+     end of the function; the emitter writes no hints and the engine does
+     not enable `wasm_branch_hinting`. The emitter knows its helper
+     fallbacks, abrupt-completion checks and throw paths.
+   - Each site carries its own copy of every expansion. `vn` executes
+     10,421 distinct instructions a request; the `!=` chain over the tags
+     {0, 13, 14, 17, 58} alone stands at 1,013 sites.
+   - The register allocator reloads a spilled value at each use (about
+     274K reloads and 217K spills a request) and GC reference spill stores
+     are untouched (139K a request, about 25K of them null constants).
+2. **Instructions the async request adds (310K against Node's 120K)**: `vn`
+   29K, the general Get 27K (`object_read` is 146K own in sync as well),
+   read records 22K, `ft` 19K, the ordinary Set 15K, `FuncRefTable::intern`
+   7.5K.
+3. **Zero fills of arrays that are then overwritten**: 39K a sync request
+   and 49K async through the `memory_fill` libcall (text decoder, String
+   concatenation, `JSON.stringify`, `trimEnd`, `slice`).
+4. **Arguments objects and by-name bindings.** `to({id:n})` still
+   materializes its arguments object for its destructured parameter (48K),
+   its binding is resolved by name (37K), and `createElement` allocates an
+   environment for its `arguments` cell (30K).
+5. **`for_in_advance` 44K and `hasOwnProperty.call` 33K**, with the read of
+   `.call` before it; a lean front for a compact phase under way saves
+   about 10K.
+6. **Read records, 252K in the hit entry**, about 240 a prototype-place
+   hit; `computed_property_write` 109K, about 245 an append.
+7. `switch` on a String makes 206 `string_equality` calls a request (15K)
+   for equal-length strings; the nineteen `instanceof` tests in `vn` walk
+   one chain nineteen times.
+
+Not started, from the first handoff: function environments at six objects
+each and the builtin call site (`proxy_call`, 40K over 160 calls). The
+host's own allocator grows about 5 KB a request through a run (the
+`mprotect` calls seen under `strace`); what allocates it is not traced.
 
 ## How to measure
 
@@ -222,8 +239,11 @@ python3 -B scripts/limited_verification.py --cloud --cloud-cpus auto -- \
   replaces it. For a baseline, restore the old source in place, build, copy
   the host, restore the new source and build again: a second build tree does
   not fit the cloud disk allowance beside the engine test binaries.
-- Instructions judge a change. Only cycles on a quiet machine compare with
-  Node.
+- Instructions and simulated fetch misses (`count --cache`) judge a change.
+  Only time on a quiet machine compares with Node:
+  `python3 scripts/rsc_wall_clock_compare.py <host> target/rsc-fixtures
+  /opt/node24/bin/node 12 2`, with nothing else running. Eight processes
+  are too few.
 
 ## Running on the cloud machine
 
@@ -238,8 +258,10 @@ python3 -B scripts/limited_verification.py --cloud --cloud-cpus auto -- \
   `--no-fail-fast`, or name the remaining `--test` targets.
 - The engine suite takes about 25 minutes that way, a release build after an
   emitter edit 3 to 5, and one Test262 case about 8 seconds on one thread.
-- A Test262 run writes `test262/snapshots/latest-*` files. Delete them
-  instead of committing them.
+- A Test262 run writes `test262/snapshots/latest-*` files. Delete the
+  untracked ones instead of committing them, the git-ignored `.txt` summary
+  with its `.json`: a summary left alone makes the next run of that subtree
+  refuse. `language/statements/class` takes about two hours on two threads.
 - Do not edit a source file while a build or a suite is in flight: the
   runtime image and the emitter must come from one source state, or the host
   stops with "immutable runtime receipt failed admission".

@@ -73,8 +73,18 @@ accepts `--case <file.js>`.
   and direct JSON members, ASCII run kernels, bulk typed-array copies and a
   chain walk for composite receivers to 3.646M and 4.011M
   ([measurement](benchmarks.md#json-byte-runs-and-composite-receivers-2026-11-15)).
-  Node 24 `--jitless` runs about 3.82M and 3.94M there; the wall clock is
-  not retaken.
+  Stores into fresh literals and arrays, arguments objects that no child
+  can name and prototype casts take it to 3.475M and 3.827M
+  ([measurement](benchmarks.md#stores-arguments-objects-and-prototype-casts-2026-11-16)),
+  and frame reloads, proven references and threaded branches in the
+  vendored translation to 3.073M and 3.382M
+  ([measurement](benchmarks.md#frame-reloads-proven-references-and-threaded-branches-2026-11-16)).
+  Node 24 `--jitless` runs about 3.82M and 3.94M there. In wall clock the
+  sync request is level with Node (306.5 against 307.3 µs) and the async
+  request 7.8% behind (362.0 against 335.9 µs): the compiled request
+  fetches its instructions from 828 KiB of distinct code and misses the
+  instruction cache about twenty times as often as the interpreter
+  ([measurement](benchmarks.md#wall-clock-against-node-and-code-locality-2026-11-16)).
  Source `89a934d06891`
   screens at 2.871/3.349 ms Fast and 2.298/2.486 ms Speed, with four fresh
   processes per actor/case rather than final qualification; qualify it against

@@ -1393,7 +1393,10 @@ stores the base once to a stack slot of the function and loads it again only
 after a call outside a loop, when a use follows before the next call; paths
 that made no call pass their value on through a block parameter, and a loop
 keeps the value it is entered with
-([translator notes](../../vendor/wasmtime-internal-cranelift-47.0.0/PATCHES.md#gc-heap-base-home-slot)).
+([translator notes](../../vendor/wasmtime-internal-cranelift-47.0.0/PATCHES.md#loads-from-the-frame-once-per-call-frame_reloads-base_home)).
+The split at calls described here was replaced on 2026-11-16 by the reload
+pass of [the translation section](#frame-reloads-proven-references-and-threaded-branches-2026-11-16),
+which keeps the home slot and measured better.
 
 | Speed, Callgrind instructions per request | Sync median | Sync mean | Async median | Async mean |
 | --- | ---: | ---: | ---: | ---: |
@@ -1633,6 +1636,243 @@ Test262 with the wasm-aot backend, all passing: `built-ins/JSON` (332),
 `slice`, `byteLength`, `length` and `buffer`, `ArrayBuffer/prototype/slice`,
 `Set` (764) and `Map` (405). Not run: the emitter's `--lib` suite and its
 other integration binaries on the merged tree, and wall clock.
+
+### Stores, arguments objects and prototype casts (2026-11-16)
+
+Callgrind instruction references per request, measured as in the sections
+above. The runtime ABI stays 75: no helper was added or removed and no GC
+layout changed. The last row is main `2be3d5542`.
+
+| Speed, Callgrind instructions per request | Sync median | Sync mean | Async median | Async mean | P bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| JSON, byte runs and composite receivers (ABI 75) | 3,645,562 | 3,741,638 | 4,010,966 | 4,118,446 | 4,861,683 |
+| Stores, arguments objects and prototype casts | 3,475,309 | 3,566,195 | 3,827,296 | 3,929,304 | 4,886,556 |
+
+Both requests are below Node 24.22.1 `--jitless` on the same machine in
+instructions (about 3.82M sync and 3.94M async for its whole process). The
+wall clock was not retaken here.
+
+| Per sync request | Calls | Before | After |
+| --- | ---: | ---: | ---: |
+| `is_subtype` libcalls from header construction | 461 → 0 | 42,411 | 0 |
+| `ordinary_property_append`, inclusive | 257 → 146 | 105,689 | 61,409 |
+| `compact_data_store`, inclusive | 672 → 390 | 72,454 | 43,409 |
+| `array_indexed_publish_default_data`, own | 319 | 82,169 | 48,046 |
+
+- **Prototype casts.** Every object header cast its prototype to the open
+  `JavaScriptObject` type, which is never allocated, so the inline equality
+  test never hit and each construction took the subtype libcall. The cast
+  now branches on the sealed ordinary, Array and Function layouts first and
+  keeps the open cast as the trapping remainder. It is the same type test
+  in a different order.
+- **Arguments objects of strict functions that create callables.** The
+  appends to dictionary storage were the implicit arguments object
+  (`length`, `callee`, `@@iterator`) built at entry by strict functions
+  whose bodies create a closure. The omission proof refused any body that
+  creates a callable. It now admits one when the activation owns no
+  environment slot for the binding and has no eval-visible binding of that
+  name: an arrow function, or a direct eval inside one, reaches the
+  parent's `arguments` only through that slot, and capture analysis creates
+  it whenever a nested function names `arguments` or holds a direct eval.
+  Class definitions and non-simple parameter lists stay refused.
+- **Literal stores.** A literal of 3 to 16 static keys writes a value
+  inline when its scalar word is zero and the storage already has its
+  reference backing; the storage is private until the last store and each
+  slot is written once. Everything else still calls the helper.
+- **Array publication.** The publish helper held growth, promotion and the
+  descriptor fallback in one body at about 257 instructions a call. Its
+  body is now the in-capacity store, an empty array's first element
+  creates its backing, and every miss goes to the existing descriptor
+  publication, which repeats the packed admission with growth and
+  promotion. A growth event costs about 600 more than before; there are
+  three a request here. `new Array(n)` with n at most 64 and a first
+  non-Number store below n now becomes a packed values table of the least
+  power-of-two capacity covering n (at least four), which is the capacity
+  doubling would have reached. The first version gave the table n slots;
+  the rooted snapshot requires power-of-two capacities and rejected a
+  three-element literal later redefined into dense descriptors, which the
+  engine's `structure` suite caught on the merged tree.
+- Not done: `to({id:n})` still materializes its arguments object for its
+  destructured parameter (about 48K a request), `for…in` advance and
+  `hasOwnProperty.call` are unchanged (54K and 43K), and
+  `computed_property_write` still spends about 245 an append (137K).
+
+Verified on the merged tree: the engine suite in release (4,241 passed and
+the doctest, the same one `runtime_cache` failure; the full run was on
+`272c81021`, where `structure` had the one snapshot failure above, and
+`structure` (36), `aot_language` (574) and `aot_gc_entries` (274) were rerun
+with the fix), the emitter's `emission` (83), `structure_builtins` (159) and
+`structure_language` (140), and Test262 with the wasm-aot backend:
+`language/expressions/array` (104), `Array/of` (32), `Array/from` (90),
+`Array/length` (60), `Array/prototype/push` (48) and `Object/defineProperty`
+(2,250), all passing. On the change's own tree: source guards, and Test262,
+8,969 of 8,971 across `language/expressions/array`, `object`, `assignment`,
+`instanceof`, `arrow-function` and `function`, `language/arguments-object`,
+`language/statements/for-in`, `language/eval-code/direct`,
+`language/function-code`, `Array/prototype/push`, `Array/length`,
+`Array/from`, `Array/of`, `Object/create`, `Object/setPrototypeOf`,
+`Object/defineProperty` and `Object/prototype/hasOwnProperty`; the two
+failures are `language/function-code/S10.2.1_A4_T2.js` in both modes, which
+fails before this work. Not run: numeric-array benchmark panels and wall clock.
+
+### Frame reloads, proven references and threaded branches (2026-11-16)
+
+Callgrind instruction references per request, measured as in the sections
+above. All of it is in the vendored Wasm-to-Cranelift translation
+([translator notes](../../vendor/wasmtime-internal-cranelift-47.0.0/PATCHES.md#frame-reloads-home-slots-proven-references-threaded-branches-and-set-tests),
+which hold the correctness argument of each pass): the emitted Wasm, the
+runtime helpers and the GC layouts are unchanged, and the runtime ABI stays
+75. The second row was measured alone on the tree before the stores
+section; the last is main `ec6b48c62`.
+
+| Speed, Callgrind instructions per request | Sync median | Sync mean | Async median | Async mean | P bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Stores, arguments objects and prototype casts | 3,475,309 | 3,566,195 | 3,827,296 | 3,929,304 | 4,886,556 |
+| Translation changes, alone on ABI 75 before the stores | 3,236,556 | 3,332,439 | 3,559,002 | 3,666,334 | 4,861,683 |
+| Both | 3,072,705 | 3,163,525 | 3,382,289 | 3,484,210 | 4,886,556 |
+
+Node 24.22.1 `--jitless` runs about 3.82M and 3.94M instructions a request
+for its whole process on the same machine: the sync request is 20% below
+it and the async request 14% below.
+
+Sync median after each change, each on top of the one before (alone, from
+3,645,562):
+
+| Change | Sync median |
+| --- | ---: |
+| Frame reloads | 3,552,613 |
+| Branch threading | 3,441,005 |
+| Straight-line `ref.cast` and references proven by a check | 3,344,847 |
+| Instance pointer home, heap base moved to the reload pass | 3,307,690 |
+| References proven by a branch | 3,280,545 |
+| One comparison for a run of constants | 3,246,099 |
+| Frame slots read on the way into a loop | 3,236,556 |
+
+- **Frame reloads.** The frontend's safepoint spiller loads a GC reference
+  from its stack-map slot at every use, and Cranelift merges those loads
+  only up to the next trapping instruction. A forward dataflow over the
+  function now knows a slot's content after a store or load, forgets it at
+  a call (except a slot holding null, which the collector does not touch),
+  keeps at a join what every predecessor agrees on, and removes loads of
+  known content. Only slots whose address is used solely for whole-slot
+  loads and stores of one type are handled; stores and stack maps are
+  untouched. The GC heap base and the instance pointer get home slots and
+  the same pass places their loads, which replaced the split at calls with
+  block parameters of the home slot section. A loop head takes a slot's
+  content as a block parameter when the loop reads it before calling.
+  32-bit GC reference reloads in `vn` go from 30,274 a request to 15,256.
+- **Branch threading.** `ref.test` with `if`, `br_on_cast` and Wasm blocks
+  that yield a condition end in a block that only branches on its own
+  parameter, so every path materialized a truth value and tested it again.
+  An edge that passes a constant, or the condition it has just branched on,
+  now goes straight to the selected successor. Truth-value materialization
+  in `vn` goes from 47,165 to 31,996.
+- **Proven references.** `ref.cast` to a non-nullable concrete type is
+  trapping checks in line, with the same order and trap code. The
+  translator records per value what control can only pass having
+  established (non-null, or a concrete type), keyed by the innermost Wasm
+  control frame and `if` arm, and emits nothing for a later
+  `ref.as_non_null`, null check, `ref.cast` or `ref.test` that the record
+  implies while that frame is open in that arm.
+- **Set tests.** The emitter's tag-set chains (`x == 6 | x == 7 | x == 8`)
+  over consecutive constants become one unsigned range comparison.
+- By body, own instructions per sync request, alone: `vn` 571,174 →
+  506,651, `ft` 435,249 → 379,536, `createElement` 181,734 → 156,537,
+  `cached_property_read` 283,879 → 252,099, `computed_property_write`
+  137,250 → 110,396. All compiled JavaScript bodies go from 1,634,907 to
+  1,446,169 and the runtime image from 1,808,118 to 1,587,578. One helper
+  loses more than about 540: `String.prototype.split`, 33,045 → 35,000.
+- The native images shrink: `program.cwasm` 13,932,768 → 12,662,976 bytes
+  and `runtime.cwasm` 47,002,560 → 43,796,408. Whole host process user time
+  was 11.71 s before and 11.73 s after (four alternating runs each on a
+  shared machine).
+- An independent read of the passes found one hole, fixed before this went
+  to main: `struct.get` of a field of the uninhabited `nofunc` type
+  returned null without a load, so where the access is its reference's
+  implicit null check no check was made, and the record of a proven
+  non-null reference would have let later checks of that value go too. The
+  emitter declares no such field. The field is now read when the read
+  carries the null trap, and a probe covers it.
+- Not done: the register allocator still reloads a spilled value per use
+  (about 274K 64-bit reloads and 217K spills a request over both images),
+  GC reference spill stores are untouched (139K a request, about 25K of
+  them null constants), and tag sets that are not a run (`!=` over
+  {0, 13, 14, 17, 58} at 1,013 sites) keep their chains.
+
+Verified on the merged tree: the engine suite in release (4,245 passed and
+the doctest, the same one `runtime_cache` failure) on `4e23521ef`; with the
+`nofunc` fix, the translator's library tests (48, of which 34 run
+Cranelift's verifier on a rewritten function) and `aot_gc_entries` (279,
+five of them hand-assembled Wasm probes on the product's Wasmtime
+configuration; the `nofunc` probe fails without the fix); source guards;
+and Test262 with the wasm-aot backend, all passing: `built-ins/Array`
+(6,119) and the first 4,240 of 8,662 cases of `language/statements/class`
+before the run was stopped at a time limit. On the change's own tree,
+Test262: `language/expressions/instanceof` (85), `yield` (123), `typeof`
+(32) and `strict-equals` (59), `language/statements/try` (388), `switch`
+(216) and `for` (758), `built-ins/JSON/stringify` (134) and
+`String/prototype/split` (240). Not run: full Test262, the Fast policy's
+request, a debug-assertions build of the vendored crate, and any target
+other than x86-64.
+
+### Wall clock against Node and code locality (2026-11-16)
+
+Main `ec6b48c62` against Node 24.22.1 `--jitless` on the cloud machine
+(4 vCPUs of a 2.3 GHz Xeon with steal time, no hardware counters), with
+`scripts/rsc_wall_clock_compare.py`: twelve fresh processes per engine and
+case, interleaved and pinned to one CPU, 100 warmups and 101 requests each,
+the median of process medians and the mean of process means. A diagnostic,
+not a qualified campaign.
+
+| Wall clock per request | Scriptw median | Node median | Scriptw mean | Node mean |
+| --- | ---: | ---: | ---: | ---: |
+| Sync | 306.5 µs | 307.3 µs | 345.4 µs | 347.5 µs |
+| Async | 362.0 µs | 335.9 µs | 405.7 µs | 379.2 µs |
+
+- Sync is level with Node (0.997 of its median and 0.994 of its mean);
+  async is 7.8% slower on the median and 7.0% on the mean. On the tree
+  before the day's work the ratios were 1.49 and 1.38 sync, 1.29 and 1.38
+  async.
+- Scriptw's process medians spread further than Node's: 288 to 373 µs
+  against 298 to 317 sync, 335 to 539 against 323 to 487 async. An earlier
+  run of eight processes each gave 363 against 309 sync and 353 against 339
+  async, so eight processes do not settle the median on this machine.
+- The comparison is level in time although Scriptw runs 20% fewer
+  instructions, and behind in async with 14% fewer: Node retires about 12.4
+  Callgrind instructions a nanosecond here and Scriptw about 10.0 sync and
+  9.3 async.
+
+Valgrind's cache and branch simulation (`rsc_instruction_counts.py count
+--cache`; here with a 64 KiB instruction cache and a 48 KiB data cache, the
+machine's first-level caches) names the difference, per request:
+
+| Simulated, per request | Instructions | Instruction fetch misses | Data misses | Mispredicted conditional | Mispredicted indirect |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Scriptw sync | 3,072,705 | 150,157 | 27,936 | 41,859 | 1,241 |
+| Scriptw async | 3,382,431 | 161,524 | 30,592 | 46,232 | 1,388 |
+| Node sync, whole process | 3,906,449 | 8,017 | 28,483 | 35,819 | 35,553 |
+
+- Data misses are the same. Node's interpreter fetches its instructions
+  from a few handlers; the compiled request fetches from about 13,300
+  distinct 64-byte lines (828 KiB) and misses on one fetch in twenty.
+- `vn` alone takes 46,144 of the misses: its native body is 527 KiB, a
+  request executes 10,421 distinct instructions of it in 434 runs with a
+  median length of 85 bytes, on 1,182 lines spread over 7 of its 9 64 KiB
+  regions. `ft` takes 16,286 and `createElement` 7,718; the compiled
+  JavaScript bodies together take about two thirds.
+- So the remaining cost is the amount of distinct code a request runs, not
+  the number of instructions: slow paths compiled in line between the fast
+  ones, and one copy of each expansion per site. Wasmtime 47 lays out
+  blocks marked by the Wasm branch hinting section as cold; the emitter
+  writes no hints.
+- The async request runs 310K instructions more than the sync one where
+  Node's runs about 120K more, spread over `vn` (29K), the general Get
+  (27K), read records (22K), `ft` (19K), the ordinary Set (15K) and the
+  collector.
+- New GC arrays are zero-filled through the `memory_fill` libcall and then
+  overwritten in full: 82 calls and 39K instructions a sync request, 88
+  and 49K async (the text decoder 10K, String concatenation 11K,
+  `JSON.stringify` 9K to 17K, `trimEnd` and `slice` 4K each).
 
 ### Descriptor work and physical allocation
 
