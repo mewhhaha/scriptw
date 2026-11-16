@@ -11,6 +11,8 @@ impl FunctionBuilder<'_> {
         value: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        // A read or write in the temporal dead zone throws.
+        function.rarely_reached();
         if !self.uses_heap {
             return self.emit_environment_native_error(
                 NativeErrorKind::ReferenceError,

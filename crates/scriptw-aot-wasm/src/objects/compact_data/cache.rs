@@ -186,6 +186,9 @@ impl FunctionBuilder<'_> {
         );
         following.load(schema, f).is_null(f);
         self.open_frame(ControlFrameKind::If, f);
+        // The end of the chain: a record is made, a bounded number of times
+        // per site, or the site has learned all it may.
+        f.rarely_reached();
         count.load(f);
         f.instruction(&Instruction::I32Const(MAX_SITE_RECORDS));
         f.instruction(&Instruction::I32GeS);

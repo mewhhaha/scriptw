@@ -51,10 +51,28 @@ enum FrameKind {
     LegacyCatchAll,
 }
 
+/// The two-way branch that decides whether the code being emitted runs: the
+/// place is reached exactly when that branch went this way, as far as the
+/// sink can tell (it takes calls to return and loops to end).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Anchor {
+    /// An arm of the `if` at this operator ordinal.
+    Arm { opener: u32, alternative: bool },
+    /// The fallthrough of the branch at this operator ordinal.
+    Fallthrough(u32),
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Frame {
     identity: u64,
     kind: FrameKind,
+    /// The ordinal of the operator that opened the frame.
+    opener: u32,
+    /// What decided that the frame's opener ran.
+    entry_anchor: Option<Anchor>,
+    /// Whether code inside the frame may leave it other than through its
+    /// end: a branch to an outer label, a return, a throw.
+    escaped: bool,
 }
 
 // Identities never enter the encoded module. Global allocation also rejects
@@ -63,13 +81,19 @@ struct Frame {
 static NEXT_LABEL_IDENTITY: AtomicU64 = AtomicU64::new(1);
 
 impl Frame {
-    fn new(kind: FrameKind) -> Self {
+    fn new(kind: FrameKind, opener: u32, entry_anchor: Option<Anchor>) -> Self {
         let identity = NEXT_LABEL_IDENTITY
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |next| {
                 next.checked_add(1)
             })
             .expect("Wasm label identity space exhausted");
-        Self { identity, kind }
+        Self {
+            identity,
+            kind,
+            opener,
+            entry_anchor,
+            escaped: false,
+        }
     }
 }
 
@@ -181,6 +205,13 @@ pub(crate) struct Function {
     excluded_i32_value: Option<(u32, i32)>,
     checked_escape_frames: Vec<LabelDepth>,
     last_instruction_escapes: bool,
+    /// Operator ordinal of each hinted branch, and whether it is likely taken.
+    branch_hints: std::collections::BTreeMap<u32, bool>,
+    /// Identities of the open labels that only rare paths branch to.
+    rare_labels: Vec<u64>,
+    /// The branch that decides whether the next instruction runs, if one
+    /// branch does.
+    anchor: Option<Anchor>,
 }
 
 impl Clone for Function {
@@ -199,6 +230,9 @@ impl Clone for Function {
             excluded_i32_value: self.excluded_i32_value,
             checked_escape_frames: self.checked_escape_frames.clone(),
             last_instruction_escapes: self.last_instruction_escapes,
+            branch_hints: self.branch_hints.clone(),
+            rare_labels: self.rare_labels.clone(),
+            anchor: self.anchor,
         }
     }
 }
@@ -215,7 +249,7 @@ impl Function {
         Self {
             body,
             locals,
-            frames: vec![Frame::new(FrameKind::Function)],
+            frames: vec![Frame::new(FrameKind::Function, 0, None)],
             parameters,
             initial_local_count,
             initial_prefix_len,
@@ -226,6 +260,9 @@ impl Function {
             excluded_i32_value: None,
             checked_escape_frames: Vec::new(),
             last_instruction_escapes: false,
+            branch_hints: std::collections::BTreeMap::new(),
+            rare_labels: Vec::new(),
+            anchor: None,
         }
     }
 
@@ -317,7 +354,9 @@ impl Function {
         self.instruction(&Instruction::LocalGet(local));
         self.instruction(&Instruction::I32Const(value));
         self.instruction(&Instruction::I32Eq);
-        self.instruction(&Instruction::If(wasm_encoder::BlockType::Empty));
+        // The guarded value is the one the arm leaves on: an abrupt
+        // completion, a failed admission.
+        self.unlikely(&Instruction::If(wasm_encoder::BlockType::Empty));
         let guard = self.label_depth();
         self.checked_escape_frames.push(guard);
         escape(self);
@@ -416,9 +455,27 @@ impl Function {
         }
 
         match instruction {
-            Instruction::Block(_) => self.frames.push(Frame::new(FrameKind::Block)),
-            Instruction::Loop(_) => self.frames.push(Frame::new(FrameKind::Loop)),
-            Instruction::If(_) => self.frames.push(Frame::new(FrameKind::IfThen)),
+            Instruction::Block(_) => self.frames.push(Frame::new(
+                FrameKind::Block,
+                self.operator_count,
+                self.anchor,
+            )),
+            Instruction::Loop(_) => self.frames.push(Frame::new(
+                FrameKind::Loop,
+                self.operator_count,
+                self.anchor,
+            )),
+            Instruction::If(_) => {
+                self.frames.push(Frame::new(
+                    FrameKind::IfThen,
+                    self.operator_count,
+                    self.anchor,
+                ));
+                self.anchor = Some(Anchor::Arm {
+                    opener: self.operator_count,
+                    alternative: false,
+                });
+            }
             Instruction::TryTable(_, catches) => {
                 // Handler labels name enclosing frames, not the new try_table
                 // frame. Check EVERY clause before changing either the frame
@@ -432,9 +489,17 @@ impl Function {
                     };
                     self.check_branch(label);
                 }
-                self.frames.push(Frame::new(FrameKind::TryTable));
+                self.frames.push(Frame::new(
+                    FrameKind::TryTable,
+                    self.operator_count,
+                    self.anchor,
+                ));
             }
-            Instruction::Try(_) => self.frames.push(Frame::new(FrameKind::LegacyTry)),
+            Instruction::Try(_) => self.frames.push(Frame::new(
+                FrameKind::LegacyTry,
+                self.operator_count,
+                self.anchor,
+            )),
             Instruction::Catch(_) | Instruction::CatchAll => {
                 let frame = self
                     .frames
@@ -451,6 +516,7 @@ impl Function {
                 } else {
                     FrameKind::LegacyCatch
                 };
+                self.anchor = None;
             }
             Instruction::Delegate(label) => {
                 assert_eq!(
@@ -471,6 +537,7 @@ impl Function {
                 );
                 self.check_branch(*label + 1);
                 self.frames.pop();
+                self.anchor = None;
             }
             Instruction::Rethrow(label) => {
                 self.check_branch(*label);
@@ -482,9 +549,17 @@ impl Function {
                     ),
                     "wasm `rethrow` must target a live legacy catch handler"
                 );
+                for frame in &mut self.frames {
+                    frame.escaped = true;
+                }
             }
             Instruction::End => {
-                self.frames.pop();
+                if let Some(closed) = self.frames.pop() {
+                    self.rare_labels.retain(|rare| *rare != closed.identity);
+                    // Whatever entered a frame that nothing leaves early
+                    // reaches the code after it.
+                    self.anchor = closed.entry_anchor.filter(|_| !closed.escaped);
+                }
             }
             Instruction::Else => {
                 let frame = self
@@ -498,20 +573,48 @@ impl Function {
                 );
                 // Both arms share a label; only its structural state changes.
                 frame.kind = FrameKind::IfElse;
+                self.anchor = Some(Anchor::Arm {
+                    opener: frame.opener,
+                    alternative: true,
+                });
             }
-            Instruction::Br(label)
-            | Instruction::BrIf(label)
+            Instruction::Br(label) => {
+                self.check_branch(*label);
+                if self.branches_rarely_to_immediate(*label) {
+                    // Only a rare path comes to this branch.
+                    self.rarely_reached();
+                }
+                self.leaves_frames_inside(*label);
+            }
+            Instruction::BrIf(label)
             | Instruction::BrOnNull(label)
-            | Instruction::BrOnNonNull(label) => self.check_branch(*label),
+            | Instruction::BrOnNonNull(label) => {
+                self.check_branch(*label);
+                self.two_way_branch(*label);
+            }
             Instruction::BrTable(labels, default) => {
                 self.check_branch(*default);
+                self.leaves_frames_inside(*default);
                 for label in labels.iter() {
                     self.check_branch(*label);
+                    self.leaves_frames_inside(*label);
                 }
+                self.anchor = None;
             }
             Instruction::BrOnCast { relative_depth, .. }
             | Instruction::BrOnCastFail { relative_depth, .. } => {
                 self.check_branch(*relative_depth);
+                self.two_way_branch(*relative_depth);
+            }
+            Instruction::Return
+            | Instruction::ReturnCall(_)
+            | Instruction::ReturnCallRef(_)
+            | Instruction::ReturnCallIndirect { .. }
+            | Instruction::Throw(_)
+            | Instruction::ThrowRef => {
+                for frame in &mut self.frames {
+                    frame.escaped = true;
+                }
             }
             _ => {}
         }
@@ -533,6 +636,116 @@ impl Function {
             .checked_add(1)
             .expect("operator count overflow");
         self
+    }
+
+    /// Emit the conditional branch `instruction` and say that it is rarely
+    /// taken: an `if` rarely runs its consequent, a `br_if` or `br_on_*`
+    /// rarely leaves for its label. The backend lays out what only such
+    /// branches reach behind the function's other code.
+    ///
+    /// A hint always names an instruction this sink emitted as a two-way
+    /// branch: it is recorded here with the instruction, or later against
+    /// the ordinal the sink kept for it ([`Function::rarely_reached`]).
+    pub(crate) fn unlikely(&mut self, instruction: &Instruction<'_>) -> &mut Self {
+        self.hinted(false, instruction)
+    }
+
+    /// Emit the conditional branch `instruction` and say that it is nearly
+    /// always taken: an `if` rarely skips its consequent (or runs its
+    /// `else`), a `br_if` or `br_on_*` rarely falls through.
+    pub(crate) fn likely(&mut self, instruction: &Instruction<'_>) -> &mut Self {
+        self.hinted(true, instruction)
+    }
+
+    fn hinted(&mut self, likely: bool, instruction: &Instruction<'_>) -> &mut Self {
+        assert!(
+            matches!(
+                instruction,
+                Instruction::If(_)
+                    | Instruction::BrIf(_)
+                    | Instruction::BrOnNull(_)
+                    | Instruction::BrOnNonNull(_)
+                    | Instruction::BrOnCast { .. }
+                    | Instruction::BrOnCastFail { .. }
+            ),
+            "only a two-way branch takes a hint"
+        );
+        self.branch_hints.insert(self.operator_count, likely);
+        self.instruction(instruction)
+    }
+
+    /// Say that the code about to be emitted runs rarely: a throw, a fault,
+    /// a fallback. When one two-way branch decides whether control comes
+    /// here, that branch is hinted to rarely go this way, unless its emitter
+    /// already hinted it: the `if` whose arm leads here without a way out
+    /// before this place, or the branch that falls through to it. Where
+    /// several paths meet, or some leave before this place, nothing is
+    /// known of any one branch and nothing is recorded.
+    pub(crate) fn rarely_reached(&mut self) {
+        match self.anchor {
+            Some(Anchor::Arm {
+                opener,
+                alternative,
+            }) => {
+                self.branch_hints.entry(opener).or_insert(alternative);
+            }
+            Some(Anchor::Fallthrough(branch)) => {
+                self.branch_hints.entry(branch).or_insert(true);
+            }
+            None => {}
+        }
+    }
+
+    /// Say that only rare paths branch to `label`: a miss, a failed proof, a
+    /// fallback. Every two-way branch to it emitted from here on is hinted
+    /// unlikely taken, unless its emitter hints it itself; an `if` around an
+    /// unconditional branch to it asks [`Function::branches_rarely_to`].
+    pub(crate) fn rarely_taken(&mut self, label: LabelDepth) {
+        // Checks that the label is open in this body.
+        let _ = self.branch_depth_to(label);
+        if !self.rare_labels.contains(&label.identity) {
+            self.rare_labels.push(label.identity);
+        }
+    }
+
+    /// Whether `label` was declared [`Function::rarely_taken`].
+    pub(crate) fn branches_rarely_to(&self, label: LabelDepth) -> bool {
+        self.rare_labels.contains(&label.identity)
+    }
+
+    fn branches_rarely_to_immediate(&self, immediate: u32) -> bool {
+        !self.rare_labels.is_empty()
+            && self
+                .rare_labels
+                .contains(&self.frames[self.frames.len() - 1 - immediate as usize].identity)
+    }
+
+    /// The frames strictly inside the target of a branch are left by it.
+    fn leaves_frames_inside(&mut self, immediate: u32) {
+        let inside = self.frames.len() - immediate as usize;
+        for frame in &mut self.frames[inside..] {
+            frame.escaped = true;
+        }
+    }
+
+    /// Called with the operator count still that of the two-way branch
+    /// being emitted.
+    fn two_way_branch(&mut self, immediate: u32) {
+        if self.branches_rarely_to_immediate(immediate) {
+            self.branch_hints
+                .entry(self.operator_count)
+                .or_insert(false);
+        }
+        self.leaves_frames_inside(immediate);
+        self.anchor = Some(Anchor::Fallthrough(self.operator_count));
+    }
+
+    /// The hinted branches of the body so far, in operator order.
+    pub(crate) fn branch_hints(&self) -> Vec<crate::branch_hints::FunctionSite> {
+        self.branch_hints
+            .iter()
+            .map(|(operator, likely)| crate::branch_hints::FunctionSite::new(*operator, *likely))
+            .collect()
     }
 
     pub(crate) fn program_literal_count(&mut self, value: crate::gc_types::ProgramLiteralCount) {

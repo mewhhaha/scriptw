@@ -1814,6 +1814,8 @@ impl CompletionLocals {
         self.target.store(function);
     }
     pub(crate) fn set_throw(&self, value: &ValueLocals, function: &mut Function) {
+        // A Throw completion is being made.
+        function.rarely_reached();
         self.value.copy_from(value, function);
         self.set_kind(crate::emit::CompletionKind::Throw, function);
         function.instruction(&Instruction::I32Const(0));
@@ -2196,7 +2198,8 @@ impl RuntimeSchema {
         function.instruction(&Instruction::ArrayGet(
             self.array_type::<PooledStringTable>().type_index().raw(),
         ));
-        function.instruction(&Instruction::BrOnNonNull(0));
+        // Null only until the ordinal's first use.
+        function.likely(&Instruction::BrOnNonNull(0));
         let ordinal = self.reserve_i32_local(function);
         ordinal.set_constant(index.ordinal() as i32, function);
         let _ = self.resolve_pooled_string_reference(ordinal, base, function);

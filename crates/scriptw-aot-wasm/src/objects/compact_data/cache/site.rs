@@ -37,7 +37,8 @@ impl FunctionBuilder<'_> {
             s.reference_type::<OwnDataReadCache>(GcNullability::NonNullable),
         ))));
         let _ = global.load(s, f);
-        f.instruction(&Instruction::BrOnNonNull(0));
+        // Null only until the site's first use.
+        f.likely(&Instruction::BrOnNonNull(0));
         let name = s.reserve_gc_local(f).initialize(
             match key {
                 SiteKey::Literal(name) => self.emit_interned_string_reference(name, f)?,

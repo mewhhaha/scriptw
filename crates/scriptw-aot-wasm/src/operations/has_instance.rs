@@ -228,6 +228,8 @@ impl FunctionBuilder<'_> {
         source.clear(function);
         let done = self.open_frame(ControlFrameKind::Block, function);
         let slow = self.open_frame(ControlFrameKind::Block, function);
+        // A site's records answer it, or it is in its first uses.
+        self.rarely_taken(slow, function);
         self.emit_instanceof_global_answer(
             read, cell, instance, &global, &object, answer, slow, function,
         );
@@ -351,6 +353,8 @@ impl FunctionBuilder<'_> {
             } => {
                 let done = self.open_frame(ControlFrameKind::Block, function);
                 let slow = self.open_frame(ControlFrameKind::Block, function);
+                // A site's record answers it, or declines for good.
+                self.rarely_taken(slow, function);
                 self.emit_instanceof_record_answer(
                     global,
                     object,

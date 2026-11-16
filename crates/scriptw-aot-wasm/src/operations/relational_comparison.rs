@@ -77,6 +77,8 @@ impl FunctionBuilder<'_> {
         });
         predicate.store(function);
         function.instruction(&Instruction::Else);
+        // Operands that are not both Numbers go to R's complete comparison.
+        function.rarely_reached();
         let realm = self.emit_execution_realm(function);
         schema
             .call_helper(

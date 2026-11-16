@@ -135,6 +135,8 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I32Const(GLOBAL_READ_RECORD_REMAKES));
         function.instruction(&Instruction::I32LeU);
         self.open_frame(ControlFrameKind::If, function);
+        // Bounded per site: its first use and a few remakes.
+        function.rarely_reached();
         let key = schema
             .reserve_gc_local::<StringValue, NonNullable>(function)
             .initialize(

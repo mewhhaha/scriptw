@@ -535,6 +535,8 @@ impl FunctionBuilder<'_> {
         error: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        // A ReferenceError or TypeError is being thrown.
+        function.rarely_reached();
         let (name, message) = match failure {
             GlobalBindingFailure::BeforeInitialization => (
                 NativeErrorKind::ReferenceError,

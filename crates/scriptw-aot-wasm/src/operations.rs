@@ -1142,7 +1142,8 @@ impl<'a> FunctionBuilder<'a> {
         value.tag().load(function);
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::BigInt as i32));
         function.instruction(&Instruction::I32Eq);
-        function.instruction(&Instruction::If(BlockType::Result(ValType::I32)));
+        // Of the types a value can have, BigInt is the unusual one.
+        function.unlikely(&Instruction::If(BlockType::Result(ValType::I32)));
         let bigint_slot = schema.reserve_gc_local(function);
         let bigint = bigint_slot.initialize(
             value.cast_reference::<BigIntValue>(schema, function),
@@ -2473,6 +2474,8 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::BigInt as i32));
         function.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, function);
+        // Of the types a value can have, BigInt is the unusual one.
+        function.rarely_reached();
         if allow_bigint {
             let bigint = schema.reserve_gc_local(function).initialize(
                 value.cast_reference::<BigIntValue>(schema, function),
@@ -2701,6 +2704,8 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::BigInt as i32));
         function.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, function);
+        // Of the types a value can have, BigInt is the unusual one.
+        function.rarely_reached();
         result.set_normal(input, function);
         function.instruction(&Instruction::Else);
         input.tag().load(function);
@@ -4567,6 +4572,8 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::BigInt as i32));
         function.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, function);
+        // Of the types a value can have, BigInt is the unusual one.
+        function.rarely_reached();
         let bigint = schema.reserve_gc_local(function).initialize(
             value.cast_reference::<BigIntValue>(schema, function),
             function,
@@ -6575,7 +6582,8 @@ impl<'a> FunctionBuilder<'a> {
         left.tag().load(function);
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::BigInt as i32));
         function.instruction(&Instruction::I32Eq);
-        function.instruction(&Instruction::If(BlockType::Result(ValType::I32)));
+        // Of an operator's operand types, BigInt is the unusual one.
+        function.unlikely(&Instruction::If(BlockType::Result(ValType::I32)));
         let left_bigint_slot = schema.reserve_gc_local(function);
         let left_bigint = left_bigint_slot.initialize(
             left.cast_reference::<BigIntValue>(schema, function),

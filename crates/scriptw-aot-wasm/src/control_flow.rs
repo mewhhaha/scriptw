@@ -742,6 +742,8 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     pub(crate) fn emit_propagate_current_throw(&self, function: &mut Function) {
+        // The current completion is a Throw on its way to its handler.
+        function.rarely_reached();
         if let Some(target) = self.active_throw_target() {
             self.emit_retire_abandoned_identifier_references(function);
             self.emit_branch_to_target(target, function);
@@ -1033,9 +1035,19 @@ impl<'a> FunctionBuilder<'a> {
 
         // The `If` opened here used to need an `extra_depth + 1` on the branch
         // inside it. The sink counts it, so the compensation is gone.
-        function.instruction(&Instruction::If(BlockType::Empty));
+        if function.branches_rarely_to(target.label) {
+            function.unlikely(&Instruction::If(BlockType::Empty));
+        } else {
+            function.instruction(&Instruction::If(BlockType::Empty));
+        }
         self.emit_branch_to_target(target, function);
         function.instruction(&Instruction::End);
+    }
+
+    /// Declares that only rare paths branch to `target`: see
+    /// `code_sink::Function::rarely_taken`.
+    pub(crate) fn rarely_taken(&self, target: ControlTarget, function: &mut Function) {
+        function.rarely_taken(target.label);
     }
 
     /// The label of a target reached without unwinding anything, for the
@@ -3146,6 +3158,9 @@ impl<'a> FunctionBuilder<'a> {
                 None => self.compile_labelled_statement(labels, statement, function)?,
             },
             StatementIr::Throw(value) => {
+                // The arm of an `if` that comes to a `throw` statement is
+                // taken to be the unusual one.
+                function.rarely_reached();
                 let thrown = self.runtime_schema().reserve_value_local(function);
                 self.compile_expr_to_value(value, &thrown, function)?;
                 self.emit_propagate_current_throw_if_needed(function);

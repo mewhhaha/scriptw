@@ -51,8 +51,12 @@ impl Reencode for Encoder<'_> {
         module: &mut wasm_encoder::Module,
         section: wasmparser::CustomSectionReader<'_>,
     ) -> Result<(), reencode::Error<String>> {
+        // The template's bodies are re-encoded with other operators, so the
+        // hints, which name byte offsets of the original bodies, do not
+        // describe them. They are advice on code placement only.
         if section.name() == crate::program_literal_operands::SECTION_NAME
             || section.name() == crate::native_program_contexts::SECTION_NAME
+            || section.name() == crate::branch_hints::SECTION_NAME
         {
             return Ok(());
         }

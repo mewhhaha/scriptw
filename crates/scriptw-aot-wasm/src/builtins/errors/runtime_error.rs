@@ -277,6 +277,8 @@ impl FunctionBuilder<'_> {
         result: &CompletionLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        // A native error is being thrown.
+        function.rarely_reached();
         let schema = self.runtime_schema();
         let realm = self.emit_execution_realm(function);
         let prototype = schema.reserve_value_local(function);
@@ -324,6 +326,8 @@ impl FunctionBuilder<'_> {
         result: &CompletionLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        // A native error is being thrown.
+        function.rarely_reached();
         let schema = self.runtime_schema();
         let message = schema.reserve_gc_local(function).initialize(
             self.emit_runtime_error_message_reference(message, function)?,
@@ -395,6 +399,8 @@ impl FunctionBuilder<'_> {
         result: &CompletionLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        // A native error is being thrown.
+        function.rarely_reached();
         let schema = self.runtime_schema();
         let header = schema.reserve_gc_local(function).initialize(
             self.emit_alloc_plain_object_with_prototype(Some(prototype), function)?,

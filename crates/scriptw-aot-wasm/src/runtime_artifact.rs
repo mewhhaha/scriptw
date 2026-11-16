@@ -136,7 +136,9 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 75 adds four leaf R helpers over code units and bytes (ASCII
 // narrowing and widening, a code-unit find and JSON's plain run) and gives
 // the JSON.stringify value helper a `fetched` operand.
-const LAYOUT_VERSION: u32 = 75;
+// Version 76 gives R and P a branch hinting section, which the engine's
+// required configuration now reads; helpers, types and globals are unchanged.
+const LAYOUT_VERSION: u32 = 76;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

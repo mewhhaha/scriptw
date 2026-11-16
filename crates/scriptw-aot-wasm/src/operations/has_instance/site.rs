@@ -38,7 +38,8 @@ impl FunctionBuilder<'_> {
             s.reference_type::<InstanceofSiteRecord>(GcNullability::NonNullable),
         ))));
         let _ = global.load(s, f);
-        f.instruction(&Instruction::BrOnNonNull(0));
+        // Null only until the site's first use.
+        f.likely(&Instruction::BrOnNonNull(0));
         let realm = self.emit_execution_realm(f);
         let made = s.helper_reference_on_stack(s.call_helper(
             InstanceofRecordArguments::new(
@@ -154,6 +155,8 @@ impl FunctionBuilder<'_> {
         let s = self.runtime_schema();
         cell.load(s, f).is_null(f);
         self.open_frame(ControlFrameKind::If, f);
+        // Until the cell is kept, on one of the site's first uses.
+        f.rarely_reached();
         let skip = self.open_frame(ControlFrameKind::Block, f);
         let label = self.local_branch_label(skip);
         let made = s

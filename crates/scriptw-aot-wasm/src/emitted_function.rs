@@ -351,6 +351,7 @@ pub(crate) struct EmittedFunction {
     /// keeps attribution bound to the exact encoded body.
     raw_body: Vec<u8>,
     literal_operands: Vec<crate::program_literal_operands::FunctionSite>,
+    branch_hints: Vec<crate::branch_hints::FunctionSite>,
     native_program_context: Option<crate::native_program_contexts::FunctionContext>,
     body_bytes: FunctionBodySize,
     declared_locals: FunctionLocalCount,
@@ -413,6 +414,7 @@ impl EmittedFunction {
         // happened to compile it.
         let declared_locals = FunctionLocalCount::of(&body);
         let literal_operands = body.literal_operands().to_vec();
+        let branch_hints = body.branch_hints();
         let native_program_context = body.native_program_context();
         let raw_body = body.into_body_named(&identity.wasm_name()).into_raw_body();
         let body_bytes = FunctionBodySize::of(&raw_body);
@@ -421,6 +423,7 @@ impl EmittedFunction {
             identity,
             raw_body,
             literal_operands,
+            branch_hints,
             native_program_context,
             body_bytes,
             declared_locals,
@@ -448,6 +451,7 @@ pub(crate) struct ModuleCode {
     section: CodeSection,
     records: Vec<EmittedFunctionRecord>,
     literal_operands: Vec<crate::program_literal_operands::ModuleSite>,
+    branch_hints: Vec<crate::branch_hints::BodySites>,
     native_program_contexts: Vec<crate::native_program_contexts::ModuleContext>,
     type_indices: Vec<u32>,
     next_wasm_index: u32,
@@ -463,6 +467,7 @@ impl ModuleCode {
             section: CodeSection::new(),
             records: Vec::new(),
             literal_operands: Vec::new(),
+            branch_hints: Vec::new(),
             native_program_contexts: Vec::new(),
             type_indices: Vec::new(),
             next_wasm_index: first_wasm_index,
@@ -505,6 +510,11 @@ impl ModuleCode {
                 .into_iter()
                 .map(|site| crate::program_literal_operands::ModuleSite::new(body, site)),
         );
+        self.branch_hints
+            .extend(crate::branch_hints::BodySites::new(
+                body,
+                function.branch_hints,
+            ));
         self.records.push(EmittedFunctionRecord {
             wasm_index,
             identity: function.identity,
@@ -520,6 +530,7 @@ impl ModuleCode {
             ModuleFunctionTable {
                 records: self.records,
                 literal_operands: self.literal_operands,
+                branch_hints: self.branch_hints,
                 native_program_contexts: self.native_program_contexts,
                 type_indices: self.type_indices,
             },
@@ -532,11 +543,19 @@ impl ModuleCode {
 pub(crate) struct ModuleFunctionTable {
     records: Vec<EmittedFunctionRecord>,
     literal_operands: Vec<crate::program_literal_operands::ModuleSite>,
+    branch_hints: Vec<crate::branch_hints::BodySites>,
     native_program_contexts: Vec<crate::native_program_contexts::ModuleContext>,
     type_indices: Vec<u32>,
 }
 
 impl ModuleFunctionTable {
+    /// The finished module `bytes` with its branch hinting section. Bodies
+    /// and their order are those of this table; the hints are bound to the
+    /// operators of these exact bytes.
+    pub(crate) fn with_branch_hints(&self, bytes: Vec<u8>) -> Result<Vec<u8>, EmitError> {
+        crate::branch_hints::insert(bytes, &self.branch_hints)
+    }
+
     /// Import compaction preserves every body/local but may shorten structural
     /// LEB operands. Bind attribution to the actual final body bytes and indices.
     pub(crate) fn remeasure_reencoded(

@@ -140,6 +140,8 @@ impl FunctionBuilder<'_> {
         result.value().set_number(result.value().scalar(), function);
         result.set_normal(result.value(), function);
         function.instruction(&Instruction::Else);
+        // Operands that are not both Numbers go to R's complete addition.
+        function.rarely_reached();
         let realm = self.emit_execution_realm(function);
         self.runtime_schema()
             .call_helper(

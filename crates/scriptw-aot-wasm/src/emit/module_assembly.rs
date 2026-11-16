@@ -2074,6 +2074,8 @@ fn emit_script_module_with_factory(
         ModuleKind::Program(_) => crate::program_imports::compact(bytes, &mut function_table)?,
         ModuleKind::Standalone(_) | ModuleKind::Runtime(_) => bytes,
     };
+    // Compaction re-encodes bodies; the hints name offsets of the final ones.
+    let bytes = function_table.with_branch_hints(bytes)?;
     let mut attribution = Vec::new();
     let function_sizes = metadata::append_function_attribution(&mut attribution, &function_table);
     debug_dump.splice(attribution_position..attribution_position, attribution);
