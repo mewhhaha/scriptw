@@ -93,7 +93,7 @@ use itertools::Itertools;
 use smallvec::{SmallVec, ToSmallVec};
 use std::collections::{HashMap, hash_map};
 use std::vec::Vec;
-use wasmparser::{FuncValidator, MemArg, Operator, WasmModuleResources};
+use wasmparser::{BranchHint, FuncValidator, MemArg, Operator, WasmModuleResources};
 use wasmtime_environ::{
     DataIndex, ElemIndex, FuncIndex, GlobalIndex, MemoryIndex, TableIndex, TagIndex, TypeConvert,
     TypeIndex, WasmHeapType, WasmRefType, WasmResult, WasmValType, wasm_unsupported,
@@ -2679,6 +2679,7 @@ pub fn translate_operator(
         }
 
         Operator::BrOnNull { relative_depth } => {
+            let branch_hint = environ.take_branch_hint(builder.srcloc().bits() as usize);
             let r = environ.stacks.pop1();
             let &[.., WasmValType::Ref(r_ty)] = operand_types else {
                 unreachable!("validation")
@@ -2686,14 +2687,15 @@ pub fn translate_operator(
             let is_null = environ.translate_ref_is_null(builder.cursor(), r, r_ty)?;
             let (br_destination, inputs) = translate_br_if_args(*relative_depth, environ);
             let else_block = builder.create_block();
-            canonicalise_brif(
+            conditional_branch(
                 environ,
                 builder,
                 is_null,
+                true,
                 br_destination,
                 &inputs,
                 else_block,
-                &[],
+                branch_hint,
             );
 
             builder.seal_block(else_block); // The only predecessor is the current block.
@@ -2709,6 +2711,7 @@ pub fn translate_operator(
             // Peek the value val from the stack.
             // If val is ref.null ht, then: pop the value val from the stack.
             // Else: Execute the instruction (br relative_depth).
+            let branch_hint = environ.take_branch_hint(builder.srcloc().bits() as usize);
             let r = environ.stacks.peek1();
             let [.., WasmValType::Ref(r_ty)] = operand_types else {
                 unreachable!("validation")
@@ -2717,14 +2720,15 @@ pub fn translate_operator(
             let (br_destination, inputs) = translate_br_if_args(*relative_depth, environ);
             let is_null = environ.translate_ref_is_null(builder.cursor(), r, r_ty)?;
             let else_block = builder.create_block();
-            canonicalise_brif(
+            conditional_branch(
                 environ,
                 builder,
                 is_null,
-                else_block,
-                &[],
+                false,
                 br_destination,
                 &inputs,
+                else_block,
+                branch_hint,
             );
 
             // In the null case, pop the ref
@@ -3119,6 +3123,7 @@ pub fn translate_operator(
             to_ref_type,
             from_ref_type: _,
         } => {
+            let branch_hint = environ.take_branch_hint(builder.srcloc().bits() as usize);
             let r = environ.stacks.peek1();
             let [.., WasmValType::Ref(r_ty)] = operand_types else {
                 unreachable!("validation")
@@ -3128,18 +3133,18 @@ pub fn translate_operator(
             let cast_is_okay = environ.translate_ref_test(builder, to_ref_type, r, *r_ty)?;
 
             let (cast_succeeds_block, inputs) = translate_br_if_args(*relative_depth, environ);
+            // NB: the `cast_fails_block` is dominated by the current block,
+            // and therefore doesn't need any block params.
             let cast_fails_block = builder.create_block();
-            canonicalise_brif(
+            conditional_branch(
                 environ,
                 builder,
                 cast_is_okay,
+                true,
                 cast_succeeds_block,
                 &inputs,
                 cast_fails_block,
-                &[
-                    // NB: the `cast_fails_block` is dominated by the current
-                    // block, and therefore doesn't need any block params.
-                ],
+                branch_hint,
             );
 
             // The only predecessor is the current block.
@@ -3154,6 +3159,7 @@ pub fn translate_operator(
             to_ref_type,
             from_ref_type: _,
         } => {
+            let branch_hint = environ.take_branch_hint(builder.srcloc().bits() as usize);
             let r = environ.stacks.peek1();
             let [.., WasmValType::Ref(r_ty)] = operand_types else {
                 unreachable!("validation")
@@ -3163,18 +3169,18 @@ pub fn translate_operator(
             let cast_is_okay = environ.translate_ref_test(builder, to_ref_type, r, *r_ty)?;
 
             let (cast_fails_block, inputs) = translate_br_if_args(*relative_depth, environ);
+            // NB: the `cast_succeeds_block` is dominated by the current
+            // block, and therefore doesn't need any block params.
             let cast_succeeds_block = builder.create_block();
-            canonicalise_brif(
+            conditional_branch(
                 environ,
                 builder,
                 cast_is_okay,
-                cast_succeeds_block,
-                &[
-                    // NB: the `cast_succeeds_block` is dominated by the current
-                    // block, and therefore doesn't need any block params.
-                ],
+                false,
                 cast_fails_block,
                 &inputs,
+                cast_succeeds_block,
+                branch_hint,
             );
 
             // The only predecessor is the current block.
@@ -4108,20 +4114,76 @@ fn translate_br_if(
     let val = env.stacks.pop1();
     let (br_destination, inputs) = translate_br_if_args(relative_depth, env);
     let next_block = builder.create_block();
-
-    if let Some(hint) = branch_hint {
-        // Likely taken => the fallthrough is cold, else the branch target is.
-        builder.set_cold_block(if hint.taken {
-            next_block
-        } else {
-            br_destination
-        });
-    }
-
-    canonicalise_brif(env, builder, val, br_destination, &inputs, next_block, &[]);
+    conditional_branch(
+        env,
+        builder,
+        val,
+        true,
+        br_destination,
+        &inputs,
+        next_block,
+        branch_hint,
+    );
 
     builder.seal_block(next_block); // The only predecessor is the current block.
     builder.switch_to_block(next_block);
+}
+
+/// End the current block with a Wasm conditional branch: to `target` with
+/// `inputs` when `condition` is nonzero (`when_nonzero`) or when it is zero,
+/// and to `fallthrough`, a new block that only this branch enters, otherwise.
+///
+/// A branch hint places the unlikely side behind the function's other code
+/// (see `func_environ::cold_paths`). When the branch is likely taken, that
+/// side is `fallthrough`, which is marked cold. When it is unlikely taken,
+/// the unlikely side is the edge to `target`, not `target` itself: likely
+/// paths may reach the end of the same Wasm block. The branch then enters a
+/// cold block of its own that only jumps to `target`, so that `target` is
+/// cold exactly when every edge into it comes from cold code.
+///
+/// The hint is read at `if` and `br_if`, as the branch hinting proposal
+/// defines, and also at `br_on_null`, `br_on_non_null`, `br_on_cast` and
+/// `br_on_cast_fail`, with the same meaning: the value says whether the
+/// branch is likely taken.
+fn conditional_branch(
+    environ: &FuncEnvironment<'_>,
+    builder: &mut FunctionBuilder,
+    condition: ir::Value,
+    when_nonzero: bool,
+    target: ir::Block,
+    inputs: &[ir::Value],
+    fallthrough: ir::Block,
+    hint: Option<BranchHint>,
+) {
+    let mut canonicalised = SmallVec::<[_; 16]>::new();
+    let canonicalised = canonicalise_v128_values(&mut canonicalised, builder, inputs);
+    // The target's parameters are variables, defined here for both the
+    // direct edge and the one through a cold block.
+    set_block_params(environ, builder, target, canonicalised);
+
+    let unlikely_edge = match hint {
+        Some(hint) if hint.taken => {
+            builder.set_cold_block(fallthrough);
+            None
+        }
+        Some(_) => {
+            let edge = builder.create_block();
+            builder.set_cold_block(edge);
+            Some(edge)
+        }
+        None => None,
+    };
+    let taken = unlikely_edge.unwrap_or(target);
+    if when_nonzero {
+        builder.ins().brif(condition, taken, &[], fallthrough, &[]);
+    } else {
+        builder.ins().brif(condition, fallthrough, &[], taken, &[]);
+    }
+    if let Some(edge) = unlikely_edge {
+        builder.seal_block(edge); // The only predecessor is the branch above.
+        builder.switch_to_block(edge);
+        builder.ins().jump(target, &[]);
+    }
 }
 
 fn translate_br_if_args(

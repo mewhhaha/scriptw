@@ -9,6 +9,10 @@
 //! be wrong: a check that only one path made, a reference that a moving
 //! collection replaced while the function was in a call, and values at and
 //! around the ends of a run.
+//!
+//! The last probe checks placement instead: the product configuration reads
+//! the branch hinting section, and what a hinted branch rarely reaches is
+//! laid out behind the function's other code.
 use scriptw_engine::configure_wasm_runtime;
 use wasmtime::{AnyRef, Caller, Config, Func, Instance, Module, Rooted, Store, Trap, Val};
 
@@ -664,5 +668,255 @@ fn a_read_of_an_uninhabited_field_still_checks_its_reference() {
             Some(Trap::NullReference),
             "{name}: {error:?}"
         );
+    }
+}
+
+fn signed_leb(mut value: i64, bytes: &mut Vec<u8>) {
+    loop {
+        let byte = (value & 0x7f) as u8;
+        value >>= 7;
+        let done = (value == 0 && byte & 0x40 == 0) || (value == -1 && byte & 0x40 != 0);
+        bytes.push(if done { byte } else { byte | 0x80 });
+        if done {
+            return;
+        }
+    }
+}
+
+/// `local.get 1; i32.const marker; i32.xor`: code that holds `marker` as an
+/// immediate, so that its place in the native code can be found.
+fn marked(marker: i32) -> Vec<u8> {
+    let mut code = vec![0x20, 0x01, 0x41];
+    signed_leb(i64::from(marker), &mut code);
+    code.push(0x73);
+    code
+}
+
+/// A two-way branch of each hinted kind, each with a marker on both sides:
+/// with the branch hinted unlikely taken (`likely` false) the first marker
+/// of its pair is in the code the hint calls rare, with the opposite hint
+/// the second is. The last function's `if` is always hinted unlikely and
+/// holds a nested `if`, whose arms are rare with it.
+const HINTED_PAIRS: [(i32, i32); 6] = [
+    (0x5a10_3701, 0x5a10_3702), // if: consequent, alternative
+    (0x5a10_3703, 0x5a10_3704), // br_if: its label, the fallthrough
+    (0x5a10_3705, 0x5a10_3706), // br_on_non_null
+    (0x5a10_3707, 0x5a10_3708), // br_on_null
+    (0x5a10_3709, 0x5a10_370a), // br_on_cast
+    (0x5a10_370b, 0x5a10_370c), // br_on_cast_fail
+];
+const RARE_NESTED: [i32; 2] = [0x5a10_370d, 0x5a10_370e];
+const AFTER_RARE: i32 = 0x5a10_370f;
+
+fn hinted_bytes(likely: bool) -> Vec<u8> {
+    let mut module = b"\0asm\x01\0\0\0".to_vec();
+    section(
+        &mut module,
+        1,
+        3,
+        &[
+            0x60, 2, 0x7f, 0x7f, 1, 0x7f, // 0: (i32, i32) -> i32
+            0x60, 2, 0x6e, 0x7f, 1, 0x7f, // 1: (anyref, i32) -> i32
+            0x5f, 1, 0x7f, 0, // 2: $s
+        ],
+    );
+    section(&mut module, 3, 7, &[0, 0, 1, 1, 1, 1, 0]);
+
+    // Each body declares one further `i32` local, local 2; `body` writes
+    // that declaration in three bytes, which precede the code.
+    const DECLARATION: usize = 3;
+    let mut code = Vec::new();
+    let mut hints = Vec::new();
+    let mut function = |instructions: &[&[u8]], hinted: usize, likely: bool| {
+        let offset = DECLARATION
+            + instructions[..hinted]
+                .iter()
+                .map(|i| i.len())
+                .sum::<usize>();
+        hints.push((offset as u32, likely));
+        code.extend(body(1, &instructions.concat()));
+    };
+    let [(then, otherwise), (label, fallthrough), (non_null, null), (is_null, not_null), (cast, not_cast), (failed, passed)] =
+        HINTED_PAIRS.map(|(rare, usual)| (marked(rare), marked(usual)));
+    const RETURN: &[u8] = &[0x0f];
+    const END: &[u8] = &[0x0b];
+    const DROP: &[u8] = &[0x1a];
+    const GET_0: &[u8] = &[0x20, 0x00];
+    const SET_2: &[u8] = &[0x21, 0x02];
+    // `if (result i32) .. else .. end`
+    function(
+        &[GET_0, &[0x04, 0x7f], &then, &[0x05], &otherwise, END],
+        1,
+        likely,
+    );
+    // `block $done block $slow .. br_if $slow .. br $done end .. end local.get 2`
+    function(
+        &[
+            &[0x02, 0x40, 0x02, 0x40],
+            GET_0,
+            &[0x0d, 0x00],
+            &fallthrough,
+            SET_2,
+            &[0x0c, 0x01],
+            END,
+            &label,
+            SET_2,
+            END,
+            &[0x20, 0x02],
+        ],
+        2,
+        likely,
+    );
+    // `block (result (ref any)) local.get 0 br_on_non_null 0 .. return end drop ..`
+    function(
+        &[
+            &[0x02, 0x64, 0x6e],
+            GET_0,
+            &[0xd6, 0x00],
+            &null,
+            RETURN,
+            END,
+            DROP,
+            &non_null,
+        ],
+        2,
+        likely,
+    );
+    // `block local.get 0 br_on_null 0 drop .. return end ..`
+    function(
+        &[
+            &[0x02, 0x40],
+            GET_0,
+            &[0xd5, 0x00],
+            DROP,
+            &not_null,
+            RETURN,
+            END,
+            &is_null,
+        ],
+        2,
+        likely,
+    );
+    // `block (result (ref $s)) local.get 0 br_on_cast 0 anyref (ref $s) drop .. return end drop ..`
+    function(
+        &[
+            &[0x02, 0x64, 0x02],
+            GET_0,
+            &[0xfb, 0x18, 0x01, 0x00, 0x6e, 0x02],
+            DROP,
+            &not_cast,
+            RETURN,
+            END,
+            DROP,
+            &cast,
+        ],
+        2,
+        likely,
+    );
+    // `block (result anyref) local.get 0 br_on_cast_fail 0 anyref (ref $s) drop .. return end drop ..`
+    function(
+        &[
+            &[0x02, 0x6e],
+            GET_0,
+            &[0xfb, 0x19, 0x01, 0x00, 0x6e, 0x02],
+            DROP,
+            &passed,
+            RETURN,
+            END,
+            DROP,
+            &failed,
+        ],
+        2,
+        likely,
+    );
+    // `local.get 0 if local.get 1 if (result i32) .. else .. end local.set 2 end local.get 2 ..`
+    function(
+        &[
+            GET_0,
+            &[0x04, 0x40, 0x20, 0x01, 0x04, 0x7f],
+            &marked(RARE_NESTED[0]),
+            &[0x05],
+            &marked(RARE_NESTED[1]),
+            END,
+            SET_2,
+            END,
+            &[0x20, 0x02, 0x1a],
+            &marked(AFTER_RARE),
+        ],
+        1,
+        false,
+    );
+
+    // `metadata.code.branch_hint`: per function its index and its hints,
+    // each a body offset, the size 1 and whether the branch is likely taken.
+    let name = b"metadata.code.branch_hint";
+    let mut custom = vec![name.len() as u8];
+    custom.extend_from_slice(name);
+    leb(hints.len() as u32, &mut custom);
+    for (index, (offset, likely)) in hints.iter().enumerate() {
+        leb(index as u32, &mut custom);
+        custom.push(1);
+        leb(*offset, &mut custom);
+        custom.extend_from_slice(&[1, u8::from(*likely)]);
+    }
+    module.push(0);
+    leb(custom.len() as u32, &mut module);
+    module.extend_from_slice(&custom);
+    section(&mut module, 10, 7, &code);
+    module
+}
+
+/// The branch hinting section reaches the native code of the product
+/// configuration: a branch hinted either way puts the side the hint calls
+/// rare behind the other, for `if`, `br_if` and the four `br_on_*` forms,
+/// under both compilation policies and when precompiled, and the blocks
+/// inside a rare arm go with it.
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn a_hinted_branch_lays_its_rare_side_out_behind_the_other() {
+    for speed in [false, true] {
+        let mut config = Config::new();
+        configure_wasm_runtime(&mut config);
+        if speed {
+            config.cranelift_opt_level(wasmtime::OptLevel::Speed);
+            config.cranelift_regalloc_algorithm(wasmtime::RegallocAlgorithm::Backtracking);
+        }
+        let engine = wasmtime::Engine::new(&config).unwrap();
+        let place = |module: &Module, marker: i32| -> usize {
+            let text = module.text();
+            let found: Vec<usize> = text
+                .windows(4)
+                .enumerate()
+                .filter(|(_, window)| *window == marker.to_le_bytes())
+                .map(|(at, _)| at)
+                .collect();
+            assert_eq!(found.len(), 1, "marker {marker:#x} in the native code");
+            found[0]
+        };
+        let unlikely = Module::new(&engine, hinted_bytes(false)).unwrap();
+        let likely = Module::new(&engine, hinted_bytes(true)).unwrap();
+        // A precompiled module is the same code.
+        let precompiled = engine.precompile_module(&hinted_bytes(false)).unwrap();
+        // SAFETY: the bytes are this engine's own output, unmodified.
+        let loaded = unsafe { Module::deserialize(&engine, &precompiled) }.unwrap();
+        assert_eq!(loaded.text(), unlikely.text(), "speed {speed}");
+        for (rare_when_unlikely, rare_when_likely) in HINTED_PAIRS {
+            assert!(
+                place(&unlikely, rare_when_unlikely) > place(&unlikely, rare_when_likely),
+                "speed {speed}: {rare_when_unlikely:#x} is behind when its branch is unlikely"
+            );
+            assert!(
+                place(&likely, rare_when_likely) > place(&likely, rare_when_unlikely),
+                "speed {speed}: {rare_when_likely:#x} is behind when the branch is likely"
+            );
+        }
+        for module in [&unlikely, &likely] {
+            for nested in RARE_NESTED {
+                assert!(
+                    place(module, nested) > place(module, AFTER_RARE),
+                    "speed {speed}: {nested:#x} is inside a rare arm"
+                );
+            }
+        }
     }
 }

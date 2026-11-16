@@ -103,6 +103,9 @@ pub(super) fn translate_read_interned_func_ref(
 
     builder.switch_to_block(slow_block);
     builder.seal_block(slow_block);
+    // An id outside the published table or an entry of another type: the
+    // libcall answers, out of line.
+    builder.set_cold_block(slow_block);
     let vmctx = func_env.vmctx_val(&mut builder.cursor());
     let get_interned_func_ref = func_env
         .builtin_functions

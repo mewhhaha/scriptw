@@ -110,6 +110,11 @@ impl WasmtimeRuntimePolicy {
         config.wasm_gc(true);
         config.wasm_exceptions(true);
         config.wasm_tail_call(true);
+        // P and R name their unlikely branches in the branch hinting section;
+        // the translation lays out what those reach behind each function's
+        // other code. It changes no behavior, and an engine without it loads
+        // the same native code.
+        config.wasm_branch_hinting(true);
 
         match self.gc {
             WasmGcCapability::CopyingWithCycleCollection => {

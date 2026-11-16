@@ -1,4 +1,5 @@
 mod branch_threading;
+mod cold_paths;
 mod gc;
 mod set_tests;
 pub(crate) mod stack_switching;

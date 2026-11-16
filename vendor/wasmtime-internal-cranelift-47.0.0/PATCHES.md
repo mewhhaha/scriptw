@@ -11,9 +11,10 @@ versions, target/ISA settings and generated machine-code policy are unchanged.
 
 The idle scratch policy modifies `src/compiler.rs`; the added private
 `src/compiler/context_pool.rs` and its tests own it. The translation changes
-below modify `src/func_environ{.rs,/gc.rs}` and `src/translate/`; the last
-section adds `src/func_environ/gc/{base_home,frame_reloads}.rs` and
-`src/func_environ/{branch_threading,set_tests}.rs`.
+below modify `src/func_environ{.rs,/gc.rs}` and `src/translate/`; the section
+before the last adds `src/func_environ/gc/{base_home,frame_reloads}.rs` and
+`src/func_environ/{branch_threading,set_tests}.rs`, and the last adds
+`src/func_environ/cold_paths.rs`.
 Registry installation markers were omitted; all other release files are kept.
 The license text is unchanged; its trailing empty line is normalized.
 
@@ -341,3 +342,83 @@ top of the range, chains that start from their identity or complete a gap,
 inequalities, and the combinations that must stay as written), each verified
 by Cranelift's verifier; the engine probes above call such chains with values
 at and around the ends of each run.
+
+## Unlikely code behind the likely code
+
+`src/translate/code_translator.rs`, `src/func_environ/{cold_paths.rs,gc.rs,
+gc/copying.rs}`, `src/func_environ.rs`. These change where a function's
+blocks are emitted and nothing else: the mark they set (`Layout::set_cold`)
+is read by the backend's block ordering alone. No instruction, value, edge,
+trap, stack map or exception table depends on it, the verifier requires only
+that the entry block is not cold, and no pass below marks it. A module
+compiled with them computes what it computed before, and loads into an engine
+configured either way (upstream already excludes `branch_hinting` from the
+artifact compatibility check).
+
+Upstream reads the Wasm branch hinting section (`metadata.code.branch_hint`,
+behind `Config::wasm_branch_hinting`, which the product configuration now
+turns on) at `if` and `br_if` and marks one block cold per hint. A throwaway
+probe on the product configuration, before these changes, found: a hint
+moves the marked block behind the function's other code under
+`None`/`SinglePass`, `Speed`/`Backtracking` and `SpeedAndSize`/`Backtracking`,
+identically for a module compiled directly and one precompiled and loaded;
+the hint's offset is the byte offset of the instruction's opcode from the
+start of the body's local declarations, and one byte off is no hint; the
+section is honored before or after the code section; and with the feature
+off nothing moves. Three things were missing for the emitter's use.
+
+- **The edge, not the target, of an unlikely branch**
+  (`conditional_branch`). For a `br_if` hinted unlikely taken, upstream marks
+  the branch's destination cold. That is the block after a Wasm `block`,
+  which the likely path usually reaches too, by falling out of the block or
+  by another branch; Cranelift then emits it, and with the pass below all
+  code it alone leads to, at the end of the function. The branch now enters a
+  cold block of its own that only jumps to the destination. The destination's
+  parameters are `Variable`s defined before the branch, as for the direct
+  edge, so the jump carries nothing; the new block has the branch as its only
+  predecessor and is sealed at once. A hint that the branch is likely taken
+  marks the fallthrough block cold, as upstream does. `if` is unchanged: each
+  arm starts in a block only the `if` enters.
+- **Hints at `br_on_null`, `br_on_non_null`, `br_on_cast` and
+  `br_on_cast_fail`.** The proposal defines hints for `if` and `br_if`; the
+  section's records name only a byte offset, so the same record is read at
+  these four instructions with the same meaning (whether the branch is
+  likely taken) and translated by the same function. A consumer that follows
+  the proposal alone never looks up those offsets.
+- **What an unlikely block leads to** (`cold_paths::spread`, last in
+  `place_frame_loads`). Cranelift moves exactly the blocks that are marked.
+  The rest of a slow path, the blocks after its first branch or call
+  continuation, the loop of a growth path, the block where two unlikely
+  edges meet, stayed between the likely code. After translation and the
+  passes above, every block that no path of unmarked blocks reaches from the
+  entry is marked too. A block that a likely path reaches is never marked,
+  so a slow path ends where it rejoins. Exception edges count as edges: a
+  handler that a likely `try_call` names stays where it is.
+
+Two slow blocks of the translation itself are now marked: the
+`get_interned_func_ref` libcall behind the inline interned funcref read
+(`gc/copying.rs`), and the `is_subtype` libcall behind the type-id equality
+test of `ref.test` and the casts (`gc.rs`). The allocation slow path, the
+write barrier's recording blocks and traps were marked already.
+
+Measured on one retained React Server Components request (sync, median of
+97, Valgrind with the machine's first-level caches) together with the
+emitter's hints: instructions 3,072,705 to 3,072,105, simulated instruction
+fetch misses 150,155 to 144,126. The executed code of the largest compiled
+body went from 434 separate runs on 1,182 cache lines to 310 on 1,089.
+
+Costs: a branch that is hinted unlikely and is taken after all pays a jump
+to the end of the function and one back, and its code is far from the code
+around it. An unlikely `br_if` adds one block and one jump to the CLIF; the
+backend emits the jump only when the block is not empty after register
+allocation's edge moves, which otherwise went on the same edge. `spread` is
+one traversal of the function's blocks, skipped when nothing is marked.
+
+Tests: `func_environ::cold_paths::tests::` (no mark, the blocks of a slow
+path and the join after it, a fallback that only cold edges reach, a block a
+likely edge also reaches, loops inside and around a slow path), each verified
+by Cranelift's verifier; `crates/scriptw-engine/tests/aot_gc_entries/aot_gc_translation_probes.rs`
+compiles a hinted branch of each of the six kinds both ways on the product
+configuration, under the Fast and Speed policies, directly and precompiled,
+and finds the rare side behind the other in the native code, and the two
+arms of an `if` nested in a rare arm with it.

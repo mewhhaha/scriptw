@@ -1930,7 +1930,8 @@ impl FuncEnvironment<'_> {
     /// (`base_home`), and keep, of the loads of GC references from their
     /// stack-map slots and of the GC heap base and the `vmctx` from their
     /// homes, one after a call instead of one at every use
-    /// (`frame_reloads`).
+    /// (`frame_reloads`). Last, mark the blocks that only unlikely code
+    /// reaches (`cold_paths`).
     pub(crate) fn place_frame_loads(&mut self, func: &mut ir::Function) {
         // This changes branches, so it comes before the control-flow graph.
         super::branch_threading::thread(func);
@@ -1946,12 +1947,14 @@ impl FuncEnvironment<'_> {
             .flatten()
             .map(|home| home.slot())
             .collect();
-        let Some(reloads) = frame_reloads::Reloads::scan(func, &homes) else {
-            return;
-        };
-        let cfg = ControlFlowGraph::with_function(func);
-        let domtree = DominatorTree::with_function(func, &cfg);
-        reloads.forward(func, &cfg, &domtree);
+        if let Some(reloads) = frame_reloads::Reloads::scan(func, &homes) {
+            let cfg = ControlFlowGraph::with_function(func);
+            let domtree = DominatorTree::with_function(func, &cfg);
+            reloads.forward(func, &cfg, &domtree);
+        }
+        // The passes above change edges and add blocks; which blocks only
+        // unlikely code reaches is decided on the function they leave.
+        super::cold_paths::spread(func);
     }
 
     /// Get the GC heap's bound.
@@ -2172,8 +2175,10 @@ impl FuncEnvironment<'_> {
             &[],
         );
 
-        // Different types block: fall back to the `is_subtype` libcall.
+        // Different types block: fall back to the `is_subtype` libcall,
+        // out of line.
         builder.switch_to_block(diff_tys_block);
+        builder.set_cold_block(diff_tys_block);
         log::trace!("is_subtype: slow path to do full `is_subtype` libcall");
         let is_subtype = self.builtin_functions.is_subtype(builder.func);
         let vmctx = self.vmctx_val(&mut builder.cursor());
