@@ -38,6 +38,9 @@ pub(super) fn run_with_config(
     let total_started = Instant::now();
     let mut config = wasmtime::Config::new();
     configure(&mut config)?;
+    if barriers.instruction_counting()? {
+        config.profiler(wasmtime::ProfilingStrategy::PerfMap);
+    }
     let started = Instant::now();
     let engine = wasmtime::Engine::new(&config).map_err(|e| e.to_string())?;
     let engine_ns = started.elapsed().as_nanos();
@@ -164,6 +167,9 @@ fn collect_observations<const WINDOWS: bool>(
         &mut phase_barriers::ExecutionWindows,
     >,
 ) -> Result<Vec<Value>, String> {
+    let thread_cpu_disabled = barriers.instruction_counting()?;
+    let not_sampled =
+        || json!({"status": "not_sampled", "reason": "disabled_for_instruction_counting"});
     let mut observations = Vec::new();
     for index in 0..samples + warmups {
         let before_store = residency::snapshot()?;
@@ -196,11 +202,17 @@ fn collect_observations<const WINDOWS: bool>(
             None
         };
         let started = Instant::now();
-        let entry_caller_cpu_started = benchmark_thread_cpu::start();
-        let (outcome, execution_thread_cpu) = instance
-            .evaluate_profiled(&mut store)
-            .map_err(|e| e.to_string())?;
-        let entry_caller_thread_cpu = benchmark_thread_cpu::finish(entry_caller_cpu_started);
+        let (outcome, cpu) = if thread_cpu_disabled {
+            let outcome = instance.evaluate(&mut store).map_err(|e| e.to_string())?;
+            (outcome, None)
+        } else {
+            let entry_caller_cpu_started = benchmark_thread_cpu::start();
+            let (outcome, execution_thread_cpu) = instance
+                .evaluate_profiled(&mut store)
+                .map_err(|e| e.to_string())?;
+            let entry_caller_thread_cpu = benchmark_thread_cpu::finish(entry_caller_cpu_started);
+            (outcome, Some((execution_thread_cpu, entry_caller_thread_cpu)))
+        };
         let execution_ns = started.elapsed().as_nanos();
         #[cfg(feature = "benchmark-module-images")]
         if WINDOWS {
@@ -242,14 +254,12 @@ fn collect_observations<const WINDOWS: bool>(
         barriers.after_store_drop(index)?;
         observations.push(json!({"index": index, "warmup": index < warmups,
             "completion": "normal", "stdout": stdout,
-            "execution_thread_cpu": benchmark_thread_cpu::serialize(
-                &execution_thread_cpu,
-                benchmark_thread_cpu::EXECUTION_SCOPE,
-            ),
-            "entry_caller_thread_cpu": benchmark_thread_cpu::serialize(
-                &entry_caller_thread_cpu,
-                "entry-caller-thread",
-            ),
+            "execution_thread_cpu": cpu.as_ref().map_or_else(not_sampled, |(execution, _)| {
+                benchmark_thread_cpu::serialize(execution, benchmark_thread_cpu::EXECUTION_SCOPE)
+            }),
+            "entry_caller_thread_cpu": cpu.as_ref().map_or_else(not_sampled, |(_, caller)| {
+                benchmark_thread_cpu::serialize(caller, "entry-caller-thread")
+            }),
             "phases_ns": {"state_linker": state_linker_ns, "register": register_ns,
                 "instantiate": instantiate_ns, "execution": execution_ns, "total": total_ns},
             "gc_capacity_before_bytes": gc_before, "gc_capacity_after_bytes": gc_after,

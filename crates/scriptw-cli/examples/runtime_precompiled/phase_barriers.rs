@@ -225,6 +225,21 @@ impl Barriers {
         }
     }
 
+    /// An instruction-counting run under Callgrind, which is never scored.
+    /// Callgrind cannot run rustix's vDSO discovery, which the thread CPU
+    /// clock performs on its first read: the auxiliary vector names a vDSO
+    /// that Valgrind does not map. Such a run therefore skips the thread CPU
+    /// clock reads, and it names native code through a perf map.
+    pub(super) fn instruction_counting(&self) -> Result<bool, String> {
+        match std::env::var("SCRIPTW_PRECOMPILED_INSTRUCTION_COUNTING") {
+            Err(std::env::VarError::NotPresent) => Ok(false),
+            Ok(value) if value == "1" && self.active.is_some() => Ok(true),
+            _ => Err(
+                "SCRIPTW_PRECOMPILED_INSTRUCTION_COUNTING=1 requires active phase barriers".into(),
+            ),
+        }
+    }
+
     pub(super) fn after_transport_drop(&mut self) -> Result<(), String> {
         self.arrive(Phase::TransportDrop, None)
     }
@@ -616,9 +631,11 @@ fn exchange(
         socket
             .set_write_timeout(Some(remaining()?))
             .map_err(|e| e.to_string())?;
-        let n = socket
-            .write(bytes)
-            .map_err(|e| format!("phase event write: {e}"))?;
+        // A Callgrind/vgdb control request interrupts the blocked syscall.
+        let n = match socket.write(bytes) {
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            n => n.map_err(|e| format!("phase event write: {e}"))?,
+        };
         if n == 0 {
             return Err("phase event socket closed".into());
         }
@@ -633,11 +650,11 @@ fn exchange(
             .set_read_timeout(Some(remaining()?))
             .map_err(|e| e.to_string())?;
         let mut byte = [0];
-        if socket
-            .read(&mut byte)
-            .map_err(|e| format!("phase acknowledgement read: {e}"))?
-            == 0
-        {
+        let n = match socket.read(&mut byte) {
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            n => n.map_err(|e| format!("phase acknowledgement read: {e}"))?,
+        };
+        if n == 0 {
             return Err("phase acknowledgement EOF".into());
         }
         line.push(byte[0]);
