@@ -831,6 +831,23 @@ impl FunctionScopes {
         self.function_scope.clone()
     }
 
+    /// Keeps the body's own variable environment record at runtime while it
+    /// declares no name.
+    ///
+    /// A sloppy function whose parameter list contains an expression has one
+    /// (`FunctionDeclarationInstantiation` step 28), inside the record that
+    /// holds the parameters. A sloppy direct eval in the body declares its
+    /// `var` and function names into it (`EvalDeclarationInstantiation`
+    /// steps 17 and 18), so the record must exist even when the body's own
+    /// code declares nothing there.
+    pub(crate) fn keep_body_variable_environment(&self) {
+        if self.parameters_eval_scope.is_some()
+            && let Some(parameters_scope) = &self.parameters_scope
+        {
+            parameters_scope.set_needs_environment();
+        }
+    }
+
     /// Marks all bindings in all scopes as escaping.
     pub(crate) fn escape_all_bindings(&self) {
         self.function_scope.escape_all_bindings();

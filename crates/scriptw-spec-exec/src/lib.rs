@@ -2367,6 +2367,102 @@ mod tests {
         }
     }
 
+    /// A sloppy function whose parameter list holds an expression runs its
+    /// body in a variable environment record of its own, inside the record
+    /// of the parameters (ECMA-262 FunctionDeclarationInstantiation steps 20
+    /// and 28). A sloppy direct eval in the body declares into that record
+    /// (EvalDeclarationInstantiation step 3.d stops its conflict walk there,
+    /// steps 17 and 18 create the names in it), so a `var` named like a
+    /// parameter is a new binding and no SyntaxError. Node 24 prints the
+    /// same lines with two exceptions. For `one:11,13,12` it prints
+    /// `undefined,13,undefined`: V8 gives every non-simple list the second
+    /// record, the specification only a list that holds an expression. And
+    /// its fourth conflict is `undefined`: V8 lets an eval in the list
+    /// declare `var arguments`, which Test262 requires to be a SyntaxError
+    /// (`language/eval-code/direct/*-declare-arguments*`).
+    #[test]
+    fn sloppy_direct_eval_declares_into_the_function_body_record() {
+        let outcome = observe_script(
+            r#"
+                function show(f) { try { return String(f()); } catch (e) { return e.constructor.name; } }
+                // The body record: the reported case first.
+                function patternAndExpression({a}, b = 1) { eval("var a"); return a; }
+                function identifierAndExpression(a, b = 1) { eval("var a"); return a; }
+                function initialized(a = 1) { eval("var a = 2"); return a; }
+                function functionDeclared(a, b = 1) { eval("function a() {}"); return typeof a; }
+                function blockFunction(a, b = 1) { eval("{ function a() {} }"); return typeof a; }
+                function argumentsDeclared(a, b = 1) { eval("var arguments"); return typeof arguments; }
+                function bodyVar(a, b = 1) { var a; eval("var a"); return a; }
+                function twice(a, b = 1) { eval("var q = 1"); eval("var q; q++"); return q; }
+                function deletable(a, b = 1) { eval("var a = 2"); return delete a; }
+                function nested(a, b = 1) { eval("eval('var a')"); return a; }
+                var arrow = (a, b = 1) => { eval("var a"); return a; };
+                var object = { method(a, b = 1) { eval("var a"); return a; } };
+                function* generator(a, b = 1) { yield a; eval("var a = 9"); yield a; }
+                function resumed() { var it = generator(3); return it.next().value + ":" + it.next().value; }
+                function perCall(n, b = 1) { if (n) eval("var w = n"); return typeof w; }
+                var dynamic = Function("a", "b = 1", "eval('var a'); return a");
+                print("body:" + [
+                    patternAndExpression({a: 14}), identifierAndExpression(13), initialized(),
+                    functionDeclared(1), blockFunction(1), argumentsDeclared(1), bodyVar(7), twice(1),
+                    deletable(1), nested(5), arrow(3), object.method(3), resumed(),
+                    perCall(1) + ":" + perCall(0) + ":" + perCall(2), dynamic(5),
+                ].map(String).join());
+                // One record: no expression in the list, so the parameter is found and kept.
+                function pattern({a}) { eval("var a"); return a; }
+                function simple(a) { eval("var a"); return a; }
+                var arrowPattern = ([a]) => { eval("var a"); return a; };
+                print("one:" + [pattern({a: 11}), simple(13), arrowPattern([12])].map(String).join());
+                // Closures of the parameter list see the record of the parameters only.
+                function parameterClosure(a, g = () => a) { eval("var a = 2"); return a + ":" + g(); }
+                function hidden(g = () => typeof y) { eval("var y = 2"); return g() + ":" + typeof y; }
+                function bodyClosure(a, b = 1) { var h = () => a; eval("var a = 2"); return h(); }
+                function listEval(a = eval("var z = 3"), g = () => z) { eval("var z = 4"); return z + ":" + g(); }
+                // A body `var` of a parameter's name starts with the parameter's value,
+                // read from the record of the parameters after an eval in the list ran.
+                function listRead(a, b = eval("a")) { var a; return a + b; }
+                print("closures:" + [parameterClosure(1), hidden(), bodyClosure(1), listEval(), listRead(45)].join());
+                // Conflicts with lexical names stay errors, an eval in the list still meets
+                // the parameters, and Annex B.3.4 keeps the catch parameter exception.
+                function lexical(a, b = 1) { let x; eval("var x"); }
+                function blockLexical(a, b = 1) { { let x; { eval("var x"); } } }
+                function listConflict(a, b = eval("var a = 3")) {}
+                function listArguments(a = eval("var arguments")) {}
+                function catchParameter(a, b = 1) { try { throw 1; } catch (e) { eval("var e = 2"); return e; } }
+                function catchOuter(a, b = 1) { try { throw 1; } catch (e) { eval("var e = 2"); } return e; }
+                print("conflicts:" + [lexical, blockLexical, listConflict, listArguments, catchParameter, catchOuter].map(show).join());
+                // Strict eval code and strict functions declare into the eval's own record.
+                function strictEval(a, b = 1) { eval("'use strict'; var a = 5"); return a; }
+                var strictFunction = (function () { "use strict"; return function (a, b = 1) { eval("var a = 5"); return a; }; })();
+                print("strict:" + [strictEval(3), strictFunction(3)].join());
+                // The body's own code declares into the same record (Annex B.3.2.1).
+                function bodyBlock(a = 1) { { function g() {} } return typeof g; }
+                function bodyBlockParameter(a = 1) { { function a() {} } return typeof a; }
+                print("annex-b:" + [bodyBlock(), bodyBlockParameter()].join());
+                (async function (a, b = 1) { await 0; eval("var a = 8"); await 0; return a; })(3)
+                    .then(function (value) { print("async:" + value); });
+                void 0;
+            "#,
+        );
+        assert_eq!(
+            outcome.completion,
+            ObservedCompletion::Normal(ObservedJsValue::Undefined)
+        );
+        assert_eq!(
+            outcome.output_events,
+            [
+                "body:undefined,undefined,2,function,function,undefined,7,2,true,undefined,undefined,undefined,3:9,number:undefined:number,undefined",
+                "one:11,13,12",
+                "closures:2:1,undefined:number,2,4:3,90",
+                "conflicts:SyntaxError,SyntaxError,SyntaxError,SyntaxError,2,undefined",
+                "strict:3,3",
+                "annex-b:function,number",
+                "async:8",
+            ]
+            .map(|line| HostOutputEvent::PrintLine(line.into()))
+        );
+    }
+
     fn execute_script(
         source: &str,
         filename: Option<&str>,

@@ -203,9 +203,9 @@ impl Eval {
         let action = if direct {
             // If the call to eval is direct, the code is executed in the current environment.
 
-            // Poison the last parent function environment, because it may contain new declarations after/during eval.
+            // Poison up to the variable environment, because it may contain new declarations after/during eval.
             if !strict {
-                context.vm.environments.poison_until_last_function();
+                context.vm.environments.poison_until_variable_environment();
             }
 
             // Set the compile time environment to the current running environment and save the number of current environments.
@@ -231,8 +231,14 @@ impl Eval {
             }
         });
 
+        // PerformEval: Let varEnv be the running execution context's VariableEnvironment.
+        //
+        // NOTE: This is the record of the function body when the function has one
+        // (`FunctionDeclarationInstantiation` step 28): the parameters live outside it, so
+        // `EvalDeclarationInstantiation` neither finds them in its conflict walk nor
+        // reuses them for a `var` of their name.
         let (var_environment, mut variable_scope) =
-            if let Some(e) = context.vm.environments.outer_function_environment() {
+            if let Some(e) = context.vm.environments.variable_environment() {
                 (e.0, e.1)
             } else {
                 (

@@ -1887,7 +1887,7 @@ impl<'ctx> ByteCompiler<'ctx> {
                     let mut outer_scope = self.lexical_scope.outer();
                     let mut shadowed_by_outer_lexical = false;
                     while let Some(scope) = outer_scope {
-                        if scope.is_function() {
+                        if self.is_variable_scope(&scope) {
                             break;
                         }
                         if !scope.is_catch_parameter_environment() && scope.has_lex_binding(&name) {
@@ -1905,7 +1905,7 @@ impl<'ctx> ByteCompiler<'ctx> {
 
                     let value = self.register_allocator.alloc();
                     self.emit_binding_access(BindingAccessOpcode::GetName, &index, &value);
-                    match self.variable_scope.set_mutable_binding_var(name.clone()) {
+                    match self.variable_environment_binding(name.clone()) {
                         Ok(binding) => {
                             let index = self.get_binding(&binding);
                             self.emit_binding_access(BindingAccessOpcode::SetName, &index, &value);

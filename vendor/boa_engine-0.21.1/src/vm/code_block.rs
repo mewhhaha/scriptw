@@ -472,7 +472,8 @@ impl CodeBlock {
             }
             Instruction::CallEvalSpread { scope_index }
             | Instruction::TailCallEvalSpread { scope_index }
-            | Instruction::PushScope { scope_index } => {
+            | Instruction::PushScope { scope_index }
+            | Instruction::PushVariableScope { scope_index } => {
                 format!("scope_index:{scope_index}")
             }
             Instruction::Call { argument_count }
@@ -917,7 +918,6 @@ impl CodeBlock {
             | Instruction::Reserved54
             | Instruction::Reserved55
             | Instruction::Reserved56
-            | Instruction::Reserved57
             => unreachable!("Reserved opcodes are unreachable"),
         }
     }

@@ -2210,8 +2210,6 @@ generate_opcodes! {
     Reserved55 => Reserved,
     /// Reserved [`Opcode`].
     Reserved56 => Reserved,
-    /// Reserved [`Opcode`].
-    Reserved57 => Reserved,
     /// Adds a `using` / `await using` resource to the current declarative environment.
     ///
     /// - Operands:
@@ -2249,4 +2247,11 @@ generate_opcodes! {
     /// - Operands:
     ///   - binding_index: `VaryingOperand`
     SetMutableBindingDeletable { binding_index: VaryingOperand },
+    /// Push the variable environment of a sloppy function body whose
+    /// parameter list contains an expression: a declarative environment that
+    /// a direct eval can declare `var` and function names into.
+    ///
+    /// - Operands:
+    ///   - scope_index: `VaryingOperand`
+    PushVariableScope { scope_index: VaryingOperand },
 }

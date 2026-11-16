@@ -8,7 +8,8 @@ pub(crate) use global::GlobalEnvironment;
 pub(crate) use lexical::LexicalEnvironment;
 pub(crate) use module::ModuleEnvironment;
 
-use crate::{JsObject, JsResult, JsValue};
+use crate::{JsObject, JsResult, JsString, JsValue};
+use boa_ast::scope::{BindingLocator, Scope};
 use boa_gc::{Finalize, GcRefCell, Trace};
 use std::cell::Cell;
 
@@ -207,13 +208,47 @@ impl DeclarativeEnvironment {
         self.kind.poison();
     }
 
+    /// Returns the runtime scope of this environment when it can be the
+    /// VariableEnvironment of running function code: a function environment,
+    /// or the separate record of a function body
+    /// (`FunctionDeclarationInstantiation` step 28).
+    ///
+    /// A sloppy direct eval adds its `var` and function names to this scope
+    /// (`EvalDeclarationInstantiation`).
+    pub(crate) fn variable_scope(&self) -> Option<&Scope> {
+        match self.kind() {
+            DeclarativeEnvironmentKind::Function(env) => Some(env.compile()),
+            DeclarativeEnvironmentKind::Lexical(env) => env.variable_scope(),
+            DeclarativeEnvironmentKind::Global(_) | DeclarativeEnvironmentKind::Module(_) => None,
+        }
+    }
+
+    /// Looks up by name a binding of this environment that the compiled code
+    /// may not know, because a direct eval can have added it to the
+    /// environment's variable scope.
+    pub(crate) fn runtime_binding(&self, name: &JsString) -> Option<BindingLocator> {
+        match self.kind() {
+            DeclarativeEnvironmentKind::Function(env) => env.compile().get_binding(name),
+            DeclarativeEnvironmentKind::Lexical(env) => env.eval_declared_binding(name),
+            DeclarativeEnvironmentKind::Global(_) | DeclarativeEnvironmentKind::Module(_) => None,
+        }
+    }
+
     /// Extends the environment with the bindings from the compile time environment.
     pub(crate) fn extend_from_compile(&self) {
-        if let Some(env) = self.kind().as_function() {
-            let compile_bindings_number = env.compile().num_bindings() as usize;
-            env.poisonable_environment()
-                .extend_bindings_from_compile(compile_bindings_number);
-        }
+        let (environment, scope) = match self.kind() {
+            DeclarativeEnvironmentKind::Function(env) => {
+                (env.poisonable_environment(), env.compile())
+            }
+            DeclarativeEnvironmentKind::Lexical(env) => {
+                let Some(scope) = env.variable_scope() else {
+                    return;
+                };
+                (env.poisonable_environment(), scope)
+            }
+            DeclarativeEnvironmentKind::Global(_) | DeclarativeEnvironmentKind::Module(_) => return,
+        };
+        environment.extend_bindings_from_compile(scope.num_bindings() as usize);
     }
 
     pub(crate) fn push_disposable_resource(&self, resource: DisposableResource) {

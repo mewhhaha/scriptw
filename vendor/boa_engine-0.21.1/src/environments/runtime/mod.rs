@@ -80,19 +80,20 @@ impl EnvironmentStack {
         &self.global
     }
 
-    /// Gets the next outer function environment.
-    pub(crate) fn outer_function_environment(&self) -> Option<(Gc<DeclarativeEnvironment>, Scope)> {
-        for env in self
-            .stack
+    /// Gets the VariableEnvironment of the running function code with its
+    /// runtime scope: the innermost function environment, or the separate
+    /// record of a function body once it is pushed
+    /// (`FunctionDeclarationInstantiation` step 28). The parameter list of
+    /// such a function still runs with the function environment.
+    pub(crate) fn variable_environment(&self) -> Option<(Gc<DeclarativeEnvironment>, Scope)> {
+        self.stack
             .iter()
             .filter_map(Environment::as_declarative)
             .rev()
-        {
-            if let Some(function_env) = env.kind().as_function() {
-                return Some((env.clone(), function_env.compile().clone()));
-            }
-        }
-        None
+            .find_map(|env| {
+                env.variable_scope()
+                    .map(|scope| (env.clone(), scope.clone()))
+            })
     }
 
     /// Pop all current environments except the global environment.
@@ -166,24 +167,28 @@ impl EnvironmentStack {
         self.stack.push(Environment::Object(object));
     }
 
+    /// Returns whether a declarative environment pushed now starts poisoned
+    /// and whether it is inside a `with` environment.
+    fn inherited_poisoned_and_with(&self) -> (bool, bool) {
+        // Check if the outer environment is a declarative environment.
+        let with = if let Some(env) = self.stack.last() {
+            env.as_declarative().is_none()
+        } else {
+            false
+        };
+
+        let environment = self
+            .stack
+            .iter()
+            .rev()
+            .find_map(Environment::as_declarative)
+            .unwrap_or(self.global());
+        (environment.poisoned(), with || environment.with())
+    }
+
     /// Push a lexical environment on the environments stack and return it's index.
     pub(crate) fn push_lexical(&mut self, bindings_count: u32) -> u32 {
-        let (poisoned, with) = {
-            // Check if the outer environment is a declarative environment.
-            let with = if let Some(env) = self.stack.last() {
-                env.as_declarative().is_none()
-            } else {
-                false
-            };
-
-            let environment = self
-                .stack
-                .iter()
-                .rev()
-                .find_map(Environment::as_declarative)
-                .unwrap_or(self.global());
-            (environment.poisoned(), with || environment.with())
-        };
+        let (poisoned, with) = self.inherited_poisoned_and_with();
 
         let index = self.stack.len() as u32;
 
@@ -194,6 +199,22 @@ impl EnvironmentStack {
         )));
 
         index
+    }
+
+    /// Push the variable environment of a function body on the environments
+    /// stack.
+    ///
+    /// The record keeps a runtime copy of its scope, as a function environment
+    /// does, so that a direct eval can declare into it without changing the
+    /// compiled scope that every call of the function shares.
+    pub(crate) fn push_variable(&mut self, scope: &Scope) {
+        let (poisoned, with) = self.inherited_poisoned_and_with();
+
+        self.stack.push(Environment::Declarative(Gc::new(
+            DeclarativeEnvironment::new(DeclarativeEnvironmentKind::Lexical(
+                LexicalEnvironment::new_variable(poisoned, with, scope.clone_for_runtime()),
+            )),
+        )));
     }
 
     /// Push a function environment on the environments stack.
@@ -262,9 +283,9 @@ impl EnvironmentStack {
         Some(self.global())
     }
 
-    /// Mark that there may be added bindings from the current environment to the next function
-    /// environment.
-    pub(crate) fn poison_until_last_function(&mut self) {
+    /// Mark that there may be added bindings from the current environment to the
+    /// VariableEnvironment of the running code.
+    pub(crate) fn poison_until_variable_environment(&mut self) {
         for env in self
             .stack
             .iter()
@@ -272,7 +293,7 @@ impl EnvironmentStack {
             .filter_map(Environment::as_declarative)
         {
             env.poison();
-            if env.is_function() {
+            if env.variable_scope().is_some() {
                 return;
             }
         }
@@ -704,9 +725,7 @@ impl Context {
             match self.environment_expect(index) {
                 Environment::Declarative(env) => {
                     if env.poisoned() {
-                        if let Some(env) = env.kind().as_function()
-                            && let Some(b) = env.compile().get_binding(locator.name())
-                        {
+                        if let Some(b) = env.runtime_binding(locator.name()) {
                             locator.set_scope(b.scope());
                             locator.set_binding_index(b.binding_index());
                             return Ok(());
@@ -771,9 +790,7 @@ impl Context {
             match self.environment_expect(index) {
                 Environment::Declarative(env) => {
                     if env.poisoned() {
-                        if let Some(env) = env.kind().as_function()
-                            && env.compile().get_binding(locator.name()).is_some()
-                        {
+                        if env.runtime_binding(locator.name()).is_some() {
                             break;
                         }
                     } else if !env.with() {

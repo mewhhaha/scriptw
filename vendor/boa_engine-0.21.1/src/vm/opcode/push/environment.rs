@@ -31,6 +31,27 @@ impl Operation for PushScope {
     const COST: u8 = 3;
 }
 
+/// `PushVariableScope` implements the Opcode Operation for `Opcode::PushVariableScope`
+///
+/// Operation:
+///  - Push the variable environment of a function body
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PushVariableScope;
+
+impl PushVariableScope {
+    #[inline(always)]
+    pub(crate) fn operation(index: VaryingOperand, context: &mut Context) {
+        let scope = context.vm.frame().code_block().constant_scope(index.into());
+        context.vm.environments.push_variable(&scope);
+    }
+}
+
+impl Operation for PushVariableScope {
+    const NAME: &'static str = "PushVariableScope";
+    const INSTRUCTION: &'static str = "INST - PushVariableScope";
+    const COST: u8 = 3;
+}
+
 /// `PushObjectEnvironment` implements the Opcode Operation for `Opcode::PushObjectEnvironment`
 ///
 /// Operation:

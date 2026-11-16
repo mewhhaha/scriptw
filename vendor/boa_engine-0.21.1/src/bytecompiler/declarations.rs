@@ -1146,7 +1146,7 @@ impl ByteCompiler<'_> {
                 //          visibility of declarations in the function body.
                 // b. Let varEnv be NewDeclarativeEnvironment(env).
                 // c. Set the VariableEnvironment of calleeContext to varEnv.
-                drop(self.push_declarative_scope(Some(parameters_scope)));
+                self.push_body_variable_scope(parameters_scope, strict);
 
                 let mut variable_scope = self.lexical_scope.clone();
 

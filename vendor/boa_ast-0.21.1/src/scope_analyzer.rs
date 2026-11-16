@@ -549,6 +549,9 @@ impl BindingEscapeAnalyzer<'_> {
         if self.direct_eval {
             scopes.escape_all_bindings();
         }
+        if contains_direct_eval {
+            scopes.keep_body_variable_environment();
+        }
         let mut scope = scopes.parameter_scope();
         std::mem::swap(&mut self.scope, &mut scope);
         self.visit_formal_parameter_list_mut(parameters)?;
