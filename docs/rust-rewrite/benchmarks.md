@@ -2042,8 +2042,8 @@ and `language/destructuring`; with six Node-checked engine tests run as
 Script, function and module code, and hand-assembled probes for hinted
 layout and stored funcrefs. An independent read of the five async
 reductions found no program any of them gets wrong; it traced a fault that
-predates them, a body `var` over a pattern-bound parameter
-([current work](current-inventory.md)). Not run: full Test262, the Fast
+predates them, a body `var` over a pattern-bound parameter, which the
+next commit repaired. Not run: full Test262, the Fast
 policy's request, the emitter's whole `--lib` suite and any target other
 than x86-64.
 

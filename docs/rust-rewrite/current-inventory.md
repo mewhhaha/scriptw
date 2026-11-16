@@ -282,6 +282,8 @@ accepts `--case <file.js>`.
   local-storage invariant on the unchanged performance baseline and candidate.
   Keep both failures in selected replay totals; the module-local change does not
   repair this existing hoisted-function/`var` case.
+  A strict function whose identifier formal a body function declaration names
+  panics the same way: `"use strict"; function f(a) { function a() {} }`.
   Ordinary function-body hoisting emits lexical `let` initialization for backend
   `HoistedVar` storage without a checked initialization flag. Distinguish this
   hoisting boundary from true lexical initialization; preserve module/block
@@ -323,13 +325,12 @@ accepts `--case <file.js>`.
   (`emit_global_property_write`); reads of such names are exact since the
   run-time global resolution. Owner: the local-copy-plus-mirror design of
   script `var` bindings.
-- **Body `var` over a pattern-bound parameter:** `function f({id}) { var id;
-  return id; }` returns undefined where FunctionDeclarationInstantiation
-  keeps the parameter's value (Node returns it). The same holds for an
-  array pattern, an arrow function and a `var` in a nested block; an
-  identifier parameter and a `var` with an initializer are right. It
-  predates the object pattern parameter work, which leaves it as it was.
-  Owner: function-body `var` hoisting over non-simple parameter lists.
+- **Direct eval `var` beside a parameter expression, spec-exec only:**
+  `function f({a}, b = 1) { eval("var a"); return a; }` throws a
+  SyntaxError in the spec-exec oracle. wasm-aot returns undefined, as
+  EvalDeclarationInstantiation says: the walk for a conflicting lexical
+  name stops at the body's variable record, and the parameter record lies
+  outside it. Owner: vendored Boa's eval declaration instantiation.
 - Five vendored `pagemap::tests::*` unit tests fail, and the emitter's
   `thousand_method_program_shares_only_the_native_bodies` measures a
   method initializer of 1,441,914 bytes against its 1,400,000 limit; both
