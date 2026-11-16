@@ -8,7 +8,7 @@
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
     <dc:title>Current React Server Components cold compilation</dc:title>
-    <dc:description>{"date": "2026-11-09", "inputs": {"adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf", "baseline-speed_host_sha256": "71d7d1e04b3eebc483ffc00a14c24493b7933ccb7d594e1c1d049b89a71477e1", "baseline_host_sha256": "71d7d1e04b3eebc483ffc00a14c24493b7933ccb7d594e1c1d049b89a71477e1", "benchmark_metrics_sha256": "5604b7ddb487fff85a725f8603ad6e155d4b4726ce308f3851f8febcf027779f", "benchmark_rsc_sha256": "88ddd80deceb61fe519ab47bedd78be65217507cdb6aedefe7a30d4ea3fcefb1", "campaign_report_sha256": "fd69205f8b015fc2fb430d9a05656a06f6f1456809862aa673bfd181039cb683", "candidate-speed_host_sha256": "b62fb80e19474f867c7657f462043ae89ba2bd9b9b9d19944101e4b47c98a5c3", "candidate_host_sha256": "b62fb80e19474f867c7657f462043ae89ba2bd9b9b9d19944101e4b47c98a5c3", "host_source_sha256": "f0aaf18a66ce744445b53ef9c4cecfeacbe8fcc90dc12117658ffa1cda133a7c", "limited_verification_sha256": "3e69a0d1651f865dc611f7fccb71f819d341f70425e02145af37e70832606f57", "node_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839", "react_driver_sha256": "5c4d95b54e44f31a13a9a4880ac5255de632a2277b7d8ec9403e74919e3c0388", "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334", "support_sha256": "8c53a403994a6ed3156f59582b087ff422d03cbd10f21f1c1c01c6d2110d1ca6", "time_sha256": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63"}, "measurement": {"blocks": 2, "calls_per_process": 201, "case_isolation": "one case per fresh process", "checked_calls_total": 16080, "clock": "per-request monotonic clock recorded by each retained host", "cpu_policy": "one CPU by inherited affinity; unchanged cpu.max retained in raw report, no finite quota claim", "measured_calls_per_engine_case": 808, "processes_per_block_per_case": 4, "processes_per_engine": 16, "processes_per_engine_per_case": 8, "samples": 101, "warmup_calls_per_engine_case": 800, "warmups": 100}, "source_report": "scriptw-rsc-current-v3"}</dc:description>
+    <dc:description>{"date": "2026-11-16", "inputs": {"adapted_source_sha256": "862430aff6894bd20148c229edee1f6f9fa07f74b6b57daf19b5dec689f8afbf", "benchmark_metrics_py_sha256": "5604b7ddb487fff85a725f8603ad6e155d4b4726ce308f3851f8febcf027779f", "benchmark_rsc_py_sha256": "f6177606a4e0c1e0619779d2eee154f363dd429014c0827986eaca356875f3c6", "campaign_report_sha256": "0c19015a95a4d9be237cc6621546a2156e0408ac56237958525361576412cb16", "limited_verification_py_sha256": "4a90d8024ad6093e6556b3b04d62025dc3861c115cbdc65435e55484c00eacc5", "react_driver_cjs_sha256": "5c4d95b54e44f31a13a9a4880ac5255de632a2277b7d8ec9403e74919e3c0388", "rsc_baseline_rs_sha256": "72f4726372e9ae13cdfd3b569c368a3aac14bdc3fc33949ef38dad77a8d68c84", "source_sha256": "2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334", "support_sha256": "1377bb1e3ec541e0e08454231e991140a179bfff39ae3826e7b4a96f976117b2"}, "measurement": {"blocks": 2, "calls_per_process": 201, "case_isolation": "one case per fresh process", "checked_calls_total": 12864, "clock": "per-request monotonic clock recorded by each retained host", "cpu_policy": "one virtual CPU by inherited affinity on a shared four-vCPU cloud machine; no CPU quota, isolation or hardware counter claim", "measured_calls_per_engine_case": 808, "processes_per_block_per_case": 4, "processes_per_engine": 16, "processes_per_engine_per_case": 8, "samples": 101, "warmup_calls_per_engine_case": 800, "warmups": 100}, "source_report": "scriptw-rsc-current-v3"}</dc:description>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -67,117 +67,128 @@ L 558.72 247.968
     </g>
     <g id="ytick_2">
      <g id="line2d_5">
-      <path d="M 63.36 217.077139
-L 558.72 217.077139
+      <path d="M 63.36 222.14188
+L 558.72 222.14188
 " clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_6"/>
      <g id="text_4">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="221.25585" transform="rotate(-0 56.36 221.25585)">2</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="226.320591" transform="rotate(-0 56.36 226.320591)">2</text>
      </g>
     </g>
     <g id="ytick_3">
      <g id="line2d_7">
-      <path d="M 63.36 186.186277
-L 558.72 186.186277
+      <path d="M 63.36 196.31576
+L 558.72 196.31576
 " clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_8"/>
      <g id="text_5">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="190.364988" transform="rotate(-0 56.36 190.364988)">4</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="200.49447" transform="rotate(-0 56.36 200.49447)">4</text>
      </g>
     </g>
     <g id="ytick_4">
      <g id="line2d_9">
-      <path d="M 63.36 155.295416
-L 558.72 155.295416
+      <path d="M 63.36 170.489639
+L 558.72 170.489639
 " clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_10"/>
      <g id="text_6">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="159.474127" transform="rotate(-0 56.36 159.474127)">6</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="174.66835" transform="rotate(-0 56.36 174.66835)">6</text>
      </g>
     </g>
     <g id="ytick_5">
      <g id="line2d_11">
-      <path d="M 63.36 124.404554
-L 558.72 124.404554
+      <path d="M 63.36 144.663519
+L 558.72 144.663519
 " clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_12"/>
      <g id="text_7">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="128.583265" transform="rotate(-0 56.36 128.583265)">8</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="148.84223" transform="rotate(-0 56.36 148.84223)">8</text>
      </g>
     </g>
     <g id="ytick_6">
      <g id="line2d_13">
-      <path d="M 63.36 93.513693
-L 558.72 93.513693
+      <path d="M 63.36 118.837399
+L 558.72 118.837399
 " clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_14"/>
      <g id="text_8">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="97.692404" transform="rotate(-0 56.36 97.692404)">10</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="123.01611" transform="rotate(-0 56.36 123.01611)">10</text>
      </g>
     </g>
     <g id="ytick_7">
      <g id="line2d_15">
-      <path d="M 63.36 62.622832
-L 558.72 62.622832
+      <path d="M 63.36 93.011279
+L 558.72 93.011279
 " clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_16"/>
      <g id="text_9">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="66.801543" transform="rotate(-0 56.36 66.801543)">12</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="97.18999" transform="rotate(-0 56.36 97.18999)">12</text>
      </g>
     </g>
-    <g id="text_10">
+    <g id="ytick_8">
+     <g id="line2d_17">
+      <path d="M 63.36 67.185158
+L 558.72 67.185158
+" clip-path="url(#pc5acb95793)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_18"/>
+     <g id="text_10">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="56.36" y="71.363869" transform="rotate(-0 56.36 71.363869)">14</text>
+     </g>
+    </g>
+    <g id="text_11">
      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="35.719922" y="150.552" transform="rotate(-90 35.719922 150.552)">Cold compile + native preparation · s</text>
     </g>
    </g>
    <g id="patch_3">
     <path d="M 157.4784 247.968
 L 266.4576 247.968
-L 266.4576 206.757183
-L 157.4784 206.757183
+L 266.4576 216.82047
+L 157.4784 216.82047
 z
 " clip-path="url(#pc5acb95793)" style="fill: #6687a3"/>
    </g>
    <g id="patch_4">
-    <path d="M 157.4784 206.757183
-L 266.4576 206.757183
-L 266.4576 200.285535
-L 157.4784 200.285535
+    <path d="M 157.4784 216.82047
+L 266.4576 216.82047
+L 266.4576 210.819624
+L 157.4784 210.819624
 z
 " clip-path="url(#pc5acb95793)" style="fill: #e5a23d"/>
    </g>
    <g id="patch_5">
-    <path d="M 157.4784 200.285535
-L 266.4576 200.285535
-L 266.4576 121.505072
-L 157.4784 121.505072
+    <path d="M 157.4784 210.819624
+L 266.4576 210.819624
+L 266.4576 130.242904
+L 157.4784 130.242904
 z
 " clip-path="url(#pc5acb95793)" style="fill: #4a9a79"/>
    </g>
    <g id="patch_6">
     <path d="M 355.6224 247.968
 L 464.6016 247.968
-L 464.6016 206.735972
-L 355.6224 206.735972
+L 464.6016 216.628105
+L 355.6224 216.628105
 z
 " clip-path="url(#pc5acb95793)" style="fill: #6687a3"/>
    </g>
    <g id="patch_7">
-    <path d="M 355.6224 206.735972
-L 464.6016 206.735972
-L 464.6016 200.259079
-L 355.6224 200.259079
+    <path d="M 355.6224 216.628105
+L 464.6016 216.628105
+L 464.6016 210.55323
+L 355.6224 210.55323
 z
 " clip-path="url(#pc5acb95793)" style="fill: #e5a23d"/>
    </g>
    <g id="patch_8">
-    <path d="M 355.6224 200.259079
-L 464.6016 200.259079
+    <path d="M 355.6224 210.55323
+L 464.6016 210.55323
 L 464.6016 90.845419
 L 355.6224 90.845419
 z
@@ -193,31 +204,31 @@ L 63.36 53.136
 L 558.72 247.968
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
-   <g id="text_11">
-    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="211.968" y="229.700482" transform="rotate(-0 211.968 229.700482)">2.67</text>
-   </g>
    <g id="text_12">
-    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #32220b" x="211.968" y="205.85925" transform="rotate(-0 211.968 205.85925)">0.42</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="211.968" y="234.732126" transform="rotate(-0 211.968 234.732126)">2.41</text>
    </g>
    <g id="text_13">
-    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="211.968" y="163.233194" transform="rotate(-0 211.968 163.233194)">5.10</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #32220b" x="211.968" y="216.157938" transform="rotate(-0 211.968 216.157938)">0.46</text>
    </g>
    <g id="text_14">
-    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="410.112" y="229.689877" transform="rotate(-0 410.112 229.689877)">2.67</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="211.968" y="172.869155" transform="rotate(-0 211.968 172.869155)">6.24</text>
    </g>
    <g id="text_15">
-    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #32220b" x="410.112" y="205.835416" transform="rotate(-0 410.112 205.835416)">0.42</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="410.112" y="234.635943" transform="rotate(-0 410.112 234.635943)">2.43</text>
    </g>
    <g id="text_16">
-    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="410.112" y="147.89014" transform="rotate(-0 410.112 147.89014)">7.08</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #32220b" x="410.112" y="215.928558" transform="rotate(-0 410.112 215.928558)">0.47</text>
    </g>
    <g id="text_17">
-    <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="211.968" y="113.862494" transform="rotate(-0 211.968 113.862494)">8.19 s</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="410.112" y="153.037215" transform="rotate(-0 410.112 153.037215)">9.27</text>
    </g>
    <g id="text_18">
-    <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="410.112" y="83.202841" transform="rotate(-0 410.112 83.202841)">10.17 s</text>
+    <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="211.968" y="122.600326" transform="rotate(-0 211.968 122.600326)">9.12 s</text>
    </g>
    <g id="text_19">
+    <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="410.112" y="83.202841" transform="rotate(-0 410.112 83.202841)">12.17 s</text>
+   </g>
+   <g id="text_20">
     <text style="font-weight: 700; font-size: 13.2px; font-family: 'DejaVu Sans'; text-anchor: start" x="63.36" y="39.136" transform="rotate(-0 63.36 39.136)">React 19.3.1 · cold compilation phases</text>
    </g>
    <g id="legend_1">
@@ -229,7 +240,7 @@ L 73.26 63.694281
 z
 " style="fill: #6687a3"/>
     </g>
-    <g id="text_20">
+    <g id="text_21">
      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="104.06" y="71.394281" transform="rotate(-0 104.06 71.394281)">Front end + lower</text>
     </g>
     <g id="patch_12">
@@ -240,7 +251,7 @@ L 224.381094 63.694281
 z
 " style="fill: #e5a23d"/>
     </g>
-    <g id="text_21">
+    <g id="text_22">
      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="255.181094" y="71.394281" transform="rotate(-0 255.181094 71.394281)">Wasm emission</text>
     </g>
     <g id="patch_13">
@@ -251,7 +262,7 @@ L 362.79375 63.694281
 z
 " style="fill: #4a9a79"/>
     </g>
-    <g id="text_22">
+    <g id="text_23">
      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="393.59375" y="71.394281" transform="rotate(-0 393.59375 71.394281)">Native preparation</text>
     </g>
    </g>

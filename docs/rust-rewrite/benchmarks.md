@@ -7,11 +7,32 @@ older implementation notes live in the [README archive](benchmark-history.md).
 
 ## React Server Components
 
-Measured **2026-11-09**, React **19.3.1**, source fingerprint `9f2788b4af9f51a77dcd3d62e3a8c717367af9c9a0eee65170af66cc8823016b`. Scriptw Fast takes about **16.9× V8 request time**; Speed takes about **13.9×**. The measured descriptor optimization reduces request medians by **2.7–2.9%**. Current CPU counters and profiles place the remaining gap in instruction volume, object operations and generated JavaScript code; the experiments below do not assign an exclusive cause to the whole gap.
+Measured **2026-11-16**, React **19.3.1**, source `875fb7647` (fingerprint `067e69797abb`), Node **24.22.1** with V8 **13.6.233.17-node.58**. Scriptw Speed takes about **1.7× V8 request time** sync and **1.9×** async; Fast takes about **4.7×**. The 2026-11-11 source, measured in the same campaign, takes 2.48 ms under Fast, 3.2 times the current Fast figure.
 
 ### Requests and measurement boundaries
 
-The campaign checked **16,080 exact outputs across 80 fresh processes**: eight processes per engine and case, 100 warmups and 101 timed calls per process, in two mirrored blocks with rotating engine/case order. Sync and async use separate processes. Timed calls within a process are dependent; the independent summaries are process medians. Baseline and candidate Cargo feature sets match across 248 shared packages. Exact executable, source, P/R, toolchain and input identities are in the [current report](rsc-current.json).
+The campaign checked **12,864 exact outputs across 64 fresh processes**: eight processes per engine and case, 100 warmups and 101 timed calls per process, in two mirrored blocks with rotating engine/case order. Sync and async use separate processes. Timed calls within a process are dependent; the independent summaries are process medians. It ran on one virtual CPU of a shared four-vCPU cloud machine (Intel Xeon at 2.30 GHz) with `benchmark-rsc.py --cloud`: no CPU isolation, no hardware counters and no compared Cargo feature graphs, so a spread of several percent between processes is machine noise as much as engine behaviour. Exact executable, source, P/R, toolchain and input identities are in the [current report](rsc-current.json); every call's time is in the [raw campaign report](rsc-campaign-20261116-report.json.xz).
+
+| Policy / source | Sync median / typical mean / typical p95 · ms | Async median / typical mean / typical p95 · ms |
+| --- | ---: | ---: |
+| Fast · `fbc281cac` (2026-11-11) | 2.477 / 2.807 / 4.300 | 2.632 / 2.969 / 4.383 |
+| Fast · `875fb7647` | 0.776 / 0.800 / 0.943 | 0.818 / 0.848 / 0.988 |
+| Speed · `875fb7647` | 0.271 / 0.280 / 0.368 | 0.341 / 0.366 / 0.521 |
+| Node 24 / V8 | 0.164 / 0.274 / 0.332 | 0.177 / 0.328 / 0.739 |
+
+Median is the median of eight process medians. Typical mean and p95 are the medians of eight within-process means and nearest-rank p95s; they are descriptive statistics, without confidence intervals. Chart whiskers show the minimum and maximum process medians: Speed's async processes range from 0.293 to 0.621 ms, with a first-block median of 0.404 ms and a second-block median of 0.300 ms, so its async median is the least settled figure here. Node's means sit well above its medians because its slow calls are few and long.
+
+![RSC request timings](assets/rsc-current/runtime.svg)
+
+With V8's JIT off (`node --jitless`), `scripts/rsc_wall_clock_compare.py` compares Speed and Node in twelve fresh processes each, outside this campaign. Three runs on 2026-11-16, the first two on source `34a5e56df` and the third on `875fb7647`, give Scriptw 279, 286 and 268 µs against Node's 309, 308 and 308 µs sync, and 309, 315 and 333 µs against 335, 329 and 329 µs async: 7 to 13% ahead sync, and between 8% ahead and 1% behind async.
+
+Cold setup per process, as medians of sixteen processes: source to Wasm takes 2.9 s, and native preparation takes 6.2 s under Fast and 9.3 s under Speed. Whole-process peak RSS, which includes that compilation, is 249 to 316 MiB for Scriptw and 76 MiB for Node.
+
+![RSC cold compilation phases](assets/rsc-current/compilation.svg)
+
+#### Previous campaign (2026-11-09)
+
+Measured on a different machine with Node 24.12.0, source fingerprint `9f2788b4af9f51a77dcd3d62e3a8c717367af9c9a0eee65170af66cc8823016b`: Fast took about 16.9× V8 request time and Speed about 13.9×. The campaign checked 16,080 exact outputs across 80 fresh processes; its identities are in the [2026-11-09 report](rsc-campaign-20261109.json).
 
 | Policy / source | Sync median / typical mean / typical p95 · ms | Async median / typical mean / typical p95 · ms |
 | --- | ---: | ---: |
@@ -21,15 +42,11 @@ The campaign checked **16,080 exact outputs across 80 fresh processes**: eight p
 | Speed candidate · `9f2788b4` | 3.537 / 3.887 / 5.195 | 3.876 / 4.291 / 5.551 |
 | Node 24 / V8 | 0.255 / 0.329 / 0.445 | 0.280 / 0.357 / 0.603 |
 
-Median is the median of eight process medians. Typical mean and p95 are the medians of eight within-process means and nearest-rank p95s; they are descriptive statistics, without confidence intervals. Candidate Fast improves 2.72% sync / 2.86% async; Speed improves 2.81% / 2.82%. Both blocks improve in all four comparisons. Chart whiskers show the minimum and maximum process medians.
-
-![RSC request timings](assets/rsc-current/runtime.svg)
-
 The 32-row catalog produces 2,059-byte sync and 2,140-byte async Flight streams, each with one root record, ID `0`. The async form adds a resolved Promise and markup; neither performs I/O. The timed `applicationRun` includes React Flight rendering, UTF-8 encoding, complete stream consumption/decoding and the fixture's `trimEnd`/split/map/search sanity scan. Render, consume and scan do not have separate clocks. Outer JSON encoding, host copying and exact-output comparison follow the clock, but their allocations can affect subsequent GC/JIT state. The bounded Web API fixture does not establish full WHATWG or engine parity.
 
 ### Warmup and case-order control
 
-The old shared-process, three-warmup method made Node async appear faster. A separate control holds seven measured calls fixed and uses eight fresh processes per cell, in two balanced blocks:
+The old shared-process, three-warmup method made Node async appear faster. A separate control from the 2026-11-09 campaign holds seven measured calls fixed and uses eight fresh processes per cell, in two balanced blocks:
 
 | Warmups | Process shape | Sync median · ms | Async median · ms |
 | ---: | --- | ---: | ---: |
@@ -38,7 +55,7 @@ The old shared-process, three-warmup method made Node async appear faster. A sep
 | 100 | Shared, sync then async | 0.279 | 0.271 |
 | 100 | Isolated case | 0.273 | 0.274 |
 
-Case isolation and longer warmup remove that reversal in this control. These seven-call cells are separate from the primary 101-call campaign. The primary campaign retains every warmup and timed observation; curves show the pointwise median across eight processes, with a logarithmic time axis. One hundred warmups do not prove fully optimized steady state.
+Case isolation and longer warmup remove that reversal in this control. These seven-call cells are separate from the primary 101-call campaigns. The current campaign retains every warmup and timed observation; curves show the pointwise median across eight processes, with a logarithmic time axis. One hundred warmups do not prove fully optimized steady state.
 
 ![RSC warmup curves](assets/rsc-current/warmup.svg)
 
@@ -2094,6 +2111,8 @@ The separate 48-process comparison checks 9,648 exact outputs, with 100 warmups,
 
 Fast compiles P with Cranelift `None` / `SinglePass`; Speed uses `Speed` / `Backtracking`. Both load the same precompiled R, whose fixed policy is `SpeedAndSize` / `Backtracking`.
 
+These are the 2026-11-09 campaign's phases; the current campaign's are under [requests and measurement boundaries](#requests-and-measurement-boundaries).
+
 | Candidate cold phase · median | Fast | Speed |
 | --- | ---: | ---: |
 | Front end and lowering · s | 2.668 | 2.670 |
@@ -2103,8 +2122,6 @@ Fast compiles P with Cranelift `None` / `SinglePass`; Speed uses `Speed` / `Back
 | Realm and instantiation · ms | 0.564 | 0.597 |
 | Module initialization · ms | 2.021 | 1.683 |
 
-![RSC cold compilation phases](assets/rsc-current/compilation.svg)
-
 Front end, emission and native preparation total about 8.19 s Fast / 10.17 s Speed, before retained calls. R production is prebuilt and excluded. V8's separately measured cold medians are 16.706 ms Realm creation, 1.468 ms module parse and 2.353 ms link/init; later JIT work is not fully accounted for by those phases.
 
 P is byte-identical across sources at **4,169,697 B**. R grows **38,769,947→38,872,804 B** (+102,857 B, about 0.27%), all in encoded code bodies. P has 541 defined functions and 3,618,661 code-body bytes; R has 1,149 functions and 14,269,752 code-body bytes. These are encoded artifact measurements; reachability and unused work were not measured. Whole-child peak RSS medians are 251.54 MiB Fast, 296.56 MiB Speed and 75.79 MiB V8, including compilation/setup/warmup. They are neither request-only memory nor live heap sizes.
@@ -2113,7 +2130,7 @@ P is byte-identical across sources at **4,169,697 B**. R grows **38,769,947→38
 
 Seven affected native scopes pass **1,611 tests**; five source-guard groups pass **380 checks**, with owner and product-graph checks also passing. Proxy/Realm/accessor/Array semantics and the unchanged 128-KiB Array.from size guard are covered. Full CI, pinned Test262 and private units were not rerun. Existing unrelated formatting and Intl identity gates remain owned.
 
-[Raw campaign, controls, profiles, sources, failed attempts and verification receipts](rsc-analysis-evidence-2026-11-09.tar.xz) · [Request report](rsc-current.json) · [Attribution](react-attribution-current.json) · [Architecture](react-architecture-current.json) · [Physical allocations](react-allocation-current.json).
+[Raw campaign, controls, profiles, sources, failed attempts and verification receipts](rsc-analysis-evidence-2026-11-09.tar.xz) · [Request report](rsc-campaign-20261109.json) · [Attribution](react-attribution-current.json) · [Architecture](react-architecture-current.json) · [Physical allocations](react-allocation-current.json).
 
 ## Focused performance situations
 

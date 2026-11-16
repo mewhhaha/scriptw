@@ -94,11 +94,18 @@ accepts `--case <file.js>`.
   315 against 329 to 335 async, with the means ahead as well, in two runs of
   twelve processes each
   ([measurement](benchmarks.md#branch-hints-the-async-requests-extra-work-and-node-2026-11-16)).
-  That is a diagnostic on a virtual machine without hardware counters:
-  qualify it with the eight-process campaign before refreshing the
-  published panel, and decide there whether Speed or Fast is the default
-  policy (every number above is Speed) and whether the CPU baseline stays
-  x86-64 without SSE4.1.
+  A third run, on source `875fb7647`, has 268 against 308 µs sync and 333
+  against 329 µs async, so the async request is level with `--jitless`
+  rather than reliably ahead. The eight-process campaign on the same cloud
+  machine is the published panel: Speed takes 0.271 and 0.341 ms, Fast
+  0.776 and 0.818 ms, and Node with its JIT 0.164 and 0.177 ms
+  ([measurement](benchmarks.md#react-server-components)). It has no
+  hardware counters or CPU isolation; a campaign on a quiet local machine
+  would tighten it. Still to decide: whether Speed or Fast is the default
+  policy (every instruction count above is Speed) and whether the CPU
+  baseline stays x86-64 without SSE4.1. The kernel, compilation and edge
+  panels need Scriptc 0.4.5 and Zig to refresh, and the focused situations
+  need the pinned Node 24.12.0.
   What remains, by size on that request: read record hits
   (`cached_property_read`, 274K own for 1,259 calls),
   `computed_property_write` (113K, about 245 an append), the general Get
