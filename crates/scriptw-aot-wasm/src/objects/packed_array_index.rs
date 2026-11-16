@@ -328,22 +328,6 @@ impl FunctionBuilder<'_> {
         numbers.clear(f);
     }
 
-    /// Private publication primitive: caller already owns CreateDataProperty
-    /// semantics or has proved an existing own writable packed data slot.
-    /// Returning zero leaves all storage unchanged for the semantic slow path.
-    fn emit_try_packed_array_number_write(
-        &mut self,
-        array: &GcLocal<ArrayObject>,
-        index: I64Local,
-        value: &ValueLocals,
-        f: &mut Function,
-    ) -> I32Local {
-        let storage = self.emit_array_index_storage(array, f);
-        let result = self.packed_number_write(&storage, index, value, f);
-        storage.clear(f);
-        result
-    }
-
     fn packed_number_only_write(
         &mut self,
         storage: &GcLocal<ArrayObject>,
@@ -722,7 +706,12 @@ impl FunctionBuilder<'_> {
         let mut f = self.begin_helper_body(RuntimeHelperId::ArrayIndexedPublishDefaultData);
         let p = self.helper_parameters::<ArrayIndexedPublishDefaultDataParameters>(&mut f);
         let s = self.runtime_schema();
-        let handled = self.emit_try_packed_array_number_write(&p.array, p.index, &p.value, &mut f);
+        // This body is the publication of every literal element and append,
+        // so it holds only the store that needs no copy. The descriptor
+        // publication repeats the packed admission with growth and
+        // promotion before it retires a packed backing.
+        let handled =
+            self.emit_packed_array_store_within_capacity(&p.array, p.index, &p.value, &mut f);
         handled.load(&mut f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, &mut f);
