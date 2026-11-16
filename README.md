@@ -38,10 +38,8 @@ hold the full tables, methods and limits.
 Medians of eight fresh processes per engine and case, 100 warmups and 101 timed
 requests each, on one CPU of a shared cloud machine. Fast and Speed are
 Scriptw's two native compilation policies; Node runs with its JIT.
-Speed takes 1.7× Node's time sync and 1.9× async; the 2026-11-09 panel, on
-another machine, had 13.9×.
-With V8's JIT off (`node --jitless`), three separate runs put Speed 7 to 13%
-ahead sync and between 8% ahead and 1% behind async.
+Speed takes 1.7× Node's time sync and 1.9× async. With V8's JIT off
+(`node --jitless`), Speed is 7 to 13% ahead sync and level async.
 [Means, tails, warmup curves and limits](docs/rust-rewrite/benchmarks.md#react-server-components) ·
 [data](docs/rust-rewrite/rsc-current.json).
 
