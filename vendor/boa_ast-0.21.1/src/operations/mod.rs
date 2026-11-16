@@ -1090,6 +1090,33 @@ where
     names
 }
 
+/// Returns the top level lexical bindings of a statement list, which may contain duplicates.
+///
+/// This is the [`LexicallyDeclaredNames`][spec] of a `ClassStaticBlockStatementList`, which the
+/// spec defines as the `TopLevelLexicallyDeclaredNames` of its `StatementList`: a function
+/// declaration at the top level of a class static block is var scoped, as in a function body.
+///
+/// [spec]: https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
+#[must_use]
+pub fn top_level_lexically_declared_names(statements: &StatementList) -> Vec<Sym> {
+    let mut names = Vec::new();
+    top_level_lexicals(statements, &mut names);
+    names
+}
+
+/// Returns the top level var bindings of a statement list, with no duplicates.
+///
+/// This is the [`VarDeclaredNames`][spec] of a `ClassStaticBlockStatementList`, which the spec
+/// defines as the `TopLevelVarDeclaredNames` of its `StatementList`.
+///
+/// [spec]: https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+#[must_use]
+pub fn top_level_var_declared_names(statements: &StatementList) -> FxHashSet<Sym> {
+    let mut names = FxHashSet::default();
+    top_level_vars(statements, &mut names);
+    names
+}
+
 /// Utility function that collects the top level lexicals of a statement list into `names`.
 ///
 /// This is equivalent to the [`TopLevelLexicallyDeclaredNames`][spec] syntax operation in the spec.

@@ -338,3 +338,35 @@ print(log.join());
         r##"function,2,function,functionfunction,functionfunction,functionfunction,functionfunction"##,
     );
 }
+
+#[test]
+fn a_class_static_block_declares_its_functions_as_a_function_body_does() {
+    // The LexicallyDeclaredNames of a ClassStaticBlockStatementList are the
+    // TopLevelLexicallyDeclaredNames of its StatementList (ECMA-262 8.2.4),
+    // so a function declaration at the root of the block is var scoped: it
+    // may share its name with a `var` or with another function declaration
+    // of the block, and it writes that one binding. The vendored parser
+    // used to report both as early errors. A block-level function inside
+    // the static block stays in its block, because class code is strict.
+    // The conflicts that remain early errors (`let a; function a() {}`,
+    // `let a; var a;`) are Test262's `static-init-invalid-lex-dup.js` and
+    // `static-init-invalid-lex-var.js`.
+    run_in_every_goal_and_mode(
+        r##"
+var log = [];
+class A { static { var x; function x() { return 1; } log.push(typeof x + x()); } }
+class B { static { function y() { return 1; } function y() { return 2; } log.push(y()); } }
+class C { static { log.push(typeof z); var z = 3; function z() {} log.push(typeof z); } }
+class D { static { { function w() { return 4; } } log.push(typeof w); } }
+class E { static { var q = 5; { let q = 6; log.push(q); } function q() {} log.push(q); } }
+class F { static { var c; function c() { return 7; } F.get = () => c; } }
+log.push(F.get()());
+class G { static { var g; function* g() { yield 8; } async function h() {} var h; log.push(g().next().value + typeof h); } }
+var H = class { static { var k; log.push(typeof k); function k() { return 9; } } static { function k() { return 10; } log.push(k()); } };
+class I { static { function i() { return 11; } log.push(i()); } static m() { var i; function i() { return 12; } return i(); } }
+log.push(I.m());
+print(log.join());
+"##,
+        "function1,2,function,number,undefined,6,5,7,8function,function,10,11,12",
+    );
+}

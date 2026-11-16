@@ -19,7 +19,8 @@ use ast::{
     function::FunctionBody as AstFunctionBody,
     function::PrivateName,
     operations::{
-        check_labels, contains_invalid_object_literal, lexically_declared_names, var_declared_names,
+        check_labels, contains_invalid_object_literal, top_level_lexically_declared_names,
+        top_level_var_declared_names,
     },
     property::MethodDefinitionKind,
 };
@@ -716,7 +717,12 @@ where
 
                     // It is a Syntax Error if the LexicallyDeclaredNames of
                     // ClassStaticBlockStatementList contains any duplicate entries.
-                    for name in &lexically_declared_names(&statement_list) {
+                    //
+                    // The LexicallyDeclaredNames of a ClassStaticBlockStatementList are the
+                    // TopLevelLexicallyDeclaredNames of its StatementList, and its
+                    // VarDeclaredNames the TopLevelVarDeclaredNames: a function declaration
+                    // at the top level of the block is var scoped, as in a function body.
+                    for name in &top_level_lexically_declared_names(&statement_list) {
                         if !lexical_names.insert(*name) {
                             return Err(Error::general(
                                 "lexical name declared multiple times",
@@ -728,7 +734,7 @@ where
                     // It is a Syntax Error if any element of the LexicallyDeclaredNames of
                     // ClassStaticBlockStatementList also occurs in the VarDeclaredNames of
                     // ClassStaticBlockStatementList.
-                    for name in var_declared_names(&statement_list) {
+                    for name in top_level_var_declared_names(&statement_list) {
                         if lexical_names.contains(&name) {
                             return Err(Error::general(
                                 "lexical name declared in var names",
