@@ -277,18 +277,6 @@ accepts `--case <file.js>`.
 - Complete current-source default and optimized release acceptance. Historical
   complete all-feature coverage and later affected-target checkpoints establish
   only their recorded scopes and sources.
-- Repair the checked-initialization panic for
-  `language/function-code/S10.2.1_A4_T2.js`: both modes crash at the Wasm backend's
-  local-storage invariant on the unchanged performance baseline and candidate.
-  Keep both failures in selected replay totals; the module-local change does not
-  repair this existing hoisted-function/`var` case.
-  A strict function whose identifier formal a body function declaration names
-  panics the same way: `"use strict"; function f(a) { function a() {} }`.
-  Ordinary function-body hoisting emits lexical `let` initialization for backend
-  `HoistedVar` storage without a checked initialization flag. Distinguish this
-  hoisting boundary from true lexical initialization; preserve module/block
-  lexicals, parameter collisions, captures and TDZ rather than weakening the
-  backend's uninitialized-storage invariant.
 - Finish retention, real serial/shard/resume checks, debug/release differential
   and robustness campaigns, supported-host reproducibility and calibrated
   performance acceptance. Preserve original IDs, budgets and failed receipts.
@@ -325,12 +313,6 @@ accepts `--case <file.js>`.
   (`emit_global_property_write`); reads of such names are exact since the
   run-time global resolution. Owner: the local-copy-plus-mirror design of
   script `var` bindings.
-- **Direct eval `var` beside a parameter expression, spec-exec only:**
-  `function f({a}, b = 1) { eval("var a"); return a; }` throws a
-  SyntaxError in the spec-exec oracle. wasm-aot returns undefined, as
-  EvalDeclarationInstantiation says: the walk for a conflicting lexical
-  name stops at the body's variable record, and the parameter record lies
-  outside it. Owner: vendored Boa's eval declaration instantiation.
 - Five vendored `pagemap::tests::*` unit tests fail, and the emitter's
   `thousand_method_program_shares_only_the_native_bodies` measures a
   method initializer of 1,441,914 bytes against its 1,400,000 limit; both
