@@ -15,6 +15,11 @@ measured the same way, but they are not hardware user-instruction counts.
   callers   <out> <callee-substring>  calls and inclusive cost by caller
   function  <out> <image> <symbol>    executed native instructions of one body
 
+`count --cache` adds Valgrind's cache and branch simulation: compiled code
+that runs fewer instructions than an interpreter can still be slower when it
+touches far more distinct code, which shows as instruction fetch misses
+(I1mr), not as instructions. `symbols --event I1mr` attributes them.
+
 `count --profile` keeps the dumps the three readers need. The host writes
 /tmp/perf-<pid>.map for its native code; `count` copies it beside the dumps.
 `function` joins the counts to `objdump` of the native image the host writes
@@ -62,6 +67,8 @@ def count(args):
     ]
     if args.profile:
         command.append("--dump-instr=yes")
+    if args.cache:
+        command += ["--cache-sim=yes", "--branch-sim=yes"]
     command += [
         str(args.host.resolve()), str(fixtures / "rsc.js"), str(fixtures / "support.json"),
         str(out / "report.json"), str(args.samples), str(args.warmups), args.policy,
@@ -108,10 +115,12 @@ def count(args):
         sys.exit("the host did not check its Flight output")
     dumps = dumps_in(out)
     counts = []
+    events = []
     for path in dumps:
         with open(path, errors="replace") as handle:
             totals = [row for row in handle if row.startswith("totals:")]
         counts.append(int(totals[0].split()[1]))
+        events.append([int(value) for value in totals[0].split()[1:]])
     if len(counts) != args.samples:
         sys.exit(f"expected {args.samples} windows, found {len(counts)}")
     # The first windows still translate newly instrumented code paths.
@@ -129,6 +138,16 @@ def count(args):
         host_sha256=report["executable_sha256"],
         program_wasm_bytes=report["program_wasm_bytes"],
     )
+    if args.cache:
+        # Valgrind's simulated first-level caches and branch predictor, as
+        # medians per request: misses of instruction fetches (I1mr), of data
+        # reads and writes (D1mr, D1mw), and mispredicted conditional and
+        # indirect branches (Bcm, Bim).
+        names = event_names(dumps_in(out)[0]) if args.profile else EVENTS
+        result["cache_medians"] = {
+            name: statistics.median(row[index] for row in events[args.discard:])
+            for index, name in enumerate(names)
+        }
     (out / "counts.json").write_text(json.dumps(dict(result, counts=counts)) + "\n")
     print(json.dumps(result))
 
@@ -153,9 +172,22 @@ class Symbols:
         return "?unmapped"
 
 
-def records(dump):
+EVENTS = "Ir Dr Dw I1mr D1mr D1mw ILmr DLmr DLmw Bc Bcm Bi Bim".split()
+
+
+def event_names(dump):
+    for line in open(dump, errors="replace"):
+        if line.startswith("events:"):
+            return line.split()[1:]
+    sys.exit(f"{dump} names no events")
+
+
+def records(dump, event="Ir"):
     """Yield (function, address, own cost) and (function, address, callee,
-    callee address, calls, inclusive cost) rows of one dump."""
+    callee address, calls, inclusive cost) rows of one dump, the cost being
+    that of `event`. A row gives its instruction and line positions and then
+    its costs, with trailing zero costs left out."""
+    column = 2 + event_names(dump).index(event)
     names = {}
     function = callee = None
     address = callee_address = calls = 0
@@ -195,11 +227,12 @@ def records(dump):
             address -= int(position[1:])
         elif position != "*":
             continue
+        cost = int(fields[column]) if column < len(fields) else 0
         if pending_call:
             pending_call = False
-            yield (function, address, callee, callee_address, calls, int(fields[-1]))
+            yield (function, address, callee, callee_address, calls, cost)
         else:
-            yield (function, address, int(fields[-1]))
+            yield (function, address, cost)
 
 
 def symbols(args):
@@ -207,11 +240,11 @@ def symbols(args):
     dumps = dumps_in(args.output)
     cost = collections.Counter()
     for dump in dumps:
-        for row in records(dump):
+        for row in records(dump, args.event):
             if len(row) == 3:
                 cost[names.name(row[0], row[1])] += row[2]
     total = sum(cost.values())
-    print(f"{total / len(dumps):.0f} instructions per request over {len(dumps)} requests")
+    print(f"{total / len(dumps):.0f} {args.event} per request over {len(dumps)} requests")
     for name, value in cost.most_common(args.top):
         print(f"{value / len(dumps):10.0f} {100 * value / total:5.1f}%  {name[:110]}")
 
@@ -294,10 +327,12 @@ def main():
     one.add_argument("--warmups", type=int, default=100)
     one.add_argument("--discard", type=int, default=3)
     one.add_argument("--profile", action="store_true")
+    one.add_argument("--cache", action="store_true")
     one.set_defaults(run=count)
     one = commands.add_parser("symbols")
     one.add_argument("output", type=Path)
     one.add_argument("--top", type=int, default=60)
+    one.add_argument("--event", default="Ir")
     one.set_defaults(run=symbols)
     one = commands.add_parser("callers")
     one.add_argument("output", type=Path)
