@@ -266,7 +266,7 @@ cp target/release/examples/compiler_precompiled_baseline target/situation-build/
 python3 -B scripts/limited_verification.py -- python3 -B scripts/benchmark-situations.py \
   --host target/situation-build/host --producer-log target/situation-build/cargo.jsonl \
   --fixtures target/situation-fixtures --output target/new-situation-reference \
-  --node /path/to/node-24.12.0 --time /path/to/gnu-time
+  --node /path/to/node-24.22.1 --time /path/to/gnu-time
 python3 -B scripts/limited_verification.py -- target/readme-chart-env/bin/python -B scripts/render-situation-benchmarks.py \
   --report target/new-situation-reference/report.json --output-dir target/situation-charts \
   --preview-dir target/situation-previews
@@ -375,13 +375,15 @@ python3 -B scripts/limited_verification.py -- python3 -B scripts/benchmark-rsc.p
   --output target/new-rsc-comparison
 ```
 
-On a managed cloud machine, which has no delegated 4 GiB cgroup scope, pin one
-CPU, clear the proxy's Node settings and pass `--cloud` to both the wrapper and
-the runner; the report records the inherited cap as its resource scope:
+On a managed cloud machine, which has no delegated 4 GiB cgroup scope, pin two
+CPUs, clear the proxy's Node settings and pass `--cloud` to the runner; the
+report records the inherited cap and the affinity as its resource scope. Every
+actor gets the same two CPUs because V8's compiler and collector threads
+otherwise preempt its main thread inside timed calls:
 
 ```sh
-env -u NODE_OPTIONS -u NODE_EXTRA_CA_CERTS -u NODE_PATH taskset -c 2 \
-  python3 -B scripts/limited_verification.py --cloud -- python3 -B scripts/benchmark-rsc.py --cloud \
+env -u NODE_OPTIONS -u NODE_EXTRA_CA_CERTS -u NODE_PATH taskset -c 2,3 \
+  python3 -B scripts/limited_verification.py --cloud --cloud-worker-cpus auto -- python3 -B scripts/benchmark-rsc.py --cloud \
   --host baseline=target/rsc-baseline/host --host candidate=target/rsc-candidate/host \
   --host candidate-speed=target/rsc-candidate/host --policy candidate-speed=speed \
   --fixtures target/new-application-fixtures --node /path/to/node --time /usr/bin/time \
@@ -393,6 +395,26 @@ a complete campaign of exactly those four actors to
 `docs/rust-rewrite/rsc-current.json`, and
 `scripts/render-application-benchmarks.py --rsc-json docs/rust-rewrite/rsc-current.json`
 draws its three charts (`--check` verifies them).
+
+The other campaigns take `--cloud` under the same wrapper and build their own
+frozen cohort from the committed tree:
+
+- **Kernels:** `benchmark-runtime-comparison.py prepare-cohort --cloud --output <cohort> ...`,
+  then `benchmark-runtime-comparison.py --cloud --frozen <cohort> --qualification-key cohort ...`,
+  `benchmark-runtime-comparison.py publish <measurement>` and `render-runtime-comparison.py`.
+- **Compilation:** `benchmark-compilation.py run --cloud --scriptw <cohort>/candidate-ordinary/scriptw ...`
+  on one CPU for both compilers, then `publish`, `install` and `render`.
+- **Edge and React:** `freeze-application-cohort.py --output <cohort>`,
+  `benchmark-react.py prepare --cloud`, `benchmark-applications.py --cloud`,
+  `benchmark-react.py run --cloud`, `publish-application-benchmarks.py` and
+  `render-application-benchmarks.py`. Pass Scriptc's real binary
+  (`node_modules/scriptc/bin/scriptc.exe`), not the package manager's shim.
+- **Situations:** `benchmark-situations.py --cloud`, `publish-situations-current.py publish`,
+  `render-situation-benchmarks.py`, and `publish-situations-current.py tables` for the
+  Markdown the details page quotes. The driver and its V8 adapter pin Node 24.22.1.
+
+A cloud cohort's qualification is its freeze and its output checks; it records
+that no native test selection was run.
 
 The maintained campaign gives each case its own process and retained Realm,
 avoiding sync-to-async warmup contamination. Defaults are 100 checked warmups,

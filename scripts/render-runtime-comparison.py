@@ -151,7 +151,7 @@ def details_section(authority, report, node, identity, rows):
     return f'''{DETAILS_START}
 ## Runtime comparison
 
-**Measured {authority['date']} locally**, compiler fingerprint `{report['source_fingerprint'][:12]}`.
+**Measured {authority['date']}**, compiler fingerprint `{report['source_fingerprint'][:12]}`.
 V8 **{node['versions']['v8']}**, Node **{node['versions']['node']}**.
 {' '.join(comparison_summaries(rows))}
 

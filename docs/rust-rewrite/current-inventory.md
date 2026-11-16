@@ -97,15 +97,22 @@ accepts `--case <file.js>`.
   A third run, on source `875fb7647`, has 268 against 308 µs sync and 333
   against 329 µs async, so the async request is level with `--jitless`
   rather than reliably ahead. The eight-process campaign on the same cloud
-  machine is the published panel: Speed takes 0.271 and 0.341 ms, Fast
-  0.776 and 0.818 ms, and Node with its JIT 0.164 and 0.177 ms
-  ([measurement](benchmarks.md#react-server-components)). It has no
-  hardware counters or CPU isolation; a campaign on a quiet local machine
-  would tighten it. Still to decide: whether Speed or Fast is the default
-  policy (every instruction count above is Speed) and whether the CPU
-  baseline stays x86-64 without SSE4.1. The kernel, compilation and edge
-  panels need Scriptc 0.4.5 and Zig to refresh, and the focused situations
-  need the pinned Node 24.12.0.
+  machine, with two CPUs for every actor, is the published panel: Speed
+  takes 0.270 and 0.303 ms, Fast 0.651 and 0.743 ms, and Node with its JIT
+  0.153 and 0.171 ms ([measurement](benchmarks.md#react-server-components)).
+  It has no hardware counters or CPU isolation; a campaign on a quiet local
+  machine would tighten it. Still to decide: whether Speed or Fast is the
+  default policy (every instruction count above is Speed) and whether the
+  CPU baseline stays x86-64 without SSE4.1.
+  The other panels were remeasured there on 2026-11-16 too. They show where
+  the next costs are: a fresh entry costs about 0.08 ms before the program
+  runs, which is most of fifteen of the seventeen kernel workloads and 4 to
+  21% of an edge batch (Scriptc's floor is 0.03 ms); the React SSR render
+  takes 8.1 ms against V8's 0.65 ms; `scriptw build wasm` of the client
+  mount bundle does not finish in 60 s; and in the focused situations Speed
+  is behind V8 by 10 to 20× on an empty retained call (3 µs against 0.24),
+  observed `arguments`, a bound global alias, singleton comparisons and
+  32 to 128 branch sites.
   What remains, by size on that request: read record hits
   (`cached_property_read`, 274K own for 1,259 calls),
   `computed_property_write` (113K, about 245 an append), the general Get

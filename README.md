@@ -20,9 +20,12 @@ in their own Wasmtime Engine, Store and Linker, with synchronous and async host 
 
 ## Benchmarks
 
-Each panel names its date and build; they are measured separately and are not
-requalified on every commit. [Benchmark details](docs/rust-rewrite/benchmarks.md)
-hold the full tables, methods and limits.
+All panels were measured on **2026-11-16** from source `067e69797abb`, on a
+shared four-vCPU cloud machine (Intel Xeon, 2.30 GHz) with Node 24.22.1. Every
+engine gets the same two CPUs, so V8's compiler and collector threads do not
+preempt its main thread. They are not requalified on every commit.
+[Benchmark details](docs/rust-rewrite/benchmarks.md) hold the full tables,
+methods and limits.
 
 ### React Server Components
 
@@ -30,37 +33,39 @@ hold the full tables, methods and limits.
 
 | Retained request | Scriptw Fast | Scriptw Speed | Node 24 / V8 |
 | --- | ---: | ---: | ---: |
-| Sync | 0.776 ms | 0.271 ms | 0.164 ms |
-| Async | 0.818 ms | 0.341 ms | 0.177 ms |
+| Sync | 0.651 ms | 0.270 ms | 0.153 ms |
+| Async | 0.743 ms | 0.303 ms | 0.171 ms |
 
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
 Medians of eight fresh processes per engine and case, 100 warmups and 101 timed
-requests each, on one CPU of a shared cloud machine. Fast and Speed are
-Scriptw's two native compilation policies; Node runs with its JIT.
-Speed takes 1.7× Node's time sync and 1.9× async. With V8's JIT off
-(`node --jitless`), Speed is 7 to 13% ahead sync and level async.
+requests each. Fast and Speed are Scriptw's two native compilation policies;
+Node runs with its JIT. Speed takes 1.8× Node's time, sync and async. With
+V8's JIT off (`node --jitless`), Speed is 7 to 13% ahead sync and level async.
 [Means, tails, warmup curves and limits](docs/rust-rewrite/benchmarks.md#react-server-components) ·
 [data](docs/rust-rewrite/rsc-current.json).
 
 ### Runtime kernels
 
 <!-- runtime-comparison:start -->
-**Runtime kernels · 2026-11-02**, compiler `87385fff34d1`; Node **24.12.0**, V8 **13.6.233.17-node.37**.
-Scriptw is faster than Scriptc in **17/17 workloads** in both blocks; block execution geometric means are **0.455–0.458× Scriptc**.
-Scriptw is faster than V8 in **6/17 workloads** in both blocks; block execution geometric means are **1.098–1.106× V8**.
+**Runtime kernels · 2026-11-16**, compiler `067e69797abb`; Node **24.22.1**, V8 **13.6.233.17-node.58**.
+Scriptw is faster than Scriptc in **13/17 workloads** in both blocks; block execution geometric means are **0.648–0.658× Scriptc**.
+Scriptw is faster than V8 in **5/17 workloads** in both blocks; block execution geometric means are **1.098–1.133× V8**.
 Wasm is compiled before timing; Scriptw entry includes Realm bootstrap. V8 creates a fresh context before timing; entry checks outputs.
 See [measurement details and charts](docs/rust-rewrite/benchmarks.md#runtime-comparison), [data and identities](docs/rust-rewrite/execution-current.json), and [workflow](CONTRIBUTING.md#benchmark-charts).
 <!-- runtime-comparison:end -->
 
-<img src="docs/rust-rewrite/assets/benchmarks-current/retained-objects.svg" width="440" alt="retained-objects.js: Scriptw, Scriptc and V8 time and memory">
+<img src="docs/rust-rewrite/assets/benchmarks-current/join-mixed-1024.svg" width="440" alt="join-mixed-1024.js: Scriptw, Scriptc and V8 time and memory">
 
-`retained-objects.js` is the middle of the 17 workloads by Scriptw's ratio to V8 (1.74×); the range is 0.03× to 4.25×.
+`join-mixed-1024.js` is the middle of the 17 workloads by Scriptw's ratio to V8 (1.57×); the range is 0.06× to 5.25×.
+Each entry starts a fresh Realm inside the timer: Scriptw's shortest entries take 0.08 ms, most of it that bootstrap,
+against 0.03 ms for Scriptc and 0.02 ms for V8, and fifteen of the seventeen workloads finish within 0.14 ms.
 
 ### Compilation
 
-**JavaScript → portable Wasm · 2026-11-02:** Scriptw is faster than Scriptc in
-**17/17 workloads**, taking **0.524× Scriptc time** by geometric mean.
+**JavaScript → portable Wasm · 2026-11-16:** Scriptw is faster than Scriptc in
+**17/17 workloads**, taking **0.588× Scriptc time** by geometric mean.
+Both compilers run on one CPU here.
 Includes CLI startup and output I/O; native compilation and execution are separate.
 [Data](docs/rust-rewrite/compilation-current.json).
 
@@ -69,22 +74,24 @@ Includes CLI startup and output I/O; native compilation and execution are separa
 ### Edge kernels and focused situations
 
 <!-- application-benchmarks:start -->
-**Edge kernels · 2026-11-02**, compiler `87385fff34d1`:
-Scriptw takes **3.8–9.3× Scriptc time** across 5 completed comparisons.
+**Edge kernels · 2026-11-16**, compiler `067e69797abb`, Intel(R) Xeon(R) Processor @ 2.30GHz (4 vCPUs), two pinned CPUs for every actor, inherited 13.4 GiB cloud memory cap:
+Scriptw takes **1.0–2.7× Scriptc time** across 5 completed comparisons.
 These use plain request/response records; networking and Web APIs are outside the workload.
 [Application charts and failed attempts](docs/rust-rewrite/benchmarks.md#application-workloads) ·
 [Data](docs/rust-rewrite/applications-current.json).
 <!-- application-benchmarks:end -->
 
-<img src="docs/rust-rewrite/assets/applications-current/edge-query.svg" width="440" alt="edge-query.js: Scriptw and Scriptc time and memory">
+<img src="docs/rust-rewrite/assets/applications-current/edge-query.svg" width="440" alt="edge-query.js: Scriptw, Scriptc and V8 time and memory">
 
-**Focused performance situations · 2026-11-08**, source `453a9074fcac`: 21 standalone programs compare Fast, Speed and V8.
+Each timed entry is a whole batch of requests in a fresh Realm, after three warmups; Scriptw's 0.08 ms entry floor is
+4 to 21% of its batch times. Against V8, Scriptw takes 2.3 to 2.9× on the six kernels. It now completes the React
+SSR render, at 8.1 ms against V8's 0.65 ms; Scriptc fails to build it.
+
+**Focused performance situations · 2026-11-16**, source `067e69797abb`: 21 standalone programs compare Fast, Speed and V8
+on a retained call after 100 warmups. Speed is ahead of V8 in 10 of them and behind in 11, by up to 20×.
 [Scores and workload bounds](docs/rust-rewrite/benchmarks.md#focused-performance-situations) · [Situation data](docs/rust-rewrite/situations-current.json).
 
 ![Global lookup situations](docs/rust-rewrite/assets/situations-current/global-lookup.svg)
-
-The kernel, compilation, edge and situation panels predate the work that
-produced the RSC figures above; they have not been remeasured since.
 
 ## Current Status
 <!-- scriptw-status:start -->

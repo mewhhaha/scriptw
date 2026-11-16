@@ -167,7 +167,8 @@ def authority_for(portable, react, receipts, archive, identity):
     resources = portable['machine']['resources']
     scope = 'one pinned CPU under a 4 GiB cgroup'
     if 'inherited_memory_cap_bytes' in resources:
-        scope = f"one pinned CPU, inherited {resources['inherited_memory_cap_bytes'] / 1024**3:.1f} GiB cloud memory cap"
+        cpus = {1: 'one pinned CPU', 2: 'two pinned CPUs for every actor'}[len(resources.get('affinity', [0]))]
+        scope = f"{cpus}, inherited {resources['inherited_memory_cap_bytes'] / 1024**3:.1f} GiB cloud memory cap"
     summary = f"{machines[0]['cpu_model']} ({machines[0]['logical_cpus']} vCPUs), {scope}"
     rows = portable['rows']
     attempts = []

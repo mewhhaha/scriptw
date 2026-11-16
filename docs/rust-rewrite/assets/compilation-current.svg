@@ -8,7 +8,7 @@
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
     <dc:title>JavaScript to portable Wasm compilation</dc:title>
-    <dc:description>{"finished_at": "2026-11-02T18:08:49.641003+00:00", "policy": {"artifacts": "Scriptw build wasm emits P and its Cargo-built Portable shared R sidecar; R extraction/admission/copy/write costs included each process, Rust/Cargo R production excluded. Scriptc links its prebuilt runtime into standalone WASI Wasm; runtime-pack production excluded.", "cache": "Fresh per-process work/source/application cache/tmp/Zig-local directories; Scriptc SCRIPTC_NO_CACHE=1. OS page caches and existing Zig global toolchain cache retained, never flushed. This is cold application/compiler-process startup, not a cold machine/toolchain installation.", "compiler_identity": "Scriptw source_commit is the embedded base Git revision; source_fingerprint and executable SHA identify the measured working-tree compiler. The performance evidence separately binds its source patch and publication.", "memory": "GNU time compiler-child lifetime high-water RSS, including accounted descendants; not simultaneous aggregate process-tree RSS, runtime RSS or live heap.", "resources": "Sequential children, one CPU, at most4GiB cgroup, no swap, grouped OOM; native/module caches unused by build wasm.", "source": "Original17 exact source/expected bytes retained; Scriptc alone receives the canonical print-to-console.log adapter.", "statistics": "Two blocks, ABBA per case with alternating first actor; second block reverses cases and actors. Four fresh builds per compiler/case; pooled and both block medians. Descriptive observations, no significance/conformance claim.", "timing": "Parent wall around GNU-time-supervised fresh compiler process; includes startup, source read, parse/lower/codegen/link and Wasm output I/O. No Wasm-to-native compilation, instantiation or JavaScript execution.", "validation": "Successful compilation and portable Wasm magic checked, emitted bytes retained; no output execution/checksum verification in this compilation-only measurement."}, "renderer": {"matplotlib": "3.11.2", "sha256": "dee9d12848713e37dd6e813f3bc62970427c1cd7da52b6bc200fce797d7a01bf"}, "schema": "scriptw-portable-wasm-compilation-v1", "source_commit": "9f9c8b9d932b779655bba0dbeaa25587d4a48e99", "summary": [{"actors": {"scriptc": {"block_median_ms": [6110.081685, 229.1577575], "ms": 229.277726, "processes": 4, "rss_mib": 72.208984375}, "scriptw": {"block_median_ms": [100.943875, 100.959305], "ms": 100.959305, "processes": 4, "rss_mib": 76.212890625}}, "file": "sort-reverse-128.js"}, {"actors": {"scriptc": {"block_median_ms": [228.6724115, 231.400948], "ms": 230.069776, "processes": 4, "rss_mib": 72.208984375}, "scriptw": {"block_median_ms": [101.162303, 115.088854], "ms": 101.3339805, "processes": 4, "rss_mib": 76.234375}}, "file": "sort-reverse-512.js"}, {"actors": {"scriptc": {"block_median_ms": [228.6899395, 230.0944295], "ms": 229.213878, "processes": 4, "rss_mib": 72.197265625}, "scriptw": {"block_median_ms": [100.9769565, 116.8551895], "ms": 101.243098, "processes": 4, "rss_mib": 76.404296875}}, "file": "sort-sorted-512.js"}, {"actors": {"scriptc": {"block_median_ms": [231.55837, 232.241297], "ms": 231.9071345, "processes": 4, "rss_mib": 72.150390625}, "scriptw": {"block_median_ms": [102.0618875, 102.613852], "ms": 102.2780735, "processes": 4, "rss_mib": 76.443359375}}, "file": "to-sorted-512.js"}, {"actors": {"scriptc": {"block_median_ms": [196.730759, 195.114518], "ms": 196.0081515, "processes": 4, "rss_mib": 71.48046875}, "scriptw": {"block_median_ms": [122.362547, 102.1739715], "ms": 102.458566, "processes": 4, "rss_mib": 76.310546875}}, "file": "join-1024.js"}, {"actors": {"scriptc": {"block_median_ms": [195.7509635, 195.230363], "ms": 195.230363, "processes": 4, "rss_mib": 71.4453125}, "scriptw": {"block_median_ms": [121.7487715, 102.4438785], "ms": 102.688318, "processes": 4, "rss_mib": 76.39453125}}, "file": "join-4096.js"}, {"actors": {"scriptc": {"block_median_ms": [204.0822135, 207.2857855], "ms": 204.7274675, "processes": 4, "rss_mib": 72.08984375}, "scriptw": {"block_median_ms": [100.832639, 102.637436], "ms": 101.4489085, "processes": 4, "rss_mib": 75.68359375}}, "file": "join-mixed-1024.js"}, {"actors": {"scriptc": {"block_median_ms": [172.6780745, 172.7011915], "ms": 172.7011915, "processes": 4, "rss_mib": 68.8828125}, "scriptw": {"block_median_ms": [124.1778875, 105.7645245], "ms": 105.7645245, "processes": 4, "rss_mib": 77.04296875}}, "file": "numeric-loop-10000.js"}, {"actors": {"scriptc": {"block_median_ms": [175.973369, 172.209853], "ms": 173.6626015, "processes": 4, "rss_mib": 68.849609375}, "scriptw": {"block_median_ms": [142.3337185, 104.9113145], "ms": 122.347935, "processes": 4, "rss_mib": 77.9765625}}, "file": "numeric-loop-50000.js"}, {"actors": {"scriptc": {"block_median_ms": [179.8110795, 176.03083], "ms": 176.3608265, "processes": 4, "rss_mib": 69.580078125}, "scriptw": {"block_median_ms": [124.5998645, 124.7624205], "ms": 124.7624205, "processes": 4, "rss_mib": 81.8125}}, "file": "folded-string-4096.js"}, {"actors": {"scriptc": {"block_median_ms": [176.059139, 176.221622], "ms": 176.221622, "processes": 4, "rss_mib": 69.859375}, "scriptw": {"block_median_ms": [130.4543605, 130.288016], "ms": 130.4167665, "processes": 4, "rss_mib": 79.900390625}}, "file": "dynamic-string-4096.js"}, {"actors": {"scriptc": {"block_median_ms": [174.15359, 174.2999465], "ms": 174.2771745, "processes": 4, "rss_mib": 70.673828125}, "scriptw": {"block_median_ms": [98.8189505, 98.677953], "ms": 98.677953, "processes": 4, "rss_mib": 76.376953125}}, "file": "integer.js"}, {"actors": {"scriptc": {"block_median_ms": [250.99919, 251.0564585], "ms": 250.99919, "processes": 4, "rss_mib": 72.6640625}, "scriptw": {"block_median_ms": [102.878658, 102.1825835], "ms": 102.4753985, "processes": 4, "rss_mib": 76.513671875}}, "file": "objects.js"}, {"actors": {"scriptc": {"block_median_ms": [250.565382, 244.5134125], "ms": 245.7417575, "processes": 4, "rss_mib": 73.23046875}, "scriptw": {"block_median_ms": [103.889443, 102.229924], "ms": 103.0736245, "processes": 4, "rss_mib": 76.787109375}}, "file": "retained-objects.js"}, {"actors": {"scriptc": {"block_median_ms": [206.2660185, 206.293024], "ms": 206.293024, "processes": 4, "rss_mib": 71.6875}, "scriptw": {"block_median_ms": [99.2088525, 100.2926585], "ms": 99.823992, "processes": 4, "rss_mib": 76.447265625}}, "file": "join-empty-1024.js"}, {"actors": {"scriptc": {"block_median_ms": [178.368299, 177.458773], "ms": 177.678029, "processes": 4, "rss_mib": 71.640625}, "scriptw": {"block_median_ms": [98.5352385, 98.598079], "ms": 98.5352385, "processes": 4, "rss_mib": 76.45703125}}, "file": "join-singleton-1024.js"}, {"actors": {"scriptc": {"block_median_ms": [176.479512, 176.8059275], "ms": 176.7741365, "processes": 4, "rss_mib": 71.607421875}, "scriptw": {"block_median_ms": [101.577568, 98.447272], "ms": 98.560417, "processes": 4, "rss_mib": 76.48828125}}, "file": "join-small-1024.js"}], "tools": {"scriptc": {"bytes": 81542448, "path": "/home/jacobt/src/scriptw/target/performance-fresh-sort/tools/scriptc/node_modules/scriptc/bin/scriptc.exe", "runtime_pack": {"files": 617, "manifest_sha256": "5dfdb7a223be8e3332c147d269d4733efc3e52aeac53628f0f3ad73daf5f72d6", "path": "/home/jacobt/src/scriptw/target/performance-fresh-sort/tools/scriptc/node_modules/@scriptc/runtime-wasm32-wasi", "tree_sha256": "7964aae35bc6a0c7f92dd3c07aa743dc6a7eee5351f9037b30e3e8c0e7e219e2"}, "sha256": "63938af518633dedf12b3bcc7adb184e4a3cbdb41b994f188adcd5884c639190", "toolchain": {"files": 756, "inputs_sha256": "129b267db978a0db5a9172c8f7b879b75e852c953b1d48b6950794834f620527", "manifest": {"bytes": 951, "path": "/home/jacobt/src/scriptw/target/performance-fresh-sort/tools/scriptc/node_modules/scriptc/bin/scriptc.exe.json", "sha256": "bfe6a90b22f13f8474336f96a54eb459eca5d4d86fcc0b71bc6ed0f7e7ccb771"}}, "version": "0.4.5"}, "scriptw": {"bytes": 228676384, "identity": {"executable_sha256": "4dbf188245232aab6eef6df559746e7d7bcff5b4c614dbf2f13290216a887303", "source_fingerprint": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5", "source_fingerprint_scheme": "scriptw-program-cache-compiler-v3", "source_revision": {"commit": "9f9c8b9d932b779655bba0dbeaa25587d4a48e99", "kind": "git-commit"}}, "path": "/home/jacobt/src/scriptw/target/performance-immutable-global-folding-20261102/candidate-ordinary/scriptw", "sha256": "4dbf188245232aab6eef6df559746e7d7bcff5b4c614dbf2f13290216a887303"}, "time": {"bytes": 23056, "path": "/home/jacobt/src/scriptw/target/performance-worker-cpu/tools/time", "sha256": "7b29eec93a6fce9aa554bf4fc7f94ef77121bc58f376cf730d060df07872ab63"}, "zig": {"bytes": 172641672, "path": "/home/jacobt/src/scriptw/target/performance-fresh-sort/tools/zig-x86_64-linux-0.16.0/zig", "sha256": "2317bbb91798556d9d0f38aabdac23db83f0979b25f767259ae474546724087c", "version": "0.16.0"}}}</dc:description>
+    <dc:description>{"finished_at": "2026-11-16T22:55:30.565026+00:00", "policy": {"artifacts": "Scriptw build wasm emits P and its Cargo-built Portable shared R sidecar; R extraction/admission/copy/write costs included each process, Rust/Cargo R production excluded. Scriptc links its prebuilt runtime into standalone WASI Wasm; runtime-pack production excluded.", "cache": "Fresh per-process work/source/application cache/tmp/Zig-local directories; Scriptc SCRIPTC_NO_CACHE=1. OS page caches and existing Zig global toolchain cache retained, never flushed. This is cold application/compiler-process startup, not a cold machine/toolchain installation.", "compiler_identity": "Scriptw source_commit is the embedded base Git revision; source_fingerprint and executable SHA identify the measured working-tree compiler. The performance evidence separately binds its source patch and publication.", "memory": "GNU time compiler-child lifetime high-water RSS, including accounted descendants; not simultaneous aggregate process-tree RSS, runtime RSS or live heap.", "resources": "Sequential children, one inherited CPU of a managed cloud machine, its inherited finite memory cap (recorded); no kernel-enforced 4GiB budget or grouped-OOM record; native/module caches unused by build wasm.", "source": "Original17 exact source/expected bytes retained; Scriptc alone receives the canonical print-to-console.log adapter.", "statistics": "Two blocks, ABBA per case with alternating first actor; second block reverses cases and actors. Four fresh builds per compiler/case; pooled and both block medians. Descriptive observations, no significance/conformance claim.", "timing": "Parent wall around GNU-time-supervised fresh compiler process; includes startup, source read, parse/lower/codegen/link and Wasm output I/O. No Wasm-to-native compilation, instantiation or JavaScript execution.", "validation": "Successful compilation and portable Wasm magic checked, emitted bytes retained; no output execution/checksum verification in this compilation-only measurement."}, "renderer": {"matplotlib": "3.11.2", "sha256": "2eea0363575f589bab0c52db1f50b4b6cdb26f69b5d9847b24344aa704f98005"}, "schema": "scriptw-portable-wasm-compilation-v1", "source_commit": "a48dfc3e6270f62dcb2b5d2a82eb7a555017693f", "summary": [{"actors": {"scriptc": {"block_median_ms": [221.5694625, 238.162576], "ms": 223.6319515, "processes": 4, "rss_mib": 80.046875}, "scriptw": {"block_median_ms": [109.227728, 110.2469535], "ms": 110.2469535, "processes": 4, "rss_mib": 77.7265625}}, "file": "sort-reverse-128.js"}, {"actors": {"scriptc": {"block_median_ms": [232.920737, 223.688717], "ms": 223.688717, "processes": 4, "rss_mib": 80.046875}, "scriptw": {"block_median_ms": [102.8938335, 119.7183475], "ms": 106.52088, "processes": 4, "rss_mib": 77.72265625}}, "file": "sort-reverse-512.js"}, {"actors": {"scriptc": {"block_median_ms": [223.127017, 232.2591225], "ms": 227.1940125, "processes": 4, "rss_mib": 80.048828125}, "scriptw": {"block_median_ms": [110.31818, 111.917667], "ms": 110.735556, "processes": 4, "rss_mib": 77.849609375}}, "file": "sort-sorted-512.js"}, {"actors": {"scriptc": {"block_median_ms": [226.1600355, 230.310794], "ms": 227.5220095, "processes": 4, "rss_mib": 79.869140625}, "scriptw": {"block_median_ms": [110.161544, 113.7139725], "ms": 111.6598215, "processes": 4, "rss_mib": 78.23046875}}, "file": "to-sorted-512.js"}, {"actors": {"scriptc": {"block_median_ms": [192.493528, 196.434507], "ms": 195.3142615, "processes": 4, "rss_mib": 80.087890625}, "scriptw": {"block_median_ms": [110.4099925, 126.9859695], "ms": 110.8359955, "processes": 4, "rss_mib": 77.375}}, "file": "join-1024.js"}, {"actors": {"scriptc": {"block_median_ms": [188.469548, 192.3650755], "ms": 190.382411, "processes": 4, "rss_mib": 80.076171875}, "scriptw": {"block_median_ms": [109.7733325, 112.007338], "ms": 110.603579, "processes": 4, "rss_mib": 77.72265625}}, "file": "join-4096.js"}, {"actors": {"scriptc": {"block_median_ms": [200.4867085, 220.9952385], "ms": 203.9164225, "processes": 4, "rss_mib": 80.0703125}, "scriptw": {"block_median_ms": [108.781865, 112.3125285], "ms": 110.172322, "processes": 4, "rss_mib": 77.751953125}}, "file": "join-mixed-1024.js"}, {"actors": {"scriptc": {"block_median_ms": [184.680794, 177.1246445], "ms": 177.1246445, "processes": 4, "rss_mib": 79.169921875}, "scriptw": {"block_median_ms": [119.7596635, 133.977786], "ms": 126.8672555, "processes": 4, "rss_mib": 79.048828125}}, "file": "numeric-loop-10000.js"}, {"actors": {"scriptc": {"block_median_ms": [166.947962, 174.528037], "ms": 172.1774855, "processes": 4, "rss_mib": 79.169921875}, "scriptw": {"block_median_ms": [126.227361, 129.331263], "ms": 127.065059, "processes": 4, "rss_mib": 79.087890625}}, "file": "numeric-loop-50000.js"}, {"actors": {"scriptc": {"block_median_ms": [168.4546135, 180.9102485], "ms": 173.499632, "processes": 4, "rss_mib": 78.982421875}, "scriptw": {"block_median_ms": [155.7452945, 158.39907], "ms": 155.7452945, "processes": 4, "rss_mib": 85.04296875}}, "file": "folded-string-4096.js"}, {"actors": {"scriptc": {"block_median_ms": [154.373063, 177.2415805], "ms": 165.256566, "processes": 4, "rss_mib": 78.80078125}, "scriptw": {"block_median_ms": [153.660679, 160.1184985], "ms": 160.1184985, "processes": 4, "rss_mib": 82.94140625}}, "file": "dynamic-string-4096.js"}, {"actors": {"scriptc": {"block_median_ms": [159.090523, 176.1089915], "ms": 168.6805185, "processes": 4, "rss_mib": 79.16796875}, "scriptw": {"block_median_ms": [103.4254305, 108.8807145], "ms": 104.758537, "processes": 4, "rss_mib": 77.6640625}}, "file": "integer.js"}, {"actors": {"scriptc": {"block_median_ms": [230.82983, 265.2047625], "ms": 244.376515, "processes": 4, "rss_mib": 80.060546875}, "scriptw": {"block_median_ms": [106.4615255, 116.6113885], "ms": 110.6955995, "processes": 4, "rss_mib": 78.0390625}}, "file": "objects.js"}, {"actors": {"scriptc": {"block_median_ms": [219.5665625, 230.07815], "ms": 224.1539555, "processes": 4, "rss_mib": 80.0703125}, "scriptw": {"block_median_ms": [104.522683, 107.9348455], "ms": 105.6928835, "processes": 4, "rss_mib": 78.126953125}}, "file": "retained-objects.js"}, {"actors": {"scriptc": {"block_median_ms": [221.236951, 218.373754], "ms": 221.236951, "processes": 4, "rss_mib": 80.04296875}, "scriptw": {"block_median_ms": [103.134695, 113.891426], "ms": 109.9518605, "processes": 4, "rss_mib": 77.7734375}}, "file": "join-empty-1024.js"}, {"actors": {"scriptc": {"block_median_ms": [177.4056685, 175.702783], "ms": 175.702783, "processes": 4, "rss_mib": 79.16796875}, "scriptw": {"block_median_ms": [106.3722345, 110.5910765], "ms": 108.8492545, "processes": 4, "rss_mib": 77.7109375}}, "file": "join-singleton-1024.js"}, {"actors": {"scriptc": {"block_median_ms": [170.227064, 174.1441605], "ms": 172.592333, "processes": 4, "rss_mib": 79.169921875}, "scriptw": {"block_median_ms": [106.6044425, 114.780957], "ms": 109.264767, "processes": 4, "rss_mib": 77.720703125}}, "file": "join-small-1024.js"}], "tools": {"scriptc": {"bytes": 81542448, "path": "/home/user/scriptw/target/scriptc-tools/node_modules/.pnpm/scriptc@0.4.5/node_modules/scriptc/bin/scriptc.exe", "runtime_pack": {"files": 617, "manifest_sha256": "5dfdb7a223be8e3332c147d269d4733efc3e52aeac53628f0f3ad73daf5f72d6", "path": "/home/user/scriptw/target/scriptc-tools/node_modules/.pnpm/@scriptc+runtime-wasm32-wasi@0.4.5/node_modules/@scriptc/runtime-wasm32-wasi", "tree_sha256": "7964aae35bc6a0c7f92dd3c07aa743dc6a7eee5351f9037b30e3e8c0e7e219e2"}, "sha256": "63938af518633dedf12b3bcc7adb184e4a3cbdb41b994f188adcd5884c639190", "toolchain": {"files": 756, "inputs_sha256": "090f59630ce487dc9f57db5d8e08934e5aced3c57faa7b8fbf02ae8b11b0ac8b", "manifest": {"bytes": 1419, "path": "/home/user/scriptw/target/scriptc-tools/node_modules/.pnpm/scriptc@0.4.5/node_modules/scriptc/bin/scriptc.exe.json", "sha256": "b007896cff9b2d599a4ee7b769ae5c99cbb2eda1f7e169ce2898219a4eb02232"}}, "version": "0.4.5"}, "scriptw": {"bytes": 218932376, "identity": {"executable_sha256": "a288a7652cb2a823c3433889ae6498013763d1d549a08ab24629b8a1f1d39515", "source_fingerprint": "067e69797abb56860fd19ddd9c0fbc74eb6af8a79cb9e2fea2ea51aadaa1b140", "source_fingerprint_scheme": "scriptw-program-cache-compiler-v3", "source_revision": {"commit": "a48dfc3e6270f62dcb2b5d2a82eb7a555017693f", "kind": "git-commit"}}, "path": "/home/user/scriptw/target/bench-20261116/kernels/cohort-final/candidate-ordinary/scriptw", "sha256": "a288a7652cb2a823c3433889ae6498013763d1d549a08ab24629b8a1f1d39515"}, "time": {"bytes": 27160, "path": "/usr/bin/time", "sha256": "3b11dec50514a8473e9f6efa7a34d584d0657538c09988f61b72d38ad4991a10"}, "zig": {"bytes": 172641672, "path": "/home/user/scriptw/target/zig-env/lib/python3.13/site-packages/ziglang/zig", "sha256": "2317bbb91798556d9d0f38aabdac23db83f0979b25f767259ae474546724087c", "version": "0.16.0"}}}</dc:description>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -53,46 +53,46 @@ L 223.2 77.76
     </g>
     <g id="xtick_2">
      <g id="line2d_3">
-      <path d="M 321.977384 537.84
-L 321.977384 77.76
+      <path d="M 324.65428 537.84
+L 324.65428 77.76
 " clip-path="url(#p06c452b5a7)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_4"/>
      <g id="text_2">
-      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="321.977384" y="548.937656" transform="rotate(-0 321.977384 548.937656)">60</text>
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="324.65428" y="548.937656" transform="rotate(-0 324.65428 548.937656)">60</text>
      </g>
     </g>
     <g id="xtick_3">
      <g id="line2d_5">
-      <path d="M 420.754769 537.84
-L 420.754769 77.76
+      <path d="M 426.108561 537.84
+L 426.108561 77.76
 " clip-path="url(#p06c452b5a7)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_6"/>
      <g id="text_3">
-      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="420.754769" y="548.937656" transform="rotate(-0 420.754769 548.937656)">120</text>
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="426.108561" y="548.937656" transform="rotate(-0 426.108561 548.937656)">120</text>
      </g>
     </g>
     <g id="xtick_4">
      <g id="line2d_7">
-      <path d="M 519.532153 537.84
-L 519.532153 77.76
+      <path d="M 527.562841 537.84
+L 527.562841 77.76
 " clip-path="url(#p06c452b5a7)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_8"/>
      <g id="text_4">
-      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="519.532153" y="548.937656" transform="rotate(-0 519.532153 548.937656)">180</text>
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="527.562841" y="548.937656" transform="rotate(-0 527.562841 548.937656)">180</text>
      </g>
     </g>
     <g id="xtick_5">
      <g id="line2d_9">
-      <path d="M 618.309538 537.84
-L 618.309538 77.76
+      <path d="M 629.017122 537.84
+L 629.017122 77.76
 " clip-path="url(#p06c452b5a7)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_10"/>
      <g id="text_5">
-      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="618.309538" y="548.937656" transform="rotate(-0 618.309538 548.937656)">240</text>
+      <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: middle" x="629.017122" y="548.937656" transform="rotate(-0 629.017122 548.937656)">240</text>
      </g>
     </g>
     <g id="text_6">
@@ -205,232 +205,232 @@ L 618.309538 77.76
    </g>
    <g id="patch_3">
     <path d="M 223.2 98.672727
-L 389.408268 98.672727
-L 389.408268 107.177903
+L 409.617089 98.672727
+L 409.617089 107.177903
 L 223.2 107.177903
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_4">
     <path d="M 223.2 123.687951
-L 390.025092 123.687951
-L 390.025092 132.193127
+L 403.316654 123.687951
+L 403.316654 132.193127
 L 223.2 132.193127
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_5">
     <path d="M 223.2 148.703175
-L 389.875474 148.703175
-L 389.875474 157.208351
+L 410.443269 148.703175
+L 410.443269 157.208351
 L 223.2 157.208351
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_6">
     <path d="M 223.2 173.718399
-L 391.579343 173.718399
-L 391.579343 182.223575
+L 412.006114 173.718399
+L 412.006114 182.223575
 L 223.2 182.223575
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_7">
     <path d="M 223.2 198.733623
-L 391.876486 198.733623
-L 391.876486 207.238799
+L 410.613103 198.733623
+L 410.613103 207.238799
 L 223.2 207.238799
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_8">
     <path d="M 223.2 223.748847
-L 392.254724 223.748847
-L 392.254724 232.254023
+L 410.220109 223.748847
+L 410.220109 232.254023
 L 223.2 232.254023
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_9">
     <path d="M 223.2 248.764071
-L 390.214297 248.764071
-L 390.214297 257.269247
+L 409.490894 248.764071
+L 409.490894 257.269247
 L 223.2 257.269247
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_10">
     <path d="M 223.2 273.779295
-L 397.319052 273.779295
-L 397.319052 282.284472
+L 437.720435 273.779295
+L 437.720435 282.284472
 L 223.2 282.284472
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_11">
     <path d="M 223.2 298.794519
-L 424.62015 298.794519
-L 424.62015 307.299696
+L 438.054902 298.794519
+L 438.054902 307.299696
 L 223.2 307.299696
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_12">
     <path d="M 223.2 323.809743
-L 428.595093 323.809743
-L 428.595093 332.31492
+L 486.550446 323.809743
+L 486.550446 332.31492
 L 223.2 332.31492
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_13">
     <path d="M 223.2 348.824967
-L 437.903785 348.824967
-L 437.903785 357.330144
+L 493.945117 348.824967
+L 493.945117 357.330144
 L 223.2 357.330144
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_14">
     <path d="M 223.2 373.840191
-L 385.652502 373.840191
-L 385.652502 382.345368
+L 400.3367 373.840191
+L 400.3367 382.345368
 L 223.2 382.345368
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_15">
     <path d="M 223.2 398.855415
-L 391.904197 398.855415
-L 391.904197 407.360592
+L 410.375707 398.855415
+L 410.375707 407.360592
 L 223.2 407.360592
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_16">
     <path d="M 223.2 423.870639
-L 392.889051 423.870639
-L 392.889051 432.375816
+L 401.916591 423.870639
+L 401.916591 432.375816
 L 223.2 432.375816
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_17">
     <path d="M 223.2 448.885863
-L 387.539214 448.885863
-L 387.539214 457.39104
+L 409.118115 448.885863
+L 409.118115 457.39104
 L 223.2 457.39104
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_18">
     <path d="M 223.2 473.901087
-L 385.417552 473.901087
-L 385.417552 482.406264
+L 407.253713 473.901087
+L 407.253713 482.406264
 L 223.2 482.406264
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_19">
     <path d="M 223.2 498.916311
-L 385.459003 498.916311
-L 385.459003 507.421488
+L 407.956305 498.916311
+L 407.956305 507.421488
 L 223.2 507.421488
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #3378b5"/>
    </g>
    <g id="patch_20">
     <path d="M 223.2 108.178512
-L 600.657568 108.178512
-L 600.657568 116.683689
+L 601.340312 108.178512
+L 601.340312 116.683689
 L 223.2 116.683689
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #36835b"/>
    </g>
    <g id="patch_21">
     <path d="M 223.2 133.193736
-L 601.961512 133.193736
-L 601.961512 141.698913
+L 601.436297 133.193736
+L 601.436297 141.698913
 L 223.2 141.698913
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #36835b"/>
    </g>
    <g id="patch_22">
     <path d="M 223.2 158.20896
-L 600.552456 158.20896
-L 600.552456 166.714137
+L 607.363418 158.20896
+L 607.363418 166.714137
 L 223.2 166.714137
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #36835b"/>
    </g>
    <g id="patch_23">
     <path d="M 223.2 183.224184
-L 604.986336 183.224184
-L 604.986336 191.729361
+L 607.918029 183.224184
+L 607.918029 191.729361
 L 223.2 191.729361
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #36835b"/>
    </g>
    <g id="patch_24">
     <path d="M 223.2 208.239408
-L 545.886209 208.239408
-L 545.886209 216.744585
+L 553.457798 208.239408
+L 553.457798 216.744585
 L 223.2 216.744585
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #36835b"/>
    </g>
    <g id="patch_25">
     <path d="M 223.2 233.254632
-L 544.605744 233.254632
-L 544.605744 241.759809
+L 545.118509 233.254632
+L 545.118509 241.759809
 L 223.2 241.759809
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #36835b"/>
    </g>
    <g id="patch_26">
     <path d="M 223.2 258.269856
-L 560.240729 258.269856
-L 560.240729 266.775033
+L 568.003232 258.269856
+L 568.003232 266.775033
 L 223.2 266.775033
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #36835b"/>
    </g>
    <g id="patch_27">
     <path d="M 223.2 283.28508
-L 507.5162 283.28508
-L 507.5162 291.790257
+L 522.700889 283.28508
+L 522.700889 291.790257
 L 223.2 291.790257
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #36835b"/>
    </g>
    <g id="patch_28">
     <path d="M 223.2 308.300304
-L 509.098959 308.300304
-L 509.098959 316.805481
+L 514.335715 308.300304
+L 514.335715 316.805481
 L 223.2 316.805481
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #36835b"/>
    </g>
    <g id="patch_29">
     <path d="M 223.2 333.315528
-L 513.541019 333.315528
-L 513.541019 341.820705
+L 516.571339 333.315528
+L 516.571339 341.820705
 L 223.2 341.820705
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #36835b"/>
    </g>
    <g id="patch_30">
     <path d="M 223.2 358.330753
-L 513.311848 358.330753
-L 513.311848 366.835929
+L 502.6331 358.330753
+L 502.6331 366.835929
 L 223.2 366.835929
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #36835b"/>
    </g>
    <g id="patch_31">
     <path d="M 223.2 383.345977
-L 510.110724 383.345977
-L 510.110724 391.851153
+L 508.422677 383.345977
+L 508.422677 391.851153
 L 223.2 391.851153
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #36835b"/>
@@ -445,32 +445,32 @@ z
    </g>
    <g id="patch_33">
     <path d="M 223.2 433.376425
-L 627.762134 433.376425
-L 627.762134 441.881601
+L 602.222971 433.376425
+L 602.222971 441.881601
 L 223.2 441.881601
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #36835b"/>
    </g>
    <g id="patch_34">
     <path d="M 223.2 458.391649
-L 562.818089 458.391649
-L 562.818089 466.896825
+L 597.290594 458.391649
+L 597.290594 466.896825
 L 223.2 466.896825
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #36835b"/>
    </g>
    <g id="patch_35">
     <path d="M 223.2 483.406873
-L 515.709516 483.406873
-L 515.709516 491.912049
+L 520.296657 483.406873
+L 520.296657 491.912049
 L 223.2 491.912049
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #36835b"/>
    </g>
    <g id="patch_36">
     <path d="M 223.2 508.422097
-L 514.221447 508.422097
-L 514.221447 516.927273
+L 515.037182 508.422097
+L 515.037182 516.927273
 L 223.2 516.927273
 z
 " clip-path="url(#p06c452b5a7)" style="fill: #36835b"/>
@@ -481,106 +481,106 @@ L 698.4 537.84
 " style="fill: none; stroke: #d0d7de; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_24">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="393.408268" y="105.00344" transform="rotate(-0 393.408268 105.00344)">101.0</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="413.617089" y="105.00344" transform="rotate(-0 413.617089 105.00344)">110.2</text>
    </g>
    <g id="text_25">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="394.025092" y="130.018664" transform="rotate(-0 394.025092 130.018664)">101.3</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="407.316654" y="130.018664" transform="rotate(-0 407.316654 130.018664)">106.5</text>
    </g>
    <g id="text_26">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="393.875474" y="155.033888" transform="rotate(-0 393.875474 155.033888)">101.2</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="414.443269" y="155.033888" transform="rotate(-0 414.443269 155.033888)">110.7</text>
    </g>
    <g id="text_27">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="395.579343" y="180.049112" transform="rotate(-0 395.579343 180.049112)">102.3</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="416.006114" y="180.049112" transform="rotate(-0 416.006114 180.049112)">111.7</text>
    </g>
    <g id="text_28">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="395.876486" y="205.064336" transform="rotate(-0 395.876486 205.064336)">102.5</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="414.613103" y="205.064336" transform="rotate(-0 414.613103 205.064336)">110.8</text>
    </g>
    <g id="text_29">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="396.254724" y="230.07956" transform="rotate(-0 396.254724 230.07956)">102.7</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="414.220109" y="230.07956" transform="rotate(-0 414.220109 230.07956)">110.6</text>
    </g>
    <g id="text_30">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="394.214297" y="255.094784" transform="rotate(-0 394.214297 255.094784)">101.4</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="413.490894" y="255.094784" transform="rotate(-0 413.490894 255.094784)">110.2</text>
    </g>
    <g id="text_31">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="401.319052" y="280.110008" transform="rotate(-0 401.319052 280.110008)">105.8</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="441.720435" y="280.110008" transform="rotate(-0 441.720435 280.110008)">126.9</text>
    </g>
    <g id="text_32">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="428.62015" y="305.125232" transform="rotate(-0 428.62015 305.125232)">122.3</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="442.054902" y="305.125232" transform="rotate(-0 442.054902 305.125232)">127.1</text>
    </g>
    <g id="text_33">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="432.595093" y="330.140456" transform="rotate(-0 432.595093 330.140456)">124.8</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="490.550446" y="330.140456" transform="rotate(-0 490.550446 330.140456)">155.7</text>
    </g>
    <g id="text_34">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="441.903785" y="355.15568" transform="rotate(-0 441.903785 355.15568)">130.4</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="497.945117" y="355.15568" transform="rotate(-0 497.945117 355.15568)">160.1</text>
    </g>
    <g id="text_35">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="389.652502" y="380.170904" transform="rotate(-0 389.652502 380.170904)">98.7</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="404.3367" y="380.170904" transform="rotate(-0 404.3367 380.170904)">104.8</text>
    </g>
    <g id="text_36">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="395.904197" y="405.186128" transform="rotate(-0 395.904197 405.186128)">102.5</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="414.375707" y="405.186128" transform="rotate(-0 414.375707 405.186128)">110.7</text>
    </g>
    <g id="text_37">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="396.889051" y="430.201352" transform="rotate(-0 396.889051 430.201352)">103.1</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="405.916591" y="430.201352" transform="rotate(-0 405.916591 430.201352)">105.7</text>
    </g>
    <g id="text_38">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="391.539214" y="455.216577" transform="rotate(-0 391.539214 455.216577)">99.8</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="413.118115" y="455.216577" transform="rotate(-0 413.118115 455.216577)">110.0</text>
    </g>
    <g id="text_39">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="389.417552" y="480.231801" transform="rotate(-0 389.417552 480.231801)">98.5</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="411.253713" y="480.231801" transform="rotate(-0 411.253713 480.231801)">108.8</text>
    </g>
    <g id="text_40">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="389.459003" y="505.247025" transform="rotate(-0 389.459003 505.247025)">98.6</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="411.956305" y="505.247025" transform="rotate(-0 411.956305 505.247025)">109.3</text>
    </g>
    <g id="text_41">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="604.657568" y="114.509225" transform="rotate(-0 604.657568 114.509225)">229.3</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="605.340312" y="114.509225" transform="rotate(-0 605.340312 114.509225)">223.6</text>
    </g>
    <g id="text_42">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="605.961512" y="139.524449" transform="rotate(-0 605.961512 139.524449)">230.1</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="605.436297" y="139.524449" transform="rotate(-0 605.436297 139.524449)">223.7</text>
    </g>
    <g id="text_43">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="604.552456" y="164.539673" transform="rotate(-0 604.552456 164.539673)">229.2</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="611.363418" y="164.539673" transform="rotate(-0 611.363418 164.539673)">227.2</text>
    </g>
    <g id="text_44">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="608.986336" y="189.554898" transform="rotate(-0 608.986336 189.554898)">231.9</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="611.918029" y="189.554898" transform="rotate(-0 611.918029 189.554898)">227.5</text>
    </g>
    <g id="text_45">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="549.886209" y="214.570122" transform="rotate(-0 549.886209 214.570122)">196.0</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="557.457798" y="214.570122" transform="rotate(-0 557.457798 214.570122)">195.3</text>
    </g>
    <g id="text_46">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="548.605744" y="239.585346" transform="rotate(-0 548.605744 239.585346)">195.2</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="549.118509" y="239.585346" transform="rotate(-0 549.118509 239.585346)">190.4</text>
    </g>
    <g id="text_47">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="564.240729" y="264.60057" transform="rotate(-0 564.240729 264.60057)">204.7</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="572.003232" y="264.60057" transform="rotate(-0 572.003232 264.60057)">203.9</text>
    </g>
    <g id="text_48">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="511.5162" y="289.615794" transform="rotate(-0 511.5162 289.615794)">172.7</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="526.700889" y="289.615794" transform="rotate(-0 526.700889 289.615794)">177.1</text>
    </g>
    <g id="text_49">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="513.098959" y="314.631018" transform="rotate(-0 513.098959 314.631018)">173.7</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="518.335715" y="314.631018" transform="rotate(-0 518.335715 314.631018)">172.2</text>
    </g>
    <g id="text_50">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="517.541019" y="339.646242" transform="rotate(-0 517.541019 339.646242)">176.4</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="520.571339" y="339.646242" transform="rotate(-0 520.571339 339.646242)">173.5</text>
    </g>
    <g id="text_51">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="517.311848" y="364.661466" transform="rotate(-0 517.311848 364.661466)">176.2</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="506.6331" y="364.661466" transform="rotate(-0 506.6331 364.661466)">165.3</text>
    </g>
    <g id="text_52">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="514.110724" y="389.67669" transform="rotate(-0 514.110724 389.67669)">174.3</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="512.422677" y="389.67669" transform="rotate(-0 512.422677 389.67669)">168.7</text>
    </g>
    <g id="text_53">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="640.417391" y="414.691914" transform="rotate(-0 640.417391 414.691914)">251.0</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="640.417391" y="414.691914" transform="rotate(-0 640.417391 414.691914)">244.4</text>
    </g>
    <g id="text_54">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="631.762134" y="439.707138" transform="rotate(-0 631.762134 439.707138)">245.7</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="606.222971" y="439.707138" transform="rotate(-0 606.222971 439.707138)">224.2</text>
    </g>
    <g id="text_55">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="566.818089" y="464.722362" transform="rotate(-0 566.818089 464.722362)">206.3</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="601.290594" y="464.722362" transform="rotate(-0 601.290594 464.722362)">221.2</text>
    </g>
    <g id="text_56">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="519.709516" y="489.737586" transform="rotate(-0 519.709516 489.737586)">177.7</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="524.296657" y="489.737586" transform="rotate(-0 524.296657 489.737586)">175.7</text>
    </g>
    <g id="text_57">
-    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="518.221447" y="514.75281" transform="rotate(-0 518.221447 514.75281)">176.8</text>
+    <text style="font-size: 8px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #24292f" x="519.037182" y="514.75281" transform="rotate(-0 519.037182 514.75281)">172.6</text>
    </g>
    <g id="legend_1">
     <g id="patch_38">

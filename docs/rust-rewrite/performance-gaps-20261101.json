@@ -1,7 +1,7 @@
 {
   "schema": "scriptw-performance-gap-diagnosis-v2",
-  "date": "2026-11-02",
-  "status": "Current fresh408-process three-runtime reference: Scriptw14/17 wall wins versus pinnedScriptc (median geomeans0.671-0.676x),6/17 versus Node24.12/V8 13.6 (1.595-1.604x). Public-entry setup differences and whole-child peakRSS retained explicitly. Runtime source matches qualified private-counter checkpoint; complete parity remains open and baseline-confirmed conformance frame failures remain owned.",
+  "date": "2026-11-16",
+  "status": "Current fresh408-process three-runtime reference measured 2026-11-16: Scriptw 12/17 wall wins versus pinned Scriptc (median geomeans 0.648-0.658x), 5/17 versus Node 24.22.1/V8 13.6.233.17-node.58 (1.098-1.133x). Public-entry setup differences and limits are in execution_three_runtime.policy.",
   "overall_v8_scriptc_parity": "open",
   "history": {
     "previous_committed_checkpoint": {
@@ -33,7 +33,220 @@
     },
     "previous_status_at_85ce": "Qualified intrinsic-layout and RegExp/observed-data improvements. Latest precompiled17median geometric means0.972-0.979x pinnedScriptc, six individual wins; every-case parity remains open. Rejected hot-read regression retained.",
     "status_before_private_counter_facts": "Qualified intrinsic birth-layout improvement: 28.3-28.5% lower median geomeans across30 precompiled cases; latest original17 comparison0.694-0.695x pinned Scriptc with12 individual wins. Both seven-case controls pass. Every-case parity remains open; rejected setup and historical controls retained.",
-    "status_before_three_runtime_comparison": "Qualified private-counter improvement: dynamic String medians36.5-36.8% lower and mixed joins5.2-5.6% lower; original17 median geomeans0.674-0.680x pinned Scriptc with14 wall wins. All four A/A gates and all30/separate controls pass. Every-case/RSS/V8 parity remains open. Additional remainder77/79 retains two baseline-confirmed native-frame Crash outcomes."
+    "status_before_three_runtime_comparison": "Qualified private-counter improvement: dynamic String medians36.5-36.8% lower and mixed joins5.2-5.6% lower; original17 median geomeans0.674-0.680x pinned Scriptc with14 wall wins. All four A/A gates and all30/separate controls pass. Every-case/RSS/V8 parity remains open. Additional remainder77/79 retains two baseline-confirmed native-frame Crash outcomes.",
+    "execution_three_runtime_before_20261116": {
+      "date": "2026-11-02",
+      "status": "Current fresh408-process three-runtime reference: Scriptw14/17 wall wins versus pinnedScriptc (median geomeans0.671-0.676x),6/17 versus Node24.12/V8 13.6 (1.595-1.604x). Public-entry setup differences and whole-child peakRSS retained explicitly. Runtime source matches qualified private-counter checkpoint; complete parity remains open and baseline-confirmed conformance frame failures remain owned.",
+      "entry": {
+        "status": "complete descriptive three-runtime public-entry reference; no conformance or significance claim",
+        "source_fingerprint": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5",
+        "publication_commit": "77c10017a64937e13de08c7873170772ae15ffab",
+        "measurement_commit": "77c10017a64937e13de08c7873170772ae15ffab",
+        "started_at": "2026-11-02T18:05:41.239176+00:00",
+        "finished_at": "2026-11-02T18:07:04.563553+00:00",
+        "runtimes": [
+          "scriptw",
+          "scriptc",
+          "v8"
+        ],
+        "node_identity": {
+          "path": "/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node",
+          "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+          "versions": {
+            "node": "24.12.0",
+            "acorn": "8.15.0",
+            "ada": "3.3.0",
+            "amaro": "1.1.5",
+            "ares": "1.34.5",
+            "brotli": "1.1.0",
+            "cjs_module_lexer": "2.1.0",
+            "cldr": "47.0",
+            "icu": "77.1",
+            "llhttp": "9.3.0",
+            "modules": "137",
+            "napi": "10",
+            "nbytes": "0.1.1",
+            "ncrypto": "0.0.1",
+            "nghttp2": "1.67.1",
+            "openssl": "3.5.4",
+            "simdjson": "4.1.0",
+            "simdutf": "6.4.0",
+            "sqlite": "3.50.4",
+            "tz": "2025b",
+            "undici": "7.16.0",
+            "unicode": "16.0",
+            "uv": "1.51.0",
+            "uvwasi": "0.0.23",
+            "v8": "13.6.233.17-node.37",
+            "zlib": "1.3.1-470d3a2",
+            "zstd": "1.5.7"
+          },
+          "harness": "crates/scriptw-cli/tests/fixtures/v8_baseline/node-runtime.cjs",
+          "harness_sha256": "0e729b593ed9d70695b66eaf17da06dd828be09590ff088a3e15c989f015e34b",
+          "flags": [],
+          "persistent_compile_cache": false
+        },
+        "shared_configuration": {
+          "collector": "copying",
+          "consumer_compiler_enabled": false,
+          "epoch_deadline": 9223372036854775807,
+          "gc_initial_bytes": 16777216,
+          "max_wasm_stack_bytes": 33554432,
+          "native_compilation_mode": "size-optimized",
+          "register_allocation": "backtracking",
+          "runtime_policy": "scriptw-required-wasmtime-experimental-v1",
+          "store_memory_limit_bytes": 1073741824,
+          "target": "generic",
+          "target_triple": "x86_64-unknown-linux-gnu",
+          "wasm_backtrace_details": "disable",
+          "wasmtime_version": "47.0.0",
+          "worker_stack_bytes": 67108864
+        },
+        "processes": 408,
+        "processes_per_actor_case": 8,
+        "measured_entries_per_process": 21,
+        "warmups_per_process": 10,
+        "preflight": {
+          "processes": 9,
+          "checked_entries": 36
+        },
+        "policy": {
+          "execution": "Public-entry wall: Scriptw evaluate entry, Scriptc WASI _start/output capture, V8 runInContext/print capture.",
+          "setup": "Wasm image loading and Store/instance setup excluded; Scriptw Realm/intrinsic bootstrap remains inside entry. V8 vm.Script eager parse and vm.Context creation outside entry; context_ns retained separately.",
+          "v8": "Normal V8 lazy compilation, JIT tiering and natural GC may occur inside entry. Ten warmups do not assert steady-state optimized code.",
+          "memory": "GNU-time whole-child peak RSS includes each process runtime, setup, warmups and code history. Node includes its source compilation/JIT; Wasm images were prepared in separate earlier processes. No live-heap interpretation.",
+          "statistics": "Fresh process is the unit; four process medians/means per actor/block, eight overall; retain every observation and both blocks. No cross-runtime CPU ratio or significance claim.",
+          "resources": "One CPU, 4GiB cgroup, no swap, grouped OOM; Wasm retained modules1/64MiB. Sequential children; no profiler/barriers.",
+          "source": "Original17 bytes shared by Scriptw and V8; Scriptc derived print-wrapper source and pinned0.4.5/Zig0.16 provenance retained in producer receipt."
+        },
+        "comparisons": {
+          "scriptc": {
+            "wins_in_both_statistics_and_blocks": [
+              "sort-reverse-128.js",
+              "sort-reverse-512.js",
+              "sort-sorted-512.js",
+              "to-sorted-512.js",
+              "join-1024.js",
+              "join-4096.js",
+              "join-mixed-1024.js",
+              "numeric-loop-10000.js",
+              "numeric-loop-50000.js",
+              "folded-string-4096.js",
+              "dynamic-string-4096.js",
+              "integer.js",
+              "objects.js",
+              "retained-objects.js",
+              "join-empty-1024.js",
+              "join-singleton-1024.js",
+              "join-small-1024.js"
+            ],
+            "geomeans": [
+              {
+                "median": 0.45458540507328443,
+                "mean": 0.4534890752430208
+              },
+              {
+                "median": 0.4581491080888699,
+                "mean": 0.4562953039848942
+              }
+            ]
+          },
+          "v8": {
+            "wins_in_both_statistics_and_blocks": [
+              "numeric-loop-10000.js",
+              "numeric-loop-50000.js",
+              "dynamic-string-4096.js",
+              "integer.js",
+              "join-singleton-1024.js",
+              "join-small-1024.js"
+            ],
+            "geomeans": [
+              {
+                "median": 1.097800046005074,
+                "mean": 0.938449679107563
+              },
+              {
+                "median": 1.1057537091233103,
+                "mean": 0.9363320119123235
+              }
+            ]
+          }
+        },
+        "parent_qualification": {
+          "unique_selected": 1844,
+          "receipt": {
+            "path": "native-qualified.json",
+            "sha256": "16bca0a79c981fde6454ba782c0f0fdf4cdb2e54551937d28032084e6dfe34fd"
+          },
+          "limits": "Full AOT lib and listed structural targets, full Engine builtins/layout target and selected GC/language/structure; no full workspace or Test262 claim. Repeated priority first-demand passes deduplicated."
+        },
+        "reference17": {
+          "evidence": {
+            "path": "analysis.json",
+            "sha256": "e6830d7977af6913a12cb528014a2120f6f3c71d90bb76168c64e71b2d6c0e69"
+          }
+        },
+        "evidence": {
+          "archive": "docs/rust-rewrite/performance-immutable-global-folding-three-runtime-20261102-inert.tar.xz",
+          "sha256": "8360f34fda29be57bbe7e676278412e5a652f199caeb7a622cf77a1eb0f8f160",
+          "bytes": 989844,
+          "regular_utf8_members": 1282,
+          "expanded_utf8_bytes": 15355594,
+          "contains_native_or_wasm_images": false
+        }
+      }
+    },
+    "compilation_portable_wasm_before_20261116": {
+      "status": "complete descriptive fresh CLI comparison; successful portable output, no execution or conformance claim",
+      "source_fingerprint": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5",
+      "publication_commit": "77c10017a64937e13de08c7873170772ae15ffab",
+      "embedded_base_commit": "9f9c8b9d932b779655bba0dbeaa25587d4a48e99",
+      "measurement_commit": "77c10017a64937e13de08c7873170772ae15ffab",
+      "started_at": "2026-11-02T18:08:14.129882+00:00",
+      "finished_at": "2026-11-02T18:08:49.641003+00:00",
+      "processes": 136,
+      "processes_per_compiler_case": 4,
+      "wins_both_block_medians": [
+        "sort-reverse-128.js",
+        "sort-reverse-512.js",
+        "sort-sorted-512.js",
+        "to-sorted-512.js",
+        "join-1024.js",
+        "join-4096.js",
+        "join-mixed-1024.js",
+        "numeric-loop-10000.js",
+        "numeric-loop-50000.js",
+        "folded-string-4096.js",
+        "dynamic-string-4096.js",
+        "integer.js",
+        "objects.js",
+        "retained-objects.js",
+        "join-empty-1024.js",
+        "join-singleton-1024.js",
+        "join-small-1024.js"
+      ],
+      "pooled_workload_median_geomean": 0.5238891966435311,
+      "report": {
+        "path": "docs/rust-rewrite/compilation-current.json",
+        "sha256": "2dba26dcef7eed09940e270bd3e9d580bb7bdd2d512d39c582fb4762121b9a97"
+      },
+      "evidence": {
+        "path": "docs/rust-rewrite/compilation-comparison.tar.gz",
+        "bytes": 10903710,
+        "sha256": "aeef541d87c00fe1854a6ddf05abe3ff403b6a426e7bf6e4821d150766e8b8e5"
+      },
+      "policy": {
+        "timing": "Parent wall around GNU-time-supervised fresh compiler process; includes startup, source read, parse/lower/codegen/link and Wasm output I/O. No Wasm-to-native compilation, instantiation or JavaScript execution.",
+        "artifacts": "Scriptw build wasm emits P and its Cargo-built Portable shared R sidecar; R extraction/admission/copy/write costs included each process, Rust/Cargo R production excluded. Scriptc links its prebuilt runtime into standalone WASI Wasm; runtime-pack production excluded.",
+        "cache": "Fresh per-process work/source/application cache/tmp/Zig-local directories; Scriptc SCRIPTC_NO_CACHE=1. OS page caches and existing Zig global toolchain cache retained, never flushed. This is cold application/compiler-process startup, not a cold machine/toolchain installation.",
+        "memory": "GNU time compiler-child lifetime high-water RSS, including accounted descendants; not simultaneous aggregate process-tree RSS, runtime RSS or live heap.",
+        "source": "Original17 exact source/expected bytes retained; Scriptc alone receives the canonical print-to-console.log adapter.",
+        "compiler_identity": "Scriptw source_commit is the embedded base Git revision; source_fingerprint and executable SHA identify the measured working-tree compiler. The performance evidence separately binds its source patch and publication.",
+        "statistics": "Two blocks, ABBA per case with alternating first actor; second block reverses cases and actors. Four fresh builds per compiler/case; pooled and both block medians. Descriptive observations, no significance/conformance claim.",
+        "resources": "Sequential children, one CPU, at most4GiB cgroup, no swap, grouped OOM; native/module caches unused by build wasm.",
+        "validation": "Successful compilation and portable Wasm magic checked, emitted bytes retained; no output execution/checksum verification in this compilation-only measurement."
+      }
+    }
   },
   "ordinary": {
     "source_fingerprint": "9f5f333b6d636e51f2fa8fb1660a0c554ea2648fd65d0184cddbbf5484e77ccb",
@@ -5646,46 +5859,48 @@
   },
   "execution_three_runtime": {
     "status": "complete descriptive three-runtime public-entry reference; no conformance or significance claim",
-    "source_fingerprint": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5",
-    "publication_commit": "77c10017a64937e13de08c7873170772ae15ffab",
-    "measurement_commit": "77c10017a64937e13de08c7873170772ae15ffab",
-    "started_at": "2026-11-02T18:05:41.239176+00:00",
-    "finished_at": "2026-11-02T18:07:04.563553+00:00",
+    "source_fingerprint": "067e69797abb56860fd19ddd9c0fbc74eb6af8a79cb9e2fea2ea51aadaa1b140",
+    "publication_commit": "a48dfc3e6270f62dcb2b5d2a82eb7a555017693f",
+    "measurement_commit": "190d631406fa50100c8cbf93d7366f0c2982c890",
+    "started_at": "2026-11-16T23:07:18.769371+00:00",
+    "finished_at": "2026-11-16T23:08:33.937636+00:00",
     "runtimes": [
       "scriptw",
       "scriptc",
       "v8"
     ],
     "node_identity": {
-      "path": "/home/jacobt/.local/share/fnm/node-versions/v24.12.0/installation/bin/node",
-      "executable_sha256": "16143bdaa79716e871d3d9b2f50ce680bca293eba7f0c3fc1d004ed2258fc839",
+      "path": "/opt/node24/bin/node",
+      "executable_sha256": "0d89485e8dfafd67d79ec1da0b5154caf6640d0a0e86f1d2deaeddbf787d7e6d",
       "versions": {
-        "node": "24.12.0",
-        "acorn": "8.15.0",
-        "ada": "3.3.0",
-        "amaro": "1.1.5",
-        "ares": "1.34.5",
-        "brotli": "1.1.0",
-        "cjs_module_lexer": "2.1.0",
-        "cldr": "47.0",
-        "icu": "77.1",
-        "llhttp": "9.3.0",
+        "node": "24.22.1",
+        "acorn": "8.18.0",
+        "ada": "4.0.0",
+        "amaro": "1.1.11",
+        "ares": "1.34.9",
+        "brotli": "1.2.0",
+        "cldr": "48.0",
+        "icu": "78.3",
+        "llhttp": "9.4.3",
+        "merve": "1.2.2",
         "modules": "137",
         "napi": "10",
-        "nbytes": "0.1.1",
+        "nbytes": "0.1.4",
         "ncrypto": "0.0.1",
-        "nghttp2": "1.67.1",
-        "openssl": "3.5.4",
-        "simdjson": "4.1.0",
+        "nghttp2": "1.70.0",
+        "nghttp3": "",
+        "ngtcp2": "",
+        "openssl": "3.5.9",
+        "simdjson": "4.6.11",
         "simdutf": "6.4.0",
-        "sqlite": "3.50.4",
-        "tz": "2025b",
-        "undici": "7.16.0",
-        "unicode": "16.0",
-        "uv": "1.51.0",
+        "sqlite": "3.53.4",
+        "tz": "2026e",
+        "undici": "7.30.1",
+        "unicode": "17.0",
+        "uv": "1.52.1",
         "uvwasi": "0.0.23",
-        "v8": "13.6.233.17-node.37",
-        "zlib": "1.3.1-470d3a2",
+        "v8": "13.6.233.17-node.58",
+        "zlib": "1.3.2.1-motley-285e94b",
         "zstd": "1.5.7"
       },
       "harness": "crates/scriptw-cli/tests/fixtures/v8_baseline/node-runtime.cjs",
@@ -5696,7 +5911,6 @@
     "shared_configuration": {
       "collector": "copying",
       "consumer_compiler_enabled": false,
-      "epoch_deadline": 9223372036854775807,
       "gc_initial_bytes": 16777216,
       "max_wasm_stack_bytes": 33554432,
       "native_compilation_mode": "size-optimized",
@@ -5723,38 +5937,33 @@
       "v8": "Normal V8 lazy compilation, JIT tiering and natural GC may occur inside entry. Ten warmups do not assert steady-state optimized code.",
       "memory": "GNU-time whole-child peak RSS includes each process runtime, setup, warmups and code history. Node includes its source compilation/JIT; Wasm images were prepared in separate earlier processes. No live-heap interpretation.",
       "statistics": "Fresh process is the unit; four process medians/means per actor/block, eight overall; retain every observation and both blocks. No cross-runtime CPU ratio or significance claim.",
-      "resources": "One CPU, 4GiB cgroup, no swap, grouped OOM; Wasm retained modules1/64MiB. Sequential children; no profiler/barriers.",
+      "resources": "At most two inherited CPUs of a managed cloud machine, the same for every actor; inherited finite memory cap (recorded), no kernel-enforced 4GiB budget or OOM event record; Wasm retained modules1/64MiB. Sequential children; no profiler/barriers.",
       "source": "Original17 bytes shared by Scriptw and V8; Scriptc derived print-wrapper source and pinned0.4.5/Zig0.16 provenance retained in producer receipt."
     },
     "comparisons": {
       "scriptc": {
         "wins_in_both_statistics_and_blocks": [
-          "sort-reverse-128.js",
           "sort-reverse-512.js",
           "sort-sorted-512.js",
           "to-sorted-512.js",
           "join-1024.js",
           "join-4096.js",
           "join-mixed-1024.js",
-          "numeric-loop-10000.js",
           "numeric-loop-50000.js",
           "folded-string-4096.js",
           "dynamic-string-4096.js",
-          "integer.js",
           "objects.js",
           "retained-objects.js",
-          "join-empty-1024.js",
-          "join-singleton-1024.js",
-          "join-small-1024.js"
+          "join-empty-1024.js"
         ],
         "geomeans": [
           {
-            "median": 0.45458540507328443,
-            "mean": 0.4534890752430208
+            "median": 0.6484425352463631,
+            "mean": 0.6638645494063339
           },
           {
-            "median": 0.4581491080888699,
-            "mean": 0.4562953039848942
+            "median": 0.6579620318532576,
+            "mean": 0.6740561444516623
           }
         ]
       },
@@ -5764,41 +5973,54 @@
           "numeric-loop-50000.js",
           "dynamic-string-4096.js",
           "integer.js",
-          "join-singleton-1024.js",
           "join-small-1024.js"
         ],
         "geomeans": [
           {
-            "median": 1.097800046005074,
-            "mean": 0.938449679107563
+            "median": 1.132796603801258,
+            "mean": 0.9440678465903403
           },
           {
-            "median": 1.1057537091233103,
-            "mean": 0.9363320119123235
+            "median": 1.097778083178898,
+            "mean": 0.8891015541248668
           }
         ]
       }
     },
+    "machine": {
+      "platform": "Linux-6.18.44-fc-v470-x86_64-with-glibc2.39",
+      "affinity": [
+        2,
+        3
+      ],
+      "cpu_model": "Intel(R) Xeon(R) Processor @ 2.30GHz",
+      "resources": {},
+      "cloud": {
+        "inherited_memory_cap_bytes": 14338772992,
+        "scope": "managed cloud machine: shared virtual CPUs, inherited memory cap, no kernel-enforced 4 GiB budget and no cgroup OOM event record"
+      }
+    },
     "parent_qualification": {
-      "unique_selected": 1844,
       "receipt": {
         "path": "native-qualified.json",
-        "sha256": "16bca0a79c981fde6454ba782c0f0fdf4cdb2e54551937d28032084e6dfe34fd"
+        "sha256": "caa4bffffd06e2ad41f4e207bfcb8c793b2e14be36978eb045ccc22c9474e11c"
       },
-      "limits": "Full AOT lib and listed structural targets, full Engine builtins/layout target and selected GC/language/structure; no full workspace or Test262 claim. Repeated priority first-demand passes deduplicated."
+      "checked_entries": 136,
+      "limits": "Freeze and image-output qualification of one committed source; no native test-suite, A/A or Test262 claim.",
+      "source": "cohort"
     },
     "reference17": {
       "evidence": {
         "path": "analysis.json",
-        "sha256": "e6830d7977af6913a12cb528014a2120f6f3c71d90bb76168c64e71b2d6c0e69"
+        "sha256": "d77df6fdf28c579d66cbf24a53882f21bcb7eac1f6a165f4a4dcfb936b1c13e2"
       }
     },
     "evidence": {
-      "archive": "docs/rust-rewrite/performance-immutable-global-folding-three-runtime-20261102-inert.tar.xz",
-      "sha256": "8360f34fda29be57bbe7e676278412e5a652f199caeb7a622cf77a1eb0f8f160",
-      "bytes": 989844,
-      "regular_utf8_members": 1282,
-      "expanded_utf8_bytes": 15355594,
+      "archive": "docs/rust-rewrite/runtime-comparison-20261116-inert.tar.xz",
+      "sha256": "709c84c7e9bab9fa1f66650cc2aff95f01bc735900a5256d00992763d27a550b",
+      "bytes": 1012472,
+      "regular_utf8_members": 1289,
+      "expanded_utf8_bytes": 15892612,
       "contains_native_or_wasm_images": false
     }
   },
@@ -6345,12 +6567,12 @@
   },
   "compilation_portable_wasm": {
     "status": "complete descriptive fresh CLI comparison; successful portable output, no execution or conformance claim",
-    "source_fingerprint": "87385fff34d1cc383cd64369036d47f7fd66f7da2aad4c463b05cf556cb3f7a5",
-    "publication_commit": "77c10017a64937e13de08c7873170772ae15ffab",
-    "embedded_base_commit": "9f9c8b9d932b779655bba0dbeaa25587d4a48e99",
-    "measurement_commit": "77c10017a64937e13de08c7873170772ae15ffab",
-    "started_at": "2026-11-02T18:08:14.129882+00:00",
-    "finished_at": "2026-11-02T18:08:49.641003+00:00",
+    "source_fingerprint": "067e69797abb56860fd19ddd9c0fbc74eb6af8a79cb9e2fea2ea51aadaa1b140",
+    "publication_commit": "a48dfc3e6270f62dcb2b5d2a82eb7a555017693f",
+    "embedded_base_commit": "a48dfc3e6270f62dcb2b5d2a82eb7a555017693f",
+    "measurement_commit": "a48dfc3e6270f62dcb2b5d2a82eb7a555017693f",
+    "started_at": "2026-11-16T22:55:05.544604+00:00",
+    "finished_at": "2026-11-16T22:55:30.565026+00:00",
     "processes": 136,
     "processes_per_compiler_case": 4,
     "wins_both_block_medians": [
@@ -6372,15 +6594,15 @@
       "join-singleton-1024.js",
       "join-small-1024.js"
     ],
-    "pooled_workload_median_geomean": 0.5238891966435311,
+    "pooled_workload_median_geomean": 0.587661356480872,
     "report": {
       "path": "docs/rust-rewrite/compilation-current.json",
-      "sha256": "2dba26dcef7eed09940e270bd3e9d580bb7bdd2d512d39c582fb4762121b9a97"
+      "sha256": "b3b265a7a4d15122682572100e05a58f70341d5682a0daa4b8f30c474dcf7926"
     },
     "evidence": {
       "path": "docs/rust-rewrite/compilation-comparison.tar.gz",
-      "bytes": 10903710,
-      "sha256": "aeef541d87c00fe1854a6ddf05abe3ff403b6a426e7bf6e4821d150766e8b8e5"
+      "bytes": 11267121,
+      "sha256": "a644c9568d5ccbcb42c4135442893899989014c763a87add5d9873f7f6e322aa"
     },
     "policy": {
       "timing": "Parent wall around GNU-time-supervised fresh compiler process; includes startup, source read, parse/lower/codegen/link and Wasm output I/O. No Wasm-to-native compilation, instantiation or JavaScript execution.",
@@ -6390,8 +6612,18 @@
       "source": "Original17 exact source/expected bytes retained; Scriptc alone receives the canonical print-to-console.log adapter.",
       "compiler_identity": "Scriptw source_commit is the embedded base Git revision; source_fingerprint and executable SHA identify the measured working-tree compiler. The performance evidence separately binds its source patch and publication.",
       "statistics": "Two blocks, ABBA per case with alternating first actor; second block reverses cases and actors. Four fresh builds per compiler/case; pooled and both block medians. Descriptive observations, no significance/conformance claim.",
-      "resources": "Sequential children, one CPU, at most4GiB cgroup, no swap, grouped OOM; native/module caches unused by build wasm.",
+      "resources": "Sequential children, one inherited CPU of a managed cloud machine, its inherited finite memory cap (recorded); no kernel-enforced 4GiB budget or grouped-OOM record; native/module caches unused by build wasm.",
       "validation": "Successful compilation and portable Wasm magic checked, emitted bytes retained; no output execution/checksum verification in this compilation-only measurement."
+    },
+    "machine": {
+      "platform": "Linux-6.18.44-fc-v470-x86_64-with-glibc2.39",
+      "affinity": [
+        2
+      ],
+      "cloud": {
+        "inherited_memory_cap_bytes": 14338772992,
+        "scope": "managed cloud machine: shared virtual CPUs, inherited memory cap, no kernel-enforced 4 GiB budget and no cgroup OOM event record"
+      }
     }
   }
 }

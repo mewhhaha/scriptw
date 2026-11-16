@@ -7,26 +7,28 @@ older implementation notes live in the [README archive](benchmark-history.md).
 
 ## React Server Components
 
-Measured **2026-11-16**, React **19.3.1**, source `875fb7647` (fingerprint `067e69797abb`), Node **24.22.1** with V8 **13.6.233.17-node.58**. Scriptw Speed takes about **1.7× V8 request time** sync and **1.9×** async; Fast takes about **4.7×**. The 2026-11-11 source, measured in the same campaign, takes 2.48 ms under Fast, 3.2 times the current Fast figure.
+Measured **2026-11-16**, React **19.3.1**, source `875fb7647` (fingerprint `067e69797abb`), Node **24.22.1** with V8 **13.6.233.17-node.58**. Scriptw Speed takes about **1.8× V8 request time**, sync and async; Fast takes about **4.3×**. The 2026-11-11 source, measured in the same campaign, takes 2.07 ms under Fast, 3.2 times the current Fast figure.
 
 ### Requests and measurement boundaries
 
-The campaign checked **12,864 exact outputs across 64 fresh processes**: eight processes per engine and case, 100 warmups and 101 timed calls per process, in two mirrored blocks with rotating engine/case order. Sync and async use separate processes. Timed calls within a process are dependent; the independent summaries are process medians. It ran on one virtual CPU of a shared four-vCPU cloud machine (Intel Xeon at 2.30 GHz) with `benchmark-rsc.py --cloud`: no CPU isolation, no hardware counters and no compared Cargo feature graphs, so a spread of several percent between processes is machine noise as much as engine behaviour. Exact executable, source, P/R, toolchain and input identities are in the [current report](rsc-current.json); every call's time is in the [raw campaign report](rsc-campaign-20261116-report.json.xz).
+The campaign checked **12,864 exact outputs across 64 fresh processes**: eight processes per engine and case, 100 warmups and 101 timed calls per process, in two mirrored blocks with rotating engine/case order. Sync and async use separate processes. Timed calls within a process are dependent; the independent summaries are process medians. It ran with `benchmark-rsc.py --cloud` on two virtual CPUs of a shared four-vCPU cloud machine (Intel Xeon at 2.30 GHz), the same two for every engine: no CPU isolation, no hardware counters and no compared Cargo feature graphs, so a spread of several percent between processes is machine noise as much as engine behaviour. Exact executable, source, P/R, toolchain and input identities are in the [current report](rsc-current.json); every call's time is in the [raw campaign report](rsc-campaign-20261116-2cpu-report.json.xz).
 
 | Policy / source | Sync median / typical mean / typical p95 · ms | Async median / typical mean / typical p95 · ms |
 | --- | ---: | ---: |
-| Fast · `fbc281cac` (2026-11-11) | 2.477 / 2.807 / 4.300 | 2.632 / 2.969 / 4.383 |
-| Fast · `875fb7647` | 0.776 / 0.800 / 0.943 | 0.818 / 0.848 / 0.988 |
-| Speed · `875fb7647` | 0.271 / 0.280 / 0.368 | 0.341 / 0.366 / 0.521 |
-| Node 24 / V8 | 0.164 / 0.274 / 0.332 | 0.177 / 0.328 / 0.739 |
+| Fast · `fbc281cac` (2026-11-11) | 2.065 / 2.274 / 3.423 | 2.314 / 2.575 / 3.670 |
+| Fast · `875fb7647` | 0.651 / 0.672 / 0.785 | 0.743 / 0.799 / 0.924 |
+| Speed · `875fb7647` | 0.270 / 0.281 / 0.373 | 0.303 / 0.321 / 0.418 |
+| Node 24 / V8 | 0.153 / 0.189 / 0.223 | 0.171 / 0.214 / 0.269 |
 
-Median is the median of eight process medians. Typical mean and p95 are the medians of eight within-process means and nearest-rank p95s; they are descriptive statistics, without confidence intervals. Chart whiskers show the minimum and maximum process medians: Speed's async processes range from 0.293 to 0.621 ms, with a first-block median of 0.404 ms and a second-block median of 0.300 ms, so its async median is the least settled figure here. Node's means sit well above its medians because its slow calls are few and long.
+Median is the median of eight process medians. Typical mean and p95 are the medians of eight within-process means and nearest-rank p95s; they are descriptive statistics, without confidence intervals. Chart whiskers show the minimum and maximum process medians; Speed's processes range from 0.234 to 0.419 ms sync and from 0.281 to 0.545 ms async.
 
 ![RSC request timings](assets/rsc-current/runtime.svg)
 
+**Two CPUs, and why.** V8 runs its compiler and collector on helper threads. With the whole process pinned to one CPU on this machine, those threads preempt the main thread inside timed calls. A first campaign the same day on one CPU has the same medians within noise (Speed 0.271 and 0.341 ms, Node 0.164 and 0.177 ms) but Node means of 0.274 and 0.328 ms against 0.189 and 0.214 ms here; its [raw report](rsc-campaign-20261116-report.json.xz) is retained. The effect is far larger where each timed entry is a fresh context after few warmups: the kernel workload `numeric-loop-10000.js` takes V8 0.87 ms per entry on one CPU and 0.16 ms on two. Every cloud campaign on this page therefore gives all actors the same two CPUs; the Wasm actors run one thread and gain nothing from the second.
+
 With V8's JIT off (`node --jitless`), `scripts/rsc_wall_clock_compare.py` compares Speed and Node in twelve fresh processes each, outside this campaign. Three runs on 2026-11-16, the first two on source `34a5e56df` and the third on `875fb7647`, give Scriptw 279, 286 and 268 µs against Node's 309, 308 and 308 µs sync, and 309, 315 and 333 µs against 335, 329 and 329 µs async: 7 to 13% ahead sync, and between 8% ahead and 1% behind async.
 
-Cold setup per process, as medians of sixteen processes: source to Wasm takes 2.9 s, and native preparation takes 6.2 s under Fast and 9.3 s under Speed. Whole-process peak RSS, which includes that compilation, is 249 to 316 MiB for Scriptw and 76 MiB for Node.
+Cold setup per process, as medians of sixteen processes: source to Wasm takes 2.7 s, and native preparation takes 5.7 s under Fast and 8.0 s under Speed. Whole-process peak RSS, which includes that compilation, is 247 to 311 MiB for Scriptw and 76 MiB for Node.
 
 ![RSC cold compilation phases](assets/rsc-current/compilation.svg)
 
@@ -2134,31 +2136,31 @@ Seven affected native scopes pass **1,611 tests**; five source-guard groups pass
 
 ## Focused performance situations
 
-Measured **2026-11-08** on source `453a9074fcac`. All 21 programs use two balanced blocks and eight fresh processes per actor. Each program compares Fast, Speed and V8.
+Measured **2026-11-16** on source `067e69797abb`. All 21 programs use two balanced blocks and eight fresh processes per actor. Each program compares Fast, Speed and V8. Measured on two virtual CPUs, the same for every actor, of a shared four-vCPU cloud machine (Intel Xeon at 2.30 GHz) with Node **24.22.1**; the previous panel used another machine and Node 24.12.0. Speed is ahead of V8 in 10 programs and behind in 11, by up to 20× (`args-observed.js`).
 
 | Program · retained call | Fast · ms (median; min–max) | Speed · ms (median; min–max) | V8 · ms (median; min–max) |
 | --- | ---: | ---: | ---: |
-| `control-empty.js` | 0.005135 (0.005049–0.00519) | 0.0050795 (0.004969–0.00511) | 0.000351 (0.000281–0.000361) |
-| `global-shallow.js` | 2.15892 (2.15098–2.18126) | 1.75727 (1.74812–2.04566) | 0.970546 (0.940678–1.03143) |
-| `global-deep8.js` | 2.74284 (2.72885–2.92174) | 1.94218 (1.9237–2.01476) | 1.00055 (0.970535–1.0487) |
-| `global-bound-deep.js` | 0.650219 (0.64179–0.950012) | 0.209287 (0.208817–0.275623) | 0.004238 (0.002334–0.004268) |
-| `global-getter-deep.js` | 2.93196 (2.89787–3.02188) | 2.14701 (2.12884–2.22942) | 0.958326 (0.945037–0.984638) |
-| `frame-compact.js` | 1.91435 (1.89905–1.98996) | 0.946457 (0.942151–0.987764) | 0.057239 (0.057008–0.07401) |
-| `frame-branches32.js` | 7.87876 (7.78232–8.0048) | 5.78901 (5.77248–5.84046) | 0.0819705 (0.078679–0.087987) |
-| `frame-branches128.js` | 8.15025 (8.06496–8.39231) | 5.72321 (5.70344–5.82869) | 0.112624 (0.111522–0.114667) |
-| `frame-branches512.js` | 10.3622 (9.78221–11.2168) | 5.94032 (5.87943–5.98716) | 0.180257 (0.171055–0.184701) |
-| `args-unused.js` | 0.0998545 (0.099239–0.107864) | 0.0552095 (0.055064–0.056267) | 0.003116 (0.003066–0.003416) |
-| `args-observed.js` | 1.04514 (1.03264–1.11379) | 0.737263 (0.729382–0.768438) | 0.003051 (0.003005–0.047811) |
-| `property-stable.js` | 0.141032 (0.140727–0.141939) | 0.0677185 (0.067518–0.06837) | 0.0711295 (0.06827–0.071556) |
-| `property-mutated.js` | 0.140146 (0.139124–0.140868) | 0.0699925 (0.069662–0.070403) | 0.062052 (0.061667–0.062749) |
-| `metadata-ordinary.js` | 0.19525 (0.19484–0.197044) | 0.080022 (0.079551–0.080523) | 0.012123 (0.012062–0.014177) |
-| `metadata-function.js` | 0.193001 (0.191653–0.196132) | 0.0802325 (0.079501–0.081545) | 0.204027 (0.202523–0.213895) |
-| `metadata-intrinsic.js` | 0.19756 (0.192776–0.206421) | 0.0809185 (0.080433–0.082066) | 0.228404 (0.223133–0.288137) |
-| `typeof-dispatch.js` | 0.883671 (0.879608–0.893415) | 0.371901 (0.364902–0.38966) | 0.0137865 (0.013606–0.024857) |
-| `singleton-dispatch.js` | 0.851495 (0.850242–0.865823) | 0.356111 (0.352128–0.376815) | 0.010465 (0.006302–0.01615) |
-| `strict-equality-numbers.js` | 0.082521 (0.082096–0.082587) | 0.030197 (0.030047–0.030368) | 0.014838 (0.011091–0.014919) |
-| `strict-equality-mixed.js` | 0.087501 (0.087316–0.087727) | 0.0334085 (0.033253–0.033624) | 0.033624 (0.033243–0.034986) |
-| `for-in-wide.js` | 0.635239 (0.631468–0.754462) | 0.54836 (0.545264–0.626258) | 0.037556 (0.03709–0.039946) |
+| `control-empty.js` | 0.00316 (0.003027–0.003178) | 0.0030755 (0.003012–0.00312) | 0.0002375 (0.000193–0.000269) |
+| `global-shallow.js` | 0.111261 (0.107266–0.136124) | 0.048062 (0.045664–0.048438) | 0.599479 (0.560081–0.619949) |
+| `global-deep8.js` | 0.14577 (0.138665–0.146196) | 0.06927 (0.065627–0.109097) | 0.59526 (0.552222–1.05359) |
+| `global-bound-deep.js` | 0.107728 (0.102634–0.111735) | 0.0572245 (0.055561–0.083536) | 0.0031465 (0.002406–0.005519) |
+| `global-getter-deep.js` | 0.297467 (0.287227–0.306692) | 0.184005 (0.176626–0.186449) | 0.576181 (0.564699–0.597811) |
+| `frame-compact.js` | 0.391537 (0.377237–0.396208) | 0.134987 (0.128052–0.137006) | 0.043629 (0.041702–0.086763) |
+| `frame-branches32.js` | 1.63851 (1.56067–1.65996) | 0.611688 (0.56219–0.63959) | 0.05843 (0.056115–0.105426) |
+| `frame-branches128.js` | 2.12376 (2.10786–2.40862) | 0.671488 (0.641652–1.21633) | 0.065614 (0.062121–0.072845) |
+| `frame-branches512.js` | 3.92478 (3.6002–4.21457) | 0.782173 (0.750552–0.797853) | 0.175694 (0.159197–0.201359) |
+| `args-unused.js` | 0.023044 (0.021835–0.039488) | 0.013766 (0.013161–0.013883) | 0.0042635 (0.00178–0.006096) |
+| `args-observed.js` | 0.180961 (0.175798–0.273426) | 0.079847 (0.075061–0.112509) | 0.004085 (0.001914–0.0114) |
+| `property-stable.js` | 0.04157 (0.040391–0.054909) | 0.02317 (0.02249–0.023644) | 0.0590835 (0.058007–0.060163) |
+| `property-mutated.js` | 0.0425575 (0.041572–0.058208) | 0.0238825 (0.023671–0.025148) | 0.047785 (0.046608–0.086904) |
+| `metadata-ordinary.js` | 0.041521 (0.039424–0.061181) | 0.0232705 (0.02263–0.031053) | 0.010646 (0.009744–0.01392) |
+| `metadata-function.js` | 0.0409075 (0.039609–0.052976) | 0.023242 (0.022868–0.029941) | 0.142642 (0.1365–0.223368) |
+| `metadata-intrinsic.js` | 0.043522 (0.042491–0.044485) | 0.0243035 (0.023383–0.025018) | 0.141457 (0.132381–0.15127) |
+| `typeof-dispatch.js` | 0.224338 (0.218735–0.362548) | 0.0705295 (0.067143–0.070954) | 0.014014 (0.012–0.017445) |
+| `singleton-dispatch.js` | 0.232727 (0.221677–0.242334) | 0.071396 (0.069737–0.076626) | 0.006939 (0.006343–0.010595) |
+| `strict-equality-numbers.js` | 0.050658 (0.04815–0.050804) | 0.011751 (0.01146–0.01181) | 0.0126915 (0.010403–0.014929) |
+| `strict-equality-mixed.js` | 0.050307 (0.047986–0.057482) | 0.012342 (0.011728–0.012449) | 0.0248025 (0.023589–0.026913) |
+| `for-in-wide.js` | 0.04312 (0.042089–0.074134) | 0.022965 (0.02226–0.023683) | 0.0269615 (0.025505–0.042662) |
 
 All scores time the public retained call after preparation; each program keeps its own workload and exact-output checks. No workload ratio or blended score is reported. [Full identities and observations](situations-current.json).
 
@@ -2168,10 +2170,10 @@ All scores time the public retained call after preparation; each program keeps i
 
 | Retained program | Fast native P · KiB | Speed native P · KiB | Portable Wasm P · KiB |
 | --- | ---: | ---: | ---: |
-| `frame-compact.js` | 2240.2 | 964.1 | 192.3 |
-| `frame-branches32.js` | 2167.2 | 963.2 | 207.3 |
-| `frame-branches128.js` | 2758.1 | 1221.4 | 302.6 |
-| `frame-branches512.js` | 5130.8 | 2278.2 | 689.8 |
+| `frame-compact.js` | 1622.0 | 685.9 | 202.8 |
+| `frame-branches32.js` | 1649.1 | 713.0 | 221.2 |
+| `frame-branches128.js` | 2179.4 | 963.3 | 333.3 |
+| `frame-branches512.js` | 4292.7 | 1968.1 | 787.5 |
 
 Native serialized sizes include code metadata and data; they do not measure peak RSS or runtime heap.
 
@@ -2188,7 +2190,7 @@ include calls and counter increments. These differences are not isolated lookup 
 ### Control-flow and call-site scaling
 
 These programs execute 8,192 logical source applications across selected sites with matching checksums. Fast and Speed may fuse admitted calls into the loop body, so logical applications are not a direct-call count. Compact dispatch uses one polymorphic site and a dynamic key; switch arms use constant keys and separate sites. This does not isolate stack-probe cost.
-The current 512-site native P image is **5.01 MiB Fast / 2.22 MiB Speed**; portable P is **0.67 MiB**. Native serialized sizes include metadata and data.
+The current 512-site native P image is **4.19 MiB Fast / 1.92 MiB Speed**; portable P is **0.77 MiB**. Native serialized sizes include metadata and data.
 
 ![Call-site scaling](assets/situations-current/frame-size.svg)
 
@@ -2299,18 +2301,16 @@ part of the result.
 
 ### Public-call control and verification
 
-The 2026-11-08 situation cohort has 504 process observations and 60,984 exact calls. Its earlier RSC companion used 40 processes and 800 exact calls; the separately source-qualified 2026-11-09 RSC campaign above supersedes that RSC panel.
+The 2026-11-16 situation cohort has 504 process observations and 60,984 exact calls.
 
-Scoped verification (**2026-11-08**, source `453a9074fcac`): 2,832 broad checks, 380 source guards, and 9 CLI smokes pass. Full CI, Test262, and private units were not rerun. Existing formatting and Intl issues remain owned; four AOT unit failures remain a historical owned gate.
-
-**Broad native scopes:** emission, structure_builtins, structure_language, structure_async, runtime_link, modules_realms, intl_temporal, structure, aot_builtins, aot_language, aot_async, aot_realm_modules, aot_gc_entries.
+All 21 programs compile and pass their exact-output checks under both policies on this source; the full engine suite passed on the same compiler sources on 2026-11-16.
 
 <!-- runtime-comparison-details:start -->
 ## Runtime comparison
 
-**Measured 2026-11-02 locally**, compiler fingerprint `87385fff34d1`.
-V8 **13.6.233.17-node.37**, Node **24.12.0**.
-Scriptw is faster than Scriptc in **17/17 workloads** in both blocks; block execution geometric means are **0.455–0.458× Scriptc**. Scriptw is faster than V8 in **6/17 workloads** in both blocks; block execution geometric means are **1.098–1.106× V8**.
+**Measured 2026-11-16**, compiler fingerprint `067e69797abb`.
+V8 **13.6.233.17-node.58**, Node **24.22.1**.
+Scriptw is faster than Scriptc in **13/17 workloads** in both blocks; block execution geometric means are **0.648–0.658× Scriptc**. Scriptw is faster than V8 in **5/17 workloads** in both blocks; block execution geometric means are **1.098–1.133× V8**.
 
 This compares Wasm public entry with V8 `runInContext`. Scriptw and Scriptc compile
 Wasm before the measured processes and share a Wasmtime host with compilation disabled.
@@ -2329,39 +2329,39 @@ time as a supplemental measurement, excluded from bars and ratios.
 
 <table>
 <tr>
-<td><img src="assets/benchmarks-current/sort-reverse-128.svg" width="440" alt="sort-reverse-128.js; Scriptw: 0.091 ms, 21.6 MiB RSS; Scriptc: 0.133 ms, 17.2 MiB RSS; V8: 0.023 ms, 59.3 MiB RSS"></td>
-<td><img src="assets/benchmarks-current/sort-reverse-512.svg" width="440" alt="sort-reverse-512.js; Scriptw: 0.133 ms, 21.7 MiB RSS; Scriptc: 0.340 ms, 17.5 MiB RSS; V8: 0.069 ms, 59.8 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/sort-reverse-128.svg" width="440" alt="sort-reverse-128.js; Scriptw: 0.090 ms, 18.1 MiB RSS; Scriptc: 0.074 ms, 13.0 MiB RSS; V8: 0.017 ms, 56.3 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/sort-reverse-512.svg" width="440" alt="sort-reverse-512.js; Scriptw: 0.109 ms, 18.1 MiB RSS; Scriptc: 0.197 ms, 13.0 MiB RSS; V8: 0.063 ms, 56.3 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/benchmarks-current/sort-sorted-512.svg" width="440" alt="sort-sorted-512.js; Scriptw: 0.133 ms, 21.7 MiB RSS; Scriptc: 0.338 ms, 17.2 MiB RSS; V8: 0.070 ms, 59.8 MiB RSS"></td>
-<td><img src="assets/benchmarks-current/to-sorted-512.svg" width="440" alt="to-sorted-512.js; Scriptw: 0.143 ms, 21.9 MiB RSS; Scriptc: 0.375 ms, 17.4 MiB RSS; V8: 0.069 ms, 59.7 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/sort-sorted-512.svg" width="440" alt="sort-sorted-512.js; Scriptw: 0.109 ms, 18.1 MiB RSS; Scriptc: 0.189 ms, 13.1 MiB RSS; V8: 0.062 ms, 56.2 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/to-sorted-512.svg" width="440" alt="to-sorted-512.js; Scriptw: 0.106 ms, 18.1 MiB RSS; Scriptc: 0.202 ms, 13.0 MiB RSS; V8: 0.059 ms, 56.3 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/benchmarks-current/join-1024.svg" width="440" alt="join-1024.js; Scriptw: 0.235 ms, 22.2 MiB RSS; Scriptc: 0.410 ms, 17.5 MiB RSS; V8: 0.055 ms, 59.5 MiB RSS"></td>
-<td><img src="assets/benchmarks-current/join-4096.svg" width="440" alt="join-4096.js; Scriptw: 0.699 ms, 22.1 MiB RSS; Scriptc: 1.547 ms, 17.8 MiB RSS; V8: 0.233 ms, 67.7 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/join-1024.svg" width="440" alt="join-1024.js; Scriptw: 0.132 ms, 18.2 MiB RSS; Scriptc: 0.234 ms, 13.0 MiB RSS; V8: 0.041 ms, 56.2 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/join-4096.svg" width="440" alt="join-4096.js; Scriptw: 0.295 ms, 18.4 MiB RSS; Scriptc: 0.797 ms, 13.6 MiB RSS; V8: 0.194 ms, 58.6 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/benchmarks-current/join-mixed-1024.svg" width="440" alt="join-mixed-1024.js; Scriptw: 0.269 ms, 21.4 MiB RSS; Scriptc: 0.271 ms, 17.2 MiB RSS; V8: 0.096 ms, 60.5 MiB RSS"></td>
-<td><img src="assets/benchmarks-current/numeric-loop-10000.svg" width="440" alt="numeric-loop-10000.js; Scriptw: 0.068 ms, 20.9 MiB RSS; Scriptc: 0.095 ms, 16.6 MiB RSS; V8: 0.142 ms, 64.8 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/join-mixed-1024.svg" width="440" alt="join-mixed-1024.js; Scriptw: 0.135 ms, 18.2 MiB RSS; Scriptc: 0.150 ms, 12.9 MiB RSS; V8: 0.086 ms, 56.7 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/numeric-loop-10000.svg" width="440" alt="numeric-loop-10000.js; Scriptw: 0.083 ms, 17.6 MiB RSS; Scriptc: 0.058 ms, 12.4 MiB RSS; V8: 0.149 ms, 62.3 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/benchmarks-current/numeric-loop-50000.svg" width="440" alt="numeric-loop-50000.js; Scriptw: 0.069 ms, 20.7 MiB RSS; Scriptc: 0.184 ms, 16.9 MiB RSS; V8: 0.698 ms, 66.7 MiB RSS"></td>
-<td><img src="assets/benchmarks-current/folded-string-4096.svg" width="440" alt="folded-string-4096.js; Scriptw: 0.170 ms, 21.1 MiB RSS; Scriptc: 0.808 ms, 16.4 MiB RSS; V8: 0.126 ms, 60.4 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/numeric-loop-50000.svg" width="440" alt="numeric-loop-50000.js; Scriptw: 0.080 ms, 17.6 MiB RSS; Scriptc: 0.162 ms, 12.4 MiB RSS; V8: 0.553 ms, 64.5 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/folded-string-4096.svg" width="440" alt="folded-string-4096.js; Scriptw: 0.121 ms, 17.6 MiB RSS; Scriptc: 0.381 ms, 12.6 MiB RSS; V8: 0.116 ms, 62.0 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/benchmarks-current/dynamic-string-4096.svg" width="440" alt="dynamic-string-4096.js; Scriptw: 0.189 ms, 20.6 MiB RSS; Scriptc: 0.285 ms, 16.7 MiB RSS; V8: 0.193 ms, 65.7 MiB RSS"></td>
-<td><img src="assets/benchmarks-current/integer.svg" width="440" alt="integer.js; Scriptw: 0.070 ms, 21.1 MiB RSS; Scriptc: 0.074 ms, 16.6 MiB RSS; V8: 2.546 ms, 66.0 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/dynamic-string-4096.svg" width="440" alt="dynamic-string-4096.js; Scriptw: 0.126 ms, 17.6 MiB RSS; Scriptc: 0.156 ms, 12.6 MiB RSS; V8: 0.158 ms, 63.0 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/integer.svg" width="440" alt="integer.js; Scriptw: 0.078 ms, 17.8 MiB RSS; Scriptc: 0.031 ms, 12.5 MiB RSS; V8: 1.244 ms, 62.8 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/benchmarks-current/objects.svg" width="440" alt="objects.js; Scriptw: 0.242 ms, 21.6 MiB RSS; Scriptc: 0.679 ms, 17.5 MiB RSS; V8: 0.067 ms, 59.6 MiB RSS"></td>
-<td><img src="assets/benchmarks-current/retained-objects.svg" width="440" alt="retained-objects.js; Scriptw: 6.235 ms, 25.8 MiB RSS; Scriptc: 34.484 ms, 23.4 MiB RSS; V8: 3.584 ms, 84.6 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/objects.svg" width="440" alt="objects.js; Scriptw: 0.130 ms, 18.0 MiB RSS; Scriptc: 0.371 ms, 12.9 MiB RSS; V8: 0.045 ms, 56.3 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/retained-objects.svg" width="440" alt="retained-objects.js; Scriptw: 4.082 ms, 23.8 MiB RSS; Scriptc: 21.224 ms, 18.7 MiB RSS; V8: 1.625 ms, 80.3 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/benchmarks-current/join-empty-1024.svg" width="440" alt="join-empty-1024.js; Scriptw: 0.077 ms, 21.4 MiB RSS; Scriptc: 0.283 ms, 17.5 MiB RSS; V8: 0.062 ms, 59.4 MiB RSS"></td>
-<td><img src="assets/benchmarks-current/join-singleton-1024.svg" width="440" alt="join-singleton-1024.js; Scriptw: 0.078 ms, 21.3 MiB RSS; Scriptc: 0.130 ms, 16.6 MiB RSS; V8: 0.098 ms, 60.1 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/join-empty-1024.svg" width="440" alt="join-empty-1024.js; Scriptw: 0.083 ms, 17.9 MiB RSS; Scriptc: 0.134 ms, 12.9 MiB RSS; V8: 0.051 ms, 56.6 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/join-singleton-1024.svg" width="440" alt="join-singleton-1024.js; Scriptw: 0.082 ms, 17.6 MiB RSS; Scriptc: 0.065 ms, 12.4 MiB RSS; V8: 0.075 ms, 56.5 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/benchmarks-current/join-small-1024.svg" width="440" alt="join-small-1024.js; Scriptw: 0.077 ms, 21.4 MiB RSS; Scriptc: 0.178 ms, 16.8 MiB RSS; V8: 0.168 ms, 60.1 MiB RSS"></td>
+<td><img src="assets/benchmarks-current/join-small-1024.svg" width="440" alt="join-small-1024.js; Scriptw: 0.085 ms, 17.8 MiB RSS; Scriptc: 0.097 ms, 12.5 MiB RSS; V8: 0.128 ms, 56.8 MiB RSS"></td>
 <td></td>
 </tr>
 </table>
@@ -2374,7 +2374,9 @@ time as a supplemental measurement, excluded from bars and ratios.
 <!-- application-benchmarks-details:start -->
 ## Application workloads
 
-Measured **2026-11-02**, compiler `87385fff34d1`.
+Measured **2026-11-16**, compiler `067e69797abb`, on
+Intel(R) Xeon(R) Processor @ 2.30GHz (4 vCPUs), two pinned CPUs for every actor, inherited 13.4 GiB cloud memory cap; Node 24.22.1 (V8 13.6.233.17-node.58),
+Chromium 153.0.8010.12.
 Six synchronous request/response kernels use plain records, without networking or
 Web APIs. The seventh case bundles real React 19.3.1
 legacy `renderToString` with hooks/context and 32 escaped rows.
@@ -2388,23 +2390,23 @@ and V8 source/context setup stay outside entry timing; Scriptw Realm bootstrap
 stays inside. Failed actors have no timing or memory bar.
 
 Across the **5 completed Scriptc comparisons**, Scriptw batch medians
-are **3.8–9.3× Scriptc**. Failed cases receive no speed score.
+are **1.0–2.7× Scriptc**. Failed cases receive no speed score.
 
 <table>
 <tr>
-<td><img src="assets/applications-current/edge-json-api.svg" width="440" alt="edge-json-api.js; Scriptw: 3.999 ms, 26.4 MiB RSS; Scriptc: 0.793 ms, 17.7 MiB RSS; V8: 0.340 ms, 55.3 MiB RSS"></td>
-<td><img src="assets/applications-current/edge-router.svg" width="440" alt="edge-router.js; Scriptw: 2.637 ms, 25.2 MiB RSS; Scriptc: 0.694 ms, 17.5 MiB RSS; V8: 0.204 ms, 54.6 MiB RSS"></td>
+<td><img src="assets/applications-current/edge-json-api.svg" width="440" alt="edge-json-api.js; Scriptw: 0.664 ms, 19.8 MiB RSS; Scriptc: 0.478 ms, 13.3 MiB RSS; V8: 0.261 ms, 53.2 MiB RSS"></td>
+<td><img src="assets/applications-current/edge-router.svg" width="440" alt="edge-router.js; Scriptw: 0.426 ms, 19.1 MiB RSS; Scriptc: 0.394 ms, 13.3 MiB RSS; V8: 0.149 ms, 53.1 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/applications-current/edge-query.svg" width="440" alt="edge-query.js; Scriptw: 6.298 ms, 27.5 MiB RSS; Scriptc: 1.268 ms, 17.6 MiB RSS; V8: 0.653 ms, 55.0 MiB RSS"></td>
-<td><img src="assets/applications-current/edge-middleware.svg" width="440" alt="edge-middleware.js; Scriptw: 2.426 ms, 25.6 MiB RSS; Scriptc: 0.622 ms, 17.8 MiB RSS; V8: 0.170 ms, 54.7 MiB RSS"></td>
+<td><img src="assets/applications-current/edge-query.svg" width="440" alt="edge-query.js; Scriptw: 0.986 ms, 20.5 MiB RSS; Scriptc: 0.718 ms, 13.3 MiB RSS; V8: 0.435 ms, 53.3 MiB RSS"></td>
+<td><img src="assets/applications-current/edge-middleware.svg" width="440" alt="edge-middleware.js; Scriptw: 0.381 ms, 19.1 MiB RSS; Scriptc: 0.364 ms, 13.3 MiB RSS; V8: 0.131 ms, 52.9 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/applications-current/edge-html.svg" width="440" alt="edge-html.js; Scriptw: 10.564 ms, 30.8 MiB RSS; Scriptc: 1.142 ms, 17.8 MiB RSS; V8: 1.004 ms, 56.6 MiB RSS"></td>
-<td><img src="assets/applications-current/edge-nested-result.svg" width="440" alt="edge-nested-result.js; Scriptw: 7.307 ms, 29.7 MiB RSS; Scriptc: failed (execution); V8: 0.390 ms, 56.0 MiB RSS"></td>
+<td><img src="assets/applications-current/edge-html.svg" width="440" alt="edge-html.js; Scriptw: 1.791 ms, 21.5 MiB RSS; Scriptc: 0.673 ms, 13.3 MiB RSS; V8: 0.739 ms, 54.9 MiB RSS"></td>
+<td><img src="assets/applications-current/edge-nested-result.svg" width="440" alt="edge-nested-result.js; Scriptw: 0.742 ms, 19.8 MiB RSS; Scriptc: failed (execution); V8: 0.296 ms, 54.0 MiB RSS"></td>
 </tr>
 <tr>
-<td><img src="assets/applications-current/react-ssr.svg" width="440" alt="react-ssr.js; Scriptw: failed (timed out); Scriptc: failed (build); V8: 0.762 ms, 56.7 MiB RSS"></td>
+<td><img src="assets/applications-current/react-ssr.svg" width="440" alt="react-ssr.js; Scriptw: 8.135 ms, 101.0 MiB RSS; Scriptc: failed (build); V8: 0.648 ms, 55.2 MiB RSS"></td>
 <td></td>
 </tr>
 </table>
@@ -2423,20 +2425,20 @@ and is not assigned to individual cases.
 
 | Reference | Entry median · ms |
 | --- | ---: |
-| RSC Flight · sync | 0.505 |
-| RSC Flight · async | 0.571 |
-| URL / Request | 2.016 |
-| JSON / Request | 3.797 |
-| React mount | 1.137 |
-| React update | 1.347 |
-| React hydration | 1.945 |
+| RSC Flight · sync | 0.408 |
+| RSC Flight · async | 0.399 |
+| URL / Request | 0.911 |
+| JSON / Request | 1.211 |
+| React mount | 1.167 |
+| React update | 1.255 |
+| React hydration | 1.265 |
 
 Actual standalone build/execution attempts remain visible, including failures:
 
 | Capability attempt | Scriptw | Scriptc | V8 host reference |
 | --- | --- | --- | --- |
-| RSC Flight · sync | Execution failed | Build failed | Node checked |
-| RSC Flight · async | Execution failed | Build failed | Node checked |
+| RSC Flight · sync | Checked | Build failed | Node checked |
+| RSC Flight · async | Checked | Build failed | Node checked |
 | URL / Request | Execution failed | Build failed | Node checked |
 | JSON / Request | Execution failed | Build failed | Node checked |
 | React client mount | Timed out (60 s) | Build failed | Chromium checked |
@@ -2444,28 +2446,37 @@ Actual standalone build/execution attempts remain visible, including failures:
 Standalone run timeouts include compilation and startup; they do not isolate
 rendering time. Scriptw's portable build and ordinary NativeHost run are
 separate probes; the run recompiles source instead of loading the dumped pair.
-At this frozen benchmark revision, Scriptw lacked DOM, encoding, Web Streams,
-Fetch and URL APIs, as recorded by its capability probe. Current-source RSC
-measurements are reported in the [README](../../README.md#benchmarks).
+Current-source RSC measurements are reported in the [README](../../README.md#benchmarks).
 
-The frozen [failure diagnosis](applications-current.json) records
-missing `TextEncoder` during RSC initialization. Corrected Scriptc Web probes
-reach `SC3002` (WASI API admission), and its nested-result case reports `SC2020`
-(dynamic `Array.slice` end unsupported). React bundles retain type-check errors.
-Scriptw's SSR output has a 2-MB function, triggering size-optimized native
-compilation; a debugger sample finds Cranelift optimization active at 20 seconds.
+Every failure keeps its stage and one line of its retained raw log (the first
+coded compiler error, otherwise the last line); the complete logs are in the
+evidence archive:
+
+| Scope | Case | Actor | Stage | Retained diagnostic |
+| --- | --- | --- | --- | --- |
+| portable | edge-nested-result.js | scriptc | execution | `exit 1: 1:    0x95b - <unknown>!<wasm function 11>: Exited with i32 exit status 1` |
+| portable | react-ssr.js | scriptc | source-to-wasm | `exit 1: error SC0001: The left-hand side of a 'for...in' statement must be of type 'string' or 'any'.` |
+| standalone | rsc-sync | scriptc | source-to-wasm | `exit 1: error SC0001: The left-hand side of a 'for...in' statement must be of type 'string' or 'any'.` |
+| standalone | rsc-async | scriptc | source-to-wasm | `exit 1: error SC0001: The left-hand side of a 'for...in' statement must be of type 'string' or 'any'.` |
+| standalone | web-url | scriptw | execution | `exit 1: uncaught throw: ReferenceError: wasm-aot completion: object: Request is not defined` |
+| standalone | web-url | scriptc | source-to-wasm | `exit 1: error SC3002: wasm32-wasi target does not support network-backed fetch (WASI Preview 1 has no socket API)` |
+| standalone | web-json | scriptw | execution | `exit 1: uncaught throw: ReferenceError: wasm-aot completion: object: Request is not defined` |
+| standalone | web-json | scriptc | source-to-wasm | `exit 1: error SC3002: wasm32-wasi target does not support network-backed fetch (WASI Preview 1 has no socket API)` |
+| standalone | client-mount | scriptw | source-to-wasm | `timed out (60 s)` |
+| standalone | client-mount | scriptc | source-to-wasm | `exit 1: error SC0001: The left-hand side of a 'for...in' statement must be of type 'string' or 'any'.` |
 
 [Data, identities and diagnostics](applications-current.json) ·
-[Inert raw evidence](application-benchmarks-20261102-inert.tar.xz) ·
+[Inert raw evidence](application-benchmarks-20261116-inert.tar.xz) ·
 [Workflow](../../CONTRIBUTING.md#react-and-edge-benchmarks).
 <!-- application-benchmarks-details:end -->
 
 ## Compilation time
 
 
-**JavaScript → portable Wasm**, measured 2026-11-02 with the same compiler
-fingerprint as the runtime charts. Scriptw is faster in **17/17 workloads**,
-taking **0.524x Scriptc's time** by geometric mean of workload medians.
+**JavaScript → portable Wasm**, measured 2026-11-16 with the same compiler
+fingerprint as the runtime charts, on one CPU of the same cloud machine for both
+compilers. Scriptw is faster in **17/17 workloads**,
+taking **0.588x Scriptc's time** by geometric mean of workload medians.
 
 ![JavaScript to portable Wasm compilation time](assets/compilation-current.svg)
 
