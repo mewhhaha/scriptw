@@ -11,8 +11,9 @@ versions, target/ISA settings and generated machine-code policy are unchanged.
 
 The idle scratch policy modifies `src/compiler.rs`; the added private
 `src/compiler/context_pool.rs` and its tests own it. The translation changes
-below modify `src/func_environ{.rs,/gc.rs}`; the heap base's home slot adds
-`src/func_environ/gc/base_home.rs`.
+below modify `src/func_environ{.rs,/gc.rs}` and `src/translate/`; the last
+section adds `src/func_environ/gc/{base_home,frame_reloads}.rs` and
+`src/func_environ/branch_threading.rs`.
 Registry installation markers were omitted; all other release files are kept.
 The license text is unchanged; its trailing empty line is normalized.
 
@@ -141,85 +142,161 @@ appended to the remembered-slot buffer the runtime publishes in
 cold blocks. Initializing stores, table and global stores need none: tables
 and globals are roots, and new objects are young or remembered whole.
 
-## GC heap base home slot
+## Frame reloads, home slots, proven references and threaded branches
 
-`src/func_environ/gc{.rs,/base_home.rs}`, `src/bounds_checks.rs`,
-`src/alias_region.rs`, `src/translate/func_translator.rs`
-([measurements](../../docs/rust-rewrite/benchmarks.md#gc-heap-base-home-slot-2026-11-15)).
-This changes where a function reads the GC heap base, not what it reads:
-Wasm semantics, trap codes, the `VMContext` and store-context layouts, target
-and ISA settings and calling conventions are unchanged, so a module compiled
-with it is interchangeable with one compiled without it.
+`src/func_environ/gc{.rs,/base_home.rs,/frame_reloads.rs}`,
+`src/func_environ/branch_threading.rs`, `src/func_environ.rs`,
+`src/bounds_checks.rs`, `src/alias_region.rs`,
+`src/translate/{code_translator.rs,func_translator.rs,stack.rs}`. These change
+which instructions a function executes, not what it computes: Wasm semantics,
+trap codes and their order, the `VMContext` and store-context layouts, stack
+maps, target and ISA settings and calling conventions are unchanged, so a
+module compiled with them is interchangeable with one compiled without.
+Callgrind instructions of one retained React Server Components request (sync,
+median of 97) went from 3,645,562 to 3,280,545 over the steps below, each
+measured on top of the ones before it.
 
-Upstream loads the base of a GC heap that cannot move with a `readonly` load,
-which Cranelift makes one value for the whole function. That value is live
-across every call between the function's first and last heap access. In a
-large function the register allocator spills it and, after the two splits
-`regalloc2` allows a value (`MAX_SPLITS_PER_SPILLSET`), reloads it from its
-spill slot before every single use: 48,126 of the 713,870 instructions the
-largest compiled JavaScript body of the retained request ran.
+### Loads from the frame, once per call (`frame_reloads`, `base_home`)
 
-- A function that reads the base of an immovable GC heap now loads it at the
-  top of its entry block, as before from the store context, and stores it to
-  a stack slot of its own, the home. Every use of the base, including the
-  field address computed by `bounds_checks::compute_addr`, is first translated
-  to a load from the home. A heap that may move keeps the upstream load from
-  the store context at every use.
-- After translation, `GcHeapBaseHome::split_at_calls` rewrites those loads.
-  Up to the first call on a path the base is the entry block's value. After a
-  call outside a loop it is loaded from the home again, right after the call
-  and only when a use can be reached from there without another call. Where
-  paths with different such values meet, a block parameter selects between
-  them (minimal SSA: the iterated dominance frontier of the defining blocks),
-  so a path that made no call passes its value on without a load. The
-  successors of a call that ends its block (`try_call`) load at their start.
-- A call inside a loop does not split. A loop keeps the value it is entered
-  with, so what it computes from the base stays loop-invariant and its
-  iterations load nothing; an edge that leaves a loop containing a call ends
-  that value, and the block it enters loads the base again when it is wanted.
-- When no load from the home remains (the function makes no call outside a
-  loop before a use), the store is removed and the slot's size set to zero:
-  such a function is compiled exactly as upstream compiles it.
-- Each remaining load addresses the slot through its own `stack_addr`, at a
-  distinct distance past the slot with the opposite load offset. The x64
-  backend folds that into `[rsp + offset]`; when it instead merges the load
-  into the instruction that uses it, it computes the address into a register,
-  and a `stack_addr` shared by every load would be computed in the entry
-  block and held in a callee-saved register or a spill slot from there.
+Two kinds of stack slot hold a value that a function reads far more often
+than the value can change.
 
-What this relies on, none of it new:
+- `cranelift-frontend` keeps each GC reference that is live across a call in
+  a stack-map slot and replaces every use of it, the ones before the first
+  call included, by a load from that slot. Cranelift's redundant-load
+  elimination stops at every instruction that can trap.
+- The GC heap base (when the heap cannot move) and the function's `vmctx`
+  parameter are one value for a whole activation. As one SSA value each is
+  live across every call; in a large function the register allocator spills
+  it and, after the two splits `regalloc2` allows a value
+  (`MAX_SPLITS_PER_SPILLSET`), reloads it before every single use. Each
+  therefore gets a home slot: the entry block stores the value there once,
+  and every use is first a load from the home (`FrameHome::load` for the
+  base, `FrameHome::of_parameter` after translation for the `vmctx`, which
+  the translator passes directly). A function that makes no call gets no
+  `vmctx` home; a heap that may move keeps the upstream load of its base
+  from the store context at every use.
 
-- The base is the same for the whole activation. Upstream's `readonly` and
-  `can_move` flags on the load already state that, and the entry block's load
-  keeps them. A module whose functions touch the GC heap needs one
-  (`needs_gc_heap`), and the store allocates it before the module is
-  instantiated, so it exists before any such function is entered; the product
-  configures a heap that cannot move (`gc_heap_may_move: false` with a 4 GiB
-  reservation).
-- The home is written once, in the entry block, before any load from it, and
-  only through its own alias region (`AliasRegionKey::GcHeapBaseHome`), so
-  every load yields the stored value. The rewrite is therefore only a choice
-  of where to load, and any choice that is valid SSA is correct; calls and
-  loops decide where a load is worth its instruction. Native code that is
-  entered or resumed (host-to-Wasm trampolines, returns from host calls and
-  libcalls, exception handlers, signal-based traps) finds the base where any
-  other stack value of the frame is; no register carries it across a call.
-- Blocks that take the parameter are joins whose every incoming edge can pass
-  an argument; a block entered from an unreachable predecessor or from a call
-  that ends its block loads instead.
+After translation and `FunctionBuilder::finalize`, `Reloads::forward` follows
+through the whole function what each such slot holds: a store makes the
+stored value known, a load of a slot whose content is known is removed, any
+other load stays and makes its result known, a call ends what is known (a slot
+holding the null reference still holds it), and a join keeps what all its
+predecessors agree on. A load that stays addresses the slot through a
+`stack_addr` of its own, at a distinct distance past the slot with the
+opposite load offset: the x64 backend folds a `stack_addr` into a store or
+load, but when it merges a load into the instruction that uses it, it
+computes the address into a register, and one `stack_addr` shared by all
+accesses would be computed where the slot is first written and kept in a
+callee-saved register or a spill slot from there. A home that nothing reads
+any more loses its store and its slot, so a function without calls is compiled
+as upstream compiles it.
 
-The pass computes a control-flow graph, a dominator tree, loops and dominance
-frontiers for each function that reads the base; functions that do not are
-untouched. Unreachable blocks keep their loads from the home. On targets whose
-backend does not fold a stack-slot address into a load, each remaining load
-costs an address computation as well; only x86-64 was measured.
+Why it is correct (the argument is in `frame_reloads.rs`): the pass handles
+only slots whose address is used as nothing but the address of whole-slot
+loads and stores of one type. Such a slot changes only at one of those stores and, for a
+stack-map slot, while a call runs and the collector relocates the reference
+in it (never a null one). Any solution of the forward equations therefore
+names, at a removed load, a value that a store or load on every path to it
+put or found in the slot with no call and no other store since; that value's
+definition dominates the load, and no collection lies between. Stores to
+stack-map slots and the stack maps themselves are untouched. `try_call` is a
+call, so exception handlers start knowing nothing but nulls; a trap leaves the
+function. The equations are iterated at most twelve rounds, after which the
+function is left as it was.
 
-A function with several calls in a row that each use the base afterwards pays
-a load per call where upstream, when the base won a callee-saved register,
-paid nothing; a small runtime helper of that shape runs up to 4.5% more
-instructions, while the request as a whole runs 1.4% fewer.
+A call also ends what is known of a home, although a home never changes, and
+no block parameter is added where paths bring different values. The base was
+first placed with SSA construction instead (a load right after each call that
+a use follows, block parameters at joins, no split inside loops); with a call
+every few blocks nearly every join took a parameter, and the moves cost more
+than the loads they saved: the request runs 19,195 instructions fewer with the
+base placed as described here than with that placement, and the same
+placement applied to the `vmctx` ran 25,827 more than no `vmctx` home at all.
+A narrower form was measured for all slots of this pass and not kept either:
+a parameter only where every path onward reads the slot before it calls,
+with a load on just the edges that do not know the content, ran 11,170 more.
 
-Tests: `func_environ::gc::base_home::tests::` (functions without calls,
-straight-line calls, joins with and without different values, loops with and
-without calls and with two entering values, `try_call` successors, jump
-tables), each verified by Cranelift's verifier after the rewrite.
+Measured: stack-map slots alone 3,645,562 to 3,552,613; with the `vmctx` home
+and the base moved to this pass 3,344,847 to 3,307,690 (after the two
+sections below).
+
+Costs: a function with several calls in a row that each use the base or the
+`vmctx` afterwards pays a load per call where upstream, when the value won a
+callee-saved register, paid nothing. A loop that calls reads what it uses
+after the call in every iteration. On targets whose backend does not fold a
+stack-slot address into a load, each remaining load costs an address
+computation as well; only x86-64 was measured.
+
+Tests: `func_environ::gc::frame_reloads::tests::` (no call, straight-line
+calls, joins that agree and that do not, loops with and without calls,
+`try_call` successors, null references, a slot used for two values, slots
+that escape or are read in part or as another type, home slots, the `vmctx`
+parameter), each
+verified by Cranelift's verifier after the rewrite.
+
+### Branches on a truth value that paths only just chose (`branch_threading`)
+
+`ref.test` followed by `if`, `br_on_cast` and Wasm blocks that yield a
+condition all end in a block whose only instruction is a `brif` on its own
+parameter, reached by edges that pass a constant or a comparison. Cranelift
+compiles that as written: each path materializes the truth value, moves it to
+the parameter and tests it again. After finalization, `thread` sends each
+such edge where the block would: an edge passing a constant jumps to the
+selected successor, an edge of a `brif` that passes its own condition goes to
+the successor its outcome selects, and a `jump` passing any other value
+becomes a copy of the block's `brif` on that value. It runs up to three
+rounds, since a threaded predecessor can become such a block.
+
+Why it is correct (the argument is in `branch_threading.rs`): a block is
+handled only when the `brif` is its only instruction and nothing else in the
+function uses any of its parameters, so entering it does exactly what the new
+edge does; the block itself is unchanged for the edges that still enter it.
+The values a new edge passes are the predecessor's own arguments and values
+that are defined on every path into the block. No call, store, trap or stack
+map is added, removed or reordered.
+
+Measured: 3,552,613 to 3,441,005.
+
+Tests: `func_environ::branch_threading::tests::` (constant and computed
+arguments, the block's other parameters, an edge passing its own condition,
+chains, parameters with other uses, blocks that do more), each verified by
+Cranelift's verifier.
+
+### Checks that an earlier check implies (`ProvenReferences` in `gc.rs`)
+
+The emitter reads a nullable local and applies `ref.as_non_null` or `ref.cast`
+at each use. Cranelift merges two such checks only when they test one SSA
+value, and after a call a GC reference is a value read from the frame again;
+a cast was also several blocks joined on a truth value.
+
+- `ref.cast` to a non-nullable concrete struct, array or exception type is
+  now a sequence of trapping checks (not null, not an `i31`, the header's
+  type) with the trap code and order it had; other casts stay `ref.test` and
+  a trap.
+- While translating, the environment records for a CLIF value what control
+  can only pass having established: not null after `ref.as_non_null`, after
+  a struct or array access that checked for null, and where `br_on_null`
+  falls through; a non-null instance of a concrete type after `ref.cast`,
+  where `br_on_cast_fail` falls through, and in the consequent of an `if` on
+  the result of `ref.test`. A later `ref.as_non_null`, null check of a GC
+  access, `ref.cast` or `ref.test` of the same value that a recorded fact
+  implies emits nothing (`ref.test` yields one).
+
+Why it is correct (the argument is on `ProvenReferences`): a fact is recorded
+with the innermost Wasm control frame, and for an `if` its arm, at the point
+that establishes it, and used only while that frame is still open in the same
+arm. Structured control flow reaches code after a point within one arm of one
+frame only through that point; the value is one SSA value whose definition
+dominates both places; and nullness and an object's type never change, a
+moving collection included. So the later check cannot fail and omitting it
+removes no trap. Unreachable code is not translated and records nothing.
+
+Measured: 3,441,005 to 3,344,847 for the cast sequence and the facts from
+checks, and 3,307,690 to 3,280,545 for the facts from branches and tests.
+
+Tests: `crates/scriptw-engine/tests/aot_gc_entries/aot_gc_translation_probes.rs`
+runs hand-assembled Wasm on the product's Wasmtime configuration: checks that
+only one path, arm or loop body made, branches on fresh truth values for
+structs, `i31` and null, and reads of a field around calls whose callee
+collects, moving the object, and then stores to it.

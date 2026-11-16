@@ -374,6 +374,8 @@ pub fn translate_operator(
                 *blockty,
                 else_is_cold,
             );
+            // The consequent runs only when `val` is not zero.
+            environ.prove_tested(val);
         }
         Operator::Else => {
             let i = environ.stacks.control_stack.len() - 1;
@@ -2669,6 +2671,8 @@ pub fn translate_operator(
 
             builder.seal_block(else_block); // The only predecessor is the current block.
             builder.switch_to_block(else_block);
+            // Control falls through only with a reference that is not null.
+            environ.prove_non_null(r);
             environ.stacks.push1(r);
         }
         Operator::BrOnNonNull { relative_depth } => {
@@ -2734,8 +2738,7 @@ pub fn translate_operator(
             let [.., WasmValType::Ref(r_ty)] = operand_types else {
                 unreachable!("validation")
             };
-            let is_null = environ.translate_ref_is_null(builder.cursor(), r, *r_ty)?;
-            environ.trapnz(builder, is_null, crate::TRAP_NULL_REFERENCE);
+            environ.translate_ref_as_non_null(builder, r, *r_ty)?;
             environ.stacks.push1(r);
         }
 
@@ -3056,7 +3059,7 @@ pub fn translate_operator(
                 unreachable!("validation")
             };
             let heap_type = environ.convert_heap_type(*hty)?;
-            let cast_okay = environ.translate_ref_test(
+            environ.translate_ref_cast(
                 builder,
                 WasmRefType {
                     heap_type,
@@ -3065,7 +3068,6 @@ pub fn translate_operator(
                 r,
                 *r_ty,
             )?;
-            environ.trapz(builder, cast_okay, crate::TRAP_CAST_FAILURE);
             environ.stacks.push1(r);
         }
         Operator::RefCastNullable { hty } => {
@@ -3074,7 +3076,7 @@ pub fn translate_operator(
                 unreachable!("validation")
             };
             let heap_type = environ.convert_heap_type(*hty)?;
-            let cast_okay = environ.translate_ref_test(
+            environ.translate_ref_cast(
                 builder,
                 WasmRefType {
                     heap_type,
@@ -3083,7 +3085,6 @@ pub fn translate_operator(
                 r,
                 *r_ty,
             )?;
-            environ.trapz(builder, cast_okay, crate::TRAP_CAST_FAILURE);
             environ.stacks.push1(r);
         }
         Operator::BrOnCast {
@@ -3155,6 +3156,7 @@ pub fn translate_operator(
             // The next Wasm instruction is executed when the cast succeeded and
             // we did not branch away.
             builder.switch_to_block(cast_succeeds_block);
+            environ.prove_cast(r, to_ref_type);
         }
 
         Operator::AnyConvertExtern => {

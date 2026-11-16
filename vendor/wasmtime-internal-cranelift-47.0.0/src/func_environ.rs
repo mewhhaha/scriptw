@@ -1,3 +1,4 @@
+mod branch_threading;
 mod gc;
 pub(crate) mod stack_switching;
 
@@ -164,7 +165,11 @@ pub struct FuncEnvironment<'module_environment> {
 
     /// This function's home slot for the GC heap base, once it has read the
     /// base of a heap that cannot move.
-    gc_heap_base_home: Option<gc::GcHeapBaseHome>,
+    gc_heap_base_home: Option<gc::FrameHome>,
+
+    /// What the function's code so far has checked of GC references, and
+    /// where (see `gc::ProvenReferences`).
+    proven_references: gc::ProvenReferences,
 
     translation: &'module_environment ModuleTranslation<'module_environment>,
 
@@ -286,6 +291,7 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
             ty_to_gc_layout: std::collections::HashMap::new(),
             gc_heap: None,
             gc_heap_base_home: None,
+            proven_references: gc::ProvenReferences::default(),
 
             heaps: PrimaryMap::default(),
             fact_sync_call_slot: None,
@@ -3164,6 +3170,47 @@ impl FuncEnvironment<'_> {
         gc_ref_ty: WasmRefType,
     ) -> WasmResult<ir::Value> {
         gc::translate_ref_test(self, builder, test_ty, gc_ref, gc_ref_ty)
+    }
+
+    /// Translate `ref.cast test_ty` of `gc_ref`: trap unless `ref.test`
+    /// would yield one.
+    pub fn translate_ref_cast(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        cast_ty: WasmRefType,
+        gc_ref: ir::Value,
+        gc_ref_ty: WasmRefType,
+    ) -> WasmResult<()> {
+        gc::translate_ref_cast(self, builder, cast_ty, gc_ref, gc_ref_ty)
+    }
+
+    /// Record that code translated from here on, to the end of the innermost
+    /// control frame's arm, runs only when the truth value `condition` is
+    /// not zero.
+    pub fn prove_tested(&mut self, condition: ir::Value) {
+        gc::prove_tested(self, condition)
+    }
+
+    /// Record that the reference `value` is not null in code translated from
+    /// here on, to the end of the innermost control frame's arm.
+    pub fn prove_non_null(&mut self, value: ir::Value) {
+        self.prove(value, gc::Proven::NonNull)
+    }
+
+    /// Record that the reference `value` is a `ty` in code translated from
+    /// here on, to the end of the innermost control frame's arm.
+    pub fn prove_cast(&mut self, value: ir::Value, ty: WasmRefType) {
+        gc::prove_cast(self, value, ty)
+    }
+
+    /// Translate `ref.as_non_null` of `value`: trap if it is null.
+    pub fn translate_ref_as_non_null(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        value: ir::Value,
+        ty: WasmRefType,
+    ) -> WasmResult<()> {
+        gc::translate_ref_as_non_null(self, builder, value, ty)
     }
 
     pub fn translate_ref_null(
