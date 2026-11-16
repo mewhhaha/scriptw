@@ -449,6 +449,12 @@ pub fn read_field_at_addr(
                         ),
                         WasmHeapType::NoFunc => {
                             let null = builder.ins().iconst(func_env.pointer_type(), 0);
+                            // The field's value is known without reading it,
+                            // but a read that is its reference's null check
+                            // still has to be made.
+                            if null_trap.is_some() {
+                                let _ = builder.ins().load(ir::types::I32, flags, addr, 0);
+                            }
                             if !r.nullable {
                                 // Because `nofunc` is uninhabited, and this
                                 // reference is non-null, this is unreachable

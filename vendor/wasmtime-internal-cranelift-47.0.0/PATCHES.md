@@ -109,7 +109,9 @@ Wasm semantics and trap codes are unchanged.
   reference 0 it faults in the heap's null guard, which the vendored runtime
   keeps inaccessible ([its notes](../wasmtime-47.0.0/PATCHES.md)). That
   access is the struct field access, or the array length load that precedes
-  every element access. A `funcref` store keeps its explicit check, since the
+  every element access. A field of the uninhabited `nofunc` type, whose value
+  is known without a load, is read all the same when the read is the check. A
+  `funcref` store keeps its explicit check, since the
   value is interned by a libcall first. So do `ref.test`, `ref.cast`,
   `br_on_cast` and `ref.is_null`, whose null outcome is a value.
 - `src/func_environ/gc.rs`: after the `index < length` check, an array

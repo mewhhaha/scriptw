@@ -585,3 +585,84 @@ fn a_chain_of_tests_against_constants_agrees_with_each_test() {
         );
     }
 }
+
+/// `(type $s (struct (field nullfuncref) (field i32)))` with two readers of
+/// the uninhabited field, each followed by another use of the reference.
+fn bottom_field_bytes() -> Vec<u8> {
+    let mut module = b"\0asm\x01\0\0\0".to_vec();
+    section(
+        &mut module,
+        1,
+        3,
+        &[
+            0x5f, 2, 0x73, 0, 0x7f, 0, // 0: $s
+            0x60, 1, 0x63, 0, 1, 0x7f, // 1: ((ref null $s)) -> i32
+            0x60, 0, 1, 0x63, 0, // 2: () -> (ref null $s)
+        ],
+    );
+    section(&mut module, 3, 3, &[2, 1, 1]);
+    let mut exports = Vec::new();
+    for (index, name) in ["new", "read_then_non_null", "read_then_field"]
+        .into_iter()
+        .enumerate()
+    {
+        leb(name.len() as u32, &mut exports);
+        exports.extend_from_slice(name.as_bytes());
+        exports.extend_from_slice(&[0, index as u8]);
+    }
+    section(&mut module, 7, 3, &exports);
+    let mut code = Vec::new();
+    // `ref.null nofunc; i32.const 7; struct.new $s`
+    code.extend(body(0, &[0xd0, 0x73, 0x41, 0x07, 0xfb, 0x00, 0x00]));
+    // `local.get 0; struct.get $s 0; drop; local.get 0; ref.as_non_null; ref.is_null`
+    code.extend(body(
+        0,
+        &[
+            0x20, 0x00, 0xfb, 0x02, 0x00, 0x00, 0x1a, 0x20, 0x00, 0xd4, 0xd1,
+        ],
+    ));
+    // `local.get 0; struct.get $s 0; drop; local.get 0; struct.get $s 1`
+    code.extend(body(
+        0,
+        &[
+            0x20, 0x00, 0xfb, 0x02, 0x00, 0x00, 0x1a, 0x20, 0x00, 0xfb, 0x02, 0x00, 0x01,
+        ],
+    ));
+    section(&mut module, 10, 3, &code);
+    module
+}
+
+/// A field of an uninhabited type is known to be null without a load, but
+/// reading it through a null reference must trap all the same, and may not
+/// stand as the proof that the reference is not null.
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn a_read_of_an_uninhabited_field_still_checks_its_reference() {
+    let mut config = Config::new();
+    configure_wasm_runtime(&mut config);
+    let engine = wasmtime::Engine::new(&config).unwrap();
+    let module = Module::new(&engine, bottom_field_bytes()).unwrap();
+    let mut store = Store::new(&engine, ());
+    let instance = Instance::new(&mut store, &module, &[]).unwrap();
+    let mut call = |name: &str, arguments: &[Val]| -> wasmtime::Result<Val> {
+        let function = instance.get_func(&mut store, name).unwrap();
+        let mut output = [Val::I32(0)];
+        function.call(&mut store, arguments, &mut output)?;
+        Ok(output[0])
+    };
+    let object = call("new", &[]).unwrap();
+    assert!(matches!(object, Val::AnyRef(Some(_))));
+    assert_eq!(
+        call("read_then_non_null", &[object]).unwrap().unwrap_i32(),
+        0
+    );
+    assert_eq!(call("read_then_field", &[object]).unwrap().unwrap_i32(), 7);
+    for name in ["read_then_non_null", "read_then_field"] {
+        let error = call(name, &[Val::AnyRef(None)]).unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<Trap>().copied(),
+            Some(Trap::NullReference),
+            "{name}: {error:?}"
+        );
+    }
+}
