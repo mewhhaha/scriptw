@@ -40,6 +40,10 @@ pub(crate) struct RPropertyLayoutRows {
 }
 impl RPropertyLayoutRows {
     pub(crate) const ROW_BYTES: u32 = 40;
+    /// One word follows a layout's String index: the number of its rows that
+    /// are keyed by a Symbol. Symbol rows are in no index, so this word is
+    /// what proves that a layout lacks every Symbol without reading its rows.
+    pub(crate) const SYMBOL_COUNT_BYTES: u32 = 4;
     #[cfg(test)]
     pub(crate) fn spans(self) -> impl Iterator<Item = RPropertyLayoutSpan> {
         self.spans.into_iter().flatten()
@@ -223,6 +227,17 @@ fn string_index(properties: &[IntrinsicPropertySpec]) -> Result<Vec<u32>, EmitEr
     Ok(buckets)
 }
 
+/// The word after the String index: how many rows a Symbol keys.
+fn symbol_row_count(properties: &[IntrinsicPropertySpec]) -> Result<u32, EmitError> {
+    u32::try_from(
+        properties
+            .iter()
+            .filter(|property| matches!(property.key, IntrinsicKey::Symbol(_)))
+            .count(),
+    )
+    .map_err(|_| EmitError::unsupported("intrinsic property index exceeds static bounds"))
+}
+
 impl StringPool {
     pub(super) fn collect_intrinsic_property_layout_strings(&mut self) -> Result<(), EmitError> {
         for id in IntrinsicPropertyLayoutId::ALL {
@@ -294,6 +309,7 @@ impl StringPool {
             index_capacity
                 .checked_mul(4)
                 .and_then(|length| index_address.checked_add(length))
+                .and_then(|end| end.checked_add(RPropertyLayoutRows::SYMBOL_COUNT_BYTES))
                 .ok_or_else(error)?;
             for property in plan.properties() {
                 for word in encode_row(property, self, functions)? {
@@ -303,6 +319,7 @@ impl StringPool {
             for bucket in buckets {
                 bytes.extend_from_slice(&bucket.to_le_bytes());
             }
+            bytes.extend_from_slice(&symbol_row_count(plan.properties())?.to_le_bytes());
             spans[id as usize] = Some(RPropertyLayoutSpan {
                 address: span_address,
                 count,

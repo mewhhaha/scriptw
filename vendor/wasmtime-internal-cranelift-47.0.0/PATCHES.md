@@ -91,6 +91,26 @@ signatures and Wasm semantics.
   the libcall. Bounds checks precede both paths, and memories and tables are
   unchanged.
 
+## Funcref stores without a call
+
+`src/func_environ/gc{.rs,/copying.rs}`, `src/alias_region.rs`, `src/lib.rs`:
+with the copying collector, a store of a `funcref` into a GC struct or
+array (`struct.new`, `struct.set`, `array.new_fixed`, `array.set` and the
+fills, which all go through `intern_func_ref`) no longer always calls
+`intern_func_ref_for_gc_heap`. The null funcref is stored as id zero, which
+the vendored runtime gives it in every table
+([its notes](../wasmtime-47.0.0/PATCHES.md#funcref-stores-without-a-call)).
+Any other address is looked up in the runtime's direct-mapped intern cache,
+whose address the runtime publishes in `VMCopyingHeapData` (offset and
+entry layout in the public `copying_heap_data` module): the entry at
+`(address >> log2(4 * pointer bytes)) mod 256` is accepted when its address
+word equals the address, and its second word is then the id. Every other
+case calls the libcall, which interns the address and fills the entry. The
+cache's address and both entry words are reloaded for each store, and the
+entry loads carry no alias region, so none is carried across a call into
+the host, the only writer. The builtin's signature and the stored ids are
+those of the libcall; a `nofunc` operand keeps its trap.
+
 ## GC access code
 
 These change the code for GC struct and array accesses and type tests

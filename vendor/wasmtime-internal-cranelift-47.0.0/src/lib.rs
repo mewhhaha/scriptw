@@ -73,6 +73,30 @@ pub mod copying_heap_data {
         (remembered_overflow(pointer_bytes) + 4).next_multiple_of(pointer_bytes)
     }
 
+    /// Offset of the address of the funcref intern cache, a pointer: the
+    /// first field after the remembered-slot buffer's address.
+    pub const fn func_ref_cache(pointer_bytes: u32) -> u32 {
+        remembered(pointer_bytes) + pointer_bytes
+    }
+
+    /// Entries in the funcref intern cache, a power of two. Each entry is
+    /// two pointer-sized words: the address of an interned `VMFuncRef` (zero
+    /// in an empty entry) and then, in the low 32 bits of the second word's
+    /// first four bytes, the id the table gave it.
+    pub const FUNC_REF_CACHE_ENTRIES: u32 = 256;
+
+    /// Bytes of one cache entry.
+    pub const fn func_ref_cache_entry_bytes(pointer_bytes: u32) -> u32 {
+        2 * pointer_bytes
+    }
+
+    /// The right shift that turns a `VMFuncRef` address into the index that
+    /// is then reduced modulo `FUNC_REF_CACHE_ENTRIES`: such records are four
+    /// pointers long, so neighbors take neighboring entries.
+    pub const fn func_ref_cache_shift(pointer_bytes: u32) -> u32 {
+        (4 * pointer_bytes).trailing_zeros()
+    }
+
     /// The end of the copying heap's nursery for a GC heap of
     /// `initial_size` bytes: one eighth of it, in whole 64 KiB units, and no
     /// nursery (zero) below 256 KiB. A slot at or above it belongs to the old

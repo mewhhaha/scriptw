@@ -920,3 +920,220 @@ fn a_hinted_branch_lays_its_rare_side_out_behind_the_other() {
         }
     }
 }
+
+/// How many functions the funcref probe defines: more than twice the
+/// runtime's intern cache, so that addresses share its entries.
+const FUNCREF_PROBE_FUNCTIONS: u32 = 600;
+
+// (module
+//   (type $f (func (result i32)))
+//   (type $s (struct (field (mut (ref null $f))) (field (mut (ref null $f)))))
+//   (func $k (type $f) i32.const k) ...                ;; one for each k
+//   (table (N + 1) funcref)                            ;; entry N stays null
+//   (elem (i32.const 0) func 0 1 ...)
+//   (func (export "new") (param i32 i32) (result (ref null $s))
+//     local.get 0 table.get 0 ref.cast (ref null $f)
+//     local.get 1 table.get 0 ref.cast (ref null $f)
+//     struct.new $s)
+//   ;; The value the function in field `which` returns, or -1 for null.
+//   (func (export "call") (param (ref null $s) i32) (result i32) (local (ref null $f))
+//     local.get 1
+//     if (result (ref null $f)) local.get 0 struct.get $s 1
+//     else local.get 0 struct.get $s 0 end
+//     local.set 2
+//     local.get 2 ref.is_null
+//     if (result i32) i32.const -1 else local.get 2 call_ref $f end)
+//   (func (export "set") (param (ref null $s) i32 i32)
+//     local.get 1
+//     if local.get 0 local.get 2 table.get 0 ref.cast (ref null $f) struct.set $s 1
+//     else local.get 0 local.get 2 table.get 0 ref.cast (ref null $f) struct.set $s 0 end))
+fn funcref_probe_bytes() -> Vec<u8> {
+    let count = FUNCREF_PROBE_FUNCTIONS;
+    let mut module = b"\0asm\x01\0\0\0".to_vec();
+    section(
+        &mut module,
+        1,
+        5,
+        &[
+            0x60, 0, 1, 0x7f, // 0: $f
+            0x5f, 2, 0x63, 0, 1, 0x63, 0, 1, // 1: $s
+            0x60, 2, 0x7f, 0x7f, 1, 0x63, 1, // 2: (i32 i32) -> (ref null $s)
+            0x60, 2, 0x63, 1, 0x7f, 1, 0x7f, // 3: ((ref null $s) i32) -> i32
+            0x60, 3, 0x63, 1, 0x7f, 0x7f, 0, // 4: ((ref null $s) i32 i32)
+        ],
+    );
+    let mut functions = vec![0u8; count as usize];
+    functions.extend_from_slice(&[2, 3, 4]);
+    section(&mut module, 3, functions.len(), &functions);
+    let mut table = vec![0x70, 0x00];
+    leb(count + 1, &mut table);
+    section(&mut module, 4, 1, &table);
+    let mut exports = Vec::new();
+    for (index, name) in ["new", "call", "set"].into_iter().enumerate() {
+        leb(name.len() as u32, &mut exports);
+        exports.extend_from_slice(name.as_bytes());
+        exports.push(0);
+        leb(count + index as u32, &mut exports);
+    }
+    section(&mut module, 7, 3, &exports);
+    let mut elements = vec![0x00, 0x41, 0x00, 0x0b];
+    leb(count, &mut elements);
+    for index in 0..count {
+        leb(index, &mut elements);
+    }
+    section(&mut module, 9, 1, &elements);
+    let mut code = Vec::new();
+    for index in 0..count {
+        // `i32.const index`, as a signed LEB128 of two bytes.
+        code.extend(body(
+            0,
+            &[0x41, (index & 0x7f) as u8 | 0x80, (index >> 7) as u8],
+        ));
+    }
+    // `table.get 0; ref.cast (ref null $f)`
+    const ENTRY: [u8; 5] = [0x25, 0x00, 0xfb, 0x17, 0x00];
+    let mut new = vec![0x20, 0x00];
+    new.extend_from_slice(&ENTRY);
+    new.extend_from_slice(&[0x20, 0x01]);
+    new.extend_from_slice(&ENTRY);
+    new.extend_from_slice(&[0xfb, 0x00, 0x01]);
+    code.extend(body(0, &new));
+    // One local of type `(ref null $f)`.
+    let call = [
+        0x01, 0x01, 0x63, 0x00, // locals
+        0x20, 0x01, 0x04, 0x63, 0x00, // local.get 1; if (result (ref null $f))
+        0x20, 0x00, 0xfb, 0x02, 0x01, 0x01, // local.get 0; struct.get $s 1
+        0x05, 0x20, 0x00, 0xfb, 0x02, 0x01, 0x00, 0x0b, // else ... struct.get $s 0; end
+        0x21, 0x02, 0x20, 0x02, 0xd1, // local.set 2; local.get 2; ref.is_null
+        0x04, 0x7f, 0x41, 0x7f, 0x05, 0x20, 0x02, 0x14, 0x00, 0x0b, // if .. -1 else call_ref $f end
+        0x0b,
+    ];
+    leb(call.len() as u32, &mut code);
+    code.extend_from_slice(&call);
+    let mut set = vec![0x20, 0x01, 0x04, 0x40, 0x20, 0x00, 0x20, 0x02];
+    set.extend_from_slice(&ENTRY);
+    set.extend_from_slice(&[0xfb, 0x05, 0x01, 0x01, 0x05, 0x20, 0x00, 0x20, 0x02]);
+    set.extend_from_slice(&ENTRY);
+    set.extend_from_slice(&[0xfb, 0x05, 0x01, 0x00, 0x0b]);
+    code.extend(body(0, &set));
+    section(&mut module, 10, count as usize + 3, &code);
+    module
+}
+
+/// A funcref stored into the GC heap is an id of the Store's table. The
+/// translation takes the id of the null funcref to be zero and reads every
+/// other id from the runtime's cache of addresses it has interned, calling
+/// the runtime only when the cache holds another address. Six hundred
+/// functions share the cache's 256 entries, in two Stores and in two
+/// instances of one Store, across collections; every field must still call
+/// the function that was stored in it.
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn a_stored_funcref_is_the_function_that_was_stored() {
+    let mut config = Config::new();
+    configure_wasm_runtime(&mut config);
+    let engine = wasmtime::Engine::new(&config).unwrap();
+    let module = Module::new(&engine, funcref_probe_bytes()).unwrap();
+    let count = FUNCREF_PROBE_FUNCTIONS as i32;
+    // Index `count` is the table's null entry.
+    let expected = |index: i32| if index == count { -1 } else { index };
+    let second = |index: i32| (index * 7 + 3) % (count + 1);
+
+    let mut stores = [Store::new(&engine, ()), Store::new(&engine, ())];
+    let instances = [
+        Instance::new(&mut stores[0], &module, &[]).unwrap(),
+        Instance::new(&mut stores[1], &module, &[]).unwrap(),
+        // A second instance in the first Store: other addresses for the
+        // same functions, in the same table and cache.
+        Instance::new(&mut stores[0], &module, &[]).unwrap(),
+    ];
+    let store_of = [0usize, 1, 0];
+    fn call(store: &mut Store<()>, instance: &Instance, name: &str, arguments: &[Val]) -> Val {
+        let function = instance.get_func(&mut *store, name).unwrap();
+        let mut output = [Val::I32(0)];
+        let results = if name == "set" { 0 } else { 1 };
+        function
+            .call(&mut *store, arguments, &mut output[..results])
+            .unwrap();
+        output[0]
+    }
+
+    for round in 0..3 {
+        let mut made = Vec::new();
+        // Interleave the instances so that each Store's cache is consulted
+        // right after the other Store filled its own.
+        for index in 0..=count {
+            for (which, instance) in instances.iter().enumerate() {
+                let store = &mut stores[store_of[which]];
+                let object = call(
+                    store,
+                    instance,
+                    "new",
+                    &[Val::I32(index), Val::I32(second(index))],
+                );
+                assert!(matches!(object, Val::AnyRef(Some(_))));
+                made.push((which, index, object));
+            }
+        }
+        for store in &mut stores {
+            store.gc(None).unwrap();
+        }
+        for (which, index, object) in &made {
+            let store = &mut stores[store_of[*which]];
+            let instance = &instances[*which];
+            assert_eq!(
+                call(store, instance, "call", &[*object, Val::I32(0)]).unwrap_i32(),
+                expected(*index),
+                "round {round}, instance {which}, first field of {index}"
+            );
+            assert_eq!(
+                call(store, instance, "call", &[*object, Val::I32(1)]).unwrap_i32(),
+                expected(second(*index)),
+                "round {round}, instance {which}, second field of {index}"
+            );
+        }
+        // A struct made by one instance is read by the other instance of
+        // its Store: the ids are the Store's, not the instance's.
+        for (which, index, object) in made.iter().filter(|(which, ..)| *which != 1).step_by(37) {
+            let other = &instances[2 - *which];
+            assert_eq!(
+                call(&mut stores[0], other, "call", &[*object, Val::I32(0)]).unwrap_i32(),
+                expected(*index)
+            );
+        }
+        // Stores into existing structs: to another function, to null and
+        // back, each read at once and again after a collection.
+        for (which, index, object) in made.iter().step_by(5) {
+            let store = &mut stores[store_of[*which]];
+            let instance = &instances[*which];
+            let replacement = (index * 11 + round) % (count + 1);
+            for (field, value) in [(0, replacement), (1, count), (1, *index)] {
+                call(
+                    store,
+                    instance,
+                    "set",
+                    &[*object, Val::I32(field), Val::I32(value)],
+                );
+                assert_eq!(
+                    call(store, instance, "call", &[*object, Val::I32(field)]).unwrap_i32(),
+                    expected(value)
+                );
+            }
+        }
+        for store in &mut stores {
+            store.gc(None).unwrap();
+        }
+        for (which, index, object) in made.iter().step_by(5) {
+            let store = &mut stores[store_of[*which]];
+            let instance = &instances[*which];
+            assert_eq!(
+                call(store, instance, "call", &[*object, Val::I32(0)]).unwrap_i32(),
+                expected((index * 11 + round) % (count + 1))
+            );
+            assert_eq!(
+                call(store, instance, "call", &[*object, Val::I32(1)]).unwrap_i32(),
+                expected(*index)
+            );
+        }
+    }
+}

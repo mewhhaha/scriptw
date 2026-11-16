@@ -124,6 +124,40 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32And);
     }
 
+    /// Leaves on the stack whether the header of an Array answers for a
+    /// property key: a Symbol, or a String that cannot be an array index and
+    /// whose hash differs from "length"'s. Every other key reports false.
+    pub(crate) fn emit_header_named_property_key_i32(&mut self, key: &ValueLocals, f: &mut Function) {
+        let s = self.runtime_schema();
+        let named = s.reserve_i32_local(f);
+        named.set_constant(0, f);
+        key.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Symbol as i32));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        named.set_constant(1, f);
+        f.instruction(&Instruction::Else);
+        key.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        let name = s
+            .reserve_gc_local(f)
+            .initialize(key.cast_reference::<StringValue>(s, f), f);
+        let hash = s.reserve_i64_local(f);
+        self.emit_string_key_hash(&name, hash, f);
+        self.emit_header_named_key_i32(&name, hash, f);
+        named.store(f);
+        s.release_i64_local(hash, f);
+        name.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        named.load(f);
+        s.release_i32_local(named, f);
+    }
+
     /// A Get whose String or Symbol key the walk answers from an object's
     /// live chain: sets `result` and branches to `done`. Every other case,
     /// including a key that still needs conversion, falls through without
@@ -279,6 +313,156 @@ impl FunctionBuilder<'_> {
             .initialize(header.load(s, f).require_non_null(f), f);
         header.clear(f);
         object
+    }
+
+    /// The ordinary header of a Map, Set, WeakMap, WeakSet or Promise, and
+    /// null for every other value. These hold every own property in that
+    /// header and override none of [[GetOwnProperty]], [[DefineOwnProperty]],
+    /// [[Set]] and [[GetPrototypeOf]].
+    pub(crate) fn emit_plain_composite_header(
+        &mut self,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) -> GcLocal<OrdinaryObject, Nullable> {
+        let s = self.runtime_schema();
+        let header = s
+            .reserve_gc_local::<OrdinaryObject, Nullable>(f)
+            .initialize_null(s, f);
+        let done = self.open_frame(ControlFrameKind::Block, f);
+        // All five carry the Object tag; an Array or a function leaves at
+        // the tag and an ordinary object at its own layout.
+        value.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Object as i32));
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(done, f);
+        value.reference().load(f);
+        f.instruction(&Instruction::RefTestNonNull(
+            s.reference_type::<OrdinaryObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.emit_branch_if_to_target(done, f);
+        macro_rules! composite {
+            ($layout:ty, $field:expr) => {{
+                let next = self.open_frame(ControlFrameKind::Block, f);
+                let composite = s.reserve_gc_local(f).initialize(
+                    value.sealed_reference_or_branch::<$layout>(
+                        s,
+                        self.local_branch_label(next),
+                        f,
+                    ),
+                    f,
+                );
+                header.replace(
+                    s.field($field)
+                        .read(&composite, s, f)
+                        .reference()
+                        .nullable(),
+                    f,
+                );
+                composite.clear(f);
+                self.emit_branch_to_target(done, f);
+                self.pop_control(ControlFrameKind::Block);
+                f.instruction(&Instruction::End);
+            }};
+        }
+        composite!(PromiseObject, PromiseObjectSchema::OBJECT);
+        composite!(MapObject, MapObjectSchema::OBJECT);
+        composite!(SetObject, SetObjectSchema::OBJECT);
+        composite!(WeakMapObject, WeakMapObjectSchema::OBJECT);
+        composite!(WeakSetObject, WeakSetObjectSchema::OBJECT);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        header
+    }
+
+    /// Sets `closed` when the walk proves that no object above the one whose
+    /// header is `object` has the String or Symbol `key`; leaves it alone,
+    /// with no effect, for every chain and key it cannot prove.
+    pub(crate) fn emit_chain_above_lacks_key(
+        &mut self,
+        object: &GcLocal<OrdinaryObject>,
+        key: &ValueLocals,
+        closed: I32Local,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let named = s.reserve_i32_local(f);
+        let scratch = s.reserve_value_local(f);
+        let prototype = s
+            .reserve_gc_local::<JavaScriptObject, Nullable>(f)
+            .initialize(
+                s.field(OrdinaryObjectSchema::PROTOTYPE)
+                    .read(object, s, f)
+                    .reference(),
+                f,
+            );
+        let unproven = self.open_frame(ControlFrameKind::Block, f);
+        let symbol = self.open_frame(ControlFrameKind::Block, f);
+        key.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(symbol, f);
+        let name = s
+            .reserve_gc_local(f)
+            .initialize(key.cast_reference::<StringValue>(s, f), f);
+        let hash = s.reserve_i64_local(f);
+        self.emit_string_key_hash(&name, hash, f);
+        self.emit_header_named_key_i32(&name, hash, f);
+        named.store(f);
+        prototype.load(s, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let first = self.emit_walk_prototype_header_or_branch(&prototype, named, unproven, f);
+        self.emit_chain_walk(
+            &first,
+            ChainKey::String { name: &name, hash },
+            named,
+            ChainAnswer::Absence,
+            &scratch,
+            unproven,
+            f,
+        );
+        first.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        closed.set_constant(1, f);
+        self.emit_branch_to_target(unproven, f);
+        s.release_i64_local(hash, f);
+        name.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        key.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Symbol as i32));
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(unproven, f);
+        let symbol = s
+            .reserve_gc_local(f)
+            .initialize(key.cast_reference::<SymbolValue>(s, f), f);
+        // A Symbol is never an index or "length".
+        named.set_constant(1, f);
+        prototype.load(s, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let first = self.emit_walk_prototype_header_or_branch(&prototype, named, unproven, f);
+        self.emit_chain_walk(
+            &first,
+            ChainKey::Symbol(&symbol),
+            named,
+            ChainAnswer::Absence,
+            &scratch,
+            unproven,
+            f,
+        );
+        first.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        closed.set_constant(1, f);
+        symbol.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        prototype.clear(f);
+        scratch.clear(f);
+        s.release_i32_local(named, f);
     }
 
     /// The ordinary header of a prototype that is an ordinary object or a
@@ -1013,37 +1197,24 @@ impl FunctionBuilder<'_> {
                 s.release_i32_local(mask, f);
             }
             ChainKey::Symbol(_) => {
-                // Symbol rows are not indexed; a layout without any lacks
-                // every Symbol.
-                let count = s.reserve_i32_local(f);
-                s.field(IntrinsicPropertyStorageSchema::COUNT)
-                    .read(intrinsic, s, f)
-                    .store(count, f);
-                row.set_constant(0, f);
-                let scan = self.open_frame(ControlFrameKind::Loop, f);
-                row.load(f);
-                count.load(f);
-                f.instruction(&Instruction::I32GeU);
-                self.emit_branch_if_to_target(done, f);
-                address.load(f);
-                row.load(f);
-                f.instruction(&Instruction::I32Const(LAYOUT_ROW_BYTES));
+                // Symbol rows are in no index. The word after the String
+                // index counts them, and a layout without any lacks every
+                // Symbol; with one, the complete search decides.
+                s.field(IntrinsicPropertyStorageSchema::INDEX_ADDRESS)
+                    .read(intrinsic, s, f);
+                s.field(IntrinsicPropertyStorageSchema::INDEX_MASK)
+                    .read(intrinsic, s, f);
+                f.instruction(&Instruction::I32Const(1));
+                f.instruction(&Instruction::I32Add);
+                f.instruction(&Instruction::I32Const(4));
                 f.instruction(&Instruction::I32Mul);
                 f.instruction(&Instruction::I32Add);
                 f.instruction(&Instruction::I32Load(wasm_encoder::MemArg {
                     offset: 0,
-                    align: 0,
+                    align: 2,
                     memory_index: 0,
                 }));
                 self.emit_branch_if_to_target(decline, f);
-                row.load(f);
-                f.instruction(&Instruction::I32Const(1));
-                f.instruction(&Instruction::I32Add);
-                row.store(f);
-                self.emit_branch_to_target(scan, f);
-                self.pop_control(ControlFrameKind::Loop);
-                f.instruction(&Instruction::End);
-                s.release_i32_local(count, f);
             }
         }
         self.pop_control(ControlFrameKind::Block);

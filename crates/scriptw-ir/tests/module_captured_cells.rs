@@ -647,7 +647,18 @@ fn module_owned_cells_exclude_eval_non_simple_parameters_and_arguments() {
         "export function read(cell) { eval(''); return cell; }",
         "export function read(cell = 0) { return cell; }",
         "export function read(...cell) { return cell; }",
-        "export function read({cell}) { return cell; }",
+        // A pattern with an initializer or a computed key gives the owner a
+        // separate body record; a pattern beside a rest parameter or a list
+        // initializer shares its refusal.
+        "export function read({cell = 0}) { return cell; }",
+        "export function read({other, cell = other}) { return cell; }",
+        "var key; export function read({[key]: cell}) { return cell; }",
+        "export function read({inner: {cell = 0}}) { return cell; }",
+        "export function read([cell = 0]) { return cell; }",
+        "export function read({cell} = {}) { return cell; }",
+        "export function read({cell}, ...rest) { return cell; }",
+        "export function read({cell}, other = 0) { return cell; }",
+        "export function read({cell}) { eval(''); return cell; }",
         "export function read() { return arguments; }",
         "export function read($arguments) { return $arguments; }",
     ] {
@@ -658,6 +669,48 @@ fn module_owned_cells_exclude_eval_non_simple_parameters_and_arguments() {
             EnvironmentIdentifierResolutionStart::CurrentEnvironment,
             "{source}"
         );
+    }
+}
+
+#[test]
+fn module_owned_cells_admit_binding_patterns_without_expressions() {
+    // The owner keeps its one activation record, which holds every name the
+    // pattern binds, so each name is one existing owned cell.
+    for source in [
+        "export function read({cell}) { return cell; }",
+        "export function read({cell}, other) { return cell; }",
+        "export function read(other, {cell}) { return cell; }",
+        "export function read({key: cell}) { return cell; }",
+        "export function read({inner: {cell}}) { return cell; }",
+        "export function read({other, ...cell}) { return cell; }",
+        "export function read([cell]) { return cell; }",
+        "export function read([, {cell}, ...others]) { return cell; }",
+        "export function read({cell}) { function hold() { return cell; } return cell; }",
+        "export const outer = ({cell}) => function read() { return cell; };",
+    ] {
+        let program = lower_module(source);
+        let (function, _, reference) = module_capture_reference(&program, "read");
+        let EnvironmentIdentifierResolutionStart::Cell(cell) = reference.resolution_start() else {
+            panic!("{source} should read the cell its pattern binds: {reference:?}");
+        };
+        assert_eq!(cell.owner(), function.id, "{source}");
+        assert_eq!(cell.source_name(), "cell", "{source}");
+        match cell.origin() {
+            ProvenBindingCellOrigin::Owned => assert!(
+                function.owned_env_bindings.iter().any(|binding| {
+                    binding.name == cell.storage_name() && binding.slot == cell.slot()
+                }),
+                "{source}: {function:?}"
+            ),
+            ProvenBindingCellOrigin::Captured { entry_hops } => assert!(
+                function.captured_bindings.iter().any(|binding| {
+                    binding.name == cell.storage_name()
+                        && binding.slot == cell.slot()
+                        && binding.hops == entry_hops
+                }),
+                "{source}: {function:?}"
+            ),
+        }
     }
 }
 

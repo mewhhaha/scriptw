@@ -295,7 +295,8 @@ impl FunctionBuilder<'_> {
     /// One step of OrdinaryGet for the kinds whose [[GetOwnProperty]] for
     /// `key` is the ordinary lookup in their header, which `header` then
     /// holds for the caller's [[GetPrototypeOf]]: besides an ordinary object
-    /// and a function, a Map, Set, WeakMap, WeakSet or Promise, a
+    /// and a function, an Array for a key that is neither an array index
+    /// nor "length", a Map, Set, WeakMap, WeakSet or Promise, a
     /// TextEncoder, TextDecoder, ReadableStream, its default reader or its
     /// byte controller, and a typed array for a key that cannot be a
     /// canonical numeric String. The non-Proxy [[GetOwnProperty]]
@@ -303,8 +304,9 @@ impl FunctionBuilder<'_> {
     /// header first and has a further answer only for a module namespace, an
     /// Array, an arguments object, a String wrapper and a typed array, whose
     /// only further keys are the canonical numeric Strings; none of the
-    /// kinds admitted here but the typed array is one of those, and none
-    /// overrides [[Get]]. Every other value leaves the probe unsupported and
+    /// kinds admitted here but the Array, whose only further keys are the
+    /// array indices and "length", and the typed array is one of those, and
+    /// none overrides [[Get]]. Every other value leaves the probe unsupported and
     /// `header` null, having observed nothing.
     pub(super) fn emit_object_get_probe(
         &mut self,
@@ -357,14 +359,36 @@ impl FunctionBuilder<'_> {
             }};
         }
         composite!(FunctionObject, FunctionObjectSchema::OBJECT);
-        // An Array, the commonest remaining kind, is never admitted.
-        target.reference().load(f);
-        f.instruction(&Instruction::RefTestNonNull(
-            schema
-                .reference_type::<ArrayObject>(GcNullability::NonNullable)
-                .heap_type,
-        ));
-        self.emit_branch_if_to_target(selected, f);
+        // An Array, the commonest remaining kind, owns its indices and
+        // "length" outside its header. The header answers every other key,
+        // and for those two the probe stays unsupported.
+        {
+            let next = self.open_frame(ControlFrameKind::Block, f);
+            let array = schema.reserve_gc_local(f).initialize(
+                target.sealed_reference_or_branch::<ArrayObject>(
+                    schema,
+                    self.local_branch_label(next),
+                    f,
+                ),
+                f,
+            );
+            self.emit_header_named_property_key_i32(key.value(), f);
+            self.open_frame(ControlFrameKind::If, f);
+            header.replace(
+                schema
+                    .field(ArrayObjectSchema::OBJECT)
+                    .read(&array, schema, f)
+                    .reference()
+                    .nullable(),
+                f,
+            );
+            self.pop_control(ControlFrameKind::If);
+            f.instruction(&Instruction::End);
+            array.clear(f);
+            self.emit_branch_to_target(selected, f);
+            self.pop_control(ControlFrameKind::Block);
+            f.instruction(&Instruction::End);
+        }
         composite!(TypedArrayObject, TypedArrayObjectSchema::OBJECT);
         composite!(SetObject, SetObjectSchema::OBJECT);
         composite!(MapObject, MapObjectSchema::OBJECT);

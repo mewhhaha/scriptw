@@ -2610,6 +2610,26 @@ where
         )
     }
 
+    /// Emit a load of the funcref intern cache's address from the copying
+    /// collector's heap data. Not read-only: a heap that changes Stores
+    /// between calls into the host is given the next Store's cache.
+    pub fn vmcopying_heap_data_func_ref_cache(
+        &mut self,
+        cursor: &mut FuncCursor<'_>,
+        copying_heap_data: ir::Value,
+    ) -> ir::Value {
+        let offset = crate::copying_heap_data::func_ref_cache(u32::from(
+            self.offsets.get_ptr_size().size(),
+        ));
+        let region = self.vmcopying_heap_data_region(cursor.func, offset);
+        cursor.ins().load(
+            self.pointer_type,
+            ir::MemFlagsData::trusted().with_alias_region(Some(region)),
+            copying_heap_data,
+            i32::try_from(offset).unwrap(),
+        )
+    }
+
     /// Memory flags for the copying heap data's field at `offset` (the
     /// remembered-slot buffer's count, capacity, overflow flag and address).
     pub fn vmcopying_heap_data_field_flags(
