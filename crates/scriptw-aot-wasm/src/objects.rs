@@ -32,6 +32,8 @@ mod array_own_indexed_data;
 mod compact_data;
 mod define_property;
 mod dense_array_index;
+mod fresh_publication;
+pub(crate) use fresh_publication::FreshDataAttributes;
 mod descriptor_object;
 mod has_property;
 mod header_projection;

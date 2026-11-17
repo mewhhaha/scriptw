@@ -1220,6 +1220,7 @@ runtime_helper_domain! {
     CompactObjectAllocate / CompactObjectAllocateArguments / CompactObjectAllocateParameters / "compact_object_allocate" { prototype:Value } => (Ref OrdinaryObject NonNullable);
     CompactShapeIndex / CompactShapeIndexArguments / CompactShapeIndexParameters / "compact_shape_index" { shape:(Ref CompactDataShape NonNullable) } => (Ref OrdinaryPropertyIndex NonNullable);
     IntrinsicDataPublish / IntrinsicDataPublishArguments / IntrinsicDataPublishParameters / "intrinsic_data_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,value:(Ref PropertyValue NonNullable),writable:I32,enumerable:I32,configurable:I32 } => Void;
+    FreshDataPropertiesPublish / FreshDataPropertiesPublishArguments / FreshDataPropertiesPublishParameters / "fresh_data_properties_publish" { object:(Ref OrdinaryObject NonNullable),keys:(Ref PooledStringTable NonNullable),values:(Ref IntrinsicPropertyValueCache NonNullable),flags:(Ref OrdinaryPropertyIndex NonNullable) } => Void;
     IntrinsicAccessorPublish / IntrinsicAccessorPublishArguments / IntrinsicAccessorPublishParameters / "intrinsic_accessor_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,getter:(Ref StoredValue NonNullable),setter:(Ref StoredValue NonNullable),enumerable:I32,configurable:I32 } => Void;
     PropertyValueResolve / PropertyValueResolveArguments / PropertyValueResolveParameters / "property_value_resolve" { value:(Ref PropertyValue NonNullable) } => (Ref StoredValue NonNullable);
     IntrinsicAccessorAllocate / IntrinsicAccessorAllocateArguments / IntrinsicAccessorAllocateParameters / "intrinsic_accessor_allocate" { header:(Ref OrdinaryObject NonNullable),code:(Ref ExecutableCode NonNullable),realm:(Ref RealmRecord NonNullable),source_ordinal:I32 } => (Ref FunctionObject NonNullable);
@@ -1423,6 +1424,7 @@ impl RuntimeHelperId {
             Self::CompactShapeIndex => HelperOwner::Runtime,
             Self::IntrinsicDataPublish => HelperOwner::Runtime,
             Self::IntrinsicAccessorPublish => HelperOwner::Runtime,
+            Self::FreshDataPropertiesPublish => HelperOwner::Runtime,
             Self::PropertyValueResolve => HelperOwner::Runtime,
             Self::NativeFunctionAllocate => HelperOwner::Runtime,
             Self::NativeConstructorHeaderAllocate => HelperOwner::Runtime,
@@ -1609,6 +1611,7 @@ impl RuntimeHelperId {
             Self::CompactShapeIndex => true,
             Self::IntrinsicDataPublish => true,
             Self::IntrinsicAccessorPublish => true,
+            Self::FreshDataPropertiesPublish => true,
             Self::PropertyValueResolve => true,
             Self::NativeFunctionAllocate => true,
             Self::NativeConstructorHeaderAllocate => true,

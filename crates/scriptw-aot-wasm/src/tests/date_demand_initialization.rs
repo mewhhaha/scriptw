@@ -6,8 +6,8 @@ use super::*;
 use crate::functions::NonArrayRealmIntrinsicSlot as Slot;
 use crate::gc_types::{
     DeferredDateConstructor, DeferredIntrinsicValue, FinalizedRuntimeModule, GcNullability,
-    GcSnapshotField, GlobalLedger, IntrinsicTable, NonNullable, RealmRecord, RealmRecordSchema,
-    RuntimeModuleTypes, StoredValue,
+    GcSnapshotField, GlobalLedger, IntrinsicPropertyValueCache, IntrinsicTable, NonNullable,
+    OrdinaryPropertyIndex, RealmRecord, RealmRecordSchema, RuntimeModuleTypes, StoredValue,
 };
 use crate::heap::DateInitializationState;
 
@@ -515,9 +515,12 @@ fn date_global_and_resolver_use_the_defining_realm_recipe_and_utc_alias_keeps_on
     .finalize_globals(GlobalLedger::new(), false, 0);
     let schema = registered.globals().schema();
     let recipe_type = type_index::<DeferredDateConstructor>(schema);
-    let publish = named(&names, "helper::intrinsic_data_publish");
+    let publish = named(&names, "helper::fresh_data_properties_publish");
+    let values_type = type_index::<IntrinsicPropertyValueCache>(schema);
+    let flags_type = type_index::<OrdinaryPropertyIndex>(schema);
     // Intrinsic initialization and global publication have separate physical
-    // owners. Both runtime Realm producers publish their own unread Date recipe.
+    // owners. Both runtime Realm producers publish their own unread Date recipe
+    // as one row of the batch that publishes the new global object's bindings.
     for publisher in [
         format!("host::{}", scriptw_ir::HostBuiltinId::CreateRealm.as_str()),
         format!(
@@ -533,22 +536,44 @@ fn date_global_and_resolver_use_the_defining_realm_recipe_and_utc_alias_keeps_on
             1,
             "{publisher} publishes one ordinary Date data recipe"
         );
-        let marker_publications: Vec<_> = calls(&initial, publish)
-            .into_iter()
+        let rows: Vec<_> = initial
+            .iter()
+            .enumerate()
+            .filter(|(_, op)| matches!(op, Operator::ArraySet { array_type_index } if *array_type_index == values_type))
+            .map(|(position, _)| position)
             .filter(|&position| {
-                let args = arguments(&initial, position, 8);
-                origin(&initial, position, local(args[4])) == Origin::Operation(markers[0])
+                let args = arguments(&initial, position, 3);
+                origin(&initial, position, local(args[2])) == Origin::Operation(markers[0])
             })
             .collect();
-        assert_eq!(marker_publications.len(), 1);
-        let publication = marker_publications[0];
-        let args = arguments(&initial, publication, 8);
+        assert_eq!(rows.len(), 1, "{publisher} stores the recipe in one value row");
+        let row = constant(&initial, rows[0], arguments(&initial, rows[0], 3)[1]);
+        let publications = calls(&initial, publish);
+        assert_eq!(publications.len(), 1, "{publisher} publishes its bindings once");
+        assert!(rows[0] < publications[0]);
+        let (flags_at, size) = initial[..publications[0]]
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(position, op)| match op {
+                Operator::ArrayNewFixed { array_type_index, array_size }
+                    if *array_type_index == flags_type => Some((position, *array_size as usize)),
+                _ => None,
+            })
+            .expect("the batch carries one flag word per binding");
+        let flags: Vec<_> = initial[flags_at - size..flags_at]
+            .iter()
+            .map(|op| constant(&initial, flags_at, op))
+            .collect();
         assert_eq!(
-            args[5..]
-                .iter()
-                .map(|arg| constant(&initial, publication, arg))
-                .collect::<Vec<_>>(),
-            [1, 0, 1]
+            flags[usize::try_from(row).unwrap()],
+            crate::objects::FreshDataAttributes {
+                writable: true,
+                enumerable: false,
+                configurable: true,
+            }
+            .word(),
+            "Date stays writable, non-enumerable and configurable"
         );
         assert!(
             calls(&initial, ensure_index).is_empty(),

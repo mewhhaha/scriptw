@@ -1421,6 +1421,7 @@ fn emit_script_module_with_factory(
             DeferredIntrinsicInstallRun, compile_deferred_intrinsic_install_run_helper;
             IntrinsicDataPublish, compile_intrinsic_data_publish_helper;
             IntrinsicAccessorPublish, compile_intrinsic_accessor_publish_helper;
+            FreshDataPropertiesPublish, compile_fresh_data_properties_publish_helper;
             PropertyValueResolve, compile_property_value_resolve_helper;
             ArgumentListAppend, compile_argument_list_append_helper;
             CachedPropertyRead, compile_cached_property_read_helper;

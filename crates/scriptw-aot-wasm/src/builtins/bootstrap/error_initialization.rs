@@ -192,14 +192,12 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    pub(super) fn emit_install_deferred_error_constructor(
+    pub(super) fn emit_deferred_error_constructor_value(
         &mut self,
-        target: &ValueLocals,
-        name: &str,
         constructor: ErrorIntrinsicConstructor,
         realm: &RealmFunctionMaterializationContext,
         function: &mut Function,
-    ) -> Result<(), EmitError> {
+    ) -> Result<GcLocal<PropertyValue>, EmitError> {
         let builtin = constructor.builtin();
         let meta = self.functions.get(&builtin.function_id()).ok_or_else(|| {
             EmitError::unsupported("deferred Error constructor lacks planned native entry")
@@ -228,36 +226,7 @@ impl FunctionBuilder<'_> {
         let deferred = schema
             .reserve_gc_local(function)
             .initialize(recipe.load(schema, function).upcast(), function);
-        let header = schema.reserve_gc_local(function).initialize(
-            self.emit_object_header_projection(target, function),
-            function,
-        );
-        let key = self.intrinsic_key(IntrinsicKey::Name(name), function)?;
-        let writable = schema.reserve_i32_local(function);
-        writable.set_constant(1, function);
-        let enumerable = schema.reserve_i32_local(function);
-        enumerable.set_constant(0, function);
-        let configurable = schema.reserve_i32_local(function);
-        configurable.set_constant(1, function);
-        schema.call_helper(
-            crate::runtime_helpers::IntrinsicDataPublishArguments::new(
-                &header,
-                &key,
-                &deferred,
-                writable,
-                enumerable,
-                configurable,
-            ),
-            self.runtime_helper_base()?,
-            function,
-        );
-        schema.release_i32_local(configurable, function);
-        schema.release_i32_local(enumerable, function);
-        schema.release_i32_local(writable, function);
-        key.clear(function);
-        header.clear(function);
-        deferred.clear(function);
         recipe.clear(function);
-        Ok(())
+        Ok(deferred)
     }
 }

@@ -150,7 +150,10 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // placeholder, canonical and layout-row reads call the new typed
 // realm_ensure_constructor helper, and their globals publish a
 // DeferredDemandConstructor recipe.
-const LAYOUT_VERSION: u32 = 79;
+// Version 80 adds the fresh_data_properties_publish R helper: a new global
+// object receives all of its bindings in one call that sizes its dictionary
+// once and inserts keys the compiler proved distinct without probing.
+const LAYOUT_VERSION: u32 = 80;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.
