@@ -118,13 +118,13 @@ impl ScriptLowerer<'_> {
     ) {
         if let Some(key) = self.finite_source_binding_key(name) {
             self.function_source_binding_candidates
-                .insert(key, candidates);
+                .insert(key, SourceCandidates::from(candidates));
         }
     }
 
     pub(super) fn merge_function_source_binding_candidates(
         &mut self,
-        observations: BTreeMap<FiniteSourceBindingKey, Vec<FiniteSourceValue>>,
+        observations: BTreeMap<FiniteSourceBindingKey, SourceCandidates>,
     ) {
         for (key, candidates) in observations {
             let environment = &self.analysis.environment_plans[&key.environment_id];
@@ -136,14 +136,9 @@ impl ScriptLowerer<'_> {
             {
                 continue;
             }
-            let previous = self
-                .function_source_binding_candidates
-                .remove(&key)
-                .unwrap_or_default();
-            self.function_source_binding_candidates.insert(
-                key,
-                finite_function_source::bounded_candidates(previous.into_iter().chain(candidates)),
-            );
+            let previous = self.function_source_binding_candidates.remove(&key);
+            self.function_source_binding_candidates
+                .insert(key, SourceCandidates::merged(previous, candidates));
         }
     }
 }

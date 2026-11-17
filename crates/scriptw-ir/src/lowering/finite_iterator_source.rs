@@ -117,7 +117,8 @@ impl ScriptLowerer<'_> {
         let properties = self
             .function_source_binding_candidates
             .entry(binding_key)
-            .or_default();
+            .or_default()
+            .make_mut();
         if let Some(FiniteSourceValue::Record(properties)) = properties
             .iter_mut()
             .find(|candidate| matches!(candidate, FiniteSourceValue::Record(_)))

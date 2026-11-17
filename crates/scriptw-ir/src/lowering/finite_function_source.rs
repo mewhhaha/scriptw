@@ -116,6 +116,84 @@ pub(super) fn bounded_candidates(
     distinct.into_iter().collect()
 }
 
+/// One entry of a lowerer's finite source candidate maps.
+///
+/// Every child lowerer starts from its parent's maps and merges each entry
+/// back through `bounded_candidates`. Entries are shared, so that copy does
+/// not clone candidate trees, and `bounded` marks a list that is itself a
+/// `bounded_candidates` output: merging such a list with itself returns it
+/// unchanged, which lets the merge skip entries a child never replaced.
+#[derive(Clone, Default)]
+pub(super) struct SourceCandidates {
+    values: std::sync::Arc<Vec<FiniteSourceValue>>,
+    bounded: bool,
+}
+
+impl SourceCandidates {
+    pub(super) fn bounded(candidates: impl IntoIterator<Item = FiniteSourceValue>) -> Self {
+        Self {
+            values: std::sync::Arc::new(bounded_candidates(candidates)),
+            bounded: true,
+        }
+    }
+
+    pub(super) fn into_values(self) -> Vec<FiniteSourceValue> {
+        std::sync::Arc::unwrap_or_clone(self.values)
+    }
+
+    /// Mutating in place may leave a list `bounded_candidates` would change.
+    pub(super) fn make_mut(&mut self) -> &mut Vec<FiniteSourceValue> {
+        self.bounded = false;
+        std::sync::Arc::make_mut(&mut self.values)
+    }
+
+    /// `bounded_candidates(previous ++ observed)`. A bounded list merged with
+    /// the same shared list is a fixed point: it is sorted and distinct, its
+    /// non-supplemental values fit the budget, and every supplemental value in
+    /// it was admitted against the same non-supplemental values.
+    pub(super) fn merged(previous: Option<Self>, observed: Self) -> Self {
+        match previous {
+            Some(previous)
+                if previous.bounded
+                    && std::sync::Arc::ptr_eq(&previous.values, &observed.values) =>
+            {
+                previous
+            }
+            previous => Self::bounded(
+                previous
+                    .map(Self::into_values)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .chain(observed.into_values()),
+            ),
+        }
+    }
+}
+
+impl From<Vec<FiniteSourceValue>> for SourceCandidates {
+    fn from(values: Vec<FiniteSourceValue>) -> Self {
+        Self {
+            values: std::sync::Arc::new(values),
+            bounded: false,
+        }
+    }
+}
+
+impl std::ops::Deref for SourceCandidates {
+    type Target = [FiniteSourceValue];
+
+    fn deref(&self) -> &[FiniteSourceValue] {
+        &self.values
+    }
+}
+
+// Equality is the candidate list; `bounded` only caches a property of it.
+impl PartialEq for SourceCandidates {
+    fn eq(&self, other: &Self) -> bool {
+        self.values == other.values
+    }
+}
+
 impl ScriptLowerer<'_> {
     // Optional hints may outlive a cell's value, but cannot cross a different
     // Reference selected by ResolveBinding. Use the same declarative cutoff
@@ -270,8 +348,9 @@ impl ScriptLowerer<'_> {
             .unwrap_or_default();
         self.function_source_binding_candidates.insert(
             key,
-            bounded_candidates(
+            SourceCandidates::bounded(
                 previous
+                    .into_values()
                     .into_iter()
                     .chain([FiniteSourceValue::SupplementalText("undefined".to_string())]),
             ),
@@ -285,7 +364,7 @@ impl ScriptLowerer<'_> {
         let key = self.finite_source_binding_key(name)?;
         self.function_source_binding_candidates
             .get(&key)
-            .map(Vec::as_slice)
+            .map(|candidates| &**candidates)
     }
 
     pub(super) fn function_source_value_candidates(
@@ -818,23 +897,18 @@ impl ScriptLowerer<'_> {
             .unwrap_or_default();
         self.function_source_binding_candidates.insert(
             key,
-            bounded_candidates(previous.into_iter().chain(candidates)),
+            SourceCandidates::bounded(previous.into_values().into_iter().chain(candidates)),
         );
     }
 
     pub(super) fn merge_function_source_parameter_candidates(
         &mut self,
-        observations: BTreeMap<(FunctionId, usize), Vec<FiniteSourceValue>>,
+        observations: BTreeMap<(FunctionId, usize), impl Into<SourceCandidates>>,
     ) {
         for (key, candidates) in observations {
-            let previous = self
-                .function_source_parameter_candidates
-                .remove(&key)
-                .unwrap_or_default();
-            self.function_source_parameter_candidates.insert(
-                key,
-                bounded_candidates(previous.into_iter().chain(candidates)),
-            );
+            let previous = self.function_source_parameter_candidates.remove(&key);
+            self.function_source_parameter_candidates
+                .insert(key, SourceCandidates::merged(previous, candidates.into()));
         }
     }
 
@@ -907,7 +981,7 @@ impl ScriptLowerer<'_> {
                 .function_source_parameter_candidates
                 .remove(&key)
                 .unwrap_or_default();
-            let merged = bounded_candidates(previous.iter().cloned().chain(candidates));
+            let merged = SourceCandidates::bounded(previous.iter().cloned().chain(candidates));
             // Optional structured hints can also overflow the closed budget.
             // They must not erase an already admitted primary candidate set.
             self.function_source_parameter_candidates.insert(
@@ -988,7 +1062,7 @@ impl ScriptLowerer<'_> {
             self.function_source_parameter_candidates
                 .get(&(function_id.to_string(), index))
                 .into_iter()
-                .flatten()
+                .flat_map(|candidates| candidates.iter())
                 .cloned()
                 .chain(default_candidates),
         );

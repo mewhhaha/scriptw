@@ -93,7 +93,7 @@ impl ScriptLowerer<'_> {
                 texts
                     .into_iter()
                     .map(FiniteSourceValue::SupplementalText)
-                    .collect(),
+                    .collect::<Vec<_>>(),
             );
         }
         self.merge_function_source_parameter_candidates(observations);

@@ -81,7 +81,7 @@ mod resumable_pattern;
 mod resumable_switch;
 mod super_construct;
 mod suspended_call;
-use finite_function_source::FiniteSourceValue;
+use finite_function_source::{FiniteSourceValue, SourceCandidates};
 use finite_source_binding::FiniteSourceBindingKey;
 mod prepared_function;
 mod prepared_script;
@@ -1200,10 +1200,10 @@ impl PreparedIdentifierWrite {
 pub(crate) struct ScriptLowerer<'a> {
     dynamic_script_sources: Vec<DynamicScriptSource>,
     dynamic_function_sources: Vec<DynamicFunctionSource>,
-    function_source_binding_candidates: BTreeMap<FiniteSourceBindingKey, Vec<FiniteSourceValue>>,
+    function_source_binding_candidates: BTreeMap<FiniteSourceBindingKey, SourceCandidates>,
     finite_source_capture_keys: BTreeMap<(usize, String), FiniteSourceBindingKey>,
     finite_source_body_scope: Option<usize>,
-    function_source_parameter_candidates: BTreeMap<(FunctionId, usize), Vec<FiniteSourceValue>>,
+    function_source_parameter_candidates: BTreeMap<(FunctionId, usize), SourceCandidates>,
     interner: &'a Interner,
     analysis: &'a Analysis<'a>,
     source_text: CompilerSourceText<'a>,
