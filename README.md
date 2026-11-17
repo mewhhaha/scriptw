@@ -134,7 +134,7 @@ Latest engine suite (**2026-11-16**, source `3351200c5`): 4,265 tests and the do
   removes access to the Store's GC heap and private linear memory, and the fault
   stops the code; this needs Unix signal handling and is exercised on Linux
   x86-64 ([contract](docs/rust-rewrite/contracts/execution-deadlines.md)).
-- **Runtime ABI 77:** rebuild Portable bundles and native images built under an
+- **Runtime ABI 82:** rebuild Portable bundles and native images built under an
   earlier ABI ([details](docs/rust-rewrite/runtime-requirements.md#runtime-abi)).
 
 [Development and verification](CONTRIBUTING.md) ·

@@ -81,3 +81,50 @@ Linux mmap-backed GC heaps prefer base pages before initialization, and retain
 that preference through in-place growth and relocation. Advice refusal keeps
 valid memory usable; custom/malloc backing retains its own allocation policy.
 These policies do not request extra collections or purge benchmark state.
+
+## Demand constructors, deferred global functions and one-call publication
+
+Runtime layouts 78 to 82 stop a fresh Realm from building intrinsics that
+a program may never reach. Nothing observable changes: a deferred value
+keeps its binding position, attributes and, once observed, its identity.
+
+- **Error family and DOMException.** DOMException's prototype and constructor
+  belong to the Error family's demand owner. Realm creation no longer reads
+  `Error.prototype`, which used to force the complete Error graph on every
+  fresh entry. Every canonical read of either slot still ensures the whole
+  family first.
+- **Demand constructors.** Twenty-six constructors start as the Undefined
+  placeholder in their canonical Realm slot: Proxy, Iterator, Number,
+  Boolean, Promise, Map, Set, WeakMap, WeakSet, WeakRef,
+  FinalizationRegistry, AsyncDisposableStack, DisposableStack,
+  AbortController, AbortSignal, EventTarget, Event, TextEncoder,
+  TextDecoder, Symbol, BigInt, ShadowRealm, AbstractModuleSource,
+  ReadableStream, ReadableStreamDefaultReader and
+  ReadableByteStreamController. A canonical read, or a layout row that names
+  the slot, checks the placeholder inline and calls
+  `realm_ensure_constructor`, which builds the constructor in its defining
+  Realm exactly as Realm creation did. Their prototypes stay eager and name
+  the constructor through a layout constructor row, so property order does
+  not move; the emitter refuses a demand constructor that would add its own
+  `prototype.constructor` data property. String, Object, Function, Array and
+  the dynamic function constructors stay eager.
+- **Deferred global functions.** `isNaN`, `isFinite`, the four URI
+  functions, `escape`, `unescape` and the web globals without a canonical
+  Realm slot publish a `DeferredIntrinsicValue` recipe that captures the
+  defining Realm and an empty cache. The one method resolver materializes
+  the function on its first semantic read, descriptor exposure or SameValue
+  check, with the original Realm's Function prototype and native entry, and
+  caches it. `eval` stays eager: direct-eval detection reads the Realm's
+  `%eval%` identity.
+- **One-call publication.** A new global object receives all its bindings
+  through `fresh_data_properties_publish`, which sizes the dictionary once
+  and inserts without probing. `GlobalBindingPublication` proves the names
+  distinct when the emitter builds it, and the helper traps unless the
+  object has no property yet. Computing a binding's value runs no JavaScript
+  and reads no global property, so publishing after every value exists is
+  unobservable.
+
+Realm creation now builds 7 constructors and 53 objects with complete
+layout storage (the four namespaces, the three original prototypes, the 7
+eager constructors and 39 covered prototypes); three emitter tests pin those
+counts.

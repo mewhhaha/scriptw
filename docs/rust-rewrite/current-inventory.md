@@ -105,14 +105,32 @@ accepts `--case <file.js>`.
   default policy (every instruction count above is Speed) and whether the
   CPU baseline stays x86-64 without SSE4.1.
   The other panels were remeasured there on 2026-11-16 too. They show where
-  the next costs are: a fresh entry costs about 0.08 ms before the program
-  runs, which is most of fifteen of the seventeen kernel workloads and 4 to
-  21% of an edge batch (Scriptc's floor is 0.03 ms); the React SSR render
-  takes 8.1 ms against V8's 0.65 ms; `scriptw build wasm` of the client
-  mount bundle does not finish in 60 s; and in the focused situations Speed
-  is behind V8 by 10 to 20× on an empty retained call (3 µs against 0.24),
+  the next costs are: a fresh entry cost about 0.08 ms before the program
+  ran, most of fifteen of the seventeen kernel workloads and 4 to 21% of an
+  edge batch (Scriptc's floor is 0.03 ms); the React SSR render takes
+  8.1 ms against V8's 0.65 ms; and in the focused situations Speed is
+  behind V8 by 10 to 20× on an empty retained call (3 µs against 0.24),
   observed `arguments`, a bound global alias, singleton comparisons and
   32 to 128 branch sites.
+  Demand-built intrinsics and one-call global publication (ABI 82) halve
+  the fresh entry in instructions (`integer.js` 275,100 to 135,512); the
+  kernel and edge panels have not been remeasured with it. Left there: the
+  pooled funcref table fill (about 31,000, needs a decision between a
+  chunked table and a faster null fill in the vendored runtime), Realm
+  creation's remaining 7 eager constructors and 39 prototypes, and the
+  host's per-Store instantiation and Linker registration outside the timer
+  (about 2.3 M instructions).
+  Compile time: lowering no longer repeats settled merges (RSC 24.2 G to
+  5.4 G instructions, the React client bundle from over a minute to about
+  7 s) and emission no longer reparses its module (3.85 G to 1.54 G)
+  ([measurement](benchmarks.md#fresh-entries-and-compile-time-2026-11-17)).
+  Open, largest first: native preparation (5.7 s Fast, 8.0 s Speed for the
+  RSC bundle; 40% is Cranelift's stack-map liveness pass over hashed sets,
+  which needs `cranelift-frontend` vendored; compilation is serial in the
+  embedding API); program Wasm size (about 76 bytes per source byte; a
+  prepared, unverified change removes null stores on released GC locals
+  for 10% of P); the inference prepass that lowers every body twice; and
+  `String` keys in the lowering maps.
   What remains, by size on that request: read record hits
   (`cached_property_read`, 274K own for 1,259 calls),
   `computed_property_write` (113K, about 245 an append), the general Get

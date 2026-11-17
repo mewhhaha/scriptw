@@ -2066,6 +2066,87 @@ next commit repaired. Not run: full Test262, the Fast
 policy's request, the emitter's whole `--lib` suite and any target other
 than x86-64.
 
+### Fresh entries and compile time (2026-11-17)
+
+Two costs that the remeasured panels exposed, measured as Callgrind
+instructions because the machine was busy with a Test262 run.
+
+**Fresh entry.** A fresh entry of a precompiled program paid about 0.08 ms
+before the program ran. For the kernel `integer.js` the timed evaluate call
+was 275,100 instructions, of which the workload itself is about 11,000.
+Realm creation built every intrinsic: it read `Error.prototype` for
+DOMException and so forced the whole Error graph (54,181), built 33
+constructors whose first `ref.func` Wasmtime initializes and interns for
+the GC heap (about 47,000), and published 81 global bindings one helper
+call at a time into a dictionary that grew by doubling (41,686). Runtime
+layouts 78 to 82 defer the Error family with DOMException, twenty-six
+constructors and the ordinary global functions to their first read, and
+publish a new global object's bindings in one call
+([contract](contracts/lazy-runtime-values.md)):
+
+| Fresh entry · instructions | Before | After | Change |
+| --- | ---: | ---: | ---: |
+| `integer.js` | 275,100 | 135,512 | −51% |
+| `sort-reverse-128.js` | 378,723 | 239,356 | −37% |
+| `numeric-loop-10000.js` | 269,428 | 130,690 | −51% |
+
+The retained RSC request is unchanged (2,893,122 sync and 3,130,936 async
+against 2,892,931 and 3,131,099; consecutive requests of one host differ by
+several hundred). What remains in `integer.js`: Realm creation about 31,600,
+global publication about 18,600, the program's own initialization about
+35,000. Outside the timed call, each fresh Store costs the host about 2.3 M
+instructions more (instantiation about 1.1 M, registering about 140 host
+functions with the Linker about 0.66 M); that is the embedding API's shape
+and was not changed. Filling the pooled funcref table (about 31,000) was
+left for a decision: chunking it adds an indirection to hot paths.
+
+**Lowering.** For the 65 KB RSC bundle the front end and lowering executed
+24.65 G instructions, 99% of it lowering, and a 325 KB React client bundle
+took over a minute: three passes repeated work that changed nothing, once
+per site times once per function. Every unknown property hook merged
+"unknown" into all 308 function signatures again (43%), every possible
+user-code site invalidated about 80 globals that were already invalidated
+(26%), and every child lowerer cloned the whole-program candidate maps and
+merged every entry back. Eight commits make those merges skip settled
+state and share unchanged data:
+
+| Lowering | Before | After |
+| --- | ---: | ---: |
+| RSC bundle · instructions | 24.18 G | 5.39 G |
+| RSC bundle in the host · front end and lowering | 2.9 s | 0.76 s |
+| React client bundle · lowering (alternating runs, loaded machine) | 71 to 78 s | 6.6 to 7.5 s |
+
+The lowered IR is identical on a corpus of 428 inputs (the RSC, SSR and
+client bundles, the edge and kernel programs and 400 Test262 files), and
+the emitted program Wasm is byte-identical for the RSC bundle and the 23
+kernel and edge programs. What remains is mostly the inference prepass,
+which lowers every body a second time (about 43% of lowering), and
+`String` keys in ordered maps (about 16% in `memcmp`).
+
+**Emission.** Emitting the RSC bundle's program module took 3.85 G
+instructions in the emitter's own harness. Import compaction re-encoded
+and reparsed the whole 5 MB module to drop unused imports (1.83 G),
+reserving a local scanned every released one (1.02 G), and writing branch
+hints decoded the module again. The code sink now records index operands
+and branch offsets as it emits, and free locals are found by type:
+1.54 G, with every output hash unchanged on the same corpus. Validating
+the finished module is now the largest single cost (0.46 G); Wasmtime
+validates it again when compiling.
+
+Native preparation, 5.7 s under Fast and 8.0 s under Speed for this
+bundle, is not changed by any of this: 40% of it is Cranelift's stack-map
+liveness pass, whose live sets are hashed sets, and the rest follows the
+size of the Wasm.
+
+Verified on the combined tree `2957071d1`: the engine suite (4,266 tests
+and the doctest pass; the cloud-only runtime cache test fails as before),
+the emitter's unit tests (684 pass; the thousand-method size test fails as
+before) and six integration binaries, the lowering crate's 2,408 tests,
+the source guards, and 29 Test262 subtrees for the deferred globals and
+constructors (all passing; eleven more, from `built-ins/Promise` to
+`built-ins/BigInt`, were still running when this was written). Wall-clock
+panels were not remeasured for this section.
+
 ### Descriptor work and physical allocation
 
 Compiler-created, already validated descriptors now call canonical ordinary/Array definition directly when admitted, retaining the exotic Reflect fallback. Known source accessor descriptors bypass the inline Array algorithm to control code growth. Public descriptor conversion and validation remain intact.
