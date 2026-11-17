@@ -344,6 +344,18 @@ impl<'a> ScriptLowerer<'a> {
                 .collect::<BTreeSet<_>>()
         };
         for name in names {
+            // Both branches kept the row they forked with; the join below
+            // would rebuild that same row.
+            if let (Some(left_row), Some(right_row)) =
+                (left.shared_change(&name), right.shared_change(&name))
+            {
+                if std::sync::Arc::ptr_eq(left_row, right_row)
+                    && Self::value_info_joins_to_itself(&left_row.value_info)
+                {
+                    merged.set_effective_shared(name, std::sync::Arc::clone(left_row));
+                    continue;
+                }
+            }
             let (Some(left_info), Some(right_info)) = (left.get(&name), right.get(&name)) else {
                 merged.set_effective(name, None);
                 continue;
@@ -386,6 +398,20 @@ impl<'a> ScriptLowerer<'a> {
             }
             ValueKind::Object | ValueKind::Array | ValueKind::Function => None,
             _ => None,
+        }
+    }
+
+    /// Whether `merge_value_infos(info, info)` is `info`: its kind is the
+    /// one its possible kinds name, and it keeps a heap shape only for a kind
+    /// whose shapes survive a join.
+    fn value_info_joins_to_itself(info: &ValueInfo) -> bool {
+        match info.kind {
+            ValueKind::Function => info.possible_kinds == KindSet::from_kind(ValueKind::Function),
+            kind => {
+                kind == info.possible_kinds.as_value_kind()
+                    && (info.heap_shape.is_none()
+                        || matches!(kind, ValueKind::Object | ValueKind::Array))
+            }
         }
     }
 

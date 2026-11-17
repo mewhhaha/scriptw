@@ -192,6 +192,12 @@ impl<V: 'static> CatalogOverlay<V> {
         self.changes.get(key).and_then(Option::as_deref)
     }
 
+    /// The shared row this overlay owns for `key`. Overlays forked from one
+    /// another hold the same row until either changes it.
+    pub(super) fn shared_change(&self, key: &str) -> Option<&Arc<V>> {
+        self.changes.get(key).and_then(Option::as_ref)
+    }
+
     /// Replace a fact without materializing the discarded previous value.
     /// Forks retain their own immutable row; no Clone bound is needed here.
     pub(super) fn insert(&mut self, key: String, value: V) {
@@ -309,6 +315,17 @@ impl<V: Clone + 'static> CatalogOverlay<V> {
 }
 
 impl<V: PartialEq + 'static> CatalogOverlay<V> {
+    /// [`Self::set_effective`] with a row this or another overlay already
+    /// owns, kept shared instead of copied.
+    pub(super) fn set_effective_shared(&mut self, key: String, value: Arc<V>) {
+        self.touch(&key);
+        if self.baseline.and_then(|baseline| baseline.get(&key)) == Some(&*value) {
+            self.changes.remove(&key);
+        } else {
+            self.changes.insert(key, Some(value));
+        }
+    }
+
     pub(super) fn set_effective(&mut self, key: String, value: Option<V>) {
         self.touch(&key);
         if self.baseline.and_then(|baseline| baseline.get(&key)) == value.as_ref() {
