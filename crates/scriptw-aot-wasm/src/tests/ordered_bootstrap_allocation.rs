@@ -95,8 +95,8 @@ fn eager_layout_births_keep_demand_recipe_and_constructor_allocation_owners() {
     let constructor_calls = calls(&bootstrap, constructor);
     assert_eq!(
         constructor_calls.len(),
-        24,
-        "all eager constructors retain the shared Context/FunctionObject cycle"
+        7,
+        "all eager constructors retain the shared Context/FunctionObject cycle; demand constructors are built on first read"
     );
     let layouts = allocations(&bootstrap, type_index::<IntrinsicPropertyStorage>(schema));
     for (position, &callable) in constructor_calls.iter().enumerate() {

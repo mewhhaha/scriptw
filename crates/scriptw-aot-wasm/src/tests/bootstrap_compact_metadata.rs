@@ -90,8 +90,8 @@ fn native_bootstrap_uses_complete_constructor_layouts_and_compact_remaining_nati
         "layout accessors remain unobserved at Realm birth"
     );
     assert_eq!(
-        shared_constructors, 24,
-        "every eager constructor shares the typed allocation tail"
+        shared_constructors, 7,
+        "every eager constructor shares the typed allocation tail; the Error, Date, RegExp, binary-data and demand constructors are built on first read"
     );
     assert_eq!(
         inline_callables,
@@ -104,7 +104,7 @@ fn native_bootstrap_uses_complete_constructor_layouts_and_compact_remaining_nati
             .filter(|op| matches!(op, Operator::Call { function_index } if *function_index == constructor_header))
             .count(),
         0,
-        "the 24 covered constructor births never allocate a transient dictionary header"
+        "the 7 covered eager constructor births never allocate a transient dictionary header"
     );
     let allocator = named_body(runtime.bytes(), allocate);
     assert_eq!(
