@@ -2144,10 +2144,30 @@ and the runtime module 2.2% smaller. A request executes the same
 instructions (2,892,016 sync, 3,129,799 async). The release of a whole
 value's reference word keeps its clear: there the null is read.
 
-Native preparation, 5.7 s under Fast and 8.0 s under Speed for this
-bundle before the code-size change, is not changed by the rest of this: 40% of it is Cranelift's stack-map
-liveness pass, whose live sets are hashed sets, and the rest follows the
-size of the Wasm.
+**Native preparation.** Compiling the RSC program module to native code
+took 5.7 s under Fast and 8.0 s under Speed, and none of the above changes
+it. Under Callgrind 40% of it was Cranelift's stack-map liveness pass
+(`SafepointSpiller::run`): its live sets were hashed sets, rebuilt by
+walking every block's instructions on each visit of the fixed point. The
+vendored `cranelift-frontend` now numbers the reference-typed values
+densely, summarises each block once as its definitions and upward-exposed
+uses, and keeps the live sets as sorted vectors
+([patch notes](../../vendor/cranelift-frontend-0.134.0/PATCHES.md)):
+
+| RSC program, Fast · instructions | Before | After |
+| --- | ---: | ---: |
+| Native compilation of the program | 71.30 G | 49.68 G |
+| of which the liveness pass | 28.76 G | 7.15 G |
+| Whole host process, cold | 95.64 G | 74.02 G |
+
+The native code is byte-identical: the RSC program and runtime images
+under both policies and the embedded runtime image differ only in the
+compiler fingerprint string, which covers `vendor/`, and every cached
+function body of seven other programs is unchanged. What remains under
+Fast is the single-pass register allocator (13.8 G), the frame-load
+placement in the vendored Wasmtime patch (8.6 G), the rest of the
+liveness pass (7.2 G) and instruction lowering (7.2 G). Speed was checked
+for identity but not counted, and no wall-clock time was measured.
 
 Verified on the combined tree `2957071d1`: the engine suite (4,266 tests
 and the doctest pass; the cloud-only runtime cache test fails as before),

@@ -124,13 +124,24 @@ accepts `--case <file.js>`.
   5.4 G instructions, the React client bundle from over a minute to about
   7 s) and emission no longer reparses its module (3.85 G to 1.54 G)
   ([measurement](benchmarks.md#fresh-entries-and-compile-time-2026-11-17)).
-  Open, largest first: native preparation (5.7 s Fast, 8.0 s Speed for the
-  RSC bundle; 40% is Cranelift's stack-map liveness pass over hashed sets,
-  which needs `cranelift-frontend` vendored; compilation is serial in the
-  embedding API); program Wasm size (about 76 bytes per source byte; a
-  prepared, unverified change removes null stores on released GC locals
-  for 10% of P); the inference prepass that lowers every body twice; and
-  `String` keys in the lowering maps.
+  Released GC locals are no longer nulled (program Wasm 10% smaller) and
+  Cranelift's stack-map liveness pass uses sorted sets instead of hashed
+  ones (native compilation of the RSC program 71.3 G to 49.7 G
+  instructions, native code byte-identical).
+  Open, largest first: native preparation, still most of a cold start
+  (the single-pass register allocator, the vendored frame-load placement,
+  the rest of the liveness pass; compilation is serial in the embedding
+  API); the native policy: under the same machine conditions Fast takes
+  about 0.75 ms an RSC request and 6.6 s to compile, optimization `None`
+  with the backtracking allocator 0.33 ms and 8.7 s, and Speed 0.31 to
+  0.39 ms and 9.5 s, so Fast's deficit is its allocator and the default
+  for retained programs needs a decision; program Wasm size (about 68
+  bytes per source byte); the inference prepass that lowers every body
+  twice; and `String` keys in the lowering maps.
+  The 2026-11-17 remeasurement of the panels is not published: the same
+  V8 and Scriptc binaries ran 25% and 16% slower than on 2026-11-16, so
+  the shared machine was in a different state. Rerun it when the
+  2026-11-16 RSC host under Speed measures about 0.27 ms again.
   What remains, by size on that request: read record hits
   (`cached_property_read`, 274K own for 1,259 calls),
   `computed_property_write` (113K, about 245 an append), the general Get
