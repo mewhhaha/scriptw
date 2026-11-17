@@ -184,7 +184,9 @@ runtime_scalar_domain!(RegExpInitializationState, 0, {
     Ready = 2,
 });
 
-// Public Error recipes select only one of the nine canonical constructors.
+// Public Error-family recipes select one of its ten canonical constructors:
+// the nine Error constructors and DOMException, whose prototype inherits
+// Error.prototype and is therefore built by the same demand owner.
 runtime_scalar_domain!(ErrorIntrinsicConstructor, 0, {
     Error = 0,
     EvalError = 1,
@@ -195,9 +197,24 @@ runtime_scalar_domain!(ErrorIntrinsicConstructor, 0, {
     TypeError = 6,
     URIError = 7,
     ReferenceError = 8,
+    DOMException = 9,
 });
 
 impl ErrorIntrinsicConstructor {
+    /// The nine constructors whose prototypes carry `name` and `message`
+    /// data properties and whose derived constructors inherit Error.
+    pub(crate) const NATIVE_ERRORS: [Self; 9] = [
+        Self::Error,
+        Self::EvalError,
+        Self::AggregateError,
+        Self::SuppressedError,
+        Self::RangeError,
+        Self::SyntaxError,
+        Self::TypeError,
+        Self::URIError,
+        Self::ReferenceError,
+    ];
+
     pub(crate) const fn from_builtin(builtin: scriptw_ir::StandardBuiltinId) -> Option<Self> {
         match builtin {
             scriptw_ir::StandardBuiltinId::ErrorConstructor => Some(Self::Error),
@@ -211,6 +228,7 @@ impl ErrorIntrinsicConstructor {
             scriptw_ir::StandardBuiltinId::TypeErrorConstructor => Some(Self::TypeError),
             scriptw_ir::StandardBuiltinId::URIErrorConstructor => Some(Self::URIError),
             scriptw_ir::StandardBuiltinId::ReferenceErrorConstructor => Some(Self::ReferenceError),
+            scriptw_ir::StandardBuiltinId::DOMExceptionConstructor => Some(Self::DOMException),
             _ => None,
         }
     }
@@ -226,6 +244,7 @@ impl ErrorIntrinsicConstructor {
             Self::TypeError => scriptw_ir::StandardBuiltinId::TypeErrorConstructor,
             Self::URIError => scriptw_ir::StandardBuiltinId::URIErrorConstructor,
             Self::ReferenceError => scriptw_ir::StandardBuiltinId::ReferenceErrorConstructor,
+            Self::DOMException => scriptw_ir::StandardBuiltinId::DOMExceptionConstructor,
         }
     }
 
@@ -248,6 +267,9 @@ impl ErrorIntrinsicConstructor {
             Self::ReferenceError => {
                 crate::functions::NonArrayRealmIntrinsicSlot::ReferenceErrorConstructor
             }
+            Self::DOMException => {
+                crate::functions::NonArrayRealmIntrinsicSlot::DOMExceptionConstructor
+            }
         }
     }
 
@@ -268,6 +290,9 @@ impl ErrorIntrinsicConstructor {
             Self::ReferenceError => {
                 crate::functions::NonArrayRealmIntrinsicSlot::ReferenceErrorPrototype
             }
+            Self::DOMException => {
+                crate::functions::NonArrayRealmIntrinsicSlot::DOMExceptionPrototype
+            }
         }
     }
 
@@ -282,6 +307,7 @@ impl ErrorIntrinsicConstructor {
             Self::TypeError => "TypeError",
             Self::URIError => "URIError",
             Self::ReferenceError => "ReferenceError",
+            Self::DOMException => "DOMException",
         }
     }
 }

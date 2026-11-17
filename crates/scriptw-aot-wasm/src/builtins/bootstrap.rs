@@ -836,18 +836,9 @@ impl<'a> FunctionBuilder<'a> {
             &parent,
             function,
         )?;
-        self.emit_load_non_array_realm_intrinsic(
-            realm,
-            NonArrayRealmIntrinsicSlot::ErrorPrototype,
-            &parent,
-            function,
-        );
-        self.emit_bootstrap_plain_prototype(
-            &context,
-            NonArrayRealmIntrinsicSlot::DOMExceptionPrototype,
-            &parent,
-            function,
-        )?;
+        // DOMException.prototype inherits Error.prototype, so the Error
+        // family's demand owner builds it; reading Error.prototype here would
+        // build every Error intrinsic at Realm creation.
         let primitive = schema.reserve_value_local(function);
         primitive.set_scalar(ScalarValue::NumberBits(0), function);
         self.emit_bootstrap_boxed_prototype(
@@ -1021,10 +1012,6 @@ impl<'a> FunctionBuilder<'a> {
             (
                 StandardBuiltinId::EventConstructor,
                 NonArrayRealmIntrinsicSlot::EventPrototype,
-            ),
-            (
-                StandardBuiltinId::DOMExceptionConstructor,
-                NonArrayRealmIntrinsicSlot::DOMExceptionPrototype,
             ),
             (
                 StandardBuiltinId::TextEncoderConstructor,
