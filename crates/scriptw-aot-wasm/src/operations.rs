@@ -193,9 +193,9 @@ fn validate_spec_operation_operands(
     )))
 }
 
-/// Catalog expressions produce a normal value or throw. Source calls keep
-/// their complete returned-kind protocol until their call owner normalizes it.
-/// Owning this choice prevents projecting a source Return as a catalog Normal.
+/// Catalog expressions produce a normal value or throw. Source calls start
+/// from an initialized completion; their call owner has already made a
+/// source Return the call's Normal value, so both project alike.
 #[must_use = "an operation result must be projected and its roots released"]
 enum SpecOperationResultLocals {
     Expression(CompletionLocals),
@@ -234,46 +234,24 @@ impl SpecOperationResultLocals {
         inputs: Vec<ValueLocals>,
         function: &mut Function,
     ) {
-        match self {
-            Self::Expression(pending) => {
-                pending.kind().load(function);
-                function.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
-                function.instruction(&Instruction::I32Eq);
-                builder.open_frame(ControlFrameKind::If, function);
-                builder.completion().copy_from(&pending, function);
-                // An in-function catch can continue allocating after this
-                // branch. Retire temporary roots before leaving their scope.
-                pending.value().reference().clear(function);
-                for input in inputs.iter().rev() {
-                    input.reference().clear(function);
-                }
-                builder.emit_propagate_current_throw(function);
-                builder.pop_control(ControlFrameKind::If);
-                function.instruction(&Instruction::End);
-                // Falling through proves the catalog's normal result. Its
-                // payload belongs to output, not the enclosing StatementList.
-                output.copy_from(pending.value(), function);
-                builder.set_completion_kind(CompletionKind::Normal, function);
-                pending.clear(function);
-                for input in inputs.into_iter().rev() {
-                    input.clear(function);
-                }
-            }
-            Self::Call(pending) => {
-                builder.completion().copy_from(&pending, function);
-                pending.kind().load(function);
-                function.instruction(&Instruction::I32Const(CompletionKind::Normal.code() as i32));
-                function.instruction(&Instruction::I32Eq);
-                builder.open_frame(ControlFrameKind::If, function);
-                output.copy_from(pending.value(), function);
-                builder.pop_control(ControlFrameKind::If);
-                function.instruction(&Instruction::End);
-                pending.clear(function);
-                for input in inputs.into_iter().rev() {
-                    input.clear(function);
-                }
-                builder.emit_propagate_current_throw_if_needed(function);
-            }
+        // A catalog result is Normal or Throw. A Call's is too: its owner
+        // made a source Return the call's Normal value
+        // (`emit_function_or_proxy_call_with_argv`).
+        let pending = match self {
+            Self::Expression(pending) | Self::Call(pending) => pending,
+        };
+        // An in-function catch can continue allocating after the Throw
+        // edge. Retire temporary roots before leaving their scope.
+        let roots = std::iter::once(pending.value())
+            .chain(inputs.iter().rev())
+            .collect::<Vec<_>>();
+        builder.emit_propagate_pending_throw(&pending, &roots, function);
+        // Falling through proves the operation's normal result. Its payload
+        // belongs to output, not the enclosing StatementList.
+        output.copy_from(pending.value(), function);
+        pending.clear(function);
+        for input in inputs.into_iter().rev() {
+            input.clear(function);
         }
     }
 }
@@ -522,7 +500,6 @@ impl<'a> FunctionBuilder<'a> {
             let boolean = schema.reserve_i32_local(function);
             boolean.store(function);
             output.set_boolean(boolean, function);
-            self.set_completion_kind(CompletionKind::Normal, function);
             schema.release_i32_local(boolean, function);
             return Ok(());
         }
@@ -573,7 +550,6 @@ impl<'a> FunctionBuilder<'a> {
             let boolean = schema.reserve_i32_local(function);
             boolean.store(function);
             output.set_boolean(boolean, function);
-            self.set_completion_kind(CompletionKind::Normal, function);
             schema.release_i32_local(boolean, function);
             for input in inputs.into_iter().rev() {
                 input.clear(function);
@@ -791,9 +767,11 @@ impl<'a> FunctionBuilder<'a> {
                             &operands[0],
                             name,
                             &inputs[0],
-                            &pending,
+                            pending.value(),
                             function,
                         )?;
+                        // The site propagated its Throw itself.
+                        pending.set_normal(pending.value(), function);
                         true
                     }
                     _ => false,
@@ -1025,9 +1003,8 @@ impl<'a> FunctionBuilder<'a> {
         let schema = self.runtime_schema();
         let base = schema.reserve_value_local(function);
         self.compile_expr_to_value(&operands[0], &base, function)?;
-        let pending = schema.reserve_completion(function);
-        self.emit_planned_property_read(&operands[0], name, &base, &pending, function)?;
-        SpecOperationResultLocals::Expression(pending).project(self, output, vec![base], function);
+        self.emit_planned_property_read(&operands[0], name, &base, output, function)?;
+        base.clear(function);
         Ok(true)
     }
 
@@ -6431,7 +6408,6 @@ impl<'a> FunctionBuilder<'a> {
             || self.try_compile_strict_singleton_comparison_i32(left, right, function)?
             || self.try_compile_string_unit_comparison_i32(left, right, function)?
         {
-            self.set_completion_kind(CompletionKind::Normal, function);
             return Ok(());
         }
         let left_value = self.runtime_schema().reserve_value_local(function);
@@ -6441,7 +6417,6 @@ impl<'a> FunctionBuilder<'a> {
         self.emit_tagged_payload_equality_i32(&left_value, &right_value, function)?;
         right_value.clear(function);
         left_value.clear(function);
-        self.set_completion_kind(CompletionKind::Normal, function);
         Ok(())
     }
 

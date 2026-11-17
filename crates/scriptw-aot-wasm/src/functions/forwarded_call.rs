@@ -141,14 +141,7 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
 
-        result.kind().load(function);
-        function.instruction(&Instruction::I32Const(CompletionKind::Throw as i32));
-        function.instruction(&Instruction::I32Eq);
-        self.open_frame(ControlFrameKind::If, function);
-        self.completion().copy_from(&result, function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        self.emit_propagate_current_throw_if_needed(function);
+        self.emit_propagate_pending_throw(&result, &[], function);
         output.copy_from(result.value(), function);
         schema.release_i32_local(handled, function);
         result.clear(function);

@@ -58,14 +58,16 @@ impl FunctionBuilder<'_> {
         Ok(s.reserve_gc_local(f).initialize(record, f))
     }
 
-    /// Reads `base.<name>` into `result` through the site's record. Only a
-    /// site whose base may be an actual OrdinaryObject answers inline.
+    /// Reads `base.<name>` into `value` through the site's record. Only a
+    /// site whose base may be an actual OrdinaryObject answers inline. The
+    /// hit entry's Throw propagates from its own result before it joins the
+    /// inline hit, so falling through always has the property's value.
     pub(crate) fn emit_static_read_site(
         &mut self,
         name: &str,
         may_be_ordinary: bool,
         base: &ValueLocals,
-        result: &CompletionLocals,
+        value: &ValueLocals,
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
@@ -74,8 +76,7 @@ impl FunctionBuilder<'_> {
         let done = if may_be_ordinary {
             let done = self.open_frame(ControlFrameKind::Block, f);
             let miss = self.open_frame(ControlFrameKind::Block, f);
-            self.emit_own_compact_record_hit(base, &record, result.value(), miss, f);
-            emit_normal_kind(result, f);
+            self.emit_own_compact_record_hit(base, &record, value, miss, f);
             self.emit_branch_to_target(done, f);
             self.pop_control(ControlFrameKind::Block);
             f.instruction(&Instruction::End);
@@ -83,6 +84,7 @@ impl FunctionBuilder<'_> {
         } else {
             None
         };
+        let result = s.reserve_completion(f);
         s.call_helper(
             crate::runtime_helpers::CachedPropertyReadArguments::new(
                 base,
@@ -93,7 +95,10 @@ impl FunctionBuilder<'_> {
             self.runtime_helper_base()?,
             f,
         )
-        .store(result, f);
+        .store(&result, f);
+        self.emit_propagate_pending_throw(&result, &[result.value()], f);
+        value.copy_from(result.value(), f);
+        result.clear(f);
         if done.is_some() {
             self.pop_control(ControlFrameKind::Block);
             f.instruction(&Instruction::End);
@@ -102,11 +107,11 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    /// The [[Set]] of PutValue at a static assignment site, into `result`:
-    /// an existing writable own data property that the site's record proves
-    /// is stored inline, everything else is the R write entry's with the
-    /// record. `key` is the site's String key, `target` the base after
-    /// ToObject and `receiver` the original base.
+    /// The [[Set]] of PutValue at a static assignment site, its Boolean
+    /// into `succeeded`: an existing writable own data property that the
+    /// site's record proves is stored inline, everything else is the R
+    /// write entry's with the record. `key` is the site's String key,
+    /// `target` the base after ToObject and `receiver` the original base.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn emit_static_write_site(
         &mut self,
@@ -115,7 +120,7 @@ impl FunctionBuilder<'_> {
         receiver: &ValueLocals,
         key: &PropertyKeyLocals,
         value: &ValueLocals,
-        result: &CompletionLocals,
+        succeeded: &ValueLocals,
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let done = self.open_frame(ControlFrameKind::Block, f);
@@ -129,15 +134,12 @@ impl FunctionBuilder<'_> {
             stored,
             f,
         )?;
-        self.emit_static_write_call(&record, target, receiver, value, result, f)?;
+        self.emit_static_write_call(&record, target, receiver, value, succeeded, f)?;
         self.emit_branch_to_target(done, f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         // The [[Set]] of an existing writable own data property is true.
-        result
-            .value()
-            .set_scalar(crate::gc_types::ScalarValue::Boolean(true), f);
-        emit_normal_kind(result, f);
+        succeeded.set_scalar(crate::gc_types::ScalarValue::Boolean(true), f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         record.clear(f);
@@ -192,7 +194,8 @@ impl FunctionBuilder<'_> {
         Ok(record)
     }
 
-    /// The R write entry for a static site's [[Set]], into `result`. The
+    /// The R write entry for a static site's [[Set]], its Boolean into
+    /// `succeeded`; the entry's Throw propagates from its own result. The
     /// record names the site's key.
     pub(crate) fn emit_static_write_call(
         &mut self,
@@ -200,10 +203,11 @@ impl FunctionBuilder<'_> {
         target: &ValueLocals,
         receiver: &ValueLocals,
         value: &ValueLocals,
-        result: &CompletionLocals,
+        succeeded: &ValueLocals,
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
+        let result = s.reserve_completion(f);
         s.call_helper(
             crate::runtime_helpers::CachedPropertyWriteArguments::new(
                 target,
@@ -216,7 +220,10 @@ impl FunctionBuilder<'_> {
             self.runtime_helper_base()?,
             f,
         )
-        .store(result, f);
+        .store(&result, f);
+        self.emit_propagate_pending_throw(&result, &[result.value()], f);
+        succeeded.copy_from(result.value(), f);
+        result.clear(f);
         Ok(())
     }
 
@@ -377,9 +384,3 @@ impl FunctionBuilder<'_> {
     }
 }
 
-/// A normal completion of the value already in `result`.
-fn emit_normal_kind(result: &CompletionLocals, f: &mut Function) {
-    result.set_kind(crate::emit::CompletionKind::Normal, f);
-    f.instruction(&Instruction::I32Const(0));
-    result.target().store(f);
-}

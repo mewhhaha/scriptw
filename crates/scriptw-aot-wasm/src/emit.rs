@@ -1485,6 +1485,31 @@ impl<'a> FunctionBuilder<'a> {
             |function| self.emit_propagate_current_throw(function),
         );
     }
+    /// Propagates the Throw of an operation's own result where it is
+    /// produced, before the result joins any other path. Only the abrupt
+    /// edge writes the function's completion: falling through proves
+    /// `pending` Normal, and Normal is already the function's completion at
+    /// every normal program point, so nothing is written there. `roots` are
+    /// temporaries this operation owns, retired on the abrupt edge because
+    /// an in-function catch can continue allocating.
+    pub(crate) fn emit_propagate_pending_throw(
+        &self,
+        pending: &CompletionLocals,
+        roots: &[&ValueLocals],
+        function: &mut Function,
+    ) {
+        pending.kind().if_equal_escape(
+            CompletionKind::Throw.code() as i32,
+            function,
+            |function| {
+                self.completion.copy_from(pending, function);
+                for root in roots {
+                    root.reference().clear(function);
+                }
+                self.emit_propagate_current_throw(function);
+            },
+        );
+    }
     pub(crate) fn emit_clear_throw_diagnostic(
         &self,
         role: ThrowDiagnosticRole,

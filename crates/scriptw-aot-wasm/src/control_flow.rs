@@ -2985,8 +2985,9 @@ impl<'a> FunctionBuilder<'a> {
                 let value = self.runtime_schema().reserve_value_local(function);
                 self.compile_expr_to_value(expr, &value, function)?;
                 self.emit_propagate_current_throw_if_needed(function);
+                // The statement's value; its Normal kind is the fact of the
+                // fall-through, already the function's completion.
                 self.completion().value().copy_from(&value, function);
-                self.set_completion_kind(CompletionKind::Normal, function);
                 value.clear(function);
             }
             StatementIr::GeneratorYield {

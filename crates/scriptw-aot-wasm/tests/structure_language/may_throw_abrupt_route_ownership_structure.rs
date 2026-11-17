@@ -79,20 +79,18 @@ fn get_v_owner_propagates_the_whole_abrupt_completion_before_publication() {
     assert!(get_v.contains("result.project(self,output,inputs,function)"));
     let projection = normalized(bounded(
         OPERATIONS_SOURCE,
-        "            Self::Expression(pending) => {",
-        "            Self::Call(pending) => {",
+        "    fn project(",
+        "impl<'a> FunctionBuilder<'a> {",
     ));
-    let throw = projection.find("CompletionKind::Throw.code()").unwrap();
-    let copy = projection
-        .find("builder.completion().copy_from(&pending,function)")
-        .unwrap();
+    // The pending Throw is propagated, as a whole completion, before the
+    // normal value is published.
     let propagate = projection
-        .find("builder.emit_propagate_current_throw(function)")
+        .find("builder.emit_propagate_pending_throw(&pending,&roots,function)")
         .unwrap();
     let publish = projection
         .find("output.copy_from(pending.value(),function)")
         .unwrap();
-    assert!(throw < copy && copy < propagate && propagate < publish);
+    assert!(propagate < publish);
     assert!(!projection.contains("CompletionKind::Normal.code()"));
     assert!(!get_v.contains("ReturnCurrentFunction"));
 }

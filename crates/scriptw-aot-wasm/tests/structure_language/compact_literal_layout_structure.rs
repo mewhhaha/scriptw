@@ -70,7 +70,7 @@ fn shared_layouts_keep_physical_instance_roots_and_live_object_reads() {
     assert!(EMIT.contains("self.runtime_schema().site_record_global(position)"));
     assert!(READ.contains("PropertyReadPlan::CachedStaticString => self.next_site_record().map(Some)"));
     assert!(READ.contains("let may_be_ordinary = target.possible_kinds.contains(ValueKind::Object);"));
-    assert!(READ.contains("self.emit_static_read_site(name, may_be_ordinary, base, result, f)"));
+    assert!(READ.contains("self.emit_static_read_site(name, may_be_ordinary, base, value, f)"));
     assert!(SITE.contains("let global = self.next_site_record()?;"));
     assert!(SITE.contains("crate::runtime_helpers::CachedPropertyReadArguments::new("));
     assert!(!READ.contains("OwnDataReadCacheSchema"));

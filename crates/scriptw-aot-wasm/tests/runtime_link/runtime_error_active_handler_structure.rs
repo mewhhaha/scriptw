@@ -36,7 +36,7 @@ fn fresh_runtime_error_delegates_to_the_canonical_current_throw_router() {
     let checked_route = section(
         EMIT_SOURCE,
         "pub(crate) fn emit_propagate_current_throw_if_needed(",
-        "pub(crate) fn emit_clear_throw_diagnostic(",
+        "pub(crate) fn emit_propagate_pending_throw(",
     );
     assert!(checked_route.contains("CompletionKind::Throw.code() as i32"));
     assert!(checked_route.contains(".if_equal_escape("));

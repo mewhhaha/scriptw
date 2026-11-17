@@ -1,4 +1,6 @@
 //! Actual P retains fresh abrupt checks while omitting checked straight-line repeats.
+//! Each potentially throwing operation keeps one escaping Throw guard, on its
+//! own result or on the function completion.
 use std::collections::{BTreeMap, BTreeSet};
 
 use scriptw_aot_wasm::emit;
@@ -53,6 +55,7 @@ fn check_guards(body: &[Operator<'_>]) -> usize {
     }
     assert!(stack.is_empty());
     let mut guards = BTreeMap::new();
+    let mut all_guards = 0;
     for (index, window) in body.windows(4).enumerate() {
         let [
             Operator::LocalGet { local_index },
@@ -63,14 +66,19 @@ fn check_guards(body: &[Operator<'_>]) -> usize {
         else {
             continue;
         };
-        if *local_index != kind || else_arms.contains(&(index + 3)) {
+        if else_arms.contains(&(index + 3)) {
             continue;
         }
         let end = ends[&(index + 3)];
         if matches!(body[end - 1], Operator::Br { relative_depth } if relative_depth > 0)
             || matches!(body[end - 1], Operator::Return | Operator::Unreachable)
         {
-            guards.insert(index, end);
+            // An operation's own result escapes its Throw before joining;
+            // only the function's completion is re-tested after joins.
+            all_guards += 1;
+            if *local_index == kind {
+                guards.insert(index, end);
+            }
         }
     }
     let checked_ends = guards.values().copied().collect::<BTreeSet<_>>();
@@ -119,7 +127,7 @@ fn check_guards(body: &[Operator<'_>]) -> usize {
             excluded = true;
         }
     }
-    guards.len()
+    all_guards
 }
 
 #[test]

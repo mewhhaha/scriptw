@@ -97,6 +97,106 @@ impl Frame {
     }
 }
 
+/// What the sink knows of one i32 local at a program point.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum I32Fact {
+    /// The local holds this value: its last write stored this constant.
+    Is(i32),
+    /// The local does not hold this value: a checked escape left on it.
+    IsNot(i32),
+}
+
+impl I32Fact {
+    fn excludes(self, value: i32) -> bool {
+        match self {
+            Self::Is(known) => known != value,
+            Self::IsNot(excluded) => excluded == value,
+        }
+    }
+
+    /// What holds on both of two incoming edges.
+    fn meet(self, other: Self) -> Option<Self> {
+        match (self, other) {
+            (Self::Is(a), Self::Is(b)) if a == b => Some(Self::Is(a)),
+            (Self::IsNot(a), Self::IsNot(b)) if a == b => Some(Self::IsNot(a)),
+            (Self::Is(known), Self::IsNot(excluded)) | (Self::IsNot(excluded), Self::Is(known))
+                if known != excluded =>
+            {
+                Some(Self::IsNot(excluded))
+            }
+            _ => None,
+        }
+    }
+}
+
+/// The i32 local facts that hold on every path to a program point, through
+/// the structured control flow the sink sees: a fact survives a join only
+/// when every edge into it carries it. Only stores and tees change a local,
+/// so calls keep every fact. A loop head and an exception handler entry
+/// start without facts, since their incoming edges are not all known.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct I32Facts {
+    facts: Vec<(u32, I32Fact)>,
+}
+
+impl I32Facts {
+    /// Facts kept per program point; the oldest is forgotten beyond this.
+    const LIMIT: usize = 32;
+
+    fn get(&self, local: u32) -> Option<I32Fact> {
+        self.facts
+            .iter()
+            .find(|(known, _)| *known == local)
+            .map(|(_, fact)| *fact)
+    }
+
+    fn forget(&mut self, local: u32) {
+        self.facts.retain(|(known, _)| *known != local);
+    }
+
+    fn set(&mut self, local: u32, fact: I32Fact) {
+        self.forget(local);
+        if self.facts.len() == Self::LIMIT {
+            self.facts.remove(0);
+        }
+        self.facts.push((local, fact));
+    }
+
+    fn meet(&self, other: &Self) -> Self {
+        Self {
+            facts: self
+                .facts
+                .iter()
+                .filter_map(|(local, fact)| {
+                    other
+                        .get(*local)
+                        .and_then(|incoming| fact.meet(incoming))
+                        .map(|fact| (*local, fact))
+                })
+                .collect(),
+        }
+    }
+}
+
+/// The facts at the current point, or none when no path reaches it.
+type ReachingI32Facts = Option<I32Facts>;
+
+fn meet_reaching(left: ReachingI32Facts, right: &ReachingI32Facts) -> ReachingI32Facts {
+    match (left, right) {
+        (None, right) => right.clone(),
+        (left, None) => left,
+        (Some(left), Some(right)) => Some(left.meet(right)),
+    }
+}
+
+/// The facts of one open frame: those carried by the edges to its label so
+/// far, and for an `if`, those at its opener for the arm that has not run.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct FrameI32Facts {
+    label: ReachingI32Facts,
+    other_arm: ReachingI32Facts,
+}
+
 /// The exact ordered local declaration consumed by one function body.
 ///
 /// The body owns this declaration from construction onward. Typed allocation
@@ -344,7 +444,12 @@ pub(crate) struct Function {
     operator_count: u32,
     literal_operands: Vec<crate::program_literal_operands::FunctionSite>,
     native_program_context: Option<crate::native_program_contexts::FunctionContext>,
-    excluded_i32_value: Option<(u32, i32)>,
+    /// The i32 local facts at the current point.
+    i32_facts: ReachingI32Facts,
+    /// The facts of each open frame, parallel to `frames`.
+    frame_i32_facts: Vec<FrameI32Facts>,
+    /// The constant the previous instruction pushed, for the next store.
+    pushed_i32_constant: Option<i32>,
     checked_escape_frames: Vec<LabelDepth>,
     last_instruction_escapes: bool,
     /// Operator ordinal of each hinted branch, and whether it is likely taken.
@@ -374,7 +479,9 @@ impl Clone for Function {
             operator_count: self.operator_count,
             literal_operands: self.literal_operands.clone(),
             native_program_context: self.native_program_context,
-            excluded_i32_value: self.excluded_i32_value,
+            i32_facts: self.i32_facts.clone(),
+            frame_i32_facts: self.frame_i32_facts.clone(),
+            pushed_i32_constant: self.pushed_i32_constant,
             checked_escape_frames: self.checked_escape_frames.clone(),
             last_instruction_escapes: self.last_instruction_escapes,
             branch_hints: self.branch_hints.clone(),
@@ -406,7 +513,9 @@ impl Function {
             operator_count: 0,
             literal_operands: Vec::new(),
             native_program_context: None,
-            excluded_i32_value: None,
+            i32_facts: Some(I32Facts::default()),
+            frame_i32_facts: vec![FrameI32Facts::default()],
+            pushed_i32_constant: None,
             checked_escape_frames: Vec::new(),
             last_instruction_escapes: false,
             branch_hints: std::collections::BTreeMap::new(),
@@ -469,17 +578,166 @@ impl Function {
     }
 
     fn forget_i32_local(&mut self, index: u32) {
-        if self
-            .excluded_i32_value
-            .is_some_and(|(local, _)| local == index)
-        {
-            self.excluded_i32_value = None;
+        if let Some(facts) = &mut self.i32_facts {
+            facts.forget(index);
         }
+    }
+
+    /// Joins `facts` into the edge to the label `immediate` frames out of
+    /// a stack `depth` frames deep. A loop label is its head, whose facts
+    /// were already given up when the loop opened.
+    fn join_i32_facts_at(&mut self, depth: usize, immediate: u32, facts: &ReachingI32Facts) {
+        let index = depth - 1 - immediate as usize;
+        if self.frames[index].kind == FrameKind::Loop {
+            return;
+        }
+        let label = self.frame_i32_facts[index].label.take();
+        self.frame_i32_facts[index].label = meet_reaching(label, facts);
+    }
+
+    /// Updates the i32 local facts across an admitted `instruction`, after
+    /// the frame stack changed for it: `enclosing_depth` frames were open
+    /// before it, and `closing` is the kind of the frame it closed.
+    fn flow_i32_facts(
+        &mut self,
+        instruction: &Instruction<'_>,
+        enclosing_depth: usize,
+        closing: Option<FrameKind>,
+    ) {
+        let pushed = self.pushed_i32_constant.take();
+        match instruction {
+            Instruction::I32Const(value) => self.pushed_i32_constant = Some(*value),
+            Instruction::LocalSet(local) | Instruction::LocalTee(local) => {
+                if let Some(facts) = &mut self.i32_facts {
+                    facts.forget(*local);
+                    if let Some(value) = pushed {
+                        facts.set(*local, I32Fact::Is(value));
+                    }
+                }
+            }
+            Instruction::Block(_) => self.frame_i32_facts.push(FrameI32Facts::default()),
+            Instruction::Loop(_) => {
+                self.frame_i32_facts.push(FrameI32Facts::default());
+                // Back edges are not emitted yet.
+                if self.i32_facts.is_some() {
+                    self.i32_facts = Some(I32Facts::default());
+                }
+            }
+            Instruction::If(_) => self.frame_i32_facts.push(FrameI32Facts {
+                label: None,
+                other_arm: self.i32_facts.clone(),
+            }),
+            Instruction::TryTable(_, catches) => {
+                // A handler can be entered from anywhere in the body.
+                let anywhere = Some(I32Facts::default());
+                for catch in catches.iter() {
+                    let (Catch::One { label, .. }
+                    | Catch::OneRef { label, .. }
+                    | Catch::All { label }
+                    | Catch::AllRef { label }) = catch;
+                    self.join_i32_facts_at(enclosing_depth, *label, &anywhere);
+                }
+                self.frame_i32_facts.push(FrameI32Facts::default());
+            }
+            Instruction::Try(_) => self.frame_i32_facts.push(FrameI32Facts::default()),
+            Instruction::Catch(_) | Instruction::CatchAll => {
+                let current = self.i32_facts.take();
+                let frame = self.frame_i32_facts.last_mut().expect("an open legacy try");
+                let label = frame.label.take();
+                frame.label = meet_reaching(label, &current);
+                self.i32_facts = Some(I32Facts::default());
+            }
+            Instruction::Delegate(_) => {
+                self.frame_i32_facts.pop();
+                self.i32_facts = Some(I32Facts::default());
+            }
+            Instruction::Else => {
+                let current = self.i32_facts.take();
+                let frame = self.frame_i32_facts.last_mut().expect("an open if");
+                let label = frame.label.take();
+                frame.label = meet_reaching(label, &current);
+                self.i32_facts = frame.other_arm.take();
+            }
+            Instruction::End => {
+                let kind = closing.expect("an admitted end closed a frame");
+                let frame = self.frame_i32_facts.pop().expect("facts of an open frame");
+                let current = self.i32_facts.take();
+                self.i32_facts = match kind {
+                    // The label is the head; only the body's end falls out.
+                    FrameKind::Loop | FrameKind::Function => current,
+                    // The arm without code falls through from the opener.
+                    FrameKind::IfThen => meet_reaching(
+                        meet_reaching(frame.label, &frame.other_arm),
+                        &current,
+                    ),
+                    FrameKind::Block
+                    | FrameKind::IfElse
+                    | FrameKind::TryTable
+                    | FrameKind::LegacyTry
+                    | FrameKind::LegacyCatch
+                    | FrameKind::LegacyCatchAll => meet_reaching(frame.label, &current),
+                };
+            }
+            Instruction::Br(label) => {
+                let current = self.i32_facts.take();
+                self.join_i32_facts_at(enclosing_depth, *label, &current);
+            }
+            Instruction::BrIf(label)
+            | Instruction::BrOnNull(label)
+            | Instruction::BrOnNonNull(label)
+            | Instruction::BrOnCast {
+                relative_depth: label,
+                ..
+            }
+            | Instruction::BrOnCastFail {
+                relative_depth: label,
+                ..
+            } => {
+                let current = self.i32_facts.clone();
+                self.join_i32_facts_at(enclosing_depth, *label, &current);
+            }
+            Instruction::BrTable(labels, default) => {
+                let current = self.i32_facts.take();
+                self.join_i32_facts_at(enclosing_depth, *default, &current);
+                for label in labels.iter() {
+                    self.join_i32_facts_at(enclosing_depth, *label, &current);
+                }
+            }
+            Instruction::Return
+            | Instruction::ReturnCall(_)
+            | Instruction::ReturnCallRef(_)
+            | Instruction::ReturnCallIndirect { .. }
+            | Instruction::Throw(_)
+            | Instruction::ThrowRef
+            | Instruction::Rethrow(_)
+            | Instruction::Unreachable => self.i32_facts = None,
+            Instruction::Suspend(_)
+            | Instruction::Resume { .. }
+            | Instruction::ResumeThrow { .. }
+            | Instruction::ResumeThrowRef { .. }
+            | Instruction::Switch { .. } => {
+                if self.i32_facts.is_some() {
+                    self.i32_facts = Some(I32Facts::default());
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Whether `local` is known not to hold `value` at the current point.
+    fn excludes_i32_value(&self, local: u32, value: i32) -> bool {
+        self.i32_facts
+            .as_ref()
+            .and_then(|facts| facts.get(local))
+            .is_some_and(|fact| fact.excludes(value))
     }
 
     /// The matching arm must leave this guard on every path. The sink owns
     /// the comparison and rejects branches into its continuation; the final
     /// instruction must also escape. Only the unmatched arm can fall through.
+    /// No guard is emitted where every path here already proves the local
+    /// is not `value` (an earlier guard, or a stored other constant, with no
+    /// store since on any path).
     pub(crate) fn if_i32_equal_escape(
         &mut self,
         local: u32,
@@ -500,7 +758,7 @@ impl Function {
             !self.free_locals.contains(local),
             "checked guard local is live"
         );
-        if self.excluded_i32_value == Some((local, value)) {
+        if self.excludes_i32_value(local, value) {
             return;
         }
         self.instruction(&Instruction::LocalGet(local));
@@ -529,7 +787,9 @@ impl Function {
         assert_eq!(self.checked_escape_frames.pop(), Some(guard));
         self.instruction(&Instruction::End);
         if !self.free_locals.contains(local) {
-            self.excluded_i32_value = Some((local, value));
+            if let Some(facts) = &mut self.i32_facts {
+                facts.set(local, I32Fact::IsNot(value));
+            }
         }
     }
 
@@ -563,48 +823,24 @@ impl Function {
             panic!("instruction emitted after the function body's final end");
         }
 
-        match instruction {
-            Instruction::LocalSet(local) | Instruction::LocalTee(local) => {
-                self.forget_i32_local(*local);
-            }
-            Instruction::Block(_)
-            | Instruction::Loop(_)
-            | Instruction::If(_)
-            | Instruction::Else
-            | Instruction::End
-            | Instruction::TryTable(_, _)
-            | Instruction::Try(_)
-            | Instruction::Catch(_)
-            | Instruction::CatchAll
-            | Instruction::Delegate(_)
-            | Instruction::Br(_)
-            | Instruction::BrIf(_)
-            | Instruction::BrTable(_, _)
-            | Instruction::BrOnNull(_)
-            | Instruction::BrOnNonNull(_)
-            | Instruction::BrOnCast { .. }
-            | Instruction::BrOnCastFail { .. }
-            | Instruction::Return
-            | Instruction::ReturnCall(_)
-            | Instruction::ReturnCallRef(_)
-            | Instruction::ReturnCallIndirect { .. }
-            | Instruction::Throw(_)
-            | Instruction::ThrowRef
-            | Instruction::Rethrow(_)
-            | Instruction::Unreachable => self.excluded_i32_value = None,
+        if matches!(
+            instruction,
             Instruction::Suspend(_)
-            | Instruction::Resume { .. }
-            | Instruction::ResumeThrow { .. }
-            | Instruction::ResumeThrowRef { .. }
-            | Instruction::Switch { .. } => {
-                self.excluded_i32_value = None;
-                assert!(
-                    self.checked_escape_frames.is_empty(),
-                    "stack switching cannot establish a checked escape fact"
-                );
-            }
-            _ => {}
+                | Instruction::Resume { .. }
+                | Instruction::ResumeThrow { .. }
+                | Instruction::ResumeThrowRef { .. }
+                | Instruction::Switch { .. }
+        ) {
+            assert!(
+                self.checked_escape_frames.is_empty(),
+                "stack switching cannot establish a checked escape fact"
+            );
         }
+        // Facts follow the instruction only once it is admitted, so a
+        // rejected instruction changes nothing.
+        let enclosing_depth = self.frames.len();
+        let closing = matches!(instruction, Instruction::End | Instruction::Delegate(_))
+            .then(|| self.frames.last().expect("an open frame was checked above").kind);
 
         match instruction {
             Instruction::Block(_) => self.frames.push(Frame::new(
@@ -770,6 +1006,7 @@ impl Function {
             }
             _ => {}
         }
+        self.flow_i32_facts(instruction, enclosing_depth, closing);
         self.last_instruction_escapes = matches!(
             instruction,
             Instruction::Br(_)

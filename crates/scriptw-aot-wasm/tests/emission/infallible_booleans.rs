@@ -294,8 +294,13 @@ fn catalog_expression_results_publish_whole_throw_only_on_the_cold_edge() {
                 panic!("the complete helper result goes directly to one cold Throw edge");
             };
             assert_eq!(kind, tested, "the result's own kind controls its projection");
+            // A source Call's owner already made a source Return its Normal
+            // value, so its result projects like any catalog result: one
+            // cold Throw edge, then the value to its output alone.
             let (_, call) = program.named("js::call#");
-            assert_eq!(guarded_value_copies(call), 1,
-                "source Call retains its existing complete returned-kind protocol");
+            assert_eq!(guarded_value_copies(call), 0,
+                "source Call has no Normal-gated value transport");
+            assert_eq!(direct_normal_publications(call), 0,
+                "a normal call result is published only to its output and source return");
         }).unwrap().join().unwrap();
 }

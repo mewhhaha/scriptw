@@ -324,14 +324,14 @@ fn aot_typestate_forces_raw_key_get_result_and_putvalue_transitions() {
         "fn evaluate_rhs_for_raw_ordinary_property_assignment(",
     );
     // A static read site reads the raw base (its R kernel throws for a
-    // nullish one) before the reference is canonicalized for the write.
+    // nullish one, propagated by the site) into the old value before the
+    // reference is canonicalized for the write.
     positions_in_order(
         &get,
         &[
             "ifletSome((base,name))=read_site{",
             "self.emit_planned_property_read(",
-            "self.emit_propagate_current_throw_if_needed(function);",
-            "old_value.copy_from(self.completion().value(),function);",
+            "&old_value,",
             "self.canonicalize_ordinary_property_reference(",
             "returnOk(ReadOrdinaryPropertyReferenceLocals{",
         ],
@@ -393,7 +393,9 @@ fn aot_typestate_forces_raw_key_get_result_and_putvalue_transitions() {
         &set,
         &[
             "OrdinarySetArguments::new(",
-            "self.emit_propagate_current_throw_if_needed(function);",
+            "self.emit_propagate_pending_throw(&result,&[result.value()],function);",
+            "succeeded.copy_from(result.value(),function);",
+            "self.emit_failed_set_check(&succeeded,strictness,message,function)?;",
             "ifstrictness.throws_on_failed_set(){",
             "self.emit_expression_native_error(NativeErrorKind::TypeError,message,function)?;",
         ],

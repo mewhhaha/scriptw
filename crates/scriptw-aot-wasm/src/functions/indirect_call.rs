@@ -64,8 +64,7 @@ impl FunctionBuilder<'_> {
                             &result,
                             function,
                         )?;
-                        self.completion().copy_from(&result, function);
-                        self.emit_propagate_current_throw_if_needed(function);
+                        self.emit_propagate_pending_throw(&result, &[], function);
                         output.copy_from(result.value(), function);
                         result.clear(function);
                         receiver.clear(function);

@@ -5,6 +5,7 @@ const OPERATIONS_SOURCE: &str = include_str!("../../src/operations.rs");
 const HELPER_SOURCE: &str = include_str!("../../src/runtime_helpers.rs");
 const HELPER_COMPILERS: &str = include_str!("../../src/emit/runtime_operations.rs");
 const VALUE_SOURCE: &str = include_str!("../../src/gc_types/value.rs");
+const EMIT_SOURCE: &str = include_str!("../../src/emit.rs");
 const CONTRACT: &str = include_str!(
     "../../../../docs/rust-rewrite/contracts/pending-to-primitive-operation-identity.md"
 );
@@ -68,14 +69,24 @@ fn named_operation_boundaries_replace_the_ignored_generic_marker() {
     assert!(operations.contains("self.emit_dynamic_property_read_with_key_locals(&lookup,&inputs[0],&key,&pending,function,"));
     assert!(operations.contains("SpecOperationResultLocals::new(operation,schema,function)"));
     assert!(operations.contains("result.project(self,output,inputs,function)"));
+    // A pending Throw becomes the function completion only on its abrupt
+    // edge; the normal fall-through writes no completion part.
     let projection = normalized(bounded(
         OPERATIONS_SOURCE,
-        "            Self::Expression(pending) => {",
-        "            Self::Call(pending) => {",
+        "    fn project(",
+        "impl<'a> FunctionBuilder<'a> {",
     ));
-    assert!(projection.contains("builder.completion().copy_from(&pending,function)"));
+    assert!(projection.contains("builder.emit_propagate_pending_throw(&pending,&roots,function)"));
     assert!(projection.contains("output.copy_from(pending.value(),function)"));
-    assert!(projection.contains("builder.emit_propagate_current_throw(function)"));
+    assert!(!projection.contains("set_completion_kind"));
+    assert!(!projection.contains("builder.completion()"));
+    let propagation = normalized(bounded(
+        EMIT_SOURCE,
+        "    pub(crate) fn emit_propagate_pending_throw(",
+        "    pub(crate) fn emit_clear_throw_diagnostic(",
+    ));
+    assert!(propagation.contains("self.completion.copy_from(pending,function)"));
+    assert!(propagation.contains("self.emit_propagate_current_throw(function)"));
 }
 
 #[test]

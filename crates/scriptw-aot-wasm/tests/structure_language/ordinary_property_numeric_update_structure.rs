@@ -352,7 +352,9 @@ fn aot_typestate_forces_get_tonumeric_delta_put_and_result_publication() {
         &set,
         &[
             "OrdinarySetArguments::new(",
-            "self.emit_propagate_current_throw_if_needed(function);",
+            "self.emit_propagate_pending_throw(&result,&[result.value()],function);",
+            "succeeded.copy_from(result.value(),function);",
+            "self.emit_failed_set_check(&succeeded,strictness,message,function)?;",
             "ifstrictness.throws_on_failed_set(){",
             "self.emit_expression_native_error(NativeErrorKind::TypeError,message,function)?;",
         ],

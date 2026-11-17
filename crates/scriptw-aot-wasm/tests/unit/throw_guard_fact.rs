@@ -50,7 +50,9 @@ fn checked_escape_elides_only_the_same_local_and_excluded_value() {
     function.instruction(&Instruction::Call(1));
     guard(&mut function, 0, 1);
     guard(&mut function, 0, 2);
+    // The stored constant 7 is not 2; 7 itself stays checked.
     guard(&mut function, other, 2);
+    guard(&mut function, other, 7);
     assert_eq!(encoded_guard_count(function), 3);
 }
 
@@ -65,108 +67,129 @@ fn checked_escape_is_invalidated_by_stores_tees_and_slot_reuse() {
     function.instruction(&Instruction::LocalTee(0));
     function.instruction(&Instruction::Drop);
     guard(&mut function, 0, 1);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::LocalSet(0));
+    guard(&mut function, 0, 1);
     let local = function.reserve_typed_local(ValType::I32);
     guard(&mut function, local, 1);
     function.release_typed_local(local);
     let reused = function.reserve_typed_local(ValType::I32);
     assert_eq!(reused, local);
     guard(&mut function, reused, 1);
-    assert_eq!(encoded_guard_count(function), 5);
+    assert_eq!(encoded_guard_count(function), 6);
 }
 
 #[test]
-fn every_control_boundary_forgets_checked_fallthrough() {
+fn a_fact_flows_into_frames_and_out_of_joins_that_every_edge_carries() {
     let empty = BlockType::Empty;
-    let cases = vec![
-        (vec![], Instruction::Block(empty)),
-        (vec![], Instruction::Loop(empty)),
-        (vec![], Instruction::If(empty)),
-        (vec![Instruction::If(empty)], Instruction::Else),
-        (vec![Instruction::Block(empty)], Instruction::End),
-        (vec![], Instruction::TryTable(empty, vec![].into())),
-        (vec![], Instruction::Try(empty)),
-        (vec![Instruction::Try(empty)], Instruction::Catch(0)),
-        (vec![Instruction::Try(empty)], Instruction::CatchAll),
-        (vec![Instruction::Try(empty)], Instruction::Delegate(0)),
-        (
-            vec![Instruction::Try(empty), Instruction::CatchAll],
-            Instruction::Rethrow(0),
-        ),
-        (vec![], Instruction::Br(0)),
-        (vec![], Instruction::BrIf(0)),
-        (vec![], Instruction::BrTable(vec![0].into(), 0)),
-        (vec![], Instruction::BrOnNull(0)),
-        (vec![], Instruction::BrOnNonNull(0)),
-        (
-            vec![],
-            Instruction::BrOnCast {
-                relative_depth: 0,
-                from_ref_type: RefType::ANYREF,
-                to_ref_type: RefType::EQREF,
-            },
-        ),
-        (
-            vec![],
-            Instruction::BrOnCastFail {
-                relative_depth: 0,
-                from_ref_type: RefType::ANYREF,
-                to_ref_type: RefType::EQREF,
-            },
-        ),
-        (vec![], Instruction::Return),
-        (vec![], Instruction::ReturnCall(1)),
-        (vec![], Instruction::ReturnCallRef(0)),
-        (
-            vec![],
-            Instruction::ReturnCallIndirect {
-                type_index: 0,
-                table_index: 0,
-            },
-        ),
-        (vec![], Instruction::Throw(0)),
-        (vec![], Instruction::ThrowRef),
-        (vec![], Instruction::Unreachable),
-        (vec![], Instruction::Suspend(0)),
-        (
-            vec![],
-            Instruction::Resume {
-                cont_type_index: 0,
-                resume_table: vec![].into(),
-            },
-        ),
-        (
-            vec![],
-            Instruction::ResumeThrow {
-                cont_type_index: 0,
-                tag_index: 0,
-                resume_table: vec![].into(),
-            },
-        ),
-        (
-            vec![],
-            Instruction::ResumeThrowRef {
-                cont_type_index: 0,
-                resume_table: vec![].into(),
-            },
-        ),
-        (
-            vec![],
-            Instruction::Switch {
-                cont_type_index: 0,
-                tag_index: 0,
-            },
-        ),
-    ];
-    for (prefix, boundary) in cases {
-        let mut function = body();
-        for instruction in prefix {
-            function.instruction(&instruction);
-        }
-        guard(&mut function, 0, 1);
-        assert_eq!(function.excluded_i32_value, Some((0, 1)));
-        function.instruction(&boundary);
-        assert_eq!(function.excluded_i32_value, None, "{boundary:?}");
-    }
+    let mut function = body();
+    guard(&mut function, 0, 1);
+    function.instruction(&Instruction::Block(empty));
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::If(empty));
+    guard(&mut function, 0, 1);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::BrIf(1));
+    function.instruction(&Instruction::Else);
+    function.instruction(&Instruction::Call(1));
+    function.instruction(&Instruction::End);
+    function.instruction(&Instruction::End);
+    guard(&mut function, 0, 1);
+    assert!(function.excludes_i32_value(0, 1));
+    // The first guard and the explicit `if`.
+    assert_eq!(encoded_guard_count(function), 2);
+}
+
+#[test]
+fn a_join_forgets_a_fact_that_one_edge_lacks() {
+    let empty = BlockType::Empty;
+    // An earlier branch out of the block.
+    let mut function = body();
+    function.instruction(&Instruction::Block(empty));
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::BrIf(0));
+    guard(&mut function, 0, 1);
+    function.instruction(&Instruction::End);
+    assert!(!function.excludes_i32_value(0, 1));
+    // An `if` arm that stores, and an `if` without `else` whose only arm
+    // establishes the fact.
+    let mut function = body();
+    guard(&mut function, 0, 1);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::If(empty));
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::LocalSet(0));
+    function.instruction(&Instruction::Else);
+    function.instruction(&Instruction::End);
+    assert!(!function.excludes_i32_value(0, 1));
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::If(empty));
+    guard(&mut function, 0, 1);
+    function.instruction(&Instruction::End);
+    assert!(!function.excludes_i32_value(0, 1));
+    // A branch table edge.
+    let mut function = body();
+    function.instruction(&Instruction::Block(empty));
+    function.instruction(&Instruction::Block(empty));
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::BrTable(vec![1].into(), 0));
+    function.instruction(&Instruction::End);
+    guard(&mut function, 0, 1);
+    function.instruction(&Instruction::End);
+    assert!(!function.excludes_i32_value(0, 1));
+}
+
+#[test]
+fn loop_heads_and_handler_entries_start_without_facts() {
+    let empty = BlockType::Empty;
+    let mut function = body();
+    guard(&mut function, 0, 1);
+    function.instruction(&Instruction::Loop(empty));
+    assert!(!function.excludes_i32_value(0, 1));
+    guard(&mut function, 0, 1);
+    function.instruction(&Instruction::End);
+    // The loop's body falls out with its own facts.
+    assert!(function.excludes_i32_value(0, 1));
+
+    let mut function = body();
+    function.instruction(&Instruction::Block(empty));
+    guard(&mut function, 0, 1);
+    function.instruction(&Instruction::TryTable(
+        empty,
+        vec![Catch::All { label: 0 }].into(),
+    ));
+    assert!(function.excludes_i32_value(0, 1));
+    function.instruction(&Instruction::End);
+    function.instruction(&Instruction::End);
+    assert!(!function.excludes_i32_value(0, 1));
+
+    let mut function = body();
+    guard(&mut function, 0, 1);
+    function.instruction(&Instruction::Try(empty));
+    function.instruction(&Instruction::CatchAll);
+    assert!(!function.excludes_i32_value(0, 1));
+    function.instruction(&Instruction::End);
+    assert!(!function.excludes_i32_value(0, 1));
+}
+
+#[test]
+fn unreachable_code_adds_no_edge_and_stack_switching_forgets() {
+    let empty = BlockType::Empty;
+    let mut function = body();
+    guard(&mut function, 0, 1);
+    function.instruction(&Instruction::Block(empty));
+    function.instruction(&Instruction::Br(0));
+    function.instruction(&Instruction::I32Const(1));
+    function.instruction(&Instruction::LocalSet(0));
+    function.instruction(&Instruction::End);
+    assert!(function.excludes_i32_value(0, 1));
+
+    let mut function = body();
+    function.instruction(&Instruction::I32Const(0));
+    function.instruction(&Instruction::LocalSet(0));
+    assert!(function.excludes_i32_value(0, 1));
+    function.instruction(&Instruction::Suspend(0));
+    assert!(!function.excludes_i32_value(0, 1));
 }
 
 #[test]

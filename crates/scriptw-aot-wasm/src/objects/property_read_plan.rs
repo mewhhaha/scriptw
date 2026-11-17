@@ -84,16 +84,17 @@ impl FunctionBuilder<'_> {
     /// target and its receiver, and its compiler-owned String key needs no
     /// coercion, so the key is materialized only when R makes the site's
     /// record. Only a base that may be an object can be the actual
-    /// OrdinaryObject the site's inline proof answers.
+    /// OrdinaryObject the site's inline proof answers. A Throw propagates
+    /// from the site; falling through has the property's value in `value`.
     pub(crate) fn emit_planned_property_read(
         &mut self,
         target: &TypedExpr,
         name: &str,
         base: &ValueLocals,
-        result: &CompletionLocals,
+        value: &ValueLocals,
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let may_be_ordinary = target.possible_kinds.contains(ValueKind::Object);
-        self.emit_static_read_site(name, may_be_ordinary, base, result, f)
+        self.emit_static_read_site(name, may_be_ordinary, base, value, f)
     }
 }

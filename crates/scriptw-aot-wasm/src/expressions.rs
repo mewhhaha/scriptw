@@ -295,18 +295,13 @@ impl<'a> FunctionBuilder<'a> {
         let schema = self.runtime_schema();
         let old_value = schema.reserve_value_local(function);
         if let Some((base, name)) = read_site {
-            let pending = schema.reserve_completion(function);
             self.emit_planned_property_read(
                 base,
                 name,
                 &reference.base_and_receiver,
-                &pending,
+                &old_value,
                 function,
             )?;
-            self.completion().copy_from(&pending, function);
-            pending.clear(function);
-            self.emit_propagate_current_throw_if_needed(function);
-            old_value.copy_from(self.completion().value(), function);
             let reference = self.canonicalize_ordinary_property_reference(
                 reference,
                 RuntimeErrorMessage::CANNOT_READ_PROPERTIES_OF_NULL_OR_UNDEFINED,
@@ -381,20 +376,19 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
+        let succeeded = schema.reserve_value_local(function);
         if let Some(site) = site {
-            let result = schema.reserve_completion(function);
             self.emit_static_write_site(
                 site,
                 &reference.target_object,
                 &reference.base_and_receiver,
                 &reference.property_key,
                 rhs,
-                &result,
+                &succeeded,
                 function,
             )?;
-            self.completion().copy_from(&result, function);
-            result.clear(function);
         } else {
+            let result = schema.reserve_completion(function);
             schema
                 .call_helper(
                     crate::runtime_helpers::OrdinarySetArguments::new(
@@ -408,22 +402,27 @@ impl<'a> FunctionBuilder<'a> {
                     self.runtime_helper_base()?,
                     function,
                 )
-                .store(self.completion(), function);
+                .store(&result, function);
+            self.emit_propagate_pending_throw(&result, &[result.value()], function);
+            succeeded.copy_from(result.value(), function);
+            result.clear(function);
         }
-        self.emit_set_completion_checks(strictness, message, function)
+        self.emit_failed_set_check(&succeeded, strictness, message, function)?;
+        succeeded.clear(function);
+        Ok(())
     }
 
-    /// After a [[Set]] into the current completion: its Throw, then a strict
-    /// assignment's TypeError for false.
-    fn emit_set_completion_checks(
+    /// After a [[Set]] that did not throw, whose Boolean is `succeeded`: a
+    /// strict assignment's TypeError for false.
+    fn emit_failed_set_check(
         &mut self,
+        succeeded: &ValueLocals,
         strictness: Strictness,
         message: RuntimeErrorMessage,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        self.emit_propagate_current_throw_if_needed(function);
         if strictness.throws_on_failed_set() {
-            self.completion().value().scalar().load(function);
+            succeeded.scalar().load(function);
             function.instruction(&Instruction::I64Eqz);
             self.open_frame(ControlFrameKind::If, function);
             self.emit_expression_native_error(NativeErrorKind::TypeError, message, function)?;
@@ -525,22 +524,22 @@ impl<'a> FunctionBuilder<'a> {
             RuntimeErrorMessage::CANNOT_CONVERT_UNDEFINED_OR_NULL_TO_OBJECT,
             function,
         )?;
-        let result = schema.reserve_completion(function);
+        let succeeded = schema.reserve_value_local(function);
         self.emit_static_write_call(
             &record,
             &target_object,
             &base_and_receiver,
             &rhs,
-            &result,
+            &succeeded,
             function,
         )?;
-        self.completion().copy_from(&result, function);
-        result.clear(function);
-        self.emit_set_completion_checks(
+        self.emit_failed_set_check(
+            &succeeded,
             assignment.strictness(),
             RuntimeErrorMessage::CANNOT_ASSIGN_TO_PROPERTY,
             function,
         )?;
+        succeeded.clear(function);
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
         // Both the inline store and the complete PutValue retire the record.
