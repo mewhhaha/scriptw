@@ -2133,8 +2133,19 @@ and branch offsets as it emits, and free locals are found by type:
 the finished module is now the largest single cost (0.46 G); Wasmtime
 validates it again when compiling.
 
+**Code size.** Releasing a typed GC local stored null into it first, to
+drop the root. Wasmtime finds Wasm stack roots through Cranelift's stack
+maps, which list the values live across each safepoint, and a released
+local is not read again before its next holder writes it, so the store
+kept nothing alive less long. Without it, and without copying a value
+onto its own locals, the RSC program module is 4,453,076 bytes instead of
+4,954,458 (−10.1%), the kernel and edge programs are 10 to 11% smaller
+and the runtime module 2.2% smaller. A request executes the same
+instructions (2,892,016 sync, 3,129,799 async). The release of a whole
+value's reference word keeps its clear: there the null is read.
+
 Native preparation, 5.7 s under Fast and 8.0 s under Speed for this
-bundle, is not changed by any of this: 40% of it is Cranelift's stack-map
+bundle before the code-size change, is not changed by the rest of this: 40% of it is Cranelift's stack-map
 liveness pass, whose live sets are hashed sets, and the rest follows the
 size of the Wasm.
 
@@ -2143,8 +2154,13 @@ and the doctest pass; the cloud-only runtime cache test fails as before),
 the emitter's unit tests (684 pass; the thousand-method size test fails as
 before) and six integration binaries, the lowering crate's 2,408 tests,
 the source guards, and 40 Test262 subtrees for the deferred globals and
-constructors (7,510 cases, all passing). Wall-clock panels were not
-remeasured for this section.
+constructors (7,510 cases, all passing). The code-size change was verified
+separately on `1055f1b55` and `99a863c08`: the same engine, emitter and
+lowering suites (the thousand-method size test now passes), the weak
+reference and collector tests, and 21 Test262 subtrees (8,812 cases, all
+passing), among them WeakRef, FinalizationRegistry, Iterator, JSON, Promise
+and `built-ins/Function`. Wall-clock panels were not remeasured for this
+section.
 
 ### Descriptor work and physical allocation
 
