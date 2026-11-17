@@ -549,8 +549,8 @@ pub struct Ctx {
     pub(crate) annotations_enabled: bool,
 
     // Cached allocation for `try_to_allocate_bundle_to_reg` to avoid allocating
-    // a new HashSet on every call.
-    pub(crate) conflict_set: FxHashSet<LiveBundleIndex>,
+    // a new set on every call.
+    pub(crate) conflict_set: ConflictSet,
 
     // Output:
     pub output: Output,
@@ -568,6 +568,56 @@ pub struct Ctx {
     pub(crate) scratch_workqueue_set: FxHashSet<Block>,
 
     pub(crate) scratch_bump: UnsafeSendSync<Bump>,
+}
+
+/// The bundles that `try_to_allocate_bundle_to_reg` has found in conflict
+/// so far, by bundle index.
+///
+/// A bundle is a member when its stamp equals the current generation, so
+/// clearing the set is one increment, however many bundles an earlier call
+/// held. A hash set's `clear` writes every one of its control bytes, and
+/// the set keeps the capacity of its largest use; with one call per probed
+/// register that rewrite was most of the cost of the set.
+#[derive(Clone, Debug)]
+pub(crate) struct ConflictSet {
+    stamps: Vec<u32>,
+    generation: u32,
+}
+
+impl Default for ConflictSet {
+    fn default() -> Self {
+        // Stamps start at zero, which is never the current generation.
+        Self {
+            stamps: Vec::new(),
+            generation: 1,
+        }
+    }
+}
+
+impl ConflictSet {
+    /// Remove every bundle.
+    pub(crate) fn clear(&mut self) {
+        self.generation = self.generation.wrapping_add(1);
+        if self.generation == 0 {
+            self.stamps.fill(0);
+            self.generation = 1;
+        }
+    }
+
+    /// Add `bundle`, and return whether it was not a member.
+    pub(crate) fn insert(&mut self, bundle: LiveBundleIndex) -> bool {
+        let index = bundle.index();
+        if index >= self.stamps.len() {
+            self.stamps.resize(index + 1, 0);
+        }
+        let stamp = &mut self.stamps[index];
+        if *stamp == self.generation {
+            false
+        } else {
+            *stamp = self.generation;
+            true
+        }
+    }
 }
 
 const _ASSERT_SEND_SYNC: () = {

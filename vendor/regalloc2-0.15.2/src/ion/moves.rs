@@ -231,7 +231,13 @@ impl<'a, F: Function> Env<'a, F> {
             }
         }
 
-        let mut inter_block_sources: FxHashMap<Block, Allocation> = FxHashMap::default();
+        // The current vreg's allocation at the end of each block, and the
+        // blocks that have one. Resetting only those blocks between vregs
+        // keeps the cost proportional to each vreg's blocks; a hash map's
+        // `clear` writes all of its capacity, which the vreg live in the
+        // most blocks sets for every later vreg.
+        let mut inter_block_sources: Vec<Option<Allocation>> = vec![None; self.func.num_blocks()];
+        let mut inter_block_source_blocks: Vec<Block> = Vec::new();
         let mut inter_block_dests = Vec::with_capacity(self.func.num_blocks());
 
         #[derive(Hash, Eq, PartialEq)]
@@ -283,7 +289,9 @@ impl<'a, F: Function> Env<'a, F> {
                 continue;
             }
 
-            inter_block_sources.clear();
+            for block in inter_block_source_blocks.drain(..) {
+                inter_block_sources[block.index()] = None;
+            }
 
             // For each range in each vreg, insert moves or
             // half-moves.  We also scan over `blockparam_ins` and
@@ -387,16 +395,17 @@ impl<'a, F: Function> Env<'a, F> {
                     }
                     trace!("examining block with end in range: block{}", block.index());
 
-                    match inter_block_sources.entry(block) {
-                        // If the entry is already present in the map, we'll try to prefer a
+                    match &mut inter_block_sources[block.index()] {
+                        // If the block already has a source, we'll try to prefer a
                         // register allocation.
-                        Entry::Occupied(mut entry) => {
-                            if !entry.get().is_reg() {
-                                entry.insert(alloc);
+                        Some(source) => {
+                            if !source.is_reg() {
+                                *source = alloc;
                             }
                         }
-                        Entry::Vacant(entry) => {
-                            entry.insert(alloc);
+                        source @ None => {
+                            *source = Some(alloc);
+                            inter_block_source_blocks.push(block);
                         }
                     }
 
@@ -630,7 +639,8 @@ impl<'a, F: Function> Env<'a, F> {
                 let vreg = self.vreg(vreg);
                 trace!("processing inter-block moves for {}", vreg);
                 for dest in inter_block_dests.drain(..) {
-                    let src = inter_block_sources[&dest.from];
+                    let src = inter_block_sources[dest.from.index()]
+                        .expect("an inter-block move's source block has a source");
 
                     trace!(
                         " -> moving from {} to {} between {:?} and {:?}",

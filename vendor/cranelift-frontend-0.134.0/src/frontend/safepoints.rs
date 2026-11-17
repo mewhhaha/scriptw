@@ -3,6 +3,38 @@
 use super::*;
 use core::ops::{Index, IndexMut};
 
+/// Whether `inst` can use values other than its arguments.
+///
+/// `DataFlowGraph::inst_values` chains an instruction's arguments with the
+/// arguments of its branch destinations and the contexts of its exception
+/// table. Only a terminator has either, so any other instruction's values are
+/// `inst_args`, in the same order; reading those directly skips the chain,
+/// which the walks below otherwise pay for every instruction of the function.
+fn uses_beyond_arguments(dfg: &DataFlowGraph, inst: Inst) -> bool {
+    let terminator = dfg.insts[inst].opcode().is_terminator();
+    debug_assert!(
+        terminator
+            || (dfg.insts[inst]
+                .branch_destination(&dfg.jump_tables, &dfg.exception_tables)
+                .is_empty()
+                && dfg.insts[inst].exception_table().is_none()),
+        "only a terminator has branch destinations or an exception table"
+    );
+    terminator
+}
+
+/// Call `f` with each value `inst` uses, in the order of
+/// `DataFlowGraph::inst_values`, aliases unresolved.
+fn for_each_inst_use(dfg: &DataFlowGraph, inst: Inst, mut f: impl FnMut(Value)) {
+    if uses_beyond_arguments(dfg, inst) {
+        dfg.inst_values(inst).for_each(f);
+    } else {
+        for &value in dfg.inst_args(inst) {
+            f(value);
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 #[repr(u8)]
 enum SlotSize {
@@ -622,12 +654,12 @@ impl LivenessAnalysis {
                 for val in func.dfg.inst_results(inst) {
                     self.summarize_def(func, *val);
                 }
-                for val in func.dfg.inst_values(inst) {
+                for_each_inst_use(&func.dfg, inst, |val| {
                     let val = func.dfg.resolve_aliases(val);
                     if let Some(index) = self.dense.get(val) {
                         self.currently_live.insert(index);
                     }
-                }
+                });
                 option_inst = func.layout.prev_inst(inst);
             }
             for val in func.dfg.block_params(block) {
@@ -746,12 +778,12 @@ impl LivenessAnalysis {
             }
 
             // Process any needs-stack-map values used by this instruction.
-            for val in func.dfg.inst_values(inst) {
+            for_each_inst_use(&func.dfg, inst, |val| {
                 let val = func.dfg.resolve_aliases(val);
                 if let Some(index) = self.dense.get(val) {
                     self.process_use(func, inst, val, index);
                 }
-            }
+            });
 
             option_inst = func.layout.prev_inst(inst);
         }
@@ -1162,7 +1194,11 @@ impl SafepointSpiller {
                 // Replace all uses of needs-stack-map values with loads from
                 // the value's associated stack slot.
                 let mut pos = FuncCursor::new(func).at_inst(inst);
-                vals.extend(pos.func.dfg.inst_values(inst));
+                if uses_beyond_arguments(&pos.func.dfg, inst) {
+                    vals.extend(pos.func.dfg.inst_values(inst));
+                } else {
+                    vals.extend_from_slice(pos.func.dfg.inst_args(inst));
+                }
                 let mut replaced_any = false;
                 for val in &mut vals {
                     *val = pos.func.dfg.resolve_aliases(*val);

@@ -50,7 +50,8 @@
 //! No call, store, trap or stack map is added, removed or reordered.
 
 use cranelift_codegen::ir::{self, InstBuilder};
-use cranelift_entity::{EntitySet, SecondaryMap};
+use cranelift_entity::SecondaryMap;
+use cranelift_entity::packed_option::PackedOption;
 use smallvec::SmallVec;
 
 /// How often the pass looks at the whole function. An edge threaded in one
@@ -71,8 +72,9 @@ type Arguments = SmallVec<[ir::BlockArg; 8]>;
 /// (see the module documentation), and return how many edges were changed.
 pub(crate) fn thread(func: &mut ir::Function) -> usize {
     let mut threaded = 0;
+    let mut uses: Option<OutsideUses> = None;
     for _ in 0..MAX_ROUNDS {
-        let round = thread_once(func);
+        let round = thread_once(func, &mut uses);
         threaded += round;
         if round == 0 {
             break;
@@ -81,10 +83,68 @@ pub(crate) fn thread(func: &mut ir::Function) -> usize {
     threaded
 }
 
-fn thread_once(func: &mut ir::Function) -> usize {
+/// For each block parameter, how many uses of it (aliases resolved) the
+/// instructions of other blocks make.
+///
+/// A block of the handled shape is a candidate exactly when none of its
+/// parameters has such a use. Counted once, by one walk over the function,
+/// and then kept current through each terminator the pass rewrites, the only
+/// instructions it changes; the rounds after the first therefore look at
+/// blocks, not at every value of every instruction again.
+struct OutsideUses {
+    /// The block that has each value as its parameter.
+    owners: SecondaryMap<ir::Value, PackedOption<ir::Block>>,
+    counts: SecondaryMap<ir::Value, u32>,
+}
+
+impl OutsideUses {
+    fn new(func: &ir::Function) -> Self {
+        let mut owners = SecondaryMap::with_capacity(func.dfg.num_values());
+        for block in func.layout.blocks() {
+            for &parameter in func.dfg.block_params(block) {
+                owners[parameter] = block.into();
+            }
+        }
+        let mut uses = Self {
+            owners,
+            counts: SecondaryMap::with_capacity(func.dfg.num_values()),
+        };
+        for block in func.layout.blocks() {
+            for inst in func.layout.block_insts(block) {
+                uses.count(func, block, inst, true);
+            }
+        }
+        uses
+    }
+
+    /// Count the uses of `inst`, an instruction of `block`, in (`add`) or
+    /// out.
+    fn count(&mut self, func: &ir::Function, block: ir::Block, inst: ir::Inst, add: bool) {
+        super::operands::for_each(&func.dfg, inst, |value| {
+            let value = func.dfg.resolve_aliases(value);
+            if let Some(owner) = self.owners[value].expand() {
+                if owner != block {
+                    if add {
+                        self.counts[value] += 1;
+                    } else {
+                        self.counts[value] -= 1;
+                    }
+                }
+            }
+        });
+    }
+
+    fn used_outside(&self, func: &ir::Function, block: ir::Block) -> bool {
+        func.dfg
+            .block_params(block)
+            .iter()
+            .any(|&parameter| self.counts[parameter] != 0)
+    }
+}
+
+fn thread_once(func: &mut ir::Function, uses: &mut Option<OutsideUses>) -> usize {
     // Blocks of the shape, by their layout.
     let mut candidates: SecondaryMap<ir::Block, Option<Candidate>> = SecondaryMap::new();
-    let mut parameters: EntitySet<ir::Value> = EntitySet::new();
     let mut any = false;
     for block in func.layout.blocks() {
         let Some(inst) = func.layout.first_inst(block) else {
@@ -112,9 +172,6 @@ fn thread_once(func: &mut ir::Function) -> usize {
             brif: inst,
             condition,
         });
-        for &parameter in func.dfg.block_params(block) {
-            parameters.insert(parameter);
-        }
         any = true;
     }
     if !any {
@@ -123,29 +180,14 @@ fn thread_once(func: &mut ir::Function) -> usize {
 
     // A candidate whose parameter something other than its own `brif` uses
     // is not one; and each candidate's entering edges.
+    let uses = uses.get_or_insert_with(|| OutsideUses::new(func));
     let mut edges: Vec<(ir::Inst, ir::Block)> = Vec::new();
-    let disqualify = |func: &ir::Function,
-                      candidates: &mut SecondaryMap<ir::Block, Option<Candidate>>,
-                      value: ir::Value,
-                      user: Option<ir::Block>| {
-        let value = func.dfg.resolve_aliases(value);
-        if !parameters.contains(value) {
-            return;
-        }
-        if let ir::ValueDef::Param(owner, _) = func.dfg.value_def(value) {
-            if Some(owner) != user {
-                candidates[owner] = None;
-            }
-        }
-    };
     for block in func.layout.blocks() {
-        // Within a candidate, the `brif` is the only instruction.
-        let user = candidates[block].map(|_| block);
-        for inst in func.layout.block_insts(block) {
-            for value in func.dfg.inst_values(inst) {
-                disqualify(func, &mut candidates, value, user);
-            }
+        if candidates[block].is_some() && uses.used_outside(func, block) {
+            candidates[block] = None;
         }
+    }
+    for block in func.layout.blocks() {
         if let Some(terminator) = func.layout.last_inst(block) {
             let first = edges.len();
             for destination in func.dfg.insts[terminator]
@@ -202,6 +244,10 @@ fn thread_once(func: &mut ir::Function) -> usize {
                 .all(|argument| matches!(argument, ir::BlockArg::Value(_)))
                 .then_some(passed)
         };
+        let block = func
+            .layout
+            .inst_block(terminator)
+            .expect("an edge's terminator is in the layout");
         match func.dfg.insts[terminator] {
             ir::InstructionData::Jump { destination, .. } => {
                 debug_assert_eq!(destination.block(&func.dfg.value_lists), target);
@@ -212,11 +258,12 @@ fn thread_once(func: &mut ir::Function) -> usize {
                     unreachable!()
                 };
                 let condition = func.dfg.resolve_aliases(condition);
+                uses.count(func, block, terminator, false);
                 match constant(func, condition) {
                     Some(truth) => {
-                        let (block, arguments) =
+                        let (destination, arguments) =
                             substituted(func, outcomes[usize::from(!truth)], &passed);
-                        func.replace(terminator).jump(block, &arguments);
+                        func.replace(terminator).jump(destination, &arguments);
                     }
                     None => {
                         let (then_block, then_arguments) = substituted(func, outcomes[0], &passed);
@@ -230,6 +277,7 @@ fn thread_once(func: &mut ir::Function) -> usize {
                         );
                     }
                 }
+                uses.count(func, block, terminator, true);
                 threaded += 1;
             }
             ir::InstructionData::Brif { arg, blocks, .. } => {
@@ -252,14 +300,16 @@ fn thread_once(func: &mut ir::Function) -> usize {
                         None if condition == tested => index == 0,
                         None => continue,
                     };
-                    let (block, arguments) =
+                    let (destination, arguments) =
                         substituted(func, outcomes[usize::from(!truth)], &passed);
-                    let call = func.dfg.block_call(block, &arguments);
+                    uses.count(func, block, terminator, false);
+                    let call = func.dfg.block_call(destination, &arguments);
                     let ir::InstructionData::Brif { blocks, .. } = &mut func.dfg.insts[terminator]
                     else {
                         unreachable!()
                     };
                     blocks[index] = call;
+                    uses.count(func, block, terminator, true);
                     threaded += 1;
                 }
             }

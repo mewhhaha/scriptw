@@ -13,8 +13,9 @@ The idle scratch policy modifies `src/compiler.rs`; the added private
 `src/compiler/context_pool.rs` and its tests own it. The translation changes
 below modify `src/func_environ{.rs,/gc.rs}` and `src/translate/`; the section
 before the last adds `src/func_environ/gc/{base_home,frame_reloads}.rs` and
-`src/func_environ/{branch_threading,set_tests}.rs`, and the last adds
-`src/func_environ/cold_paths.rs`.
+`src/func_environ/{branch_threading,set_tests}.rs`, the one after it adds
+`src/func_environ/cold_paths.rs`, and the last adds
+`src/func_environ/operands.rs`.
 Registry installation markers were omitted; all other release files are kept.
 The license text is unchanged; its trailing empty line is normalized.
 
@@ -442,3 +443,57 @@ compiles a hinted branch of each of the six kinds both ways on the product
 configuration, under the Fast and Speed policies, directly and precompiled,
 and finds the rare side behind the other in the native code, and the two
 arms of an `if` nested in a rare arm with it.
+
+## Cheaper passes after translation
+
+`src/func_environ/{operands.rs,branch_threading.rs,gc/frame_reloads.rs,
+gc/base_home.rs}`, `src/func_environ.rs`. These change how the passes that
+`place_frame_loads` runs find what they look for, not what they do: every
+instruction, value, block, stack slot and edge they create, change or remove,
+and the order in which they do so, is unchanged, so the CLIF and the native
+code are identical. On the React Server Components program those passes were
+about 14% of native compilation under either policy, most of it walking
+every value of every instruction several times.
+
+- `operands`: `DataFlowGraph::inst_values` chains an instruction's arguments
+  with the arguments of its branch destinations and its exception table's
+  contexts. Only a terminator has either, so the walks below read a
+  non-terminator's arguments directly, in the same order (asserted in debug
+  builds).
+- `branch_threading::thread` decided in each of its up to three rounds which
+  blocks qualify by walking every value of the function, to find block
+  parameters used outside their block. It now counts those uses once, by
+  parameter, and keeps the counts current through the only instructions it
+  changes, the terminators it rewrites (uses out before, in after). A block
+  of the handled shape qualifies exactly when none of its parameters has
+  such a use, which is what the walk found; the edges are still collected in
+  layout order and threaded in the same sequence.
+- `Reloads::scan` maps a `stack_addr` result to its slot with a
+  `SecondaryMap` instead of a `HashMap` and a membership set, and `hoist`'s
+  added events are kept by block in `SecondaryMap`s instead of `HashMap`s;
+  nothing iterated either map in an order that reached the output.
+- `Reloads::solve` no longer re-evaluates a block none of whose predecessors'
+  ends changed since the block was last evaluated (a block that loops to
+  itself counts its own change). Its end is a function of those ends alone,
+  so re-evaluating it would give the end it has. Which ends change in which
+  round, the number of rounds (and so the twelve-round limit) and the
+  solution are those of evaluating every block every round.
+- `FrameHome::of_parameter` and `Reloads::scan` read each instruction's
+  values through `operands`.
+
+Measured (Callgrind instructions, one process compiling the React Server
+Components program, `rsc_baseline`): `place_frame_loads` went from 8.19 G
+to 4.88 G under either policy (`thread` 2.32 G to 0.77 G, `Reloads::solve`
+1.58 G to 0.74 G, `Reloads::scan` 1.56 G to 1.06 G, `of_parameter` 1.26 G
+to 0.90 G).
+
+Checked: with the Fast and Speed policies, the native images of the React
+Server Components program and of the runtime compiled in-process
+(`rsc_baseline`), and both runtime images that the runtime-image build
+script produces, are byte for byte those built before, except for the native
+compiler fingerprint inside Wasmtime's module version string.
+
+Tests: the crate's unit tests, among them `func_environ::branch_threading::tests::`
+and `func_environ::gc::frame_reloads::tests::` (which cover the home slots),
+pass unchanged in a debug build.
+

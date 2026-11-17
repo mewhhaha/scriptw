@@ -76,3 +76,18 @@ their allocations for the next function; upstream kept only the outer vector.
 
 Tests: the crate's own `frontend::safepoints::tests::` (upstream's expected
 CLIF, stack maps and slot assignments) pass unchanged.
+
+## Instruction values without the terminator chain
+
+`src/frontend/safepoints.rs`: the spiller's three walks over every
+instruction (block summaries, the final liveness walk and the rewrite) read
+an instruction's values through `DataFlowGraph::inst_values`, which chains
+its arguments with the arguments of its branch destinations and the
+contexts of its exception table. Only a terminator has either. The walks
+now read a non-terminator's arguments directly (`for_each_inst_use`; the
+rewrite copies them as a slice) and keep `inst_values` for terminators, so
+every walk sees the same values in the same order (the rewrite overwrites
+them in that order), and the output is unchanged; debug builds assert that a
+non-terminator has neither part. Measured as above, the spiller went from
+6.70 G to 5.55 G under either policy, with the same native images (checked
+as above, for both policies).

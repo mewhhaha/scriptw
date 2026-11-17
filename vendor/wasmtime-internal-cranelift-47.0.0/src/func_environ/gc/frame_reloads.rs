@@ -99,8 +99,7 @@ use cranelift_codegen::cursor::{Cursor, FuncCursor};
 use cranelift_codegen::dominator_tree::DominatorTree;
 use cranelift_codegen::flowgraph::ControlFlowGraph;
 use cranelift_codegen::ir::{self, InstBuilder};
-use cranelift_entity::{EntitySet, SecondaryMap};
-use std::collections::HashMap;
+use cranelift_entity::SecondaryMap;
 
 /// Rounds over the function's blocks after which the pass gives up. A
 /// function without loops needs two (the second confirms the first); each
@@ -176,9 +175,9 @@ pub(crate) struct Reloads {
     accesses: Vec<Option<Access>>,
     /// The parameters that `hoist` gave loop headers, as events at their
     /// start.
-    entered: HashMap<ir::Block, Vec<Event>>,
+    entered: SecondaryMap<ir::Block, Vec<Event>>,
     /// The loads that `hoist` put at the end of blocks.
-    appended: HashMap<ir::Block, Vec<Event>>,
+    appended: SecondaryMap<ir::Block, Vec<Event>>,
 }
 
 /// How the function loads a handled slot.
@@ -203,8 +202,8 @@ impl Reloads {
             numbers[home] = plain.len() as u32;
             plain.push(true);
         }
-        let mut addresses: HashMap<ir::Value, (ir::StackSlot, i32)> = HashMap::new();
-        let mut is_address: EntitySet<ir::Value> = EntitySet::new();
+        let mut addresses: SecondaryMap<ir::Value, Option<(ir::StackSlot, i32)>> =
+            SecondaryMap::new();
         for block in func.layout.blocks() {
             for inst in func.layout.block_insts(block) {
                 match func.dfg.insts[inst] {
@@ -214,8 +213,7 @@ impl Reloads {
                         offset,
                     } => {
                         let address = func.dfg.first_result(inst);
-                        addresses.insert(address, (stack_slot, offset.into()));
-                        is_address.insert(address);
+                        addresses[address] = Some((stack_slot, offset.into()));
                     }
                     ref data if data.opcode().is_call() => {
                         for entry in func.dfg.user_stack_map_entries(inst).unwrap_or(&[]) {
@@ -239,10 +237,7 @@ impl Reloads {
         // The slot `value` addresses, when the pass handles that slot.
         let address_of = |value: ir::Value| {
             let value = func.dfg.resolve_aliases(value);
-            if !is_address.contains(value) {
-                return None;
-            }
-            let (slot, offset) = addresses[&value];
+            let (slot, offset) = addresses[value]?;
             (numbers[slot] != NONE).then_some((slot, numbers[slot], offset))
         };
         let whole_slot = |slot: ir::StackSlot, ty: ir::Type, address: i32, access: i32| {
@@ -337,11 +332,11 @@ impl Reloads {
                 }
                 // Any other instruction that takes a slot's address lets it
                 // escape.
-                for value in func.dfg.inst_values(inst) {
+                super::super::operands::for_each(&func.dfg, inst, |value| {
                     if let Some((_, number, _)) = address_of(value) {
                         plain[number as usize] = false;
                     }
-                }
+                });
             }
             block_events[block] = (start, events.len() as u32);
         }
@@ -382,21 +377,18 @@ impl Reloads {
             block_events,
             homes,
             accesses,
-            entered: HashMap::new(),
-            appended: HashMap::new(),
+            entered: SecondaryMap::new(),
+            appended: SecondaryMap::new(),
         })
     }
 
     /// The events of `block` in the order they happen.
     fn events(&self, block: ir::Block) -> impl DoubleEndedIterator<Item = Event> + '_ {
         let (start, end) = self.block_events[block];
-        fn of(added: &HashMap<ir::Block, Vec<Event>>, block: ir::Block) -> &[Event] {
-            added.get(&block).map_or(&[], |events| events.as_slice())
-        }
-        of(&self.entered, block)
+        self.entered[block]
             .iter()
             .chain(&self.events[start as usize..end as usize])
-            .chain(of(&self.appended, block))
+            .chain(&self.appended[block])
             .copied()
     }
 
@@ -463,13 +455,35 @@ impl Reloads {
         blocks: &[ir::Block],
     ) -> Option<SecondaryMap<ir::Block, Option<Known>>> {
         let mut ends: SecondaryMap<ir::Block, Option<Known>> = SecondaryMap::new();
+        // A block's end follows from its predecessors' ends alone. Each
+        // evaluation of a block takes the next tick of `clock`, and a block
+        // whose end changes records that tick; a block that was evaluated
+        // after the last change of each of its predecessors would compute the
+        // end it has, so it is not evaluated again. A block is its own
+        // predecessor when it loops to itself, and then the change it made
+        // at its own tick counts. Rounds, changes and the answer are those of
+        // evaluating every block in every round.
+        let mut clock: u32 = 0;
+        let mut evaluated: SecondaryMap<ir::Block, u32> = SecondaryMap::new();
+        let mut changed_at: SecondaryMap<ir::Block, u32> = SecondaryMap::new();
         for _ in 0..MAX_ROUNDS {
             let mut changed = false;
             for &block in blocks {
+                let seen = evaluated[block];
+                if seen != 0
+                    && !cfg
+                        .pred_iter(block)
+                        .any(|predecessor| changed_at[predecessor.block] >= seen)
+                {
+                    continue;
+                }
+                clock += 1;
+                evaluated[block] = clock;
                 let start = self.at_start(cfg, &ends, entry, block);
                 let end = self.at_end(func, block, start);
                 if ends[block].as_ref() != Some(&end) {
                     ends[block] = Some(end);
+                    changed_at[block] = clock;
                     changed = true;
                 }
             }
@@ -625,10 +639,7 @@ impl Reloads {
                             let address = pos.ins().stack_addr(access.pointer_type, access.slot, 0);
                             let loaded = pos.ins().load(access.ty, flags, address, 0);
                             let inst = pos.func.dfg.value_def(loaded).unwrap_inst();
-                            self.appended
-                                .entry(predecessor.block)
-                                .or_default()
-                                .push(Event::Load { slot, inst });
+                            self.appended[predecessor.block].push(Event::Load { slot, inst });
                             loaded
                         }
                     };
@@ -641,7 +652,7 @@ impl Reloads {
                         }
                     }
                 }
-                self.entered.entry(block).or_default().push(Event::Enter {
+                self.entered[block].push(Event::Enter {
                     slot,
                     value: parameter,
                 });

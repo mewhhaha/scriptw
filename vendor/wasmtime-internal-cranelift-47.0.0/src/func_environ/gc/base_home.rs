@@ -89,11 +89,9 @@ impl FrameHome {
         for block in func.layout.blocks() {
             for inst in func.layout.block_insts(block) {
                 calls |= func.dfg.insts[inst].opcode().is_call();
-                if func
-                    .dfg
-                    .inst_values(inst)
-                    .any(|value| func.dfg.resolve_aliases(value) == parameter)
-                {
+                if super::super::operands::any(&func.dfg, inst, |value| {
+                    func.dfg.resolve_aliases(value) == parameter
+                }) {
                     users.push(inst);
                 }
             }
