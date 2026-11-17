@@ -52,7 +52,7 @@ impl FunctionBuilder<'_> {
             &mut function,
         );
         self.emit_build_error_family(&ErrorIntrinsicBuild(&parameters.realm), &mut function)?;
-        // The 18 canonical slots are the strong roots, even when every public
+        // The 20 canonical slots are the strong roots, even when every public
         // global was deleted or replaced before private first use.
         schema.field(RealmRecordSchema::ERROR_STATE).write(
             &parameters.realm,
@@ -83,7 +83,7 @@ impl FunctionBuilder<'_> {
         );
         // Ordinary prototypes carry no [[ErrorData]]. Preserve their original
         // own-property order: name, message, constructor, then Error methods.
-        for identity in ErrorIntrinsicConstructor::ALL {
+        for identity in ErrorIntrinsicConstructor::NATIVE_ERRORS {
             if identity != ErrorIntrinsicConstructor::Error {
                 self.emit_load_building_error_intrinsic(
                     building,
@@ -122,7 +122,7 @@ impl FunctionBuilder<'_> {
         // The first constructor inherits Function.prototype; all derived
         // constructors inherit the completed private canonical Error constructor.
         let constructor_parent = schema.reserve_value_local(function);
-        for identity in ErrorIntrinsicConstructor::ALL {
+        for identity in ErrorIntrinsicConstructor::NATIVE_ERRORS {
             let prototype = schema.reserve_value_local(function);
             self.emit_load_building_error_intrinsic(
                 building,
@@ -152,6 +152,41 @@ impl FunctionBuilder<'_> {
             prototype.clear(function);
         }
         constructor_parent.clear(function);
+        // DOMException.prototype is an ordinary layout object inheriting the
+        // completed Error.prototype; its constructor inherits Function.prototype.
+        self.emit_load_building_error_intrinsic(
+            building,
+            NonArrayRealmIntrinsicSlot::ErrorPrototype,
+            &parent,
+            function,
+        );
+        self.emit_bootstrap_plain_prototype(
+            &context,
+            NonArrayRealmIntrinsicSlot::DOMExceptionPrototype,
+            &parent,
+            function,
+        )?;
+        if self
+            .runtime_bootstrap_plan
+            .should_initialize_standard_builtin(StandardBuiltinId::DOMExceptionConstructor)
+        {
+            let prototype = schema.reserve_value_local(function);
+            self.emit_load_building_error_intrinsic(
+                building,
+                NonArrayRealmIntrinsicSlot::DOMExceptionPrototype,
+                &prototype,
+                function,
+            );
+            let constructor = self.init_builtin_constructor_object_with_parent(
+                StandardBuiltinId::DOMExceptionConstructor,
+                &context,
+                &prototype,
+                None,
+                function,
+            )?;
+            constructor.clear(function);
+            prototype.clear(function);
+        }
         parent.clear(function);
         self.release_realm_function_materialization_context(context, function);
         Ok(())

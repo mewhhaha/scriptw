@@ -141,7 +141,11 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 77 ends each intrinsic property layout in R's static data with the
 // number of its rows that a Symbol keys, a word after the String index that
 // the chain walk in P and R reads to prove that a layout lacks a Symbol.
-const LAYOUT_VERSION: u32 = 77;
+// Version 78 moves DOMException's prototype and constructor into the Error
+// family's demand owner: Realm creation no longer reads Error.prototype, and
+// the public DOMException global becomes a deferred Error-family recipe whose
+// closed constructor domain gains DOMException.
+const LAYOUT_VERSION: u32 = 78;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

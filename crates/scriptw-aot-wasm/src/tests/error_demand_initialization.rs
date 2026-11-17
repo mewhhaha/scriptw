@@ -8,7 +8,7 @@ use crate::gc_types::{
 };
 use crate::heap::ErrorInitializationState;
 
-const ERROR_SLOTS: [Slot; 18] = [
+const ERROR_SLOTS: [Slot; 20] = [
     Slot::ErrorPrototype,
     Slot::EvalErrorPrototype,
     Slot::AggregateErrorPrototype,
@@ -27,6 +27,8 @@ const ERROR_SLOTS: [Slot; 18] = [
     Slot::TypeErrorConstructor,
     Slot::URIErrorConstructor,
     Slot::ReferenceErrorConstructor,
+    Slot::DOMExceptionPrototype,
+    Slot::DOMExceptionConstructor,
 ];
 
 pub(super) fn type_index<T: GcHeapType>(schema: &RuntimeSchema) -> u32 {
@@ -193,7 +195,7 @@ fn canonical_runtime_defers_the_complete_error_graph_with_a_void_realm_abi() {
     );
     assert_eq!(
         calls(&resolve, ensure_index),
-        9,
+        10,
         "one gated branch for each closed public constructor recipe"
     );
     for identity in crate::heap::ErrorIntrinsicConstructor::ALL {
@@ -220,7 +222,8 @@ fn canonical_runtime_defers_the_complete_error_graph_with_a_void_realm_abi() {
     }
     for (helper, expected) in [
         ("helper::native_constructor_header_allocate", 9),
-        ("helper::intrinsic_constructor_allocate", 9),
+        // The nine Error constructors and DOMException's layout constructor.
+        ("helper::intrinsic_constructor_allocate", 10),
         ("helper::intrinsic_accessor_allocate", 2),
     ] {
         assert_eq!(
@@ -415,7 +418,7 @@ fn canonical_runtime_defers_the_complete_error_graph_with_a_void_realm_abi() {
             .into_iter()
             .map(|slot| (slot.gc_index(), 1))
             .collect(),
-        "all 18 canonical slots published exactly once"
+        "all 20 canonical slots published exactly once"
     );
 }
 

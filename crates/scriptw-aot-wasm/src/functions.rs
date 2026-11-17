@@ -433,6 +433,8 @@ impl NonArrayRealmIntrinsicSlot {
                 | Self::URIErrorPrototype
                 | Self::ReferenceErrorConstructor
                 | Self::ReferenceErrorPrototype
+                | Self::DOMExceptionConstructor
+                | Self::DOMExceptionPrototype
         )
     }
 
