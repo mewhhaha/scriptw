@@ -1641,6 +1641,15 @@ impl ValueLocals {
         self.reference.clear(function);
     }
     pub(crate) fn copy_from(&self, source: &Self, function: &mut Function) {
+        // A value copied onto its own locals is already there.
+        if self.tag.index == source.tag.index {
+            assert!(
+                self.scalar.index == source.scalar.index
+                    && self.reference.index == source.reference.index,
+                "value locals are reserved together"
+            );
+            return;
+        }
         source.tag.load(function);
         self.tag.store(function);
         source.scalar.load(function);
@@ -1781,6 +1790,9 @@ pub(crate) struct CompletionLocals {
 impl CompletionLocals {
     pub(crate) fn copy_from(&self, source: &Self, function: &mut Function) {
         self.value.copy_from(&source.value, function);
+        if self.kind.index == source.kind.index && self.target.index == source.target.index {
+            return;
+        }
         source.kind.load(function);
         self.kind.store(function);
         source.target.load(function);
