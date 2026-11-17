@@ -135,5 +135,36 @@ fn targeted_bulk_edits_clone_only_selected_rows_in_effective_key_order() {
     ));
 }
 
+#[test]
+fn settled_idempotent_edit_revisits_exactly_the_keys_mutated_since() {
+    let baseline = Box::leak(Box::new(BTreeMap::from([
+        ("a".to_string(), 1),
+        ("b".to_string(), 2),
+        ("z".to_string(), 26),
+    ])));
+    let edit = IdempotentEdit::UnknownPropertyHook;
+    let keys = Arc::new(BTreeSet::from(["a".to_string(), "b".to_string()]));
+    let mut facts = CatalogOverlay::new(baseline);
+    assert_eq!(facts.unsettled_keys(edit, &keys), ["a", "b"]);
+    facts.settle(edit, keys.clone());
+    assert!(facts.unsettled_keys(edit, &keys).is_empty());
+    // A different key set with equal contents is not the settled one.
+    let other = Arc::new((*keys).clone());
+    assert_eq!(facts.unsettled_keys(edit, &other), ["a", "b"]);
+    // Every mutable access unsettles its key, even one that writes nothing,
+    // and keys outside the settled set are not tracked.
+    let _ = facts.get_mut("b");
+    facts.insert("z".to_string(), 0);
+    assert_eq!(facts.unsettled_keys(edit, &keys), ["b"]);
+    facts.set_effective("a".to_string(), Some(5));
+    assert_eq!(facts.unsettled_keys(edit, &keys), ["a", "b"]);
+    let mut fork = facts.clone();
+    fork.settle(edit, keys.clone());
+    assert_eq!(facts.unsettled_keys(edit, &keys), ["a", "b"]);
+    fork.edit_matching(|key, _| key == "a", |_, value| *value += 1);
+    assert_eq!(fork.unsettled_keys(edit, &keys), ["a"]);
+    assert!(fork.empty_changes().unsettled_keys(edit, &keys).len() == 2);
+}
+
 #[path = "tests/changed_facts.rs"]
 mod changed_facts;

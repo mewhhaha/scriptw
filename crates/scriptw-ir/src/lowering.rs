@@ -31,7 +31,7 @@ mod builtin_call_info_tests;
 mod builtin_catalog;
 mod builtin_shapes;
 mod catalog_overlay;
-use catalog_overlay::CatalogOverlay;
+use catalog_overlay::{CatalogOverlay, IdempotentEdit};
 type FunctionSignatures = CatalogOverlay<FunctionSignature>;
 type GlobalProperties = CatalogOverlay<GlobalPropertyInfo>;
 mod call_candidate_analysis;
@@ -8813,14 +8813,17 @@ impl<'a> ScriptLowerer<'a> {
     }
 
     fn merge_function_this_info(&mut self, function_id: &FunctionId, info: ValueInfo) {
-        let Some(signature) = self.function_signatures.get(function_id).cloned() else {
+        let Some(signature) = self.function_signatures.get(function_id) else {
             return;
         };
         if signature.protocol.flavor() == FunctionFlavor::Arrow {
             return;
         }
         let (next, observed) = if signature.this_observed {
-            (self.merge_value_infos(signature.this_info, info), true)
+            (
+                self.merge_value_infos(signature.this_info.clone(), info),
+                true,
+            )
         } else {
             (info, true)
         };

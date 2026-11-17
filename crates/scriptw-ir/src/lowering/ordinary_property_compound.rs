@@ -644,11 +644,17 @@ impl<'a> ScriptLowerer<'a> {
         }
     }
 
+    /// Merge an unknown hook call into every planned source function.
+    ///
+    /// The merge is idempotent per signature and touches no other entry, so
+    /// once applied it only needs repeating for signatures mutated since.
     pub(super) fn observe_all_planned_source_as_unknown_property_hooks(&mut self) {
-        let targets = self.analysis.planned_source_function_ids.clone();
-        for target in targets.iter() {
-            self.observe_unknown_property_hook(target);
+        let targets = std::sync::Arc::clone(&self.analysis.planned_source_function_ids);
+        let edit = IdempotentEdit::UnknownPropertyHook;
+        for target in self.function_signatures.unsettled_keys(edit, &targets) {
+            self.observe_unknown_property_hook(&target);
         }
+        self.function_signatures.settle(edit, targets);
     }
 
     pub(super) fn expression_effect_accounting(

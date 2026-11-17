@@ -1,6 +1,6 @@
 //! Immutable compiler recipes with isolated, copy-on-write lowering facts.
 
-use std::collections::{btree_map, BTreeMap};
+use std::collections::{btree_map, BTreeMap, BTreeSet};
 use std::iter::Peekable;
 use std::sync::Arc;
 
@@ -8,6 +8,28 @@ use std::sync::Arc;
 pub(super) struct CatalogOverlay<V: 'static> {
     baseline: Option<&'static BTreeMap<String, V>>,
     changes: BTreeMap<String, Option<Arc<V>>>,
+    /// The last whole-key-set idempotent edit and the entries changed since.
+    /// Every mutable access records its key here, so an entry can never be
+    /// treated as settled after it changed.
+    settled: Option<SettledEdit>,
+}
+
+/// An edit of each entry of a key set which is idempotent and reads or writes
+/// no other entry: applying it again to an entry that has not been mutated
+/// since leaves the entry unchanged.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum IdempotentEdit {
+    /// Merge an unknown receiver and unknown arguments into a signature, as
+    /// an unknown property hook may call any planned source function.
+    UnknownPropertyHook,
+}
+
+#[derive(Debug, Clone)]
+struct SettledEdit {
+    edit: IdempotentEdit,
+    keys: Arc<BTreeSet<String>>,
+    /// Keys of `keys` accessed mutably since `edit` was applied to all keys.
+    touched: BTreeSet<String>,
 }
 
 impl<V: 'static> Default for CatalogOverlay<V> {
@@ -15,6 +37,7 @@ impl<V: 'static> Default for CatalogOverlay<V> {
         Self {
             baseline: None,
             changes: BTreeMap::new(),
+            settled: None,
         }
     }
 }
@@ -24,7 +47,43 @@ impl<V: 'static> CatalogOverlay<V> {
         Self {
             baseline: Some(baseline),
             changes: BTreeMap::new(),
+            settled: None,
         }
+    }
+
+    fn touch(&mut self, key: &str) {
+        if let Some(settled) = &mut self.settled {
+            if settled.keys.contains(key) && !settled.touched.contains(key) {
+                settled.touched.insert(key.to_string());
+            }
+        }
+    }
+
+    /// The keys of `keys` on which `edit` may still change an entry, in key
+    /// order: all of them unless `edit` was settled for this same key set,
+    /// otherwise only the entries mutated since.
+    pub(super) fn unsettled_keys(
+        &self,
+        edit: IdempotentEdit,
+        keys: &Arc<BTreeSet<String>>,
+    ) -> Vec<String> {
+        match &self.settled {
+            Some(settled) if settled.edit == edit && Arc::ptr_eq(&settled.keys, keys) => {
+                settled.touched.iter().cloned().collect()
+            }
+            _ => keys.iter().cloned().collect(),
+        }
+    }
+
+    /// Record that `edit` was just applied to every key that
+    /// [`Self::unsettled_keys`] returned for `keys`, with no other mutation
+    /// in between.
+    pub(super) fn settle(&mut self, edit: IdempotentEdit, keys: Arc<BTreeSet<String>>) {
+        self.settled = Some(SettledEdit {
+            edit,
+            keys,
+            touched: BTreeSet::new(),
+        });
     }
 
     pub(super) fn get(&self, key: &str) -> Option<&V> {
@@ -37,6 +96,7 @@ impl<V: 'static> CatalogOverlay<V> {
     /// Replace a fact without materializing the discarded previous value.
     /// Forks retain their own immutable row; no Clone bound is needed here.
     pub(super) fn insert(&mut self, key: String, value: V) {
+        self.touch(&key);
         self.changes.insert(key, Some(Arc::new(value)));
     }
 
@@ -75,12 +135,14 @@ impl<V: 'static> CatalogOverlay<V> {
         Self {
             baseline: self.baseline,
             changes: BTreeMap::new(),
+            settled: None,
         }
     }
 }
 
 impl<V: Clone + 'static> CatalogOverlay<V> {
     pub(super) fn get_mut(&mut self, key: &str) -> Option<&mut V> {
+        self.touch(key);
         if !self.changes.contains_key(key) {
             let (key, value) = self.baseline?.get_key_value(key)?;
             self.changes
@@ -95,6 +157,7 @@ impl<V: Clone + 'static> CatalogOverlay<V> {
     #[cfg(test)]
     pub(super) fn remove(&mut self, key: &str) -> Option<V> {
         let previous = self.get(key).cloned();
+        self.touch(key);
         if self
             .baseline
             .is_some_and(|baseline| baseline.contains_key(key))
@@ -129,6 +192,7 @@ impl<V: Clone + 'static> CatalogOverlay<V> {
 
 impl<V: PartialEq + 'static> CatalogOverlay<V> {
     pub(super) fn set_effective(&mut self, key: String, value: Option<V>) {
+        self.touch(&key);
         if self.baseline.and_then(|baseline| baseline.get(&key)) == value.as_ref() {
             self.changes.remove(&key);
         } else {
