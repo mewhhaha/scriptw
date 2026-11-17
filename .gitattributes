@@ -1,6 +1,7 @@
 # Preserve the published upstream license byte for byte, including its final
 # blank line. Product-source whitespace checks retain their normal settings.
 vendor/wasmtime-internal-cache-47.0.0/LICENSE whitespace=-blank-at-eof
+vendor/cranelift-frontend-0.134.0/LICENSE whitespace=-blank-at-eof
 
 # Bind the complete upstream Test262 bytes independently of host newline settings.
 test262/vendor/test262/** -text whitespace=-blank-at-eof,-blank-at-eol
