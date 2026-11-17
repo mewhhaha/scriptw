@@ -272,6 +272,62 @@ fn leb128_len(value: u32) -> u32 {
     (32 - (value | 1).leading_zeros()).div_ceil(7)
 }
 
+/// Released locals awaiting reuse.
+///
+/// Local numbering reaches the emitted bytes, so the reuse order is the
+/// contract: a reservation takes the earliest released local of its type in
+/// `order`, and the most recently released local then moves into its place
+/// (`Vec::swap_remove`). `positions` holds, per type, the positions in
+/// `order` of that type's locals, so finding that local needs no scan;
+/// `released` answers membership without one.
+#[derive(Debug, Clone, Default)]
+struct FreeLocals {
+    order: Vec<(u32, ValType)>,
+    positions: std::collections::BTreeMap<ValType, std::collections::BTreeSet<u32>>,
+    released: Vec<bool>,
+}
+
+impl PartialEq for FreeLocals {
+    fn eq(&self, other: &Self) -> bool {
+        // `positions` and `released` are derived from `order`.
+        self.order == other.order
+    }
+}
+impl Eq for FreeLocals {}
+
+impl FreeLocals {
+    fn contains(&self, local: u32) -> bool {
+        self.released.get(local as usize).copied().unwrap_or(false)
+    }
+
+    fn push(&mut self, local: u32, ty: ValType) {
+        let position = u32::try_from(self.order.len()).expect("released local count exceeds u32");
+        self.order.push((local, ty));
+        self.positions.entry(ty).or_default().insert(position);
+        let slot = local as usize;
+        if self.released.len() <= slot {
+            self.released.resize(slot + 1, false);
+        }
+        self.released[slot] = true;
+    }
+
+    fn take(&mut self, ty: ValType) -> Option<u32> {
+        let position = self.positions.get_mut(&ty)?.pop_first()?;
+        let (local, _) = self.order.swap_remove(position as usize);
+        if let Some(&(_, moved)) = self.order.get(position as usize) {
+            let last = u32::try_from(self.order.len()).expect("released local count exceeds u32");
+            let moved = self
+                .positions
+                .get_mut(&moved)
+                .expect("every released local's type has positions");
+            moved.remove(&last);
+            moved.insert(position);
+        }
+        self.released[local as usize] = false;
+        Some(local)
+    }
+}
+
 /// A function body and its open frames, including the implicit function label.
 ///
 /// Re-exported as `Function` from the crate root so all emitters use the same
@@ -284,7 +340,7 @@ pub(crate) struct Function {
     parameters: Vec<ValType>,
     initial_local_count: u32,
     initial_prefix_len: usize,
-    free_locals: Vec<u32>,
+    free_locals: FreeLocals,
     operator_count: u32,
     literal_operands: Vec<crate::program_literal_operands::FunctionSite>,
     native_program_context: Option<crate::native_program_contexts::FunctionContext>,
@@ -342,7 +398,7 @@ impl Function {
             parameters,
             initial_local_count,
             initial_prefix_len,
-            free_locals: Vec::new(),
+            free_locals: FreeLocals::default(),
             operator_count: 0,
             literal_operands: Vec::new(),
             native_program_context: None,
@@ -371,10 +427,7 @@ impl Function {
             !self.frames.is_empty(),
             "cannot reserve a local after function publication"
         );
-        if let Some(position) = self.free_locals.iter().position(|index| {
-            self.locals.type_at(*index - self.parameters.len() as u32) == Some(ty)
-        }) {
-            let index = self.free_locals.swap_remove(position);
+        if let Some(index) = self.free_locals.take(ty) {
             self.forget_i32_local(index);
             return index;
         }
@@ -401,9 +454,13 @@ impl Function {
             index >= base + self.initial_local_count && index < base + self.locals.count(),
             "only this body's dynamically reserved locals can be released"
         );
-        assert!(!self.free_locals.contains(&index), "local released twice");
+        assert!(!self.free_locals.contains(index), "local released twice");
         self.forget_i32_local(index);
-        self.free_locals.push(index);
+        let ty = self
+            .locals
+            .type_at(index - base)
+            .expect("a released local is declared");
+        self.free_locals.push(index, ty);
     }
 
     fn forget_i32_local(&mut self, index: u32) {
@@ -435,7 +492,7 @@ impl Function {
             "checked guard requires an i32 local"
         );
         assert!(
-            !self.free_locals.contains(&local),
+            !self.free_locals.contains(local),
             "checked guard local is live"
         );
         if self.excluded_i32_value == Some((local, value)) {
@@ -466,7 +523,7 @@ impl Function {
         );
         assert_eq!(self.checked_escape_frames.pop(), Some(guard));
         self.instruction(&Instruction::End);
-        if !self.free_locals.contains(&local) {
+        if !self.free_locals.contains(local) {
             self.excluded_i32_value = Some((local, value));
         }
     }
