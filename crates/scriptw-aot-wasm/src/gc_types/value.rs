@@ -110,11 +110,12 @@ impl NativeSharedBufferResult {
         self.clear(function);
         resource
     }
+    /// Ends this holder: the local returns to the pool for its next holder
+    /// of the same type, without a store. A released local is never read
+    /// again by this holder, and a GC root is an SSA value live across a
+    /// safepoint (Cranelift's stack maps), so a store of null here retained
+    /// nothing less. A next holder writes the local before reading it.
     pub(crate) fn clear(self, function: &mut Function) {
-        function.instruction(&Instruction::RefNull(
-            wasm_encoder::RefType::EXTERNREF.heap_type,
-        ));
-        function.instruction(&Instruction::LocalSet(self.index));
         function.release_typed_local(self.index);
     }
 }
@@ -243,7 +244,6 @@ impl EqRefLocal {
 #[derive(Debug)]
 pub(crate) struct GcLocal<T: GcHeapType, N: GcFieldNullability = NonNullable> {
     index: u32,
-    heap_type: HeapType,
     shape: PhantomData<fn() -> (T, N)>,
 }
 
@@ -265,9 +265,12 @@ impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
         let GcStackReference { .. } = value;
         function.instruction(&Instruction::LocalSet(self.index));
     }
+    /// Ends this holder: the local returns to the pool for its next holder
+    /// of the same type, without a store. A released local is never read
+    /// again by this holder, and a GC root is an SSA value live across a
+    /// safepoint (Cranelift's stack maps), so a store of null here retained
+    /// nothing less. A next holder writes the local before reading it.
     pub(crate) fn clear(self, function: &mut Function) {
-        function.instruction(&Instruction::RefNull(self.heap_type));
-        function.instruction(&Instruction::LocalSet(self.index));
         function.release_typed_local(self.index);
     }
 }
@@ -370,7 +373,6 @@ fn sealed_cast_or_branch<T: GcHeapType>(
 #[derive(Debug)]
 pub(crate) struct GcLocalSlot<T: GcHeapType, N: GcFieldNullability = NonNullable> {
     index: u32,
-    heap_type: HeapType,
     shape: PhantomData<fn() -> (T, N)>,
 }
 impl<T: GcHeapType, N: GcFieldNullability> GcLocalSlot<T, N> {
@@ -383,7 +385,6 @@ impl<T: GcHeapType, N: GcFieldNullability> GcLocalSlot<T, N> {
         function.instruction(&Instruction::LocalSet(self.index));
         GcLocal {
             index: self.index,
-            heap_type: self.heap_type,
             shape: PhantomData,
         }
     }
@@ -806,11 +807,12 @@ impl<R: GcFunctionRole, N: GcFieldNullability> FunctionLocal<R, N> {
         let FunctionStackReference { .. } = value;
         function.instruction(&Instruction::LocalSet(self.index));
     }
+    /// Ends this holder: the local returns to the pool for its next holder
+    /// of the same type, without a store. A released local is never read
+    /// again by this holder, and a GC root is an SSA value live across a
+    /// safepoint (Cranelift's stack maps), so a store of null here retained
+    /// nothing less. A next holder writes the local before reading it.
     pub(crate) fn clear(self, function: &mut Function) {
-        function.instruction(&Instruction::RefNull(HeapType::Concrete(
-            R::SIGNATURE.type_index(),
-        )));
-        function.instruction(&Instruction::LocalSet(self.index));
         function.release_typed_local(self.index);
     }
 }
@@ -2516,7 +2518,6 @@ impl RuntimeSchema {
         let reference_type = self.reference_type::<T>(GcNullability::Nullable);
         GcLocalSlot {
             index: function.reserve_typed_local(ValType::Ref(reference_type)),
-            heap_type: reference_type.heap_type,
             shape: PhantomData,
         }
     }
@@ -3072,8 +3073,9 @@ impl<'a, Base: GcHeapType> GcOperand<'a, GcRef<Base>, NonNullable> {
         _schema: &RuntimeSchema,
     ) -> Self {
         Self {
-            // GC locals are physically nullable so they can release roots.
-            // A nominal upcast preserves the logical non-null requirement.
+            // GC locals are physically nullable: a declared Wasm local needs
+            // a default. A nominal upcast preserves the logical non-null
+            // requirement.
             source: OperandSource::NonNullLocal(value.index),
             shape: PhantomData,
         }

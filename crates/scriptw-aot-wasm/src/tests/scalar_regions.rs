@@ -769,11 +769,18 @@ fn compact_row_misses_exit_before_body_effects_and_release_roots_before_resume()
                 _ => None,
             })
             .expect("canonical outer PackedValues is held in a typed root");
+        // A GC root is a value live across a call (Cranelift stack maps). The
+        // row backing's value is never read after the row loop, so the generic
+        // loop's calls and throws do not retain it, with no store of null.
+        let next_access = operators[range.end + 1..].iter().find(|op| {
+            matches!(op,
+                Operator::LocalGet { local_index }
+                | Operator::LocalSet { local_index }
+                | Operator::LocalTee { local_index } if *local_index == backing)
+        });
         assert!(
-            between.windows(2).any(|ops| matches!(ops,
-            [Operator::RefNull { .. }, Operator::LocalSet { local_index }]
-                if *local_index == backing)),
-            "retained row backing is cleared before the generic loop can throw or leave"
+            !matches!(next_access, Some(Operator::LocalGet { .. })),
+            "retained row backing is dead after the row loop: no later read before a write"
         );
     });
 }

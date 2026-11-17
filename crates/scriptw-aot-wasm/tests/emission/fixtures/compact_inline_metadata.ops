@@ -14,6 +14,9 @@
 # 71: every later type index, in heap types and in struct and array
 # immediates, moves up by one (71, 78, 83, 97, 98, 148, 149 and 156 become
 # 72, 79, 84, 98, 99, 149, 150 and 157).
+# A released typed GC local is no longer overwritten with null (eight
+# ref.null/local.set pairs fewer: two after the length read, six at the
+# backedge; the exit branch destination moves down by four).
 I32Const { value: 8 }
 I32Const { value: 0 }
 I32Store8 { memarg: MemArg { align: 0, max_align: 0, offset: 0, memory: 0 } }
@@ -81,11 +84,11 @@ LocalSet local12
 LocalGet local10
 I32Const { value: 6 }
 I32Ne
-BrIf operator175
+BrIf operator171
 LocalGet local12
 RefTestNonNull { hty: Concrete(Module(72)) }
 I32Eqz
-BrIf operator175
+BrIf operator171
 LocalGet local12
 RefCastNonNull { hty: Concrete(Module(72)) }
 LocalSet local14
@@ -95,7 +98,7 @@ LocalSet local15
 LocalGet local15
 RefTestNonNull { hty: Concrete(Module(84)) }
 I32Eqz
-BrIf operator175
+BrIf operator171
 LocalGet local15
 RefCastNonNull { hty: Concrete(Module(84)) }
 LocalSet local16
@@ -104,7 +107,7 @@ StructGet { struct_type_index: 84, field_index: 0 }
 LocalGet local20
 RefEq
 I32Eqz
-BrIf operator175
+BrIf operator171
 LocalGet local16
 StructGet { struct_type_index: 84, field_index: 1 }
 LocalGet local21
@@ -134,7 +137,7 @@ End
 LocalGet local10
 I32Const { value: 3 }
 I32Ne
-BrIf operator175
+BrIf operator171
 LocalGet local11
 F64ReinterpretI64
 LocalSet local1
@@ -167,11 +170,11 @@ End
 LocalGet local10
 I32Const { value: 4 }
 I32Ne
-BrIf operator175
+BrIf operator171
 LocalGet local12
 RefTestNonNull { hty: Concrete(Module(149)) }
 I32Eqz
-BrIf operator175
+BrIf operator171
 LocalGet local12
 RefCastNonNull { hty: Concrete(Module(149)) }
 LocalSet local23
@@ -181,28 +184,12 @@ LocalSet local24
 LocalGet local24
 ArrayLen
 F64ConvertI32U
-RefNull { hty: Concrete(Module(150)) }
-LocalSet local24
-RefNull { hty: Concrete(Module(149)) }
-LocalSet local23
 LocalSet local2
 I32Const { value: 1 }
 LocalSet local9
 End
 RefNull { hty: Abstract { shared: false, ty: Eq } }
 LocalSet local12
-RefNull { hty: Concrete(Module(99)) }
-LocalSet local18
-RefNull { hty: Concrete(Module(157)) }
-LocalSet local17
-RefNull { hty: Concrete(Module(84)) }
-LocalSet local16
-RefNull { hty: Concrete(Module(79)) }
-LocalSet local15
-RefNull { hty: Concrete(Module(72)) }
-LocalSet local14
-RefNull { hty: Concrete(Module(63)) }
-LocalSet local13
 LocalGet local9
 I32Eqz
 BrIf exit0
