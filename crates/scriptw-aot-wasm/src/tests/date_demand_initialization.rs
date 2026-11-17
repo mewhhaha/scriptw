@@ -515,7 +515,8 @@ fn date_global_and_resolver_use_the_defining_realm_recipe_and_utc_alias_keeps_on
     .finalize_globals(GlobalLedger::new(), false, 0);
     let schema = registered.globals().schema();
     let recipe_type = type_index::<DeferredDateConstructor>(schema);
-    let publish = named(&names, "helper::fresh_data_properties_publish");
+    let publish = named(&names, "helper::intrinsic_data_publish");
+    let batch = named(&names, "helper::fresh_data_properties_publish");
     let values_type = type_index::<IntrinsicPropertyValueCache>(schema);
     let flags_type = type_index::<OrdinaryPropertyIndex>(schema);
     // Intrinsic initialization and global publication have separate physical
@@ -548,7 +549,7 @@ fn date_global_and_resolver_use_the_defining_realm_recipe_and_utc_alias_keeps_on
             .collect();
         assert_eq!(rows.len(), 1, "{publisher} stores the recipe in one value row");
         let row = constant(&initial, rows[0], arguments(&initial, rows[0], 3)[1]);
-        let publications = calls(&initial, publish);
+        let publications = calls(&initial, batch);
         assert_eq!(publications.len(), 1, "{publisher} publishes its bindings once");
         assert!(rows[0] < publications[0]);
         let (flags_at, size) = initial[..publications[0]]
