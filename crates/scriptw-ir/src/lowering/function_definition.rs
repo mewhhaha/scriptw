@@ -104,13 +104,9 @@ impl<'a> ScriptLowerer<'a> {
             .owner_plans
             .get(&function.id)
             .is_some_and(|owner| owner.private_environment_id.is_some());
-        let mut lowerer = ScriptLowerer::new(
-            self.interner,
-            self.analysis,
-            self.source_text,
+        let mut lowerer = self.child_lowerer(
             self.root_this_binding_for_function_owner(&function.id),
             function.id.clone(),
-            self.host_surface_policy,
         );
         // These five maps are moved back into `self` on every exit path below,
         // so hand them to the nested lowerer by move rather than deep clone.

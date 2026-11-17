@@ -14,14 +14,7 @@ impl ScriptLowerer<'_> {
             let before_callback_contexts = self.exact_context_callback_observations.clone();
             let before_source_parameters = self.function_source_parameter_candidates.clone();
             let before_source_bindings = self.function_source_binding_candidates.clone();
-            let mut pass = ScriptLowerer::new(
-                self.interner,
-                self.analysis,
-                self.source_text,
-                self.root_this_binding,
-                SCRIPT_OWNER_ID.to_string(),
-                self.host_surface_policy,
-            );
+            let mut pass = self.child_lowerer(self.root_this_binding, SCRIPT_OWNER_ID.to_string());
             pass.function_signatures = self.function_signatures.clone();
             pass.visible_function_names = self.visible_function_names.clone();
             pass.global_properties = self.global_properties.clone();
@@ -231,14 +224,7 @@ impl ScriptLowerer<'_> {
             return;
         }
 
-        let mut pass = ScriptLowerer::new(
-            self.interner,
-            self.analysis,
-            self.source_text,
-            self.root_this_binding,
-            SCRIPT_OWNER_ID.to_string(),
-            self.host_surface_policy,
-        );
+        let mut pass = self.child_lowerer(self.root_this_binding, SCRIPT_OWNER_ID.to_string());
         pass.function_signatures = self.function_signatures.clone();
         pass.visible_function_names = self.visible_function_names.clone();
         pass.global_properties = self.global_properties.clone();
@@ -314,17 +300,13 @@ impl ScriptLowerer<'_> {
         {
             return None;
         }
-        let mut pass = ScriptLowerer::new(
-            self.interner,
-            self.analysis,
-            self.source_text,
+        let mut pass = self.child_lowerer(
             self.root_this_binding,
             if capture_context_is_authoritative {
                 self.current_owner_id.clone()
             } else {
                 function_id.clone()
             },
-            self.host_surface_policy,
         );
         pass.function_signatures = self.function_signatures.clone();
         pass.visible_function_names = self.visible_function_names.clone();

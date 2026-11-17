@@ -1282,7 +1282,8 @@ pub(crate) struct ScriptLowerer<'a> {
     unknown_user_code_effects_introduced: bool,
     /// Capture plans cannot change while this lowerer borrows their Analysis.
     /// Keep physical and source-name membership once, separate from live facts.
-    captured_binding_names: BTreeSet<String>,
+    /// Child lowerers borrow the same Analysis and share this set.
+    captured_binding_names: std::sync::Arc<BTreeSet<String>>,
     function_signature_shape_evidence: FunctionSignatureShapeEvidence,
     source_call_flow_effects: SourceCallFlowEffects,
     intervening_effect_epoch: u64,
@@ -1652,10 +1653,6 @@ impl<'a> ScriptLowerer<'a> {
         current_owner_id: String,
         host_surface_policy: HostSurfacePolicy,
     ) -> Self {
-        let private_environment_id = analysis
-            .owner_plans
-            .get(&current_owner_id)
-            .and_then(|owner| owner.private_environment_id);
         let captured_binding_names = analysis
             .function_plans
             .values()
@@ -1665,6 +1662,47 @@ impl<'a> ScriptLowerer<'a> {
                 })
             })
             .collect();
+        Self::with_captured_binding_names(
+            interner,
+            analysis,
+            source_text,
+            root_this_binding,
+            current_owner_id,
+            host_surface_policy,
+            std::sync::Arc::new(captured_binding_names),
+        )
+    }
+
+    /// A fresh lowerer over this lowerer's Analysis, source and host policy.
+    fn child_lowerer(
+        &self,
+        root_this_binding: RootThisBinding,
+        current_owner_id: String,
+    ) -> ScriptLowerer<'a> {
+        Self::with_captured_binding_names(
+            self.interner,
+            self.analysis,
+            self.source_text,
+            root_this_binding,
+            current_owner_id,
+            self.host_surface_policy,
+            std::sync::Arc::clone(&self.captured_binding_names),
+        )
+    }
+
+    fn with_captured_binding_names(
+        interner: &'a Interner,
+        analysis: &'a Analysis<'a>,
+        source_text: CompilerSourceText<'a>,
+        root_this_binding: RootThisBinding,
+        current_owner_id: String,
+        host_surface_policy: HostSurfacePolicy,
+        captured_binding_names: std::sync::Arc<BTreeSet<String>>,
+    ) -> Self {
+        let private_environment_id = analysis
+            .owner_plans
+            .get(&current_owner_id)
+            .and_then(|owner| owner.private_environment_id);
         let mut lowerer = Self {
             interner,
             analysis,
@@ -1857,14 +1895,7 @@ impl<'a> ScriptLowerer<'a> {
         }
         let lower_trace = std::env::var_os("SCRIPTW_LOWER_TRACE").is_some();
         let tp = std::time::Instant::now();
-        let mut prepass = ScriptLowerer::new(
-            self.interner,
-            self.analysis,
-            self.source_text,
-            self.root_this_binding,
-            SCRIPT_OWNER_ID.to_string(),
-            self.host_surface_policy,
-        );
+        let mut prepass = self.child_lowerer(self.root_this_binding, SCRIPT_OWNER_ID.to_string());
         prepass.function_signatures = self.function_signatures.clone();
         prepass.function_source_parameter_candidates =
             self.function_source_parameter_candidates.clone();
@@ -6945,14 +6976,7 @@ impl<'a> ScriptLowerer<'a> {
                 self.merge_value_infos(ValueInfo::undefined(), current_new_target_info);
         }
 
-        let mut lowerer = ScriptLowerer::new(
-            self.interner,
-            self.analysis,
-            self.source_text,
-            self.root_this_binding,
-            function_id.clone(),
-            self.host_surface_policy,
-        );
+        let mut lowerer = self.child_lowerer(self.root_this_binding, function_id.clone());
         lowerer.function_signatures = std::mem::take(&mut self.function_signatures);
         lowerer.visible_function_names = self.visible_function_names.clone();
         lowerer.global_properties = self.global_properties.clone();
@@ -7469,14 +7493,7 @@ impl<'a> ScriptLowerer<'a> {
             },
         );
 
-        let mut lowerer = ScriptLowerer::new(
-            self.interner,
-            self.analysis,
-            self.source_text,
-            self.root_this_binding,
-            function_id.clone(),
-            self.host_surface_policy,
-        );
+        let mut lowerer = self.child_lowerer(self.root_this_binding, function_id.clone());
         lowerer.function_signatures = std::mem::take(&mut self.function_signatures);
         lowerer.visible_function_names = self.visible_function_names.clone();
         lowerer.global_properties = self.global_properties.clone();
