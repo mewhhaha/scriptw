@@ -1,7 +1,6 @@
 //! Support for safepoints and stack maps.
 
 use super::*;
-use crate::{HashMap, HashSet};
 use core::ops::{Index, IndexMut};
 
 #[derive(Clone, Copy)]
@@ -98,11 +97,172 @@ impl<T> SlotSizeMap<T> {
     }
 }
 
-/// A set of live values.
+/// A dense numbering of a function's needs-stack-map values.
 ///
-/// Make sure to copy to a vec and sort, or something, before iterating over the
-/// values to ensure deterministic output.
-type LiveSet = HashSet<ir::Value>;
+/// Indices are assigned in ascending `ir::Value` order, so a sorted set of
+/// indices maps to a sorted set of values. Every place that needs a
+/// deterministic order (stack map entries, eager stack slot assignment) relies
+/// on that.
+struct DenseValues {
+    /// Each needs-stack-map value's dense index, `u32::MAX` for other values.
+    index: SecondaryMap<ir::Value, u32>,
+
+    /// The value of each dense index, in ascending order.
+    values: Vec<ir::Value>,
+}
+
+impl Default for DenseValues {
+    fn default() -> Self {
+        Self {
+            index: SecondaryMap::with_default(u32::MAX),
+            values: Vec::new(),
+        }
+    }
+}
+
+impl DenseValues {
+    fn clear(&mut self) {
+        self.index.clear();
+        self.values.clear();
+    }
+
+    fn initialize(&mut self, func: &Function, stack_map_values: &EntitySet<ir::Value>) {
+        self.index.resize(func.dfg.num_values());
+        for val in stack_map_values.iter() {
+            self.index[val] = u32::try_from(self.values.len()).unwrap();
+            self.values.push(val);
+        }
+    }
+
+    /// The dense index of `val` if it needs inclusion in stack maps.
+    fn get(&self, val: ir::Value) -> Option<u32> {
+        match self.index.get(val) {
+            Some(&index) if index != u32::MAX => Some(index),
+            _ => None,
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.values.len()
+    }
+}
+
+/// A set of dense value indices with constant-time insertion, removal,
+/// membership test and clearing (Briggs and Torczon's sparse set). Iteration
+/// order is insertion order as perturbed by removals; every caller that needs
+/// an order sorts.
+#[derive(Default)]
+struct SparseSet {
+    /// The members, densely.
+    members: Vec<u32>,
+
+    /// For each index, its position in `members` if it is a member; any value
+    /// otherwise.
+    positions: Vec<u32>,
+}
+
+impl SparseSet {
+    fn clear(&mut self) {
+        self.members.clear();
+        self.positions.clear();
+    }
+
+    /// Make this an empty set over indices `0..universe`.
+    fn reset(&mut self, universe: usize) {
+        self.members.clear();
+        self.positions.clear();
+        self.positions.resize(universe, 0);
+    }
+
+    fn contains(&self, index: u32) -> bool {
+        let position = self.positions[index as usize] as usize;
+        position < self.members.len() && self.members[position] == index
+    }
+
+    /// Insert `index`, returning whether it was absent.
+    fn insert(&mut self, index: u32) -> bool {
+        if self.contains(index) {
+            return false;
+        }
+        self.positions[index as usize] = u32::try_from(self.members.len()).unwrap();
+        self.members.push(index);
+        true
+    }
+
+    /// Remove `index`, returning whether it was present.
+    fn remove(&mut self, index: u32) -> bool {
+        if !self.contains(index) {
+            return false;
+        }
+        let position = self.positions[index as usize];
+        let last = self.members.pop().unwrap();
+        if last != index {
+            self.members[position as usize] = last;
+            self.positions[last as usize] = position;
+        }
+        true
+    }
+
+    fn members(&self) -> &[u32] {
+        &self.members
+    }
+
+    fn remove_all(&mut self) {
+        self.members.clear();
+    }
+}
+
+/// `out = a + b` for sorted, duplicate-free `a` and `b`; `out` is sorted and
+/// duplicate-free.
+fn sorted_union(out: &mut Vec<u32>, a: &[u32], b: &[u32]) {
+    out.clear();
+    out.reserve(a.len() + b.len());
+    let (mut i, mut j) = (0, 0);
+    while i < a.len() && j < b.len() {
+        match a[i].cmp(&b[j]) {
+            core::cmp::Ordering::Less => {
+                out.push(a[i]);
+                i += 1;
+            }
+            core::cmp::Ordering::Greater => {
+                out.push(b[j]);
+                j += 1;
+            }
+            core::cmp::Ordering::Equal => {
+                out.push(a[i]);
+                i += 1;
+                j += 1;
+            }
+        }
+    }
+    out.extend_from_slice(&a[i..]);
+    out.extend_from_slice(&b[j..]);
+}
+
+/// `out = (live_out - kills) + gens` for sorted, duplicate-free inputs; `out`
+/// is sorted and duplicate-free.
+fn sorted_transfer(out: &mut Vec<u32>, live_out: &[u32], kills: &[u32], gens: &[u32]) {
+    out.clear();
+    out.reserve(live_out.len() + gens.len());
+    let (mut k, mut g) = (0, 0);
+    for &index in live_out {
+        while k < kills.len() && kills[k] < index {
+            k += 1;
+        }
+        if k < kills.len() && kills[k] == index {
+            continue;
+        }
+        while g < gens.len() && gens[g] < index {
+            out.push(gens[g]);
+            g += 1;
+        }
+        if g < gens.len() && gens[g] == index {
+            g += 1;
+        }
+        out.push(index);
+    }
+    out.extend_from_slice(&gens[g..]);
+}
 
 /// A worklist of blocks' post-order indices that we need to process.
 #[derive(Default)]
@@ -110,7 +270,8 @@ struct Worklist {
     /// Stack of blocks to process.
     stack: Vec<u32>,
 
-    /// The set of blocks that need to be updated.
+    /// The set of blocks that need to be updated, indexed by post-order
+    /// index.
     ///
     /// This is a subset of the elements present in `self.stack`, *not* the
     /// exact same elements. `self.stack` is allowed to have duplicates, and
@@ -120,7 +281,7 @@ struct Worklist {
     /// predecessors, and therefore inner loop bodies before continuing to
     /// process outer loop bodies. This ultimately results in fewer iterations
     /// required to reach a fixed point.
-    need_updates: HashSet<u32>,
+    need_updates: Vec<bool>,
 }
 
 impl Extend<u32> for Worklist {
@@ -150,7 +311,7 @@ impl Worklist {
             need_updates,
         } = self;
         stack.reserve(capacity);
-        need_updates.reserve(capacity);
+        need_updates.resize(capacity, false);
     }
 
     fn push(&mut self, block_index: u32) {
@@ -158,7 +319,7 @@ impl Worklist {
         // now it is and it needs an update. If it was already in `self.stack`,
         // then pushing this copy logically hoists it to the top of the
         // stack. See the above note about processing inner-most loops first.
-        self.need_updates.insert(block_index);
+        self.need_updates[block_index as usize] = true;
         self.stack.push(block_index);
     }
 
@@ -169,11 +330,30 @@ impl Worklist {
             // it was logically hoisted up to the top of the stack, while this
             // entry was left behind, and we already popped the hoisted
             // copy. See the above note about processing inner-most loops first.
-            if self.need_updates.remove(&block_index) {
+            let need_update = &mut self.need_updates[block_index as usize];
+            if core::mem::replace(need_update, false) {
                 return Some(block_index);
             }
         }
         None
+    }
+}
+
+/// The range of `LivenessAnalysis::safepoint_values` holding one safepoint's
+/// live values; `start == u32::MAX` for an instruction that is not a recorded
+/// safepoint.
+#[derive(Clone, Copy)]
+struct SafepointLive {
+    start: u32,
+    end: u32,
+}
+
+impl Default for SafepointLive {
+    fn default() -> Self {
+        Self {
+            start: u32::MAX,
+            end: u32::MAX,
+        }
     }
 }
 
@@ -235,6 +415,15 @@ impl Worklist {
 /// record the precise set of needs-stack-map values that are live across each
 /// safepoint instruction inside the block, which is the final output of this
 /// analysis.
+///
+/// Live sets are sorted vectors over a dense numbering of the
+/// needs-stack-map values (see [`DenseValues`]). Before the fixed-point, one
+/// backwards pass over each block summarizes it as the needs-stack-map values it defines (`kills`) and
+/// those it uses before any definition in the block (`gens`), so that
+/// `live_in = (live_out - kills) + gens` composes exactly the per-instruction
+/// steps described above; the fixed-point then revisits blocks with sorted
+/// merges, without walking their instructions again. Its result is the same
+/// least fixed-point.
 pub(crate) struct LivenessAnalysis {
     /// Reusable depth-first search state for traversing a function's blocks.
     dfs: Dfs,
@@ -253,19 +442,45 @@ pub(crate) struct LivenessAnalysis {
     /// updates cascaded to them and when we reach a fixed-point.
     worklist: Worklist,
 
-    /// A map from a block's post-order index to its live-in set.
-    live_ins: Vec<LiveSet>,
+    /// The dense numbering of this function's needs-stack-map values.
+    dense: DenseValues,
 
-    /// A map from a block's post-order index to its live-out set.
-    live_outs: Vec<LiveSet>,
+    /// Each block's live-in set, by post-order index, as sorted dense
+    /// indices. Entries past the current function's block count are empty
+    /// and keep their allocations for reuse.
+    live_ins: Vec<Vec<u32>>,
 
-    /// The set of each needs-stack-map value that is currently live while
-    /// processing a block.
-    currently_live: LiveSet,
+    /// Each block's live-out set, by post-order index, as sorted dense
+    /// indices; reused like `live_ins`.
+    live_outs: Vec<Vec<u32>>,
 
-    /// A mapping from each safepoint instruction to the set of needs-stack-map
-    /// values that are live across it.
-    safepoints: HashMap<ir::Inst, SmallVec<[ir::Value; 4]>>,
+    /// Scratch space for merging live sets.
+    scratch: Vec<u32>,
+
+    /// Sorted dense indices of the needs-stack-map values each block defines;
+    /// block `i` owns `kills[summary_ranges[i].0 .. summary_ranges[i + 1].0]`.
+    kills: Vec<u32>,
+
+    /// Sorted dense indices of the needs-stack-map values each block uses before
+    /// defining them; block `i` owns
+    /// `gens[summary_ranges[i].1 .. summary_ranges[i + 1].1]`.
+    gens: Vec<u32>,
+
+    /// Start offsets into `kills` and `gens`, one entry per block plus a final
+    /// end entry.
+    summary_ranges: Vec<(u32, u32)>,
+
+    /// The dense index of each needs-stack-map value that is currently live
+    /// while processing a block.
+    currently_live: SparseSet,
+
+    /// The values live across each recorded safepoint, sorted, concatenated
+    /// in recording order.
+    safepoint_values: Vec<ir::Value>,
+
+    /// A mapping from each safepoint instruction to the range of
+    /// `safepoint_values` that are live across it.
+    safepoints: SecondaryMap<ir::Inst, SafepointLive>,
 
     /// The set of values that are live across *any* safepoint in the function,
     /// i.e. the union of all the values in the `safepoints` map.
@@ -280,19 +495,19 @@ impl Default for LivenessAnalysis {
             block_to_index: SecondaryMap::with_default(u32::MAX),
             predecessors: Default::default(),
             worklist: Default::default(),
+            dense: Default::default(),
             live_ins: Default::default(),
             live_outs: Default::default(),
+            scratch: Default::default(),
+            kills: Default::default(),
+            gens: Default::default(),
+            summary_ranges: Default::default(),
             currently_live: Default::default(),
+            safepoint_values: Default::default(),
             safepoints: Default::default(),
             live_across_any_safepoint: Default::default(),
         }
     }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum RecordSafepoints {
-    Yes,
-    No,
 }
 
 impl LivenessAnalysis {
@@ -305,9 +520,15 @@ impl LivenessAnalysis {
             block_to_index,
             predecessors,
             worklist,
+            dense,
             live_ins,
             live_outs,
+            scratch,
+            kills,
+            gens,
+            summary_ranges,
             currently_live,
+            safepoint_values,
             safepoints,
             live_across_any_safepoint,
         } = self;
@@ -316,15 +537,23 @@ impl LivenessAnalysis {
         block_to_index.clear();
         predecessors.clear();
         worklist.clear();
-        live_ins.clear();
-        live_outs.clear();
+        dense.clear();
+        for set in live_ins.iter_mut().chain(live_outs.iter_mut()) {
+            set.clear();
+        }
+        scratch.clear();
+        kills.clear();
+        gens.clear();
+        summary_ranges.clear();
         currently_live.clear();
+        safepoint_values.clear();
         safepoints.clear();
         live_across_any_safepoint.clear();
     }
 
-    /// Given that we've initialized `self.post_order`, reserve capacity for the
-    /// various data structures we use during our analysis.
+    /// Given that we've initialized `self.post_order` and `self.dense`,
+    /// reserve capacity for the various data structures we use during our
+    /// analysis.
     fn reserve_capacity(&mut self, func: &Function) {
         let LivenessAnalysis {
             dfs: _,
@@ -332,20 +561,31 @@ impl LivenessAnalysis {
             block_to_index,
             predecessors,
             worklist,
+            dense,
             live_ins,
             live_outs,
-            currently_live: _,
-            safepoints: _,
+            scratch: _,
+            kills: _,
+            gens: _,
+            summary_ranges,
+            currently_live,
+            safepoint_values: _,
+            safepoints,
             live_across_any_safepoint: _,
         } = self;
 
         block_to_index.resize(func.dfg.num_blocks());
+        safepoints.resize(func.dfg.num_insts());
 
         let capacity = post_order.len();
         worklist.reserve(capacity);
         predecessors.resize(capacity, Default::default());
-        live_ins.resize(capacity, Default::default());
-        live_outs.resize(capacity, Default::default());
+        if live_ins.len() < capacity {
+            live_ins.resize_with(capacity, Vec::new);
+            live_outs.resize_with(capacity, Vec::new);
+        }
+        summary_ranges.reserve(capacity + 1);
+        currently_live.reset(dense.len());
     }
 
     fn initialize_block_to_index_map(&mut self) {
@@ -366,11 +606,63 @@ impl LivenessAnalysis {
         }
     }
 
+    /// Summarize each block as the needs-stack-map values it defines and
+    /// those it uses before defining them, by the same backwards walk as
+    /// `process_block` starting from an empty live set.
+    fn initialize_block_summaries(&mut self, func: &Function) {
+        for block_index in 0..self.post_order.len() {
+            let block = self.post_order[block_index];
+            self.summary_ranges.push((
+                u32::try_from(self.kills.len()).unwrap(),
+                u32::try_from(self.gens.len()).unwrap(),
+            ));
+
+            let mut option_inst = func.layout.last_inst(block);
+            while let Some(inst) = option_inst {
+                for val in func.dfg.inst_results(inst) {
+                    self.summarize_def(func, *val);
+                }
+                for val in func.dfg.inst_values(inst) {
+                    let val = func.dfg.resolve_aliases(val);
+                    if let Some(index) = self.dense.get(val) {
+                        self.currently_live.insert(index);
+                    }
+                }
+                option_inst = func.layout.prev_inst(inst);
+            }
+            for val in func.dfg.block_params(block) {
+                self.summarize_def(func, *val);
+            }
+
+            // What remains live is the block's upward-exposed uses. Clear the
+            // scratch set for the next block.
+            let (kills_start, gens_start) = *self.summary_ranges.last().unwrap();
+            self.kills[kills_start as usize..].sort_unstable();
+            self.gens.extend_from_slice(self.currently_live.members());
+            self.gens[gens_start as usize..].sort_unstable();
+            self.currently_live.remove_all();
+        }
+        self.summary_ranges.push((
+            u32::try_from(self.kills.len()).unwrap(),
+            u32::try_from(self.gens.len()).unwrap(),
+        ));
+    }
+
+    fn summarize_def(&mut self, func: &Function, val: ir::Value) {
+        debug_assert!(!func.dfg.value_is_alias(val));
+        if let Some(index) = self.dense.get(val) {
+            self.currently_live.remove(index);
+            self.kills.push(index);
+        }
+    }
+
     /// Process a value's definition, removing it from the currently-live set.
     fn process_def(&mut self, func: &Function, val: ir::Value) {
         debug_assert!(!func.dfg.value_is_alias(val));
-        if self.currently_live.remove(&val) {
-            log::trace!("liveness:   defining {val:?}, removing it from the live set");
+        if let Some(index) = self.dense.get(val) {
+            if self.currently_live.remove(index) {
+                log::trace!("liveness:   defining {val:?}, removing it from the live set");
+            }
         }
     }
 
@@ -380,23 +672,45 @@ impl LivenessAnalysis {
             "liveness:   found safepoint: {inst:?}: {}",
             func.dfg.display_inst(inst)
         );
-        log::trace!("liveness:     live set = {:?}", self.currently_live);
 
-        let mut live = self.currently_live.iter().copied().collect::<SmallVec<_>>();
-        // Keep order deterministic since we add stack map entries in this
-        // order.
-        live.sort();
-        debug_assert!(live.iter().all(|v| !func.dfg.value_is_alias(*v)));
+        // Ascending dense indices are ascending values: keep order
+        // deterministic since we add stack map entries in this order.
+        self.scratch.clear();
+        self.scratch
+            .extend_from_slice(self.currently_live.members());
+        self.scratch.sort_unstable();
+        let start = u32::try_from(self.safepoint_values.len()).unwrap();
+        for &index in &self.scratch {
+            let val = self.dense.values[index as usize];
+            debug_assert!(!func.dfg.value_is_alias(val));
+            self.safepoint_values.push(val);
+            self.live_across_any_safepoint.insert(val);
+        }
+        let end = u32::try_from(self.safepoint_values.len()).unwrap();
+        log::trace!(
+            "liveness:     live set = {:?}",
+            &self.safepoint_values[start as usize..end as usize]
+        );
 
-        self.live_across_any_safepoint.extend(live.iter().copied());
-        self.safepoints.insert(inst, live);
+        debug_assert_eq!(self.safepoints[inst].start, u32::MAX);
+        self.safepoints[inst] = SafepointLive { start, end };
+    }
+
+    /// The values live across `inst`, if it is a recorded safepoint.
+    fn safepoint_live(&self, inst: Inst) -> Option<&[ir::Value]> {
+        match self.safepoints.get(inst) {
+            Some(live) if live.start != u32::MAX => {
+                Some(&self.safepoint_values[live.start as usize..live.end as usize])
+            }
+            _ => None,
+        }
     }
 
     /// Process a use of a needs-stack-map value, inserting it into the
     /// currently-live set.
-    fn process_use(&mut self, func: &Function, inst: Inst, val: Value) {
+    fn process_use(&mut self, func: &Function, inst: Inst, val: Value, index: u32) {
         debug_assert!(!func.dfg.value_is_alias(val));
-        if self.currently_live.insert(val) {
+        if self.currently_live.insert(index) {
             log::trace!(
                 "liveness:   found use of {val:?}, marking it live: {inst:?}: {}",
                 func.dfg.display_inst(inst)
@@ -404,21 +718,17 @@ impl LivenessAnalysis {
         }
     }
 
-    /// Process all the instructions in a block in reverse order.
-    fn process_block(
-        &mut self,
-        func: &mut Function,
-        stack_map_values: &EntitySet<ir::Value>,
-        block_index: usize,
-        record_safepoints: RecordSafepoints,
-    ) {
+    /// Process all the instructions in a block in reverse order, recording
+    /// the live set at each safepoint.
+    fn process_block(&mut self, func: &mut Function, block_index: usize) {
         let block = self.post_order[block_index];
         log::trace!("liveness: traversing {block:?}");
 
         // Reset the currently-live set to this block's live-out set.
-        self.currently_live.clear();
-        self.currently_live
-            .extend(self.live_outs[block_index].iter().copied());
+        self.currently_live.remove_all();
+        for &index in &self.live_outs[block_index] {
+            self.currently_live.insert(index);
+        }
 
         // Now process this block's instructions, incrementally building its
         // live-in set inside the currently-live set.
@@ -429,18 +739,17 @@ impl LivenessAnalysis {
                 self.process_def(func, *val);
             }
 
-            // If this instruction is a safepoint and we've been asked to record
-            // safepoints, then do so.
+            // If this instruction is a safepoint, then record it.
             let opcode = func.dfg.insts[inst].opcode();
-            if record_safepoints == RecordSafepoints::Yes && opcode.is_safepoint() {
+            if opcode.is_safepoint() {
                 self.record_safepoint(func, inst);
             }
 
             // Process any needs-stack-map values used by this instruction.
             for val in func.dfg.inst_values(inst) {
                 let val = func.dfg.resolve_aliases(val);
-                if stack_map_values.contains(val) {
-                    self.process_use(func, inst, val);
+                if let Some(index) = self.dense.get(val) {
+                    self.process_use(func, inst, val, index);
                 }
             }
 
@@ -458,9 +767,11 @@ impl LivenessAnalysis {
     pub fn run(&mut self, func: &mut Function, stack_map_values: &EntitySet<ir::Value>) {
         self.clear();
         self.post_order.extend(self.dfs.post_order_iter(func));
+        self.dense.initialize(func, stack_map_values);
         self.reserve_capacity(func);
         self.initialize_block_to_index_map();
         self.initialize_predecessors_map(func);
+        self.initialize_block_summaries(func);
 
         // Initially enqueue all blocks for processing. We push them in reverse
         // post-order (which yields them in post-order when popped) because if
@@ -473,41 +784,40 @@ impl LivenessAnalysis {
         while let Some(block_index) = self.worklist.pop() {
             let block_index = usize::try_from(block_index).unwrap();
 
-            // Because our live sets grow monotonically, we just need to see if
-            // the size changed to determine whether the whole set changed.
-            let initial_live_in_len = self.live_ins[block_index].len();
-
             // The live-out set for a block is the union of the live-in sets of
             // its successors.
             for successor in func.block_successors(self.post_order[block_index]) {
                 let successor_index = self.block_to_index[successor];
                 debug_assert_ne!(successor_index, u32::MAX);
                 let successor_index = usize::try_from(successor_index).unwrap();
-                self.live_outs[block_index].extend(self.live_ins[successor_index].iter().copied());
+                if self.live_ins[successor_index].is_empty() {
+                    continue;
+                }
+                sorted_union(
+                    &mut self.scratch,
+                    &self.live_outs[block_index],
+                    &self.live_ins[successor_index],
+                );
+                core::mem::swap(&mut self.scratch, &mut self.live_outs[block_index]);
             }
-            debug_assert!(
-                self.live_outs[block_index]
-                    .iter()
-                    .all(|v| !func.dfg.value_is_alias(*v))
+
+            // live_in = (live_out - kills) + gens.
+            let (kills_start, gens_start) = self.summary_ranges[block_index];
+            let (kills_end, gens_end) = self.summary_ranges[block_index + 1];
+            sorted_transfer(
+                &mut self.scratch,
+                &self.live_outs[block_index],
+                &self.kills[kills_start as usize..kills_end as usize],
+                &self.gens[gens_start as usize..gens_end as usize],
             );
 
-            // Process the block to compute its live-in set, but do not record
-            // safepoints yet, as we haven't yet processed loop back edges (see
-            // below).
-            self.process_block(func, stack_map_values, block_index, RecordSafepoints::No);
-
-            // The live-in set for a block is the set of values that are still
-            // live after the block's instructions have been processed.
-            self.live_ins[block_index].extend(self.currently_live.iter().copied());
-            debug_assert!(
-                self.live_ins[block_index]
-                    .iter()
-                    .all(|v| !func.dfg.value_is_alias(*v))
-            );
-
-            // If the live-in set changed, then we need to revisit all this
-            // block's predecessors.
-            if self.live_ins[block_index].len() != initial_live_in_len {
+            // Our live sets grow monotonically, so we just need to see if the
+            // size changed to determine whether the whole set changed. If it
+            // did, then we need to revisit all this block's predecessors.
+            debug_assert!(self.scratch.len() >= self.live_ins[block_index].len());
+            let changed = self.scratch.len() != self.live_ins[block_index].len();
+            core::mem::swap(&mut self.scratch, &mut self.live_ins[block_index]);
+            if changed {
                 self.worklist
                     .extend(self.predecessors[block_index].iter().copied());
             }
@@ -517,10 +827,17 @@ impl LivenessAnalysis {
         // each safepoint instruction in each block, backwards from the block's
         // live-out set.
         for block_index in 0..self.post_order.len() {
-            self.process_block(func, stack_map_values, block_index, RecordSafepoints::Yes);
+            self.process_block(func, block_index);
 
+            #[cfg(debug_assertions)]
+            {
+                self.scratch.clear();
+                self.scratch
+                    .extend_from_slice(self.currently_live.members());
+                self.scratch.sort_unstable();
+            }
             debug_assert_eq!(
-                self.currently_live, self.live_ins[block_index],
+                self.scratch, self.live_ins[block_index],
                 "when we recompute the live-in set for a block as part of \
                  computing live sets at each safepoint, we should get the same \
                  result we computed in the fixed-point"
@@ -542,7 +859,7 @@ struct StackSlots {
     /// ever add it to this map, it can remain in a virtual register for the
     /// duration of its lifetime, and we won't replace all its uses with reloads
     /// and all that stuff.
-    stack_slots: HashMap<ir::Value, ir::StackSlot>,
+    stack_slots: SecondaryMap<ir::Value, PackedOption<ir::StackSlot>>,
 
     /// A map from slot size to free stack slots that are not being used
     /// anymore. This allows us to reuse stack slots across multiple values
@@ -561,12 +878,15 @@ impl StackSlots {
     }
 
     fn get(&self, val: ir::Value) -> Option<ir::StackSlot> {
-        self.stack_slots.get(&val).copied()
+        self.stack_slots.get(val).and_then(|slot| slot.expand())
     }
 
     fn get_or_create_stack_slot(&mut self, func: &mut Function, val: ir::Value) -> ir::StackSlot {
         debug_assert!(!func.dfg.value_is_alias(val));
-        *self.stack_slots.entry(val).or_insert_with(|| {
+        if let Some(slot) = self.get(val) {
+            return slot;
+        }
+        let slot = {
             log::trace!("rewriting:     {val:?} needs a stack slot");
             let ty = func.dfg.value_type(val);
             let size = ty.bytes();
@@ -587,7 +907,9 @@ impl StackSlots {
                     slot
                 }
             }
-        })
+        };
+        self.stack_slots[val] = slot.into();
+        slot
     }
 
     fn free_stack_slot(&mut self, size: SlotSize, slot: ir::StackSlot) {
@@ -703,8 +1025,7 @@ impl SafepointSpiller {
 
         let live = self
             .liveness
-            .safepoints
-            .get(&inst)
+            .safepoint_live(inst)
             .expect("should only call `rewrite_safepoint` on safepoint instructions");
 
         for val in live {
@@ -806,13 +1127,16 @@ impl SafepointSpiller {
             // across the whole loop, rather than just at the first use site we
             // see within the loop, which could otherwise lead to incorrect
             // stack slot reuse.
+            //
+            // Ascending dense indices are ascending values, so slots are
+            // assigned in sorted value order.
             vals.extend(
                 self.liveness.live_outs[block_index]
                     .iter()
-                    .copied()
+                    .map(|&index| self.liveness.dense.values[index as usize])
                     .filter(|val| self.liveness.live_across_any_safepoint.contains(*val)),
             );
-            vals.sort_unstable();
+            debug_assert!(vals.is_sorted());
             for val in vals.drain(..) {
                 self.stack_slots.get_or_create_stack_slot(func, val);
             }
@@ -831,7 +1155,7 @@ impl SafepointSpiller {
                 // If this instruction is a safepoint, then we must add stack
                 // map entries for the needs-stack-map values that are live
                 // across it.
-                if self.liveness.safepoints.contains_key(&inst) {
+                if self.liveness.safepoint_live(inst).is_some() {
                     self.rewrite_safepoint(func, inst);
                 }
 
