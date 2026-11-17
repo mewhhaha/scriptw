@@ -129,9 +129,10 @@ accepts `--case <file.js>`.
   ones (native compilation of the RSC program 71.3 G to 49.7 G
   instructions, native code byte-identical).
   Open, largest first: native preparation, still most of a cold start
-  (the single-pass register allocator, the vendored frame-load placement,
-  the rest of the liveness pass; compilation is serial in the embedding
-  API); the native policy: under the same machine conditions Fast takes
+  (6.9 s for the RSC program under Speed on a busy machine; the
+  backtracking allocator and the e-graph pass are the largest parts, and
+  the embedding API compiles serially although two jobs measured 1.7×
+  faster: decide whether to enable it and bound its memory); the native policy: under the same machine conditions Fast takes
   about 0.75 ms an RSC request and 6.6 s to compile, optimization `None`
   with the backtracking allocator 0.33 ms and 8.7 s, and Speed 0.31 to
   0.39 ms and 9.5 s, so Fast's deficit is its allocator; the embedding

@@ -2166,8 +2166,38 @@ compiler fingerprint string, which covers `vendor/`, and every cached
 function body of seven other programs is unchanged. What remains under
 Fast is the single-pass register allocator (13.8 G), the frame-load
 placement in the vendored Wasmtime patch (8.6 G), the rest of the
-liveness pass (7.2 G) and instruction lowering (7.2 G). Speed was checked
-for identity but not counted, and no wall-clock time was measured.
+liveness pass (7.2 G) and instruction lowering (7.2 G).
+
+A second byte-identical pass over the same code vendors regalloc2 0.15.2
+and replaces hash-map clears and repeated walks there, in the frame-load
+placement and in the liveness pass's instruction walks
+([regalloc2 notes](../../vendor/regalloc2-0.15.2/PATCHES.md)). Native
+compilation of the RSC program, now under both policies:
+
+| RSC program · instructions | Fast | Speed |
+| --- | ---: | ---: |
+| Before this pass | 45.00 G | 57.11 G |
+| After | 40.53 G | 50.95 G |
+
+The program and runtime images under both policies and the embedded
+runtime images are identical apart from the fingerprint string, and
+18,453 random functions allocated by the vendored and the registry
+regalloc2 came out equal. Under Speed the backtracking register allocator
+(13.5 G) and the e-graph optimisation (8.5 G) are now the largest parts.
+Per policy, with one host on a busy machine (medians of three):
+
+| Native policy | Request | Native preparation |
+| --- | ---: | ---: |
+| `None` / single-pass (Fast) | 713 µs | 4.22 s |
+| `None` / backtracking | 309 µs | 5.59 s |
+| `Speed` / single-pass | 675 µs | 5.58 s |
+| `Speed` / backtracking (Speed) | 286 µs | 6.85 s |
+
+The embedding API compiles a program's functions on one thread
+(`parallel_compilation(false)` since the first commit, with no recorded
+reason). With two compilation jobs the CLI's native compilation of the
+same bundle took 3.29 s instead of 5.54 s, for 358 MB peak memory instead
+of 244 MB.
 
 Verified on the combined tree `2957071d1`: the engine suite (4,266 tests
 and the doctest pass; the cloud-only runtime cache test fails as before),
