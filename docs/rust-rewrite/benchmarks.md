@@ -2142,10 +2142,9 @@ Verified on the combined tree `2957071d1`: the engine suite (4,266 tests
 and the doctest pass; the cloud-only runtime cache test fails as before),
 the emitter's unit tests (684 pass; the thousand-method size test fails as
 before) and six integration binaries, the lowering crate's 2,408 tests,
-the source guards, and 29 Test262 subtrees for the deferred globals and
-constructors (all passing; eleven more, from `built-ins/Promise` to
-`built-ins/BigInt`, were still running when this was written). Wall-clock
-panels were not remeasured for this section.
+the source guards, and 40 Test262 subtrees for the deferred globals and
+constructors (7,510 cases, all passing). Wall-clock panels were not
+remeasured for this section.
 
 ### Descriptor work and physical allocation
 
