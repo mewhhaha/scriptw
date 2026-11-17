@@ -97,24 +97,25 @@ accepts `--case <file.js>`.
   A third run, on source `875fb7647`, has 268 against 308 µs sync and 333
   against 329 µs async, so the async request is level with `--jitless`
   rather than reliably ahead. The eight-process campaign on the same cloud
-  machine, with two CPUs for every actor, is the published panel: Speed
-  takes 0.270 and 0.303 ms, Fast 0.651 and 0.743 ms, and Node with its JIT
-  0.153 and 0.171 ms ([measurement](benchmarks.md#react-server-components)).
-  It has no hardware counters or CPU isolation; a campaign on a quiet local
-  machine would tighten it. Still to decide: whether Speed or Fast is the
-  default policy (every instruction count above is Speed) and whether the
-  CPU baseline stays x86-64 without SSE4.1.
-  The other panels were remeasured there on 2026-11-16 too. They show where
-  the next costs are: a fresh entry cost about 0.08 ms before the program
-  ran, most of fifteen of the seventeen kernel workloads and 4 to 21% of an
-  edge batch (Scriptc's floor is 0.03 ms); the React SSR render takes
-  8.1 ms against V8's 0.65 ms; and in the focused situations Speed is
-  behind V8 by 10 to 20× on an empty retained call (3 µs against 0.24),
-  observed `arguments`, a bound global alias, singleton comparisons and
+  machine, with two CPUs for every actor, is the published panel: on
+  2026-11-17 Speed takes 0.269 and 0.294 ms, Fast 0.675 and 0.777 ms, and
+  Node with its JIT 0.166 and 0.178 ms, so Speed is 1.6× Node
+  ([measurement](benchmarks.md#react-server-components)). It has no
+  hardware counters or CPU isolation; a campaign on a quiet local machine
+  would tighten it. Speed is now the embedding default; still to decide
+  whether the CPU baseline stays x86-64 without SSE4.1.
+  The other panels were remeasured on 2026-11-17 with a calibration check
+  (unchanged V8 and Scriptc binaries within 3% of 2026-11-16). A fresh
+  entry now costs about 0.05 ms before the program runs (Scriptc 0.03 ms),
+  3 to 15% of an edge batch; Scriptw is faster than V8 in 7 of 17 kernels
+  and than Scriptc in 15; the React SSR render takes 7.3 ms against V8's
+  0.63 ms; and in the focused situations Speed is behind V8 in 12 of 21,
+  most on observed `arguments` (29×), a bound global alias (16×), an empty
+  retained call (3 µs against 0.24), singleton and `typeof` dispatch and
   32 to 128 branch sites.
   Demand-built intrinsics and one-call global publication (ABI 82) halve
-  the fresh entry in instructions (`integer.js` 275,100 to 135,512); the
-  kernel and edge panels have not been remeasured with it. Left there: the
+  the fresh entry in instructions (`integer.js` 275,100 to 135,512). Left
+  there: the
   pooled funcref table fill (about 31,000, needs a decision between a
   chunked table and a faster null fill in the vendored runtime), Realm
   creation's remaining 7 eager constructors and 39 prototypes, and the
@@ -140,10 +141,10 @@ accepts `--case <file.js>`.
   Test262 keep their internal Fast dispatch; program Wasm size (about 68
   bytes per source byte); the inference prepass that lowers every body
   twice; and `String` keys in the lowering maps.
-  The 2026-11-17 remeasurement of the panels is not published: the same
-  V8 and Scriptc binaries ran 25% and 16% slower than on 2026-11-16, so
-  the shared machine was in a different state. Rerun it when the
-  2026-11-16 RSC host under Speed measures about 0.27 ms again.
+  A first 2026-11-17 remeasurement was discarded: the same V8 and Scriptc
+  binaries ran 25% and 16% slower than on 2026-11-16. The published one
+  ran after the 2026-11-16 RSC host under Speed measured about 0.27 ms
+  again, as published.
   What remains, by size on that request: read record hits
   (`cached_property_read`, 224K own for 1,171 sync calls after its entry
   began dispatching on the record's hint with one `br_table` and keeping

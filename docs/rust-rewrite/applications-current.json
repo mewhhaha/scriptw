@@ -1,10 +1,10 @@
 {
   "archive": {
-    "bytes": 1191740,
-    "expanded_utf8_bytes": 38867148,
-    "file": "application-benchmarks-20261116-inert.tar.xz",
-    "regular_utf8_members": 792,
-    "sha256": "d1090d677cc311975527fd326f8cddc0dd639ed64c2ed5c008aead5fbe22c2dd"
+    "bytes": 1191244,
+    "expanded_utf8_bytes": 38875519,
+    "file": "application-benchmarks-20261117-inert.tar.xz",
+    "regular_utf8_members": 794,
+    "sha256": "72c91454ff98cd2218f40f4198a40e04040e9e130819d0df6904cd9558642102"
   },
   "coverage": {
     "browser_processes": 8,
@@ -76,7 +76,7 @@
       "case": "client-mount",
       "owner": "Scriptw compiler/runtime host APIs",
       "scope": "standalone",
-      "stage": "source-to-wasm"
+      "stage": "execution"
     },
     {
       "actor": "scriptc",
@@ -86,7 +86,7 @@
       "stage": "source-to-wasm"
     }
   ],
-  "finished_at": "2026-11-16T23:11:32.053528+00:00",
+  "finished_at": "2026-11-17T23:03:05.737410+00:00",
   "limits": "Fresh-entry portable corpus and retained-Realm Web/DOM references have different timing boundaries. No pooled ratio across them, significance claim, full React support, deployed edge platform throughput or conformance acceptance. Timed-out child RSS/CPU samples are unavailable, not zero.",
   "machine": {
     "portable": {
@@ -96,14 +96,14 @@
       ],
       "architecture": "x86_64",
       "cpu_model": "Intel(R) Xeon(R) Processor @ 2.30GHz",
-      "kernel": "6.18.44-fc-v470",
+      "kernel": "6.18.44-fc-v553",
       "logical_cpus": 4,
       "resources": {
         "affinity": [
           2,
           3
         ],
-        "inherited_memory_cap_bytes": 14338772992,
+        "inherited_memory_cap_bytes": 14338760704,
         "scope": "managed cloud machine: shared virtual CPUs, inherited memory cap, no kernel-enforced 4 GiB budget and no cgroup OOM event record"
       },
       "system": "Linux"
@@ -111,13 +111,13 @@
     "react": {
       "architecture": "x86_64",
       "cpu_model": "Intel(R) Xeon(R) Processor @ 2.30GHz",
-      "kernel": "6.18.44-fc-v470",
+      "kernel": "6.18.44-fc-v553",
       "logical_cpus": 4,
       "system": "Linux"
     },
     "summary": "Intel(R) Xeon(R) Processor @ 2.30GHz (4 vCPUs), two pinned CPUs for every actor, inherited 13.4 GiB cloud memory cap"
   },
-  "measurement_commit": "190d631406fa50100c8cbf93d7366f0c2982c890",
+  "measurement_commit": "d2948d61990177157f0bf44c3c5df477b2ba214d",
   "portable": [
     {
       "actors": {
@@ -125,18 +125,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 471757.0,
-              "process_peak_rss_bytes": 13950976.0
+              "entry_wall_ns": 476217.5,
+              "process_peak_rss_bytes": 14401536.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 478590.5,
-              "process_peak_rss_bytes": 14004224.0
+              "entry_wall_ns": 469844.0,
+              "process_peak_rss_bytes": 14243840.0
             }
           ],
-          "entry_wall_ns": 478485.5,
-          "process_peak_rss_bytes": 13971456.0,
-          "process_wall_ns": 172011774.0,
+          "entry_wall_ns": 469844.0,
+          "process_peak_rss_bytes": 14352384.0,
+          "process_wall_ns": 165225597.0,
           "processes": 8,
           "status": "sampled"
         },
@@ -144,18 +144,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 628969.5,
-              "process_peak_rss_bytes": 20656128.0
+              "entry_wall_ns": 636459.5,
+              "process_peak_rss_bytes": 20914176.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 678039.0,
-              "process_peak_rss_bytes": 20774912.0
+              "entry_wall_ns": 626425.0,
+              "process_peak_rss_bytes": 20934656.0
             }
           ],
-          "entry_wall_ns": 663686.5,
-          "process_peak_rss_bytes": 20709376.0,
-          "process_wall_ns": 246456474.5,
+          "entry_wall_ns": 630983.0,
+          "process_peak_rss_bytes": 20920320.0,
+          "process_wall_ns": 239889984.0,
           "processes": 8,
           "status": "sampled"
         },
@@ -163,18 +163,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 256342.5,
-              "process_peak_rss_bytes": 55662592.0
+              "entry_wall_ns": 248420.5,
+              "process_peak_rss_bytes": 66537472.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 264063.0,
-              "process_peak_rss_bytes": 55777280.0
+              "entry_wall_ns": 272190.5,
+              "process_peak_rss_bytes": 66506752.0
             }
           ],
-          "entry_wall_ns": 260632.0,
-          "process_peak_rss_bytes": 55738368.0,
-          "process_wall_ns": 42825531.5,
+          "entry_wall_ns": 250985.5,
+          "process_peak_rss_bytes": 66525184.0,
+          "process_wall_ns": 40165993.5,
           "processes": 8,
           "status": "sampled"
         }
@@ -187,18 +187,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 385800.5,
-              "process_peak_rss_bytes": 13950976.0
+              "entry_wall_ns": 414848.5,
+              "process_peak_rss_bytes": 14403584.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 403172.5,
-              "process_peak_rss_bytes": 14002176.0
+              "entry_wall_ns": 398522.5,
+              "process_peak_rss_bytes": 14352384.0
             }
           ],
-          "entry_wall_ns": 394391.0,
-          "process_peak_rss_bytes": 13998080.0,
-          "process_wall_ns": 163149602.5,
+          "entry_wall_ns": 407704.0,
+          "process_peak_rss_bytes": 14395392.0,
+          "process_wall_ns": 161368788.5,
           "processes": 8,
           "status": "sampled"
         },
@@ -206,18 +206,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 375641.0,
-              "process_peak_rss_bytes": 20054016.0
+              "entry_wall_ns": 363295.5,
+              "process_peak_rss_bytes": 20262912.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 503563.0,
-              "process_peak_rss_bytes": 20002816.0
+              "entry_wall_ns": 349061.0,
+              "process_peak_rss_bytes": 20221952.0
             }
           ],
-          "entry_wall_ns": 425790.5,
-          "process_peak_rss_bytes": 20043776.0,
-          "process_wall_ns": 242363452.5,
+          "entry_wall_ns": 351775.0,
+          "process_peak_rss_bytes": 20221952.0,
+          "process_wall_ns": 234128142.0,
           "processes": 8,
           "status": "sampled"
         },
@@ -225,18 +225,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 144397.0,
-              "process_peak_rss_bytes": 55650304.0
+              "entry_wall_ns": 159325.0,
+              "process_peak_rss_bytes": 66535424.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 149039.5,
-              "process_peak_rss_bytes": 55736320.0
+              "entry_wall_ns": 153637.5,
+              "process_peak_rss_bytes": 66480128.0
             }
           ],
-          "entry_wall_ns": 148685.0,
-          "process_peak_rss_bytes": 55687168.0,
-          "process_wall_ns": 40257997.0,
+          "entry_wall_ns": 153637.5,
+          "process_peak_rss_bytes": 66500608.0,
+          "process_wall_ns": 37094460.0,
           "processes": 8,
           "status": "sampled"
         }
@@ -249,18 +249,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 695602.0,
-              "process_peak_rss_bytes": 14002176.0
+              "entry_wall_ns": 703715.5,
+              "process_peak_rss_bytes": 14348288.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 743098.0,
-              "process_peak_rss_bytes": 13983744.0
+              "entry_wall_ns": 698862.5,
+              "process_peak_rss_bytes": 14219264.0
             }
           ],
-          "entry_wall_ns": 717779.0,
-          "process_peak_rss_bytes": 13983744.0,
-          "process_wall_ns": 168358686.5,
+          "entry_wall_ns": 703362.0,
+          "process_peak_rss_bytes": 14301184.0,
+          "process_wall_ns": 165894688.0,
           "processes": 8,
           "status": "sampled"
         },
@@ -268,18 +268,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 955738.0,
-              "process_peak_rss_bytes": 21479424.0
+              "entry_wall_ns": 941031.0,
+              "process_peak_rss_bytes": 21360640.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 1000185.0,
-              "process_peak_rss_bytes": 21426176.0
+              "entry_wall_ns": 957181.0,
+              "process_peak_rss_bytes": 21383168.0
             }
           ],
-          "entry_wall_ns": 986391.0,
-          "process_peak_rss_bytes": 21463040.0,
-          "process_wall_ns": 248227227.0,
+          "entry_wall_ns": 952804.5,
+          "process_peak_rss_bytes": 21372928.0,
+          "process_wall_ns": 247251825.0,
           "processes": 8,
           "status": "sampled"
         },
@@ -287,18 +287,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 410508.0,
-              "process_peak_rss_bytes": 55916544.0
+              "entry_wall_ns": 423262.5,
+              "process_peak_rss_bytes": 66662400.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 462128.5,
-              "process_peak_rss_bytes": 55873536.0
+              "entry_wall_ns": 405271.0,
+              "process_peak_rss_bytes": 66705408.0
             }
           ],
-          "entry_wall_ns": 434871.0,
-          "process_peak_rss_bytes": 55891968.0,
-          "process_wall_ns": 44141883.0,
+          "entry_wall_ns": 410805.5,
+          "process_peak_rss_bytes": 66668544.0,
+          "process_wall_ns": 40584460.0,
           "processes": 8,
           "status": "sampled"
         }
@@ -311,18 +311,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 376802.5,
-              "process_peak_rss_bytes": 13920256.0
+              "entry_wall_ns": 383312.5,
+              "process_peak_rss_bytes": 14309376.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 359103.0,
-              "process_peak_rss_bytes": 13973504.0
+              "entry_wall_ns": 431365.5,
+              "process_peak_rss_bytes": 14323712.0
             }
           ],
-          "entry_wall_ns": 363710.5,
-          "process_peak_rss_bytes": 13973504.0,
-          "process_wall_ns": 165686956.5,
+          "entry_wall_ns": 383312.5,
+          "process_peak_rss_bytes": 14323712.0,
+          "process_wall_ns": 166286754.0,
           "processes": 8,
           "status": "sampled"
         },
@@ -330,18 +330,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 397118.0,
-              "process_peak_rss_bytes": 19664896.0
+              "entry_wall_ns": 337374.5,
+              "process_peak_rss_bytes": 20310016.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 368925.0,
-              "process_peak_rss_bytes": 20133888.0
+              "entry_wall_ns": 320015.0,
+              "process_peak_rss_bytes": 20355072.0
             }
           ],
-          "entry_wall_ns": 380741.5,
-          "process_peak_rss_bytes": 20039680.0,
-          "process_wall_ns": 242036176.0,
+          "entry_wall_ns": 333169.0,
+          "process_peak_rss_bytes": 20326400.0,
+          "process_wall_ns": 235981570.5,
           "processes": 8,
           "status": "sampled"
         },
@@ -349,18 +349,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 131493.0,
-              "process_peak_rss_bytes": 55420928.0
+              "entry_wall_ns": 158208.5,
+              "process_peak_rss_bytes": 66304000.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 134014.5,
-              "process_peak_rss_bytes": 55422976.0
+              "entry_wall_ns": 127776.0,
+              "process_peak_rss_bytes": 66279424.0
             }
           ],
-          "entry_wall_ns": 131493.0,
-          "process_peak_rss_bytes": 55422976.0,
-          "process_wall_ns": 41679581.5,
+          "entry_wall_ns": 134938.0,
+          "process_peak_rss_bytes": 66297856.0,
+          "process_wall_ns": 37232452.5,
           "processes": 8,
           "status": "sampled"
         }
@@ -373,18 +373,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 676339.0,
-              "process_peak_rss_bytes": 13975552.0
+              "entry_wall_ns": 627661.5,
+              "process_peak_rss_bytes": 14229504.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 669968.0,
-              "process_peak_rss_bytes": 13977600.0
+              "entry_wall_ns": 663492.5,
+              "process_peak_rss_bytes": 14374912.0
             }
           ],
-          "entry_wall_ns": 672652.0,
-          "process_peak_rss_bytes": 13977600.0,
-          "process_wall_ns": 171707570.0,
+          "entry_wall_ns": 646218.5,
+          "process_peak_rss_bytes": 14336000.0,
+          "process_wall_ns": 165702555.0,
           "processes": 8,
           "status": "sampled"
         },
@@ -392,18 +392,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 1781339.0,
-              "process_peak_rss_bytes": 22609920.0
+              "entry_wall_ns": 1665049.5,
+              "process_peak_rss_bytes": 22681600.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 1813142.0,
-              "process_peak_rss_bytes": 22468608.0
+              "entry_wall_ns": 1723659.0,
+              "process_peak_rss_bytes": 22804480.0
             }
           ],
-          "entry_wall_ns": 1791490.5,
-          "process_peak_rss_bytes": 22536192.0,
-          "process_wall_ns": 256722087.5,
+          "entry_wall_ns": 1698481.0,
+          "process_peak_rss_bytes": 22765568.0,
+          "process_wall_ns": 256967021.0,
           "processes": 8,
           "status": "sampled"
         },
@@ -411,18 +411,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 736084.5,
-              "process_peak_rss_bytes": 57493504.0
+              "entry_wall_ns": 746442.0,
+              "process_peak_rss_bytes": 68319232.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 738528.5,
-              "process_peak_rss_bytes": 57524224.0
+              "entry_wall_ns": 851825.0,
+              "process_peak_rss_bytes": 68333568.0
             }
           ],
-          "entry_wall_ns": 738528.5,
-          "process_peak_rss_bytes": 57524224.0,
-          "process_wall_ns": 49707777.0,
+          "entry_wall_ns": 746442.0,
+          "process_peak_rss_bytes": 68333568.0,
+          "process_wall_ns": 46284944.0,
           "processes": 8,
           "status": "sampled"
         }
@@ -442,18 +442,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 745155.0,
-              "process_peak_rss_bytes": 20795392.0
+              "entry_wall_ns": 655589.5,
+              "process_peak_rss_bytes": 21106688.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 739325.0,
-              "process_peak_rss_bytes": 20670464.0
+              "entry_wall_ns": 720467.0,
+              "process_peak_rss_bytes": 21178368.0
             }
           ],
-          "entry_wall_ns": 741740.5,
-          "process_peak_rss_bytes": 20736000.0,
-          "process_wall_ns": 246248871.0,
+          "entry_wall_ns": 676950.5,
+          "process_peak_rss_bytes": 21147648.0,
+          "process_wall_ns": 241481074.5,
           "processes": 8,
           "status": "sampled"
         },
@@ -461,18 +461,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 288850.5,
-              "process_peak_rss_bytes": 56645632.0
+              "entry_wall_ns": 277834.0,
+              "process_peak_rss_bytes": 67477504.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 300771.0,
-              "process_peak_rss_bytes": 56662016.0
+              "entry_wall_ns": 302405.0,
+              "process_peak_rss_bytes": 67432448.0
             }
           ],
-          "entry_wall_ns": 296431.0,
-          "process_peak_rss_bytes": 56662016.0,
-          "process_wall_ns": 45026918.0,
+          "entry_wall_ns": 301984.0,
+          "process_peak_rss_bytes": 67459072.0,
+          "process_wall_ns": 39069580.5,
           "processes": 8,
           "status": "sampled"
         }
@@ -492,18 +492,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 8184301.5,
-              "process_peak_rss_bytes": 105711616.0
+              "entry_wall_ns": 6913873.0,
+              "process_peak_rss_bytes": 101128192.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 7820001.0,
-              "process_peak_rss_bytes": 105988096.0
+              "entry_wall_ns": 8509313.0,
+              "process_peak_rss_bytes": 101138432.0
             }
           ],
-          "entry_wall_ns": 8135219.5,
-          "process_peak_rss_bytes": 105936896.0,
-          "process_wall_ns": 443243754.5,
+          "entry_wall_ns": 7310061.0,
+          "process_peak_rss_bytes": 101138432.0,
+          "process_wall_ns": 415883959.0,
           "processes": 8,
           "status": "sampled"
         },
@@ -511,18 +511,18 @@
           "blocks": [
             {
               "block": 0,
-              "entry_wall_ns": 694330.0,
-              "process_peak_rss_bytes": 57884672.0
+              "entry_wall_ns": 607192.5,
+              "process_peak_rss_bytes": 68653056.0
             },
             {
               "block": 1,
-              "entry_wall_ns": 641967.5,
-              "process_peak_rss_bytes": 57862144.0
+              "entry_wall_ns": 667120.0,
+              "process_peak_rss_bytes": 68646912.0
             }
           ],
-          "entry_wall_ns": 648375.5,
-          "process_peak_rss_bytes": 57862144.0,
-          "process_wall_ns": 55046325.5,
+          "entry_wall_ns": 632352.5,
+          "process_peak_rss_bytes": 68646912.0,
+          "process_wall_ns": 47587808.5,
           "processes": 8,
           "status": "sampled"
         }
@@ -531,28 +531,28 @@
     }
   ],
   "react_reference_medians_ms": {
-    "hydrate": 1.265,
-    "mount": 1.1675,
-    "rsc-async": 0.3989845,
-    "rsc-sync": 0.4080175,
-    "update": 1.255,
-    "web-json": 1.211187,
-    "web-url": 0.9113695
+    "hydrate": 1.47,
+    "mount": 1.2125,
+    "rsc-async": 0.445347,
+    "rsc-sync": 0.400178,
+    "update": 1.27,
+    "web-json": 1.2084115,
+    "web-url": 0.932221
   },
   "reports": {
     "portable": {
-      "path": "target/bench-20261116/applications/campaign/portable/report.json",
-      "sha256": "f008787182ccc01855872ef5589cb60b14f5f81c4707e002d0d94b5fcf4eccb8"
+      "path": "target/bench-20261117/applications/campaign/portable/report.json",
+      "sha256": "46e124b03bbb9ebc5f2c658bbac66f59b13f1f6349acaae2aa67be20c296321b"
     },
     "react": {
-      "path": "target/bench-20261116/applications/campaign/react/report.json",
-      "sha256": "f993f94adc15e19820b5faca2ea7f33c29a517eedf6153670be6a1ca2c2b162c"
+      "path": "target/bench-20261117/applications/campaign/react/report.json",
+      "sha256": "23fd3373314f8fdc70d22166c88f51052748b0ae629168d29f3a0c61fb769878"
     }
   },
   "repository_root": "/home/user/scriptw",
   "schema": "scriptw-application-charts-v1",
-  "source_commit": "a48dfc3e6270f62dcb2b5d2a82eb7a555017693f",
-  "source_fingerprint": "067e69797abb56860fd19ddd9c0fbc74eb6af8a79cb9e2fea2ea51aadaa1b140",
+  "source_commit": "d2948d61990177157f0bf44c3c5df477b2ba214d",
+  "source_fingerprint": "697c47c22eb076d2772580c12b8470bcc1505f205601943e245f951e4c8230b4",
   "standalone": [
     {
       "actor": "scriptw",
@@ -613,9 +613,9 @@
     {
       "actor": "scriptw",
       "case": "client-mount",
-      "stage": "source-to-wasm",
+      "stage": "execution",
       "status": "failed",
-      "timed_out": true
+      "timed_out": false
     },
     {
       "actor": "scriptc",
@@ -625,7 +625,7 @@
       "timed_out": false
     }
   ],
-  "started_at": "2026-11-16T23:08:35.934303+00:00",
+  "started_at": "2026-11-17T23:00:30.017341+00:00",
   "status": "complete_descriptive_benchmarks_with_explicit_failures",
   "versions": {
     "chromium": "153.0.8010.12",

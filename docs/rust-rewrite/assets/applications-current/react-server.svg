@@ -8,7 +8,7 @@
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
     <dc:title>Node · Flight and Web APIs</dc:title>
-    <dc:description>{"boundary": "Complete async operation", "renderer": {"matplotlib": "3.11.2", "script_sha256": "6ffeb486e07e25da534f4738313d65d387d183c0d81e4844cc003646a89ee40b", "shared_renderer_sha256": "679c42803b48b75a24699b8609046e5e13ebbfaab3d1359409ca8f6d0f6035df"}, "rows": [{"case": "rsc-sync", "process_medians_ns": {"maximum": 633561, "median": 408017.5, "minimum": 389841, "p90": 633561, "p95": 633561, "samples": [411665, 404370, 402443, 389841, 417101, 633561, 418729, 402234]}, "processes": [{"block": 0, "entry_wall_ns": {"maximum": 526825, "median": 411665, "minimum": 381433, "p90": 526825, "p95": 526825, "samples": [381433, 526825, 441720, 407786, 397147, 411665, 426666]}, "process": 0}, {"block": 0, "entry_wall_ns": {"maximum": 3647386, "median": 404370, "minimum": 338949, "p90": 3647386, "p95": 3647386, "samples": [407208, 3647386, 404370, 379268, 338949, 479200, 349617]}, "process": 1}, {"block": 0, "entry_wall_ns": {"maximum": 532136, "median": 402443, "minimum": 354236, "p90": 532136, "p95": 532136, "samples": [402443, 416572, 408998, 354355, 354236, 532136, 386294]}, "process": 2}, {"block": 0, "entry_wall_ns": {"maximum": 1448763, "median": 389841, "minimum": 361166, "p90": 1448763, "p95": 1448763, "samples": [361166, 388766, 620548, 1448763, 389841, 479896, 364894]}, "process": 3}, {"block": 1, "entry_wall_ns": {"maximum": 516628, "median": 417101, "minimum": 322590, "p90": 516628, "p95": 516628, "samples": [367779, 487227, 465661, 417101, 322590, 516628, 396146]}, "process": 0}, {"block": 1, "entry_wall_ns": {"maximum": 959056, "median": 633561, "minimum": 462389, "p90": 959056, "p95": 959056, "samples": [703098, 633561, 462389, 593892, 678584, 959056, 632683]}, "process": 1}, {"block": 1, "entry_wall_ns": {"maximum": 535070, "median": 418729, "minimum": 389540, "p90": 535070, "p95": 535070, "samples": [389540, 535070, 394791, 433234, 418729, 498901, 405794]}, "process": 2}, {"block": 1, "entry_wall_ns": {"maximum": 445229, "median": 402234, "minimum": 338965, "p90": 445229, "p95": 445229, "samples": [372287, 402234, 415155, 391605, 338965, 426494, 445229]}, "process": 3}]}, {"case": "rsc-async", "process_medians_ns": {"maximum": 421140, "median": 398984.5, "minimum": 366225, "p90": 421140, "p95": 421140, "samples": [383484, 421140, 404151, 410089, 366225, 393818, 379705, 414700]}, "processes": [{"block": 0, "entry_wall_ns": {"maximum": 454408, "median": 383484, "minimum": 341711, "p90": 454408, "p95": 454408, "samples": [383484, 389530, 360300, 341711, 374585, 454408, 397750]}, "process": 0}, {"block": 0, "entry_wall_ns": {"maximum": 3686171, "median": 421140, "minimum": 372793, "p90": 3686171, "p95": 3686171, "samples": [420857, 372793, 403813, 3686171, 421140, 604408, 1221342]}, "process": 1}, {"block": 0, "entry_wall_ns": {"maximum": 1469305, "median": 404151, "minimum": 374558, "p90": 1469305, "p95": 1469305, "samples": [404151, 374558, 429124, 374820, 385999, 511416, 1469305]}, "process": 2}, {"block": 0, "entry_wall_ns": {"maximum": 1834712, "median": 410089, "minimum": 355524, "p90": 1834712, "p95": 1834712, "samples": [421240, 379161, 410089, 357730, 355524, 506922, 1834712]}, "process": 3}, {"block": 1, "entry_wall_ns": {"maximum": 1455188, "median": 366225, "minimum": 327869, "p90": 1455188, "p95": 1455188, "samples": [354632, 366225, 431491, 360708, 327869, 441479, 1455188]}, "process": 0}, {"block": 1, "entry_wall_ns": {"maximum": 523788, "median": 393818, "minimum": 364751, "p90": 523788, "p95": 523788, "samples": [379236, 392584, 413166, 364751, 403204, 523788, 393818]}, "process": 1}, {"block": 1, "entry_wall_ns": {"maximum": 489286, "median": 379705, "minimum": 343361, "p90": 489286, "p95": 489286, "samples": [344139, 379705, 383037, 343361, 379109, 489286, 477069]}, "process": 2}, {"block": 1, "entry_wall_ns": {"maximum": 1314221, "median": 414700, "minimum": 324837, "p90": 1314221, "p95": 1314221, "samples": [386782, 414700, 473319, 402715, 324837, 472975, 1314221]}, "process": 3}]}, {"case": "web-url", "process_medians_ns": {"maximum": 930388, "median": 911369.5, "minimum": 875614, "p90": 930388, "p95": 930388, "samples": [875614, 929515, 926321, 897451, 922902, 899837, 879926, 930388]}, "processes": [{"block": 0, "entry_wall_ns": {"maximum": 2224390, "median": 875614, "minimum": 586854, "p90": 2224390, "p95": 2224390, "samples": [868632, 1131712, 1701688, 875614, 816073, 2224390, 586854]}, "process": 0}, {"block": 0, "entry_wall_ns": {"maximum": 1671976, "median": 929515, "minimum": 621193, "p90": 1671976, "p95": 1671976, "samples": [879191, 1195301, 1671976, 929515, 1112264, 621193, 712868]}, "process": 1}, {"block": 0, "entry_wall_ns": {"maximum": 1597631, "median": 926321, "minimum": 623331, "p90": 1597631, "p95": 1597631, "samples": [926321, 1125004, 1597631, 995049, 833775, 623331, 714131]}, "process": 2}, {"block": 0, "entry_wall_ns": {"maximum": 2388208, "median": 897451, "minimum": 624407, "p90": 2388208, "p95": 2388208, "samples": [914300, 1191677, 2388208, 848356, 897451, 624407, 715112]}, "process": 3}, {"block": 1, "entry_wall_ns": {"maximum": 1727740, "median": 922902, "minimum": 701809, "p90": 1727740, "p95": 1727740, "samples": [922902, 1396325, 1727740, 743008, 1046075, 723515, 701809]}, "process": 0}, {"block": 1, "entry_wall_ns": {"maximum": 1740691, "median": 899837, "minimum": 684368, "p90": 1740691, "p95": 1740691, "samples": [902982, 1177627, 1740691, 789954, 899837, 743428, 684368]}, "process": 1}, {"block": 1, "entry_wall_ns": {"maximum": 1674115, "median": 879926, "minimum": 666718, "p90": 1674115, "p95": 1674115, "samples": [990508, 1398881, 1674115, 879926, 850146, 672989, 666718]}, "process": 2}, {"block": 1, "entry_wall_ns": {"maximum": 1656407, "median": 930388, "minimum": 640069, "p90": 1656407, "p95": 1656407, "samples": [853395, 1061184, 1656407, 930388, 1369641, 640069, 712714]}, "process": 3}]}, {"case": "web-json", "process_medians_ns": {"maximum": 2273499, "median": 1211187.0, "minimum": 1138555, "p90": 2273499, "p95": 2273499, "samples": [1158521, 1157459, 1138555, 1188068, 1329091, 1234306, 2273499, 1575103]}, "processes": [{"block": 0, "entry_wall_ns": {"maximum": 2433914, "median": 1158521, "minimum": 884224, "p90": 2433914, "p95": 2433914, "samples": [2202583, 1158521, 1038273, 1732237, 2433914, 1040930, 884224]}, "process": 0}, {"block": 0, "entry_wall_ns": {"maximum": 2255794, "median": 1157459, "minimum": 980511, "p90": 2255794, "p95": 2255794, "samples": [2032445, 1157459, 1132818, 1719131, 2255794, 994151, 980511]}, "process": 1}, {"block": 0, "entry_wall_ns": {"maximum": 2356162, "median": 1138555, "minimum": 883268, "p90": 2356162, "p95": 2356162, "samples": [2106462, 1138555, 1094559, 1631847, 2356162, 1024932, 883268]}, "process": 2}, {"block": 0, "entry_wall_ns": {"maximum": 3140745, "median": 1188068, "minimum": 902651, "p90": 3140745, "p95": 3140745, "samples": [3140745, 1188068, 1114476, 2268605, 2028488, 1077654, 902651]}, "process": 3}, {"block": 1, "entry_wall_ns": {"maximum": 3557259, "median": 1329091, "minimum": 813138, "p90": 3557259, "p95": 3557259, "samples": [3557259, 1163242, 1329091, 1699828, 2104729, 1184641, 813138]}, "process": 0}, {"block": 1, "entry_wall_ns": {"maximum": 2016374, "median": 1234306, "minimum": 917136, "p90": 2016374, "p95": 2016374, "samples": [2016374, 1145214, 1056307, 1743843, 1971616, 1234306, 917136]}, "process": 1}, {"block": 1, "entry_wall_ns": {"maximum": 3998660, "median": 2273499, "minimum": 789961, "p90": 3998660, "p95": 3998660, "samples": [2353270, 1195775, 1568770, 2273499, 2308892, 3998660, 789961]}, "process": 2}, {"block": 1, "entry_wall_ns": {"maximum": 2080410, "median": 1575103, "minimum": 1112407, "p90": 2080410, "p95": 2080410, "samples": [2080410, 1112407, 1991111, 1575103, 2078288, 1286828, 1143039]}, "process": 3}]}], "source_commit": "a48dfc3e6270f62dcb2b5d2a82eb7a555017693f", "source_fingerprint": "067e69797abb56860fd19ddd9c0fbc74eb6af8a79cb9e2fea2ea51aadaa1b140"}</dc:description>
+    <dc:description>{"boundary": "Complete async operation", "renderer": {"matplotlib": "3.11.2", "script_sha256": "6ffeb486e07e25da534f4738313d65d387d183c0d81e4844cc003646a89ee40b", "shared_renderer_sha256": "679c42803b48b75a24699b8609046e5e13ebbfaab3d1359409ca8f6d0f6035df"}, "rows": [{"case": "rsc-sync", "process_medians_ns": {"maximum": 820930, "median": 400178.0, "minimum": 366268, "p90": 820930, "p95": 820930, "samples": [408529, 379174, 820930, 422537, 393644, 366268, 406712, 383530]}, "processes": [{"block": 0, "entry_wall_ns": {"maximum": 1628944, "median": 408529, "minimum": 352764, "p90": 1628944, "p95": 1628944, "samples": [409637, 532488, 408529, 360354, 352764, 1628944, 398254]}, "process": 0}, {"block": 0, "entry_wall_ns": {"maximum": 2057395, "median": 379174, "minimum": 304529, "p90": 2057395, "p95": 2057395, "samples": [355113, 379174, 2057395, 353315, 304529, 899203, 403282]}, "process": 1}, {"block": 0, "entry_wall_ns": {"maximum": 1483346, "median": 820930, "minimum": 750506, "p90": 1483346, "p95": 1483346, "samples": [815158, 1244718, 1483346, 808911, 750506, 820930, 826750]}, "process": 2}, {"block": 0, "entry_wall_ns": {"maximum": 3722695, "median": 422537, "minimum": 346923, "p90": 3722695, "p95": 3722695, "samples": [428462, 363483, 3722695, 390641, 346923, 654009, 422537]}, "process": 3}, {"block": 1, "entry_wall_ns": {"maximum": 3662735, "median": 393644, "minimum": 353718, "p90": 3662735, "p95": 3662735, "samples": [393644, 366729, 3662735, 372760, 353718, 661933, 403131]}, "process": 0}, {"block": 1, "entry_wall_ns": {"maximum": 1428185, "median": 366268, "minimum": 320185, "p90": 1428185, "p95": 1428185, "samples": [349688, 504827, 366268, 361184, 320185, 1428185, 371791]}, "process": 1}, {"block": 1, "entry_wall_ns": {"maximum": 491947, "median": 406712, "minimum": 387077, "p90": 491947, "p95": 491947, "samples": [406712, 491947, 434744, 390306, 389422, 419494, 387077]}, "process": 2}, {"block": 1, "entry_wall_ns": {"maximum": 3675977, "median": 383530, "minimum": 333723, "p90": 3675977, "p95": 3675977, "samples": [389040, 363479, 366410, 3675977, 333723, 602608, 383530]}, "process": 3}]}, {"case": "rsc-async", "process_medians_ns": {"maximum": 929965, "median": 445347.0, "minimum": 401599, "p90": 929965, "p95": 929965, "samples": [587436, 710390, 412167, 408721, 404618, 401599, 929965, 478527]}, "processes": [{"block": 0, "entry_wall_ns": {"maximum": 3762004, "median": 587436, "minimum": 490008, "p90": 3762004, "p95": 3762004, "samples": [587436, 574965, 3762004, 490008, 506472, 762431, 1710114]}, "process": 0}, {"block": 0, "entry_wall_ns": {"maximum": 1445753, "median": 710390, "minimum": 592895, "p90": 1445753, "p95": 1445753, "samples": [755947, 694293, 710390, 1445753, 686269, 840985, 592895]}, "process": 1}, {"block": 0, "entry_wall_ns": {"maximum": 3635872, "median": 412167, "minimum": 377558, "p90": 3635872, "p95": 3635872, "samples": [412167, 377558, 405620, 3635872, 402836, 441668, 433987]}, "process": 2}, {"block": 0, "entry_wall_ns": {"maximum": 514278, "median": 408721, "minimum": 376339, "p90": 514278, "p95": 514278, "samples": [408721, 382443, 376339, 434857, 395586, 514278, 410866]}, "process": 3}, {"block": 1, "entry_wall_ns": {"maximum": 3709166, "median": 404618, "minimum": 376140, "p90": 3709166, "p95": 3709166, "samples": [386084, 407945, 383806, 3709166, 404618, 430620, 376140]}, "process": 0}, {"block": 1, "entry_wall_ns": {"maximum": 537582, "median": 401599, "minimum": 323364, "p90": 537582, "p95": 537582, "samples": [375431, 381222, 416419, 401599, 323364, 537582, 414893]}, "process": 1}, {"block": 1, "entry_wall_ns": {"maximum": 1090023, "median": 929965, "minimum": 435219, "p90": 1090023, "p95": 1090023, "samples": [929965, 968026, 1090023, 1026294, 693961, 485475, 435219]}, "process": 2}, {"block": 1, "entry_wall_ns": {"maximum": 1222180, "median": 478527, "minimum": 388868, "p90": 1222180, "p95": 1222180, "samples": [520507, 500778, 438894, 478527, 388868, 469516, 1222180]}, "process": 3}]}, {"case": "web-url", "process_medians_ns": {"maximum": 1068294, "median": 932221.0, "minimum": 779591, "p90": 1068294, "p95": 1068294, "samples": [915451, 969812, 1068294, 903099, 946969, 779591, 930903, 933539]}, "processes": [{"block": 0, "entry_wall_ns": {"maximum": 1579964, "median": 915451, "minimum": 632806, "p90": 1579964, "p95": 1579964, "samples": [1122312, 1148076, 1579964, 915451, 820168, 671571, 632806]}, "process": 0}, {"block": 0, "entry_wall_ns": {"maximum": 1632159, "median": 969812, "minimum": 584790, "p90": 1632159, "p95": 1632159, "samples": [969812, 1224967, 1632159, 1087294, 824436, 652536, 584790]}, "process": 1}, {"block": 0, "entry_wall_ns": {"maximum": 2090577, "median": 1068294, "minimum": 685766, "p90": 2090577, "p95": 2090577, "samples": [1035393, 1747226, 2090577, 1249511, 1068294, 685766, 720355]}, "process": 2}, {"block": 0, "entry_wall_ns": {"maximum": 1700488, "median": 903099, "minimum": 676297, "p90": 1700488, "p95": 1700488, "samples": [903099, 1014094, 1700488, 907370, 851859, 676297, 689491]}, "process": 3}, {"block": 1, "entry_wall_ns": {"maximum": 4388537, "median": 946969, "minimum": 681800, "p90": 4388537, "p95": 4388537, "samples": [893226, 946969, 4388537, 848739, 1247731, 681800, 1155078]}, "process": 0}, {"block": 1, "entry_wall_ns": {"maximum": 1559123, "median": 779591, "minimum": 650054, "p90": 1559123, "p95": 1559123, "samples": [877459, 1098198, 1559123, 779591, 751663, 650054, 683534]}, "process": 1}, {"block": 1, "entry_wall_ns": {"maximum": 1651246, "median": 930903, "minimum": 736937, "p90": 1651246, "p95": 1651246, "samples": [949716, 1228133, 1651246, 897923, 895994, 930903, 736937]}, "process": 2}, {"block": 1, "entry_wall_ns": {"maximum": 1985729, "median": 933539, "minimum": 658321, "p90": 1985729, "p95": 1985729, "samples": [892243, 1161024, 1985729, 933539, 836171, 658321, 970133]}, "process": 3}]}, {"case": "web-json", "process_medians_ns": {"maximum": 1400727, "median": 1208411.5, "minimum": 1120309, "p90": 1400727, "p95": 1400727, "samples": [1196142, 1128457, 1231975, 1243436, 1172389, 1120309, 1400727, 1220681]}, "processes": [{"block": 0, "entry_wall_ns": {"maximum": 2559169, "median": 1196142, "minimum": 842236, "p90": 2559169, "p95": 2559169, "samples": [2559169, 1138988, 1196142, 1684278, 2199530, 1077694, 842236]}, "process": 0}, {"block": 0, "entry_wall_ns": {"maximum": 2174969, "median": 1128457, "minimum": 932274, "p90": 2174969, "p95": 2174969, "samples": [2174969, 1088860, 1128457, 1723687, 2050649, 995741, 932274]}, "process": 1}, {"block": 0, "entry_wall_ns": {"maximum": 2186645, "median": 1231975, "minimum": 840010, "p90": 2186645, "p95": 2186645, "samples": [2053720, 1065600, 1006612, 1370415, 2186645, 1231975, 840010]}, "process": 2}, {"block": 0, "entry_wall_ns": {"maximum": 2156008, "median": 1243436, "minimum": 992054, "p90": 2156008, "p95": 2156008, "samples": [2156008, 1243436, 1146473, 1729491, 2114001, 992054, 1238345]}, "process": 3}, {"block": 1, "entry_wall_ns": {"maximum": 2483858, "median": 1172389, "minimum": 826208, "p90": 2483858, "p95": 2483858, "samples": [2483858, 1172389, 1163119, 1764660, 2255137, 965382, 826208]}, "process": 0}, {"block": 1, "entry_wall_ns": {"maximum": 1981419, "median": 1120309, "minimum": 833066, "p90": 1981419, "p95": 1981419, "samples": [1981419, 1120309, 1047673, 1572955, 1900706, 953113, 833066]}, "process": 1}, {"block": 1, "entry_wall_ns": {"maximum": 2141717, "median": 1400727, "minimum": 884624, "p90": 2141717, "p95": 2141717, "samples": [2141717, 1139964, 1100566, 1617663, 2042020, 1400727, 884624]}, "process": 2}, {"block": 1, "entry_wall_ns": {"maximum": 3075405, "median": 1220681, "minimum": 836798, "p90": 3075405, "p95": 3075405, "samples": [2625687, 1220681, 1166028, 3075405, 2107654, 1037983, 836798]}, "process": 3}]}], "source_commit": "d2948d61990177157f0bf44c3c5df477b2ba214d", "source_fingerprint": "697c47c22eb076d2772580c12b8470bcc1505f205601943e245f951e4c8230b4"}</dc:description>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -53,79 +53,79 @@ L 138.24 47.952
     </g>
     <g id="xtick_2">
      <g id="line2d_3">
-      <path d="M 190.918139 218.448
-L 190.918139 47.952
+      <path d="M 191.039131 218.448
+L 191.039131 47.952
 " clip-path="url(#p52ee150631)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_4"/>
      <g id="text_2">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="190.918139" y="234.805422" transform="rotate(-0 190.918139 234.805422)">0.2</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="191.039131" y="234.805422" transform="rotate(-0 191.039131 234.805422)">0.2</text>
      </g>
     </g>
     <g id="xtick_3">
      <g id="line2d_5">
-      <path d="M 243.596278 218.448
-L 243.596278 47.952
+      <path d="M 243.838262 218.448
+L 243.838262 47.952
 " clip-path="url(#p52ee150631)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_6"/>
      <g id="text_3">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="243.596278" y="234.805422" transform="rotate(-0 243.596278 234.805422)">0.4</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="243.838262" y="234.805422" transform="rotate(-0 243.838262 234.805422)">0.4</text>
      </g>
     </g>
     <g id="xtick_4">
      <g id="line2d_7">
-      <path d="M 296.274416 218.448
-L 296.274416 47.952
+      <path d="M 296.637393 218.448
+L 296.637393 47.952
 " clip-path="url(#p52ee150631)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_8"/>
      <g id="text_4">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="296.274416" y="234.805422" transform="rotate(-0 296.274416 234.805422)">0.6</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="296.637393" y="234.805422" transform="rotate(-0 296.637393 234.805422)">0.6</text>
      </g>
     </g>
     <g id="xtick_5">
      <g id="line2d_9">
-      <path d="M 348.952555 218.448
-L 348.952555 47.952
+      <path d="M 349.436523 218.448
+L 349.436523 47.952
 " clip-path="url(#p52ee150631)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_10"/>
      <g id="text_5">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="348.952555" y="234.805422" transform="rotate(-0 348.952555 234.805422)">0.8</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="349.436523" y="234.805422" transform="rotate(-0 349.436523 234.805422)">0.8</text>
      </g>
     </g>
     <g id="xtick_6">
      <g id="line2d_11">
-      <path d="M 401.630694 218.448
-L 401.630694 47.952
+      <path d="M 402.235654 218.448
+L 402.235654 47.952
 " clip-path="url(#p52ee150631)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_12"/>
      <g id="text_6">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="401.630694" y="234.805422" transform="rotate(-0 401.630694 234.805422)">1.0</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="402.235654" y="234.805422" transform="rotate(-0 402.235654 234.805422)">1.0</text>
      </g>
     </g>
     <g id="xtick_7">
      <g id="line2d_13">
-      <path d="M 454.308833 218.448
-L 454.308833 47.952
+      <path d="M 455.034785 218.448
+L 455.034785 47.952
 " clip-path="url(#p52ee150631)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_14"/>
      <g id="text_7">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="454.308833" y="234.805422" transform="rotate(-0 454.308833 234.805422)">1.2</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="455.034785" y="234.805422" transform="rotate(-0 455.034785 234.805422)">1.2</text>
      </g>
     </g>
     <g id="xtick_8">
      <g id="line2d_15">
-      <path d="M 506.986972 218.448
-L 506.986972 47.952
+      <path d="M 507.833916 218.448
+L 507.833916 47.952
 " clip-path="url(#p52ee150631)" style="fill: none; stroke: #eaeef2; stroke-width: 0.8; stroke-linecap: square"/>
      </g>
      <g id="line2d_16"/>
      <g id="text_8">
-      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="506.986972" y="234.805422" transform="rotate(-0 506.986972 234.805422)">1.4</text>
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="507.833916" y="234.805422" transform="rotate(-0 507.833916 234.805422)">1.4</text>
      </g>
     </g>
     <g id="text_9">
@@ -160,24 +160,24 @@ L 506.986972 47.952
    </g>
    <g id="patch_3">
     <path d="M 138.24 55.701818
-L 245.708013 55.701818
-L 245.708013 81.534545
+L 243.885253 55.701818
+L 243.885253 81.534545
 L 138.24 81.534545
 z
 " clip-path="url(#p52ee150631)" style="fill: #de8b36"/>
    </g>
    <g id="patch_4">
     <path d="M 138.24 98.756364
-L 243.328804 98.756364
-L 243.328804 124.589091
+L 255.809673 98.756364
+L 255.809673 124.589091
 L 138.24 124.589091
 z
 " clip-path="url(#p52ee150631)" style="fill: #de8b36"/>
    </g>
    <g id="patch_5">
     <path d="M 138.24 141.810909
-L 378.286245 141.810909
-L 378.286245 167.643636
+L 384.342293 141.810909
+L 384.342293 167.643636
 L 138.24 167.643636
 z
 " clip-path="url(#p52ee150631)" style="fill: #de8b36"/>
@@ -196,16 +196,16 @@ L 552.96 218.448
 " style="fill: none; stroke: #000000; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
    </g>
    <g id="text_14">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="250.708013" y="71.475604" transform="rotate(-0 250.708013 71.475604)">0.408</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="248.885253" y="71.475604" transform="rotate(-0 248.885253 71.475604)">0.400</text>
    </g>
    <g id="text_15">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="248.328804" y="114.530149" transform="rotate(-0 248.328804 114.530149)">0.399</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="260.809673" y="114.530149" transform="rotate(-0 260.809673 114.530149)">0.445</text>
    </g>
    <g id="text_16">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="383.286245" y="157.584695" transform="rotate(-0 383.286245 157.584695)">0.911</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="389.342293" y="157.584695" transform="rotate(-0 389.342293 157.584695)">0.932</text>
    </g>
    <g id="text_17">
-    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="462.255385" y="200.63924" transform="rotate(-0 462.255385 200.63924)">1.211</text>
+    <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start" x="462.255385" y="200.63924" transform="rotate(-0 462.255385 200.63924)">1.208</text>
    </g>
    <g id="text_18">
     <text style="font-weight: 700; font-size: 13.2px; font-family: 'DejaVu Sans'; text-anchor: start" x="138.24" y="32.952" transform="rotate(-0 138.24 32.952)">Node · Flight and Web APIs</text>
