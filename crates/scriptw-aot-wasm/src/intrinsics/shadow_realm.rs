@@ -1,4 +1,5 @@
 //! Each Realm owns its ShadowRealm constructor, prototype and native methods.
+//! The prototype is built with the Realm; the constructor on first canonical read.
 
 use super::super::*;
 use super::IntrinsicPropertyLayoutId;
@@ -30,13 +31,8 @@ impl FunctionBuilder<'_> {
             &prototype,
             function,
         );
-        let constructor = self.init_builtin_constructor_object(
-            StandardBuiltinId::ShadowRealmConstructor,
-            realm,
-            &prototype,
-            function,
-        )?;
-        constructor.clear(function);
+        // The constructor is a crate::heap::DemandConstructor: its first
+        // canonical read, or the prototype's constructor row, builds it.
         prototype.clear(function);
         object.clear(function);
         Ok(())

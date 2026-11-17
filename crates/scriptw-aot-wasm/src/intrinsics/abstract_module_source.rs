@@ -30,12 +30,8 @@ impl FunctionBuilder<'_> {
             &prototype,
             function,
         );
-        let constructor = self.init_builtin_constructor_object(
-            StandardBuiltinId::AbstractModuleSourceConstructor,
-            realm,
-            &prototype,
-            function,
-        )?;
+        // The constructor is a crate::heap::DemandConstructor: its first
+        // canonical read, or the prototype's constructor row, builds it.
         // The host source kind has one stable prototype in this defining Realm.
         // Its parent is the abstract intrinsic, not Object.prototype.
         let source_prototype = schema.reserve_gc_local(function).initialize(
@@ -50,7 +46,6 @@ impl FunctionBuilder<'_> {
             function,
         );
         source_prototype.clear(function);
-        constructor.clear(function);
         prototype.clear(function);
         object.clear(function);
         Ok(())

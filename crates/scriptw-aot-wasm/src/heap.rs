@@ -336,6 +336,11 @@ runtime_scalar_domain!(DemandConstructor, 0, {
     Set = 18,
     Symbol = 19,
     BigInt = 20,
+    ShadowRealm = 21,
+    ReadableStream = 22,
+    ReadableStreamDefaultReader = 23,
+    ReadableByteStreamController = 24,
+    AbstractModuleSource = 25,
 });
 
 impl DemandConstructor {
@@ -363,6 +368,11 @@ impl DemandConstructor {
             Self::Set => B::SetConstructor,
             Self::Symbol => B::SymbolConstructor,
             Self::BigInt => B::BigIntConstructor,
+            Self::ShadowRealm => B::ShadowRealmConstructor,
+            Self::ReadableStream => B::ReadableStreamConstructor,
+            Self::ReadableStreamDefaultReader => B::ReadableStreamDefaultReaderConstructor,
+            Self::ReadableByteStreamController => B::ReadableByteStreamControllerConstructor,
+            Self::AbstractModuleSource => B::AbstractModuleSourceConstructor,
         }
     }
 
@@ -390,6 +400,11 @@ impl DemandConstructor {
             Self::Set => S::SetConstructor,
             Self::Symbol => S::SymbolConstructor,
             Self::BigInt => S::BigIntConstructor,
+            Self::ShadowRealm => S::ShadowRealmConstructor,
+            Self::ReadableStream => S::ReadableStreamConstructor,
+            Self::ReadableStreamDefaultReader => S::ReadableStreamDefaultReaderConstructor,
+            Self::ReadableByteStreamController => S::ReadableByteStreamControllerConstructor,
+            Self::AbstractModuleSource => S::AbstractModuleSourceConstructor,
         }
     }
 
@@ -419,6 +434,11 @@ impl DemandConstructor {
             Self::Set => S::SetPrototype,
             Self::Symbol => S::SymbolPrototype,
             Self::BigInt => S::BigIntPrototype,
+            Self::ShadowRealm => S::ShadowRealmPrototype,
+            Self::ReadableStream => S::ReadableStreamPrototype,
+            Self::ReadableStreamDefaultReader => S::ReadableStreamDefaultReaderPrototype,
+            Self::ReadableByteStreamController => S::ReadableByteStreamControllerPrototype,
+            Self::AbstractModuleSource => S::AbstractModuleSourcePrototype,
         }
     }
 

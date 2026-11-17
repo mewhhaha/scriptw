@@ -153,7 +153,11 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 80 adds the fresh_data_properties_publish R helper: a new global
 // object receives all of its bindings in one call that sizes its dictionary
 // once and inserts keys the compiler proved distinct without probing.
-const LAYOUT_VERSION: u32 = 80;
+// Version 81 adds ShadowRealm, AbstractModuleSource, ReadableStream,
+// ReadableStreamDefaultReader and ReadableByteStreamController to the demand
+// constructor domain: their slots start as the Undefined placeholder and the
+// DeferredDemandConstructor recipe word gains five values.
+const LAYOUT_VERSION: u32 = 81;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

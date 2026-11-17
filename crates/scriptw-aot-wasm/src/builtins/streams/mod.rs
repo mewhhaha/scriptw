@@ -75,19 +75,18 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<(), EmitError> {
         use crate::intrinsics::IntrinsicPropertyLayoutId as Layout;
-        for (ctor, slot, layout) in [
+        // Each constructor is a crate::heap::DemandConstructor: its first
+        // canonical read, or its prototype's constructor row, builds it.
+        for (slot, layout) in [
             (
-                StandardBuiltinId::ReadableStreamConstructor,
                 Slot::ReadableStreamPrototype,
                 Layout::ReadableStreamPrototype,
             ),
             (
-                StandardBuiltinId::ReadableStreamDefaultReaderConstructor,
                 Slot::ReadableStreamDefaultReaderPrototype,
                 Layout::ReadableStreamDefaultReaderPrototype,
             ),
             (
-                StandardBuiltinId::ReadableByteStreamControllerConstructor,
                 Slot::ReadableByteStreamControllerPrototype,
                 Layout::ReadableByteStreamControllerPrototype,
             ),
@@ -105,8 +104,6 @@ impl FunctionBuilder<'_> {
             let prototype = s.reserve_value_local(f);
             prototype.set_reference(&header, s, f);
             self.emit_store_non_array_realm_intrinsic(realm.realm(), slot, &prototype, f);
-            let constructor = self.init_builtin_constructor_object(ctor, realm, &prototype, f)?;
-            constructor.clear(f);
             prototype.clear(f);
             header.clear(f);
         }

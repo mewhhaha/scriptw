@@ -915,8 +915,9 @@ impl<'a> FunctionBuilder<'a> {
         {
             self.emit_initialize_stream_intrinsics(&context, &object_prototype, function)?;
         }
-        // Proxy, Iterator and the constructors in crate::heap::DemandConstructor
-        // are built by their first canonical read (see demand_constructors).
+        // Proxy, Iterator, ShadowRealm, AbstractModuleSource, the stream
+        // constructors and the others in crate::heap::DemandConstructor are
+        // built by their first canonical read (see demand_constructors).
         if self
             .runtime_bootstrap_plan
             .should_initialize_standard_builtin(StandardBuiltinId::ArrayConstructor)
