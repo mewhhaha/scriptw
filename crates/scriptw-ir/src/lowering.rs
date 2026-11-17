@@ -237,6 +237,36 @@ pub(crate) struct GlobalPropertyInfo {
     pub(crate) source: GlobalPropertySource,
 }
 
+impl GlobalPropertyInfo {
+    /// This fact with its heap shape discarded, built without copying the
+    /// shape first.
+    fn without_heap_shape(&self) -> Self {
+        let Self {
+            value_info:
+                ValueInfo {
+                    kind,
+                    possible_kinds,
+                    heap_shape: _,
+                    function_targets,
+                },
+            proven_present,
+            configurable,
+            source,
+        } = self;
+        Self {
+            value_info: ValueInfo {
+                kind: *kind,
+                possible_kinds: *possible_kinds,
+                heap_shape: None,
+                function_targets: function_targets.clone(),
+            },
+            proven_present: *proven_present,
+            configurable: *configurable,
+            source: *source,
+        }
+    }
+}
+
 /// The joined global-property fact immediately before a logical assignment's
 /// possible outer write.
 #[derive(Debug, Clone)]
@@ -5548,6 +5578,17 @@ impl<'a> ScriptLowerer<'a> {
         }
     }
 
+    /// `visit_live_heap_shape_roots` with a visitor that discards every
+    /// shape. Global property facts are rebuilt without their shapes rather
+    /// than copied from the catalog or a shared row and then cleared.
+    fn discard_live_heap_shape_roots(&mut self) {
+        self.global_properties.replace_matching(
+            |_, property| property.value_info.heap_shape.is_some(),
+            |_, property| property.without_heap_shape(),
+        );
+        self.visit_live_heap_shape_roots(|_, _, _| false);
+    }
+
     fn invalidate_unknown_user_code_effects(&mut self) {
         self.observe_live_script_global_values();
         self.invalidate_unknown_user_code_effect_facts();
@@ -5577,7 +5618,7 @@ impl<'a> ScriptLowerer<'a> {
                 binding.function_targets.widen_for_possible_replacement();
             }
         }
-        self.visit_live_heap_shape_roots(|_, _, _| false);
+        self.discard_live_heap_shape_roots();
 
         self.invalidate_all_possible_global_property_value_infos();
         self.global_properties.edit_matching(

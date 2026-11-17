@@ -206,6 +206,26 @@ impl<V: Clone + 'static> CatalogOverlay<V> {
     }
 }
 
+impl<V: 'static> CatalogOverlay<V> {
+    /// Like `edit_matching`, but each selected entry's replacement is built
+    /// from the current entry by reference, so a baseline or shared entry is
+    /// not first copied whole when the edit discards most of it.
+    pub(super) fn replace_matching(
+        &mut self,
+        mut select: impl FnMut(&String, &V) -> bool,
+        mut replace: impl FnMut(&String, &V) -> V,
+    ) {
+        let replacements = self
+            .iter()
+            .filter(|(key, value)| select(key, value))
+            .map(|(key, value)| (key.clone(), replace(key, value)))
+            .collect::<Vec<_>>();
+        for (key, value) in replacements {
+            self.insert(key, value);
+        }
+    }
+}
+
 impl<V: PartialEq + 'static> CatalogOverlay<V> {
     pub(super) fn set_effective(&mut self, key: String, value: Option<V>) {
         self.touch(&key);

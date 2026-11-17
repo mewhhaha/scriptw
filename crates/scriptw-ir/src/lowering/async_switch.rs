@@ -318,7 +318,7 @@ impl<'a> ScriptLowerer<'a> {
                 }
             }
         }
-        self.visit_live_heap_shape_roots(|_, _, _| false);
+        self.discard_live_heap_shape_roots();
         self.static_boolean_bindings.clear();
         self.static_string_bindings.clear();
         self.static_to_string_regexp_object_bindings.clear();
