@@ -144,7 +144,10 @@ accepts `--case <file.js>`.
   the shared machine was in a different state. Rerun it when the
   2026-11-16 RSC host under Speed measures about 0.27 ms again.
   What remains, by size on that request: read record hits
-  (`cached_property_read`, 274K own for 1,259 calls),
+  (`cached_property_read`, 224K own for 1,171 sync calls after its entry
+  began dispatching on the record's hint with one `br_table` and keeping
+  its record, storage and holder in non-null locals; that saved 27K sync
+  and 30K async, and its frame prologue is now the largest part),
   `computed_property_write` (113K, about 245 an append), the general Get
   (118K async), `for_in_advance` (45K) and `hasOwnProperty.call` (34K),
   Promise species and construction in the async request (37K),
