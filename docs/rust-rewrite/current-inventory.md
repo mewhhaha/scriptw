@@ -147,7 +147,13 @@ accepts `--case <file.js>`.
   (`cached_property_read`, 224K own for 1,171 sync calls after its entry
   began dispatching on the record's hint with one `br_table` and keeping
   its record, storage and holder in non-null locals; that saved 27K sync
-  and 30K async, and its frame prologue is now the largest part),
+  and 30K async, and its frame prologue is now the largest part).
+  Compiled functions no longer write their completion state on every
+  normal path, and a Throw test is dropped where every path already
+  proves it is not Throw: 2,864,501 to 2,815,221 instructions sync and
+  3,098,689 to 3,046,837 async, the RSC program 135 KB smaller. About 440
+  runtime-builtin sites still copy a result into the completion before
+  testing it. Still on that request:
   `computed_property_write` (113K, about 245 an append), the general Get
   (118K async), `for_in_advance` (45K) and `hasOwnProperty.call` (34K),
   Promise species and construction in the async request (37K),
