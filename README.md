@@ -39,7 +39,8 @@ methods and limits.
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 
 Medians of eight fresh processes per engine and case, 100 warmups and 101 timed
-requests each. Fast and Speed are Scriptw's two native compilation policies;
+requests each. Fast and Speed are Scriptw's two native compilation policies (Speed is the
+embedding API's default, Fast what `scriptw run` uses);
 Node runs with its JIT. Speed takes 1.8× Node's time, sync and async. With
 V8's JIT off (`node --jitless`), Speed is 7 to 13% ahead sync and level async.
 [Means, tails, warmup curves and limits](docs/rust-rewrite/benchmarks.md#react-server-components) ·
