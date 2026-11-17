@@ -105,6 +105,15 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
+    /// Whether `expression` is a read the projection answers. A fast path that
+    /// would evaluate its base on its own leaves it whole instead, so the read
+    /// keeps the answer from the argument vector.
+    pub(crate) fn is_projected_arguments_read(&self, expression: &TypedExpr) -> bool {
+        self.projected_arguments
+            .as_ref()
+            .is_some_and(|projected| projected.proof.read(expression).is_some())
+    }
+
     pub(crate) fn compile_projected_arguments_read(
         &mut self,
         expression: &TypedExpr,
@@ -114,6 +123,20 @@ impl FunctionBuilder<'_> {
         let Some(projected) = self.projected_arguments.take() else {
             return Ok(false);
         };
+        if projected.proof.own_binding(expression) {
+            // The proof admits the binding only as the base of a read, so this
+            // is a site that took such a read apart and evaluates the base on
+            // its own. The binding holds a placeholder until a read needs the
+            // object: the base is the real object, built now if no read has.
+            let result = self.emit_materialize_projected_arguments(&projected, function);
+            if result.is_ok() {
+                output.copy_from(&projected.materialized, function);
+                self.completion().set_normal(output, function);
+            }
+            self.projected_arguments = Some(projected);
+            result?;
+            return Ok(true);
+        }
         let Some(read) = projected.proof.read(expression) else {
             self.projected_arguments = Some(projected);
             return Ok(false);

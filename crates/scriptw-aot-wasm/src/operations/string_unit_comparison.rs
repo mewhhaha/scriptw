@@ -8,6 +8,7 @@
 use super::*;
 
 struct StringUnitComparison<'a> {
+    read: &'a TypedExpr,
     target: &'a TypedExpr,
     key: &'a PropertyKeyIr,
     literal: &'a TypedExpr,
@@ -44,6 +45,7 @@ impl<'a> StringUnitComparison<'a> {
             return None;
         };
         Some(Self {
+            read,
             target,
             key,
             literal,
@@ -63,6 +65,13 @@ impl FunctionBuilder<'_> {
         let Some(plan) = StringUnitComparison::for_operands(left, right) else {
             return Ok(false);
         };
+        // A strict invocation's projected `arguments[i]` is never a String
+        // base, and the projection answers it from the argument vector only
+        // when it is compiled whole: evaluating its base here would build the
+        // object the projection exists to avoid.
+        if self.is_projected_arguments_read(plan.read) {
+            return Ok(false);
+        }
         let schema = self.runtime_schema();
         let result = schema.reserve_i32_local(function);
         let receiver = schema.reserve_value_local(function);

@@ -152,3 +152,49 @@ print(log.join(" | "));
     let expected = r#"["div",null,{}] | ["div",null,{}] | ["div","7",{"a":1}] | ["Widget",null,{"b":2,"children":"x","size":3,"a":"default"}] | ["Widget","k",{"a":0,"children":["x","y","z"],"size":3}] | false,false,0 | true,false,1 | [object String]13 | [object Arguments]2 | v3receiver>first>second"#;
     run_at_top_level_and_in_a_function(source, expected);
 }
+
+#[test]
+fn one_unit_string_comparisons_read_through_the_projection() {
+    // `arguments[i] === "c"` on either side, under `&&`, after a value
+    // computed into a var, past the count where an inherited getter answers,
+    // and Function.prototype.bind's bound and constructed calls as Test262's
+    // 15.3.4.5-3-1 and 15.3.4.5.2-4-1/-2 make them.
+    let source = r#"
+var log = [];
+function first(x) { "use strict"; return arguments[0] === "a"; }
+function reversed(x) { "use strict"; return "a" === arguments[0]; }
+function differs(x) { "use strict"; return arguments[0] !== "b"; }
+function guarded(x) { "use strict"; return true && arguments[0] === "a"; }
+function second(x) { "use strict"; return x === "a" && arguments[1] === "a"; }
+function viaVar(x) { "use strict"; var y = x === "a"; return y && arguments[0] === "a"; }
+function mixed(x) { "use strict"; return arguments[0] === "a" && arguments[0] === x && arguments.length; }
+log.push([first("a"), first("b"), first(), first("ab"), first(new String("a"))].join(","));
+log.push([reversed("a"), reversed("b"), differs("a"), differs("b"), differs()].join(","));
+log.push([guarded("a"), second("a", "a"), second("a"), second("b", "a"), viaVar("a"), viaVar("b")].join(","));
+log.push([mixed("a"), mixed("a", 2, 3), mixed("b")].join(","));
+// An inherited index getter answers an index past the count.
+Object.defineProperty(Object.prototype, 1, { configurable: true, get: function () { return "a"; } });
+log.push([second("a"), second("a", "b")].join(","));
+delete Object.prototype[1];
+// Function.prototype.bind's bound and constructed calls, as Test262's
+// 15.3.4.5-3-1 and 15.3.4.5.2-4-1/-2 use them.
+var foo = function (x, y) {
+  "use strict";
+  return new Boolean((x + y) === "ab" && arguments[0] === "a" && arguments[1] === "b" && arguments.length === 2);
+};
+log.push(foo.bind({}, "a", "b")() == true, foo.bind({}, "a")("b") == true, foo.bind({}, "b", "a")() == true);
+var func = function (x, y, z) {
+  "use strict";
+  var objResult = {};
+  objResult.returnValue = x + y + z;
+  objResult.returnVerifyResult = arguments[0] === "a" && arguments.length === 3;
+  return objResult;
+};
+var a = new (Function.prototype.bind.call(func, {}, "a", "b", "c"))();
+var b = new (Function.prototype.bind.call(func, {}))("a", "b", "c");
+log.push(a.returnValue, a.returnVerifyResult, b.returnValue, b.returnVerifyResult);
+print(log.join(" | "));
+"#;
+    let expected = r#"true,false,false,false,false | true,false,true,false,true | true,true,false,false,true,false | 1,3,false | true,false | true | true | false | abc | true | abc | true"#;
+    run_at_top_level_and_in_a_function(source, expected);
+}

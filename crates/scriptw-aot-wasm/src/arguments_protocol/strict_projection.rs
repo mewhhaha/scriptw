@@ -157,7 +157,9 @@ impl StrictArgumentsProjection {
         PresentArgumentsObjectProtocol::Unmapped(UnmappedArgumentsPlan { _private: () })
     }
 
-    fn own_binding(&self, value: &TypedExpr) -> bool {
+    /// A read of the binding itself, as the base of an admitted read that an
+    /// emitter fast path evaluates on its own.
+    pub(crate) fn own_binding(&self, value: &TypedExpr) -> bool {
         match &value.expr {
             ExprIr::Arguments => true,
             ExprIr::Identifier(name) => name == LEXICAL_ARGUMENTS_NAME,
@@ -544,6 +546,8 @@ mod tests {
             "function make(a) { 'use strict'; return arguments[(a(),0)]; }",
             "function make(a) { 'use strict'; return arguments[arguments.length - 1]; }",
             "function make(a) { 'use strict'; return arguments.callee; }",
+            // A one-unit String comparison, which has its own fast path.
+            "function make(a) { 'use strict'; return arguments[0] === 'a' && arguments[1] !== 'b'; }",
             "function make(a) { 'use strict'; for (var i = 0; i < arguments.length; i++) a(arguments[i]); }",
             "function make(t, c, d) { 'use strict'; var p = {}, n = arguments.length - 2, k; for (k in c) p[k] = c[k]; if (n === 1) p.children = d; else if (n > 1) { var a = Array(n); for (var i = 0; i < n; i++) a[i] = arguments[i + 2]; p.children = a; } return p; }",
             // A method call on another receiver, as createElement's own-key test.

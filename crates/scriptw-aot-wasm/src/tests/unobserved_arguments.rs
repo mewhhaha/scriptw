@@ -186,3 +186,22 @@ fn strict_reentry_and_property_reads_omit_only_unobserved_arguments() {
         assert!(traffic.depth_guard, "{source}: {traffic:?}");
     }
 }
+
+#[test]
+fn projected_reads_compared_with_one_unit_strings_keep_their_read_sites() {
+    // Each projected read builds the real object behind its own guard, so
+    // the body holds one construction per read site. A one-unit String
+    // comparison must not take the read apart and evaluate the binding,
+    // which holds only a placeholder until a read builds the object.
+    for (source, sites) in [
+        ("function make(x) { 'use strict'; return arguments[0] === 'a'; } make('a');", 1),
+        ("function make(x) { 'use strict'; return 'a' !== arguments[0]; } make('a');", 1),
+        ("function make(x) { 'use strict'; return x === 'a' && arguments[1] === 'a'; } make('a');", 1),
+        ("function make(x) { 'use strict'; var y = x === 'a'; return y && arguments[0] === 'a'; } make('a');", 1),
+        ("function make(x, y) { 'use strict'; return arguments[0] === 'a' && arguments[1] === 'b' && arguments.length === 2; } make('a', 'b');", 3),
+    ] {
+        let traffic = activation_traffic(source);
+        assert_eq!(traffic.arguments, sites, "{source}: {traffic:?}");
+        assert!(traffic.depth_guard, "{source}: {traffic:?}");
+    }
+}
