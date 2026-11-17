@@ -156,6 +156,9 @@ fn settled_idempotent_edit_revisits_exactly_the_keys_mutated_since() {
     let _ = facts.get_mut("b");
     facts.insert("z".to_string(), 0);
     assert_eq!(facts.unsettled_keys(edit, &keys), ["b"]);
+    assert!(facts.is_settled(edit, "a"));
+    assert!(!facts.is_settled(edit, "b"));
+    assert!(!facts.is_settled(edit, "z"));
     facts.set_effective("a".to_string(), Some(5));
     assert_eq!(facts.unsettled_keys(edit, &keys), ["a", "b"]);
     let mut fork = facts.clone();

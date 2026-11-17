@@ -632,7 +632,15 @@ impl<'a> ScriptLowerer<'a> {
         self.merge_function_this_info(function_id, this_info);
     }
 
+    /// Merge an unknown receiver and arguments into `function_id`: the edit
+    /// [`IdempotentEdit::UnknownPropertyHook`] names.
     fn observe_unknown_property_hook(&mut self, function_id: &FunctionId) {
+        if self
+            .function_signatures
+            .is_settled(IdempotentEdit::UnknownPropertyHook, function_id)
+        {
+            return;
+        }
         let unknown = unknown_runtime_value_info();
         self.merge_function_this_info(function_id, unknown.clone());
         self.merge_function_param_infos(

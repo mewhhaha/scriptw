@@ -75,6 +75,15 @@ impl<V: 'static> CatalogOverlay<V> {
         }
     }
 
+    /// Whether `edit` was applied to the entry for `key` as part of the
+    /// settled key set and the entry was not mutated since, so applying it
+    /// again would leave the entry unchanged.
+    pub(super) fn is_settled(&self, edit: IdempotentEdit, key: &str) -> bool {
+        self.settled.as_ref().is_some_and(|settled| {
+            settled.edit == edit && settled.keys.contains(key) && !settled.touched.contains(key)
+        })
+    }
+
     /// Record that `edit` was just applied to every key that
     /// [`Self::unsettled_keys`] returned for `keys`, with no other mutation
     /// in between.
