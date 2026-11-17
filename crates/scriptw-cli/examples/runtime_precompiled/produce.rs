@@ -4,7 +4,10 @@ use std::time::Instant;
 
 pub(super) fn run(fixtures: &Path, output: &Path) -> Result<Value, String> {
     run_with_config(fixtures, output, |config| {
-        scriptw_engine::configure_wasm_runtime(config);
+        scriptw_engine::configure_wasm_runtime(
+            config,
+            scriptw_engine::NativeCompilationPolicy::Fast,
+        );
         Ok(())
     })
 }

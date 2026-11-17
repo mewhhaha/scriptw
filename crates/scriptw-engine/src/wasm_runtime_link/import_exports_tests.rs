@@ -93,7 +93,7 @@ fn state() -> WasmHostState {
 }
 fn engine() -> WasmtimeEngine {
     let mut config = wasmtime::Config::new();
-    configure_wasm_runtime(&mut config);
+    configure_wasm_runtime(&mut config, crate::NativeCompilationPolicy::Fast);
     WasmtimeEngine::new(&config).unwrap()
 }
 fn modules(engine: &WasmtimeEngine, program: &[u8]) -> WasmModules {

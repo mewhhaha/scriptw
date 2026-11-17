@@ -9,7 +9,7 @@ use wasmtime::{
 
 fn engine() -> wasmtime::Engine {
     let mut config = Config::new();
-    configure_wasm_runtime(&mut config);
+    configure_wasm_runtime(&mut config, scriptw_engine::NativeCompilationPolicy::Fast);
     wasmtime::Engine::new(&config).unwrap()
 }
 
@@ -169,7 +169,10 @@ fn precompiled_admission_rejects_old_gc_policy_in_both_directions() {
     let image = EmbeddedRuntime::precompile(&producer, &artifact).unwrap();
 
     let mut old_config = Config::new();
-    configure_wasm_runtime(&mut old_config);
+    configure_wasm_runtime(
+        &mut old_config,
+        scriptw_engine::NativeCompilationPolicy::Fast,
+    );
     old_config
         .gc_heap_reservation(1_u64 << 30)
         .gc_heap_may_move(true);

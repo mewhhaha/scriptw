@@ -132,6 +132,40 @@ fn assert_output(outcome: ObservedRunOutcome, expected: &str) {
 }
 
 #[test]
+fn each_native_policy_sets_its_optimization_and_allocator_and_runs_a_linked_program() {
+    let artifact = artifact(
+        "import {add} from 'dd:host'; print(add(20,22));",
+        registry(false),
+    );
+    assert!(artifact.runtime.is_some(), "the program links the real R");
+    for (policy, optimization, allocator) in [
+        (
+            NativeCompilationPolicy::default(),
+            wasmtime::OptLevel::Speed,
+            wasmtime::RegallocAlgorithm::Backtracking,
+        ),
+        (
+            NativeCompilationPolicy::Fast,
+            wasmtime::OptLevel::None,
+            wasmtime::RegallocAlgorithm::SinglePass,
+        ),
+    ] {
+        let mut config = WasmtimeConfig::new();
+        configure_wasm_runtime(&mut config, policy);
+        let engine = WasmtimeEngine::new(&config).unwrap();
+        assert_eq!(engine.get_cranelift_opt_level(), Some(optimization));
+        assert_eq!(engine.get_cranelift_regalloc_algorithm(), Some(allocator));
+        assert!(!engine.get_parallel_compilation());
+        let runtime = EmbeddedRuntime::compile(&engine, &artifact).unwrap();
+        let mut store = store(&runtime, 0.0);
+        let mut linker = linker(&runtime);
+        runtime.register(&mut store, &mut linker).unwrap();
+        let instance = runtime.instantiate(&mut store, &mut linker).unwrap();
+        assert_output(instance.evaluate(&mut store).unwrap(), "42");
+    }
+}
+
+#[test]
 fn ordinary_linker_numeric_functions_keep_first_class_call_and_strict_number_semantics() {
     let artifact = artifact(
         r#"
@@ -438,7 +472,7 @@ fn undeclared_error_tags_and_foreign_store_engine_lifecycles_are_not_authority()
         .to_string()
         .contains("different Store"));
     let mut config = WasmtimeConfig::new();
-    configure_wasm_runtime(&mut config);
+    configure_wasm_runtime(&mut config, crate::NativeCompilationPolicy::Fast);
     let foreign_engine = WasmtimeEngine::new(&config).unwrap();
     let mut wrong_store = WasmtimeStore::new(
         &foreign_engine,
@@ -502,7 +536,7 @@ fn embedder_fuel_limit_is_not_reset_and_different_foreign_programs_share_unchang
     let scalar = compiler.emit_wasm(&scalar).unwrap();
     assert!(scalar.runtime.is_none());
     let mut config = WasmtimeConfig::new();
-    configure_wasm_runtime(&mut config);
+    configure_wasm_runtime(&mut config, crate::NativeCompilationPolicy::Fast);
     config.consume_fuel(true);
     let engine = WasmtimeEngine::new(&config).unwrap();
     let runtime = EmbeddedRuntime::compile(&engine, &scalar).unwrap();

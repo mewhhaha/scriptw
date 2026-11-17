@@ -35,7 +35,10 @@ fn run() -> Result<(), String> {
     let bytes = fs::read(&args[0]).map_err(|e| e.to_string())?;
     let expected = fs::read(&args[1]).map_err(|e| e.to_string())?;
     let mut config = Config::new();
-    scriptw_engine::configure_wasm_runtime(&mut config);
+    scriptw_engine::configure_wasm_runtime(
+        &mut config,
+        scriptw_engine::NativeCompilationPolicy::Fast,
+    );
     let engine = Engine::new(&config).map_err(|e| e.to_string())?;
     let begin = Instant::now();
     let module = Module::new(&engine, &bytes).map_err(|e| e.to_string())?;

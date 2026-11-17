@@ -24,6 +24,13 @@ or Node's worker APIs. SIMD is not an additional requirement of this policy.
 
 ## Host compatibility
 
+The embedding API's `configure_wasm_runtime` takes a `NativeCompilationPolicy`:
+`Speed` (the default; Cranelift `OptLevel::Speed` with the backtracking
+register allocator) or `Fast` (`OptLevel::None`, single-pass). Scriptw's own
+CLI and Test262 execution choose their native mode internally, as before
+(`Fast` for one-shot runs), and do not use this default. The precompiled runtime image R keeps its own fixed policy
+and loads under either.
+
 Rust embedding entry runs synchronously on the caller thread using a guarded
 64-MiB Wasmtime fiber stack. Synchronous host callbacks retain that thread's
 affinity. Reentrant entry receives an independent 64-MiB scoped-thread stack;

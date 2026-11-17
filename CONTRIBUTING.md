@@ -432,6 +432,8 @@ Repeat `--host NAME=PATH` and select `--policy NAME=speed` to include an explici
 native-policy diagnostic in the same balanced schedule. Each actor retains its
 own policy and source identity; never blend its samples with Fast.
 
+The host's `fast` and `speed` modes are the embedding API's two
+`NativeCompilationPolicy` variants; `speed` is that API's default.
 For excluded compiler-policy diagnostics, `fast-backtracking` and
 `speed-single-pass` cross optimization and register allocation independently.
 Record their actual configuration and separate process cohorts alongside the

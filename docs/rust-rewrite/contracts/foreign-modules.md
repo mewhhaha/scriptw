@@ -143,9 +143,16 @@ workspace pins version 47.0.0 and supplies its checked dependency patches in
 patch set with paths pointing to this checkout; dependency patches are owned
 by the top-level Cargo workspace. The runnable example uses that pinned setup.
 
-`configure_wasm_runtime(&mut Config)` replaces the supplied configuration with
-Scriptw's required capabilities and defaults. Apply custom compilation, fuel
-and interruption settings **after** this call. The embedder then creates its
+`configure_wasm_runtime(&mut Config, NativeCompilationPolicy)` replaces the
+supplied configuration with Scriptw's required capabilities and the chosen
+native policy, which always sets Cranelift's optimization level and register
+allocator together. `NativeCompilationPolicy::default()` is `Speed`
+(`OptLevel::Speed`, backtracking allocator): a program compiled once and run
+many times in retained Realms. `Fast` (`OptLevel::None`, single-pass) compiles
+quickest and suits one-shot runs. On one retained RSC host, a request took
+0.31 to 0.39 ms under `Speed` against about 0.75 ms under `Fast`, for 9.2 to
+9.8 s of native compilation against 6.5 to 6.8 s. Apply fuel and interruption
+settings **after** this call. The embedder then creates its
 Wasmtime `Engine` and calls
 `EmbeddedRuntime::compile(&engine, &artifact)` to admit Portable P and R plus
 their persisted foreign requirements.

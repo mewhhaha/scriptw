@@ -383,7 +383,10 @@ fn portable_retained_host_get_keeps_unread_foreign_intl_separate_from_mutated_en
     // happens through retained host Get after module initialization and GC.
     let artifact = compiler.emit_wasm(&unit).unwrap();
     let mut config = wasmtime::Config::new();
-    scriptw_engine::configure_wasm_runtime(&mut config);
+    scriptw_engine::configure_wasm_runtime(
+        &mut config,
+        scriptw_engine::NativeCompilationPolicy::Fast,
+    );
     let engine = wasmtime::Engine::new(&config).unwrap();
     let runtime = EmbeddedRuntime::compile(&engine, &artifact).unwrap();
     let state = runtime.new_state(RealmBuilder::new().build(), ()).unwrap();

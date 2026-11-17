@@ -12,9 +12,11 @@ mod tests;
 
 /// The normal required Wasmtime runtime, with its native compiler disabled.
 /// Apply fuel/deadline settings separately; configuring compiler options after
-/// this call is unsupported by Wasmtime. Loading never enables a compiler.
+/// this call is unsupported by Wasmtime. Loading never enables a compiler, so
+/// the image's own recorded policy, not this Engine's, determines its code.
 pub fn configure_precompiled_wasm_runtime(config: &mut wasmtime::Config) {
-    configure_wasm_runtime(config);
+    // No compiler runs here; the policy argument is inert once it is disabled.
+    configure_wasm_runtime(config, NativeCompilationPolicy::Fast);
     config.enable_compiler(false);
 }
 

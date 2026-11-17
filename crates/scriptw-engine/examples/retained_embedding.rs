@@ -6,7 +6,8 @@ use scriptw_engine::{
         ForeignResultType, ForeignValueType,
     },
     CompileOptions, EmbeddedEvaluation, EmbeddedRuntime, Engine, ForeignCompleter, ForeignValue,
-    IntlCompilationProfile, JsCompletion, JsPromiseState, JsValue, RealmBuilder, WasmStoreState,
+    IntlCompilationProfile, JsCompletion, JsPromiseState, JsValue, NativeCompilationPolicy,
+    RealmBuilder, WasmStoreState,
 };
 use std::sync::mpsc;
 use std::time::Duration;
@@ -87,7 +88,8 @@ export default {
     // callbacks or a private JavaScript evaluator.
     let artifact = Engine::new(RealmBuilder::new().build()).load_portable_bundle(&bundle)?;
     let mut configuration = wasmtime::Config::new();
-    configure_wasm_runtime(&mut configuration);
+    // The default policy optimizes native code for a program that runs many times.
+    configure_wasm_runtime(&mut configuration, NativeCompilationPolicy::default());
     let engine = wasmtime::Engine::new(&configuration)?;
     let runtime = EmbeddedRuntime::compile(&engine, &artifact)?;
     let state = runtime.new_state(RealmBuilder::new().build(), ())?;

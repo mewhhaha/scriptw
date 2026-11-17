@@ -50,7 +50,7 @@ fn gc_shared_decimal_helper_executes_the_full_unsigned_magnitude_domain() {
         .1
         .clone();
     let mut config = wasmtime::Config::new();
-    crate::configure_wasm_runtime(&mut config);
+    crate::configure_wasm_runtime(&mut config, crate::NativeCompilationPolicy::Fast);
     let engine = wasmtime::Engine::new(&config).unwrap();
     let runtime = crate::EmbeddedRuntime::compile(&engine, &artifact).unwrap();
     let state = runtime.new_state(RealmBuilder::new().build(), ()).unwrap();

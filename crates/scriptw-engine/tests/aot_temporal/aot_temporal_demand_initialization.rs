@@ -359,7 +359,10 @@ fn retained_host_reads_initialize_a_complete_namespace_without_source_references
         .unwrap();
     let artifact = compiler.emit_wasm(&unit).unwrap();
     let mut config = wasmtime::Config::new();
-    scriptw_engine::configure_wasm_runtime(&mut config);
+    scriptw_engine::configure_wasm_runtime(
+        &mut config,
+        scriptw_engine::NativeCompilationPolicy::Fast,
+    );
     let engine = wasmtime::Engine::new(&config).unwrap();
     let runtime = EmbeddedRuntime::compile(&engine, &artifact).unwrap();
     let state = runtime.new_state(RealmBuilder::new().build(), ()).unwrap();

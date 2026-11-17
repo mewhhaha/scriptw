@@ -69,7 +69,8 @@ mod execution_failure;
 pub use embedding::{
     configure_precompiled_wasm_runtime, configure_wasm_runtime, throw_foreign_error,
     EmbeddedEvaluation, EmbeddedInstance, EmbeddedRuntime, ForeignCompleter, ForeignValue,
-    JsCompletion, JsPromiseState, JsValue, JsValueKind, PrecompiledEmbeddedProgram, WasmStoreState,
+    JsCompletion, JsPromiseState, JsValue, JsValueKind, NativeCompilationPolicy,
+    PrecompiledEmbeddedProgram, WasmStoreState,
 };
 mod global_script_prelude;
 mod graph_observation;

@@ -31,7 +31,9 @@ fn write_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
 }
 
 fn configure_producer(config: &mut wasmtime::Config) -> Result<(), String> {
-    scriptw_engine::configure_wasm_runtime(config);
+    // The producer's own SpeedAndSize/backtracking policy replaces either
+    // public policy's optimization level and allocator.
+    scriptw_engine::configure_wasm_runtime(config, scriptw_engine::NativeCompilationPolicy::Fast);
     config.cranelift_opt_level(wasmtime::OptLevel::SpeedAndSize);
     config.cranelift_regalloc_algorithm(wasmtime::RegallocAlgorithm::Backtracking);
     config.wasm_backtrace_details(wasmtime::WasmBacktraceDetails::Disable);

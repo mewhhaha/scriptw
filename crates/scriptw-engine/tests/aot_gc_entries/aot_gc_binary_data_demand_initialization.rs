@@ -325,7 +325,10 @@ export function inspectForeign(C) {
         .unwrap();
     let artifact = compiler.emit_wasm(&unit).unwrap();
     let mut config = wasmtime::Config::new();
-    scriptw_engine::configure_wasm_runtime(&mut config);
+    scriptw_engine::configure_wasm_runtime(
+        &mut config,
+        scriptw_engine::NativeCompilationPolicy::Fast,
+    );
     let engine = wasmtime::Engine::new(&config).unwrap();
     let runtime = EmbeddedRuntime::compile(&engine, &artifact).unwrap();
     // Reuse the same Portable runtime image in two stores. Each store must

@@ -174,7 +174,10 @@ export function properties() {
         .expect("calendar/data-order module compiles");
     let artifact = compiler.emit_wasm(&unit).expect("real P/R module emits");
     let mut config = wasmtime::Config::new();
-    scriptw_engine::configure_wasm_runtime(&mut config);
+    scriptw_engine::configure_wasm_runtime(
+        &mut config,
+        scriptw_engine::NativeCompilationPolicy::Fast,
+    );
     let engine = wasmtime::Engine::new(&config).expect("required experimental Wasmtime features");
     let runtime =
         EmbeddedRuntime::compile(&engine, &artifact).expect("one retained native P/R owner");

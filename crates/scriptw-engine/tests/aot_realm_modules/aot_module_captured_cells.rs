@@ -1,7 +1,8 @@
 use scriptw_engine::{
     CompileOptions, EmbeddedEvaluation, EmbeddedInstance, EmbeddedRuntime, Engine,
-    ExecutionBackend, ForeignValue, HostOutputEvent, JsCompletion, JsValue, ObservedCompletion,
-    RealmBuilder, RunOptions, WasmStoreState, configure_compilation_jobs, configure_wasm_runtime,
+    ExecutionBackend, ForeignValue, HostOutputEvent, JsCompletion, JsValue,
+    NativeCompilationPolicy, ObservedCompletion, RealmBuilder, RunOptions, WasmStoreState,
+    configure_compilation_jobs, configure_wasm_runtime,
 };
 
 fn assert_output(source: &str, module: bool, expected: &[&str]) {
@@ -253,7 +254,7 @@ export function bump(amount) { return counter(amount); }
         .unwrap();
     let artifact = compiler.emit_wasm(&unit).unwrap();
     let mut config = wasmtime::Config::new();
-    configure_wasm_runtime(&mut config);
+    configure_wasm_runtime(&mut config, NativeCompilationPolicy::Fast);
     let native = wasmtime::Engine::new(&config).unwrap();
     // EmbeddedRuntime admission requires the real Portable compilation profile.
     let runtime = EmbeddedRuntime::compile(&native, &artifact).unwrap();
@@ -406,7 +407,7 @@ export function boundaries() {
         .unwrap();
     let artifact = compiler.emit_wasm(&unit).unwrap();
     let mut config = wasmtime::Config::new();
-    configure_wasm_runtime(&mut config);
+    configure_wasm_runtime(&mut config, NativeCompilationPolicy::Fast);
     let native = wasmtime::Engine::new(&config).unwrap();
     let runtime = EmbeddedRuntime::compile(&native, &artifact).unwrap();
     for _ in 0..2 {

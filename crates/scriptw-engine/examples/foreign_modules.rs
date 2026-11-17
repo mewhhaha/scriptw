@@ -6,7 +6,7 @@ use scriptw_engine::{
         ForeignResultType, ForeignValueType,
     },
     CompileOptions, EmbeddedRuntime, Engine, HostOutputEvent, IntlCompilationProfile,
-    ObservedCompletion, RealmBuilder, WasmStoreState,
+    NativeCompilationPolicy, ObservedCompletion, RealmBuilder, WasmStoreState,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,7 +38,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     drop(compiler);
     let artifact = Engine::new(RealmBuilder::new().build()).load_portable_bundle(&bytes)?;
     let mut configuration = wasmtime::Config::new();
-    configure_wasm_runtime(&mut configuration);
+    // The default policy optimizes native code for a program that runs many times.
+    configure_wasm_runtime(&mut configuration, NativeCompilationPolicy::default());
     let engine = wasmtime::Engine::new(&configuration)?;
     let runtime = EmbeddedRuntime::compile(&engine, &artifact)?;
     let state = runtime.new_state(RealmBuilder::new().build(), ())?;

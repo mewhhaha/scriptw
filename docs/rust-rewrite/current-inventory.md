@@ -134,8 +134,9 @@ accepts `--case <file.js>`.
   API); the native policy: under the same machine conditions Fast takes
   about 0.75 ms an RSC request and 6.6 s to compile, optimization `None`
   with the backtracking allocator 0.33 ms and 8.7 s, and Speed 0.31 to
-  0.39 ms and 9.5 s, so Fast's deficit is its allocator and the default
-  for retained programs needs a decision; program Wasm size (about 68
+  0.39 ms and 9.5 s, so Fast's deficit is its allocator; the embedding
+  API now defaults to Speed (`NativeCompilationPolicy`), while the CLI and
+  Test262 keep their internal Fast dispatch; program Wasm size (about 68
   bytes per source byte); the inference prepass that lowers every body
   twice; and `String` keys in the lowering maps.
   The 2026-11-17 remeasurement of the panels is not published: the same

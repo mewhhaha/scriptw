@@ -355,7 +355,10 @@ export function localTime(){return savedDate.getHours()===1 && savedDate.getTime
         .unwrap();
     let artifact = compiler.emit_wasm(&unit).unwrap();
     let mut config = wasmtime::Config::new();
-    scriptw_engine::configure_wasm_runtime(&mut config);
+    scriptw_engine::configure_wasm_runtime(
+        &mut config,
+        scriptw_engine::NativeCompilationPolicy::Fast,
+    );
     let engine = wasmtime::Engine::new(&config).unwrap();
     let runtime = EmbeddedRuntime::compile(&engine, &artifact).unwrap();
     for _ in 0..2 {

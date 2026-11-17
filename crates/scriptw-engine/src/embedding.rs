@@ -95,16 +95,47 @@ pub(super) struct StoreEmbeddingState {
     async_host: ForeignAsyncState,
 }
 
-/// Initialize Scriptw's required Wasmtime configuration. Apply any embedder
-/// compilation or fuel settings after this call. This sets the normal
-/// Fast/copying-GC baseline without epoch checks: compiled code is stopped
-/// through `wasmtime::Store::interrupt_handle`, and callers own that handle
-/// and any deadline. Evaluation neither requests nor cancels an interrupt.
-pub fn configure_wasm_runtime(config: &mut wasmtime::Config) {
-    *config = wasmtime_config::base_config(
-        WasmNativeCompilationMode::Fast,
-        wasmtime::WasmBacktraceDetails::Environment,
-    );
+/// How Cranelift compiles an embedded program: its optimization level and
+/// register allocator, always chosen together.
+///
+/// The default is [`Speed`](Self::Speed). An embedder compiles a program once
+/// and runs it many times in retained Realms, where faster code repays the
+/// longer compilation. [`Fast`](Self::Fast) suits one-shot execution.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub enum NativeCompilationPolicy {
+    /// Cranelift `OptLevel::Speed` with the backtracking register allocator.
+    #[default]
+    Speed,
+    /// Cranelift `OptLevel::None` with the single-pass register allocator:
+    /// the cheapest compilation, at the cost of slower code.
+    Fast,
+}
+
+impl NativeCompilationPolicy {
+    fn settings(self) -> (WasmNativeCompilationMode, wasmtime::RegallocAlgorithm) {
+        match self {
+            Self::Speed => (
+                WasmNativeCompilationMode::Speed,
+                wasmtime::RegallocAlgorithm::Backtracking,
+            ),
+            Self::Fast => (
+                WasmNativeCompilationMode::Fast,
+                wasmtime::RegallocAlgorithm::SinglePass,
+            ),
+        }
+    }
+}
+
+/// Initialize Scriptw's required Wasmtime configuration with a native
+/// compilation `policy` (pass `NativeCompilationPolicy::default()`, Speed,
+/// unless compilation cost dominates). Apply any fuel settings after this
+/// call. This sets the copying-GC baseline without epoch checks: compiled code
+/// is stopped through `wasmtime::Store::interrupt_handle`, and callers own that
+/// handle and any deadline. Evaluation neither requests nor cancels an interrupt.
+pub fn configure_wasm_runtime(config: &mut wasmtime::Config, policy: NativeCompilationPolicy) {
+    let (mode, allocator) = policy.settings();
+    *config = wasmtime_config::base_config(mode, wasmtime::WasmBacktraceDetails::Environment);
+    config.cranelift_regalloc_algorithm(allocator);
     config.parallel_compilation(false);
 }
 
