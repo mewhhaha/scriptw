@@ -38,8 +38,8 @@ use crate::functions::NonArrayRealmIntrinsicSlot;
 use crate::gc_types::{
     ArrayObject, ArrayObjectSchema, FunctionObject, FunctionObjectSchema, JavaScriptObject,
     MapObject, MapObjectSchema, PrimitiveBox, PrimitiveBoxSchema, PromiseObject,
-    PromiseObjectSchema, RealmRecord, SetObject, SetObjectSchema, WeakMapObject,
-    WeakMapObjectSchema, WeakSetObject, WeakSetObjectSchema,
+    PromiseObjectSchema, RealmRecord, ReferenceResultBlock, SetObject, SetObjectSchema,
+    WeakMapObject, WeakMapObjectSchema, WeakSetObject, WeakSetObjectSchema,
 };
 
 /// A compact storage of one of its two sealed layouts.
@@ -165,13 +165,36 @@ const RECEIVER_LAYOUTS: [ReceiverLayout; 9] = [
     ReceiverLayout::Promise,
 ];
 
-impl ReceiverLayout {
-    /// The bits of a site's hint that hold the header layout.
-    const HINT_MASK: i32 = (1 << ReceiverStorage::HINT_SHIFT) - 1;
+// A site's hint holds the header layout below the storage layout.
+const _: () = assert!(RECEIVER_LAYOUTS.len() <= 1 << ReceiverStorage::HINT_SHIFT);
 
+/// Every word a site's hint can hold is below this; the entry's table
+/// branch has one entry for each.
+const HINT_WORDS: i32 = (RECEIVER_STORAGES.len() as i32) << ReceiverStorage::HINT_SHIFT;
+
+/// The (header, storage) layouts a hint sends straight to their casts:
+/// every pair for which some section holds proofs.
+fn hinted_pairs() -> Vec<(ReceiverLayout, ReceiverStorage)> {
+    RECEIVER_LAYOUTS
+        .into_iter()
+        .flat_map(|layout| {
+            RECEIVER_STORAGES
+                .into_iter()
+                .filter(move |storage| storage.has_proofs(layout.class().proofs()))
+                .map(move |storage| (layout, storage))
+        })
+        .collect()
+}
+
+impl ReceiverLayout {
     /// The word of a site's hint for this layout.
     pub(super) const fn word(self) -> i32 {
         self as i32
+    }
+
+    /// The word of a site's hint for this layout on `storage`.
+    const fn hint_word(self, storage: ReceiverStorage) -> i32 {
+        self.word() | storage.word() << ReceiverStorage::HINT_SHIFT
     }
 
     const fn class(self) -> ReceiverClass {
@@ -213,6 +236,12 @@ impl ReceiverStorage {
     const fn word(self) -> i32 {
         self as i32
     }
+
+    /// Whether a section holds proofs for this storage under `proofs`: no
+    /// record names a receiver rule for intrinsic storage.
+    const fn has_proofs(self, proofs: Proofs) -> bool {
+        !matches!((self, proofs), (Self::Intrinsic, Proofs::Composite))
+    }
 }
 
 /// Which of a record's proofs a receiver's header may use.
@@ -235,6 +264,61 @@ impl ReceiverClass {
             Self::Composite => 2,
         }
     }
+
+    const fn proofs(self) -> Proofs {
+        match self {
+            Self::Ordinary | Self::Function => Proofs::Object,
+            Self::Composite => Proofs::Composite,
+        }
+    }
+}
+
+/// The proofs a storage section emits for the receivers it admits; within
+/// an object section, the receiver's `ReceiverClass` still tells an
+/// ordinary object from a function.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Proofs {
+    /// An actual ordinary object or a function: its own records, its
+    /// absence rule and its probed own properties.
+    Object,
+    /// Any other layout: only its absence rule.
+    Composite,
+}
+
+/// One of a pair for each kind of `Proofs`.
+struct ByProofs<T> {
+    object: T,
+    composite: T,
+}
+
+impl<T> ByProofs<T> {
+    fn at(&self, proofs: Proofs) -> &T {
+        match proofs {
+            Proofs::Object => &self.object,
+            Proofs::Composite => &self.composite,
+        }
+    }
+}
+
+/// The blocks that hand each storage section its storage.
+struct StorageSections {
+    intrinsic: ReferenceResultBlock<IntrinsicPropertyStorage>,
+    dictionary: ByProofs<ReferenceResultBlock<OrdinaryPropertyStorage>>,
+    inline: ByProofs<ReferenceResultBlock<InlineCompactDataStorage>>,
+    array: ByProofs<ReferenceResultBlock<ArrayCompactDataStorage>>,
+}
+
+/// What every section of a read entry shares: the site's first record, its
+/// key, the value and found word it answers with, and the label for a
+/// receiver that no record answers.
+#[derive(Clone, Copy)]
+struct ReadReceiver<'a> {
+    head: &'a GcLocal<OwnDataReadCache>,
+    name: &'a GcLocal<StringValue>,
+    key: &'a PropertyKeyLocals,
+    value: &'a ValueLocals,
+    found: I32Local,
+    exhausted: ControlTarget,
 }
 
 impl FunctionBuilder<'_> {
@@ -272,9 +356,13 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
-        let name = s.reserve_gc_local(f).initialize(
+        // Every proof reads the record: one non-null copy is checked once.
+        let head = s
+            .reserve_non_null_gc_local(f)
+            .initialize(record.load(s, f), f);
+        let name = s.reserve_non_null_gc_local(f).initialize(
             s.field(OwnDataReadCacheSchema::KEY)
-                .read(record, s, f)
+                .read(&head, s, f)
                 .reference(),
             f,
         );
@@ -283,7 +371,7 @@ impl FunctionBuilder<'_> {
         let found = s.reserve_i32_local(f);
         let miss = self.open_frame(ControlFrameKind::Block, f);
         // The miss kernel registers a site's first record on its first use.
-        s.field(OwnDataReadCacheSchema::SLOT).read(record, s, f);
+        s.field(OwnDataReadCacheSchema::SLOT).read(&head, s, f);
         f.instruction(&Instruction::I32Const(super::UNVISITED_SLOT));
         f.instruction(&Instruction::I32Eq);
         self.emit_branch_if_to_target(miss, f);
@@ -299,40 +387,143 @@ impl FunctionBuilder<'_> {
             f.instruction(&Instruction::I32Eq);
             self.emit_branch_if_to_target(*case, f);
         }
+        let receiver = ReadReceiver {
+            head: &head,
+            name: &name,
+            key: &key,
+            value: &value,
+            found,
+            exhausted,
+        };
+        self.emit_object_receiver_read(target, &receiver, f)?;
 
-        // The ordinary header of the receiver, by the layout the site last
-        // met and then by every layout in turn.
-        let hint = s.reserve_i32_local(f);
-        s.field(OwnDataReadCacheSchema::HINT)
-            .read(record, s, f)
-            .store(hint, f);
+        // A String or Number has no own property for a recorded key: its own
+        // keys are indices and "length", which never get a record. ToObject
+        // would box it with the current Realm's prototype, which holds the
+        // place.
+        for ((_, kind, slot), _) in primitives.into_iter().rev() {
+            self.pop_control(ControlFrameKind::Block);
+            f.instruction(&Instruction::End);
+            let realm: GcLocal<RealmRecord> = self.load_current_realm(f);
+            let intrinsic = s.reserve_value_local(f);
+            self.emit_load_non_array_realm_intrinsic(&realm, slot, &intrinsic, f);
+            realm.clear(f);
+            let holder = self.emit_realm_prototype_header_or_branch(&intrinsic, exhausted, f);
+            intrinsic.clear(f);
+            self.emit_record_scan(&head, f, |builder, candidate, next, f| {
+                builder.emit_receiver_rule_or_branch(candidate, kind, None, next, f);
+                builder.emit_recorded_place_hit(candidate, &holder, &key, &value, found, next, f)
+            })?;
+            holder.clear(f);
+            self.emit_branch_to_target(exhausted, f);
+        }
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        // The site still learns: the miss kernel records this receiver.
+        s.field(OwnDataReadCacheSchema::BUDGET).read(&head, s, f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32GtS);
+        self.emit_branch_if_to_target(miss, f);
+        self.emit_static_read_walk(target, &name, &value, miss, f);
+        emit_return_normal(&value, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(found, f);
+        value.clear(f);
+        key.clear(f);
+        name.clear(f);
+        head.clear(f);
+        Ok(())
+    }
+
+    /// The read from a receiver with one of the sealed header layouts: its
+    /// ordinary header and its storage are classified, and that storage's
+    /// proofs ask each record in turn. Returns the value, or branches to
+    /// the receiver's `exhausted`; nothing falls through.
+    ///
+    /// The site's hint selects, by one table branch, the one header cast
+    /// and the one storage cast the site last met; a receiver either cast
+    /// rejects is classified by every layout in turn. Each storage has one
+    /// section of proofs for objects and functions and one for the other
+    /// layouts, which may use only their absence rule; the cast that
+    /// enters a section hands it the storage as a non-null reference.
+    fn emit_object_receiver_read(
+        &mut self,
+        target: &ValueLocals,
+        receiver: &ReadReceiver<'_>,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
         let header = s
             .reserve_gc_local::<OrdinaryObject, Nullable>(f)
             .initialize_null(s, f);
         let class = s.reserve_i32_local(f);
-        let classified = self.open_frame(ControlFrameKind::Block, f);
+        let sections = StorageSections {
+            intrinsic: self.open_reference_block(s, f),
+            dictionary: ByProofs {
+                composite: self.open_reference_block(s, f),
+                object: self.open_reference_block(s, f),
+            },
+            inline: ByProofs {
+                composite: self.open_reference_block(s, f),
+                object: self.open_reference_block(s, f),
+            },
+            array: ByProofs {
+                composite: self.open_reference_block(s, f),
+                object: self.open_reference_block(s, f),
+            },
+        };
+        // Header found by a layout the hint did not name: the storage is
+        // then classified by every layout in turn.
+        let classified = ByProofs {
+            composite: self.open_frame(ControlFrameKind::Block, f),
+            object: self.open_frame(ControlFrameKind::Block, f),
+        };
         let unhinted = self.open_frame(ControlFrameKind::Block, f);
-        let layout_hint = s.reserve_i32_local(f);
-        hint.load(f);
-        f.instruction(&Instruction::I32Const(ReceiverLayout::HINT_MASK));
-        f.instruction(&Instruction::I32And);
-        layout_hint.store(f);
-        for layout in RECEIVER_LAYOUTS {
-            layout_hint.load(f);
-            f.instruction(&Instruction::I32Const(layout.word()));
-            f.instruction(&Instruction::I32Eq);
-            self.open_frame(ControlFrameKind::If, f);
-            header.replace(
-                self.emit_layout_header_or_branch(layout, target, unhinted, f)
-                    .nullable(),
+        let pairs = hinted_pairs();
+        let cases = pairs
+            .iter()
+            .map(|_| self.open_frame(ControlFrameKind::Block, f))
+            .collect::<Vec<_>>();
+        let labels = (0..HINT_WORDS)
+            .map(|word| {
+                let case = pairs
+                    .iter()
+                    .position(|(layout, storage)| layout.hint_word(*storage) == word);
+                self.local_branch_label(case.map_or(unhinted, |index| cases[index]))
+            })
+            .collect::<Vec<_>>();
+        s.field(OwnDataReadCacheSchema::HINT)
+            .read(receiver.head, s, f);
+        f.branch_table_to_labels(labels, self.local_branch_label(unhinted));
+        for (layout, storage) in pairs.into_iter().rev() {
+            self.pop_control(ControlFrameKind::Block);
+            f.instruction(&Instruction::End);
+            let proofs = layout.class().proofs();
+            let object = s.reserve_non_null_gc_local(f).initialize(
+                self.emit_layout_header_or_branch(layout, target, unhinted, f),
                 f,
             );
+            header.replace(object.load(s, f).nullable(), f);
             class.set_constant(layout.class().word(), f);
-            self.emit_branch_to_target(classified, f);
-            self.pop_control(ControlFrameKind::If);
-            f.instruction(&Instruction::End);
+            let base = s.reserve_non_null_gc_local(f).initialize(
+                s.field(OrdinaryObjectSchema::PROPERTIES)
+                    .read(&object, s, f)
+                    .reference(),
+                f,
+            );
+            object.clear(f);
+            // A storage of another layout is classified by every layout.
+            self.emit_storage_section_or_branch(
+                storage,
+                proofs,
+                &base,
+                &sections,
+                *classified.at(proofs),
+                f,
+            );
+            base.clear(f);
         }
-        s.release_i32_local(layout_hint, f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         for layout in RECEIVER_LAYOUTS {
@@ -343,135 +534,160 @@ impl FunctionBuilder<'_> {
                 f,
             );
             class.set_constant(layout.class().word(), f);
-            self.emit_branch_to_target(classified, f);
+            self.emit_branch_to_target(*classified.at(layout.class().proofs()), f);
             self.pop_control(ControlFrameKind::Block);
             f.instruction(&Instruction::End);
         }
         // Every other value: a Proxy, an exotic object, another primitive.
-        self.emit_branch_to_target(exhausted, f);
+        self.emit_branch_to_target(receiver.exhausted, f);
+        for proofs in [Proofs::Object, Proofs::Composite] {
+            self.pop_control(ControlFrameKind::Block);
+            f.instruction(&Instruction::End);
+            let base = s.reserve_non_null_gc_local(f).initialize(
+                s.field(OrdinaryObjectSchema::PROPERTIES)
+                    .read(&header, s, f)
+                    .reference(),
+                f,
+            );
+            for storage in RECEIVER_STORAGES {
+                if !storage.has_proofs(proofs) {
+                    continue;
+                }
+                let next = self.open_frame(ControlFrameKind::Block, f);
+                self.emit_storage_section_or_branch(storage, proofs, &base, &sections, next, f);
+                self.pop_control(ControlFrameKind::Block);
+                f.instruction(&Instruction::End);
+            }
+            base.clear(f);
+            // No record names a receiver rule for a composite layout on
+            // intrinsic storage.
+            self.emit_branch_to_target(receiver.exhausted, f);
+        }
+
+        // Each section, entered with its storage and with `header` and
+        // `class` describing the receiver, returns or branches to
+        // `exhausted`.
+        let StorageSections {
+            intrinsic,
+            dictionary,
+            inline,
+            array,
+        } = sections;
+        for (block, proofs) in [
+            (array.object, Proofs::Object),
+            (array.composite, Proofs::Composite),
+        ] {
+            let storage = block.close(f);
+            self.pop_control(ControlFrameKind::Block);
+            let storage =
+                CompactStorage::Array(s.reserve_non_null_gc_local(f).initialize(storage, f));
+            self.emit_compact_section(receiver, &header, class, storage, proofs, f)?;
+        }
+        for (block, proofs) in [
+            (inline.object, Proofs::Object),
+            (inline.composite, Proofs::Composite),
+        ] {
+            let storage = block.close(f);
+            self.pop_control(ControlFrameKind::Block);
+            let storage =
+                CompactStorage::Inline(s.reserve_non_null_gc_local(f).initialize(storage, f));
+            self.emit_compact_section(receiver, &header, class, storage, proofs, f)?;
+        }
+        for (block, proofs) in [
+            (dictionary.object, Proofs::Object),
+            (dictionary.composite, Proofs::Composite),
+        ] {
+            let storage = block.close(f);
+            self.pop_control(ControlFrameKind::Block);
+            let storage = s.reserve_non_null_gc_local(f).initialize(storage, f);
+            self.emit_dictionary_section(receiver, &header, class, storage, proofs, f)?;
+        }
+        let storage = intrinsic.close(f);
         self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
-        let object = s
-            .reserve_gc_local(f)
-            .initialize(header.load(s, f).require_non_null(f), f);
+        let storage = s.reserve_non_null_gc_local(f).initialize(storage, f);
+        self.emit_intrinsic_section(receiver, storage, f)?;
+        s.release_i32_local(class, f);
         header.clear(f);
-        let base = s.reserve_gc_local(f).initialize(
-            s.field(OrdinaryObjectSchema::PROPERTIES)
-                .read(&object, s, f)
-                .reference(),
-            f,
-        );
+        Ok(())
+    }
+
+    /// Branches to the section of `storage` for `proofs` with `base` as
+    /// that storage, or to `other` for a storage of any other layout.
+    fn emit_storage_section_or_branch(
+        &self,
+        storage: ReceiverStorage,
+        proofs: Proofs,
+        base: &GcLocal<ObjectPropertyStorage>,
+        sections: &StorageSections,
+        other: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let label = self.local_branch_label(other);
+        match storage {
+            ReceiverStorage::Array => sections.array.at(proofs).branch_with(
+                base.sealed_nested_subtype_or_branch::<CompactDataStorage, ArrayCompactDataStorage>(
+                    s, label, f,
+                ),
+                f,
+            ),
+            ReceiverStorage::Inline => sections.inline.at(proofs).branch_with(
+                base.sealed_nested_subtype_or_branch::<CompactDataStorage, InlineCompactDataStorage>(
+                    s, label, f,
+                ),
+                f,
+            ),
+            ReceiverStorage::Dictionary => sections.dictionary.at(proofs).branch_with(
+                base.sealed_subtype_or_branch::<OrdinaryPropertyStorage>(s, label, f),
+                f,
+            ),
+            ReceiverStorage::Intrinsic => match proofs {
+                Proofs::Object => sections.intrinsic.branch_with(
+                    base.sealed_subtype_or_branch::<IntrinsicPropertyStorage>(s, label, f),
+                    f,
+                ),
+                Proofs::Composite => {
+                    unreachable!("a composite layout has no proofs on intrinsic storage")
+                }
+            },
+        }
+    }
+
+    /// Compact storage: the live shape is compared with each record's.
+    fn emit_compact_section(
+        &mut self,
+        receiver: &ReadReceiver<'_>,
+        header: &GcLocal<OrdinaryObject, Nullable>,
+        class: I32Local,
+        storage: CompactStorage,
+        proofs: Proofs,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let ReadReceiver {
+            head,
+            name,
+            key,
+            value,
+            found,
+            exhausted,
+        } = *receiver;
+        let object = s
+            .reserve_non_null_gc_local(f)
+            .initialize(header.load(s, f).require_non_null(f), f);
         let prototype = s
             .reserve_gc_local::<JavaScriptObject, Nullable>(f)
             .initialize_null(s, f);
-
-        // The receiver's current storage as its one sealed layout, by the
-        // layout the site last met and then by every layout in turn.
-        let array = s
-            .reserve_gc_local::<ArrayCompactDataStorage, Nullable>(f)
-            .initialize_null(s, f);
-        let inline = s
-            .reserve_gc_local::<InlineCompactDataStorage, Nullable>(f)
-            .initialize_null(s, f);
-        let dictionary = s
-            .reserve_gc_local::<OrdinaryPropertyStorage, Nullable>(f)
-            .initialize_null(s, f);
-        let intrinsic = s
-            .reserve_gc_local::<IntrinsicPropertyStorage, Nullable>(f)
-            .initialize_null(s, f);
-        let stored = self.open_frame(ControlFrameKind::Block, f);
-        let unhinted = self.open_frame(ControlFrameKind::Block, f);
-        hint.load(f);
-        f.instruction(&Instruction::I32Const(ReceiverStorage::HINT_SHIFT as i32));
-        f.instruction(&Instruction::I32ShrU);
-        hint.store(f);
-        macro_rules! storage_as {
-            ($kind:expr, $other:expr) => {{
-                let label = self.local_branch_label($other);
-                match $kind {
-                    ReceiverStorage::Array => array.replace(
-                        base.sealed_nested_subtype_or_branch::<
-                            CompactDataStorage,
-                            ArrayCompactDataStorage,
-                        >(s, label, f)
-                        .nullable(),
-                        f,
-                    ),
-                    ReceiverStorage::Inline => inline.replace(
-                        base.sealed_nested_subtype_or_branch::<
-                            CompactDataStorage,
-                            InlineCompactDataStorage,
-                        >(s, label, f)
-                        .nullable(),
-                        f,
-                    ),
-                    ReceiverStorage::Dictionary => dictionary.replace(
-                        base.sealed_subtype_or_branch::<OrdinaryPropertyStorage>(s, label, f)
-                            .nullable(),
-                        f,
-                    ),
-                    ReceiverStorage::Intrinsic => intrinsic.replace(
-                        base.sealed_subtype_or_branch::<IntrinsicPropertyStorage>(s, label, f)
-                            .nullable(),
-                        f,
-                    ),
-                }
-            }};
-        }
-        for kind in RECEIVER_STORAGES {
-            hint.load(f);
-            f.instruction(&Instruction::I32Const(kind.word()));
-            f.instruction(&Instruction::I32Eq);
-            self.open_frame(ControlFrameKind::If, f);
-            storage_as!(kind, unhinted);
-            self.emit_branch_to_target(stored, f);
-            self.pop_control(ControlFrameKind::If);
-            f.instruction(&Instruction::End);
-        }
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
-        for kind in RECEIVER_STORAGES {
-            let next = self.open_frame(ControlFrameKind::Block, f);
-            storage_as!(kind, next);
-            self.emit_branch_to_target(stored, f);
-            self.pop_control(ControlFrameKind::Block);
-            f.instruction(&Instruction::End);
-        }
-        self.emit_branch_to_target(exhausted, f);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
-        s.release_i32_local(hint, f);
-        base.clear(f);
-
-        // Compact storage: the live shape is compared with each record's.
-        for layout in COMPACT_LAYOUTS {
-            match layout {
-                CompactLayout::Array => array.load(s, f).is_null(f),
-                CompactLayout::Inline => inline.load(s, f).is_null(f),
-            }
-            f.instruction(&Instruction::I32Eqz);
-            self.open_frame(ControlFrameKind::If, f);
-            let storage = match layout {
-                CompactLayout::Array => CompactStorage::Array(
-                    s.reserve_gc_local(f)
-                        .initialize(array.load(s, f).require_non_null(f), f),
-                ),
-                CompactLayout::Inline => CompactStorage::Inline(
-                    s.reserve_gc_local(f)
-                        .initialize(inline.load(s, f).require_non_null(f), f),
-                ),
-            };
-            let shape = s.reserve_gc_local(f).initialize(storage.shape(s, f), f);
-            self.emit_record_scan(record, f, |builder, candidate, next, f| {
-                let s = builder.runtime_schema();
-                // An own record: the recorded shape has the key at a
-                // nonnegative slot; a negative slot is the closed tail
-                // beyond a shape that lacks it.
+        let shape = s
+            .reserve_non_null_gc_local(f)
+            .initialize(storage.shape(s, f), f);
+        self.emit_record_scan(head, f, |builder, candidate, next, f| {
+            let s = builder.runtime_schema();
+            // An own record: the recorded shape has the key at a
+            // nonnegative slot; a negative slot is the closed tail beyond a
+            // shape that lacks it. Only an object or a function owns it.
+            if proofs == Proofs::Object {
                 let rule = builder.open_frame(ControlFrameKind::Block, f);
-                class.load(f);
-                f.instruction(&Instruction::I32Const(ReceiverClass::Composite.word()));
-                f.instruction(&Instruction::I32Eq);
-                builder.emit_branch_if_to_target(rule, f);
                 let _ = shape.load(s, f);
                 s.field(OwnDataReadCacheSchema::SHAPE).read(candidate, s, f);
                 f.instruction(&Instruction::RefEq);
@@ -487,13 +703,13 @@ impl FunctionBuilder<'_> {
                 builder.open_frame(ControlFrameKind::If, f);
                 match &storage {
                     CompactStorage::Array(array) => {
-                        builder.emit_array_compact_value_at(array, slot, &value, f)
+                        builder.emit_array_compact_value_at(array, slot, value, f)
                     }
                     CompactStorage::Inline(inline) => {
-                        builder.emit_inline_compact_recorded_value_at(inline, slot, &value, f)
+                        builder.emit_inline_compact_recorded_value_at(inline, slot, value, f)
                     }
                 }
-                emit_return_normal(&value, f);
+                emit_return_normal(value, f);
                 builder.pop_control(ControlFrameKind::If);
                 f.instruction(&Instruction::End);
                 // Only an actual ordinary object registers a closed tail.
@@ -504,69 +720,87 @@ impl FunctionBuilder<'_> {
                 builder.emit_recorded_closed_tail_or_branch(&object, slot, rule, f)?;
                 s.release_i32_local(slot, f);
                 value.set_undefined(f);
-                emit_return_normal(&value, f);
+                emit_return_normal(value, f);
                 builder.pop_control(ControlFrameKind::Block);
                 f.instruction(&Instruction::End);
-                // The live shape lacks the key, and the receiver's live
-                // [[Prototype]] holds the place.
-                builder.emit_receiver_rule_or_branch(
-                    candidate,
-                    HolderReceiverKind::Object,
-                    Some(&shape),
-                    next,
-                    f,
-                );
-                builder.emit_prototype_place_hit(
-                    candidate, &object, &prototype, &key, &value, found, next, f,
-                )
-            })?;
-            self.emit_unrecorded_shape_read(
-                record, &object, &storage, &shape, class, &prototype, &name, &key, &value, found,
-                exhausted, f,
-            )?;
-            self.emit_branch_to_target(exhausted, f);
-            shape.clear(f);
-            storage.clear(f);
-            self.pop_control(ControlFrameKind::If);
-            f.instruction(&Instruction::End);
-        }
-        array.clear(f);
-        inline.clear(f);
-        // A dictionary: an own entry at a record's position, or the absence
-        // rule of a dictionary that never held an entry.
-        dictionary.load(s, f).is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, f);
-        let live = s
-            .reserve_gc_local(f)
-            .initialize(dictionary.load(s, f).require_non_null(f), f);
-        self.emit_record_scan(record, f, |builder, candidate, next, f| {
-            let s = builder.runtime_schema();
-            let rule = builder.open_frame(ControlFrameKind::Block, f);
-            class.load(f);
-            f.instruction(&Instruction::I32Const(ReceiverClass::Composite.word()));
-            f.instruction(&Instruction::I32Eq);
-            builder.emit_branch_if_to_target(rule, f);
-            let position = s.reserve_i32_local(f);
-            s.field(OwnDataReadCacheSchema::DICTIONARY_POSITION)
-                .read(candidate, s, f)
-                .store(position, f);
-            builder.emit_dictionary_position_read_with(
-                &live,
-                position,
-                &key,
-                &value,
-                found,
-                RecipeValues::Decline,
+            }
+            // The live shape lacks the key, and the receiver's live
+            // [[Prototype]] holds the place.
+            builder.emit_receiver_rule_or_branch(
+                candidate,
+                HolderReceiverKind::Object,
+                Some(&shape),
+                next,
                 f,
             );
-            s.release_i32_local(position, f);
-            found.load(f);
-            f.instruction(&Instruction::If(BlockType::Empty));
-            emit_return_normal(&value, f);
-            f.instruction(&Instruction::End);
-            builder.pop_control(ControlFrameKind::Block);
-            f.instruction(&Instruction::End);
+            builder.emit_prototype_place_hit(
+                candidate, &object, &prototype, key, value, found, next, f,
+            )
+        })?;
+        // A composite layout's own properties are never probed.
+        if proofs == Proofs::Object {
+            self.emit_unrecorded_shape_read(
+                head, &object, &storage, &shape, class, &prototype, name, key, value, found,
+                exhausted, f,
+            )?;
+        }
+        self.emit_branch_to_target(exhausted, f);
+        shape.clear(f);
+        storage.clear(f);
+        prototype.clear(f);
+        object.clear(f);
+        Ok(())
+    }
+
+    /// A dictionary: an own entry at a record's position, or the absence
+    /// rule of a dictionary that never held an entry.
+    fn emit_dictionary_section(
+        &mut self,
+        receiver: &ReadReceiver<'_>,
+        header: &GcLocal<OrdinaryObject, Nullable>,
+        class: I32Local,
+        live: GcLocal<OrdinaryPropertyStorage>,
+        proofs: Proofs,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let ReadReceiver {
+            head,
+            name,
+            key,
+            value,
+            found,
+            exhausted,
+        } = *receiver;
+        let object = s
+            .reserve_non_null_gc_local(f)
+            .initialize(header.load(s, f).require_non_null(f), f);
+        let prototype = s
+            .reserve_gc_local::<JavaScriptObject, Nullable>(f)
+            .initialize_null(s, f);
+        self.emit_record_scan(head, f, |builder, candidate, next, f| {
+            let s = builder.runtime_schema();
+            // Only an object or a function owns an entry a record placed.
+            if proofs == Proofs::Object {
+                let position = s.reserve_i32_local(f);
+                s.field(OwnDataReadCacheSchema::DICTIONARY_POSITION)
+                    .read(candidate, s, f)
+                    .store(position, f);
+                builder.emit_dictionary_position_read_with(
+                    &live,
+                    position,
+                    key,
+                    value,
+                    found,
+                    RecipeValues::Decline,
+                    f,
+                );
+                s.release_i32_local(position, f);
+                found.load(f);
+                f.instruction(&Instruction::If(BlockType::Empty));
+                emit_return_normal(value, f);
+                f.instruction(&Instruction::End);
+            }
             builder.emit_empty_dictionary_or_branch(&live, next, f);
             builder.emit_receiver_rule_or_branch(
                 candidate,
@@ -576,34 +810,41 @@ impl FunctionBuilder<'_> {
                 f,
             );
             builder.emit_prototype_place_hit(
-                candidate, &object, &prototype, &key, &value, found, next, f,
+                candidate, &object, &prototype, key, value, found, next, f,
             )
         })?;
         self.emit_probed_dictionary_read(
-            record, &object, &live, class, &prototype, &name, &key, &value, found, exhausted, f,
+            head, &object, &live, class, &prototype, name, key, value, found, exhausted, f,
         )?;
         self.emit_branch_to_target(exhausted, f);
         live.clear(f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        dictionary.clear(f);
-        // An intrinsic layout is immutable: storage at a recorded address
-        // has the key's data row in the recorded value group. No record
-        // names a receiver rule for it.
-        class.load(f);
-        f.instruction(&Instruction::I32Const(ReceiverClass::Composite.word()));
-        f.instruction(&Instruction::I32Eq);
-        self.emit_branch_if_to_target(exhausted, f);
-        let layout = s.reserve_gc_local(f).initialize(
-            intrinsic.non_null_or_branch(self.local_branch_label(exhausted), f),
-            f,
-        );
-        intrinsic.clear(f);
+        prototype.clear(f);
+        object.clear(f);
+        Ok(())
+    }
+
+    /// An intrinsic layout is immutable: storage at a recorded address has
+    /// the key's data row in the recorded value group. No record names a
+    /// receiver rule for it, and only an object or a function owns it.
+    fn emit_intrinsic_section(
+        &mut self,
+        receiver: &ReadReceiver<'_>,
+        layout: GcLocal<IntrinsicPropertyStorage>,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let ReadReceiver {
+            head,
+            value,
+            found,
+            exhausted,
+            ..
+        } = *receiver;
         let address = s.reserve_i32_local(f);
         s.field(IntrinsicPropertyStorageSchema::ADDRESS)
             .read(&layout, s, f)
             .store(address, f);
-        self.emit_record_scan(record, f, |builder, candidate, next, f| {
+        self.emit_record_scan(head, f, |builder, candidate, next, f| {
             let s = builder.runtime_schema();
             address.load(f);
             s.field(OwnDataReadCacheSchema::LAYOUT)
@@ -615,56 +856,17 @@ impl FunctionBuilder<'_> {
                 .read(candidate, s, f)
                 .store(group, f);
             found.set_constant(0, f);
-            builder.emit_materialized_intrinsic_group(&layout, group, &value, found, f);
+            builder.emit_materialized_intrinsic_group(&layout, group, value, found, f);
             s.release_i32_local(group, f);
             found.load(f);
             f.instruction(&Instruction::If(BlockType::Empty));
-            emit_return_normal(&value, f);
+            emit_return_normal(value, f);
             f.instruction(&Instruction::End);
             Ok(())
         })?;
         self.emit_branch_to_target(exhausted, f);
         s.release_i32_local(address, f);
         layout.clear(f);
-        prototype.clear(f);
-        object.clear(f);
-        s.release_i32_local(class, f);
-
-        // A String or Number has no own property for a recorded key: its own
-        // keys are indices and "length", which never get a record. ToObject
-        // would box it with the current Realm's prototype, which holds the
-        // place.
-        for ((_, kind, slot), _) in primitives.into_iter().rev() {
-            self.pop_control(ControlFrameKind::Block);
-            f.instruction(&Instruction::End);
-            let realm: GcLocal<RealmRecord> = self.load_current_realm(f);
-            let intrinsic = s.reserve_value_local(f);
-            self.emit_load_non_array_realm_intrinsic(&realm, slot, &intrinsic, f);
-            realm.clear(f);
-            let holder = self.emit_realm_prototype_header_or_branch(&intrinsic, exhausted, f);
-            intrinsic.clear(f);
-            self.emit_record_scan(record, f, |builder, candidate, next, f| {
-                builder.emit_receiver_rule_or_branch(candidate, kind, None, next, f);
-                builder.emit_recorded_place_hit(candidate, &holder, &key, &value, found, next, f)
-            })?;
-            holder.clear(f);
-            self.emit_branch_to_target(exhausted, f);
-        }
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
-        // The site still learns: the miss kernel records this receiver.
-        s.field(OwnDataReadCacheSchema::BUDGET).read(record, s, f);
-        f.instruction(&Instruction::I32Const(0));
-        f.instruction(&Instruction::I32GtS);
-        self.emit_branch_if_to_target(miss, f);
-        self.emit_static_read_walk(target, &name, &value, miss, f);
-        emit_return_normal(&value, f);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
-        s.release_i32_local(found, f);
-        value.clear(f);
-        key.clear(f);
-        name.clear(f);
         Ok(())
     }
 
@@ -855,10 +1057,13 @@ impl FunctionBuilder<'_> {
         let cursor = s
             .reserve_gc_local::<OwnDataReadCache, Nullable>(f)
             .initialize(head.load(s, f).nullable(), f);
+        let done = self.open_frame(ControlFrameKind::Block, f);
         let scan = self.open_frame(ControlFrameKind::Loop, f);
-        let candidate = s
-            .reserve_gc_local(f)
-            .initialize(cursor.load(s, f).require_non_null(f), f);
+        // The one null test of each record: the end of the chain.
+        let candidate = s.reserve_non_null_gc_local(f).initialize(
+            cursor.non_null_or_branch(self.local_branch_label(done), f),
+            f,
+        );
         let next = self.open_frame(ControlFrameKind::Block, f);
         proofs(self, &candidate, next, f)?;
         self.pop_control(ControlFrameKind::Block);
@@ -870,10 +1075,10 @@ impl FunctionBuilder<'_> {
             f,
         );
         candidate.clear(f);
-        cursor.load(s, f).is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(scan, f);
+        self.emit_branch_to_target(scan, f);
         self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         cursor.clear(f);
         Ok(())
@@ -1372,7 +1577,7 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         let object = s
-            .reserve_gc_local(f)
+            .reserve_non_null_gc_local(f)
             .initialize(header.load(s, f).require_non_null(f), f);
         header.clear(f);
         object
@@ -1421,7 +1626,7 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         let object = s
-            .reserve_gc_local(f)
+            .reserve_non_null_gc_local(f)
             .initialize(header.load(s, f).require_non_null(f), f);
         header.clear(f);
         object
@@ -1440,7 +1645,7 @@ impl FunctionBuilder<'_> {
         let label = self.local_branch_label(other);
         match layout {
             CompactLayout::Array => CompactStorage::Array(
-                s.reserve_gc_local(f).initialize(
+                s.reserve_non_null_gc_local(f).initialize(
                     base.sealed_nested_subtype_or_branch::<
                         CompactDataStorage,
                         ArrayCompactDataStorage,
@@ -1449,7 +1654,7 @@ impl FunctionBuilder<'_> {
                 ),
             ),
             CompactLayout::Inline => CompactStorage::Inline(
-                s.reserve_gc_local(f).initialize(
+                s.reserve_non_null_gc_local(f).initialize(
                     base.sealed_nested_subtype_or_branch::<
                         CompactDataStorage,
                         InlineCompactDataStorage,
@@ -1521,7 +1726,7 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
-        let holder_base = s.reserve_gc_local(f).initialize(
+        let holder_base = s.reserve_non_null_gc_local(f).initialize(
             s.field(OrdinaryObjectSchema::PROPERTIES)
                 .read(holder, s, f)
                 .reference(),
@@ -1535,7 +1740,7 @@ impl FunctionBuilder<'_> {
         // An intrinsic layout is immutable: storage at the recorded address
         // has the same rows, and keeps each materialized value in its group.
         let other = self.open_frame(ControlFrameKind::Block, f);
-        let intrinsic = s.reserve_gc_local(f).initialize(
+        let intrinsic = s.reserve_non_null_gc_local(f).initialize(
             holder_base.sealed_subtype_or_branch::<IntrinsicPropertyStorage>(
                 s,
                 self.local_branch_label(other),
@@ -1594,7 +1799,7 @@ impl FunctionBuilder<'_> {
             f.instruction(&Instruction::End);
         }
         // A dictionary entry is confirmed by its own key at the position.
-        let dictionary = s.reserve_gc_local(f).initialize(
+        let dictionary = s.reserve_non_null_gc_local(f).initialize(
             holder_base.sealed_subtype_or_branch::<OrdinaryPropertyStorage>(
                 s,
                 self.local_branch_label(miss),

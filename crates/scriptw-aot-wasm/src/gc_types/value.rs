@@ -244,7 +244,21 @@ impl EqRefLocal {
 #[derive(Debug)]
 pub(crate) struct GcLocal<T: GcHeapType, N: GcFieldNullability = NonNullable> {
     index: u32,
+    declaration: LocalDeclaration,
     shape: PhantomData<fn() -> (T, N)>,
+}
+
+/// The Wasm type a typed GC local is declared with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LocalDeclaration {
+    /// `(ref null T)`: pooled with every other holder of `T`; a read that
+    /// reaches a new block is a new value, which Wasmtime checks for null
+    /// again at each access.
+    Nullable,
+    /// `(ref T)`: validation proves every read non-null, so Wasmtime emits
+    /// no null check for it. Validation also confines each read to the
+    /// block that wrote the local, or to a block nested in it.
+    NonNull,
 }
 
 impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
@@ -255,8 +269,9 @@ impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
     ) -> GcStackReference<T, N> {
         function.instruction(&Instruction::LocalGet(self.index));
         // The local declaration already proves its concrete heap type.
-        // Logical non-null ownership only needs a null refinement here.
-        if !N::NULLABLE {
+        // Logical non-null ownership only needs a null refinement here,
+        // which a non-null declaration already proves.
+        if !N::NULLABLE && self.declaration == LocalDeclaration::Nullable {
             function.instruction(&Instruction::RefAsNonNull);
         }
         GcStackReference::new()
@@ -368,11 +383,45 @@ fn sealed_cast_or_branch<T: GcHeapType>(
     GcStackReference::new()
 }
 
+/// A block whose result is a non-null `T`: each branch to it carries one,
+/// and none falls through its end, which leaves the reference on the stack.
+/// It hands a value proved by a cast in one of several places to the one
+/// place that uses it, without a nullable local.
+#[derive(Debug)]
+pub(crate) struct ReferenceResultBlock<T: GcHeapType> {
+    label: crate::LabelDepth,
+    shape: PhantomData<fn() -> T>,
+}
+impl<T: GcHeapType> ReferenceResultBlock<T> {
+    /// The block `FunctionBuilder::open_reference_block` has just opened
+    /// with the result type `(ref T)` at `label`.
+    pub(crate) fn opened(label: crate::LabelDepth) -> Self {
+        Self {
+            label,
+            shape: PhantomData,
+        }
+    }
+
+    /// Branches to the block's end with `value` as its result.
+    pub(crate) fn branch_with(&self, value: GcStackReference<T>, function: &mut Function) {
+        let GcStackReference { .. } = value;
+        function.branch_to_label(self.label);
+    }
+
+    /// Ends the block, whose result is then on the stack. The caller pops
+    /// the builder's frame for it.
+    pub(crate) fn close(self, function: &mut Function) -> GcStackReference<T> {
+        function.instruction(&Instruction::End);
+        GcStackReference::new()
+    }
+}
+
 /// A declaration is consumed when a reference is initialized. Non-null locals
 /// cannot be read while their Wasm default value is still null.
 #[derive(Debug)]
 pub(crate) struct GcLocalSlot<T: GcHeapType, N: GcFieldNullability = NonNullable> {
     index: u32,
+    declaration: LocalDeclaration,
     shape: PhantomData<fn() -> (T, N)>,
 }
 impl<T: GcHeapType, N: GcFieldNullability> GcLocalSlot<T, N> {
@@ -385,6 +434,7 @@ impl<T: GcHeapType, N: GcFieldNullability> GcLocalSlot<T, N> {
         function.instruction(&Instruction::LocalSet(self.index));
         GcLocal {
             index: self.index,
+            declaration: self.declaration,
             shape: PhantomData,
         }
     }
@@ -2530,6 +2580,24 @@ impl RuntimeSchema {
         let reference_type = self.reference_type::<T>(GcNullability::Nullable);
         GcLocalSlot {
             index: function.reserve_typed_local(ValType::Ref(reference_type)),
+            declaration: LocalDeclaration::Nullable,
+            shape: PhantomData,
+        }
+    }
+
+    /// A local declared `(ref T)`, for a hot holder read in many blocks:
+    /// no read of it is checked for null. Wasm validation accepts a read
+    /// only inside the block whose `local.set` initialized it (or a block
+    /// nested in that one), so the holder must be initialized in the
+    /// outermost block that reads it.
+    pub(crate) fn reserve_non_null_gc_local<T: GcHeapType>(
+        &self,
+        function: &mut Function,
+    ) -> GcLocalSlot<T> {
+        let reference_type = self.reference_type::<T>(GcNullability::NonNullable);
+        GcLocalSlot {
+            index: function.reserve_typed_local(ValType::Ref(reference_type)),
+            declaration: LocalDeclaration::NonNull,
             shape: PhantomData,
         }
     }
@@ -3073,9 +3141,20 @@ impl<'a, T: GcHeapType, N: GcFieldNullability> GcOperand<'a, GcRef<T>, N> {
             source: if N::NULLABLE {
                 OperandSource::Local(value.index)
             } else {
-                OperandSource::NonNullLocal(value.index)
+                value.non_null_source()
             },
             shape: PhantomData,
+        }
+    }
+}
+impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
+    /// A non-null operand read from this logically non-null local: a
+    /// nullable declaration refines the read, which a non-null declaration
+    /// already proves.
+    fn non_null_source(&self) -> OperandSource {
+        match self.declaration {
+            LocalDeclaration::Nullable => OperandSource::NonNullLocal(self.index),
+            LocalDeclaration::NonNull => OperandSource::Local(self.index),
         }
     }
 }
@@ -3085,10 +3164,9 @@ impl<'a, Base: GcHeapType> GcOperand<'a, GcRef<Base>, NonNullable> {
         _schema: &RuntimeSchema,
     ) -> Self {
         Self {
-            // GC locals are physically nullable: a declared Wasm local needs
-            // a default. A nominal upcast preserves the logical non-null
-            // requirement.
-            source: OperandSource::NonNullLocal(value.index),
+            // A GC local is physically nullable unless declared `(ref T)`.
+            // A nominal upcast preserves the logical non-null requirement.
+            source: value.non_null_source(),
             shape: PhantomData,
         }
     }
@@ -3096,7 +3174,7 @@ impl<'a, Base: GcHeapType> GcOperand<'a, GcRef<Base>, NonNullable> {
 impl<'a, T: GcHeapType> GcOperand<'a, GcRef<T>, Nullable> {
     pub(crate) fn nullable_reference(value: &'a GcLocal<T>, _schema: &RuntimeSchema) -> Self {
         Self {
-            source: OperandSource::NonNullLocal(value.index),
+            source: value.non_null_source(),
             shape: PhantomData,
         }
     }

@@ -979,6 +979,20 @@ impl<'a> FunctionBuilder<'a> {
         target
     }
 
+    /// Opens a block whose every branch carries one non-null `T`, which
+    /// its end leaves on the stack; see [`ReferenceResultBlock`].
+    pub(crate) fn open_reference_block<T: GcHeapType>(
+        &mut self,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) -> ReferenceResultBlock<T> {
+        function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(
+            schema.reference_type::<T>(GcNullability::NonNullable),
+        ))));
+        self.control_stack.push(ControlFrameKind::Block);
+        ReferenceResultBlock::opened(function.label_depth())
+    }
+
     /// Pops the tracked entry `open_frame` pushed.
     ///
     /// The matching `End` is still written by the caller and is still counted
