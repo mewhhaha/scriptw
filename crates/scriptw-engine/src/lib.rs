@@ -1107,6 +1107,13 @@ static COMPILATION_POOL: OnceLock<Result<rayon::ThreadPool, String>> = OnceLock:
 /// Default Cranelift parallelism: half the logical CPUs, with a minimum of one.
 /// Test262's `--threads` remains a separate case-execution setting.
 pub fn default_compilation_jobs() -> usize {
+    // This crate's unit tests share one process, and many of them configure
+    // one job explicitly. A test that compiles without configuring must not
+    // choose a different CPU-derived count first: on a multi-CPU machine the
+    // tests that then ask for one job would all be refused.
+    if cfg!(test) {
+        return 1;
+    }
     std::thread::available_parallelism()
         .map(usize::from)
         .unwrap_or(2)
