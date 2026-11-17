@@ -186,6 +186,92 @@ impl LocalDeclarations {
     }
 }
 
+/// The index space an [`IndexOperand`] names.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(crate) enum IndexSpace {
+    Function,
+    Global,
+}
+
+/// A function or global index immediate inside an encoded body.
+///
+/// Program import compaction renumbers both index spaces after every body is
+/// emitted. The sink records each such immediate as it encodes it, so the
+/// final body is these bytes with exactly these operands rewritten; no pass
+/// has to decode the body's operators again to find them.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(crate) struct IndexOperand {
+    /// Byte offset of the operand's LEB128 encoding in the body.
+    offset: u32,
+    space: IndexSpace,
+    index: u32,
+}
+
+impl IndexOperand {
+    pub(crate) const fn offset(self) -> u32 {
+        self.offset
+    }
+    pub(crate) const fn space(self) -> IndexSpace {
+        self.space
+    }
+    pub(crate) const fn index(self) -> u32 {
+        self.index
+    }
+
+    /// The function or global index an instruction carries. Each of these
+    /// instructions encodes that index as its last immediate.
+    fn of(instruction: &Instruction<'_>) -> Option<(IndexSpace, u32)> {
+        match *instruction {
+            Instruction::Call(index)
+            | Instruction::ReturnCall(index)
+            | Instruction::RefFunc(index) => Some((IndexSpace::Function, index)),
+            Instruction::GlobalGet(index)
+            | Instruction::GlobalSet(index)
+            | Instruction::GlobalAtomicGet {
+                global_index: index,
+                ..
+            }
+            | Instruction::GlobalAtomicSet {
+                global_index: index,
+                ..
+            }
+            | Instruction::GlobalAtomicRmwAdd {
+                global_index: index,
+                ..
+            }
+            | Instruction::GlobalAtomicRmwSub {
+                global_index: index,
+                ..
+            }
+            | Instruction::GlobalAtomicRmwAnd {
+                global_index: index,
+                ..
+            }
+            | Instruction::GlobalAtomicRmwOr {
+                global_index: index,
+                ..
+            }
+            | Instruction::GlobalAtomicRmwXor {
+                global_index: index,
+                ..
+            }
+            | Instruction::GlobalAtomicRmwXchg {
+                global_index: index,
+                ..
+            }
+            | Instruction::GlobalAtomicRmwCmpxchg {
+                global_index: index,
+                ..
+            } => Some((IndexSpace::Global, index)),
+            _ => None,
+        }
+    }
+}
+
+fn leb128_len(value: u32) -> u32 {
+    (32 - (value | 1).leading_zeros()).div_ceil(7)
+}
+
 /// A function body and its open frames, including the implicit function label.
 ///
 /// Re-exported as `Function` from the crate root so all emitters use the same
@@ -209,6 +295,8 @@ pub(crate) struct Function {
     branch_hints: std::collections::BTreeMap<u32, bool>,
     /// Identities of the open labels that only rare paths branch to.
     rare_labels: Vec<u64>,
+    /// Every function and global index immediate, in body order.
+    index_operands: Vec<IndexOperand>,
     /// The branch that decides whether the next instruction runs, if one
     /// branch does.
     anchor: Option<Anchor>,
@@ -232,6 +320,7 @@ impl Clone for Function {
             last_instruction_escapes: self.last_instruction_escapes,
             branch_hints: self.branch_hints.clone(),
             rare_labels: self.rare_labels.clone(),
+            index_operands: self.index_operands.clone(),
             anchor: self.anchor,
         }
     }
@@ -262,6 +351,7 @@ impl Function {
             last_instruction_escapes: false,
             branch_hints: std::collections::BTreeMap::new(),
             rare_labels: Vec::new(),
+            index_operands: Vec::new(),
             anchor: None,
         }
     }
@@ -631,6 +721,14 @@ impl Function {
                 | Instruction::Unreachable
         );
         self.body.instruction(instruction);
+        if let Some((space, index)) = IndexOperand::of(instruction) {
+            let end = u32::try_from(self.body.byte_len()).expect("Wasm body exceeds u32 bytes");
+            self.index_operands.push(IndexOperand {
+                offset: end - leb128_len(index),
+                space,
+                index,
+            });
+        }
         self.operator_count = self
             .operator_count
             .checked_add(1)
@@ -902,10 +1000,11 @@ impl Function {
         self.body.byte_len()
     }
 
-    pub(crate) fn into_body_named(
+    /// The finished body and its index operands, at their offsets in it.
+    pub(crate) fn into_body_and_index_operands(
         self,
         context: &dyn core::fmt::Display,
-    ) -> wasm_encoder::Function {
+    ) -> (wasm_encoder::Function, Vec<IndexOperand>) {
         assert!(
             self.frames.is_empty(),
             "function body for {context} has an unclosed control frame: {} label(s) still open",
@@ -913,13 +1012,20 @@ impl Function {
         );
         let raw = self.body.into_raw_body();
         let mut body = self.locals.encode_body();
+        // Locals declared after construction lengthen the declaration prefix.
+        let prefix = u32::try_from(body.byte_len()).expect("Wasm body exceeds u32 bytes");
+        let initial = u32::try_from(self.initial_prefix_len).expect("Wasm body exceeds u32 bytes");
         body.raw(raw[self.initial_prefix_len..].iter().copied());
-        body
+        let mut operands = self.index_operands;
+        for operand in &mut operands {
+            operand.offset = operand.offset - initial + prefix;
+        }
+        (body, operands)
     }
 
     #[cfg(test)]
     pub(crate) fn into_body(self) -> wasm_encoder::Function {
-        self.into_body_named(&"an unnamed test body")
+        self.into_body_and_index_operands(&"an unnamed test body").0
     }
 }
 

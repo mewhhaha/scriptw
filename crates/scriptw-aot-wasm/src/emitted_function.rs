@@ -350,6 +350,8 @@ pub(crate) struct EmittedFunction {
     /// would, so this is byte-identical to pushing the `Function` itself, and it
     /// keeps attribution bound to the exact encoded body.
     raw_body: Vec<u8>,
+    /// Every function and global index immediate in `raw_body`, in order.
+    index_operands: Vec<crate::code_sink::IndexOperand>,
     literal_operands: Vec<crate::program_literal_operands::FunctionSite>,
     branch_hints: Vec<crate::branch_hints::FunctionSite>,
     native_program_context: Option<crate::native_program_contexts::FunctionContext>,
@@ -407,7 +409,7 @@ impl EmittedFunction {
     }
 
     fn new(identity: FunctionIdentity, body: Function) -> Self {
-        // `into_body_named` asserts the label stack is empty, so an emitter
+        // `into_body_and_index_operands` asserts the label stack is empty, so an emitter
         // that opened a frame and never closed it fails here — with the
         // identity in the panic message, not merely in scope — instead of as
         // an anonymous wasmtime validation error inside whichever Test262 case
@@ -416,12 +418,14 @@ impl EmittedFunction {
         let literal_operands = body.literal_operands().to_vec();
         let branch_hints = body.branch_hints();
         let native_program_context = body.native_program_context();
-        let raw_body = body.into_body_named(&identity.wasm_name()).into_raw_body();
+        let (body, index_operands) = body.into_body_and_index_operands(&identity.wasm_name());
+        let raw_body = body.into_raw_body();
         let body_bytes = FunctionBodySize::of(&raw_body);
         Self {
             declaration: FunctionDeclaration::NonCallable,
             identity,
             raw_body,
+            index_operands,
             literal_operands,
             branch_hints,
             native_program_context,
@@ -454,6 +458,7 @@ pub(crate) struct ModuleCode {
     branch_hints: Vec<crate::branch_hints::BodySites>,
     native_program_contexts: Vec<crate::native_program_contexts::ModuleContext>,
     type_indices: Vec<u32>,
+    index_operands: Vec<Vec<crate::code_sink::IndexOperand>>,
     next_wasm_index: u32,
 }
 
@@ -470,6 +475,7 @@ impl ModuleCode {
             branch_hints: Vec::new(),
             native_program_contexts: Vec::new(),
             type_indices: Vec::new(),
+            index_operands: Vec::new(),
             next_wasm_index: first_wasm_index,
         }
     }
@@ -499,6 +505,7 @@ impl ModuleCode {
         self.functions.function(type_index);
         self.type_indices.push(type_index);
         self.section.raw(&function.raw_body);
+        self.index_operands.push(function.index_operands);
         let body = u32::try_from(self.records.len()).expect("code body count overflow");
         if let Some(context) = function.native_program_context {
             self.native_program_contexts
@@ -533,6 +540,7 @@ impl ModuleCode {
                 branch_hints: self.branch_hints,
                 native_program_contexts: self.native_program_contexts,
                 type_indices: self.type_indices,
+                index_operands: self.index_operands,
             },
         )
     }
@@ -546,6 +554,8 @@ pub(crate) struct ModuleFunctionTable {
     branch_hints: Vec<crate::branch_hints::BodySites>,
     native_program_contexts: Vec<crate::native_program_contexts::ModuleContext>,
     type_indices: Vec<u32>,
+    /// Per body, in code-section order: its function and global index operands.
+    index_operands: Vec<Vec<crate::code_sink::IndexOperand>>,
 }
 
 impl ModuleFunctionTable {
@@ -556,42 +566,28 @@ impl ModuleFunctionTable {
         crate::branch_hints::insert(bytes, &self.branch_hints)
     }
 
-    /// Import compaction preserves every body/local but may shorten structural
-    /// LEB operands. Bind attribution to the actual final body bytes and indices.
-    pub(crate) fn remeasure_reencoded(
+    /// The function and global index operands of each body, in code-section
+    /// order, at their offsets in the body as emitted.
+    pub(crate) fn index_operands(&self) -> &[Vec<crate::code_sink::IndexOperand>] {
+        &self.index_operands
+    }
+
+    /// Import compaction preserves every body and its locals but may shorten
+    /// index operands. Bind attribution to the final body sizes (one per
+    /// body, in code-section order) and indices.
+    pub(crate) fn rebind_compacted(
         &mut self,
-        bytes: &[u8],
+        body_sizes: &[usize],
         mut remap: impl FnMut(u32) -> Result<u32, EmitError>,
     ) -> Result<(), EmitError> {
-        let fail = |message: String| {
-            EmitError::unsupported(format!(
-                "compiler function attribution reencoding failed: {message}"
-            ))
-        };
-        let mut records = self.records.iter_mut();
-        for payload in wasmparser::Parser::new(0).parse_all(bytes) {
-            if let wasmparser::Payload::CodeSectionEntry(body) =
-                payload.map_err(|e| fail(e.to_string()))?
-            {
-                let record = records
-                    .next()
-                    .ok_or_else(|| fail("extra final body".into()))?;
-                let mut locals = 0u32;
-                for local in body.get_locals_reader().map_err(|e| fail(e.to_string()))? {
-                    let (count, _) = local.map_err(|e| fail(e.to_string()))?;
-                    locals = locals
-                        .checked_add(count)
-                        .ok_or_else(|| fail("local count overflow".into()))?;
-                }
-                if locals != record.declared_locals.count() {
-                    return Err(fail("final body changed declared local count".into()));
-                }
-                record.wasm_index = remap(record.wasm_index)?;
-                record.body_bytes = FunctionBodySize::of(&bytes[body.range()]);
-            }
+        if body_sizes.len() != self.records.len() {
+            return Err(EmitError::unsupported(
+                "compiler function attribution: compaction changed the body count",
+            ));
         }
-        if records.next().is_some() {
-            return Err(fail("missing final body".into()));
+        for (record, size) in self.records.iter_mut().zip(body_sizes) {
+            record.wasm_index = remap(record.wasm_index)?;
+            record.body_bytes = FunctionBodySize(u32::try_from(*size).unwrap_or(u32::MAX));
         }
         Ok(())
     }

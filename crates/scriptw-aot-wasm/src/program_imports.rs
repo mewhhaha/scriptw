@@ -1,7 +1,15 @@
 //! Final producer-P import compaction. R, types, bodies and operators are retained.
-//! Structural references use the encoder's exhaustive index adapters; names and
-//! plain declarative ref.func lists do not keep otherwise unused imports alive.
-use crate::{emitted_function::ModuleFunctionTable, module::EmitError};
+//! Structural references outside the code section use the encoder's exhaustive
+//! index adapters; names and plain declarative ref.func lists do not keep
+//! otherwise unused imports alive. Code bodies are not decoded again: the code
+//! sink recorded every function and global index operand as it encoded it
+//! ([`crate::code_sink::IndexOperand`]), so those operands are the bodies'
+//! references and compaction rewrites exactly them.
+use crate::{
+    code_sink::{IndexOperand, IndexSpace},
+    emitted_function::ModuleFunctionTable,
+    module::EmitError,
+};
 use std::collections::BTreeSet;
 use wasm_encoder::{
     reencode::{self, Reencode},
@@ -51,8 +59,28 @@ struct References {
     functions: BTreeSet<u32>,
     globals: BTreeSet<u32>,
 }
+impl References {
+    fn of_bodies(table: &ModuleFunctionTable) -> Self {
+        let mut references = Self::default();
+        for operand in table.index_operands().iter().flatten() {
+            match operand.space() {
+                IndexSpace::Function => references.functions.insert(operand.index()),
+                IndexSpace::Global => references.globals.insert(operand.index()),
+            };
+        }
+        references
+    }
+}
 impl Reencode for References {
     type Error = String;
+    /// Body references were taken from the recorded index operands.
+    fn parse_code_section(
+        &mut self,
+        _: &mut wasm_encoder::CodeSection,
+        _: wasmparser::CodeSectionReader<'_>,
+    ) -> Result<(), reencode::Error<String>> {
+        Ok(())
+    }
     fn function_index(&mut self, index: u32) -> Result<u32, reencode::Error<String>> {
         self.functions.insert(index);
         Ok(index)
@@ -119,9 +147,59 @@ impl Maps {
 }
 struct Rewrite<'a> {
     maps: &'a Maps,
+    bytes: &'a [u8],
+    index_operands: &'a [Vec<IndexOperand>],
+    /// Final size of each body rewritten so far, in code-section order.
+    body_sizes: Vec<usize>,
+    body: Vec<u8>,
+}
+impl Rewrite<'_> {
+    /// `raw` (one body as emitted) with each index operand renumbered.
+    fn rewrite_body(&mut self, raw: &[u8], operands: &[IndexOperand]) -> Result<(), String> {
+        self.body.clear();
+        let mut copied = 0;
+        for operand in operands {
+            let at = operand.offset() as usize;
+            if at < copied || at >= raw.len() {
+                return Err("index operands are not in body order".into());
+            }
+            let mut reader = wasmparser::BinaryReader::new(&raw[at..], 0);
+            let encoded = reader.read_var_u32().map_err(|error| error.to_string())?;
+            if encoded != operand.index() {
+                return Err(format!(
+                    "recorded index operand {} does not match the body's {encoded}",
+                    operand.index()
+                ));
+            }
+            let index = match operand.space() {
+                IndexSpace::Function => self.maps.functions.require(FunctionIndex(encoded))?.0,
+                IndexSpace::Global => self.maps.globals.require(GlobalIndex(encoded))?.0,
+            };
+            self.body.extend_from_slice(&raw[copied..at]);
+            wasm_encoder::Encode::encode(&index, &mut self.body);
+            copied = at + reader.current_position();
+        }
+        self.body.extend_from_slice(&raw[copied..]);
+        Ok(())
+    }
 }
 impl Reencode for Rewrite<'_> {
     type Error = String;
+    fn parse_function_body(
+        &mut self,
+        code: &mut wasm_encoder::CodeSection,
+        func: wasmparser::FunctionBody<'_>,
+    ) -> Result<(), reencode::Error<String>> {
+        let index_operands = self.index_operands;
+        let operands = index_operands
+            .get(self.body_sizes.len())
+            .ok_or_else(|| user("a code body has no recorded index operands"))?;
+        let bytes = self.bytes;
+        self.rewrite_body(&bytes[func.range()], operands).map_err(user)?;
+        code.raw(&self.body);
+        self.body_sizes.push(self.body.len());
+        Ok(())
+    }
     fn function_index(&mut self, index: u32) -> Result<u32, reencode::Error<String>> {
         self.maps
             .functions
@@ -221,7 +299,7 @@ pub(crate) fn compact(
     bytes: Vec<u8>,
     table: &mut ModuleFunctionTable,
 ) -> Result<Vec<u8>, EmitError> {
-    let mut references = References::default();
+    let mut references = References::of_bodies(table);
     references
         .parse_core_module(&mut Module::new(), parser(), &bytes)
         .map_err(invalid)?;
@@ -230,12 +308,20 @@ pub(crate) fn compact(
         return Ok(bytes);
     }
     let mut module = Module::new();
-    Rewrite { maps: &maps }
+    let mut rewrite = Rewrite {
+        maps: &maps,
+        bytes: &bytes,
+        index_operands: table.index_operands(),
+        body_sizes: Vec::new(),
+        body: Vec::new(),
+    };
+    rewrite
         .parse_core_module(&mut module, parser(), &bytes)
         .map_err(invalid)?;
+    let body_sizes = rewrite.body_sizes;
     let output = module.finish();
     wasmparser::Validator::new_with_features(crate::runtime_artifact::program_validation_features()).validate_all(&output).map_err(invalid)?;
-    table.remeasure_reencoded(&output, |index| {
+    table.rebind_compacted(&body_sizes, |index| {
         maps.functions
             .require(FunctionIndex(index))
             .map(|i| i.0)
