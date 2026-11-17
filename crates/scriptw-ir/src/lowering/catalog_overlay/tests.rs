@@ -169,5 +169,37 @@ fn settled_idempotent_edit_revisits_exactly_the_keys_mutated_since() {
     assert!(fork.empty_changes().unsettled_keys(edit, &keys).len() == 2);
 }
 
+#[test]
+fn settled_whole_catalog_edits_retest_only_entries_mutated_since() {
+    let baseline = Box::leak(Box::new(BTreeMap::from([
+        ("a".to_string(), 1),
+        ("b".to_string(), 2),
+        ("c".to_string(), 3),
+    ])));
+    let mut facts = CatalogOverlay::new(baseline);
+    let tested = std::cell::RefCell::new(Vec::new());
+    let odd = |key: &String, value: &i32| {
+        tested.borrow_mut().push(key.clone());
+        value % 2 == 1
+    };
+    let discard = IdempotentEdit::DiscardHeapShape;
+    let forget = IdempotentEdit::ForgetConfigurablePresence;
+    facts.replace_selected(discard, odd, |_, value| value + 1);
+    assert_eq!(tested.take(), ["a", "b", "c"]);
+    assert_eq!(facts.values().copied().collect::<Vec<_>>(), [2, 2, 4]);
+    // The other edit has its own settled state; both track later mutations.
+    facts.edit_selected(forget, |_, value| *value > 3, |_, value| *value = 0);
+    facts.insert("d".to_string(), 7);
+    let _ = facts.get_mut("b");
+    facts.replace_selected(discard, odd, |_, value| value + 1);
+    // "c" was edited by the other edit after `discard` settled.
+    assert_eq!(tested.take(), ["b", "c", "d"]);
+    assert_eq!(facts.get("d"), Some(&8));
+    facts.replace_selected(discard, odd, |_, value| value + 1);
+    assert!(tested.take().is_empty());
+    let fresh = facts.empty_changes();
+    assert_eq!(fresh.selected_keys(discard, |_, _| true), ["a", "b", "c"]);
+}
+
 #[path = "tests/changed_facts.rs"]
 mod changed_facts;

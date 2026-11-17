@@ -8,10 +8,10 @@ use std::sync::Arc;
 pub(super) struct CatalogOverlay<V: 'static> {
     baseline: Option<&'static BTreeMap<String, V>>,
     changes: BTreeMap<String, Option<Arc<V>>>,
-    /// The last whole-key-set idempotent edit and the entries changed since.
-    /// Every mutable access records its key here, so an entry can never be
-    /// treated as settled after it changed.
-    settled: Option<SettledEdit>,
+    /// The last whole-key-set application of each idempotent edit and the
+    /// entries changed since. Every mutable access records its key here, so
+    /// an entry can never be treated as settled after it changed.
+    settled: Vec<SettledEdit>,
 }
 
 /// An edit of each entry of a key set which is idempotent and reads or writes
@@ -22,12 +22,32 @@ pub(super) enum IdempotentEdit {
     /// Merge an unknown receiver and unknown arguments into a signature, as
     /// an unknown property hook may call any planned source function.
     UnknownPropertyHook,
+    /// Discard the heap shape of every entry that has one.
+    DiscardHeapShape,
+    /// Stop proving presence of every configurable entry proven present.
+    ForgetConfigurablePresence,
+}
+
+#[derive(Debug, Clone)]
+enum SettledKeys {
+    Listed(Arc<BTreeSet<String>>),
+    /// Every key, including keys inserted later.
+    All,
+}
+
+impl SettledKeys {
+    fn contains(&self, key: &str) -> bool {
+        match self {
+            Self::Listed(keys) => keys.contains(key),
+            Self::All => true,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 struct SettledEdit {
     edit: IdempotentEdit,
-    keys: Arc<BTreeSet<String>>,
+    keys: SettledKeys,
     /// Keys of `keys` accessed mutably since `edit` was applied to all keys.
     touched: BTreeSet<String>,
 }
@@ -37,7 +57,7 @@ impl<V: 'static> Default for CatalogOverlay<V> {
         Self {
             baseline: None,
             changes: BTreeMap::new(),
-            settled: None,
+            settled: Vec::new(),
         }
     }
 }
@@ -47,16 +67,82 @@ impl<V: 'static> CatalogOverlay<V> {
         Self {
             baseline: Some(baseline),
             changes: BTreeMap::new(),
-            settled: None,
+            settled: Vec::new(),
         }
     }
 
     fn touch(&mut self, key: &str) {
-        if let Some(settled) = &mut self.settled {
+        for settled in &mut self.settled {
             if settled.keys.contains(key) && !settled.touched.contains(key) {
                 settled.touched.insert(key.to_string());
             }
         }
+    }
+
+    fn settled_edit(&self, edit: IdempotentEdit) -> Option<&SettledEdit> {
+        self.settled.iter().find(|settled| settled.edit == edit)
+    }
+
+    fn record_settled(&mut self, edit: IdempotentEdit, keys: SettledKeys) {
+        self.settled.retain(|settled| settled.edit != edit);
+        self.settled.push(SettledEdit {
+            edit,
+            keys,
+            touched: BTreeSet::new(),
+        });
+    }
+
+    /// The keys `select` picks for a whole-catalog `edit`, in key order. Once
+    /// `edit` was applied to every selected entry, only entries mutated since
+    /// can be selected again: the edit leaves `select` false on the entry,
+    /// and both read only that entry.
+    fn selected_keys(
+        &self,
+        edit: IdempotentEdit,
+        mut select: impl FnMut(&String, &V) -> bool,
+    ) -> Vec<String> {
+        match self.settled_edit(edit) {
+            Some(SettledEdit {
+                keys: SettledKeys::All,
+                touched,
+                ..
+            }) => touched
+                .iter()
+                .filter(|key| self.get(key).is_some_and(|value| select(key, value)))
+                .cloned()
+                .collect(),
+            _ => self
+                .iter()
+                .filter_map(|(key, value)| select(key, value).then(|| key.clone()))
+                .collect(),
+        }
+    }
+
+    /// Replace every entry `select` picks with `replace` of it, for an
+    /// [`IdempotentEdit`] that leaves `select` false. Each replacement is
+    /// built from the current entry by reference, so a baseline or shared
+    /// entry is not first copied whole when the edit discards most of it.
+    pub(super) fn replace_selected(
+        &mut self,
+        edit: IdempotentEdit,
+        select: impl FnMut(&String, &V) -> bool,
+        mut replace: impl FnMut(&String, &V) -> V,
+    ) {
+        let replacements = self
+            .selected_keys(edit, select)
+            .into_iter()
+            .map(|key| {
+                let value = replace(
+                    &key,
+                    self.get(&key).expect("selected catalog entry must exist"),
+                );
+                (key, value)
+            })
+            .collect::<Vec<_>>();
+        for (key, value) in replacements {
+            self.insert(key, value);
+        }
+        self.record_settled(edit, SettledKeys::All);
     }
 
     /// The keys of `keys` on which `edit` may still change an entry, in key
@@ -67,10 +153,12 @@ impl<V: 'static> CatalogOverlay<V> {
         edit: IdempotentEdit,
         keys: &Arc<BTreeSet<String>>,
     ) -> Vec<String> {
-        match &self.settled {
-            Some(settled) if settled.edit == edit && Arc::ptr_eq(&settled.keys, keys) => {
-                settled.touched.iter().cloned().collect()
-            }
+        match self.settled_edit(edit) {
+            Some(SettledEdit {
+                keys: SettledKeys::Listed(settled),
+                touched,
+                ..
+            }) if Arc::ptr_eq(settled, keys) => touched.iter().cloned().collect(),
             _ => keys.iter().cloned().collect(),
         }
     }
@@ -79,20 +167,15 @@ impl<V: 'static> CatalogOverlay<V> {
     /// settled key set and the entry was not mutated since, so applying it
     /// again would leave the entry unchanged.
     pub(super) fn is_settled(&self, edit: IdempotentEdit, key: &str) -> bool {
-        self.settled.as_ref().is_some_and(|settled| {
-            settled.edit == edit && settled.keys.contains(key) && !settled.touched.contains(key)
-        })
+        self.settled_edit(edit)
+            .is_some_and(|settled| settled.keys.contains(key) && !settled.touched.contains(key))
     }
 
     /// Record that `edit` was just applied to every key that
     /// [`Self::unsettled_keys`] returned for `keys`, with no other mutation
     /// in between.
     pub(super) fn settle(&mut self, edit: IdempotentEdit, keys: Arc<BTreeSet<String>>) {
-        self.settled = Some(SettledEdit {
-            edit,
-            keys,
-            touched: BTreeSet::new(),
-        });
+        self.record_settled(edit, SettledKeys::Listed(keys));
     }
 
     pub(super) fn get(&self, key: &str) -> Option<&V> {
@@ -151,7 +234,7 @@ impl<V: 'static> CatalogOverlay<V> {
         Self {
             baseline: self.baseline,
             changes: BTreeMap::new(),
-            settled: None,
+            settled: Vec::new(),
         }
     }
 }
@@ -204,25 +287,24 @@ impl<V: Clone + 'static> CatalogOverlay<V> {
             );
         }
     }
-}
 
-impl<V: 'static> CatalogOverlay<V> {
-    /// Like `edit_matching`, but each selected entry's replacement is built
-    /// from the current entry by reference, so a baseline or shared entry is
-    /// not first copied whole when the edit discards most of it.
-    pub(super) fn replace_matching(
+    /// `edit_matching` for an [`IdempotentEdit`] that leaves `select` false
+    /// on each entry it edits. After the first pass only entries mutated
+    /// since are tested again.
+    pub(super) fn edit_selected(
         &mut self,
-        mut select: impl FnMut(&String, &V) -> bool,
-        mut replace: impl FnMut(&String, &V) -> V,
+        edit_kind: IdempotentEdit,
+        select: impl FnMut(&String, &V) -> bool,
+        mut edit: impl FnMut(&String, &mut V),
     ) {
-        let replacements = self
-            .iter()
-            .filter(|(key, value)| select(key, value))
-            .map(|(key, value)| (key.clone(), replace(key, value)))
-            .collect::<Vec<_>>();
-        for (key, value) in replacements {
-            self.insert(key, value);
+        for key in self.selected_keys(edit_kind, select) {
+            edit(
+                &key,
+                self.get_mut(&key)
+                    .expect("selected catalog entry must exist"),
+            );
         }
+        self.record_settled(edit_kind, SettledKeys::All);
     }
 }
 

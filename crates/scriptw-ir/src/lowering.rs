@@ -5415,6 +5415,14 @@ impl<'a> ScriptLowerer<'a> {
     /// have changed.
     fn visit_live_heap_shape_roots(
         &mut self,
+        visit: impl FnMut(KindSet, &FunctionTargetKnowledge, &mut HeapShape) -> bool,
+    ) {
+        self.visit_heap_shape_roots(true, visit);
+    }
+
+    fn visit_heap_shape_roots(
+        &mut self,
+        visit_global_properties: bool,
         mut visit: impl FnMut(KindSet, &FunctionTargetKnowledge, &mut HeapShape) -> bool,
     ) {
         // This visitor can refine an existing shape or discard it. Its typed
@@ -5481,17 +5489,19 @@ impl<'a> ScriptLowerer<'a> {
                 &mut visit,
             );
         }
-        self.global_properties.edit_matching(
-            |_, property| property.value_info.heap_shape.is_some(),
-            |_, property| {
-                visit_present(
-                    property.value_info.possible_kinds,
-                    &property.value_info.function_targets,
-                    &mut property.value_info.heap_shape,
-                    &mut visit,
-                )
-            },
-        );
+        if visit_global_properties {
+            self.global_properties.edit_matching(
+                |_, property| property.value_info.heap_shape.is_some(),
+                |_, property| {
+                    visit_present(
+                        property.value_info.possible_kinds,
+                        &property.value_info.function_targets,
+                        &mut property.value_info.heap_shape,
+                        &mut visit,
+                    )
+                },
+            );
+        }
         for info in self.well_known_symbol_prototype_properties.values_mut() {
             visit_present(
                 info.possible_kinds,
@@ -5582,11 +5592,13 @@ impl<'a> ScriptLowerer<'a> {
     /// shape. Global property facts are rebuilt without their shapes rather
     /// than copied from the catalog or a shared row and then cleared.
     fn discard_live_heap_shape_roots(&mut self) {
-        self.global_properties.replace_matching(
+        self.global_properties.replace_selected(
+            IdempotentEdit::DiscardHeapShape,
             |_, property| property.value_info.heap_shape.is_some(),
             |_, property| property.without_heap_shape(),
         );
-        self.visit_live_heap_shape_roots(|_, _, _| false);
+        // No global property fact has a shape left to visit.
+        self.visit_heap_shape_roots(false, |_, _, _| false);
     }
 
     fn invalidate_unknown_user_code_effects(&mut self) {
@@ -5621,7 +5633,8 @@ impl<'a> ScriptLowerer<'a> {
         self.discard_live_heap_shape_roots();
 
         self.invalidate_all_possible_global_property_value_infos();
-        self.global_properties.edit_matching(
+        self.global_properties.edit_selected(
+            IdempotentEdit::ForgetConfigurablePresence,
             |_, property| property.configurable && property.proven_present,
             |_, property| property.proven_present = false,
         );
