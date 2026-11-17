@@ -157,7 +157,11 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // ReadableStreamDefaultReader and ReadableByteStreamController to the demand
 // constructor domain: their slots start as the Undefined placeholder and the
 // DeferredDemandConstructor recipe word gains five values.
-const LAYOUT_VERSION: u32 = 81;
+// Version 82 publishes isNaN, isFinite, the URI functions, escape and
+// unescape as DeferredIntrinsicValue recipes that the method resolver
+// materializes on first observation; eval and canonical-slot functions stay
+// eager.
+const LAYOUT_VERSION: u32 = 82;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

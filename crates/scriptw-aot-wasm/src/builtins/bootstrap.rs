@@ -1233,6 +1233,21 @@ impl<'a> FunctionBuilder<'a> {
                             &bootstrap.realm,
                             function,
                         )?)
+                    } else if let Some(method) =
+                        match self.functions.get(&builtin.function_id()) {
+                            Some(meta) => {
+                                crate::intrinsics::DeferredIntrinsicMethod::validated_global(
+                                    *builtin, meta,
+                                )?
+                            }
+                            None => None,
+                        }
+                    {
+                        Some(self.emit_deferred_global_function_value(
+                            method,
+                            &bootstrap.realm,
+                            function,
+                        ))
                     } else {
                         if *builtin == StandardBuiltinId::EvalFunction {
                             self.emit_load_realm_eval_intrinsic_to_local(

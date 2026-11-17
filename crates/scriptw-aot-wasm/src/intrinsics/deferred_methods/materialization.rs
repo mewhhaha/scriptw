@@ -14,7 +14,7 @@ impl MethodPlan {
         meta: WasmFunctionMeta,
     ) -> Result<Self, EmitError> {
         let valid = meta.standard_builtin == Some(method.0)
-            && DeferredIntrinsicMethod::new(method.0).is_some()
+            && DeferredIntrinsicMethod::any(method.0).is_some()
             && matches!(meta.entry.identity(), FunctionIdentity::StandardBuiltin(id) if id == method.0)
             && meta.entry.executable_kind()? == ExecutableCodeKind::StandardBuiltin
             && meta.protocol() == scriptw_ir::FunctionProtocolIr::OrdinaryCallOnly

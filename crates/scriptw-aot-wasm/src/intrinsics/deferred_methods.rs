@@ -55,9 +55,63 @@ impl DeferredIntrinsicMethod {
             && !StandardBuiltinId::all_globals().contains(&builtin))
         .then_some(Self(builtin))
     }
+
+    /// An ordinary global function, such as isNaN or encodeURI, whose global
+    /// property holds a recipe until its first observation. eval stays eager:
+    /// direct-eval detection compares against the Realm's %eval% identity.
+    pub(super) fn global(builtin: StandardBuiltinId) -> Option<Self> {
+        (builtin != StandardBuiltinId::EvalFunction
+            && crate::module::standard_builtin_function_realm_slot(builtin).is_none()
+            && !builtin.constructable()
+            && StandardBuiltinId::all_globals().contains(&builtin))
+        .then_some(Self(builtin))
+    }
+
+    /// Either deferred domain: a method row or an ordinary global function.
+    fn any(builtin: StandardBuiltinId) -> Option<Self> {
+        Self::new(builtin).or_else(|| Self::global(builtin))
+    }
+
+    pub(crate) fn validated_global(
+        builtin: StandardBuiltinId,
+        meta: &WasmFunctionMeta,
+    ) -> Result<Option<Self>, EmitError> {
+        let Some(method) = Self::global(builtin) else {
+            return Ok(None);
+        };
+        MethodPlan::new(method, meta.clone())?;
+        Ok(Some(method))
+    }
 }
 
 impl FunctionBuilder<'_> {
+    /// The recipe an ordinary global function's binding publishes. It
+    /// captures the defining Realm and an empty cache, as an installation's.
+    pub(crate) fn emit_deferred_global_function_value(
+        &mut self,
+        method: DeferredIntrinsicMethod,
+        realm: &crate::functions::RealmFunctionMaterializationContext,
+        f: &mut Function,
+    ) -> GcLocal<PropertyValue> {
+        let s = self.runtime_schema();
+        let recipe = s.reserve_gc_local(f).initialize(
+            s.struct_type::<DeferredIntrinsicValue>().construct(
+                (
+                    GcOperand::reference(realm.realm(), s),
+                    GcOperand::constant(method.0),
+                    GcOperand::null(s),
+                ),
+                f,
+            ),
+            f,
+        );
+        let value = s
+            .reserve_gc_local(f)
+            .initialize(recipe.load(s, f).upcast(), f);
+        recipe.clear(f);
+        value
+    }
+
     pub(super) fn emit_install_deferred_intrinsic_method_aliases(
         &mut self,
         target: &ValueLocals,
@@ -556,7 +610,7 @@ impl FunctionBuilder<'_> {
             .values()
             .filter_map(|meta| {
                 meta.standard_builtin
-                    .and_then(DeferredIntrinsicMethod::new)
+                    .and_then(DeferredIntrinsicMethod::any)
                     .map(|method| MethodPlan::new(method, meta.clone()))
             })
             .collect::<Result<Vec<_>, _>>()?;
