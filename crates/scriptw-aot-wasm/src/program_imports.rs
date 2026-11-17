@@ -151,12 +151,16 @@ struct Rewrite<'a> {
     index_operands: &'a [Vec<IndexOperand>],
     /// Final size of each body rewritten so far, in code-section order.
     body_sizes: Vec<usize>,
+    /// Per body rewritten so far: the offset of each operand whose encoding
+    /// became shorter, and by how many bytes.
+    removed: Vec<Vec<(u32, u32)>>,
     body: Vec<u8>,
 }
 impl Rewrite<'_> {
     /// `raw` (one body as emitted) with each index operand renumbered.
     fn rewrite_body(&mut self, raw: &[u8], operands: &[IndexOperand]) -> Result<(), String> {
         self.body.clear();
+        let mut removed = Vec::new();
         let mut copied = 0;
         for operand in operands {
             let at = operand.offset() as usize;
@@ -176,10 +180,17 @@ impl Rewrite<'_> {
                 IndexSpace::Global => self.maps.globals.require(GlobalIndex(encoded))?.0,
             };
             self.body.extend_from_slice(&raw[copied..at]);
+            let written = self.body.len();
             wasm_encoder::Encode::encode(&index, &mut self.body);
-            copied = at + reader.current_position();
+            let width = reader.current_position();
+            let shorter = width - (self.body.len() - written);
+            if shorter != 0 {
+                removed.push((operand.offset(), shorter as u32));
+            }
+            copied = at + width;
         }
         self.body.extend_from_slice(&raw[copied..]);
+        self.removed.push(removed);
         Ok(())
     }
 }
@@ -313,15 +324,20 @@ pub(crate) fn compact(
         bytes: &bytes,
         index_operands: table.index_operands(),
         body_sizes: Vec::new(),
+        removed: Vec::new(),
         body: Vec::new(),
     };
     rewrite
         .parse_core_module(&mut module, parser(), &bytes)
         .map_err(invalid)?;
-    let body_sizes = rewrite.body_sizes;
+    let Rewrite {
+        body_sizes,
+        removed,
+        ..
+    } = rewrite;
     let output = module.finish();
     wasmparser::Validator::new_with_features(crate::runtime_artifact::program_validation_features()).validate_all(&output).map_err(invalid)?;
-    table.rebind_compacted(&body_sizes, |index| {
+    table.rebind_compacted(&body_sizes, &removed, |index| {
         maps.functions
             .require(FunctionIndex(index))
             .map(|i| i.0)

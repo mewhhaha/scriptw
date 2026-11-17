@@ -1,13 +1,17 @@
 //! The branch hinting section of an emitted module.
 //!
 //! An emitter marks a two-way branch where it emits it
-//! (`code_sink::Function::unlikely` and `likely`). The mark is the ordinal
-//! of the branch among its body's operators: locals declared later and
-//! import compaction move a body's bytes but keep its operators. The
-//! section, `metadata.code.branch_hint` of the WebAssembly branch hinting
-//! proposal, names each branch by its byte offset from the start of the
-//! body's local declarations, so it is written last, from the final bytes,
-//! and placed before the code section as the proposal requires.
+//! (`code_sink::Function::unlikely` and `likely`), or later by the ordinal
+//! of the branch among its body's operators. The code sink keeps the byte
+//! offset of every two-way branch it encodes and gives each hinted one its
+//! offset when the body is finished, after the body's local declaration is
+//! final. Import compaction shortens index operands and moves the offsets
+//! after them by what it removed ([`BodySites::compact`]). The section,
+//! `metadata.code.branch_hint` of the WebAssembly branch hinting proposal,
+//! names each branch by its byte offset from the start of the body's local
+//! declarations; it is written last, after the final bytes, and placed
+//! before the code section as the proposal requires. Writing it decodes no
+//! operator: it checks that each offset holds a two-way branch opcode.
 //!
 //! The proposal hints `if` and `br_if`. The pinned Wasmtime translation
 //! reads the same record at `br_on_null`, `br_on_non_null`, `br_on_cast` and
@@ -15,22 +19,22 @@
 //! that follows the proposal alone never looks at their offsets. A hint
 //! changes where native code is placed, never what it computes.
 use crate::module::EmitError;
-use wasmparser::{Operator, Parser, Payload, TypeRef};
+use wasmparser::{Parser, Payload, TypeRef};
 
 pub(crate) const SECTION_NAME: &str = "metadata.code.branch_hint";
 const CODE_SECTION_ID: u8 = 10;
 
-/// One hinted branch of a body under construction.
+/// One hinted branch of a finished body: its byte offset in the body.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct FunctionSite {
-    operator: u32,
+    offset: u32,
     likely: bool,
 }
 
 impl FunctionSite {
-    /// Only the code sink mints a site, as it emits the branch.
-    pub(crate) fn new(operator: u32, likely: bool) -> Self {
-        Self { operator, likely }
+    /// Only the code sink mints a site, as it finishes the body.
+    pub(crate) fn new(offset: u32, likely: bool) -> Self {
+        Self { offset, likely }
     }
 }
 
@@ -44,6 +48,34 @@ pub(crate) struct BodySites {
 impl BodySites {
     pub(crate) fn new(body: u32, sites: Vec<FunctionSite>) -> Option<Self> {
         (!sites.is_empty()).then_some(Self { body, sites })
+    }
+
+    pub(crate) fn body(&self) -> u32 {
+        self.body
+    }
+
+    /// Follow import compaction of this body: `removed` gives, in body
+    /// order, the offset of each rewritten operand and how many bytes its
+    /// rewriting removed. Every byte removed before a branch moves it.
+    pub(crate) fn compact(&mut self, removed: impl IntoIterator<Item = (u32, u32)>) {
+        let mut removed = removed.into_iter().peekable();
+        let mut shift = 0;
+        for site in &mut self.sites {
+            while let Some((_, bytes)) = removed.next_if(|(offset, _)| *offset < site.offset) {
+                shift += bytes;
+            }
+            site.offset -= shift;
+        }
+    }
+}
+
+/// Whether the operator at the start of `code` is a two-way branch.
+fn starts_two_way_branch(code: &[u8]) -> bool {
+    match code {
+        [0x04 | 0x0D | 0xD5 | 0xD6, ..] => true,
+        // br_on_cast and br_on_cast_fail.
+        [0xFB, 0x18 | 0x19, ..] => true,
+        _ => false,
     }
 }
 
@@ -108,39 +140,28 @@ pub(crate) fn insert(bytes: Vec<u8>, bodies: &[BodySites]) -> Result<Vec<u8>, Em
                 let Some(sites) = pending.next_if(|sites| sites.body == ordinal) else {
                     continue;
                 };
-                let start = entry.range().start;
-                let mut reader = entry.get_operators_reader().map_err(fail)?;
-                let mut operator = 0u32;
+                let code = &bytes[entry.range()];
                 leb(imported + ordinal, &mut functions);
                 leb(
                     u32::try_from(sites.sites.len()).map_err(fail)?,
                     &mut functions,
                 );
+                let mut previous = None;
                 for site in &sites.sites {
-                    if site.operator < operator {
-                        return Err(fail("sites of a body are not in operator order"));
+                    if previous.is_some_and(|previous| site.offset <= previous) {
+                        return Err(fail("sites of a body are not in body order"));
                     }
-                    while operator < site.operator {
-                        reader.read().map_err(fail)?;
-                        operator += 1;
-                    }
-                    let offset = reader.original_position() - start;
-                    if !matches!(
-                        reader.read().map_err(fail)?,
-                        Operator::If { .. }
-                            | Operator::BrIf { .. }
-                            | Operator::BrOnNull { .. }
-                            | Operator::BrOnNonNull { .. }
-                            | Operator::BrOnCast { .. }
-                            | Operator::BrOnCastFail { .. }
-                    ) {
+                    previous = Some(site.offset);
+                    if !code
+                        .get(site.offset as usize..)
+                        .is_some_and(starts_two_way_branch)
+                    {
                         return Err(fail(format!(
-                            "operator {} of body {ordinal} is not a two-way branch",
-                            site.operator
+                            "offset {} of body {ordinal} is not a two-way branch",
+                            site.offset
                         )));
                     }
-                    operator += 1;
-                    leb(u32::try_from(offset).map_err(fail)?, &mut functions);
+                    leb(site.offset, &mut functions);
                     functions.push(1);
                     functions.push(u8::from(site.likely));
                 }
@@ -194,8 +215,9 @@ mod tests {
         let mut sites = Vec::new();
         for (ordinal, body) in bodies.into_iter().enumerate() {
             functions.function(0);
-            sites.extend(BodySites::new(ordinal as u32, body.branch_hints()));
-            code.function(&body.into_body());
+            let finished = body.finish_named(&"a test body");
+            sites.extend(BodySites::new(ordinal as u32, finished.branch_hints));
+            code.function(&finished.body);
         }
         module.section(&functions);
         module.section(&code);
@@ -392,13 +414,8 @@ mod tests {
             function.rarely_reached();
         });
         assert_eq!(
-            function.branch_hints(),
-            [
-                FunctionSite::new(1, false),
-                FunctionSite::new(8, true),
-                FunctionSite::new(14, true),
-                FunctionSite::new(24, true),
-            ]
+            function.hinted_operators(),
+            [(1, false), (8, true), (14, true), (24, true)]
         );
     }
 
@@ -428,12 +445,8 @@ mod tests {
             function.instruction(&Instruction::End);
         });
         assert_eq!(
-            function.branch_hints(),
-            [
-                FunctionSite::new(2, false),
-                FunctionSite::new(7, false),
-                FunctionSite::new(9, true),
-            ]
+            function.hinted_operators(),
+            [(2, false), (7, false), (9, true)]
         );
     }
 

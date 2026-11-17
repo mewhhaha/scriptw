@@ -353,6 +353,9 @@ pub(crate) struct Function {
     rare_labels: Vec<u64>,
     /// Every function and global index immediate, in body order.
     index_operands: Vec<IndexOperand>,
+    /// Operator ordinal and byte offset of every two-way branch, in body
+    /// order: a hint may name a branch after it was emitted.
+    two_way_branches: Vec<(u32, u32)>,
     /// The branch that decides whether the next instruction runs, if one
     /// branch does.
     anchor: Option<Anchor>,
@@ -377,6 +380,7 @@ impl Clone for Function {
             branch_hints: self.branch_hints.clone(),
             rare_labels: self.rare_labels.clone(),
             index_operands: self.index_operands.clone(),
+            two_way_branches: self.two_way_branches.clone(),
             anchor: self.anchor,
         }
     }
@@ -408,6 +412,7 @@ impl Function {
             branch_hints: std::collections::BTreeMap::new(),
             rare_labels: Vec::new(),
             index_operands: Vec::new(),
+            two_way_branches: Vec::new(),
             anchor: None,
         }
     }
@@ -777,6 +782,12 @@ impl Function {
                 | Instruction::Rethrow(_)
                 | Instruction::Unreachable
         );
+        if is_two_way_branch(instruction) {
+            self.two_way_branches.push((
+                self.operator_count,
+                u32::try_from(self.body.byte_len()).expect("Wasm body exceeds u32 bytes"),
+            ));
+        }
         self.body.instruction(instruction);
         if let Some((space, index)) = IndexOperand::of(instruction) {
             let end = u32::try_from(self.body.byte_len()).expect("Wasm body exceeds u32 bytes");
@@ -814,15 +825,7 @@ impl Function {
 
     fn hinted(&mut self, likely: bool, instruction: &Instruction<'_>) -> &mut Self {
         assert!(
-            matches!(
-                instruction,
-                Instruction::If(_)
-                    | Instruction::BrIf(_)
-                    | Instruction::BrOnNull(_)
-                    | Instruction::BrOnNonNull(_)
-                    | Instruction::BrOnCast { .. }
-                    | Instruction::BrOnCastFail { .. }
-            ),
+            is_two_way_branch(instruction),
             "only a two-way branch takes a hint"
         );
         self.branch_hints.insert(self.operator_count, likely);
@@ -895,11 +898,13 @@ impl Function {
         self.anchor = Some(Anchor::Fallthrough(self.operator_count));
     }
 
-    /// The hinted branches of the body so far, in operator order.
-    pub(crate) fn branch_hints(&self) -> Vec<crate::branch_hints::FunctionSite> {
+    /// The hinted branches of the body so far: operator ordinal and whether
+    /// it is likely taken, in operator order.
+    #[cfg(test)]
+    pub(crate) fn hinted_operators(&self) -> Vec<(u32, bool)> {
         self.branch_hints
             .iter()
-            .map(|(operator, likely)| crate::branch_hints::FunctionSite::new(*operator, *likely))
+            .map(|(operator, likely)| (*operator, *likely))
             .collect()
     }
 
@@ -1057,11 +1062,9 @@ impl Function {
         self.body.byte_len()
     }
 
-    /// The finished body and its index operands, at their offsets in it.
-    pub(crate) fn into_body_and_index_operands(
-        self,
-        context: &dyn core::fmt::Display,
-    ) -> (wasm_encoder::Function, Vec<IndexOperand>) {
+    /// The finished body with its index operands and hinted branches, at
+    /// their offsets in it.
+    pub(crate) fn finish_named(self, context: &dyn core::fmt::Display) -> FinishedBody {
         assert!(
             self.frames.is_empty(),
             "function body for {context} has an unclosed control frame: {} label(s) still open",
@@ -1073,17 +1076,56 @@ impl Function {
         let prefix = u32::try_from(body.byte_len()).expect("Wasm body exceeds u32 bytes");
         let initial = u32::try_from(self.initial_prefix_len).expect("Wasm body exceeds u32 bytes");
         body.raw(raw[self.initial_prefix_len..].iter().copied());
-        let mut operands = self.index_operands;
-        for operand in &mut operands {
+        let mut index_operands = self.index_operands;
+        for operand in &mut index_operands {
             operand.offset = operand.offset - initial + prefix;
         }
-        (body, operands)
+        let branches = self.two_way_branches;
+        let branch_hints = self
+            .branch_hints
+            .iter()
+            .map(|(operator, likely)| {
+                let at = branches
+                    .binary_search_by_key(operator, |(ordinal, _)| *ordinal)
+                    .unwrap_or_else(|_| {
+                        panic!("a hint in {context} names operator {operator}, which is no two-way branch")
+                    });
+                crate::branch_hints::FunctionSite::new(branches[at].1 - initial + prefix, *likely)
+            })
+            .collect();
+        FinishedBody {
+            body,
+            index_operands,
+            branch_hints,
+        }
     }
 
     #[cfg(test)]
     pub(crate) fn into_body(self) -> wasm_encoder::Function {
-        self.into_body_and_index_operands(&"an unnamed test body").0
+        self.finish_named(&"an unnamed test body").body
     }
+}
+
+/// A closed body and what the module needs to know of its bytes.
+pub(crate) struct FinishedBody {
+    pub(crate) body: wasm_encoder::Function,
+    /// Every function and global index immediate, at its offset in `body`.
+    pub(crate) index_operands: Vec<IndexOperand>,
+    /// Every hinted branch, at its offset in `body`, in body order.
+    pub(crate) branch_hints: Vec<crate::branch_hints::FunctionSite>,
+}
+
+/// The branches whose direction a branch hint can describe.
+fn is_two_way_branch(instruction: &Instruction<'_>) -> bool {
+    matches!(
+        instruction,
+        Instruction::If(_)
+            | Instruction::BrIf(_)
+            | Instruction::BrOnNull(_)
+            | Instruction::BrOnNonNull(_)
+            | Instruction::BrOnCast { .. }
+            | Instruction::BrOnCastFail { .. }
+    )
 }
 
 // The complete declaration enters the same owner as its emitted body.

@@ -409,16 +409,19 @@ impl EmittedFunction {
     }
 
     fn new(identity: FunctionIdentity, body: Function) -> Self {
-        // `into_body_and_index_operands` asserts the label stack is empty, so an emitter
+        // `finish_named` asserts the label stack is empty, so an emitter
         // that opened a frame and never closed it fails here — with the
         // identity in the panic message, not merely in scope — instead of as
         // an anonymous wasmtime validation error inside whichever Test262 case
         // happened to compile it.
         let declared_locals = FunctionLocalCount::of(&body);
         let literal_operands = body.literal_operands().to_vec();
-        let branch_hints = body.branch_hints();
         let native_program_context = body.native_program_context();
-        let (body, index_operands) = body.into_body_and_index_operands(&identity.wasm_name());
+        let crate::code_sink::FinishedBody {
+            body,
+            index_operands,
+            branch_hints,
+        } = body.finish_named(&identity.wasm_name());
         let raw_body = body.into_raw_body();
         let body_bytes = FunctionBodySize::of(&raw_body);
         Self {
@@ -573,14 +576,16 @@ impl ModuleFunctionTable {
     }
 
     /// Import compaction preserves every body and its locals but may shorten
-    /// index operands. Bind attribution to the final body sizes (one per
-    /// body, in code-section order) and indices.
+    /// index operands. Bind attribution and branch hints to the final body
+    /// sizes and indices; `removed` gives per body, in code-section order,
+    /// the offset of each operand that became shorter and by how much.
     pub(crate) fn rebind_compacted(
         &mut self,
         body_sizes: &[usize],
+        removed: &[Vec<(u32, u32)>],
         mut remap: impl FnMut(u32) -> Result<u32, EmitError>,
     ) -> Result<(), EmitError> {
-        if body_sizes.len() != self.records.len() {
+        if body_sizes.len() != self.records.len() || removed.len() != self.records.len() {
             return Err(EmitError::unsupported(
                 "compiler function attribution: compaction changed the body count",
             ));
@@ -588,6 +593,9 @@ impl ModuleFunctionTable {
         for (record, size) in self.records.iter_mut().zip(body_sizes) {
             record.wasm_index = remap(record.wasm_index)?;
             record.body_bytes = FunctionBodySize(u32::try_from(*size).unwrap_or(u32::MAX));
+        }
+        for sites in &mut self.branch_hints {
+            sites.compact(removed[sites.body() as usize].iter().copied());
         }
         Ok(())
     }
