@@ -93,6 +93,13 @@ impl<V: 'static> CatalogOverlay<V> {
         }
     }
 
+    /// The row this overlay owns for `key`, ignoring a baseline row it has not
+    /// changed. A caller skipping a write which would equal the current row
+    /// must also know that the write would not first copy a baseline row.
+    pub(super) fn owned_change(&self, key: &str) -> Option<&V> {
+        self.changes.get(key).and_then(Option::as_deref)
+    }
+
     /// Replace a fact without materializing the discarded previous value.
     /// Forks retain their own immutable row; no Clone bound is needed here.
     pub(super) fn insert(&mut self, key: String, value: V) {

@@ -13,6 +13,10 @@ impl StaticStringBindingFacts {
         self.by_storage_name.get(&binding.storage_name)
     }
 
+    pub(super) fn contains_storage_name(&self, storage_name: &str) -> bool {
+        self.by_storage_name.contains_key(storage_name)
+    }
+
     pub(super) fn insert(&mut self, binding: &BindingInfo, value: String) {
         self.by_storage_name
             .insert(binding.storage_name.clone(), value);

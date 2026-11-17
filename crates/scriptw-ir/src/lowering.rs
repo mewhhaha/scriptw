@@ -5263,19 +5263,83 @@ impl<'a> ScriptLowerer<'a> {
         self.record_nested_script_global_value_info(name, info);
     }
 
+    /// Whether [`Self::invalidate_possible_global_property_value_info`] would
+    /// leave every fact for the writable `name` as it is and only record a
+    /// caller-flow invalidation. Keep the two in step: each condition below
+    /// is one write of that function already holding its value.
+    fn possible_global_property_value_info_is_invalidated(&self, name: &str) -> bool {
+        // The written row, unknown apart from its known targets, already
+        // owned so that writing it would not first copy a baseline row.
+        let Some(property) = self.global_properties.owned_change(name) else {
+            return false;
+        };
+        let info = &property.value_info;
+        if property.source != GlobalPropertySource::Merged
+            || info.kind != ValueKind::Dynamic
+            || info.possible_kinds != KindSet::all_runtime_tags()
+            || info.heap_shape.is_some()
+            || !matches!(info.function_targets, FunctionTargetKnowledge::Open(_))
+        {
+            return false;
+        }
+        // record_binding_value_write.
+        if !self.invalidated_static_binding_names.contains(name)
+            || self.static_boolean_bindings.contains_key(name)
+            || self.static_to_string_regexp_object_bindings.contains(name)
+        {
+            return false;
+        }
+        let Some(binding) = self
+            .var_bindings
+            .get(name)
+            .filter(|binding| binding.is_script_global)
+        else {
+            return true;
+        };
+        // The binding's targets join into the written ones, so equal targets
+        // keep both unchanged.
+        if binding.kind != info.kind
+            || binding.possible_kinds != info.possible_kinds
+            || binding.heap_shape.is_some()
+            || binding.function_targets != info.function_targets
+            || self.static_string_bindings.contains_storage_name(name)
+        {
+            return false;
+        }
+        !self.is_nested_script_global_var_name(name)
+            || self
+                .nested_script_global_value_infos
+                .get(name)
+                .is_some_and(|existing| {
+                    self.merge_value_infos(existing.clone(), info.clone()) == *existing
+                })
+    }
+
     fn invalidate_all_possible_global_property_value_infos(&mut self) {
-        let mut names = self
+        let mut names = BTreeSet::new();
+        let mut already_invalidated = false;
+        let writable_names = self
             .global_properties
             .keys()
-            .filter(|name| Self::global_property_is_writable_name(name))
-            .cloned()
-            .collect::<BTreeSet<_>>();
-        names.extend(
-            self.var_bindings
-                .iter()
-                .filter(|(_, binding)| binding.is_script_global)
-                .map(|(name, _)| name.clone()),
-        );
+            .chain(
+                self.var_bindings
+                    .iter()
+                    .filter(|(_, binding)| binding.is_script_global)
+                    .map(|(name, _)| name),
+            )
+            .filter(|name| Self::global_property_is_writable_name(name));
+        for name in writable_names {
+            if self.possible_global_property_value_info_is_invalidated(name) {
+                already_invalidated = true;
+            } else {
+                names.insert(name.clone());
+            }
+        }
+        // Readers compare the effect epoch only for change, so one advance
+        // stands for every skipped invalidation.
+        if already_invalidated {
+            self.record_caller_flow_invalidation();
+        }
         for name in names {
             self.invalidate_possible_global_property_value_info(&name);
         }
