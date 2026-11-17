@@ -143,7 +143,66 @@ impl FunctionBuilder<'_> {
                 .bind(schema, schema.reserve_gc_local(function), function);
             namespace.clear(function);
         }
-        self.emit_load_realm_intrinsic_stored_at_index(realm, slot.gc_index(), function)
+        let stored = self.emit_load_realm_intrinsic_stored_at_index(realm, slot.gc_index(), function);
+        if crate::heap::DemandConstructor::from_slot(slot).is_some() {
+            self.emit_ensure_demand_constructor(realm, &stored, None, slot.gc_index(), function);
+        }
+        stored
+    }
+
+    /// A demand constructor's slot holds the Undefined placeholder until its
+    /// first canonical read builds it. `dynamic` names the slot operand of a
+    /// layout row; otherwise `index` is the compile-time slot.
+    pub(crate) fn emit_ensure_demand_constructor(
+        &mut self,
+        realm: &GcLocal<RealmRecord>,
+        stored: &GcLocal<StoredValue>,
+        dynamic: Option<crate::gc_types::I32Local>,
+        index: u32,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        let slot = schema.reserve_i32_local(function);
+        schema
+            .field(crate::gc_types::StoredValueSchema::TAG)
+            .read(stored, schema, function)
+            .store(slot, function);
+        slot.load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Undefined as i32));
+        function.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, function);
+        match dynamic {
+            Some(operand) => {
+                operand.load(function);
+                slot.store(function);
+            }
+            None => slot.set_constant(index as i32, function),
+        }
+        schema.call_helper(
+            crate::runtime_helpers::RealmEnsureConstructorArguments::new(realm, slot),
+            self.runtime_helper_base()
+                .expect("demand constructor reads require registered runtime helpers"),
+            function,
+        );
+        let intrinsics = schema.reserve_gc_local(function).initialize(
+            schema
+                .struct_type::<RealmRecord>()
+                .field(RealmRecordSchema::INTRINSICS)
+                .read(realm, schema, function)
+                .reference(),
+            function,
+        );
+        stored.replace(
+            schema
+                .array_type::<IntrinsicTable>()
+                .read(&intrinsics, slot, schema, function)
+                .reference(),
+            function,
+        );
+        intrinsics.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(slot, function);
     }
 
     /// Only the Date builder may read completed Date slots while Building.

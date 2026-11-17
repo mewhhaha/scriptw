@@ -17,6 +17,7 @@ pub(crate) use regexp_initialization::RegExpIntrinsicBuild;
 mod binary_data_initialization;
 pub(crate) use binary_data_initialization::BinaryDataIntrinsicBuild;
 mod intl_initialization;
+mod demand_constructors;
 mod realm_initialization;
 pub(crate) use intl_initialization::IntlIntrinsicBuild;
 mod temporal_initialization;
@@ -912,23 +913,8 @@ impl<'a> FunctionBuilder<'a> {
         {
             self.emit_initialize_stream_intrinsics(&context, &object_prototype, function)?;
         }
-        for (builtin, slot) in [
-            (
-                StandardBuiltinId::ProxyConstructor,
-                NonArrayRealmIntrinsicSlot::ObjectPrototype,
-            ),
-            (
-                StandardBuiltinId::IteratorConstructor,
-                NonArrayRealmIntrinsicSlot::IteratorPrototype,
-            ),
-        ] {
-            if self
-                .runtime_bootstrap_plan
-                .should_initialize_standard_builtin(builtin)
-            {
-                self.emit_bootstrap_constructor_from_slot(builtin, &context, slot, function)?;
-            }
-        }
+        // Proxy, Iterator and the constructors in crate::heap::DemandConstructor
+        // are built by their first canonical read (see demand_constructors).
         if self
             .runtime_bootstrap_plan
             .should_initialize_standard_builtin(StandardBuiltinId::ArrayConstructor)
@@ -954,84 +940,8 @@ impl<'a> FunctionBuilder<'a> {
         }
         for (builtin, slot) in [
             (
-                StandardBuiltinId::NumberConstructor,
-                NonArrayRealmIntrinsicSlot::NumberPrototype,
-            ),
-            (
                 StandardBuiltinId::StringConstructor,
                 NonArrayRealmIntrinsicSlot::StringPrototype,
-            ),
-            (
-                StandardBuiltinId::BooleanConstructor,
-                NonArrayRealmIntrinsicSlot::BooleanPrototype,
-            ),
-            (
-                StandardBuiltinId::PromiseConstructor,
-                NonArrayRealmIntrinsicSlot::PromisePrototype,
-            ),
-            (
-                StandardBuiltinId::MapConstructor,
-                NonArrayRealmIntrinsicSlot::MapPrototype,
-            ),
-            (
-                StandardBuiltinId::WeakMapConstructor,
-                NonArrayRealmIntrinsicSlot::WeakMapPrototype,
-            ),
-            (
-                StandardBuiltinId::WeakRefConstructor,
-                NonArrayRealmIntrinsicSlot::WeakRefPrototype,
-            ),
-            (
-                StandardBuiltinId::FinalizationRegistryConstructor,
-                NonArrayRealmIntrinsicSlot::FinalizationRegistryPrototype,
-            ),
-            (
-                StandardBuiltinId::WeakSetConstructor,
-                NonArrayRealmIntrinsicSlot::WeakSetPrototype,
-            ),
-            (
-                StandardBuiltinId::AsyncDisposableStackConstructor,
-                NonArrayRealmIntrinsicSlot::AsyncDisposableStackPrototype,
-            ),
-            (
-                StandardBuiltinId::DisposableStackConstructor,
-                NonArrayRealmIntrinsicSlot::DisposableStackPrototype,
-            ),
-            (
-                StandardBuiltinId::AbortControllerConstructor,
-                NonArrayRealmIntrinsicSlot::AbortControllerPrototype,
-            ),
-            (
-                StandardBuiltinId::AbortSignalConstructor,
-                NonArrayRealmIntrinsicSlot::AbortSignalPrototype,
-            ),
-            (
-                StandardBuiltinId::EventTargetConstructor,
-                NonArrayRealmIntrinsicSlot::EventTargetPrototype,
-            ),
-            (
-                StandardBuiltinId::EventConstructor,
-                NonArrayRealmIntrinsicSlot::EventPrototype,
-            ),
-            (
-                StandardBuiltinId::TextEncoderConstructor,
-                NonArrayRealmIntrinsicSlot::TextEncoderPrototype,
-            ),
-            (
-                StandardBuiltinId::TextDecoderConstructor,
-                NonArrayRealmIntrinsicSlot::TextDecoderPrototype,
-            ),
-            (
-                StandardBuiltinId::SetConstructor,
-                NonArrayRealmIntrinsicSlot::SetPrototype,
-            ),
-            (
-                StandardBuiltinId::SymbolConstructor,
-                NonArrayRealmIntrinsicSlot::SymbolPrototype,
-            ),
-            (
-                StandardBuiltinId::BigIntConstructor,
-                NonArrayRealmIntrinsicSlot::BigIntPrototype,
             ),
         ] {
             if self
@@ -1344,6 +1254,17 @@ impl<'a> FunctionBuilder<'a> {
                             &object,
                             &binding.name,
                             constructor,
+                            &bootstrap.realm,
+                            function,
+                        )?;
+                        continue;
+                    }
+                    if let Some(demand) = crate::heap::DemandConstructor::from_builtin(*builtin)
+                    {
+                        self.emit_install_deferred_demand_constructor(
+                            &object,
+                            &binding,
+                            demand,
                             &bootstrap.realm,
                             function,
                         )?;

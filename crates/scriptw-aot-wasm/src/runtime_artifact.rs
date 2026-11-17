@@ -145,7 +145,12 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // family's demand owner: Realm creation no longer reads Error.prototype, and
 // the public DOMException global becomes a deferred Error-family recipe whose
 // closed constructor domain gains DOMException.
-const LAYOUT_VERSION: u32 = 78;
+// Version 79 builds Proxy, Iterator and nineteen other layout-covered
+// constructors on their first canonical read: their slots hold the Undefined
+// placeholder, canonical and layout-row reads call the new typed
+// realm_ensure_constructor helper, and their globals publish a
+// DeferredDemandConstructor recipe.
+const LAYOUT_VERSION: u32 = 79;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

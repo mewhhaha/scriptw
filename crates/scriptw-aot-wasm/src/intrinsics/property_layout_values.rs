@@ -217,6 +217,9 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
+        // A row may name a demand constructor that no read has built yet.
+        // Every other ready slot is complete, which the check below enforces.
+        self.emit_ensure_demand_constructor(realm, &stored, Some(index), 0, f);
         let value = s.reserve_value_local(f);
         s.struct_type::<StoredValue>()
             .read_into(&stored, &value, s, f);

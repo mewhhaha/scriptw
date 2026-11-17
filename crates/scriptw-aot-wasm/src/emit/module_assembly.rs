@@ -1511,6 +1511,7 @@ fn emit_script_module_with_factory(
             RealmEnsureTemporal, compile_realm_ensure_temporal_helper;
             RealmEnsureBinaryData, compile_realm_ensure_binary_data_helper;
             RealmEnsureErrors, compile_realm_ensure_errors_helper;
+            RealmEnsureConstructor, compile_realm_ensure_constructor_helper;
             RealmEnsureDate, compile_realm_ensure_date_helper;
             RealmEnsureRegExp, compile_realm_ensure_regexp_helper;
             RealmEnsureIntl, compile_realm_ensure_intl_helper;

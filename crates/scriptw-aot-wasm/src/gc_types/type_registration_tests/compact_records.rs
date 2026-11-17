@@ -31,6 +31,10 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         .struct_type::<DeferredBinaryDataConstructor>()
         .type_index()
         .raw();
+    let demand_index = schema
+        .struct_type::<DeferredDemandConstructor>()
+        .type_index()
+        .raw();
     let error_index = schema
         .struct_type::<DeferredErrorConstructor>()
         .type_index()
@@ -79,6 +83,7 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         temporal_index,
         intl_index,
         binary_index,
+        demand_index,
         error_index,
         date_index,
         regexp_index,
@@ -128,7 +133,7 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         ]
     );
 
-    for recipe_index in [binary_index, error_index] {
+    for recipe_index in [binary_index, demand_index, error_index] {
         let CompositeInnerType::Struct(recipe) = &types[recipe_index as usize].composite_type.inner
         else {
             panic!("constructor recipe must be a registered struct");

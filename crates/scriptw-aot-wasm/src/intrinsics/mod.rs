@@ -123,6 +123,10 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
+        assert!(
+            crate::heap::DemandConstructor::from_slot(slot).is_none(),
+            "a demand constructor slot is read only through its gate"
+        );
         let index = schema.reserve_i32_local(function);
         function.instruction(&Instruction::I32Const(slot.gc_index() as i32));
         index.store(function);

@@ -1253,6 +1253,7 @@ runtime_helper_domain! {
     RealmEnsureTemporal / RealmEnsureTemporalArguments / RealmEnsureTemporalParameters / "realm_ensure_temporal" { realm:(Ref RealmRecord NonNullable) } => (Ref StoredValue NonNullable);
     RealmEnsureBinaryData / RealmEnsureBinaryDataArguments / RealmEnsureBinaryDataParameters / "realm_ensure_binary_data" { realm:(Ref RealmRecord NonNullable) } => Void;
     RealmEnsureErrors / RealmEnsureErrorsArguments / RealmEnsureErrorsParameters / "realm_ensure_errors" { realm:(Ref RealmRecord NonNullable) } => Void;
+    RealmEnsureConstructor / RealmEnsureConstructorArguments / RealmEnsureConstructorParameters / "realm_ensure_constructor" { realm:(Ref RealmRecord NonNullable),slot:I32 } => Void;
     RealmEnsureDate / RealmEnsureDateArguments / RealmEnsureDateParameters / "realm_ensure_date" { realm:(Ref RealmRecord NonNullable) } => Void;
     RealmEnsureRegExp / RealmEnsureRegExpArguments / RealmEnsureRegExpParameters / "realm_ensure_regexp" { realm:(Ref RealmRecord NonNullable) } => Void;
     RealmEnsureIntl / RealmEnsureIntlArguments / RealmEnsureIntlParameters / "realm_ensure_intl" { realm:(Ref RealmRecord NonNullable) } => (Ref StoredValue NonNullable);
@@ -1455,6 +1456,7 @@ impl RuntimeHelperId {
             Self::RealmEnsureTemporal => HelperOwner::Runtime,
             Self::RealmEnsureBinaryData => HelperOwner::Runtime,
             Self::RealmEnsureErrors => HelperOwner::Runtime,
+            Self::RealmEnsureConstructor => HelperOwner::Runtime,
             Self::RealmEnsureDate => HelperOwner::Runtime,
             Self::RealmEnsureRegExp => HelperOwner::Runtime,
             Self::RealmEnsureIntl => HelperOwner::Runtime,
@@ -1640,6 +1642,7 @@ impl RuntimeHelperId {
             Self::RealmEnsureTemporal => true,
             Self::RealmEnsureBinaryData => true,
             Self::RealmEnsureErrors => true,
+            Self::RealmEnsureConstructor => true,
             Self::RealmEnsureDate => true,
             Self::RealmEnsureRegExp => true,
             Self::RealmEnsureIntl => true,

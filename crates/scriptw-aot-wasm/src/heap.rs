@@ -312,6 +312,127 @@ impl ErrorIntrinsicConstructor {
     }
 }
 
+// Canonical constructors that a Realm builds on their first canonical read.
+// Their prototypes stay eager; see builtins/bootstrap/demand_constructors.rs.
+runtime_scalar_domain!(DemandConstructor, 0, {
+    Proxy = 0,
+    Iterator = 1,
+    Number = 2,
+    Boolean = 3,
+    Promise = 4,
+    Map = 5,
+    WeakMap = 6,
+    WeakRef = 7,
+    FinalizationRegistry = 8,
+    WeakSet = 9,
+    AsyncDisposableStack = 10,
+    DisposableStack = 11,
+    AbortController = 12,
+    AbortSignal = 13,
+    EventTarget = 14,
+    Event = 15,
+    TextEncoder = 16,
+    TextDecoder = 17,
+    Set = 18,
+    Symbol = 19,
+    BigInt = 20,
+});
+
+impl DemandConstructor {
+    pub(crate) const fn builtin(self) -> scriptw_ir::StandardBuiltinId {
+        use scriptw_ir::StandardBuiltinId as B;
+        match self {
+            Self::Proxy => B::ProxyConstructor,
+            Self::Iterator => B::IteratorConstructor,
+            Self::Number => B::NumberConstructor,
+            Self::Boolean => B::BooleanConstructor,
+            Self::Promise => B::PromiseConstructor,
+            Self::Map => B::MapConstructor,
+            Self::WeakMap => B::WeakMapConstructor,
+            Self::WeakRef => B::WeakRefConstructor,
+            Self::FinalizationRegistry => B::FinalizationRegistryConstructor,
+            Self::WeakSet => B::WeakSetConstructor,
+            Self::AsyncDisposableStack => B::AsyncDisposableStackConstructor,
+            Self::DisposableStack => B::DisposableStackConstructor,
+            Self::AbortController => B::AbortControllerConstructor,
+            Self::AbortSignal => B::AbortSignalConstructor,
+            Self::EventTarget => B::EventTargetConstructor,
+            Self::Event => B::EventConstructor,
+            Self::TextEncoder => B::TextEncoderConstructor,
+            Self::TextDecoder => B::TextDecoderConstructor,
+            Self::Set => B::SetConstructor,
+            Self::Symbol => B::SymbolConstructor,
+            Self::BigInt => B::BigIntConstructor,
+        }
+    }
+
+    pub(crate) const fn slot(self) -> crate::functions::NonArrayRealmIntrinsicSlot {
+        use crate::functions::NonArrayRealmIntrinsicSlot as S;
+        match self {
+            Self::Proxy => S::ProxyConstructor,
+            Self::Iterator => S::IteratorConstructor,
+            Self::Number => S::NumberConstructor,
+            Self::Boolean => S::BooleanConstructor,
+            Self::Promise => S::PromiseConstructor,
+            Self::Map => S::MapConstructor,
+            Self::WeakMap => S::WeakMapConstructor,
+            Self::WeakRef => S::WeakRefConstructor,
+            Self::FinalizationRegistry => S::FinalizationRegistryConstructor,
+            Self::WeakSet => S::WeakSetConstructor,
+            Self::AsyncDisposableStack => S::AsyncDisposableStackConstructor,
+            Self::DisposableStack => S::DisposableStackConstructor,
+            Self::AbortController => S::AbortControllerConstructor,
+            Self::AbortSignal => S::AbortSignalConstructor,
+            Self::EventTarget => S::EventTargetConstructor,
+            Self::Event => S::EventConstructor,
+            Self::TextEncoder => S::TextEncoderConstructor,
+            Self::TextDecoder => S::TextDecoderConstructor,
+            Self::Set => S::SetConstructor,
+            Self::Symbol => S::SymbolConstructor,
+            Self::BigInt => S::BigIntConstructor,
+        }
+    }
+
+    /// The eagerly built prototype that the constructor's `prototype` names.
+    /// Proxy has none and receives Object.prototype, as eager bootstrap did.
+    pub(crate) const fn prototype_slot(self) -> crate::functions::NonArrayRealmIntrinsicSlot {
+        use crate::functions::NonArrayRealmIntrinsicSlot as S;
+        match self {
+            Self::Proxy => S::ObjectPrototype,
+            Self::Iterator => S::IteratorPrototype,
+            Self::Number => S::NumberPrototype,
+            Self::Boolean => S::BooleanPrototype,
+            Self::Promise => S::PromisePrototype,
+            Self::Map => S::MapPrototype,
+            Self::WeakMap => S::WeakMapPrototype,
+            Self::WeakRef => S::WeakRefPrototype,
+            Self::FinalizationRegistry => S::FinalizationRegistryPrototype,
+            Self::WeakSet => S::WeakSetPrototype,
+            Self::AsyncDisposableStack => S::AsyncDisposableStackPrototype,
+            Self::DisposableStack => S::DisposableStackPrototype,
+            Self::AbortController => S::AbortControllerPrototype,
+            Self::AbortSignal => S::AbortSignalPrototype,
+            Self::EventTarget => S::EventTargetPrototype,
+            Self::Event => S::EventPrototype,
+            Self::TextEncoder => S::TextEncoderPrototype,
+            Self::TextDecoder => S::TextDecoderPrototype,
+            Self::Set => S::SetPrototype,
+            Self::Symbol => S::SymbolPrototype,
+            Self::BigInt => S::BigIntPrototype,
+        }
+    }
+
+    pub(crate) fn from_builtin(builtin: scriptw_ir::StandardBuiltinId) -> Option<Self> {
+        Self::ALL.into_iter().find(|demand| demand.builtin() == builtin)
+    }
+
+    pub(crate) fn from_slot(slot: crate::functions::NonArrayRealmIntrinsicSlot) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|demand| demand.slot().gc_index() == slot.gc_index())
+    }
+}
+
 // Only public constructors can inhabit a deferred global recipe. The abstract
 // %TypedArray% remains privately rooted in the defining Realm's intrinsic table.
 runtime_scalar_domain!(BinaryDataConstructor, 0, {
