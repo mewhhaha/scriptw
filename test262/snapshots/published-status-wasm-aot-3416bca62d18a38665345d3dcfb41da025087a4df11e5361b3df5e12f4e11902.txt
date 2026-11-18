@@ -1,0 +1,43 @@
+published real Test262 status
+producer=scriptw
+refresh_date=2026-11-18
+execution_backend=wasm-aot
+manifest_hash=13327628081868727304
+compiler_identity={"source_fingerprint_scheme":"scriptw-program-cache-compiler-v3","source_fingerprint":"9c84626c7197122eb63b94f1a4f15e465337e2534cdf5445a6a4e45ac8db9129","source_revision":{"kind":"git-commit","commit":"41983e248feab2f731d7ac54cfa66a4c41032c9f"},"executable_sha256":"c9abd4d4d8bafc77c94c3856d849d19eba07699ce0814a01cb2bed9bae41f50c"}
+pinned: ecma262=5345883164f463e87f8b40aca4956157ecba8783 test262=6a4268a9354a545d41c3b62efebc478ed8c521f4
+fake_wasm_safe=187/187
+fake_full=191/191
+real_total=102994
+real_passed=102990
+real_failed=4
+goal=Full pinned Test262 green
+progress=102990/102994
+remaining_to_green=4
+burn_down: NotImplemented=0 Crash=0 Bug=4
+snapshot_json=test262/snapshots/cloud-41983e248-reuse-20261117-aggregate-13327628081868727304.json
+snapshot_txt=test262/snapshots/cloud-41983e248-reuse-20261117-aggregate-13327628081868727304.txt
+outcomes:
+  Success=102990
+  NotImplemented=0
+  Crash=0
+  Bug=4
+failure_kinds:
+  Runtime=4
+  EarlyError=0
+  HostHarness=0
+  Lowering=0
+  Parser=0
+  Unsupported=0
+  WasmBackend=0
+failure_origins:
+  unknown=4
+  boa-parser=0
+  boa-runtime=0
+  icu-intl=0
+  local-harness=0
+  spec-exec-host=0
+  wasm-backend=0
+top_targets:
+  intl402/Temporal/ZonedDateTime: 248/250 passed (failed 2)
+  annexB: 1376/1377 passed (failed 1)
+  staging/sm/lexical-environment: 38/39 passed (failed 1)

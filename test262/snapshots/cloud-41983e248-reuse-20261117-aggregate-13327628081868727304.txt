@@ -1,0 +1,18 @@
+test262 aggregate-matrix summary (snapshot v8)
+producer=scriptw
+compiler_identity={"source_fingerprint_scheme":"scriptw-program-cache-compiler-v3","source_fingerprint":"9c84626c7197122eb63b94f1a4f15e465337e2534cdf5445a6a4e45ac8db9129","source_revision":{"kind":"git-commit","commit":"41983e248feab2f731d7ac54cfa66a4c41032c9f"},"executable_sha256":"c9abd4d4d8bafc77c94c3856d849d19eba07699ce0814a01cb2bed9bae41f50c"}
+execution_backend=wasm-aot
+matrix_strategy_version=3
+pinned: ecma262=5345883164f463e87f8b40aca4956157ecba8783 test262=6a4268a9354a545d41c3b62efebc478ed8c521f4
+total=102994 pass=102990 fail=4
+Parser=0
+EarlyError=0
+Lowering=0
+Runtime=4
+WasmBackend=0
+HostHarness=0
+Unsupported=0
+outcome_Success=102990
+outcome_NotImplemented=0
+outcome_Crash=0
+outcome_Bug=4

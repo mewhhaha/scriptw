@@ -1,4 +1,62 @@
-# Current Test262 baseline — 2026-10-23
+# Current Test262 baseline — 2026-11-18
+
+The complete pinned suite ran through the optimized default-feature Wasm-AOT
+compiler: **102,990 Success / 4 Bug / 0 Crash / 0 NotImplemented**, covering
+**all 748 matrix nodes and 102,994 mode-specific executions**. The four failures
+are the same four tracked upstream disagreements as the 2026-10-23 run; no new
+failure appeared. This is not a green suite.
+
+No filters, skips, fixture patches or timeout extensions were used. Three
+reusable case workers kept fresh per-case state, one compiler job each and the
+normal 60-second deadline, on a shared four-vCPU cloud machine with its
+inherited 13.4 GiB memory cap, one matrix node per invocation. The run started
+on 2026-11-17 and resumed from its checkpoints after two container restarts,
+with the same family, compiler and settings; publication exited zero on
+2026-11-18.
+
+Measured product: **`41983e248feab2f731d7ac54cfa66a4c41032c9f`**.
+
+- Compiler fingerprint scheme: `scriptw-program-cache-compiler-v3`.
+- Compiler fingerprint: `9c84626c7197122eb63b94f1a4f15e465337e2534cdf5445a6a4e45ac8db9129`.
+- Executing image SHA-256: `c9abd4d4d8bafc77c94c3856d849d19eba07699ce0814a01cb2bed9bae41f50c`.
+- Test262 pin: `6a4268a9354a545d41c3b62efebc478ed8c521f4`.
+- ECMA-262 pin: `5345883164f463e87f8b40aca4956157ecba8783`.
+
+Changes after `41983e248` (the read entry's hint dispatch, completion state
+written only on abrupt edges, the embedding policy default and the
+byte-identical Cranelift and regalloc2 work) are not covered by this run;
+each ran its affected suites and Test262 subtrees.
+
+The [canonical manifest](../../test262/snapshots/published-status-wasm-aot.manifest.json)
+selects the immutable native [JSON](../../test262/snapshots/published-status-wasm-aot-3416bca62d18a38665345d3dcfb41da025087a4df11e5361b3df5e12f4e11902.json)
+and [text](../../test262/snapshots/published-status-wasm-aot-3416bca62d18a38665345d3dcfb41da025087a4df11e5361b3df5e12f4e11902.txt)
+members, imported unchanged from the frozen checkout, and the
+[aggregate snapshot](../../test262/snapshots/cloud-41983e248-reuse-20261117-aggregate-13327628081868727304.json)
+they name. The [portable chart record](test262-chart-full-20261022.json)
+embeds the aggregate and all 748 leaf snapshots, verifies their identities,
+and applies the unchanged 429-execution scope audit (its filename is the
+first full campaign's). The README bars contain **102,561 in-scope passes /
+4 failures / 0 unimplemented / 429 out of standalone Wasm scope**. All 429
+scoped-out cases passed through the native host. No lossless log archive was
+retained for this run.
+[Scope policy](runtime-requirements.md#out-of-scope-tests).
+
+## Remaining failures
+
+| Original execution ID | Outcome | Explanation / tracking |
+| --- | --- | --- |
+| `sloppy-script:annexB/language/function-code/block-decl-func-skip-arguments.js` | Bug | Implicit arguments binding conflict; Test262 #5113 / PR #5112 |
+| `sloppy-script:intl402/Temporal/ZonedDateTime/links.js` | Bug | Johnston/Honolulu identity conflict; related ECMA-402 #806 |
+| `strict-script:intl402/Temporal/ZonedDateTime/links.js` | Bug | Same timezone conflict in strict mode |
+| `sloppy-script:staging/sm/lexical-environment/block-scoped-functions-annex-b-label.js` | Bug | Labelled function visibility; related ECMA-262 #1595, no exact issue found |
+
+[Reasons, exact controls and upstream links](../../test262/errata/proposals/upstream-status-20261021.md)
+retain the 2026-10-21 upstream status check. No new upstream-status check is
+claimed by this suite run. By user decision, all four remain ordinary failures.
+
+## Historical evidence
+
+### 2026-10-23 full run
 
 The complete pinned suite ran through the optimized default-feature Wasm-AOT
 compiler: **102,990 Success / 4 Bug / 0 Crash / 0 NotImplemented**, covering
@@ -31,7 +89,7 @@ retains native aggregate/leaf snapshots, text reports, provenance, raw logs,
 memory samples, commands and an inventory. The [verification receipt](test262-full-20261023.json)
 records its SHA-256 and exact census/failure checks.
 
-The [portable chart record](test262-chart-full-20261022.json) independently embeds
+Its portable chart record (`test262-chart-full-20261022.json` as committed at `183953284`; the file now holds the 2026-11-18 run) independently embeds
 the aggregate and all 748 leaves, verifies identities and disjoint execution IDs,
 and applies the unchanged 429-execution scope audit. The filename identifies the
 campaign start; its measurement date is **2026-10-23**. The README bars contain
@@ -45,21 +103,6 @@ The sampled whole-cgroup maximum was **34,264,653,824 bytes**, with zero OOM or
 OOM-kill events. This includes shared files and tmpfs; it is neither process RSS
 nor JavaScript heap usage. Broader native/default/all-feature, release and
 performance acceptance remain open in the [inventory](current-inventory.md).
-
-## Remaining failures
-
-| Original execution ID | Outcome | Explanation / tracking |
-| --- | --- | --- |
-| `sloppy-script:annexB/language/function-code/block-decl-func-skip-arguments.js` | Bug | Implicit arguments binding conflict; Test262 #5113 / PR #5112 |
-| `sloppy-script:intl402/Temporal/ZonedDateTime/links.js` | Bug | Johnston/Honolulu identity conflict; related ECMA-402 #806 |
-| `strict-script:intl402/Temporal/ZonedDateTime/links.js` | Bug | Same timezone conflict in strict mode |
-| `sloppy-script:staging/sm/lexical-environment/block-scoped-functions-annex-b-label.js` | Bug | Labelled function visibility; related ECMA-262 #1595, no exact issue found |
-
-[Reasons, exact controls and upstream links](../../test262/errata/proposals/upstream-status-20261021.md)
-retain the 2026-10-21 upstream status check. No new upstream-status check is
-claimed by this suite run. By user decision, all four remain ordinary failures.
-
-## Historical evidence
 
 The original **2026-10-20** full run measured compiler `c5053c9d4` at
 **102,978 Success / 16 Bug / 0 Crash / 0 NotImplemented**. Its byte-identical

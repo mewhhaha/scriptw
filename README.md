@@ -95,27 +95,27 @@ on a retained call after 100 warmups. Speed is ahead of V8 in 9 of them and behi
 
 ## Current Status
 <!-- scriptw-status:start -->
-Published Test262 (`wasm-aot`, `2026-10-23`): `102990/102994` passed; `4` failed.
+Published Test262 (`wasm-aot`, `2026-11-18`): `102990/102994` passed; `4` failed.
 Native-host conformance includes cases unsupported by standalone Wasm; it does not establish current HEAD coverage.
 Pinned revisions: `ecma262=5345883164f463e87f8b40aca4956157ecba8783` `test262=6a4268a9354a545d41c3b62efebc478ed8c521f4`
-Compiler build fingerprint: `7337ccbc2834d0d17902382431789227b6dddf8fda40842bf19c4243161d56f9`; executing image SHA-256: `32ee09a9a33daaf7d27fcb1b649db7223fcbd3ce00f0943cf19cce5ef886101b`
-Published status artifacts: `/workspace/scriptw-full-suite-20261022/test262/snapshots/scriptw-hot-reads-b9ecfe64b-20261022-aggregate-13327628081868727304.json` and `/workspace/scriptw-full-suite-20261022/test262/snapshots/scriptw-hot-reads-b9ecfe64b-20261022-aggregate-13327628081868727304.txt`
+Compiler build fingerprint: `9c84626c7197122eb63b94f1a4f15e465337e2534cdf5445a6a4e45ac8db9129`; executing image SHA-256: `c9abd4d4d8bafc77c94c3856d849d19eba07699ce0814a01cb2bed9bae41f50c`
+Published status artifacts: `test262/snapshots/cloud-41983e248-reuse-20261117-aggregate-13327628081868727304.json` and `test262/snapshots/cloud-41983e248-reuse-20261117-aggregate-13327628081868727304.txt`
 [Full test details](docs/rust-rewrite/test262-current.md) · [Refresh workflow](CONTRIBUTING.md#test262).
 <!-- scriptw-status:end -->
 
 <!-- scriptw-test-graph:start -->
 ![Test262: 102,561 passing in scope, 4 failing, 0 not implemented, 429 out of standalone Wasm scope](docs/rust-rewrite/assets/test262-status.svg)
 
-**Published full run, 2026-10-23:** 102,994 mode-specific
-executions at pin `6a4268a93`, compiler `b9ecfe64b`.
+**Published full run, 2026-11-18:** 102,994 mode-specific
+executions at pin `6a4268a93`, compiler `41983e248`.
 The **429 out-of-scope executions** passed through the native host;
 standalone Wasm excludes their dynamic source compilation. All four categories
 retain the full denominator, including every failure.
-[Scope inventory](docs/rust-rewrite/test262-chart-full-20261022.json) · [Published result](test262/snapshots/published-status-wasm-aot-857165c90f0fb4ac3ec0493a3b4470977007808c5b1c10ecf5512840edc80f46.json) ·
+[Scope inventory](docs/rust-rewrite/test262-chart-full-20261022.json) · [Published result](test262/snapshots/published-status-wasm-aot-3416bca62d18a38665345d3dcfb41da025087a4df11e5361b3df5e12f4e11902.json) ·
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 <!-- scriptw-test-graph:end -->
 
-Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and the doctest pass; one runtime cache test fails on the cloud machine only. Later changes ran their affected suites and Test262 subtrees. A full Test262 run of `41983e248` is in progress and not yet published; [current work](docs/rust-rewrite/current-inventory.md) lists what is open.
+Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and the doctest pass; one runtime cache test fails on the cloud machine only. The published Test262 run above measured `41983e248`; later changes ran their affected suites and Test262 subtrees; [current work](docs/rust-rewrite/current-inventory.md) lists what is open.
 
 ## Caveats
 
