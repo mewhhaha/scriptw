@@ -1,15 +1,25 @@
 //! Bounded source candidates never assert a live callable's identity.
 use super::*;
+use crate::arguments_protocol::StrictArgumentsProjection;
 
 #[derive(Debug)]
 pub(crate) struct CapturedCallSource {
     pub(super) function: FunctionIr,
     pub(super) forwarding: bool,
+    /// A strict source whose own arguments object only admitted reads observe.
+    /// An inlined site has exactly one actual argument per formal, so `length`
+    /// is that count and a literal index below it is the passed value: an
+    /// unmapped own index below the count is an unwritten data property and
+    /// the object never exists. Every other read refuses the site.
+    pub(super) arguments: Option<StrictArgumentsProjection>,
 }
 
 impl CapturedCallSource {
     pub(crate) fn new(function: &FunctionIr) -> Option<Self> {
-        crate::function_entry::LocalArgumentsPlan::for_function(function)?;
+        let arguments = match crate::function_entry::LocalArgumentsPlan::for_function(function) {
+            Some(_) => None,
+            None => Some(StrictArgumentsProjection::admit(function)?),
+        };
         if function.params.is_empty()
             || function.params.len() > 2
             || function.eval_environment.is_some()
@@ -53,9 +63,13 @@ impl CapturedCallSource {
         {
             return None;
         }
+        if forwarding && arguments.is_some() {
+            return None;
+        }
         Some(Self {
             function: function.clone(),
             forwarding,
+            arguments,
         })
     }
 }
@@ -94,7 +108,13 @@ fn statement_budget(statement: &StatementIr, budget: &mut usize) -> Option<()> {
 fn expression_budget(value: &TypedExpr, budget: &mut usize) -> Option<()> {
     *budget = budget.checked_sub(1)?;
     match &value.expr {
-        ExprIr::Number(_) | ExprIr::String(_) | ExprIr::Boolean(_) | ExprIr::Identifier(_) => {}
+        // The implicit binding is admitted only as the base of a projection
+        // read; the source compiler answers or refuses each read.
+        ExprIr::Number(_)
+        | ExprIr::String(_)
+        | ExprIr::Boolean(_)
+        | ExprIr::Identifier(_)
+        | ExprIr::Arguments => {}
         ExprIr::EnvironmentIdentifier(reference) => match &reference.operation {
             EnvOp::Read => {}
             EnvOp::Assign { value } => expression_budget(value, budget)?,
@@ -192,8 +212,15 @@ mod tests {
 
     #[test]
     fn source_candidates_refuse_arguments_observers_and_mutable_object_writes() {
+        let admitted = "export function step(row,i){return arguments[0].x+arguments.length+i;}";
+        let ir = scriptw_ir::lower(&parse(admitted, ParseOptions::module()).unwrap());
+        let plans: Vec<_> = ir.script.as_ref().unwrap().functions.iter()
+            .filter_map(CapturedCallSource::new).collect();
+        assert_eq!(plans.len(), 1, "own reads of a strict source are projected");
+        assert!(plans[0].arguments.is_some());
         for source in [
-            "export function step(row,i){return arguments[0].x+i;}",
+            "export function step(row,i){return arguments;}",
+            "export function step(row,i){arguments[0]=row;return row.x+i;}",
             "export function step(row,i){row.x=i;return row.x;}",
             "export function step(row,i){return ()=>row.x+i;}",
             "export function step(row,i){return eval('row.x+i');}",

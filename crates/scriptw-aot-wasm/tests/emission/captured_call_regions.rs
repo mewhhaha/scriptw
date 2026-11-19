@@ -11,7 +11,7 @@ use wasmparser::{Operator, Validator, WasmFeatures};
 #[test]
 fn unchanged_captured_call_programs_have_scalar_loops_and_real_call_fallbacks() {
     std::thread::Builder::new().name("captured-call-regions".into()).stack_size(64 * 1024 * 1024).spawn(|| {
-        for (source, alias_comparisons) in [(include_str!("fixtures/numeric_body_args_unused.mjs"), 0), (include_str!("fixtures/numeric_body_frame_compact.mjs"), 8)] {
+        for (source, alias_comparisons) in [(include_str!("fixtures/numeric_body_args_unused.mjs"), 0), (include_str!("../fixtures/strict_arguments_observed.js"), 0), (include_str!("fixtures/numeric_body_frame_compact.mjs"), 8)] {
             let ir = lower(&parse(source, ParseOptions::module()).unwrap());
             assert!(ir.is_wasm_supported(), "{:?}", ir.diagnostics);
             let artifact = emit(&ir).unwrap();
@@ -43,8 +43,10 @@ fn observed_arguments_and_large_forwarding_switches_keep_source_calls() {
         .stack_size(64 * 1024 * 1024)
         .spawn(|| {
             let original = include_str!("fixtures/numeric_body_args_unused.mjs");
+            // Literal-index and length reads are projected; the object itself
+            // and computed keys are not.
             let observed =
-                original.replace("var original = value;", "var original = arguments[0];");
+                original.replace("var original = value;", "var original = arguments[index & 1];");
             let frame = include_str!("fixtures/numeric_body_frame_compact.mjs");
             let mut branches = String::from("switch(index & 255) {");
             for index in 0..256 {

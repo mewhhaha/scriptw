@@ -107,3 +107,11 @@ print('captured call domains ok');
         );
     }
 }
+
+#[test]
+fn captured_regions_answer_projected_arguments_from_passed_values() {
+    run(
+        include_str!("../fixtures/captured_call_arguments.js"),
+        "captured call arguments ok",
+    );
+}

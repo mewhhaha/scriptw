@@ -9,6 +9,7 @@ use scriptw_ir::{
     LEXICAL_ARGUMENTS_NAME,
 };
 
+#[derive(Debug, Clone)]
 pub(crate) struct StrictArgumentsProjection {
     source: scriptw_ir::FunctionId,
     named_own_binding: bool,
@@ -148,6 +149,24 @@ impl StrictArgumentsProjection {
                 _ => None,
             },
             _ => None,
+        }
+    }
+
+    /// The actual argument position an admitted own read names when its key
+    /// is a literal array index: `length` and computed keys answer `None`.
+    pub(crate) fn literal_index(&self, value: &TypedExpr) -> Option<u32> {
+        match self.read(value)? {
+            ArgumentsProjectionRead::First => Some(0),
+            ArgumentsProjectionRead::Length | ArgumentsProjectionRead::Other => None,
+            ArgumentsProjectionRead::Index => {
+                let ExprIr::Number(bits) = &self.read_key(value)?.expr else {
+                    return None;
+                };
+                let index = f64::from_bits(*bits);
+                // ToPropertyKey(-0) is "0", like the First read.
+                (index.fract() == 0.0 && (0.0..f64::from(u32::MAX)).contains(&index))
+                    .then_some(index as u32)
+            }
         }
     }
 

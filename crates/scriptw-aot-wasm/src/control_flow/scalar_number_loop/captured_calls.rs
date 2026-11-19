@@ -7,6 +7,7 @@ use scriptw_ir::{
     CapturedBindingIr, EnvironmentIdentifierOperationIr as EnvOp,
     EnvironmentIdentifierResolutionStart, FunctionIr, ProvenBindingCellOrigin,
 };
+use crate::arguments_protocol::ArgumentsProjectionRead;
 use std::sync::Arc;
 
 mod source;
@@ -71,6 +72,9 @@ struct SourceCompiler<'a, 'b, 'c> {
     source: Arc<CapturedCallSource>,
     call: usize,
     bindings: BTreeMap<String, Binding>,
+    /// Each actual argument as passed, before any formal assignment: the
+    /// values projected arguments reads observe. Empty without a projection.
+    positional: Vec<Binding>,
     captures: Vec<usize>,
     domains: BTreeMap<usize, NumberDomain>,
     depth: usize,
@@ -257,11 +261,15 @@ fn compile_site(
             .get(&source.function.id)?
             .entry
             .source_id();
+        if source.function.params.len() != arguments.len() {
+            return None;
+        }
         let mut compiler = SourceCompiler {
             proof,
             source: source.clone(),
             call,
             bindings: BTreeMap::new(),
+            positional: Vec::new(),
             captures: Vec::new(),
             domains: BTreeMap::new(),
             depth,
@@ -280,6 +288,23 @@ fn compile_site(
                     Binding::Number(slot)
                 }
             };
+            if source.arguments.is_some() {
+                // A formal assignment rewrites its own slot; the snapshot
+                // keeps the passed value in another one.
+                let snapshot = match &binding {
+                    Binding::Number(slot) => {
+                        let copy = compiler.temporary()?;
+                        let value = compiler.read_slot(*slot);
+                        compiler.domains.insert(copy, value.intrinsic_domain());
+                        body.push(NumberStatement::Initialize(
+                            NumberExpression::AssignCallSlot(copy, Box::new(value)),
+                        ));
+                        Binding::Number(copy)
+                    }
+                    other => other.clone(),
+                };
+                compiler.positional.push(snapshot);
+            }
             compiler.bindings.insert(parameter.name.clone(), binding);
         }
         let (last, statements) = source.function.body.statements.split_last()?;
@@ -302,6 +327,17 @@ fn compile_site(
 }
 
 impl SourceCompiler<'_, '_, '_> {
+    /// The passed value an admitted own read with a literal index below the
+    /// actual count observes.
+    fn projected_argument(&self, value: &TypedExpr) -> Option<&Binding> {
+        let index = self.source.arguments.as_ref()?.literal_index(value)?;
+        self.positional.get(usize::try_from(index).ok()?)
+    }
+
+    fn projected_row(&self, value: &TypedExpr) -> bool {
+        matches!(self.projected_argument(value), Some(Binding::Row))
+    }
+
     fn read_slot(&self, slot: usize) -> NumberExpression {
         NumberExpression::CallSlot(
             slot,
@@ -426,6 +462,10 @@ impl SourceCompiler<'_, '_, '_> {
             StatementIr::Var(values) if declarations => {
                 for value in values {
                     let init = value.init.as_ref()?;
+                    if self.projected_row(init) {
+                        self.bindings.insert(value.name.clone(), Binding::Row);
+                        continue;
+                    }
                     if let ExprIr::Identifier(other) = &init.expr {
                         if let Some(Binding::Row) = self.bindings.get(other) {
                             self.bindings.insert(value.name.clone(), Binding::Row);
@@ -494,11 +534,27 @@ impl SourceCompiler<'_, '_, '_> {
     }
     fn expression(&mut self, value: &TypedExpr) -> Option<NumberExpression> {
         self.visit()?;
+        if let Some(projection) = &self.source.arguments {
+            if let Some(read) = projection.read(value) {
+                if matches!(read, ArgumentsProjectionRead::Length) {
+                    return Some(NumberExpression::Constant(
+                        (self.positional.len() as f64).to_bits(),
+                    ));
+                }
+                let Binding::Number(slot) = self.projected_argument(value)? else {
+                    return None;
+                };
+                return Some(self.read_slot(*slot));
+            }
+        }
         if let Some(read) = PropertyReadView::of(value) {
-            let ExprIr::Identifier(target) = &read.target.expr else {
-                return None;
+            let row = match &read.target.expr {
+                ExprIr::Identifier(target) => {
+                    matches!(self.bindings.get(target), Some(Binding::Row))
+                }
+                _ => self.projected_row(read.target),
             };
-            if !matches!(self.bindings.get(target), Some(Binding::Row)) {
+            if !row {
                 return None;
             }
             let ReadKey::StaticString(name) = read.key else {
