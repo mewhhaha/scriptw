@@ -167,21 +167,33 @@ impl NumericLeafExpression {
                 function.instruction(&Instruction::F64Neg);
             }
             Self::Bitwise(op, lhs, rhs) => {
-                let left = schema.reserve_i64_local(function);
-                let right = schema.reserve_i64_local(function);
-                lhs.emit_parameters(schema, parameter, function);
-                function.instruction(&Instruction::I64ReinterpretF64);
-                left.store(function);
-                rhs.emit_parameters(schema, parameter, function);
-                function.instruction(&Instruction::I64ReinterpretF64);
-                right.store(function);
-                crate::operations::emit_number_bitwise_payload(
-                    schema, *op, left, right, left, function,
+                use crate::operations::BitwiseOperand;
+                let operand = |value: &Self, function: &mut Function| match value {
+                    Self::Constant(bits) => BitwiseOperand::Uint32(
+                        crate::operations::number_to_uint32(f64::from_bits(*bits)),
+                    ),
+                    _ => {
+                        let payload = schema.reserve_i64_local(function);
+                        value.emit_parameters(schema, parameter, function);
+                        function.instruction(&Instruction::I64ReinterpretF64);
+                        payload.store(function);
+                        BitwiseOperand::Payload(payload)
+                    }
+                };
+                let left = operand(lhs, function);
+                let right = operand(rhs, function);
+                let result = schema.reserve_i64_local(function);
+                crate::operations::emit_number_bitwise_operands(
+                    schema, *op, left, right, result, function,
                 );
-                left.load(function);
+                result.load(function);
                 function.instruction(&Instruction::F64ReinterpretI64);
-                schema.release_i64_local(right, function);
-                schema.release_i64_local(left, function);
+                schema.release_i64_local(result, function);
+                for operand in [right, left] {
+                    if let BitwiseOperand::Payload(payload) = operand {
+                        schema.release_i64_local(payload, function);
+                    }
+                }
             }
             Self::Binary(op, lhs, rhs) => {
                 lhs.emit_parameters(schema, parameter, function);

@@ -1711,10 +1711,21 @@ impl<'a> FunctionBuilder<'a> {
         let schema = self.runtime_schema();
         let left = schema.reserve_value_local(function);
         let right = schema.reserve_value_local(function);
+        // A literal Number operand is its own ToNumeric and evaluates
+        // nothing: its ToUint32 is a compile-time constant.
+        let operands = |left: &ValueLocals, right: &ValueLocals| {
+            (
+                BitwiseOperand::literal(lhs)
+                    .map_or(BitwiseOperand::Payload(left.scalar()), BitwiseOperand::Uint32),
+                BitwiseOperand::literal(rhs)
+                    .map_or(BitwiseOperand::Payload(right.scalar()), BitwiseOperand::Uint32),
+            )
+        };
         if lhs.kind == ValueKind::Number && rhs.kind == ValueKind::Number {
             self.compile_expr_to_value(lhs, &left, function)?;
             self.compile_expr_to_value(rhs, &right, function)?;
-            self.emit_number_bitwise_to_locals(op, left.scalar(), right.scalar(), output, function);
+            let (left_operand, right_operand) = operands(&left, &right);
+            self.emit_number_bitwise_to_locals(op, left_operand, right_operand, output, function);
             right.clear(function);
             left.clear(function);
             return Ok(());
@@ -1743,7 +1754,8 @@ impl<'a> FunctionBuilder<'a> {
             self.emit_propagate_current_throw(function);
         }
         function.instruction(&Instruction::Else);
-        self.emit_number_bitwise_to_locals(op, left.scalar(), right.scalar(), output, function);
+        let (left_operand, right_operand) = operands(&left, &right);
+        self.emit_number_bitwise_to_locals(op, left_operand, right_operand, output, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         right.clear(function);
@@ -1754,12 +1766,12 @@ impl<'a> FunctionBuilder<'a> {
     fn emit_number_bitwise_to_locals(
         &mut self,
         op: BitwiseBinaryOp,
-        left: I64Local,
-        right: I64Local,
+        left: BitwiseOperand,
+        right: BitwiseOperand,
         output: &ValueLocals,
         function: &mut Function,
     ) {
-        emit_number_bitwise_payload(
+        emit_number_bitwise_operands(
             self.runtime_schema(),
             op,
             left,
@@ -6667,6 +6679,57 @@ pub(crate) fn emit_number_to_uint32_payload(
     function.instruction(&Instruction::End);
 }
 
+/// One Number operand of a binary bitwise operator: a runtime payload, or
+/// a literal whose ToUint32 the compiler applied. ToInt32 and ToUint32 have
+/// the same low 32 bits, which is all the 32-bit operators read.
+#[derive(Clone, Copy)]
+pub(crate) enum BitwiseOperand {
+    Payload(I64Local),
+    Uint32(u32),
+}
+
+impl BitwiseOperand {
+    /// The literal operand of a Number expression, if it is one.
+    pub(crate) fn literal(value: &TypedExpr) -> Option<u32> {
+        match value.expr {
+            ExprIr::Number(bits) => Some(number_to_uint32(f64::from_bits(bits))),
+            _ => None,
+        }
+    }
+
+    fn emit_uint32(self, schema: &crate::gc_types::RuntimeSchema, function: &mut Function) {
+        match self {
+            Self::Payload(payload) => {
+                let bits = schema.reserve_i64_local(function);
+                emit_number_to_uint32_payload(payload, bits, function);
+                bits.load(function);
+                function.instruction(&Instruction::I32WrapI64);
+                schema.release_i64_local(bits, function);
+            }
+            Self::Uint32(value) => {
+                function.instruction(&Instruction::I32Const(value as i32));
+            }
+        }
+    }
+}
+
+/// ToUint32 (ECMA-262 7.1.7) of a Number: NaN and the infinities are +0,
+/// otherwise the truncated integer modulo 2^32. f64 `%` is exact, and both
+/// operands of the correction are integers below 2^53.
+pub(crate) fn number_to_uint32(value: f64) -> u32 {
+    if !value.is_finite() {
+        return 0;
+    }
+    let modulus = 4_294_967_296.0;
+    let remainder = value.trunc() % modulus;
+    let remainder = if remainder < 0.0 {
+        remainder + modulus
+    } else {
+        remainder
+    };
+    remainder as u32
+}
+
 pub(crate) fn emit_number_bitwise_payload(
     schema: &crate::gc_types::RuntimeSchema,
     op: BitwiseBinaryOp,
@@ -6675,14 +6738,26 @@ pub(crate) fn emit_number_bitwise_payload(
     output: I64Local,
     function: &mut Function,
 ) {
-    let left_bits = schema.reserve_i64_local(function);
-    let right_bits = schema.reserve_i64_local(function);
-    emit_number_to_uint32_payload(left, left_bits, function);
-    emit_number_to_uint32_payload(right, right_bits, function);
-    left_bits.load(function);
-    function.instruction(&Instruction::I32WrapI64);
-    right_bits.load(function);
-    function.instruction(&Instruction::I32WrapI64);
+    emit_number_bitwise_operands(
+        schema,
+        op,
+        BitwiseOperand::Payload(left),
+        BitwiseOperand::Payload(right),
+        output,
+        function,
+    );
+}
+
+pub(crate) fn emit_number_bitwise_operands(
+    schema: &crate::gc_types::RuntimeSchema,
+    op: BitwiseBinaryOp,
+    left: BitwiseOperand,
+    right: BitwiseOperand,
+    output: I64Local,
+    function: &mut Function,
+) {
+    left.emit_uint32(schema, function);
+    right.emit_uint32(schema, function);
     match op {
         BitwiseBinaryOp::And => function.instruction(&Instruction::I32And),
         BitwiseBinaryOp::Or => function.instruction(&Instruction::I32Or),
@@ -6698,6 +6773,33 @@ pub(crate) fn emit_number_bitwise_payload(
     });
     function.instruction(&Instruction::I64ReinterpretF64);
     output.store(function);
-    schema.release_i64_local(right_bits, function);
-    schema.release_i64_local(left_bits, function);
+}
+
+#[cfg(test)]
+mod bitwise_literal_tests {
+    use super::number_to_uint32;
+
+    #[test]
+    fn literal_operands_fold_to_the_exact_to_uint32() {
+        for (value, expected) in [
+            (7.0, 7),
+            (-1.0, u32::MAX),
+            (4_294_967_296.0, 0),
+            (4_294_967_297.5, 1),
+            (-0.0, 0),
+            (0.9, 0),
+            (-0.9, 0),
+            (-4_294_967_297.0, u32::MAX),
+            (2_147_483_648.0, 2_147_483_648),
+            (-2_147_483_649.0, 2_147_483_647),
+            (9_007_199_254_740_992.0, 0),
+            (1e20, 1_661_992_960),
+            (-1e20, 2_632_974_336),
+            (f64::NAN, 0),
+            (f64::INFINITY, 0),
+            (f64::NEG_INFINITY, 0),
+        ] {
+            assert_eq!(number_to_uint32(value), expected, "{value}");
+        }
+    }
 }
