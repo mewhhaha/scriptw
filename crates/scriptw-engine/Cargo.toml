@@ -37,7 +37,7 @@ benchmark-module-images = []
 # out of product and release builds. Only enable for developer-only
 # differential-oracle testing (see AGENTS.md and conformance area T25). Never enable this
 # feature for a shipped/product build.
-spec-exec-oracle = ["dep:scriptw-spec-exec"]
+spec-exec-oracle = ["dep:scriptw-spec-exec", "scriptw-spec-exec/oracle"]
 
 [lib]
 path = "src/lib.rs"

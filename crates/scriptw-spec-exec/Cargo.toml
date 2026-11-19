@@ -4,13 +4,31 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+# The Boa interpreter compiles only under `oracle`, which
+# `scriptw-engine/spec-exec-oracle` enables. Without it this workspace member
+# is an empty library, so `cargo build --workspace` and every default graph
+# stay interpreter-free (scripts/check-no-interpreter-in-product-graph.sh).
+[features]
+default = []
+oracle = ["dep:boa_engine", "dep:serde_json"]
+
 [dependencies]
-serde_json = "1.0"
-boa_engine = { version = "0.21.0", features = ["annex-b", "experimental", "intl_bundled"] }
+serde_json = { version = "1.0", optional = true }
+boa_engine = { version = "0.21.0", features = ["annex-b", "experimental", "intl_bundled"], optional = true }
 scriptw-runtime = { path = "../scriptw-runtime" }
 
 [lib]
 path = "src/lib.rs"
+
+[[test]]
+name = "embedded_json_modules"
+path = "tests/embedded_json_modules.rs"
+required-features = ["oracle"]
+
+[[test]]
+name = "embedded_module_graph"
+path = "tests/embedded_module_graph.rs"
+required-features = ["oracle"]
 
 [lints]
 workspace = true

@@ -8,7 +8,9 @@ autotests = false
 
 [features]
 default = []
-feature-roots = []
+# The oracle crate is a workspace member; it is empty unless its own `oracle`
+# feature is on, which the ordinary workspace graph never enables.
+feature-roots = ["dep:scriptw-spec-exec"]
 
 [dependencies]
 scriptw-front = { path = "../scriptw-front" }
@@ -16,7 +18,7 @@ scriptw-ir = { path = "../scriptw-ir" }
 scriptw-intl-collator-data = { path = "../scriptw-intl-collator-data" }
 scriptw-runtime = { path = "../scriptw-runtime" }
 scriptw-runtime-image = { path = "../scriptw-runtime-image" }
-scriptw-spec-exec = { path = "../scriptw-spec-exec" }
+scriptw-spec-exec = { path = "../scriptw-spec-exec", optional = true }
 scriptw-aot-wasm = { path = "../scriptw-aot-wasm" }
 scriptw-engine = { path = "../scriptw-engine" }
 scriptw-cli = { path = "../scriptw-cli" }

@@ -4,7 +4,10 @@
 # interpreter and exists only as a hidden, developer-only differential
 # oracle gated behind the `spec-exec-oracle` cargo feature. This script
 # proves that feature is off by default and that boa_engine does not appear
-# in the default dependency graph of scriptw-engine or scriptw-cli.
+# in the default dependency graph of scriptw-engine, scriptw-cli or the whole
+# workspace (`cargo build --workspace`, `cargo check --workspace
+# --all-targets`): scriptw-spec-exec is a workspace member whose Boa code
+# compiles only under its own `oracle` feature.
 set -euo pipefail
 
 failures=0
@@ -17,9 +20,16 @@ fail() {
 # Capture Cargo's exit status separately from inspecting its output. A failed
 # graph query is not evidence that the product excludes the interpreter.
 check_graph() {
-  local package="$1" expectation="$2" graph count
+  local package="$1" expectation="$2" graph count selection
   shift 2
-  if ! graph="$(cargo tree --locked -p "$package" --prefix none --format '{p}' "$@")"; then
+  # The pseudo-package `--workspace` selects every member with its default
+  # features, as a bare workspace build or check does (dev edges included).
+  if [[ "$package" == "--workspace" ]]; then
+    selection=(--workspace)
+  else
+    selection=(-p "$package")
+  fi
+  if ! graph="$(cargo tree --locked "${selection[@]}" --prefix none --format '{p}' "$@")"; then
     fail "could not inspect dependency graph of $package ($expectation)"
     return
   fi
@@ -46,8 +56,11 @@ check_graph() {
 
 check_graph scriptw-engine absent
 check_graph scriptw-cli absent
+check_graph --workspace absent
+check_graph scriptw-spec-exec absent
 check_graph scriptw-engine present --features spec-exec-oracle
 check_graph scriptw-cli present --features spec-exec-oracle
+check_graph scriptw-spec-exec present --features oracle
 
 artifact_test="crates/scriptw-aot-wasm/tests/emission/product_artifact.rs"
 if [ ! -f "$artifact_test" ]; then

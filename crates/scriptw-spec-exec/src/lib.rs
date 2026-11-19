@@ -1,3 +1,9 @@
+//! Developer-only Boa differential oracle (AGENTS.md: never a product path).
+//!
+//! The whole crate compiles only under its `oracle` feature, which
+//! `scriptw-engine/spec-exec-oracle` enables; otherwise it is empty.
+#![cfg(feature = "oracle")]
+
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
