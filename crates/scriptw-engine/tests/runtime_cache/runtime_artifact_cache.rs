@@ -368,6 +368,9 @@ fn embedded_runtime_executes_fresh_programs_without_a_native_runtime_compile() {
                 .as_nanos()
         )));
     fs::create_dir(&directory.0).unwrap();
+    // R loads from an unnamed private inode where the cache directory's
+    // filesystem can hold one, and from the owned-byte lease otherwise.
+    let temp_backing = expected_native_backing(&directory.0);
     let executable = std::env::current_exe().unwrap();
     for role in ["producer", "consumer", "graph"] {
         let cache = directory.0.join(role);
@@ -379,6 +382,7 @@ fn embedded_runtime_executes_fresh_programs_without_a_native_runtime_compile() {
         let trace = String::from_utf8_lossy(&output.stderr);
         assert!(trace.contains("runtime-build-package hit:"), "{trace}");
         assert_embedded_compilation_modes(&trace);
+        assert_native_backing(&trace, temp_backing);
         assert!(
             !trace.contains("runtime-cache miss:"),
             "no raw R regeneration: {trace}"
@@ -395,6 +399,7 @@ fn embedded_runtime_executes_fresh_programs_without_a_native_runtime_compile() {
     let trace = String::from_utf8_lossy(&cached.stderr);
     assert!(trace.contains("runtime-build-package hit:"), "{trace}");
     assert_embedded_compilation_modes(&trace);
+    assert_native_backing(&trace, temp_backing);
     assert!(trace.contains("program-cache hit:"), "{trace}");
     assert_native_cache_counts(&cached, 1, 0); // Only P uses the native disk cache.
                                                // A regular file makes all cache directory creation fail. This is an
@@ -409,9 +414,61 @@ fn embedded_runtime_executes_fresh_programs_without_a_native_runtime_compile() {
     let trace = String::from_utf8_lossy(&output.stderr);
     assert!(trace.contains("runtime-build-package hit:"), "{trace}");
     assert_embedded_compilation_modes(&trace);
+    // No cache directory can hold a private inode: the lease path, pinned.
+    assert_native_backing(&trace, NativeBacking::Lease);
     assert!(
         trace.contains("module-cache result unavailable:"),
         "{trace}"
+    );
+    // Pin the private-inode path too, where Cargo's target directory is on a
+    // disk filesystem (it is not on tmpfs on the machines this suite runs on;
+    // a target on tmpfs leaves only the lease path to observe).
+    let disk = CacheDirectory(Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!(
+        "scriptw-embedded-runtime-disk-{}",
+        std::process::id()
+    )));
+    if disk.0.exists() {
+        fs::remove_dir_all(&disk.0).unwrap();
+    }
+    fs::create_dir_all(&disk.0).unwrap();
+    let disk_backing = expected_native_backing(&disk.0);
+    let output = child(&executable, EMBEDDED_TEST, "consumer", &disk.0.join("consumer"));
+    let trace = String::from_utf8_lossy(&output.stderr);
+    assert_embedded_compilation_modes(&trace);
+    assert_native_backing(&trace, disk_backing);
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NativeBacking {
+    PrivateInode,
+    Lease,
+}
+
+/// The engine refuses a private native inode on tmpfs and ramfs (Linux
+/// uapi magic.h), where it would only hide the image's bytes from RSS.
+fn expected_native_backing(directory: &Path) -> NativeBacking {
+    if !cfg!(target_os = "linux") {
+        return NativeBacking::Lease; // Private inodes are Linux-only.
+    }
+    let stat = rustix::fs::statfs(directory).expect("cache filesystem is inspectable");
+    if matches!(stat.f_type as u64, 0x0102_1994 | 0x8584_58f6) {
+        NativeBacking::Lease
+    } else {
+        NativeBacking::PrivateInode
+    }
+}
+
+fn assert_native_backing(trace: &str, expected: NativeBacking) {
+    let backing = match expected {
+        NativeBacking::PrivateInode => "private-inode",
+        NativeBacking::Lease => "lease",
+    };
+    assert!(
+        trace.lines().any(|line| {
+            line.contains("runtime-native-bundle hit:")
+                && line.contains(&format!(", backing: {backing} ("))
+        }),
+        "R must load through the {backing} path: {trace}"
     );
 }
 

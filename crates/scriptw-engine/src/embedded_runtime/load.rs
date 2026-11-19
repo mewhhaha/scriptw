@@ -1,5 +1,6 @@
 //! Per-Engine native admission and a transient private Cargo-byte lease.
 use super::*;
+use super::native_backing::NativeLoadPath;
 
 impl EmbeddedNativeRuntime {
     pub(super) fn accepts_native(&self, image: &scriptw_runtime_image::NativeRuntimeBytes) -> bool {
@@ -42,6 +43,7 @@ impl EmbeddedNativeRuntime {
             let loaded = unsafe { backing.deserialize(engine) };
             timings.deserialize += started.elapsed();
             if let Ok(module) = loaded {
+                self.trace_hit(backing.bytes(), NativeLoadPath::PrivateInode, mode);
                 return Some(module);
             }
         }
@@ -82,15 +84,7 @@ impl EmbeddedNativeRuntime {
         }
         match loaded {
             Ok(module) => {
-                if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
-                    eprintln!(
-                        "scriptw wasm trace: runtime-native-bundle hit: {} bytes (runtime: {}, execution: {}, source: {:?})",
-                        native_length,
-                        self.manifest.modes.runtime.as_str(),
-                        mode.as_str(),
-                        self.images.profile
-                    );
-                }
+                self.trace_hit(native_length as u64, NativeLoadPath::Lease, mode);
                 Some(module)
             }
             Err(error) => {
@@ -99,6 +93,21 @@ impl EmbeddedNativeRuntime {
                 }
                 None
             }
+        }
+    }
+
+    /// Both admitted load paths report the same hit line; only `backing`
+    /// differs.
+    fn trace_hit(&self, native_bytes: u64, backing: NativeLoadPath, mode: WasmNativeCompilationMode) {
+        if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
+            eprintln!(
+                "scriptw wasm trace: runtime-native-bundle hit: {} bytes, backing: {} (runtime: {}, execution: {}, source: {:?})",
+                native_bytes,
+                backing.as_str(),
+                self.manifest.modes.runtime.as_str(),
+                mode.as_str(),
+                self.images.profile
+            );
         }
     }
 }

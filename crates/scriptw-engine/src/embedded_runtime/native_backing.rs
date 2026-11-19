@@ -7,7 +7,30 @@ use std::fs::File;
 #[cfg(all(test, target_os = "linux"))]
 use std::io::Write;
 
-pub(super) struct NativeBacking(File);
+/// Where an admitted embedded native runtime was deserialized from.
+#[derive(Clone, Copy)]
+pub(super) enum NativeLoadPath {
+    /// An unnamed private inode under the module cache directory.
+    PrivateInode,
+    /// The owned-byte lease, used where the cache directory cannot hold a
+    /// private inode (tmpfs, ramfs, or an unavailable cache).
+    Lease,
+}
+
+impl NativeLoadPath {
+    pub(super) fn as_str(self) -> &'static str {
+        match self {
+            NativeLoadPath::PrivateInode => "private-inode",
+            NativeLoadPath::Lease => "lease",
+        }
+    }
+}
+
+pub(super) struct NativeBacking {
+    file: File,
+    /// Length of the admitted native image, for the load trace.
+    bytes: u64,
+}
 
 impl NativeBacking {
     pub(super) fn from_cargo(
@@ -27,12 +50,11 @@ impl NativeBacking {
                     scriptw_runtime_image::write_portable_native(&mut file)
                 }
             }?;
-            if written.digest() != expected
-                || file.metadata().ok()?.len() != written.decoded_bytes() as u64
-            {
+            let bytes = file.metadata().ok()?.len();
+            if written.digest() != expected || bytes != written.decoded_bytes() as u64 {
                 return None;
             }
-            return Some(Self(file));
+            return Some(Self { file, bytes });
         }
         #[cfg(not(target_os = "linux"))]
         {
@@ -69,13 +91,20 @@ impl NativeBacking {
         {
             let mut file = Self::private_file()?;
             file.write_all(bytes).ok()?;
-            Some(Self(file))
+            Some(Self {
+                file,
+                bytes: bytes.len() as u64,
+            })
         }
         #[cfg(not(target_os = "linux"))]
         {
             let _ = bytes;
             None
         }
+    }
+
+    pub(super) fn bytes(&self) -> u64 {
+        self.bytes
     }
 
     /// # Safety
@@ -88,7 +117,7 @@ impl NativeBacking {
         // SAFETY: caller supplies native authority; the unlinked inode has no
         // exposed mutation path. This type publishes no writable File/descriptor,
         // and Wasmtime retains its own Arc<File> through Module/Store lifetimes.
-        unsafe { wasmtime::Module::deserialize_open_file(engine, self.0.try_clone()?) }
+        unsafe { wasmtime::Module::deserialize_open_file(engine, self.file.try_clone()?) }
     }
 }
 
@@ -111,8 +140,9 @@ mod tests {
                 #[cfg(target_os = "linux")]
                 {
                     use std::os::unix::fs::MetadataExt;
-                    assert_eq!(backing.0.metadata().unwrap().nlink(), 0);
-                    assert_eq!(backing.0.metadata().unwrap().len(), native.len() as u64);
+                    assert_eq!(backing.file.metadata().unwrap().nlink(), 0);
+                    assert_eq!(backing.file.metadata().unwrap().len(), native.len() as u64);
+                    assert_eq!(backing.bytes(), native.len() as u64);
                 }
                 // SAFETY: exact Module::serialize output of this pinned engine.
                 // Dropping the backing before invocation proves Wasmtime retains

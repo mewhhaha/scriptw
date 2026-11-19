@@ -258,15 +258,13 @@ accepts `--case <file.js>`.
   (`emit_global_property_write`); reads of such names are exact since the
   run-time global resolution. Owner: the local-copy-plus-mirror design of
   script `var` bindings.
-- Five vendored `pagemap::tests::*` unit tests fail, and the emitter's
-  `thousand_method_program_shares_only_the_native_bodies` measures a
-  method initializer of 1,441,914 bytes against its 1,400,000 limit; both
-  predate the RSC work. On the cloud machine only,
-  `runtime_cache::embedded_runtime_executes_fresh_programs_without_a_native_runtime_compile`
-  fails: where `/tmp` is not tmpfs the runtime is backed by a private file,
-  and that path prints no "runtime-native-bundle hit" line. Owner:
-  vendored Wasmtime patches, native program templates and the runtime
-  cache test's host assumptions.
+- Five vendored `pagemap::tests::*` unit tests were reported failing on the
+  cloud machine. No repository command runs them: Cargo refuses
+  `cargo test -p wasmtime` because the vendored crate is not a workspace
+  member and has dev-dependencies, so they cannot enter the
+  `known-failures.tsv` ledger, whose rows libtest enforces. Owner: vendored
+  Wasmtime patches (attribute the failures against a standalone checkout of
+  `vendor/wasmtime-47.0.0` on this kernel).
 
 ## Conformance boundaries
 
