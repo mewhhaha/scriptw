@@ -2236,7 +2236,6 @@ dependencies = [
  "icu_normalizer",
  "icu_properties",
  "memchr",
- "num-bigint",
  "scriptw-front",
  "scriptw-intl",
  "scriptw-ir",
@@ -2351,7 +2350,6 @@ dependencies = [
  "ryu-js",
  "scriptw-front",
  "serde_json",
- "zerotrie",
 ]
 
 [[package]]

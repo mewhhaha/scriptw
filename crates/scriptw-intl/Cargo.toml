@@ -28,6 +28,8 @@ ryu-js = "=1.0.2"
 [build-dependencies]
 icu_collections = { version = "=2.0.0", default-features = false }
 icu_calendar = { version = "=2.0.6", default-features = false, features = ["datagen", "compiled_data"] }
+# Not referenced by build.rs: pins the exact baked calendar data that
+# icu_calendar's `compiled_data` feature links into the build script.
 icu_calendar_data = { version = "=2.0.0", default-features = false }
 jiff-tzdb = "=0.1.6"
 serde_json = "=1.0.149"

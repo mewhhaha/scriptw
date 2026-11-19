@@ -9,7 +9,6 @@ license.workspace = true
 boa_ast = { version = "0.21.1", features = ["annex-b"] }
 boa_interner = "0.21.1"
 icu_properties = "2.0.2"
-zerotrie = { version = "0.2.2", features = ["alloc"] }
 num-bigint = "0.4.6"
 num-traits = "0.2.19"
 scriptw-front = { path = "../scriptw-front" }
