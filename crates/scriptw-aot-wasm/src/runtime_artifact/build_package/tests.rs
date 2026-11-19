@@ -113,6 +113,7 @@ fn r_free_emission_never_queries_a_supplied_cache() {
         crate::PromiseRejectionPolicy::default(),
         &IntlCompilationProfile::Minimal,
         RuntimeArtifactInputs::new(Some(&UnusedCache)),
+        crate::ProfileMode::None,
     )
     .unwrap();
     assert!(

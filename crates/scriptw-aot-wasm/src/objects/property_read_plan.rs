@@ -66,7 +66,9 @@ impl FunctionBuilder<'_> {
         }
         match PropertyReadPlan::for_write(target, key) {
             PropertyReadPlan::General => Ok(None),
-            PropertyReadPlan::CachedStaticString => self.next_site_record().map(Some),
+            PropertyReadPlan::CachedStaticString => self
+                .next_profiled_site_record(crate::profile::SiteKind::PropertyWrite)
+                .map(|(global, _)| Some(global)),
         }
     }
 

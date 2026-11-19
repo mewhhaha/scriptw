@@ -132,6 +132,7 @@ impl Engine {
                     .map(|cache| cache as &dyn scriptw_aot_wasm::RuntimeArtifactCache),
                 scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost,
             ),
+            scriptw_aot_wasm::ProfileMode::None,
         )
         .map_err(|error| EngineError::from_wasm_emit_error(&unit.ir, error))?;
         let runtime = artifact.runtime().cloned();

@@ -470,6 +470,7 @@ pub fn emit(program: &ProgramIr) -> Result<WasmArtifact, EmitError> {
         PromiseRejectionPolicy::default(),
         &scriptw_intl::IntlCompilationProfile::default(),
         crate::RuntimeArtifactInputs::new(None),
+        crate::ProfileMode::None,
     )
 }
 
@@ -482,6 +483,7 @@ pub fn emit_with_promise_rejection_policy(
         promise_rejection_policy,
         &scriptw_intl::IntlCompilationProfile::default(),
         crate::RuntimeArtifactInputs::new(None),
+        crate::ProfileMode::None,
     )
 }
 
@@ -497,6 +499,7 @@ pub fn emit_with_intl_profile(
         promise_rejection_policy,
         intl_profile,
         crate::RuntimeArtifactInputs::new(None),
+        crate::ProfileMode::None,
     )
 }
 
@@ -512,15 +515,18 @@ pub fn emit_with_intl_profile_and_runtime_cache(
         promise_rejection_policy,
         intl_profile,
         crate::RuntimeArtifactInputs::new(cache),
+        crate::ProfileMode::None,
     )
 }
 
 /// Compile with checked raw runtime inputs, resolved only for a linked program.
+/// `profile` specialises the program's P; R never depends on it.
 pub fn emit_with_intl_profile_and_runtime_inputs(
     program: &ProgramIr,
     promise_rejection_policy: PromiseRejectionPolicy,
     intl_profile: &scriptw_intl::IntlCompilationProfile,
     inputs: crate::RuntimeArtifactInputs<'_>,
+    profile: crate::ProfileMode<'_>,
 ) -> Result<WasmArtifact, EmitError> {
     emit_with_observation_mode(
         program,
@@ -528,6 +534,7 @@ pub fn emit_with_intl_profile_and_runtime_inputs(
         intl_profile,
         false,
         inputs,
+        profile,
     )
 }
 
@@ -543,6 +550,7 @@ pub fn emit_with_rooted_snapshot(
         promise_rejection_policy,
         intl_profile,
         crate::RuntimeArtifactInputs::new(None),
+        crate::ProfileMode::None,
     )
 }
 
@@ -558,6 +566,7 @@ pub fn emit_with_rooted_snapshot_and_runtime_cache(
         promise_rejection_policy,
         intl_profile,
         crate::RuntimeArtifactInputs::new(cache),
+        crate::ProfileMode::None,
     )
 }
 
@@ -567,6 +576,7 @@ pub fn emit_with_rooted_snapshot_and_runtime_inputs(
     promise_rejection_policy: PromiseRejectionPolicy,
     intl_profile: &scriptw_intl::IntlCompilationProfile,
     inputs: crate::RuntimeArtifactInputs<'_>,
+    profile: crate::ProfileMode<'_>,
 ) -> Result<WasmArtifact, EmitError> {
     emit_with_observation_mode(
         program,
@@ -574,6 +584,7 @@ pub fn emit_with_rooted_snapshot_and_runtime_inputs(
         intl_profile,
         true,
         inputs,
+        profile,
     )
 }
 
@@ -583,7 +594,9 @@ fn emit_with_observation_mode(
     intl_profile: &scriptw_intl::IntlCompilationProfile,
     snapshot: bool,
     inputs: crate::RuntimeArtifactInputs<'_>,
+    profile: crate::ProfileMode<'_>,
 ) -> Result<WasmArtifact, EmitError> {
+    let profile = crate::profile::ProfileUse::of(profile)?;
     // Diagnostics are scanned *before* `program.script`: a stage that reports a
     // reason for failing also declines to produce a script, so checking the
     // script first replaces every honest diagnostic with the generic "no
@@ -612,6 +625,7 @@ fn emit_with_observation_mode(
         &intl_selection,
         snapshot,
         inputs,
+        profile,
     )
 }
 
@@ -621,6 +635,7 @@ fn emit_script(
     intl_selection: &scriptw_intl::IntlDataSelection,
     snapshot: bool,
     inputs: crate::RuntimeArtifactInputs<'_>,
+    profile: crate::profile::ProfileUse,
 ) -> Result<WasmArtifact, EmitError> {
     if !snapshot {
         if let Some(standalone) = runtime_requirement::StandaloneAdmission::new(script) {
@@ -629,6 +644,7 @@ fn emit_script(
                 ModuleKind::Standalone(&standalone),
                 promise_rejection_policy,
                 intl_selection,
+                profile,
             )?
             .artifact);
         }
@@ -658,6 +674,7 @@ fn emit_script(
         ModuleKind::Program(&runtime),
         promise_rejection_policy,
         intl_selection,
+        profile,
     )?
     .artifact)
 }
@@ -676,6 +693,7 @@ pub(crate) fn emit_runtime_module(
         ModuleKind::Runtime(source_compilation_profile),
         PromiseRejectionPolicy::default(),
         intl_selection,
+        crate::profile::ProfileUse::None,
     )
 }
 
@@ -2172,6 +2190,21 @@ impl<'a> FunctionBuilder<'a> {
         self.require_genuine_source_site()?;
         let position = self.functions.next_site_record(T::KIND)?;
         self.runtime_schema().site_record_global(position)
+    }
+
+    /// The global that holds a new static property site's record, and the
+    /// site's reference in the module's site map, minted alike whatever the
+    /// profile.
+    pub(crate) fn next_profiled_site_record(
+        &mut self,
+        kind: crate::profile::SiteKind,
+    ) -> Result<(crate::gc_types::SiteRecordGlobal, crate::profile::SiteRef), EmitError> {
+        let global = self.next_site_record()?;
+        let body = self
+            .function_id
+            .clone()
+            .map_or(crate::profile::SiteBody::Main, crate::profile::SiteBody::Source);
+        Ok((global, self.functions.next_profile_site(body, kind)?))
     }
 
     fn require_genuine_source_site(&self) -> Result<(), EmitError> {

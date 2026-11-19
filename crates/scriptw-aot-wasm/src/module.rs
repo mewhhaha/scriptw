@@ -1303,6 +1303,8 @@ pub struct WasmArtifact {
     /// disagree.
     pub function_sizes: Vec<EmittedFunctionSummary>,
     pub(crate) runtime: Option<std::sync::Arc<crate::RuntimeArtifact>>,
+    /// The profiled sites of this module's P, in emission order.
+    pub(crate) site_map: crate::profile::SiteMap,
 }
 
 impl WasmArtifact {
@@ -1315,6 +1317,12 @@ impl WasmArtifact {
     /// is a standalone module.
     pub fn runtime(&self) -> Option<&std::sync::Arc<crate::RuntimeArtifact>> {
         self.runtime.as_ref()
+    }
+
+    /// The profiled sites of this module's P, in emission order: what an
+    /// execution profile of it names.
+    pub fn site_map(&self) -> &crate::profile::SiteMap {
+        &self.site_map
     }
 }
 

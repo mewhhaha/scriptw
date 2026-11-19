@@ -31,7 +31,17 @@ fn emit_script_module_with_factory(
     intl_selection: &IntlDataSelection,
     factory: Option<NativeProgramFactory<'_>>,
     validated_runtime: Option<&crate::ValidatedRuntimeArtifact>,
+    profile: crate::profile::ProfileUse,
 ) -> Result<EmittedModule, EmitError> {
+    // R is shared and profile-independent: only a program module's P is
+    // specialised.
+    if matches!(kind, ModuleKind::Runtime(_))
+        && !matches!(profile, crate::profile::ProfileUse::None)
+    {
+        return Err(EmitError::unsupported(
+            "compiler invariant: the runtime module takes no execution profile",
+        ));
+    }
     if let ModuleKind::Standalone(admission) = kind {
         if !std::ptr::eq(script, admission.script()) {
             return Err(EmitError::unsupported(
@@ -354,7 +364,8 @@ fn emit_script_module_with_factory(
         crate::planning::ModuleGraphPlan::from_script(script)?,
     )
     .with_module_import_bindings(script.declares_module_import_bindings())
-    .with_foreign_imports(foreign_imports);
+    .with_foreign_imports(foreign_imports)
+    .with_profile(profile);
     let entry_exports = ProgramExports::new(kind, &layout, factory, &function_metas)?;
     let owned_pool;
     let string_pool = match (kind, validated_runtime) {
@@ -2084,7 +2095,9 @@ fn emit_script_module_with_factory(
     if let Some(budget) = FunctionBodyBudget::from_env() {
         function_table.check_budget(budget)?;
     }
+    let site_map = function_metas.finish_site_map()?;
     let artifact = WasmArtifact {
+        site_map,
         bytes,
         invariant_note: "direct-js-to-wasm module",
         debug_dump: debug_dump.join("\n"),

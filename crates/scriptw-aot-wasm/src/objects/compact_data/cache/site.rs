@@ -71,7 +71,8 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
-        let global = self.next_site_record()?;
+        let (global, _site) =
+            self.next_profiled_site_record(crate::profile::SiteKind::PropertyRead)?;
         let record = self.emit_site_record(global, SiteKey::Literal(name), f)?;
         let done = if may_be_ordinary {
             let done = self.open_frame(ControlFrameKind::Block, f);
