@@ -8,6 +8,7 @@ mod aot_arguments_index_descriptors;
 mod aot_arguments_iteration;
 mod aot_arguments_iterator_mutation;
 mod aot_arguments_projection_reads;
+mod aot_arguments_source_resolution;
 mod aot_binding_cell_payload;
 mod aot_boxed_string_environment_writes;
 mod aot_callable_capture_lifecycle;

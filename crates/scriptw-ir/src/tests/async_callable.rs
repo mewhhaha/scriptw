@@ -277,7 +277,8 @@ fn records_instance_and_static_async_class_methods_with_resume_state() {
 #[test]
 fn records_async_arrows_with_lexical_captures_and_parameter_tdz() {
     let program = lower_script(
-        "function make(marker) {
+        "function viaEval() { eval(''); }
+             function make(marker) {
                  const expression = async delta =>
                      this.value + arguments[0] + delta + (new.target === undefined ? 1 : 0);
                  const block = async (value = later, later) => {

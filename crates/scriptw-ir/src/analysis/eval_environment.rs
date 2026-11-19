@@ -138,23 +138,6 @@ pub(super) fn contains_annex_b_arguments_candidate(script: &Script) -> bool {
     script.visit_with(&mut ArgumentsDeclarations).is_break()
 }
 
-/// Source `arguments` accesses must resolve one live binding, including writes
-/// and closures. A copied hidden-slot fast path cannot represent reassignment.
-pub(super) fn contains_arguments_reference(script: &Script) -> bool {
-    struct ArgumentsReferences;
-    impl<'ast> Visitor<'ast> for ArgumentsReferences {
-        type BreakTy = ();
-        fn visit_identifier(&mut self, identifier: &'ast Identifier) -> ControlFlow<Self::BreakTy> {
-            if identifier.sym() == Sym::ARGUMENTS {
-                ControlFlow::Break(())
-            } else {
-                ControlFlow::Continue(())
-            }
-        }
-    }
-    script.visit_with(&mut ArgumentsReferences).is_break()
-}
-
 pub(super) fn source_identifiers(script: &Script, interner: &Interner) -> BTreeSet<String> {
     struct SourceIdentifiers<'a> {
         interner: &'a Interner,

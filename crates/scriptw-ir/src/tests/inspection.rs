@@ -49,10 +49,15 @@ fn inspection_param_fixture_retains_source_parameters_and_arguments_cell_referen
     ));
     assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
     let script = program.script.as_ref().unwrap();
-    assert_eq!(script.functions.len(), 4);
+    // Exact helper contexts are call-site copies of these source functions.
+    let source_functions = script
+        .functions
+        .iter()
+        .filter(|function| !function.id.contains("$exact_helper_context$"))
+        .collect::<Vec<_>>();
+    assert_eq!(source_functions.len(), 4);
     assert_eq!(
-        script
-            .functions
+        source_functions
             .iter()
             .flat_map(|function| &function.params)
             .filter(|parameter| parameter.default_init.is_some())
@@ -60,16 +65,14 @@ fn inspection_param_fixture_retains_source_parameters_and_arguments_cell_referen
         2
     );
     assert_eq!(
-        script
-            .functions
+        source_functions
             .iter()
             .flat_map(|function| &function.params)
             .filter(|parameter| parameter.is_rest)
             .count(),
         1
     );
-    let outer = script
-        .functions
+    let outer = source_functions
         .iter()
         .find(|function| function.name == "outer")
         .unwrap();
@@ -92,24 +95,16 @@ fn inspection_param_fixture_retains_source_parameters_and_arguments_cell_referen
     let ExprIr::PropertyRead { target, .. } = &returned.expr else {
         panic!("arguments index retains its property Get: {returned:?}")
     };
-    let ExprIr::EnvironmentIdentifier(reference) = &target.expr else {
-        panic!("captured arguments retains a runtime Reference: {target:?}")
-    };
-    assert_eq!(reference.name, "arguments");
-    assert_eq!(
-        reference.resolution_start(),
-        EnvironmentIdentifierResolutionStart::CurrentEnvironment
+    assert!(
+        matches!(&target.expr, ExprIr::Identifier(name) if name == &capture.name),
+        "captured arguments reads the enclosing owner's cell: {target:?}"
     );
-    assert!(matches!(
-        reference.operation,
-        EnvironmentIdentifierOperationIr::Read
-    ));
     let summary = program.ir_summary();
     for expected in [
         "arguments_uses=0",
         "lexical_arguments_captures=1",
-        "environment_identifier_reads=4",
-        "environment_identifier_calls=3",
+        "environment_identifier_reads=0",
+        "environment_identifier_calls=0",
     ] {
         assert!(
             summary.split_whitespace().any(|field| field == expected),
@@ -156,17 +151,19 @@ fn inspection_runtime_arguments_reads_do_not_claim_shadowed_arguments_objects() 
         let ExprIr::PropertyRead { target, .. } = &returned.expr else {
             panic!("arguments index preserves its Get: {returned:?}")
         };
-        let ExprIr::EnvironmentIdentifier(reference) = &target.expr else {
-            panic!("lookup must resolve the actual enclosing binding: {target:?}")
+        let resolved = if has_arguments_parameter {
+            "arguments"
+        } else {
+            LEXICAL_ARGUMENTS_NAME
         };
-        assert_eq!(
-            reference.resolution_start(),
-            EnvironmentIdentifierResolutionStart::CurrentEnvironment
+        assert!(
+            matches!(&target.expr, ExprIr::Identifier(name) if name == resolved),
+            "lookup must resolve the actual enclosing binding: {target:?}"
         );
-        assert!(matches!(
-            reference.operation,
-            EnvironmentIdentifierOperationIr::Read
-        ));
+        assert!(arrow
+            .captured_bindings
+            .iter()
+            .any(|binding| binding.name == resolved));
         assert_eq!(target.kind, ValueKind::Dynamic, "{source}");
         let summary = program.ir_summary();
         assert!(
@@ -178,7 +175,7 @@ fn inspection_runtime_arguments_reads_do_not_claim_shadowed_arguments_objects() 
         assert!(
             summary
                 .split_whitespace()
-                .any(|field| field == "environment_identifier_reads=1"),
+                .any(|field| field == "environment_identifier_reads=0"),
             "{summary}"
         );
     }
@@ -201,7 +198,10 @@ fn inspection_builtin_counters_keep_resolved_intrinsics_distinct_from_runtime_re
         Some(&StandardBuiltinId::AggregateErrorConstructor.function_id())
     );
 
-    let runtime = lower_script("function pick() { return arguments[1]; } AggregateError([], 'x'); new AggregateError([], 'x');");
+    // Direct eval keeps every Script identifier a runtime Reference.
+    let runtime = lower_script(
+        "function pick() { return eval('1'); } AggregateError([], 'x'); new AggregateError([], 'x');",
+    );
     assert!(runtime.is_wasm_supported(), "{:?}", runtime.diagnostics);
     let script = runtime.script.as_ref().unwrap();
     assert_eq!(script.aggregate_errors, 0);
@@ -242,10 +242,10 @@ fn inspection_builtin_counters_keep_resolved_intrinsics_distinct_from_runtime_re
     ));
     let summary = runtime.ir_summary();
     for expected in [
-        "calls=2",
+        "calls=3",
         "constructs=1",
-        "environment_identifier_reads=2",
-        "environment_identifier_calls=1",
+        "environment_identifier_reads=1",
+        "environment_identifier_calls=2",
         "aggregate_errors=0",
     ] {
         assert!(
@@ -260,7 +260,8 @@ fn inspection_builtin_counters_keep_resolved_intrinsics_distinct_from_runtime_re
 
 #[test]
 fn inspection_named_environment_reads_include_parameter_initializers() {
-    let program = lower_script("function f(value = arguments) { return value; }");
+    // Direct eval makes the invocation records named; `arguments` alone does not.
+    let program = lower_script("eval(''); function f(value = arguments) { return value; }");
     assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
     let function = program
         .script

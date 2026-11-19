@@ -42,6 +42,33 @@ impl ScriptLowerer<'_> {
         self.root_this_binding
     }
 
+    /// FunctionDeclarationInstantiation binds the source name `arguments` to
+    /// the implicit arguments object in the owner's own record unless a
+    /// parameter or declaration of that name occupies it. An arrow reaches its
+    /// enclosing function's binding through the captured storage instead.
+    /// Analysis resolves every reference the same way
+    /// (`analysis/arguments_reference.rs`), so reads, writes, destructuring
+    /// targets and closures all share the one `LEXICAL_ARGUMENTS_NAME` cell, and
+    /// no Script global of that name can precede it.
+    pub(super) fn declare_source_arguments_binding(&mut self) {
+        let Some(binding) = self
+            .scopes
+            .last()
+            .and_then(|scope| scope.get(LEXICAL_ARGUMENTS_NAME))
+            .cloned()
+        else {
+            return;
+        };
+        let owner = &self.analysis.owner_plans[&self.current_owner_id];
+        if self.analysis.environment_plans[&owner.activation_environment_id]
+            .binding_storage_names
+            .contains("arguments")
+        {
+            return;
+        }
+        self.declare_binding("arguments".to_string(), binding);
+    }
+
     pub(super) fn begin_function_body_environment(&mut self) -> Option<LexicalEnvironmentIr> {
         let owner = &self.analysis.owner_plans[&self.current_owner_id];
         let body_id = owner.body_environment_id?;

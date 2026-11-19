@@ -102,9 +102,8 @@ fn stable_arguments_fact_keeps_the_live_named_reference_and_ordinary_cell_owner(
     }
     let returned = returned_reference(&arrow.body.statements).expect("arrow's return");
     assert!(matches!(&returned.expr,
-        ExprIr::EnvironmentIdentifier(reference)
-            if reference.name == "arguments"
-            && matches!(reference.operation, scriptw_ir::EnvironmentIdentifierOperationIr::Read)));
+        ExprIr::Identifier(name) if name == scriptw_ir::LEXICAL_ARGUMENTS_NAME));
+    assert_eq!(returned.kind, ValueKind::Arguments);
     let unrelated = script
         .functions
         .iter()

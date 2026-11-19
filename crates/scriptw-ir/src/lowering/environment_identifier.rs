@@ -54,7 +54,9 @@ impl<'ast> Visitor<'ast> for ArgumentsCellStability {
 impl StableImplicitArgumentsCell {
     fn analyze(lowerer: &ScriptLowerer<'_>, name: &str) -> Option<Self> {
         if name != "arguments"
-            || lowerer.lookup_binding(name).is_some()
+            || lowerer
+                .lookup_binding(name)
+                .is_some_and(|binding| binding.storage_name != LEXICAL_ARGUMENTS_NAME)
             || !lowerer.with_environment_chain.is_empty()
         {
             return None;
@@ -108,6 +110,12 @@ impl StableImplicitArgumentsCell {
 }
 
 impl ScriptLowerer<'_> {
+    /// The initial-value fact of the implicit arguments cell a static read of
+    /// source `arguments` names, when no source form can replace it.
+    pub(super) fn stable_implicit_arguments_info(&self) -> Option<ValueInfo> {
+        StableImplicitArgumentsCell::analyze(self, "arguments").map(|cell| cell.value_info(self))
+    }
+
     /// Var bookkeeping must keep its activation/captured declarative position.
     /// Creating a block binding here would incorrectly cut off the enclosing
     /// with chain for the next occurrence of the same target name.

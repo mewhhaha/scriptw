@@ -209,7 +209,7 @@ fn records_nested_generator_try_finally_resume_state_boundaries() {
 #[test]
 fn generator_activation_owns_bindings_that_survive_a_yield() {
     let program = lower_script(
-            "function* activation(parameter) { let local = parameter; if (local) { yield local; local += arguments[0]; } }",
+            "function viaEval() { eval(''); } function* activation(parameter) { let local = parameter; if (local) { yield local; local += arguments[0]; } }",
         );
     assert!(program.is_wasm_supported());
     let script = program.script.as_ref().expect("script ir should exist");

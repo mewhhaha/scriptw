@@ -354,8 +354,11 @@ impl ReadOnlyUses<'_> {
                         _ => false,
                     }
             }
+            // A Script global's PutValue, like a runtime Reference's above,
+            // may run a setter but can reach this object only through a read.
             ExprIr::AssignIdentifier { name, value }
-            | ExprIr::CompoundAssignIdentifier { name, value, .. } => {
+            | ExprIr::CompoundAssignIdentifier { name, value, .. }
+            | ExprIr::GlobalPropertyWrite { name, value, .. } => {
                 other_name(name) && self.expression(value, reads)
             }
             ExprIr::PropertyRead { target, key } => {
@@ -591,10 +594,10 @@ mod tests {
 
     #[test]
     fn named_implicit_binding_requires_the_actual_unique_owned_slot() {
-        // A Script that names `arguments` keeps named records; a Module
-        // owner keeps its implicit binding private.
+        // A Script with a direct eval keeps named records; a Module owner
+        // keeps its implicit binding private.
         let original = function(
-            "function make(a) { 'use strict'; return arguments[0]+arguments.length; }",
+            "function make(a) { 'use strict'; return arguments[0]+arguments.length; } function named() { eval(''); }",
             ParseOptions::script(),
         );
         assert!(StrictArgumentsProjection::admit(&original).is_some());

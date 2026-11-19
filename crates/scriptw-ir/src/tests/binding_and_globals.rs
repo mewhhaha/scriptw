@@ -482,25 +482,19 @@ fn root_update_replaces_an_earlier_nested_script_global_value() {
     let StatementIr::Expression(expression) = script.body.statements.last().unwrap() else {
         panic!("expected final expression");
     };
-    let ExprIr::EnvironmentIdentifier(reference) = &expression.expr else {
+    let ExprIr::GlobalIdentifierRead { name } = &expression.expr else {
         panic!("the final read must observe the live updated global binding");
     };
-    assert_eq!(reference.name, "args");
-    assert!(matches!(
-        reference.operation,
-        EnvironmentIdentifierOperationIr::Read
-    ));
+    assert_eq!(name, "args");
+    assert_eq!(expression.possible_kinds, KindSet::from_kind(ValueKind::Number));
     let StatementIr::Expression(update) = &script.body.statements[script.body.statements.len() - 2]
     else {
         panic!("the original root update must precede the final read");
     };
-    let ExprIr::EnvironmentIdentifier(reference) = &update.expr else {
-        panic!("the original write must retain runtime Reference selection");
-    };
-    assert_eq!(reference.name, "args");
-    let EnvironmentIdentifierOperationIr::Assign { value } = &reference.operation else {
+    let ExprIr::GlobalPropertyWrite { name, value, .. } = &update.expr else {
         panic!("the root update must remain a single actual assignment");
     };
+    assert_eq!(name, "args");
     assert_eq!(value.kind, ValueKind::Number);
     assert_eq!(value.possible_kinds, KindSet::from_kind(ValueKind::Number));
     assert!(matches!(value.expr, ExprIr::Number(bits) if bits == 1f64.to_bits()));
@@ -1408,4 +1402,29 @@ fn with_plain_write_joins_the_skipped_mutable_declarative_fallback() {
         read.possible_kinds.contains(ValueKind::Number),
         "the unselected Object ER writes the Number: {read:?}"
     );
+}
+
+#[test]
+fn an_arguments_reference_keeps_unrelated_captured_reads_static() {
+    // The implicit binding is one owner's storage. A capture elsewhere in the
+    // Script still reads its cell, not a named runtime environment lookup.
+    let program = lower_script(
+        "var make = function () { 'use strict'; var n = 2; \
+           function read() { return n; } \
+           function count() { return arguments.length; } \
+           return read; }; make()();",
+    );
+    assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
+    let script = program.script.as_ref().expect("script ir should exist");
+    assert!(script.eval_environment.is_none());
+    for function in &script.functions {
+        assert!(function.eval_environment.is_none(), "{}", function.name);
+    }
+    let read = script
+        .functions
+        .iter()
+        .find(|function| function.name == "read")
+        .expect("read should be lowered");
+    let body = format!("{:?}", read.body);
+    assert!(!body.contains("EnvironmentIdentifier"), "{body}");
 }

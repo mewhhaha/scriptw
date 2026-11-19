@@ -5841,6 +5841,19 @@ impl<'a> ScriptLowerer<'a> {
         };
         if let Some(binding) = binding.filter(|_| !self.is_unshadowed_script_global_binding(&name))
         {
+            if binding.storage_name == LEXICAL_ARGUMENTS_NAME {
+                if binding.possible_kinds == KindSet::from_kind(ValueKind::Arguments) {
+                    // The owner's own implicit binding, unassigned on this path.
+                    return TypedExpr::from_info(
+                        ValueInfo::new(ValueKind::Arguments),
+                        ExprIr::Arguments,
+                    );
+                }
+                if let Some(info) = self.stable_implicit_arguments_info() {
+                    // An arrow's capture of a cell nothing can reassign.
+                    return TypedExpr::from_info(info, ExprIr::Identifier(binding.storage_name));
+                }
+            }
             let mut info = ValueInfo {
                 kind: binding.kind,
                 possible_kinds: binding.possible_kinds,
@@ -7199,6 +7212,7 @@ impl<'a> ScriptLowerer<'a> {
                 initialization: Initialization::Initialized,
             },
         );
+        lowerer.declare_source_arguments_binding();
 
         let mut params = Vec::with_capacity(parameters.as_ref().len());
         let mut parameter_prefix_statements = Vec::new();
@@ -7666,6 +7680,7 @@ impl<'a> ScriptLowerer<'a> {
                 initialization: Initialization::Initialized,
             },
         );
+        lowerer.declare_source_arguments_binding();
         let return_value = match Self::unwrap_parenthesized_expr(expression) {
             Expression::ClassExpression(class) if class.name_scope().is_none() => {
                 // The parser can attach an inferred literal/private label to

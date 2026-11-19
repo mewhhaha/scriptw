@@ -516,6 +516,7 @@ impl<'a> ScriptLowerer<'a> {
                 },
             );
         }
+        lowerer.declare_source_arguments_binding();
 
         let mut params = Vec::with_capacity(parameters.as_ref().len());
         let mut parameter_prefix_statements = Vec::new();

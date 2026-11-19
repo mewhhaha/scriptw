@@ -57,8 +57,8 @@ impl ProvenBindingCellIr {
         storage_name: &str,
         source_name: &str,
     ) -> Option<Self> {
-        // Collected before arguments-only exposure is folded into eval_visible;
-        // actual eval and Annex-B binding creation never receive this evidence.
+        // Collected before Module reuse is folded into eval_visible; actual
+        // eval and Annex-B binding creation never receive this evidence.
         if !analysis.module_cell_owners.0.contains(owner_id)
             || source_name == "arguments"
             || source_name == LEXICAL_ARGUMENTS_NAME

@@ -1,4 +1,5 @@
 use super::*;
+mod arguments_reference;
 mod binding_inference;
 pub(crate) use binding_inference::{BindingInferenceRecipe, OwnerBindingInference};
 mod direct_eval_capture;
@@ -492,11 +493,13 @@ impl<'a> AnalysisBuilder<'a> {
                 ))
             || eval_environment::contains_direct_eval_call(script)
             || eval_environment::contains_annex_b_arguments_candidate(script);
-        // Module reuse and arguments require named nonlocals and a live arguments
-        // binding, but cannot expose private strict-function locals. Actual eval
+        // Only code that can create or observe bindings by name at run time makes
+        // the whole Script eval-visible. An `arguments` reference is resolved
+        // statically (`analysis/arguments_reference.rs`) to one owner's implicit
+        // binding and exposes nothing else. Module reuse requires named
+        // nonlocals but cannot expose private strict-function locals; actual eval
         // or Annex-B binding creation still disables both static storage paths.
         let static_module_bindings = self.realm_reusable_module_environments && !self.eval_visible;
-        self.eval_visible |= eval_environment::contains_arguments_reference(script);
         self.eval_visible |= self.realm_reusable_module_environments;
         self.source_identifiers = eval_environment::source_identifiers(script, interner);
         let direct_context = match &self.script_instantiation {
@@ -4049,6 +4052,17 @@ impl<'a> AnalysisBuilder<'a> {
         capture_aliases: &BTreeMap<String, String>,
         refs: &mut BTreeMap<String, String>,
     ) {
+        // Every reference form (read, assignment and destructuring target,
+        // update, for-in/of head, shorthand property) resolves `arguments`
+        // the same way: the owner's implicit binding is its own storage.
+        if source_name == "arguments"
+            && self.resolve_arguments_reference(capture_aliases.get(&source_name))
+                == arguments_reference::ArgumentsReference::OwnerImplicit
+        {
+            refs.entry(LEXICAL_ARGUMENTS_NAME.to_string())
+                .or_insert_with(|| LEXICAL_ARGUMENTS_NAME.to_string());
+            return;
+        }
         let alias = capture_aliases.get(&source_name);
         let parameter_phase = self.owner_plans.get(owner_id).is_some_and(|owner| {
             owner.body_environment_id.is_some()
@@ -5658,31 +5672,6 @@ impl<'a> AnalysisBuilder<'a> {
         match expression {
             Expression::Identifier(identifier) => {
                 let name = interner.resolve_expect(identifier.sym()).to_string();
-                if name == "arguments" {
-                    let owner = self.owner_plans.get(owner_id);
-                    let source_binds_arguments =
-                        owner.is_some_and(|owner| owner.root_bindings.contains("arguments"));
-                    if !source_binds_arguments {
-                        if owner.is_some_and(|owner| owner.flavor == FunctionFlavor::Arrow) {
-                            self.record_ref(
-                                owner_id,
-                                LEXICAL_ARGUMENTS_NAME.to_string(),
-                                capture_aliases,
-                                refs,
-                            );
-                        } else if owner_id != SCRIPT_OWNER_ID {
-                            self.record_ref(
-                                owner_id,
-                                LEXICAL_ARGUMENTS_NAME.to_string(),
-                                capture_aliases,
-                                refs,
-                            );
-                        } else {
-                            self.record_ref(owner_id, name, capture_aliases, refs);
-                        }
-                        return;
-                    }
-                }
                 self.record_ref(owner_id, name, capture_aliases, refs);
             }
             Expression::Parenthesized(expression) => {

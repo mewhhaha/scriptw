@@ -611,3 +611,70 @@ fn analysis_nonempty_blocks_retain_eval_visibility_and_binding_ownership() {
         });
     }
 }
+
+#[test]
+fn arguments_references_resolve_to_one_binding_without_exposing_any_owner() {
+    // Without eval, `with` or an Annex B `function arguments`, an `arguments`
+    // reference names one statically known binding. No environment of any
+    // owner, including the one whose arguments object it is, becomes
+    // eval-visible, so unrelated owners keep their proven cells.
+    with_script_analysis(
+        "var shared = 1; \
+         function outer() { 'use strict'; var n = 0; return function inner() { return n + shared; }; } \
+         function counts() { return arguments.length; } \
+         function implicit() { return () => arguments; } \
+         function declared() { var arguments; return () => arguments; } \
+         function parameters(a = () => arguments) { var arguments; return a; } \
+         function blocked() { { let arguments = 1; return () => arguments; } } \
+         { let arguments = 2; var top = () => arguments; }",
+        |analysis| {
+            assert!(analysis
+                .environment_plans
+                .values()
+                .all(|environment| !environment.eval_visible));
+            let arrow_arguments_capture = |parent: &str| {
+                let parent_id = if parent == SCRIPT_OWNER_ID {
+                    SCRIPT_OWNER_ID.to_string()
+                } else {
+                    analysis
+                        .function_plans
+                        .values()
+                        .find(|function| function.name == parent)
+                        .expect("parent should be planned")
+                        .id
+                        .clone()
+                };
+                let arrow = analysis
+                    .function_plans
+                    .values()
+                    .find(|function| {
+                        function.parent_owner_id == parent_id
+                            && function.protocol == FunctionProtocolIr::Arrow
+                    })
+                    .expect("arrow should be planned");
+                let mut captures = arrow.captures.iter().filter(|(_, capture)| {
+                    capture.source_name == "arguments"
+                        || capture.source_name == LEXICAL_ARGUMENTS_NAME
+                });
+                let (storage, capture) = captures.next().expect("arrow captures arguments");
+                assert!(captures.next().is_none());
+                (storage.clone(), capture.source_name.clone())
+            };
+            let implicit = (
+                LEXICAL_ARGUMENTS_NAME.to_string(),
+                LEXICAL_ARGUMENTS_NAME.to_string(),
+            );
+            assert_eq!(arrow_arguments_capture("implicit"), implicit);
+            assert_eq!(arrow_arguments_capture("parameters"), implicit);
+            assert_eq!(
+                arrow_arguments_capture("declared"),
+                ("arguments".to_string(), "arguments".to_string())
+            );
+            for parent in ["blocked", SCRIPT_OWNER_ID] {
+                let (storage, source) = arrow_arguments_capture(parent);
+                assert_eq!(source, "arguments");
+                assert!(storage != "arguments" && storage != LEXICAL_ARGUMENTS_NAME);
+            }
+        },
+    );
+}
