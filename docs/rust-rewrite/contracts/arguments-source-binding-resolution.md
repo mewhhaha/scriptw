@@ -14,9 +14,17 @@ The historical actual `aee6bc109` compiler records Bugs in sloppy modes of
 Read fallback selects an ArgumentsObject while writes resolve a different
 source/global slot, and an outer global can precede the own-arguments fallback.
 
-Units referencing `arguments` now retain named environment visibility. All
-source reads/writes/destructuring and closure references use the existing live
-ResolveBinding path, preserving with, eval, parameter and lexical precedence.
+Analysis resolves every `arguments` reference statically
+(`analysis/arguments_reference.rs`): walking the lexical chain it finds a
+source binding named `arguments`, the nearest ordinary function's implicit
+binding, or, outside any function, an ordinary global reference. Reads,
+writes, destructuring and update targets, for-in/of heads, shorthand
+properties and arrow captures all use that one result, so a Script global can
+no longer precede a function's own `arguments`. A reference no longer makes
+any environment eval-visible; only direct eval and the Annex B
+`function arguments` form still do. (Before `c294028e7` a whole-Script scan
+made every activation eval-visible, which sent every identifier in a classic
+Script through runtime name lookup.)
 The existing hidden arguments slot is exported under its source name when no
 real source declaration masks it. A simple source `var arguments` slot starts
 with the protocol's initialized ArgumentsObject value rather than undefined;

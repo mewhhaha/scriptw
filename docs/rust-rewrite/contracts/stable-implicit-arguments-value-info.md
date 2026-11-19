@@ -1,6 +1,8 @@
 # Stable implicit Arguments cell facts
 
-Source Arguments reads still use the live named EnvironmentIdentifier Read.
+An owner's unreassigned own `arguments` read lowers to `ExprIr::Arguments`;
+reads that resolve elsewhere use their resolved binding (see
+[source binding resolution](arguments-source-binding-resolution.md)).
 The compiler can retain its initial Arguments kind only for a verified actual
 implicit cell of an ordinary owner. A lexical arrow supplies the capture
 analysis EnvironmentId; an ordinary function supplies its activation record.
