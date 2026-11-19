@@ -59,9 +59,11 @@ impl FunctionBuilder<'_> {
     }
 
     /// Reads `base.<name>` into `value` through the site's record. Only a
-    /// site whose base may be an actual OrdinaryObject answers inline. The
-    /// hit entry's Throw propagates from its own result before it joins the
-    /// inline hit, so falling through always has the property's value.
+    /// site whose base may be an actual OrdinaryObject answers inline, and a
+    /// site the execution profile marks hot first proves its dominant kind
+    /// of answer inline. The hit entry's Throw propagates from its own
+    /// result before it joins the inline hits, so falling through always
+    /// has the property's value.
     pub(crate) fn emit_static_read_site(
         &mut self,
         name: &str,
@@ -71,20 +73,22 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
-        let (global, _site) =
+        let (global, site) =
             self.next_profiled_site_record(crate::profile::SiteKind::PropertyRead)?;
+        let specialisation = self.functions.read_specialisation(&site);
         let record = self.emit_site_record(global, SiteKey::Literal(name), f)?;
-        let done = if may_be_ordinary {
-            let done = self.open_frame(ControlFrameKind::Block, f);
+        let done = (may_be_ordinary || specialisation.is_some())
+            .then(|| self.open_frame(ControlFrameKind::Block, f));
+        if let (Some(specialisation), Some(done)) = (specialisation, done) {
+            self.emit_profiled_read(specialisation, base, &record, value, done, f)?;
+        }
+        if let (true, Some(done)) = (may_be_ordinary, done) {
             let miss = self.open_frame(ControlFrameKind::Block, f);
             self.emit_own_compact_record_hit(base, &record, value, miss, f);
             self.emit_branch_to_target(done, f);
             self.pop_control(ControlFrameKind::Block);
             f.instruction(&Instruction::End);
-            Some(done)
-        } else {
-            None
-        };
+        }
         let result = s.reserve_completion(f);
         s.call_helper(
             crate::runtime_helpers::CachedPropertyReadArguments::new(

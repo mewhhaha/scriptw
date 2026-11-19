@@ -9,9 +9,22 @@
 //! record's proofs stand alone, so the hit entry may answer from any of them,
 //! and no record depends on its place in the chain.
 use super::*;
+
+/// Records, in a unit-test build only, that a proof emitter shared by the R
+/// read entry and a profiled P read site ran.
+macro_rules! proof_step {
+    ($step:expr) => {
+        #[cfg(test)]
+        super::proof_trace::record($step);
+    };
+}
+
 mod entry;
 mod hit;
 mod holder;
+mod profiled_read;
+#[cfg(test)]
+mod proof_trace;
 mod site;
 mod write;
 

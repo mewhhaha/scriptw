@@ -197,6 +197,22 @@ pub enum CompactStorageLayout {
     Inline,
 }
 
+/// The storage of the prototype that holds a read's place.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum PlaceHolder {
+    /// An immutable intrinsic property layout, as an unmodified intrinsic
+    /// prototype has.
+    Intrinsic,
+    /// Compact storage of either sealed layout.
+    Compact,
+    /// A dictionary.
+    Dictionary,
+}
+
+impl PlaceHolder {
+    pub const ALL: [Self; 3] = [Self::Intrinsic, Self::Compact, Self::Dictionary];
+}
+
 /// The sealed object layouts whose ordinary header holds every named own
 /// property a site record can name.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -240,27 +256,31 @@ pub enum ReadSpecialisation {
     AbsentClosedTail(CompactStorageLayout),
     /// An actual OrdinaryObject on compact storage of this layout lacks the
     /// key by a record's receiver rule, and the record's place on its live
-    /// [[Prototype]] holds it.
-    ProtoPlaceCompact(CompactStorageLayout),
+    /// [[Prototype]], whose storage is the holder's, holds it.
+    ProtoPlaceCompact(CompactStorageLayout, PlaceHolder),
     /// A receiver with this header on a dictionary that holds no entry: the
-    /// record's place on its live [[Prototype]] (commonly an intrinsic
-    /// prototype such as %WeakMap.prototype% or %Function.prototype%) holds
-    /// the key.
+    /// record's place on its live [[Prototype]], an intrinsic prototype
+    /// such as %WeakMap.prototype% or %Function.prototype% on its intrinsic
+    /// layout, holds the key.
     ProtoPlaceIntrinsic(ReceiverHeader),
     /// A String: the record's place on the current Realm's
-    /// %String.prototype% holds the key.
+    /// %String.prototype%, on its intrinsic layout, holds the key.
     StringPrototypePlace,
 }
 
 impl ReadSpecialisation {
     /// Every specialisation, in code order.
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 20] = [
         Self::OwnCompact(CompactStorageLayout::Array),
         Self::OwnCompact(CompactStorageLayout::Inline),
         Self::AbsentClosedTail(CompactStorageLayout::Array),
         Self::AbsentClosedTail(CompactStorageLayout::Inline),
-        Self::ProtoPlaceCompact(CompactStorageLayout::Array),
-        Self::ProtoPlaceCompact(CompactStorageLayout::Inline),
+        Self::ProtoPlaceCompact(CompactStorageLayout::Array, PlaceHolder::Intrinsic),
+        Self::ProtoPlaceCompact(CompactStorageLayout::Array, PlaceHolder::Compact),
+        Self::ProtoPlaceCompact(CompactStorageLayout::Array, PlaceHolder::Dictionary),
+        Self::ProtoPlaceCompact(CompactStorageLayout::Inline, PlaceHolder::Intrinsic),
+        Self::ProtoPlaceCompact(CompactStorageLayout::Inline, PlaceHolder::Compact),
+        Self::ProtoPlaceCompact(CompactStorageLayout::Inline, PlaceHolder::Dictionary),
         Self::ProtoPlaceIntrinsic(ReceiverHeader::Ordinary),
         Self::ProtoPlaceIntrinsic(ReceiverHeader::Function),
         Self::ProtoPlaceIntrinsic(ReceiverHeader::Array),
@@ -293,12 +313,19 @@ impl ReadSpecialisation {
                 ReceiverHeader::Promise => 8,
             }
         }
+        const fn holder(holder: PlaceHolder) -> u8 {
+            match holder {
+                PlaceHolder::Intrinsic => 0,
+                PlaceHolder::Compact => 1,
+                PlaceHolder::Dictionary => 2,
+            }
+        }
         match self {
             Self::OwnCompact(storage) => layout(storage),
             Self::AbsentClosedTail(storage) => 2 + layout(storage),
-            Self::ProtoPlaceCompact(storage) => 4 + layout(storage),
-            Self::ProtoPlaceIntrinsic(receiver) => 6 + header(receiver),
-            Self::StringPrototypePlace => 15,
+            Self::ProtoPlaceCompact(storage, place) => 4 + 3 * layout(storage) + holder(place),
+            Self::ProtoPlaceIntrinsic(receiver) => 10 + header(receiver),
+            Self::StringPrototypePlace => 19,
         }
     }
 
@@ -457,8 +484,8 @@ impl ExecutionProfile {
         let site_map = SiteMapDigest(reader.array()?);
         let compiler = String::from_utf8(reader.sized()?.to_vec())
             .map_err(|_| ProfileError::Malformed("compiler fingerprint is not UTF-8"))?;
-        let training_requests = NonZeroU32::new(reader.u32()?)
-            .ok_or(ProfileError::Malformed("no training request"))?;
+        let training_requests =
+            NonZeroU32::new(reader.u32()?).ok_or(ProfileError::Malformed("no training request"))?;
         let mut reads = BTreeMap::new();
         for _ in 0..reader.u32()? {
             let site = reader.site()?;
@@ -720,7 +747,10 @@ mod tests {
                 Some(specialisation)
             );
         }
-        assert_eq!(ReadSpecialisation::from_code(16), None);
+        for (code, specialisation) in ReadSpecialisation::ALL.into_iter().enumerate() {
+            assert_eq!(usize::from(specialisation.code()), code);
+        }
+        assert_eq!(ReadSpecialisation::from_code(20), None);
     }
 
     #[test]

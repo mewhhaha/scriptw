@@ -2200,11 +2200,20 @@ impl<'a> FunctionBuilder<'a> {
         kind: crate::profile::SiteKind,
     ) -> Result<(crate::gc_types::SiteRecordGlobal, crate::profile::SiteRef), EmitError> {
         let global = self.next_site_record()?;
-        let body = self
-            .function_id
-            .clone()
-            .map_or(crate::profile::SiteBody::Main, crate::profile::SiteBody::Source);
+        let body = self.function_id.clone().map_or(
+            crate::profile::SiteBody::Main,
+            crate::profile::SiteBody::Source,
+        );
         Ok((global, self.functions.next_profile_site(body, kind)?))
+    }
+
+    /// Runs `emit` with no deadline poll at the head of the loops it opens:
+    /// for code whose loops the runtime bounds, as R's are.
+    pub(crate) fn with_bounded_loops<R>(&mut self, emit: impl FnOnce(&mut Self) -> R) -> R {
+        let polls = std::mem::replace(&mut self.deadline_polls, DeadlinePolls::Runtime);
+        let result = emit(self);
+        self.deadline_polls = polls;
+        result
     }
 
     fn require_genuine_source_site(&self) -> Result<(), EmitError> {

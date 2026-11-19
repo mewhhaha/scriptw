@@ -99,10 +99,10 @@ mod planning;
 mod prepared_script;
 mod profile;
 pub use profile::{
-    AdmittedProfile, CompactStorageLayout, ExecutionProfile, ProfileError, ProfileMismatch,
-    ProfileMode, ProgramKey, ReadSiteObservation, ReadSpecialisation, ReceiverHeader, SiteBody,
-    SiteKind, SiteMap, SiteMapDigest, SiteRef, HOT_READ_EXECUTIONS_PER_REQUEST,
-    PROFILE_FORMAT_VERSION,
+    AdmittedProfile, CompactStorageLayout, ExecutionProfile, PlaceHolder, ProfileError,
+    ProfileMismatch, ProfileMode, ProgramKey, ReadSiteObservation, ReadSpecialisation,
+    ReceiverHeader, SiteBody, SiteKind, SiteMap, SiteMapDigest, SiteRef,
+    HOT_READ_EXECUTIONS_PER_REQUEST, PROFILE_FORMAT_VERSION,
 };
 mod program_hooks;
 mod promise_rejection_policy;
