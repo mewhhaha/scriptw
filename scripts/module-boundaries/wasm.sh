@@ -207,10 +207,13 @@ if [[ "$(head -n 1 "$native_template_signature_fixture_source")" != '#![cfg(test
   fail 'native signature binary fixtures must be compiled only for tests'
 fi
 gc_instruction_escapes="$(
-  rg -n 'Instruction::(Struct(New|Get|Set)|Array(New|Get|Set|Fill|Copy|Len))' \
-    crates/scriptw-aot-wasm/src --glob '*.rs' --glob '!**/gc_types/**' \
-      --glob '!crates/scriptw-aot-wasm/src/native_program_template/tests.rs' \
-      --glob '!crates/scriptw-aot-wasm/src/native_program_template/tests/program_owned_payload.rs' || true
+  grep -RnE --include='*.rs' --exclude-dir=gc_types \
+    'Instruction::(Struct(New|Get|Set)|Array(New|Get|Set|Fill|Copy|Len))' \
+    crates/scriptw-aot-wasm/src \
+    | grep -Fv \
+      -e 'crates/scriptw-aot-wasm/src/native_program_template/tests.rs:' \
+      -e 'crates/scriptw-aot-wasm/src/native_program_template/tests/program_owned_payload.rs:' \
+    || true
 )"
 if [ -n "$gc_instruction_escapes" ]; then
   fail "raw Wasm-GC record/array instructions must stay in the central schema: $gc_instruction_escapes"
@@ -1850,7 +1853,7 @@ wasm_json_reviver="crates/scriptw-aot-wasm/src/builtins/json/reviver.rs"
 wasm_json_stringify="crates/scriptw-aot-wasm/src/builtins/json/stringify.rs"
 require_file "$wasm_json_builtins"
 check_no_inline_legacy_includes "$wasm_json_builtins"
-for json_child in grammar parse parse_array parse_frame_state quote reviver string_output stringify stringify_replacer; do
+for json_child in grammar module_value parse parse_array parse_frame_state quote reviver stringify stringify_replacer; do
   json_child_source="crates/scriptw-aot-wasm/src/builtins/json/${json_child}.rs"
   require_file "$json_child_source"
   check_no_inline_legacy_includes "$json_child_source"
@@ -1921,9 +1924,6 @@ check_no_inline_legacy_includes "$wasm_json_parse_array"
 check_raw_line_budget "$wasm_json_parse_array" 220
 check_raw_line_budget "$wasm_json_reviver" 550
 check_raw_line_budget "$wasm_json_stringify" 950
-wasm_json_output="crates/scriptw-aot-wasm/src/builtins/json/string_output.rs"
-require_fixed_string_count "$wasm_json_output" 'pub(super) struct StringOutputConstruction' 1 'private consuming JSON output owner'
-check_raw_line_budget "$wasm_json_output" 180
 wasm_json_replacer="crates/scriptw-aot-wasm/src/builtins/json/stringify_replacer.rs"
 require_fixed_string_count "$wasm_json_replacer" 'pub(super) struct JsonStringifyReplacerInvocationLocals' 1 'one private JSON replacer role authority'
 require_fixed_string_count "$wasm_json_replacer" 'pub(super) fn emit_json_apply_replacer_with_this(' 1 'one consuming JSON replacer boundary'

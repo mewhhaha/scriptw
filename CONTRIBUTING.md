@@ -85,6 +85,8 @@ python3 -B scripts/conformance_owners.py
 python3 -B scripts/intl_source_identities.py
 ```
 
+`scripts/ci-fast.sh [BASE_REF]` runs, in order, every guard step CI's `validate` job runs before it builds, including the three above, and lists the failing steps.
+
 Before a changed backend's dependency build, source guards provide a fast diagnostic:
 
 ```sh

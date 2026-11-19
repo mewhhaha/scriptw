@@ -83,15 +83,18 @@ if [ "${#workflow_files[@]}" -gt 0 ]; then
   fi
 fi
 
+# Tracked and untracked, non-ignored files, as ripgrep would see them, without
+# requiring ripgrep: a missing tool must not silently pass this check.
 removed_entrypoint_references="$({
-  rg -n \
+  git grep --untracked -nE \
     'runtime/index\.js|compiler/wrap\.js|test262/(compare\.js|fails\.cjs|generateHistoricalData\.js|index\.js|missingHarness\.js|read\.js|history\.json)' \
-    --glob '!check-no-legacy-js.sh' \
+    -- \
     crates \
     scripts \
     README.md \
     CONTRIBUTING.md \
     AGENTS.md \
+    ':(exclude,glob)**/check-no-legacy-js.sh' \
     2>/dev/null || true
 })"
 if [ -n "$removed_entrypoint_references" ]; then

@@ -314,7 +314,7 @@ check_no_inline_legacy_includes "$wasm_module_source"
 check_no_inline_legacy_includes "$wasm_module_source_tests"
 check_raw_line_budget "$wasm_module_source" 180
 check_raw_line_budget "$wasm_module_source_tests" 120
-if rg -n 'emit_function_or_proxy_call|emit_private_module_resume|<module source>' "$wasm_module_source"; then
+if grep -nE 'emit_function_or_proxy_call|emit_private_module_resume|<module source>' "$wasm_module_source"; then
   fail 'native source records cannot invoke a JS activation or recognize a fixture locator'
 fi
 # Explicit proposal policy owns only new files/caps; no existing checks/caps removed.
@@ -366,7 +366,7 @@ check_no_inline_legacy_includes "$ir_source_tests"
 check_registered_module_source_test_child "$engine_source_tests"
 check_raw_line_budget "$ir_source_tests" 180
 check_raw_line_budget "$engine_source_tests" 280
-if rg -n '<module source>' "$ir_source_loaded" "$ir_source_records" "$ir_source_definitions" "$ir_source_assembly" "$ir_source_graph" 'crates/scriptw-runtime/src/embedded_module_graph.rs' 'crates/scriptw-engine/src/module_loader.rs'; then
+if grep -nE '<module source>' "$ir_source_loaded" "$ir_source_records" "$ir_source_definitions" "$ir_source_assembly" "$ir_source_graph" 'crates/scriptw-runtime/src/embedded_module_graph.rs' 'crates/scriptw-engine/src/module_loader.rs'; then
   fail 'compiler/runtime module-source support cannot recognize Test262 fixture locators'
 fi
 # Final async-generator body completion distinguishes runtime undefined from an
