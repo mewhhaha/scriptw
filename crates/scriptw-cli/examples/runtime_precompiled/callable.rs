@@ -9,6 +9,31 @@ use std::time::Instant;
 const PRODUCER_SCHEMA: &str = "scriptw-retained-call-producer-v2";
 const EXECUTION_SCHEMA: &str = "scriptw-retained-call-execution-v2";
 
+/// Retained calls admit phase barriers only for an unscored Callgrind count of
+/// one selected call: the barriers bracket exactly that `run` call.
+fn instruction_counting_barriers(
+    samples: usize,
+    warmups: usize,
+) -> Result<phase_barriers::Barriers, String> {
+    if std::env::var_os("SCRIPTW_PRECOMPILED_EXECUTION_WINDOWS").is_some() {
+        return Err("retained-call diagnostics reject precompiled execution windows".into());
+    }
+    let barriers = phase_barriers::Barriers::from_environment(samples, warmups)?;
+    let counting = barriers.instruction_counting()?;
+    if !counting
+        && std::env::vars_os().any(|(key, _)| {
+            key.to_string_lossy()
+                .starts_with("SCRIPTW_PRECOMPILED_PHASE_")
+        })
+    {
+        return Err(
+            "retained-call phase barriers require SCRIPTW_PRECOMPILED_INSTRUCTION_COUNTING=1"
+                .into(),
+        );
+    }
+    Ok(barriers)
+}
+
 fn reject_observers() -> Result<(), String> {
     if std::env::vars_os().any(|(key, _)| {
         let key = key.to_string_lossy();
@@ -95,11 +120,14 @@ impl NativePolicy {
         config.cranelift_regalloc_algorithm(allocator);
     }
 
-    fn consumer_engine(self) -> Result<wasmtime::Engine, String> {
+    fn consumer_engine(self, perf_map: bool) -> Result<wasmtime::Engine, String> {
         let mut config = wasmtime::Config::new();
         configure_producer(&mut config)?;
         self.configure(&mut config);
         config.enable_compiler(false);
+        if perf_map {
+            config.profiler(wasmtime::ProfilingStrategy::PerfMap);
+        }
         let engine = wasmtime::Engine::new(&config).map_err(|e| e.to_string())?;
         if engine.get_cranelift_opt_level().is_some() {
             return Err("retained consumer unexpectedly enabled a compiler".into());
@@ -407,8 +435,10 @@ pub(super) fn execute(
     samples: &str,
     warmups: &str,
 ) -> Result<Value, String> {
-    reject_observers()?;
     let (samples, warmups) = counts(samples, warmups)?;
+    let mut barriers = instruction_counting_barriers(samples, warmups)?;
+    let counting = barriers.instruction_counting()?;
+    barriers.after_transport_drop()?;
     let producer: Value =
         serde_json::from_slice(&fs::read(path.with_extension("json")).map_err(|e| e.to_string())?)
             .map_err(|e| e.to_string())?;
@@ -452,7 +482,7 @@ pub(super) fn execute(
     {
         return Err("retained derived/original source provenance differs".into());
     }
-    let engine = policy.consumer_engine()?;
+    let engine = policy.consumer_engine(counting)?;
     report["native_configuration"] = native_configuration(&engine);
     let bytes = fs::read(path).map_err(|e| e.to_string())?;
     if producer["image_sha256"] != hash(&bytes) || producer["image_bytes"] != bytes.len() {
@@ -561,11 +591,13 @@ pub(super) fn execute(
                 "",
             )?;
         }
+        barriers.after_instantiate(index)?;
         let started = Instant::now();
         let completion = instance
             .call(&mut store, &function, None, &[])
             .map_err(|e| e.to_string())?;
         let call_ns = started.elapsed().as_nanos();
+        barriers.after_execution(index)?;
         if !matches!(&completion, JsCompletion::Normal(value) if value.is_undefined()) {
             return Err(format!(
                 "retained call did not return undefined normally: {completion:?}"
@@ -578,10 +610,12 @@ pub(super) fn execute(
                 .map_err(|e| e.to_string())?,
             expected,
         )?;
+        barriers.after_store_drop(index)?;
         observations.push(json!({"index":index,"warmup":index < warmups,"call_ns":call_ns,
             "invocation_index":invocation_index,"input":input,"prepare_ns":prepare_ns,
             "completion":"normal","matched":true,"stdout_sha256":hash(stdout.as_bytes()),"stdout":stdout}));
     }
+    barriers.finish(&mut report)?;
     report["producer"] = producer;
     report["samples"] = json!(samples);
     report["warmups"] = json!(warmups);
@@ -738,7 +772,7 @@ mod tests {
             ("size-optimized", "SpeedAndSize", "Backtracking"),
         ] {
             let policy = NativePolicy::parse(Some(name)).unwrap();
-            let engine = policy.consumer_engine().unwrap();
+            let engine = policy.consumer_engine(false).unwrap();
             let consumer = native_configuration(&engine);
             assert!(consumer["cranelift_opt_level"].is_null());
             assert!(consumer["register_allocation"].is_null());
