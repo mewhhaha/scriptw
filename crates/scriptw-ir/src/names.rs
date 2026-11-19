@@ -19,11 +19,42 @@ pub use scriptw_front::{
 
 /// Source-unspellable capture of a direct eval caller execution context.
 pub const DIRECT_EVAL_EXECUTION_CONTEXT_NAME: &str = "\0direct.eval.context";
-pub const LEXICAL_THIS_NAME: &str = "$this";
-pub const LEXICAL_ARGUMENTS_NAME: &str = "$arguments";
+/// Compiler-private binding storage names contain `.`, which no
+/// IdentifierName can contain (ECMA-262 12.7), so no source declaration,
+/// reference or assignment, in any owner or through any capture, can reach
+/// one. The fixed names below follow that rule; every temporary is minted by
+/// [`PrivateBindingName::temporary`].
+pub const PRIVATE_BINDING_NAME_MARK: char = '.';
+
+/// A minted compiler-private temporary binding name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PrivateBindingName(String);
+
+impl PrivateBindingName {
+    /// `$<hint>.<index>`: `hint` names the temporary's role (a trailing `.`
+    /// is folded into the separator) and `index` makes it unique.
+    pub(crate) fn temporary(hint: &str, index: usize) -> Self {
+        let hint = hint.trim_end_matches(PRIVATE_BINDING_NAME_MARK);
+        assert!(
+            !hint.is_empty() && !hint.contains(char::is_whitespace),
+            "a private binding hint is a nonempty role name"
+        );
+        Self(format!("${hint}{PRIVATE_BINDING_NAME_MARK}{index}"))
+    }
+
+    pub(crate) fn into_storage_name(self) -> String {
+        self.0
+    }
+}
+
+/// The value parameter of a synthesized auto-accessor setter.
+pub(crate) const AUTO_ACCESSOR_VALUE_NAME: &str = "$auto.accessor.value";
+/// Lexical `this`, `arguments` and `[[HomeObject]]` cells an arrow captures.
+pub const LEXICAL_THIS_NAME: &str = "$.this";
+pub const LEXICAL_ARGUMENTS_NAME: &str = "$.arguments";
 pub const LEXICAL_NEW_TARGET_NAME: &str = "$new.target";
 /// Compiler-private lexical `[[HomeObject]]` binding for arrows using `super`.
-pub const LEXICAL_HOME_OBJECT_NAME: &str = "$homeObject";
+pub const LEXICAL_HOME_OBJECT_NAME: &str = "$.homeObject";
 /// Compiler-private environment bindings for lexical `super()` in arrows.
 pub const DERIVED_ACTIVATION_THIS_NAME: &str = "$derived.this";
 pub const DERIVED_ACTIVATION_THIS_STATUS_NAME: &str = "$derived.thisStatus";
@@ -1786,3 +1817,41 @@ pub const BUILTIN_INTL_DURATION_FORMAT_PROTOTYPE_FORMAT_FUNCTION_ID: &str =
     "$builtin.Intl.DurationFormat.prototype.format";
 pub const BUILTIN_INTL_DURATION_FORMAT_PROTOTYPE_FORMAT_TO_PARTS_FUNCTION_ID: &str =
     "$builtin.Intl.DurationFormat.prototype.formatToParts";
+
+#[cfg(test)]
+mod private_binding_name_tests {
+    use super::*;
+    use scriptw_front::{parse, ParseOptions};
+
+    #[test]
+    fn private_binding_names_are_not_identifier_names() {
+        let minted = [
+            PrivateBindingName::temporary("forof", 0).into_storage_name(),
+            PrivateBindingName::temporary("forin", 12).into_storage_name(),
+            PrivateBindingName::temporary("lex", 3).into_storage_name(),
+            PrivateBindingName::temporary("object.spread.", 4).into_storage_name(),
+        ];
+        assert_eq!(minted[0], "$forof.0");
+        assert_eq!(minted[3], "$object.spread.4");
+        let fixed = [
+            LEXICAL_THIS_NAME,
+            LEXICAL_ARGUMENTS_NAME,
+            LEXICAL_NEW_TARGET_NAME,
+            LEXICAL_HOME_OBJECT_NAME,
+            DERIVED_ACTIVATION_THIS_NAME,
+            DERIVED_ACTIVATION_THIS_STATUS_NAME,
+            DERIVED_ACTIVATION_NEW_TARGET_NAME,
+            DERIVED_ACTIVATION_FUNCTION_NAME,
+            AUTO_ACCESSOR_VALUE_NAME,
+        ];
+        for name in fixed.iter().copied().chain(minted.iter().map(String::as_str)) {
+            assert!(name.contains(PRIVATE_BINDING_NAME_MARK), "{name}");
+            for options in [ParseOptions::script(), ParseOptions::module()] {
+                assert!(
+                    parse(&format!("var {name};"), options).is_err(),
+                    "{name} parses as a binding"
+                );
+            }
+        }
+    }
+}

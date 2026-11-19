@@ -277,26 +277,22 @@ impl AnalysisBuilder<'_> {
     /// without eval nothing resolves the name `arguments` at runtime, so the
     /// owner's own references read its storage directly (lowering selects the
     /// storage only while no environment slot holds it), and an arrow child's
-    /// reference is a real capture that still retains a slot. Only a source
-    /// spelling of the private storage name refuses it.
+    /// reference is a real capture that still retains a slot. The synthetic
+    /// storage names are unspellable in source.
     pub(super) fn plan_module_local_candidates(&mut self) {
         for id in self.ordinary_module_owner_ids() {
             let function = &self.function_plans[&id];
             let owner = &self.owner_plans[&function.id];
             let activation = &self.environment_plans[&owner.activation_environment_id];
-            let private_arguments_storage =
-                !self.source_identifiers.contains(LEXICAL_ARGUMENTS_NAME);
             let locals = activation
                 .binding_modes
                 .iter()
                 .filter_map(|(name, mode)| {
-                    if matches!(name.as_str(), LEXICAL_THIS_NAME | LEXICAL_NEW_TARGET_NAME) {
-                        // Some synthetic spellings are valid source names.
-                        // Never infer their identity from the spelling alone.
-                        return (!self.source_identifiers.contains(name)).then(|| name.clone());
-                    }
-                    if name == LEXICAL_ARGUMENTS_NAME {
-                        return private_arguments_storage.then(|| name.clone());
+                    if matches!(
+                        name.as_str(),
+                        LEXICAL_THIS_NAME | LEXICAL_NEW_TARGET_NAME | LEXICAL_ARGUMENTS_NAME
+                    ) {
+                        return Some(name.clone());
                     }
                     if matches!(name.as_str(), "arguments" | LEXICAL_HOME_OBJECT_NAME) {
                         return None;

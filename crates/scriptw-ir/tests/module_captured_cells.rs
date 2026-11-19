@@ -4,7 +4,7 @@ use scriptw_ir::{
     EnvironmentIdentifierResolutionStart, ExprIr, FunctionFlavor, FunctionIr, FunctionProtocolIr,
     FunctionTargetKnowledge, KindSet, ModuleActivationKindIr, ModuleGraphSources, ModuleKey,
     ModuleSourceIr, ProgramIr, ProvenBindingCellOrigin, StatementIr, TypedExpr, ValueKind,
-    LEXICAL_ARGUMENTS_NAME, LEXICAL_NEW_TARGET_NAME, LEXICAL_THIS_NAME,
+    LEXICAL_ARGUMENTS_NAME, LEXICAL_HOME_OBJECT_NAME, LEXICAL_NEW_TARGET_NAME, LEXICAL_THIS_NAME,
 };
 
 fn lower_module(source: &str) -> ProgramIr {
@@ -691,7 +691,6 @@ fn module_owned_cells_exclude_eval_non_simple_parameters_and_arguments() {
         "export function read({cell}, ...rest) { return cell; }",
         "export function read({cell}, other = 0) { return cell; }",
         "export function read({cell}) { eval(''); return cell; }",
-        "export function read($arguments) { return $arguments; }",
     ] {
         let program = lower_module(source);
         let (_, _, reference) = module_capture_reference(&program, "read");
@@ -877,7 +876,6 @@ fn module_synthetic_cell_pruning_retains_arguments_observers_and_dynamic_owners(
     // private spelling and dynamic owners retain the cell.
     for source in [
         "export function read() { return () => arguments; }",
-        "export function read($arguments) { return $arguments; }",
         "export function read() { return eval('arguments'); }",
         "export function read(value) { return () => eval('arguments[0]'); }",
         "export function read(value) { const parent = () => arguments[0]; return function() { return eval('parent()'); }; }",
@@ -908,17 +906,30 @@ fn module_synthetic_cell_pruning_retains_arguments_observers_and_dynamic_owners(
             "{source}: {function:?}"
         );
     }
-    let program = lower_module("export function read($this) { return $this; }");
-    let function = program
-        .script
-        .as_ref()
-        .unwrap()
-        .functions
-        .iter()
-        .find(|function| function.name == "read")
-        .unwrap();
-    assert!(function
-        .owned_env_bindings
-        .iter()
-        .any(|binding| binding.name == LEXICAL_THIS_NAME));
+    // A source binding spelled like private storage is an ordinary local:
+    // it neither shares nor retains the synthetic cells.
+    for source in [
+        "export function read($this) { return $this; }",
+        "export function read($arguments) { return $arguments; }",
+        "export function read() { var $homeObject = 1; return $homeObject; }",
+    ] {
+        let program = lower_module(source);
+        let function = program
+            .script
+            .as_ref()
+            .unwrap()
+            .functions
+            .iter()
+            .find(|function| function.name == "read")
+            .unwrap();
+        assert!(
+            function.owned_env_bindings.iter().all(|binding| ![
+                LEXICAL_THIS_NAME,
+                LEXICAL_ARGUMENTS_NAME,
+                LEXICAL_HOME_OBJECT_NAME
+            ]
+            .contains(&binding.name.as_str())),
+            "{source}: {function:?}"
+        );
+    }
 }

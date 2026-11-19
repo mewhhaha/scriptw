@@ -332,7 +332,8 @@ pub use runtime_semantics::{
 
 pub use names::*;
 pub(crate) use names::{
-    MAX_ARRAY_INDEX, MAX_STATIC_ARRAY_SHAPE_INDEX, SCRIPT_OWNER_ID, TDZ_BINDING_STORAGE_PREFIX,
+    PrivateBindingName, AUTO_ACCESSOR_VALUE_NAME, MAX_ARRAY_INDEX, MAX_STATIC_ARRAY_SHAPE_INDEX,
+    SCRIPT_OWNER_ID, TDZ_BINDING_STORAGE_PREFIX,
 };
 
 /// The three module binding-name domains. See

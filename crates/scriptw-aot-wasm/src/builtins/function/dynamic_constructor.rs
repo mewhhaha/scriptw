@@ -82,11 +82,11 @@ impl EmptyDerivedFunction {
             constructor_instance: ValueInfo::undefined(),
             // Ordinary lowering owns this invocation state in every resumable
             // activation, including empty bodies, and assigns slots by name.
-            owned_env_bindings: [
+            owned_env_bindings: std::collections::BTreeSet::from([
                 LEXICAL_ARGUMENTS_NAME,
                 LEXICAL_NEW_TARGET_NAME,
                 LEXICAL_THIS_NAME,
-            ]
+            ])
             .into_iter()
             .zip(0_u32..)
             .map(|(name, slot)| OwnedEnvBindingIr {

@@ -114,7 +114,7 @@ fn validate_entry_local_sink<'a>(
     functions: &[FunctionIr],
 ) -> Result<(), GeneratorForOfAssignmentError> {
     if !value_name
-        .strip_prefix("$forof.assignment")
+        .strip_prefix("$forof.assignment.")
         .is_some_and(|suffix| {
             !suffix.is_empty() && suffix.bytes().all(|byte| byte.is_ascii_digit())
         })

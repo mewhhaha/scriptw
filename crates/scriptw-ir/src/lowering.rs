@@ -1421,9 +1421,9 @@ impl<'a> ScriptLowerer<'a> {
     }
 
     fn alloc_temp_binding_name(&mut self, hint: &str) -> String {
-        let name = format!("${hint}{}", self.next_temp_binding_index);
+        let name = PrivateBindingName::temporary(hint, self.next_temp_binding_index);
         self.next_temp_binding_index += 1;
-        name
+        name.into_storage_name()
     }
 
     fn alloc_suspension_owned_binding(&mut self, hint: &str, value_info: ValueInfo) -> String {
@@ -7951,7 +7951,7 @@ impl<'a> ScriptLowerer<'a> {
                 )
             }
             FunctionProtocolIr::ClassSetter => {
-                let parameter_name = "$auto_accessor_value".to_string();
+                let parameter_name = AUTO_ACCESSOR_VALUE_NAME.to_string();
                 let value = TypedExpr::from_info(
                     value_info.clone(),
                     ExprIr::Identifier(parameter_name.clone()),

@@ -261,7 +261,7 @@ fn eager_child_owners_restore_current_loop_branch_context() {
     assert_eq!(body.exit_state(), 1);
 }
 
-const ASSIGNMENT_SINK: &str = "$forof.assignment7";
+const ASSIGNMENT_SINK: &str = "$forof.assignment.7";
 
 fn entry_value() -> TypedExpr {
     TypedExpr::from_info(
