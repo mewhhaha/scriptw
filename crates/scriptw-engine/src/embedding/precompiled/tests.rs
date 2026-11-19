@@ -322,7 +322,14 @@ fn precompiled_framing_rejects_corruption_truncation_overflow_and_trailing_data_
     let mut source = bytes.clone();
     source[8] ^= 1;
     resign(&mut source);
-    assert!(envelope::decode(&source).is_err());
+    let build = compiler_identity::build_source_fingerprint()
+        .unwrap()
+        .to_string();
+    let error = envelope::decode(&source).err().unwrap().to_string();
+    assert!(
+        error.contains(&build) && error.contains("compiler source"),
+        "{error}"
+    );
     let mut extra = bytes;
     extra.insert(extra.len() - 32, 0);
     resign(&mut extra);

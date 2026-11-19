@@ -224,6 +224,15 @@ kept-resident pool by default, or on-demand mappings for both under
 `store_allocation`; the runtime-comparison preflight and both panels' publishers
 refuse a campaign whose Scriptw and Scriptc processes differ.
 
+`scriptw-precompiled-consumer` only consumes images. Produce them with
+`compiler_precompiled_baseline prepare-scriptw`/`prepare-wasi` built from the same
+source; admission refuses another source fingerprint and names both. Its end-to-end
+check builds the package on its own, as feature unification requires:
+
+```sh
+python3 -B scripts/limited_verification.py -- cargo test --release --locked -p scriptw-precompiled-consumer --test end_to_end
+```
+
 For JavaScript-to-portable-Wasm compilation, select a frozen ordinary CLI
 (`scriptw`, not a precompiled execution host), Scriptc 0.4.5 and Zig 0.16.0:
 

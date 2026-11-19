@@ -56,8 +56,22 @@ pub(super) fn decode(bytes: &[u8], fingerprint: &[u8; 32]) -> Result<Frame, Stri
     if !(HEADER + 8 + 1 + DIGEST..=MAX_IMAGE).contains(&bytes.len()) {
         return Err("WASI image size outside bounds".into());
     }
-    if &bytes[..8] != MAGIC || &bytes[8..40] != fingerprint {
-        return Err("WASI image magic or compiler identity mismatch".into());
+    if &bytes[..8] != MAGIC {
+        return Err("WASI image magic mismatch".into());
+    }
+    if &bytes[8..40] != fingerprint {
+        let hex = |bytes: &[u8]| {
+            bytes
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>()
+        };
+        return Err(format!(
+            "WASI image was produced from compiler source {}, but this build is {}: produce it \
+             with a host built from the same source",
+            hex(&bytes[8..40]),
+            hex(fingerprint)
+        ));
     }
     let length = |offset| -> Result<usize, String> {
         let raw = u64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap());

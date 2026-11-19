@@ -204,6 +204,15 @@ Cargo workspace feature unification. Build the same package separately with
 use identical producer images, target and runtime settings. Compile-time
 source exclusion is distinct from the Wasmtime compiler-disabled runtime policy.
 
+The consumer has no producer. Produce its images with the shared host
+(`compiler_precompiled_baseline prepare-scriptw` or `prepare-wasi`) built from
+the same source: both envelopes record the producer's compiler source
+fingerprint, and admission refuses any other, naming both fingerprints. The
+hosts are different executables, so their `executable_sha256` always differs
+and is not part of admission. After any source change, rebuild both before
+producing images. `crates/scriptw-precompiled-consumer/tests/end_to_end.rs`
+produces one fixture with that producer code and runs the consumer binary on it.
+
 `scripts/benchmark-consumer-capability.py --help` describes the two-host diagnostic.
 It retains balanced fresh-process observations, exact image/source identities and
 all failures, and compares RSS, PSS, private-dirty memory and execution time.

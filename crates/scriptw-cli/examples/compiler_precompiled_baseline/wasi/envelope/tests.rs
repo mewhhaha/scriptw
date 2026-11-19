@@ -11,7 +11,11 @@ fn inert_frame_checks_bind_lengths_identity_and_every_payload_byte() {
     let frame = decode(&bytes, &[7; 32]).unwrap();
     assert_eq!(&bytes[frame.program], b"\0asm\x01\0\0\0");
     assert_eq!(&bytes[frame.native], b"inert");
-    assert!(decode(&bytes, &[8; 32]).is_err());
+    let error = decode(&bytes, &[8; 32]).err().unwrap();
+    assert!(
+        error.contains(&"07".repeat(32)) && error.contains(&"08".repeat(32)),
+        "{error}"
+    );
     for offset in 0..bytes.len() {
         let mut changed = bytes.clone();
         changed[offset] ^= 1;

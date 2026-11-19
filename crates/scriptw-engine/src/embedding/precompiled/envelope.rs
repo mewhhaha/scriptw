@@ -19,6 +19,17 @@ fn invalid() -> EngineError {
     EngineError::new("precompiled image failed bounded framing, source or checksum admission")
 }
 
+/// An intact image from another compiler source: the usual cause is a
+/// producer and consumer built from different checkouts or edits.
+fn source_mismatch(producer: &[u8], build: compiler_identity::CompilerDigest) -> EngineError {
+    let producer: String = producer.iter().map(|byte| format!("{byte:02x}")).collect();
+    EngineError::new(format!(
+        "precompiled image was produced from compiler source {producer}, but this build is {build}: \
+         images bind their producer's compiler source fingerprint, so produce them with a \
+         host built from the same source"
+    ))
+}
+
 fn take<'a>(bytes: &mut &'a [u8], count: usize) -> Result<&'a [u8], EngineError> {
     let (value, rest) = bytes.split_at_checked(count).ok_or_else(invalid)?;
     *bytes = rest;
@@ -79,13 +90,13 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Frame, EngineError> {
         return Err(invalid());
     }
     let mut rest = body;
-    if take(&mut rest, 8)? != MAGIC
-        || take(&mut rest, 32)?
-            != compiler_identity::build_source_fingerprint()
-                .map_err(EngineError::new)?
-                .as_bytes()
-    {
+    if take(&mut rest, 8)? != MAGIC {
         return Err(invalid());
+    }
+    let producer = take(&mut rest, 32)?;
+    let build = compiler_identity::build_source_fingerprint().map_err(EngineError::new)?;
+    if producer != build.as_bytes() {
+        return Err(source_mismatch(producer, build));
     }
     let linked = take(&mut rest, 1)?[0];
     let key: [u8; 32] = take(&mut rest, 32)?.try_into().map_err(|_| invalid())?;
