@@ -17,6 +17,7 @@ zerovec = { version = "=0.11.6", default-features = false, features = ["alloc"] 
 # has a scoped allowance. Other product crates inherit workspace forbid.
 [lints.rust]
 unsafe_code = "deny"
+unused_must_use = "deny"
 
 [lib]
 path = "src/lib.rs"

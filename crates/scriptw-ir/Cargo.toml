@@ -26,3 +26,6 @@ path = "src/lib.rs"
 [[test]]
 name = "scriptw_ir_integration"
 path = "tests/integration.rs"
+
+[lints]
+workspace = true

@@ -33,3 +33,8 @@ path = "src/lib.rs"
 name = "scriptw-differential-worker"
 path = "src/bin/scriptw-differential-worker.rs"
 required-features = ["spec-exec-oracle"]
+
+# Contains audited unsafe code, so it cannot inherit the workspace
+# `unsafe_code = "forbid"`; it keeps the workspace `unused_must_use` denial.
+[lints.rust]
+unused_must_use = "deny"

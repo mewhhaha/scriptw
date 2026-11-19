@@ -99,7 +99,7 @@ impl FunctionBuilder<'_> {
             projected.proof.unmapped_protocol(),
             function,
         )?;
-        self.read_binding_to_locals(projected.storage, &projected.materialized, function);
+        self.read_binding_to_locals(projected.storage, &projected.materialized, function)?;
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         Ok(())

@@ -11,3 +11,6 @@ boa_parser = { version = "0.21.1", features = ["annex-b"] }
 
 [lib]
 path = "src/lib.rs"
+
+[lints]
+workspace = true

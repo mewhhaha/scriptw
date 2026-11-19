@@ -30,3 +30,6 @@ serde_json = "1.0"
 name = "feature_roots"
 path = "tests/feature_roots.rs"
 required-features = ["feature-roots"]
+
+[lints]
+workspace = true

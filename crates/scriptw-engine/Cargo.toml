@@ -41,3 +41,8 @@ spec-exec-oracle = ["dep:scriptw-spec-exec"]
 
 [lib]
 path = "src/lib.rs"
+
+# Contains audited unsafe code, so it cannot inherit the workspace
+# `unsafe_code = "forbid"`; it keeps the workspace `unused_must_use` denial.
+[lints.rust]
+unused_must_use = "deny"

@@ -27,6 +27,9 @@ repository = "https://github.com/mewhhaha/scriptw"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
+# A dropped `Result` silently skips an error path in emitted code; every
+# crate denies it (crates with audited unsafe code scope this lint locally).
+unused_must_use = "deny"
 
 [patch.crates-io]
 boa_ast = { path = "vendor/boa_ast-0.21.1" }

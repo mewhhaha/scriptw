@@ -18,3 +18,9 @@ wasmtime-wasi = { version = "=47.0.0", default-features = false, features = ["p1
 benchmark-module-images = ["scriptw-engine/benchmark-module-images"]
 # Control build for same-source capability-on/off experiments.
 native-source-compiler = ["scriptw-engine/native-source-compiler"]
+
+# Compiles the scriptw-cli example sources it shares through #[path], which
+# contain audited unsafe code, so it cannot inherit the workspace
+# `unsafe_code = "forbid"`; it keeps the workspace `unused_must_use` denial.
+[lints.rust]
+unused_must_use = "deny"

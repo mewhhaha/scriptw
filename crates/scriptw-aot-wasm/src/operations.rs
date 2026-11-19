@@ -1,5 +1,3 @@
-#![deny(unused_must_use)]
-
 use super::*;
 use crate::gc_types::{
     BigIntLimbArray, BigIntValue, BigIntValueSchema, BoundFunction, CodeUnitArray,

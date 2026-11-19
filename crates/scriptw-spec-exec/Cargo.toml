@@ -11,3 +11,6 @@ scriptw-runtime = { path = "../scriptw-runtime" }
 
 [lib]
 path = "src/lib.rs"
+
+[lints]
+workspace = true
