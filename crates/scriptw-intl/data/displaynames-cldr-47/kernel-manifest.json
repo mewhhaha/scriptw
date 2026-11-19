@@ -1,19 +1,19 @@
 {
   "files": [
     {
-      "bytes": 6341,
+      "bytes": 6633,
       "path": "Cargo.toml",
-      "sha256": "22b986e19549ee2a3bf393717d16fa1544f10a556e0b88ca540042c79823e643"
+      "sha256": "04fcceba06c69542119cda479ed92cd2ad9047d1899c4b623e0f2a82f290a6a2"
     },
     {
-      "bytes": 90596,
+      "bytes": 97421,
       "path": "crates/scriptw-aot-wasm/src/emit.rs",
-      "sha256": "285c700032ca9355545818445a674a39e756588e80686bdef986c2aa3a607dae"
+      "sha256": "e9cb6be3693c9c1e0ad8963267d6238d3406c2523cfc2e54ffa7c1ba2a770c27"
     },
     {
-      "bytes": 85149,
+      "bytes": 93139,
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-      "sha256": "7f932d625d38f9293396336de6ac8bdfe9fefa9b15f624638f0ba15296e60a82"
+      "sha256": "bbd0db75ad2f4e1d3523e23e91a1856e7f3aeaf98d5f2610e755c710eb236ab4"
     },
     {
       "bytes": 33961,
@@ -31,9 +31,9 @@
       "sha256": "1a49f7e4acab0c7365901f0ac9622772a3a826814315c67e374e068d3390ccfa"
     },
     {
-      "bytes": 3253,
+      "bytes": 3393,
       "path": "crates/scriptw-intl/Cargo.toml",
-      "sha256": "65d6f91a9eafa1324a6e4c415a7c905b29a54be20706438cd82da9c0bd37e5d9"
+      "sha256": "cbd9d4f4dfd7713b4b354e4c15deac329480969da673c4c9cc0b4076ff6b8e10"
     },
     {
       "bytes": 2790,
@@ -476,9 +476,9 @@
       "sha256": "528af1ae444c718905aa2a75fe42e1ec1653706364f6dee2ecef9ce93048715f"
     },
     {
-      "bytes": 80488,
+      "bytes": 80452,
       "path": "crates/scriptw-intl/src/provider.rs",
-      "sha256": "82b3dfb92dbb2a2a010487c333833db13d873d8829bb37dfd435b19962d78fc7"
+      "sha256": "d9e7db0364ab6736a25c0ca93ddc87c7ee841216ee2b29efeaf2836123184211"
     },
     {
       "bytes": 2251,
@@ -506,9 +506,9 @@
       "sha256": "555340ca30dabd79560cd293768c0e34208df204af1fb82bec15705bc26dbdfd"
     },
     {
-      "bytes": 60983,
+      "bytes": 60510,
       "path": "crates/scriptw-intl/src/selection.rs",
-      "sha256": "57855d4648549931b707138c467b7562c107f190284e9ca1ce39f6607f5c9b2d"
+      "sha256": "2bc13a57dad7046d03d0cad07cd69ac27204de6212b1b38417c301a38e31fcdd"
     },
     {
       "bytes": 21454,
@@ -623,7 +623,7 @@
       "version": "0.10.9"
     }
   ],
-  "provider_data_sha256": "ced74da4b6489b87d09e99faeaba6a64dc92b513f4a973a490d00a2c93068622",
+  "provider_data_sha256": "6c370d4b1db7351aad9749d2a7887ee772c6e79fd377ec0173b3e0a3ecff5020",
   "schema_version": 1,
   "scope": "actual immutable image admission, retained selected data owners, checked native algorithm, primitive codecs, host consumer and captured CLDR inputs; tests and self identities excluded; runtime acceptance pending",
   "service": "DisplayNames",

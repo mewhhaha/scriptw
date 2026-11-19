@@ -2,14 +2,14 @@
   "conditional_projection": "valid UTF16 pairs decode normally; isolated surrogates become U+FFFD only for ICU template selection; output uses indexed original strings",
   "files": [
     {
-      "bytes": 85149,
+      "bytes": 93139,
       "path": "crates/scriptw-aot-wasm/src/emit/module_assembly.rs",
-      "sha256": "7f932d625d38f9293396336de6ac8bdfe9fefa9b15f624638f0ba15296e60a82"
+      "sha256": "bbd0db75ad2f4e1d3523e23e91a1856e7f3aeaf98d5f2610e755c710eb236ab4"
     },
     {
-      "bytes": 90596,
+      "bytes": 97421,
       "path": "crates/scriptw-aot-wasm/src/emit.rs",
-      "sha256": "285c700032ca9355545818445a674a39e756588e80686bdef986c2aa3a607dae"
+      "sha256": "e9cb6be3693c9c1e0ad8963267d6238d3406c2523cfc2e54ffa7c1ba2a770c27"
     },
     {
       "bytes": 33961,
@@ -22,9 +22,9 @@
       "sha256": "fcb7014f7f3fbb0271cac56fb221ebc0ac83a2ba4687c70411971b7cd1e475e8"
     },
     {
-      "bytes": 3253,
+      "bytes": 3393,
       "path": "crates/scriptw-intl/Cargo.toml",
-      "sha256": "65d6f91a9eafa1324a6e4c415a7c905b29a54be20706438cd82da9c0bd37e5d9"
+      "sha256": "cbd9d4f4dfd7713b4b354e4c15deac329480969da673c4c9cc0b4076ff6b8e10"
     },
     {
       "bytes": 2790,
@@ -167,9 +167,9 @@
       "sha256": "555340ca30dabd79560cd293768c0e34208df204af1fb82bec15705bc26dbdfd"
     },
     {
-      "bytes": 80488,
+      "bytes": 80452,
       "path": "crates/scriptw-intl/src/provider.rs",
-      "sha256": "82b3dfb92dbb2a2a010487c333833db13d873d8829bb37dfd435b19962d78fc7"
+      "sha256": "d9e7db0364ab6736a25c0ca93ddc87c7ee841216ee2b29efeaf2836123184211"
     },
     {
       "bytes": 21454,
@@ -187,9 +187,9 @@
       "sha256": "e9cebd0542dd58677b5d2e55ae60912d377df921d806fbfd6e5e2c6b1e432186"
     },
     {
-      "bytes": 60983,
+      "bytes": 60510,
       "path": "crates/scriptw-intl/src/selection.rs",
-      "sha256": "57855d4648549931b707138c467b7562c107f190284e9ca1ce39f6607f5c9b2d"
+      "sha256": "2bc13a57dad7046d03d0cad07cd69ac27204de6212b1b38417c301a38e31fcdd"
     },
     {
       "bytes": 8002,
@@ -343,7 +343,7 @@
       }
     ]
   },
-  "provider_data_sha256": "5fcb9e49c8291931a50f1e15c5a046ad7db89d33a6cfa5c60078babd8a9372e7",
+  "provider_data_sha256": "aa57b131ed616d842075ea0c9f395928fd438c370b40ec3dec1bb3742fd76d58",
   "purpose": "pinned ICU list templates, conditional DFA and exact UTF16/indexed parts kernel",
   "schema_version": 1,
   "source_archive_sha256": "f64d583886e9a8201535b5296be9fb2f299d6e21f84d39488ce51affdd6c8f5e"
