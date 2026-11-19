@@ -7,9 +7,9 @@
       "sha256": "bbd0db75ad2f4e1d3523e23e91a1856e7f3aeaf98d5f2610e755c710eb236ab4"
     },
     {
-      "bytes": 97421,
+      "bytes": 97400,
       "path": "crates/scriptw-aot-wasm/src/emit.rs",
-      "sha256": "e9cb6be3693c9c1e0ad8963267d6238d3406c2523cfc2e54ffa7c1ba2a770c27"
+      "sha256": "14feffacc286ed92e4f46d65cdd62eeb8fc70e9d8d28c4d75b725408bfa3179b"
     },
     {
       "bytes": 33961,
@@ -343,7 +343,7 @@
       }
     ]
   },
-  "provider_data_sha256": "aa57b131ed616d842075ea0c9f395928fd438c370b40ec3dec1bb3742fd76d58",
+  "provider_data_sha256": "13f6c5959498e76381aa3ed8e09c14b38734f0db921cd0165538f7a1a7d21aff",
   "purpose": "pinned ICU list templates, conditional DFA and exact UTF16/indexed parts kernel",
   "schema_version": 1,
   "source_archive_sha256": "f64d583886e9a8201535b5296be9fb2f299d6e21f84d39488ce51affdd6c8f5e"
