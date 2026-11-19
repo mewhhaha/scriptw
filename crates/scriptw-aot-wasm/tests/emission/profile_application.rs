@@ -158,13 +158,7 @@ fn profile(
     for (index, site) in site_map.read_sites().enumerate() {
         if let Some(dominant) = kind(index, site) {
             profile
-                .observe_read(
-                    site,
-                    ReadSiteObservation {
-                        executions: 1 << 20,
-                        dominant,
-                    },
-                )
+                .observe_read(site, ReadSiteObservation::dominated(1 << 20, dominant))
                 .unwrap();
         }
     }
@@ -305,9 +299,9 @@ fn true_kind_fixtures_specialise_their_probe_site() {
 }
 
 /// A profile trained on another build's site map is rejected, never
-/// applied silently; so is collection, which this compiler cannot do.
+/// applied silently.
 #[test]
-fn mismatched_profiles_and_collection_are_rejected() {
+fn mismatched_profiles_are_rejected() {
     let first = program(TRUE_KIND_FIXTURES[0].1).unwrap();
     let second = program(TRUE_KIND_FIXTURES[5].1).unwrap();
     let trained = emit_with(&first, ProfileMode::None).unwrap();
@@ -317,8 +311,6 @@ fn mismatched_profiles_and_collection_are_rejected() {
     );
     let error = emit_with(&second, ProfileMode::Apply(&empty(trained.site_map()))).unwrap_err();
     assert!(error.contains("site map"), "{error}");
-    let error = emit_with(&first, ProfileMode::Collect).unwrap_err();
-    assert!(error.contains("collection"), "{error}");
     let foreign = ExecutionProfile::new(
         ProgramKey::new([1; 32]),
         trained.site_map(),
@@ -331,6 +323,185 @@ fn mismatched_profiles_and_collection_are_rejected() {
     );
 }
 
+const COLLECT: ProfileMode<'static> = ProfileMode::Collect {
+    program: PROGRAM,
+    compiler: "scriptw collect test",
+};
+
+/// What a Collect-mode P adds, read back from its bytes.
+struct Collection {
+    section: Vec<u8>,
+    /// The profile memory's size in bytes.
+    memory_bytes: usize,
+    /// Counter increments outside the dump: `i64.load; i64.const 1;
+    /// i64.add; i64.store` at one offset of the profile memory.
+    increments: usize,
+    /// Accesses of the profile memory outside the dump that are no
+    /// increment.
+    stray_accesses: usize,
+}
+
+fn collection(artifact: &WasmArtifact) -> Collection {
+    use wasmparser::{ExternalKind, Operator, Payload, TypeRef};
+    let mut imported_functions = 0;
+    let mut memories = 0;
+    let mut profile_memory = None;
+    let mut dump = None;
+    let mut section = None;
+    let mut sizes = Vec::new();
+    let mut bodies = Vec::new();
+    for payload in wasmparser::Parser::new(0).parse_all(&artifact.bytes) {
+        match payload.unwrap() {
+            Payload::ImportSection(reader) => {
+                for import in reader.into_imports() {
+                    match import.unwrap().ty {
+                        TypeRef::Func(_) | TypeRef::FuncExact(_) => imported_functions += 1,
+                        TypeRef::Memory(memory) => {
+                            sizes.push(memory.initial);
+                            memories += 1;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Payload::MemorySection(reader) => {
+                for memory in reader {
+                    sizes.push(memory.unwrap().initial);
+                    memories += 1;
+                }
+            }
+            Payload::ExportSection(reader) => {
+                for export in reader {
+                    let export = export.unwrap();
+                    match (export.name, export.kind) {
+                        (scriptw_aot_wasm::PROFILE_MEMORY_EXPORT, ExternalKind::Memory) => {
+                            profile_memory = Some(export.index)
+                        }
+                        (scriptw_aot_wasm::PROFILE_DUMP_EXPORT, ExternalKind::Func) => {
+                            dump = Some(export.index)
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Payload::CustomSection(reader)
+                if reader.name() == scriptw_aot_wasm::PROFILE_SITES_SECTION =>
+            {
+                assert!(section.is_none(), "one profile sites section");
+                section = Some(reader.data().to_vec());
+            }
+            Payload::CodeSectionEntry(body) => bodies.push(body),
+            _ => {}
+        }
+    }
+    let memory = profile_memory.expect("the profile memory is exported");
+    assert_eq!(
+        memory + 1,
+        memories,
+        "the profile memory is the last memory"
+    );
+    let dump = dump.expect("the profile dump is exported");
+    assert_eq!(
+        dump as usize,
+        imported_functions + bodies.len() - 1,
+        "the dump is the last function"
+    );
+    let (mut increments, mut stray_accesses) = (0, 0);
+    for body in &bodies[..bodies.len() - 1] {
+        let operators = body
+            .get_operators_reader()
+            .unwrap()
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        for (at, operator) in operators.iter().enumerate() {
+            let on_profile = |operator: &Operator| match operator {
+                Operator::I64Load { memarg } | Operator::I64Store { memarg } => {
+                    (memarg.memory == memory).then_some(memarg.offset)
+                }
+                _ => None,
+            };
+            let Some(offset) = on_profile(operator) else {
+                continue;
+            };
+            if matches!(operator, Operator::I64Store { .. }) {
+                continue;
+            }
+            let increment = matches!(
+                operators.get(at + 1..at + 3),
+                Some([Operator::I64Const { value: 1 }, Operator::I64Add])
+            ) && operators.get(at + 3).and_then(|store| on_profile(store))
+                == Some(offset)
+                && matches!(operators[at + 3], Operator::I64Store { .. });
+            if increment {
+                increments += 1;
+            } else {
+                stray_accesses += 1;
+            }
+        }
+    }
+    Collection {
+        section: section.expect("the profile sites section is present"),
+        memory_bytes: sizes[memory as usize] as usize * 65_536,
+        increments,
+        stray_accesses,
+    }
+}
+
+/// A Collect-mode P validates, keeps the unprofiled site map, counts every
+/// site and body entry in its own memory, and describes that memory in a
+/// section that decodes into a profile of every site. An untrained memory
+/// decodes into a profile with nothing hot.
+fn check_collection(name: &str, program: &ProgramIr, unprofiled: &WasmArtifact) -> usize {
+    let collected = emit_with(program, COLLECT).unwrap_or_else(|error| panic!("{name}: {error}"));
+    validate(&collected, name);
+    assert_eq!(collected.site_map(), unprofiled.site_map(), "{name}");
+    assert_ne!(collected.bytes, unprofiled.bytes, "{name}");
+    let collection = collection(&collected);
+    let site_map = unprofiled.site_map();
+    assert_eq!(collection.stray_accesses, 0, "{name}");
+    // One increment per read site and at least one per body; a planned
+    // write site whose record the emission dropped counts nothing.
+    assert!(
+        collection.increments > site_map.read_sites().count(),
+        "{name}: {} increments",
+        collection.increments
+    );
+    let memory = vec![0; collection.memory_bytes];
+    let profile = ExecutionProfile::from_collection(&collection.section, &memory, NonZeroU32::MIN)
+        .unwrap_or_else(|error| panic!("{name}: {error}"));
+    assert_eq!(profile.program(), &PROGRAM, "{name}");
+    assert_eq!(profile.site_map_digest(), &site_map.digest(), "{name}");
+    assert_eq!(
+        profile.reads().count(),
+        site_map.read_sites().count(),
+        "{name}"
+    );
+    assert_eq!(
+        profile.reads().count() + profile.writes().count(),
+        site_map.sites().len(),
+        "{name}"
+    );
+    assert!(profile.bodies().count() >= 1, "{name}");
+    assert_eq!(
+        AdmittedProfile::admit(&profile, &PROGRAM)
+            .unwrap()
+            .specialised_reads(),
+        0,
+        "{name}"
+    );
+    collected.bytes.len()
+}
+
+#[test]
+fn collect_mode_instruments_without_changing_the_site_map() {
+    for (name, source, _) in TRUE_KIND_FIXTURES {
+        let program = program(source).unwrap();
+        let unprofiled = emit_with(&program, ProfileMode::None).unwrap();
+        check_collection(name, &program, &unprofiled);
+    }
+}
+
 /// What one fixture of the corpus showed under every synthetic profile.
 #[derive(Default)]
 struct CorpusCounts {
@@ -338,6 +509,7 @@ struct CorpusCounts {
     emitted: usize,
     read_sites: usize,
     profiled_emissions: usize,
+    collected: usize,
 }
 
 #[test]
@@ -357,6 +529,8 @@ fn corpus_keeps_site_maps_and_validates_under_every_profile() {
             return counts;
         };
         counts.emitted = 1;
+        check_collection(name, &program, &unprofiled);
+        counts.collected = 1;
         let site_map = unprofiled.site_map();
         counts.read_sites = site_map.read_sites().count();
         let unchanged = emit_with(&program, ProfileMode::Apply(&empty(site_map)))
@@ -391,10 +565,11 @@ fn corpus_keeps_site_maps_and_validates_under_every_profile() {
             emitted: total.emitted + counts.emitted,
             read_sites: total.read_sites + counts.read_sites,
             profiled_emissions: total.profiled_emissions + counts.profiled_emissions,
+            collected: total.collected + counts.collected,
         });
     eprintln!(
-        "pgo corpus: {} fixtures, {} emitted, {} read sites, {} profiled emissions validated",
-        total.fixtures, total.emitted, total.read_sites, total.profiled_emissions
+        "pgo corpus: {} fixtures, {} emitted, {} read sites, {} profiled emissions validated, {} Collect-mode P validated and decoded",
+        total.fixtures, total.emitted, total.read_sites, total.profiled_emissions, total.collected
     );
 }
 
@@ -480,6 +655,13 @@ fn report_profiled_program_size() {
             for kind in ReadSpecialisation::ALL {
                 measure(format!("{kind:?} at every site"), uniform(site_map, kind));
             }
+            let collected = check_collection("size source", &program, &unprofiled);
+            let growth = collected - base;
+            lines.push(format!(
+                "Collect mode: P {collected} bytes, +{growth} (+{:.2}%), {} sites",
+                growth as f64 * 100.0 / base as f64,
+                site_map.sites().len()
+            ));
             lines.join("\n")
         })
         .unwrap()

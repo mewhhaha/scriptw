@@ -2200,11 +2200,26 @@ impl<'a> FunctionBuilder<'a> {
         kind: crate::profile::SiteKind,
     ) -> Result<(crate::gc_types::SiteRecordGlobal, crate::profile::SiteRef), EmitError> {
         let global = self.next_site_record()?;
-        let body = self.function_id.clone().map_or(
+        let site = self
+            .functions
+            .next_profile_site(self.profile_body(), kind, global)?;
+        Ok((global, site))
+    }
+
+    /// The body of P this builder emits, as a profile names it.
+    fn profile_body(&self) -> crate::profile::SiteBody {
+        self.function_id.clone().map_or(
             crate::profile::SiteBody::Main,
             crate::profile::SiteBody::Source,
-        );
-        Ok((global, self.functions.next_profile_site(body, kind)?))
+        )
+    }
+
+    /// In a Collect-mode P, counts an entry of this body.
+    pub(crate) fn emit_profile_body_entry(&self, f: &mut Function) -> Result<(), EmitError> {
+        if let Some(counter) = self.functions.profile_body_counter(self.profile_body())? {
+            counter.emit_increment(f);
+        }
+        Ok(())
     }
 
     /// Runs `emit` with no deadline poll at the head of the loops it opens:

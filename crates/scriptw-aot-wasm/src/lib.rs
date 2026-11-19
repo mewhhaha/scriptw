@@ -102,7 +102,8 @@ pub use profile::{
     AdmittedProfile, CompactStorageLayout, ExecutionProfile, PlaceHolder, ProfileError,
     ProfileMismatch, ProfileMode, ProgramKey, ReadSiteObservation, ReadSpecialisation,
     ReceiverHeader, SiteBody, SiteKind, SiteMap, SiteMapDigest, SiteRef,
-    HOT_READ_EXECUTIONS_PER_REQUEST, PROFILE_FORMAT_VERSION,
+    HOT_READ_EXECUTIONS_PER_REQUEST, PROFILE_DUMP_EXPORT, PROFILE_FORMAT_VERSION,
+    PROFILE_MEMORY_EXPORT, PROFILE_SITES_SECTION, PROFILE_SITES_SECTION_VERSION,
 };
 mod program_hooks;
 mod promise_rejection_policy;

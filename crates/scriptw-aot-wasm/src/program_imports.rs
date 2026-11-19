@@ -40,7 +40,8 @@ fn check_custom(section: &wasmparser::CustomSectionReader<'_>) -> Result<(), Str
     match section.name() {
         "name" => Ok(()),
         crate::RUNTIME_SOURCE_COMPILATION_PROFILE_CUSTOM_SECTION
-        | crate::FOREIGN_MODULES_CUSTOM_SECTION => Ok(()),
+        | crate::FOREIGN_MODULES_CUSTOM_SECTION
+        | crate::profile::PROFILE_SITES_SECTION => Ok(()),
         crate::native_program_contexts::SECTION_NAME => {
             crate::native_program_contexts::read(section.data())
                 .map(|_| ())

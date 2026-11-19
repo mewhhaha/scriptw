@@ -104,6 +104,8 @@ pub(crate) enum FunctionIdentity {
     HostBuiltin(HostBuiltinId),
     /// One of the shared runtime helpers.
     RuntimeHelper(RuntimeHelperId),
+    /// A Collect-mode P's exported profile dump.
+    ProfileDump,
 }
 
 impl FunctionIdentity {
@@ -132,6 +134,7 @@ impl FunctionIdentity {
             Self::StandardBuiltin(builtin) => format!("builtin::{}", builtin.debug_name()),
             Self::HostBuiltin(builtin) => format!("host::{}", builtin.as_str()),
             Self::RuntimeHelper(helper) => format!("helper::{}", helper.debug_name()),
+            Self::ProfileDump => "scriptw::profile_dump".to_string(),
         }
     }
 
@@ -149,6 +152,7 @@ impl FunctionIdentity {
             Self::StandardBuiltin(_) => "builtin",
             Self::HostBuiltin(_) => "host-builtin",
             Self::RuntimeHelper(_) => "runtime-helper",
+            Self::ProfileDump => "profile-dump",
         }
     }
 
@@ -171,6 +175,8 @@ impl FunctionIdentity {
             Self::PreparedScript { .. } => StaticSignature::PreparedScript.type_index(),
             Self::BinaryNumericSource { .. } => StaticSignature::BinaryNumericCallback.type_index(),
             Self::RuntimeHelper(helper) => helper.type_index(),
+            // `() -> ()`, a type every module declares.
+            Self::ProfileDump => StaticSignature::HostCollectGc.type_index(),
         }
     }
 }
@@ -334,6 +340,7 @@ impl core::fmt::Display for FunctionBodySize {
 enum FunctionDeclaration {
     NonCallable,
     ProgramInitialize(crate::function_layout::ProgramInitializeIndex),
+    ProfileDump(crate::function_layout::ProfileDumpIndex),
     Planned(crate::function_entry::PlannedFunctionEntry),
     BinaryNumeric(crate::function_entry::PlannedBinaryNumericEntry),
     LocalArguments(crate::function_entry::PlannedLocalArgumentsEntry),
@@ -376,6 +383,15 @@ impl EmittedFunction {
         let (index, body) = body.into_parts();
         let mut function = Self::new(FunctionIdentity::ProgramInitialize, body);
         function.declaration = FunctionDeclaration::ProgramInitialize(index);
+        function
+    }
+    /// A Collect-mode P's profile dump, at the index its layout planned.
+    pub(crate) fn profile_dump(
+        index: crate::function_layout::ProfileDumpIndex,
+        body: Function,
+    ) -> Self {
+        let mut function = Self::new(FunctionIdentity::ProfileDump, body);
+        function.declaration = FunctionDeclaration::ProfileDump(index);
         function
     }
     pub(crate) fn runtime_helper(helper: RuntimeHelperId, body: Function) -> Self {
@@ -491,6 +507,10 @@ impl ModuleCode {
             FunctionDeclaration::ProgramInitialize(index) => {
                 index.assert_body_index(wasm_index);
                 StaticSignature::ProgramInitialize.type_index()
+            }
+            FunctionDeclaration::ProfileDump(index) => {
+                index.assert_body_index(wasm_index);
+                function.identity.type_index()
             }
             FunctionDeclaration::Planned(entry) => {
                 entry.assert_body_index(wasm_index);

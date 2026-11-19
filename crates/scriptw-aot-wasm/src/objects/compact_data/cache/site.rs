@@ -33,6 +33,11 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<GcLocal<OwnDataReadCache>, EmitError> {
         let s = self.runtime_schema();
+        // A Collect-mode P counts the site's executions here, where every
+        // execution of it loads its record.
+        if let Some(counter) = self.functions.profile_site_counter(global) {
+            counter.emit_increment(f);
+        }
         f.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(
             s.reference_type::<OwnDataReadCache>(GcNullability::NonNullable),
         ))));

@@ -172,7 +172,7 @@ pub(super) enum ReceiverLayout {
     Promise,
 }
 
-const RECEIVER_LAYOUTS: [ReceiverLayout; 9] = [
+pub(super) const RECEIVER_LAYOUTS: [ReceiverLayout; 9] = [
     ReceiverLayout::Ordinary,
     ReceiverLayout::Function,
     ReceiverLayout::Array,
@@ -233,15 +233,15 @@ impl ReceiverLayout {
 
 /// The sealed storage layouts of an ordinary header, in the order the entry
 /// tests a storage that the site's hint does not place.
-#[derive(Clone, Copy)]
-enum ReceiverStorage {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum ReceiverStorage {
     Array,
     Inline,
     Dictionary,
     Intrinsic,
 }
 
-const RECEIVER_STORAGES: [ReceiverStorage; 4] = [
+pub(super) const RECEIVER_STORAGES: [ReceiverStorage; 4] = [
     ReceiverStorage::Array,
     ReceiverStorage::Inline,
     ReceiverStorage::Dictionary,
@@ -250,9 +250,9 @@ const RECEIVER_STORAGES: [ReceiverStorage; 4] = [
 
 impl ReceiverStorage {
     /// A site's hint holds the storage layout above the header layout.
-    const HINT_SHIFT: u32 = 4;
+    pub(super) const HINT_SHIFT: u32 = 4;
 
-    const fn word(self) -> i32 {
+    pub(super) const fn word(self) -> i32 {
         self as i32
     }
 

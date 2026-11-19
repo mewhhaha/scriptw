@@ -109,6 +109,16 @@ fn emit_script_module_with_factory(
             standard_builtin_uses_memory_atomics(builtin)
                 || standard_builtin_uses_shared_buffer_resource(builtin)
         });
+    // The linear memories the module imports or defines for the program: a
+    // module with shared memory imports its private and shared memories, and
+    // any other module that uses the heap defines its private memory. A
+    // Collect-mode P's profile memory follows them.
+    let program_memories = if uses_shared_memory {
+        2
+    } else {
+        u32::from(uses_heap)
+    };
+    let collects_profile = matches!(profile, crate::profile::ProfileUse::Collect(_));
     let uses_atomics_wait = compiled_standard_builtins.contains(&StandardBuiltinId::AtomicsWait);
     let uses_atomics_wait_async =
         compiled_standard_builtins.contains(&StandardBuiltinId::AtomicsWaitAsync);
@@ -343,7 +353,8 @@ fn emit_script_module_with_factory(
         },
     )
     .with_standard_builtin_local_arguments(&compiled_standard_builtins)
-    .with_foreign_imports(script.foreign_modules.functions().count(), kind)?;
+    .with_foreign_imports(script.foreign_modules.functions().count(), kind)?
+    .with_profile_dump(collects_profile, kind)?;
     let (module_types, foreign_types) = ModuleTypeRegistry::new(kind)
         .with_global_prelude(compile_program && script.module_prelude.is_some())
         .with_foreign_modules(&script.foreign_modules)?;
@@ -365,7 +376,10 @@ fn emit_script_module_with_factory(
     )
     .with_module_import_bindings(script.declares_module_import_bindings())
     .with_foreign_imports(foreign_imports)
-    .with_profile(profile);
+    .with_profile(
+        profile,
+        crate::profile::collect::ProfileMemory::after(program_memories),
+    );
     let entry_exports = ProgramExports::new(kind, &layout, factory, &function_metas)?;
     let owned_pool;
     let string_pool = match (kind, validated_runtime) {
@@ -1623,6 +1637,32 @@ fn emit_script_module_with_factory(
             .map(|(_, body)| body),
     );
     program_functions.extend(program_helpers);
+    // A Collect-mode P's dump follows every body whose sites it reads.
+    let profile_collection = function_metas.finish_profile_collection()?;
+    if let Some(collected) = &profile_collection {
+        let index = layout
+            .profile_dump_index()
+            .expect("a Collect-mode layout plans the profile dump");
+        program_functions.push(EmittedFunction::profile_dump(
+            index,
+            crate::objects::emit_profile_dump(
+                module_package.schema(),
+                &collected.reads,
+                collected.memory.index(),
+                collected.dump_base,
+            )?,
+        ));
+        exports.export(
+            crate::profile::PROFILE_DUMP_EXPORT,
+            ExportKind::Func,
+            index.raw(),
+        );
+        exports.export(
+            crate::profile::PROFILE_MEMORY_EXPORT,
+            ExportKind::Memory,
+            collected.memory.index(),
+        );
+    }
     module_package.append_functions(compiled_functions, program_functions);
     let runtime_global_types = module_package.runtime_global_types();
 
@@ -1873,6 +1913,22 @@ fn emit_script_module_with_factory(
         }
         data = Some(section);
     }
+    if let Some(collected) = &profile_collection {
+        let memories = memories.get_or_insert_with(MemorySection::new);
+        let imported = if uses_shared_memory { 2 } else { 0 };
+        if imported + memories.len() != collected.memory.index() {
+            return Err(EmitError::unsupported(
+                "compiler invariant: the profile memory is not after the program's memories",
+            ));
+        }
+        memories.memory(MemoryType {
+            minimum: collected.pages,
+            maximum: Some(collected.pages),
+            memory64: false,
+            shared: false,
+            page_size_log2: None,
+        });
+    }
     if compile_runtime {
         exports.export(
             crate::NATIVE_REGEXP_LITERAL_FACTORY_EXPORT,
@@ -2072,6 +2128,19 @@ fn emit_script_module_with_factory(
     metadata::append_function_name(&mut module, &mut debug_dump, &function_table)?;
     if let Some(section) = factory.and_then(|_| function_table.native_program_context_section()) {
         module.section(&section);
+    }
+    if let Some(collected) = &profile_collection {
+        module.section(&wasm_encoder::CustomSection {
+            name: crate::profile::PROFILE_SITES_SECTION.into(),
+            data: (&collected.section[..]).into(),
+        });
+        debug_dump.push(format!(
+            "custom section: {} ({} bytes), profile memory {} ({} pages)",
+            crate::profile::PROFILE_SITES_SECTION,
+            collected.section.len(),
+            collected.memory.index(),
+            collected.pages
+        ));
     }
 
     let runtime_layout = matches!(kind, ModuleKind::Runtime(_)).then(|| {

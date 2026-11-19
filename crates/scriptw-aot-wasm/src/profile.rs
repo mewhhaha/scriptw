@@ -16,11 +16,25 @@
 //! program it is applied to; emission then only looks sites up. The emitter
 //! checks the one thing only emission can know, that the site map it
 //! enumerates is the one the profile was trained on, when P is complete.
+//!
+//! A profile is recorded by an instrumented build of the same P
+//! ([`ProfileMode::Collect`], see [`collect`]): its site map is the
+//! unprofiled build's, its JavaScript semantics and what its site records
+//! learn are the unprofiled build's, and only time changes. After a training
+//! run, [`ExecutionProfile::from_collection`] turns the build's
+//! `scriptw.profile.sites` section and its `scriptw.profile` memory into a
+//! profile.
 use crate::module::EmitError;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
 use std::num::NonZeroU32;
 use std::sync::Arc;
+
+pub(crate) mod collect;
+pub use collect::{
+    PROFILE_DUMP_EXPORT, PROFILE_MEMORY_EXPORT, PROFILE_SITES_SECTION,
+    PROFILE_SITES_SECTION_VERSION,
+};
 
 /// The magic that opens an encoded profile.
 const MAGIC: &[u8; 6] = b"SWPROF";
@@ -39,9 +53,16 @@ pub enum ProfileMode<'a> {
     /// No profile: P is exactly the unprofiled build.
     #[default]
     None,
-    /// An instrumented build that records a profile. Not implemented in this
-    /// compiler: emission rejects it rather than emit an uninstrumented P.
-    Collect,
+    /// An instrumented build that records a profile of the program whose
+    /// key is `program`, compiled by the compiler `compiler` names
+    /// (informational). P counts every body entry and every static property
+    /// site's executions in a memory of its own, exports a function that
+    /// writes what each read site's records learned next to the counts, and
+    /// describes both in a custom section; see [`collect`].
+    Collect {
+        program: ProgramKey,
+        compiler: &'a str,
+    },
     /// A build specialised by an admitted profile.
     Apply(&'a AdmittedProfile),
 }
@@ -293,7 +314,7 @@ impl ReadSpecialisation {
         Self::StringPrototypePlace,
     ];
 
-    const fn code(self) -> u8 {
+    pub(crate) const fn code(self) -> u8 {
         const fn layout(layout: CompactStorageLayout) -> u8 {
             match layout {
                 CompactStorageLayout::Array => 0,
@@ -329,19 +350,40 @@ impl ReadSpecialisation {
         }
     }
 
-    fn from_code(code: u8) -> Option<Self> {
+    pub(crate) fn from_code(code: u8) -> Option<Self> {
         Self::ALL
             .into_iter()
             .find(|specialisation| specialisation.code() == code)
     }
 }
 
-/// What a training run saw at one static read site: how often it ran and
-/// the kind of answer that dominated.
+/// What a training run saw at one static read site: how often it ran, the
+/// kind of answer that dominated, if one did, and the shape of its record
+/// chain.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ReadSiteObservation {
     pub executions: u64,
-    pub dominant: ReadSpecialisation,
+    /// The one kind of answer the site's records prove, when every record
+    /// of its chain proves that kind and the site still learned.
+    pub dominant: Option<ReadSpecialisation>,
+    /// The records of the site's chain at the end of the run; zero for a
+    /// site that never ran.
+    pub records: u8,
+    /// The site spent its learning budget: receivers its records cannot
+    /// name were common enough that its entry answers them by walking.
+    pub megamorphic: bool,
+}
+
+impl ReadSiteObservation {
+    /// A site of `executions` whose one record proves `dominant`.
+    pub fn dominated(executions: u64, dominant: ReadSpecialisation) -> Self {
+        Self {
+            executions,
+            dominant: Some(dominant),
+            records: 1,
+            megamorphic: false,
+        }
+    }
 }
 
 /// A recorded execution profile, as written to and read from `.swprof`.
@@ -351,7 +393,11 @@ pub struct ExecutionProfile {
     site_map: SiteMapDigest,
     compiler: String,
     training_requests: NonZeroU32,
+    /// How often each body was entered.
+    bodies: BTreeMap<SiteBody, u64>,
     reads: BTreeMap<SiteRef, ReadSiteObservation>,
+    /// How often each static write site ran.
+    writes: BTreeMap<SiteRef, u64>,
 }
 
 /// Why a profile was not admitted.
@@ -373,6 +419,8 @@ pub enum ProfileError {
     Malformed(&'static str),
     /// A read observation names a site of another kind.
     NotAReadSite,
+    /// A write observation names a site of another kind.
+    NotAWriteSite,
 }
 
 impl std::fmt::Display for ProfileError {
@@ -390,6 +438,7 @@ impl std::fmt::Display for ProfileError {
             ),
             Self::Malformed(what) => write!(f, "malformed execution profile: {what}"),
             Self::NotAReadSite => f.write_str("read observation for a site that is not a read"),
+            Self::NotAWriteSite => f.write_str("write observation for a site that is not a write"),
         }
     }
 }
@@ -414,8 +463,39 @@ impl ExecutionProfile {
             site_map: site_map.digest(),
             compiler: compiler.into(),
             training_requests,
+            bodies: BTreeMap::new(),
             reads: BTreeMap::new(),
+            writes: BTreeMap::new(),
         }
+    }
+
+    /// The profile a Collect-mode P recorded over `training_requests`
+    /// requests: `section` is its `scriptw.profile.sites` custom section and
+    /// `memory` its `scriptw.profile` memory, read after the run ended and
+    /// the P's `scriptw.profile.dump` export was called. Every number is
+    /// checked against the section; nothing is reinterpreted.
+    pub fn from_collection(
+        section: &[u8],
+        memory: &[u8],
+        training_requests: NonZeroU32,
+    ) -> Result<Self, ProfileError> {
+        collect::decode(section, memory, training_requests)
+    }
+
+    /// Records how often a body was entered; a later observation of the
+    /// same body replaces it.
+    pub fn observe_body(&mut self, body: &SiteBody, entries: u64) {
+        self.bodies.insert(body.clone(), entries);
+    }
+
+    /// Records how often a static write site ran; a later observation of
+    /// the same site replaces it.
+    pub fn observe_write(&mut self, site: &SiteRef, executions: u64) -> Result<(), ProfileError> {
+        if site.kind != SiteKind::PropertyWrite {
+            return Err(ProfileError::NotAWriteSite);
+        }
+        self.writes.insert(site.clone(), executions);
+        Ok(())
     }
 
     /// Records what a static read site saw; a later observation of the same
@@ -448,12 +528,21 @@ impl ExecutionProfile {
         self.training_requests
     }
 
+    pub fn bodies(&self) -> impl Iterator<Item = (&SiteBody, &u64)> {
+        self.bodies.iter()
+    }
+
     pub fn reads(&self) -> impl Iterator<Item = (&SiteRef, &ReadSiteObservation)> {
         self.reads.iter()
     }
 
+    pub fn writes(&self) -> impl Iterator<Item = (&SiteRef, &u64)> {
+        self.writes.iter()
+    }
+
     /// The `.swprof` encoding: magic, u16 version, identity, training
-    /// request count and the read-site table, little-endian throughout.
+    /// request count, then the body, read-site and write-site tables,
+    /// little-endian throughout.
     pub fn encode(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(MAGIC);
@@ -462,11 +551,27 @@ impl ExecutionProfile {
         bytes.extend_from_slice(&self.site_map.0);
         encode_bytes(&mut bytes, self.compiler.as_bytes());
         encode_u32(&mut bytes, self.training_requests.get());
+        encode_u32(&mut bytes, self.bodies.len() as u32);
+        for (body, entries) in &self.bodies {
+            encode_body(&mut bytes, body);
+            bytes.extend_from_slice(&entries.to_le_bytes());
+        }
         encode_u32(&mut bytes, self.reads.len() as u32);
         for (site, observation) in &self.reads {
             encode_site(&mut bytes, site);
             bytes.extend_from_slice(&observation.executions.to_le_bytes());
-            bytes.push(observation.dominant.code());
+            bytes.push(
+                observation
+                    .dominant
+                    .map_or(NO_DOMINANT_KIND, ReadSpecialisation::code),
+            );
+            bytes.push(observation.records);
+            bytes.push(u8::from(observation.megamorphic));
+        }
+        encode_u32(&mut bytes, self.writes.len() as u32);
+        for (site, executions) in &self.writes {
+            encode_site(&mut bytes, site);
+            bytes.extend_from_slice(&executions.to_le_bytes());
         }
         bytes
     }
@@ -486,6 +591,14 @@ impl ExecutionProfile {
             .map_err(|_| ProfileError::Malformed("compiler fingerprint is not UTF-8"))?;
         let training_requests =
             NonZeroU32::new(reader.u32()?).ok_or(ProfileError::Malformed("no training request"))?;
+        let mut bodies = BTreeMap::new();
+        for _ in 0..reader.u32()? {
+            let body = reader.body()?;
+            let entries = u64::from_le_bytes(reader.array()?);
+            if bodies.insert(body, entries).is_some() {
+                return Err(ProfileError::Malformed("a body is recorded twice"));
+            }
+        }
         let mut reads = BTreeMap::new();
         for _ in 0..reader.u32()? {
             let site = reader.site()?;
@@ -493,19 +606,43 @@ impl ExecutionProfile {
                 return Err(ProfileError::NotAReadSite);
             }
             let executions = u64::from_le_bytes(reader.array()?);
-            let dominant = ReadSpecialisation::from_code(reader.array::<1>()?[0])
-                .ok_or(ProfileError::Malformed("unknown read specialisation"))?;
+            let [dominant, records, megamorphic] = reader.array::<3>()?;
+            let dominant = match dominant {
+                NO_DOMINANT_KIND => None,
+                code => Some(
+                    ReadSpecialisation::from_code(code)
+                        .ok_or(ProfileError::Malformed("unknown read specialisation"))?,
+                ),
+            };
+            let megamorphic = match megamorphic {
+                0 => false,
+                1 => true,
+                _ => return Err(ProfileError::Malformed("megamorphic flag is not 0 or 1")),
+            };
             if reads
                 .insert(
                     site,
                     ReadSiteObservation {
                         executions,
                         dominant,
+                        records,
+                        megamorphic,
                     },
                 )
                 .is_some()
             {
                 return Err(ProfileError::Malformed("a read site is recorded twice"));
+            }
+        }
+        let mut writes = BTreeMap::new();
+        for _ in 0..reader.u32()? {
+            let site = reader.site()?;
+            if site.kind != SiteKind::PropertyWrite {
+                return Err(ProfileError::NotAWriteSite);
+            }
+            let executions = u64::from_le_bytes(reader.array()?);
+            if writes.insert(site, executions).is_some() {
+                return Err(ProfileError::Malformed("a write site is recorded twice"));
             }
         }
         if !reader.bytes.is_empty() {
@@ -516,7 +653,9 @@ impl ExecutionProfile {
             site_map,
             compiler,
             training_requests,
+            bodies,
             reads,
+            writes,
         })
     }
 }
@@ -534,7 +673,7 @@ struct Admitted {
 
 impl AdmittedProfile {
     /// Admits `profile` for the program whose key is `program`. A read site
-    /// is specialised when it ran at least
+    /// is specialised when it has a dominant kind and ran at least
     /// [`HOT_READ_EXECUTIONS_PER_REQUEST`] times per training request.
     pub fn admit(profile: &ExecutionProfile, program: &ProgramKey) -> Result<Self, ProfileError> {
         if profile.program != *program {
@@ -546,7 +685,7 @@ impl AdmittedProfile {
             .reads
             .iter()
             .filter(|(_, observation)| observation.executions >= threshold)
-            .map(|(site, observation)| (site.clone(), observation.dominant))
+            .filter_map(|(site, observation)| Some((site.clone(), observation.dominant?)))
             .collect();
         Ok(Self(Arc::new(Admitted {
             site_map: profile.site_map,
@@ -578,12 +717,12 @@ impl AdmittedProfile {
     }
 }
 
-/// What an emission does with its profile, past the entry point that
-/// rejects collection.
+/// What an emission does with its profile, owned past the entry point.
 #[derive(Clone, Debug, Default)]
 pub(crate) enum ProfileUse {
     #[default]
     None,
+    Collect(collect::CollectionIdentity),
     Apply(AdmittedProfile),
 }
 
@@ -591,20 +730,16 @@ impl ProfileUse {
     pub(crate) fn of(mode: ProfileMode<'_>) -> Result<Self, EmitError> {
         match mode {
             ProfileMode::None => Ok(Self::None),
-            ProfileMode::Collect => Err(EmitError::unsupported(
-                "execution profile collection is not implemented by this compiler",
+            ProfileMode::Collect { program, compiler } => Ok(Self::Collect(
+                collect::CollectionIdentity::new(program, compiler),
             )),
             ProfileMode::Apply(profile) => Ok(Self::Apply(profile.clone())),
         }
     }
-
-    pub(crate) fn read_specialisation(&self, site: &SiteRef) -> Option<ReadSpecialisation> {
-        match self {
-            Self::None => None,
-            Self::Apply(profile) => profile.read_specialisation(site),
-        }
-    }
 }
+
+/// Encoding of a read observation without a dominant kind.
+const NO_DOMINANT_KIND: u8 = u8::MAX;
 
 fn encode_u32(bytes: &mut Vec<u8>, value: u32) {
     bytes.extend_from_slice(&value.to_le_bytes());
@@ -615,14 +750,18 @@ fn encode_bytes(bytes: &mut Vec<u8>, value: &[u8]) {
     bytes.extend_from_slice(value);
 }
 
-fn encode_site(bytes: &mut Vec<u8>, site: &SiteRef) {
-    match &site.body {
+fn encode_body(bytes: &mut Vec<u8>, body: &SiteBody) {
+    match body {
         SiteBody::Main => bytes.push(0),
         SiteBody::Source(id) => {
             bytes.push(1);
             encode_bytes(bytes, id.as_bytes());
         }
     }
+}
+
+fn encode_site(bytes: &mut Vec<u8>, site: &SiteRef) {
+    encode_body(bytes, &site.body);
     bytes.push(site.kind.code());
     encode_u32(bytes, site.ordinal);
 }
@@ -654,15 +793,19 @@ impl<'a> Reader<'a> {
         self.take(len)
     }
 
-    fn site(&mut self) -> Result<SiteRef, ProfileError> {
-        let body = match self.array::<1>()?[0] {
+    fn body(&mut self) -> Result<SiteBody, ProfileError> {
+        Ok(match self.array::<1>()?[0] {
             0 => SiteBody::Main,
             1 => SiteBody::Source(
                 String::from_utf8(self.sized()?.to_vec())
                     .map_err(|_| ProfileError::Malformed("body id is not UTF-8"))?,
             ),
             _ => return Err(ProfileError::Malformed("unknown site body")),
-        };
+        })
+    }
+
+    fn site(&mut self) -> Result<SiteRef, ProfileError> {
+        let body = self.body()?;
         let kind = SiteKind::from_code(self.array::<1>()?[0])
             .ok_or(ProfileError::Malformed("unknown site kind"))?;
         let ordinal = self.u32()?;
@@ -705,13 +848,7 @@ mod tests {
                 .zip(ReadSpecialisation::ALL.into_iter().rev()),
         ) {
             profile
-                .observe_read(
-                    site,
-                    ReadSiteObservation {
-                        executions,
-                        dominant,
-                    },
-                )
+                .observe_read(site, ReadSiteObservation::dominated(executions, dominant))
                 .unwrap();
         }
         profile
@@ -791,9 +928,18 @@ mod tests {
             ExecutionProfile::decode(&trailing),
             Err(ProfileError::Malformed("trailing bytes"))
         );
+        // The last read's kind, flag and chain length precede the empty
+        // write table's count.
+        let mut flag = bytes.clone();
+        let at = flag.len() - 5;
+        flag[at] = 2;
+        assert_eq!(
+            ExecutionProfile::decode(&flag),
+            Err(ProfileError::Malformed("megamorphic flag is not 0 or 1"))
+        );
         let mut kind = bytes;
-        let last = kind.len() - 1;
-        kind[last] = 99;
+        let at = kind.len() - 7;
+        kind[at] = 99;
         assert_eq!(
             ExecutionProfile::decode(&kind),
             Err(ProfileError::Malformed("unknown read specialisation"))
@@ -836,21 +982,62 @@ mod tests {
         assert_eq!(
             profile.observe_read(
                 write,
-                ReadSiteObservation {
-                    executions: 1,
-                    dominant: ReadSpecialisation::StringPrototypePlace,
-                },
+                ReadSiteObservation::dominated(1, ReadSpecialisation::StringPrototypePlace),
             ),
             Err(ProfileError::NotAReadSite)
+        );
+        let read = map.read_sites().next().unwrap();
+        assert_eq!(
+            profile.observe_write(read, 1),
+            Err(ProfileError::NotAWriteSite)
         );
     }
 
     #[test]
-    fn collection_is_rejected_until_implemented() {
-        assert!(ProfileUse::of(ProfileMode::Collect).is_err());
+    fn collection_is_a_profile_use() {
+        assert!(matches!(
+            ProfileUse::of(ProfileMode::Collect {
+                program: ProgramKey::new([1; 32]),
+                compiler: "test",
+            }),
+            Ok(ProfileUse::Collect(_))
+        ));
         assert!(matches!(
             ProfileUse::of(ProfileMode::None),
             Ok(ProfileUse::None)
         ));
+    }
+
+    #[test]
+    fn codec_round_trips_bodies_writes_and_undominated_reads() {
+        let map = site_map();
+        let mut profile = profile(&map);
+        let reads = map.read_sites().collect::<Vec<_>>();
+        profile
+            .observe_read(
+                reads[1],
+                ReadSiteObservation {
+                    executions: 9,
+                    dominant: None,
+                    records: 8,
+                    megamorphic: true,
+                },
+            )
+            .unwrap();
+        let write = map
+            .sites()
+            .iter()
+            .find(|site| site.kind() == SiteKind::PropertyWrite)
+            .unwrap();
+        profile.observe_write(write, 77).unwrap();
+        profile.observe_body(&SiteBody::Main, 1);
+        profile.observe_body(&SiteBody::Source("f1".into()), 300);
+        let decoded = ExecutionProfile::decode(&profile.encode()).unwrap();
+        assert_eq!(decoded, profile);
+        assert_eq!(decoded.bodies().count(), 2);
+        assert_eq!(decoded.writes().collect::<Vec<_>>(), [(write, &77)]);
+        // An undominated read is never specialised, however hot.
+        let admitted = AdmittedProfile::admit(&decoded, &ProgramKey::new([7; 32])).unwrap();
+        assert_eq!(admitted.read_specialisation(reads[1]), None);
     }
 }

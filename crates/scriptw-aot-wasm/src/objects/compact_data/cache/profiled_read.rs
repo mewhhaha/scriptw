@@ -45,7 +45,7 @@ fn holder_storages(holder: PlaceHolder) -> &'static [HolderStorage] {
     }
 }
 
-fn receiver_layout(header: ReceiverHeader) -> ReceiverLayout {
+pub(super) fn receiver_layout(header: ReceiverHeader) -> ReceiverLayout {
     match header {
         ReceiverHeader::Ordinary => ReceiverLayout::Ordinary,
         ReceiverHeader::Function => ReceiverLayout::Function,
@@ -389,13 +389,7 @@ mod tests {
         );
         for site in artifact.site_map().read_sites() {
             profile
-                .observe_read(
-                    site,
-                    ReadSiteObservation {
-                        executions: u64::MAX,
-                        dominant: kind,
-                    },
-                )
+                .observe_read(site, ReadSiteObservation::dominated(u64::MAX, kind))
                 .unwrap();
         }
         AdmittedProfile::admit(&profile, &program).unwrap()

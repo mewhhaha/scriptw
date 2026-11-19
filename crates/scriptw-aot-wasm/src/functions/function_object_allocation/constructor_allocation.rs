@@ -41,7 +41,8 @@ impl<'a> ConstructorAllocationPlan<'a> {
             | FunctionIdentity::LocalArgumentsAdapter { .. }
             | FunctionIdentity::NativeLocalArgumentsAdapter(_)
             | FunctionIdentity::PreparedScript { .. }
-            | FunctionIdentity::RuntimeHelper(_) => false,
+            | FunctionIdentity::RuntimeHelper(_)
+            | FunctionIdentity::ProfileDump => false,
         };
         if !identity_matches || !meta.protocol().is_constructable() {
             return Err(EmitError::unsupported(
