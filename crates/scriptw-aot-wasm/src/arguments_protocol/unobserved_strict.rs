@@ -571,6 +571,31 @@ mod tests {
     }
 
     #[test]
+    fn an_ordinary_child_that_names_its_own_binding_leaves_the_parent_unobserved() {
+        // Without eval, a Module child's `arguments` is its own private
+        // binding, so the parent keeps neither a slot nor an observer.
+        for source in [
+            "export function make(input) { return function(){return arguments[0];}; }",
+            "export function make(input) { return function(){return () => arguments[0];}; }",
+            "export function make(input) { return function*(){yield arguments[0];}; }",
+        ] {
+            with_module(source, |function| {
+                assert!(
+                    function
+                        .owned_env_bindings
+                        .iter()
+                        .all(|binding| binding.name != LEXICAL_ARGUMENTS_NAME),
+                    "{source}"
+                );
+                assert!(
+                    UnobservedStrictArguments::admit(function).is_some(),
+                    "{source}"
+                );
+            });
+        }
+    }
+
+    #[test]
     fn a_child_callable_that_names_the_binding_owns_its_environment_slot() {
         // The slot is what refuses the proof: the walk never reads a child.
         // Capture analysis also gives the slot to an activation whose
@@ -581,10 +606,7 @@ mod tests {
             "export function make(input) { return () => () => arguments[0]; }",
             "export function make(input) { return () => eval(input); }",
             "export function make(input) { return () => () => eval(input); }",
-            "export function make(input) { return function(){return arguments[0];}; }",
-            "export function make(input) { return function(){return () => arguments[0];}; }",
             "export function make(input) { return function(){return eval('arguments[0]');}; }",
-            "export function make(input) { return function*(){yield arguments[0];}; }",
         ] {
             with_module(source, |function| {
                 assert!(

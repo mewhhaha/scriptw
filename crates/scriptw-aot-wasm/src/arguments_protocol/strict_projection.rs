@@ -572,9 +572,11 @@ mod tests {
 
     #[test]
     fn named_implicit_binding_requires_the_actual_unique_owned_slot() {
+        // A Script that names `arguments` keeps named records; a Module
+        // owner keeps its implicit binding private.
         let original = function(
-            "function make(a) { return arguments[0]+arguments.length; }",
-            ParseOptions::module(),
+            "function make(a) { 'use strict'; return arguments[0]+arguments.length; }",
+            ParseOptions::script(),
         );
         assert!(StrictArgumentsProjection::admit(&original).is_some());
         assert!(

@@ -212,7 +212,15 @@ impl ScriptLowerer<'_> {
         else {
             return true;
         };
-        let Some(binding) = self.lookup_binding(name) else {
+        // An ordinary owner always declares its own implicit arguments
+        // storage, and a module candidate owner is never an arrow, so the
+        // innermost one is this owner's. It names `arguments` unless a source
+        // binding of that name shadows it.
+        let Some(binding) = self.lookup_binding(name).or_else(|| {
+            (name == "arguments")
+                .then(|| self.lookup_binding(LEXICAL_ARGUMENTS_NAME))
+                .flatten()
+        }) else {
             return true;
         };
         if !locals.contains(&binding.storage_name)

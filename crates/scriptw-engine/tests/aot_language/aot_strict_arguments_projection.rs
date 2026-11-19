@@ -79,3 +79,9 @@ print('arguments Realm ok');
         "arguments Realm ok",
     );
 }
+
+#[test]
+fn module_owner_arguments_storage_keeps_every_observation() {
+    let source = include_str!("../fixtures/module_arguments_storage.js");
+    run(source, true, "module arguments storage ok");
+}

@@ -460,7 +460,6 @@ fn module_global_start_proof_excludes_eval_parameter_scopes_and_implicit_argumen
         "export function read(value = 0) { return external; }",
         "export function read(...values) { return external; }",
         "export function read({value}) { return external; }",
-        "export function read() { return arguments; }",
     ] {
         let program = lower_module(source);
         let (_, _, reference) = module_capture_reference(&program, "read");
@@ -469,6 +468,39 @@ fn module_global_start_proof_excludes_eval_parameter_scopes_and_implicit_argumen
             EnvironmentIdentifierResolutionStart::CurrentEnvironment,
             "{source}"
         );
+    }
+}
+
+/// Without eval nothing resolves `arguments` at runtime: a module owner's own
+/// reference reads its private implicit binding, never a named record or the
+/// global environment, and keeps no cell unless an arrow child captures it.
+#[test]
+fn module_owner_arguments_read_its_own_private_binding() {
+    for source in [
+        "export function read() { return arguments; }",
+        "export function read(value) { value = 9; return arguments; }",
+        "export function read() { var inner = function () { return arguments; }; return arguments; }",
+    ] {
+        let program = lower_module(source);
+        assert!(program.is_wasm_supported(), "{source}: {:?}", program.diagnostics);
+        let function = program
+            .script
+            .as_ref()
+            .unwrap()
+            .functions
+            .iter()
+            .find(|function| function.name == "read")
+            .unwrap();
+        let value = function_return(function).expect("source return");
+        assert!(matches!(value.expr, ExprIr::Arguments), "{source}: {value:?}");
+        assert!(
+            function
+                .owned_env_bindings
+                .iter()
+                .all(|binding| binding.name != LEXICAL_ARGUMENTS_NAME),
+            "{source}: {function:?}"
+        );
+        assert!(function.eval_environment.is_none(), "{source}: {function:?}");
     }
 }
 
@@ -659,7 +691,6 @@ fn module_owned_cells_exclude_eval_non_simple_parameters_and_arguments() {
         "export function read({cell}, ...rest) { return cell; }",
         "export function read({cell}, other = 0) { return cell; }",
         "export function read({cell}) { eval(''); return cell; }",
-        "export function read() { return arguments; }",
         "export function read($arguments) { return $arguments; }",
     ] {
         let program = lower_module(source);
@@ -748,13 +779,12 @@ fn module_private_locals_do_not_inherit_arguments_storage_requirements() {
                 .captured_bindings
                 .iter()
                 .all(|binding| binding.name != *storage));
-            assert_eq!(
+            assert!(
                 function
                     .owned_env_bindings
                     .iter()
-                    .any(|binding| binding.name == LEXICAL_ARGUMENTS_NAME),
-                name == "snapshot",
-                "retain the arguments cell exactly when this owner observes it: {function:?}"
+                    .all(|binding| binding.name != LEXICAL_ARGUMENTS_NAME),
+                "an owner's own observation keeps its arguments private: {function:?}"
             );
             if name != "parameter" {
                 assert_eq!(value.kind, ValueKind::Number);
@@ -842,10 +872,10 @@ fn module_synthetic_cell_capture_discovery_keeps_real_context_and_adjusts_hops()
 
 #[test]
 fn module_synthetic_cell_pruning_retains_arguments_observers_and_dynamic_owners() {
+    // Own and nested-function observations keep private storage; see
+    // module_owner_arguments_read_its_own_private_binding. Captures, the
+    // private spelling and dynamic owners retain the cell.
     for source in [
-        "export function read() { return arguments; }",
-        "export function read() { return {arguments}; }",
-        "export function read() { return function() { return arguments; }; }",
         "export function read() { return () => arguments; }",
         "export function read($arguments) { return $arguments; }",
         "export function read() { return eval('arguments'); }",

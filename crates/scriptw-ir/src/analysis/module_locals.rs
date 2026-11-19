@@ -269,25 +269,23 @@ impl AnalysisBuilder<'_> {
 
     /// Actual eval and dynamic binding creation have already been excluded.
     /// Strict arguments snapshot the incoming list rather than alias parameters.
-    /// Keep observed arguments, lexical/function/self storage and all actual
-    /// captures. Ordinary this/new.target reads already use body-entry values;
-    /// only a real child capture requires their synthetic environment cells.
+    /// Keep lexical/function/self storage and all actual captures. Ordinary
+    /// this/new.target reads already use body-entry values; only a real child
+    /// capture requires their synthetic environment cells.
+    ///
+    /// The implicit arguments binding is a candidate too, observed or not:
+    /// without eval nothing resolves the name `arguments` at runtime, so the
+    /// owner's own references read its storage directly (lowering selects the
+    /// storage only while no environment slot holds it), and an arrow child's
+    /// reference is a real capture that still retains a slot. Only a source
+    /// spelling of the private storage name refuses it.
     pub(super) fn plan_module_local_candidates(&mut self) {
         for id in self.ordinary_module_owner_ids() {
             let function = &self.function_plans[&id];
             let owner = &self.owner_plans[&function.id];
             let activation = &self.environment_plans[&owner.activation_environment_id];
-            // Traverse children too: refusing unrelated child arguments only
-            // loses this optimization. Eval is already excluded for this set.
-            let unobserved_arguments = !self.source_identifiers.contains(LEXICAL_ARGUMENTS_NAME)
-                && function
-                    .parameters
-                    .visit_with(&mut ArgumentsReferences)
-                    .is_continue()
-                && function
-                    .body
-                    .visit_with(&mut ArgumentsReferences)
-                    .is_continue();
+            let private_arguments_storage =
+                !self.source_identifiers.contains(LEXICAL_ARGUMENTS_NAME);
             let locals = activation
                 .binding_modes
                 .iter()
@@ -298,7 +296,7 @@ impl AnalysisBuilder<'_> {
                         return (!self.source_identifiers.contains(name)).then(|| name.clone());
                     }
                     if name == LEXICAL_ARGUMENTS_NAME {
-                        return unobserved_arguments.then(|| name.clone());
+                        return private_arguments_storage.then(|| name.clone());
                     }
                     if matches!(name.as_str(), "arguments" | LEXICAL_HOME_OBJECT_NAME) {
                         return None;
@@ -313,21 +311,5 @@ impl AnalysisBuilder<'_> {
             self.module_local_candidates
                 .insert(function.id.clone(), locals);
         }
-    }
-}
-
-struct ArgumentsReferences;
-
-impl<'ast> Visitor<'ast> for ArgumentsReferences {
-    type BreakTy = ();
-
-    fn visit_identifier(
-        &mut self,
-        identifier: &'ast boa_ast::expression::Identifier,
-    ) -> ControlFlow<()> {
-        if identifier.sym() == boa_interner::Sym::ARGUMENTS {
-            return ControlFlow::Break(());
-        }
-        ControlFlow::Continue(())
     }
 }

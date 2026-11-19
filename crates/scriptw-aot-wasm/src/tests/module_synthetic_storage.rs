@@ -86,8 +86,11 @@ fn observed_and_arrow_captured_module_context_keeps_real_cells() {
         "export function make() { return arguments[0]; }",
         "make",
         |counts| {
-            assert_eq!(counts[0], 1, "only observed arguments needs a BindingCell");
-            assert_eq!(counts[1], 1, "its activation record remains");
+            assert_eq!(
+                counts,
+                [0; 6],
+                "an owner's own observation keeps its arguments binding private"
+            );
         },
     );
     with_storage_counts(
