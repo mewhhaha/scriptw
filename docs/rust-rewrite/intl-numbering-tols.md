@@ -17,7 +17,7 @@ and [actual aliases](https://github.com/unicode-org/cldr/blob/acd6d88ae493633240
 defines U+11DE0–U+11DE9 as decimal numbers with values zero through nine.
 The complete four primary files have fixed SHA-256 pins; the shared generator
 constructor checks every source and the closed one-system/six-alias recipe.
-Unicode data retains its [Unicode licence](../../../crates/scriptw-intl/data/datetime-cldr-47/LICENSE).
+Unicode data retains its [Unicode licence](../../crates/scriptw-intl/data/datetime-cldr-47/LICENSE).
 
 NumberFormat appends only those ten genuine `Nd` points to its baseline Unicode16
 spacing properties before evaluating the existing CLDR UnicodeSet rules.

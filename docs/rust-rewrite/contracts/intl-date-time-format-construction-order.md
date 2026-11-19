@@ -78,7 +78,6 @@ This slice is closed over eight files:
 - `crates/scriptw-aot-wasm/src/builtins/intl_datetimeformat.rs`;
 - `crates/scriptw-aot-wasm/src/builtins/intl_datetimeformat/construction_lifecycle.rs`;
 - `crates/scriptw-aot-wasm/src/functions.rs`;
-- `crates/scriptw-aot-wasm/tests/intl_date_time_format_construction_order_structure.rs`;
 - `crates/scriptw-cli/tests/fixtures/wasm_intl_date_time_format_construction_order.js`;
 - `crates/scriptw-cli/tests/cli/intl.rs`;
 - this contract; and

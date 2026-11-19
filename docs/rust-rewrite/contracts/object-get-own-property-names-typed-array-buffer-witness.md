@@ -63,8 +63,8 @@ view changes only that numeric prefix; it does not hide ordinary String keys.
 
 ## Durable evidence
 
-`crates/scriptw-aot-wasm/tests/object_get_own_property_names_typed_array_witness_structure.rs`
-bounds the owner at the following `Object.getOwnPropertySymbols` compiler. It
+The structure test `object_get_own_property_names_typed_array_witness_structure.rs`, no longer in the tree,
+bounded the owner at the following `Object.getOwnPropertySymbols` compiler. It
 requires the unique standard-builtin dispatch edge, one private-state load, one
 immutable view and one `ArrayLikeLengthSnapshot` witness, fixes brand-check and
 Proxy-dispatch order, and rejects raw validators, direct view/backing-store

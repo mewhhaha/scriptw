@@ -100,7 +100,7 @@ to complete elements before publishing the bound.
 
 ## Durable structural guard
 
-`crates/scriptw-aot-wasm/tests/atomics_typed_array_witness_structure.rs` bounds
+The structure test `atomics_typed_array_witness_structure.rs`, no longer in the tree, bounded
 only the four owner bodies above. For each it requires one private-state load,
 one immutable view, one `ValidatedMethodEntry` witness, one retained data
 pointer snapshot and one separate element-kind load. It rejects the legacy

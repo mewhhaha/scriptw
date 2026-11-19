@@ -108,8 +108,8 @@ revalidation.
 
 ## Durable source guard
 
-`crates/scriptw-aot-wasm/tests/typed_array_copy_within_witness_structure.rs`
-bounds only the body from
+The structure test `typed_array_copy_within_witness_structure.rs`, no longer in the tree,
+bounded only the body from
 `compile_typed_array_prototype_copy_within_builtin` to
 `compile_typed_array_prototype_to_reversed_builtin`, plus its dispatcher arm.
 It must require:

@@ -1312,7 +1312,7 @@ and golden-capture rungs and were not run by this stage.
 
 T24 closes the consumer-side gap formerly recorded as R4.
 
-- `crates/scriptw-aot-wasm/src/module/error_prototype_location.rs` defines one private
+- `error_prototype_location.rs` (no longer in the tree) defined one private
   `ErrorPrototypeLocation { global_index, realm_offset }`. One exhaustive
   `match NativeErrorKind`, with no catch-all, assigns both values together.
   `error_prototype_global_index` and `error_realm_prototype_offset` are total

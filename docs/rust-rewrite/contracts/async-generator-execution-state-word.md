@@ -175,8 +175,8 @@ fallthrough.
 
 ## Durable source witness
 
-`crates/scriptw-aot-wasm/tests/async_generator_execution_state_structure.rs`
-pins:
+The structure test `async_generator_execution_state_structure.rs`, no longer in the tree,
+pinned:
 
 - exactly five variants, one `ALL` list and one exhaustive stable projection;
 - absence of the retired state constants and suspended-await variant;

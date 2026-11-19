@@ -255,9 +255,9 @@ cache across emitted calls.
 
 ## Durable structural witness
 
-Add
-`crates/scriptw-aot-wasm/tests/async_generator_request_completion_kind_structure.rs`
-as a bounded source guard over `heap.rs`, `standard.rs` and `promise.rs`. It
+A structure test
+`async_generator_request_completion_kind_structure.rs` (not in the tree) was
+planned as a bounded source guard over `heap.rs`, `standard.rs` and `promise.rs`. It
 should require:
 
 - exactly the Normal, Return and Throw variants;

@@ -118,7 +118,7 @@ traps in the strict loader before any of those routes can observe it.
 
 ## Durable source witness
 
-`crates/scriptw-aot-wasm/tests/async_generator_body_status_structure.rs` pins:
+The structure test `async_generator_body_status_structure.rs`, no longer in the tree, pinned:
 
 - the exact six variants, one complete `ALL` list and exhaustive stable words;
 - absence of the retired raw constants and unchecked conversions;

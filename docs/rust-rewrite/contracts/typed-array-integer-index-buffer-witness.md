@@ -79,8 +79,8 @@ caller's return value beyond the validity bit.
 
 ## Durable structural guard
 
-`crates/scriptw-aot-wasm/tests/typed_array_integer_index_witness_structure.rs`
-bounds only `emit_typed_array_valid_integer_index_i32`. It requires one
+The structure test `typed_array_integer_index_witness_structure.rs`, no longer in the tree,
+bounded only `emit_typed_array_valid_integer_index_i32`. It requires one
 private-state load, one immutable view, one live witness and one
 `IntegerIndexedProperty` projection. It pins the four early numeric exits,
 their order before the index conversion and witness, the one false

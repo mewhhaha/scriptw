@@ -39,12 +39,13 @@ Test262 host capability. It closes intrinsic identity, descriptors,
 constructor prototype fallback, and defining-Realm TypeError ownership. It
 does not implement collection-driven cleanup.
 
-The entry-Realm algorithm owners remain
-`crates/scriptw-aot-wasm/src/builtins/finalization_registry.rs` and
-`crates/scriptw-aot-wasm/src/intrinsics/collections.rs`. Created-Realm ownership
-lives in the private
-`crates/scriptw-aot-wasm/src/builtins/host/created_realm_finalization_registry_intrinsics.rs`
-child.
+The entry-Realm algorithm owners are now
+`crates/scriptw-aot-wasm/src/builtins/weak/finalization.rs` and the intrinsic
+property layouts in `crates/scriptw-aot-wasm/src/intrinsics/property_layouts/eager.rs`.
+The private created-Realm child
+`created_realm_finalization_registry_intrinsics.rs` and its
+`CreatedRealmFinalizationRegistryIntrinsics` token described below are no
+longer in the tree.
 
 ## Publication lifecycle
 
@@ -94,8 +95,8 @@ Realm-local `%FinalizationRegistry.prototype%`.
 ## Evidence
 
 The bounded source test
-`crates/scriptw-aot-wasm/tests/created_realm_finalization_registry_publication_structure.rs`
-pins the private one-shot token, Realm-slot write, exact callable ownership,
+`created_realm_finalization_registry_publication_structure.rs`, no longer in
+the tree, pinned the private one-shot token, Realm-slot write, exact callable ownership,
 constructor-first own-key order, descriptor installation, global-allocation
 boundary, and reverse materialize/publish ordering. It passes `7/7`.
 

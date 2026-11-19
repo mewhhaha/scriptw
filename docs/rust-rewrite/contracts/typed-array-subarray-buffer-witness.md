@@ -150,7 +150,7 @@ buffer.
 
 ## Durable structural and runtime evidence
 
-`crates/scriptw-aot-wasm/tests/typed_array_subarray_witness_structure.rs` bounds
+The structure test `typed_array_subarray_witness_structure.rs`, no longer in the tree, bounded
 only the `TypedArrayPrototypeSubarray` arm through the following `DateNow` arm.
 It requires one private-state load, one immutable view and one
 `ArrayLikeLengthSnapshot` witness, plus one separate result private-state load,

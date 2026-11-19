@@ -251,8 +251,8 @@ across emitted calls.
 
 ## Durable structural witness
 
-`crates/scriptw-aot-wasm/tests/generator_state_word_structure.rs` should be a
-source-bounded guard over `heap.rs`, `functions.rs`, and
+A structure test `generator_state_word_structure.rs` (not in the tree) was to
+be a source-bounded guard over `heap.rs`, `functions.rs`, and
 `builtins/standard.rs`. It should require:
 
 - exactly the four enum variants, `GeneratorState::ALL`, the stable

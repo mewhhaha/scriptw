@@ -91,7 +91,7 @@ source and executable identities to the compiler-identity and Wasmtime child
 outputs. A new label cannot turn old measurements into evidence for new code.
 
 Each admitted report has a deterministic archive at
-`docs/rust-rewrite/performance-history/REPORT_SHA256.tar.gz`. It contains the
+`docs/rust-rewrite/performance-history/<report SHA-256>.tar.gz`. It contains the
 exact `report.json` and every retained log, workload file and P Wasm file
 (80 retained files for each seeded seven-sample report).
 R is not added: it was not part of the original report's retained-file plan.

@@ -199,8 +199,8 @@ cargo test -p scriptw-cli --test cli iterator::run_wasm_backend_preserves_direct
 ./target/debug/scriptw --jobs 1 test262 run built-ins/Proxy/apply/call-parameters.js --suite-root test262/vendor/test262 --execution-backend wasm-aot --timeout-ms 180000 --threads 1
 ```
 
-The source-structure target is
-`crates/scriptw-aot-wasm/tests/direct_sync_for_of_protocol_error_realm_structure.rs`.
+The source-structure target was
+`direct_sync_for_of_protocol_error_realm_structure.rs`; it is not in the tree.
 Its intended checks are
 `direct_for_of_owners_project_five_typed_protocol_errors`,
 `async_disposable_for_of_boxes_primitives_in_the_current_function_realm`,

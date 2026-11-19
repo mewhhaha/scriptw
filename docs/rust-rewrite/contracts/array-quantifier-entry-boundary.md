@@ -92,9 +92,9 @@ witnesses.
 
 ## Durable regression
 
-`crates/scriptw-aot-wasm/tests/typed_array_quantifier_family_witness_structure.rs`
-bounds the generic `every` body through `some` and the generic `some` body
-through `filter`. Its entry-family regression requires:
+The structure test `typed_array_quantifier_family_witness_structure.rs`, no longer in the tree,
+bounded the generic `every` body through `some` and the generic `some` body
+through `filter`. Its entry-family regression required:
 
 - no policy Boolean, dead brand local, strict receiver diagnostic or
   `ValidatedMethodEntry` in either generic body;

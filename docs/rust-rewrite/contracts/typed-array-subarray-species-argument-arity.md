@@ -85,8 +85,8 @@ protocol.
 
 ## Durable focused evidence
 
-The existing
-`crates/scriptw-aot-wasm/tests/typed_array_subarray_witness_structure.rs` guard is
+The structure test
+`typed_array_subarray_witness_structure.rs`, no longer in the tree, was
 the bounded source owner. It requires:
 
 - one two-entry and one three-entry `emit_pre_evaluated_arg_vector` call in the

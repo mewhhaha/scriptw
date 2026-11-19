@@ -119,7 +119,7 @@ Every other Rust product source must remain zero for all nine operations.
 
 ## Durable witness
 
-`crates/scriptw-aot-wasm/tests/generator_resume_kind_structure.rs` pins:
+The structure test `generator_resume_kind_structure.rs`, no longer in the tree, pinned:
 
 - the exact three variants, ordered `ALL` list and exhaustive stable words;
 - absence of the retired integer tokens and integer conversions;

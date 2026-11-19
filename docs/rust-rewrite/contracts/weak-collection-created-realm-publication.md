@@ -43,12 +43,12 @@ closes intrinsic identity, exact descriptors, prototype-key order,
 constructor-prototype fallback and defining-Realm TypeError ownership. It does
 not make the collector's weak and ephemeron metadata executable.
 
-The entry-Realm algorithms remain in
-`crates/scriptw-aot-wasm/src/builtins/collections.rs`, and their entry-Realm
-properties remain in `crates/scriptw-aot-wasm/src/intrinsics/collections.rs`.
-Created-Realm ownership lives in the private
-`crates/scriptw-aot-wasm/src/builtins/host/created_realm_weak_collection_intrinsics.rs`
-child.
+The entry-Realm algorithms are now in
+`crates/scriptw-aot-wasm/src/builtins/weak/collections.rs`, and their entry-Realm
+properties in `crates/scriptw-aot-wasm/src/intrinsics/property_layouts/eager.rs`.
+The private created-Realm child
+`created_realm_weak_collection_intrinsics.rs` and the publication token
+described below are no longer in the tree.
 
 ## Publication lifecycle
 

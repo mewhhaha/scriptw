@@ -142,7 +142,7 @@ from leaking back into the five-value activation field.
 
 ## Durable source witness
 
-`crates/scriptw-aot-wasm/tests/async_generator_resume_kind_structure.rs` pins:
+The structure test `async_generator_resume_kind_structure.rs`, no longer in the tree, pinned:
 
 - exactly five variants, one complete `ALL` list and an exhaustive stable word
   projection;

@@ -37,16 +37,15 @@ realms created by the Test262 host capability. It closes the missing intrinsic
 surface needed to exercise the existing constructor prototype fallback and
 current-function-Realm TypeErrors. It does not implement weak reachability.
 
-The entry-Realm algorithm owners remain:
+The entry-Realm algorithm owners are now:
 
-- `crates/scriptw-aot-wasm/src/builtins/weak_ref.rs` for construction, `deref`,
-  branding and errors; and
-- `crates/scriptw-aot-wasm/src/intrinsics/collections.rs` for the entry-Realm
-  `deref` and `@@toStringTag` properties.
+- `crates/scriptw-aot-wasm/src/builtins/weak/references.rs` for construction,
+  `deref`, branding and errors; and
+- `crates/scriptw-aot-wasm/src/intrinsics/property_layouts/eager.rs` for the
+  entry-Realm `deref` and `@@toStringTag` properties.
 
-Created-Realm materialization and publication are owned by the private
-`crates/scriptw-aot-wasm/src/builtins/host/created_realm_weak_ref_intrinsics.rs`
-child. The parent host bootstrap retains only the inferred producer/consumer
+The private created-Realm child `created_realm_weak_ref_intrinsics.rs` and the
+publication token described below are no longer in the tree. The parent host bootstrap retains only the inferred producer/consumer
 call pair.
 
 ## Publication lifecycle
@@ -103,9 +102,9 @@ created Realm's populated WeakRef slot for primitive foreign
 
 ## Evidence
 
-The bounded source test is
-`crates/scriptw-aot-wasm/tests/created_realm_weak_ref_publication_structure.rs`.
-It pins the private token lifecycle, the required Realm slot, both self-backed
+The bounded source test was
+`created_realm_weak_ref_publication_structure.rs`; it is no longer in the tree.
+It pinned the private token lifecycle, the required Realm slot, both self-backed
 callables, constructor-first own-key order, the exact descriptors, the existing
 constructor fallback and the current-function-Realm error routes.
 
