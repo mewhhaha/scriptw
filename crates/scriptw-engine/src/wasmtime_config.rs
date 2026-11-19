@@ -4,7 +4,7 @@
 use crate::wasmtime_policy::PRODUCT_WASMTIME_POLICY;
 use wasmtime::{Config, ModuleVersionStrategy, OptLevel, RegallocAlgorithm, WasmBacktraceDetails};
 
-pub(crate) const CONFIGURATION_SCHEMA: u32 = 6;
+pub(crate) const CONFIGURATION_SCHEMA: u32 = 7;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum WasmNativeCompilationMode {
@@ -29,14 +29,17 @@ pub(crate) const WASM_MAX_STACK_SIZE: usize = 32 * 1024 * 1024;
 pub(crate) const ENGINE_WORKER_STACK_SIZE: usize = 64 * 1024 * 1024;
 const _: () = assert!(WASM_MAX_STACK_SIZE > 0 && WASM_MAX_STACK_SIZE < ENGINE_WORKER_STACK_SIZE);
 
-/// Existing per-store cap and linear-memory reservation; embedding changes neither.
+/// Per-Store cap on each memory and the GC heap (`StoreLimits`, a pool's
+/// `max_memory_size`); embedding does not change it.
 pub(crate) const WASM_STORE_MEMORY_CAP_BYTES: usize = 1024 * 1024 * 1024;
-const WASM_LINEAR_MEMORY_GUARD_BYTES: u64 = 32 * 1024 * 1024;
-// The copying collector divides this space into two semi-spaces. Start with
-// enough room for ordinary bootstrap and short-lived argument/descriptor
-// records, rather than repeatedly copying their live graph while growing from
-// zero. Pages remain committed on demand; the existing Store limit and the
-// collector's normal growth and forced-collection paths still apply.
+/// Reservation of every linear memory and the GC heap: equal, as a Store pool
+/// requires, and at least the cap, so nothing moves.
+pub(crate) const WASM_HEAP_RESERVATION_BYTES: u64 = 1 << 32;
+const _: () = assert!(WASM_HEAP_RESERVATION_BYTES >= WASM_STORE_MEMORY_CAP_BYTES as u64);
+pub(crate) const WASM_LINEAR_MEMORY_GUARD_BYTES: u64 = 32 * 1024 * 1024;
+// Semi-spaces with room for bootstrap and short-lived records, rather than
+// copying their live graph while growing from zero. Pages commit on demand;
+// the Store limit and the collector's growth and collection paths still apply.
 pub(crate) const WASM_GC_HEAP_INITIAL_BYTES: usize = 16 * 1024 * 1024;
 const _: () = assert!(WASM_GC_HEAP_INITIAL_BYTES < WASM_STORE_MEMORY_CAP_BYTES);
 
@@ -53,21 +56,19 @@ pub(crate) fn base_config(
     });
     config.cranelift_regalloc_algorithm(RegallocAlgorithm::SinglePass);
     config.gc_heap_initial_size(WASM_GC_HEAP_INITIAL_BYTES as u64);
-    // Cover the complete 32-bit reference range with reserved address space.
-    // Wasmtime can use its protected pages instead of per-field heap checks.
-    // Initial accessible memory and the per-memory Store limit stay separate.
-    config.gc_heap_reservation(1_u64 << 32);
+    // Cover the 32-bit reference range: protected pages replace heap checks.
+    config.gc_heap_reservation(WASM_HEAP_RESERVATION_BYTES);
     config.gc_heap_guard_size(WASM_LINEAR_MEMORY_GUARD_BYTES);
     config.gc_heap_reservation_for_growth(0);
     config.gc_heap_may_move(false);
     config.max_wasm_stack(WASM_MAX_STACK_SIZE);
     config.async_stack_size(ENGINE_WORKER_STACK_SIZE);
-    // Shared memories cannot relocate. Their reservation covers the existing
-    // StoreLimits cap; ordinary memories retain the same growth/guard policy.
-    config.memory_reservation(WASM_STORE_MEMORY_CAP_BYTES as u64);
+    // Equal to the GC heap's in every Engine (`pooled_stores`), so one native
+    // image serves pooled and on-demand Engines. Shared memories ignore
+    // StoreLimits; Scriptw's import declares the 1 GiB maximum.
+    config.memory_reservation(WASM_HEAP_RESERVATION_BYTES);
     config.memory_reservation_for_growth(0);
-    // The reservation is the whole Store limit, so growth never needs to
-    // relocate. Saying so lets a deadline publish a memory's range.
+    // Growth never relocates; saying so lets a deadline publish the range.
     config.memory_may_move(false);
     config.memory_guard_size(WASM_LINEAR_MEMORY_GUARD_BYTES);
     config.guard_before_linear_memory(true);

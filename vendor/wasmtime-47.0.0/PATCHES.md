@@ -264,6 +264,42 @@ keeps those bytes faulting
   count the guard out of a semi-space, and `tests/interrupt_handle.rs` tells a
   null access and a request apart.
 
+## Pooled GC heaps
+
+A pooled Engine takes GC heaps from its memory pool, and the pool hands a
+returned slot to the next Store with its dirty pages kept resident. The null
+guard above must hold on such a slot too.
+
+- `src/runtime/vm/memory.rs`: `Memory::set_prefix_access` protects the first
+  pages of a memory whose `MemoryImageSlot` maps no copy-on-write image,
+  which is every pooled GC heap; it used to report that it could not, so a
+  pooled Engine failed at its first GC heap. The slot records only that its
+  first `accessible` bytes are read-write and never touches the prefix while
+  the memory is in use. Its reset writes from offset 0, so the caller must
+  restore the prefix before deallocation (a slot with a copy-on-write image
+  still reports that it cannot).
+- `src/runtime/vm/gc/enabled/copying.rs`: `detach` restores the guard before
+  the Store returns the memory, and asserts that the restore happened, so
+  neither the pool's reset nor the slot's next owner (another heap or a
+  linear memory) finds it inaccessible. `attach` clears the protected flag:
+  a pooled heap object is reused with a memory that arrives accessible from
+  offset 0, and its own guard is then protected again by
+  `protect_null_guard`. `StoreOpaque::drop` already retires the Store's
+  interrupt state, restoring any access a request removed, before
+  `detach`.
+- `src/config.rs`: `PoolingAllocationConfig::total_stacks` no longer requires
+  the `async` feature (without it there is no stack pool and the setting has
+  no effect). The product enables no `async`, but a host that links
+  `wasmtime-wasi` does through feature unification, and the default of
+  1,000 64-MiB fiber stacks would map 64 GiB and protect 1,000 guard pages at
+  every Engine creation.
+- Tests: the engine's `aot_gc_pooled_stores` (a null access traps on each
+  reused slot and after a collection; an interrupted Store and one dropped
+  with a request pending hand the next Store an accessible heap with its
+  guard and working interrupts; Store limits cap a pooled heap; a reused slot
+  starts zeroed; a full pool refuses a Store until one is dropped) and the
+  embedding test that reports a full pool as a typed error.
+
 ## Global roots
 
 `src/runtime/store/gc.rs`: a collection traces an instance's globals from

@@ -514,12 +514,18 @@ fn process_virtual_memory_bytes() -> u64 {
 
 #[cfg(all(target_os = "linux", target_pointer_width = "64"))]
 #[test]
-fn three_live_wasm_stores_reserve_less_than_four_gibibytes() {
+fn three_live_wasm_stores_reserve_only_their_memory_reservations() {
     const EXPORTED_MEMORY_WASM: &[u8] = &[
         0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x05, 0x03, 0x01, 0x00, 0x01, 0x07, 0x0a,
         0x01, 0x06, 0x6d, 0x65, 0x6d, 0x6f, 0x72, 0x79, 0x02, 0x00,
     ];
-    const MAXIMUM_ADDITIONAL_VIRTUAL_MEMORY_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+    // Each memory reserves the configured 4 GiB (the GC heap's reservation,
+    // so a Store pool can serve both) and its guards, never Wasmtime's
+    // default 8 GiB with a 2 GiB guard; 256 MiB covers the rest.
+    const MAXIMUM_ADDITIONAL_VIRTUAL_MEMORY_BYTES: u64 = 3
+        * (crate::wasmtime_config::WASM_HEAP_RESERVATION_BYTES
+            + 2 * crate::wasmtime_config::WASM_LINEAR_MEMORY_GUARD_BYTES)
+        + 256 * 1024 * 1024;
 
     let engines = [
         (
@@ -562,8 +568,11 @@ fn three_live_wasm_stores_reserve_less_than_four_gibibytes() {
 fn shared_memory_reaches_but_cannot_exceed_the_one_gibibyte_cap() {
     const EXPORTED_SHARED_MEMORY_WASM: &[u8] = &[
         0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x05, 0x06, 0x01, 0x03, 0x01, 0x80, 0x80,
-        0x04, 0x07, 0x0a, 0x01, 0x06, 0x6d, 0x65, 0x6d, 0x6f, 0x72, 0x79, 0x02, 0x00,
+        0x01, 0x07, 0x0a, 0x01, 0x06, 0x6d, 0x65, 0x6d, 0x6f, 0x72, 0x79, 0x02, 0x00,
     ];
+    // A shared memory ignores Store limits, and its 4 GiB reservation no
+    // longer stops it at 1 GiB. Like Scriptw's own shared-memory import, the
+    // probe declares the 1 GiB maximum (16,384 pages), which caps it.
     const WASM_PAGE_BYTES: usize = 64 * 1024;
     const ONE_GIBIBYTE_PAGES: u64 = 16_384;
 

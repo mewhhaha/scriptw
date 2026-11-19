@@ -47,4 +47,5 @@ mod aot_gc_value_backing_transitions;
 
 mod aot_gc_eager_accessors;
 
+mod aot_gc_pooled_stores;
 mod aot_gc_virtual_reservation;

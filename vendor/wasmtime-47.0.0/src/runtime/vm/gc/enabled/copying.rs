@@ -1162,6 +1162,11 @@ unsafe impl GcHeap for CopyingHeap {
         assert!(!memory.is_shared_memory());
         self.vmmemory = Some(memory.vmmemory());
         self.memory = Some(memory);
+        // A pooled heap object is reused with another slot or Store. Its
+        // memory arrives accessible from offset 0 (the previous owner's
+        // `detach` restored the guard; a fresh slot never had one), so the
+        // guard is not protected until `protect_null_guard` runs for it.
+        self.null_guard_protected = false;
         self.initialize_semi_spaces();
 
         if cfg!(gc_zeal) {
@@ -1184,13 +1189,18 @@ unsafe impl GcHeap for CopyingHeap {
         // The next Store publishes its own table.
         self.vmctx_data.set_func_refs(crate::vm::FuncRefTableView::unpublished());
 
-        // The memory's next owner (e.g. a pooling allocator resetting it) may
-        // access every byte again.
+        // The memory's next owner may access every byte again: a pooling
+        // allocator resets a returned slot from offset 0 and may hand it to
+        // another Store's heap or linear memory. Nothing may reach the
+        // deallocation with the guard still inaccessible.
         if self.null_guard_protected {
             let len = usize::try_from(self.null_guard).unwrap();
             // SAFETY: restoring access cannot invalidate any reference.
             let restored = unsafe { self.memory.as_mut().unwrap().set_prefix_access(len, true) };
-            restored.expect("restoring access to the GC heap's null guard");
+            assert!(
+                matches!(restored, Ok(true)),
+                "restoring access to the GC heap's null guard: {restored:?}"
+            );
             self.null_guard_protected = false;
         }
 

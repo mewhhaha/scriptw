@@ -4257,8 +4257,10 @@ impl PoolingAllocationConfig {
     /// execution, when enabled (default is `1000`).
     ///
     /// This value has a direct impact on the amount of memory allocated by the
-    /// pooling instance allocator.
-    #[cfg(feature = "async")]
+    /// pooling instance allocator. Without the `async` feature no stack pool
+    /// exists and this setting has no effect; it is available anyway so that a
+    /// crate can bound the pool whether or not another crate in its build
+    /// enables `async`.
     pub fn total_stacks(&mut self, count: u32) -> &mut Self {
         self.limits.total_stacks = count;
         self

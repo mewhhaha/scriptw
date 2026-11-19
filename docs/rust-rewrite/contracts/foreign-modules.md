@@ -191,6 +191,35 @@ the numerical `.code`. Ordinary host errors and Wasm traps remain fatal traps;
 they are not converted into successful results or catchable operation errors.
 Without the tag declaration, no expected-error tag is imported or registered.
 
+## Pooled stores
+
+An embedder that creates a fresh Store per request can make its Engine take
+GC heaps from a pool: `configure_pooled_stores(&mut config, &pool)` after
+`configure_wasm_runtime` or `configure_precompiled_wasm_runtime`, which replace
+the whole configuration. `PooledStores::new(max_concurrent, keep_resident_bytes)`
+validates the policy once: 1 to 1,024 concurrent Stores, and up to 16 MiB (the
+GC heap's initial size, in 64 KiB units) of each returned heap's dirty pages
+kept resident and zeroed for the next Store; `PooledStores::sequential()` is
+one Store at a time keeping 16 MiB. Pooling is off unless configured. Each first
+touch of an on-demand heap page faults (about 1–1.4 µs on the measured host),
+so a pooled heap removes most of a short entry's faults; see the
+[measurements](../benchmarks.md#pooled-gc-heaps-2026-11-19).
+
+The call returns how the host resets a heap. With Linux's `PAGEMAP_SCAN` (6.7
+and later) only dirty pages are zeroed (`KeepDirtyPagesResident`). Without it,
+keeping 16 MiB would zero all of it at every drop, so the pool releases every
+page instead (`ReleaseAll`) and only reuses mappings. Creating a Store beyond
+the pool's capacity fails at `instantiate` with an error whose
+`is_store_pool_exhausted()` is true; nothing falls back to on-demand
+allocation, and dropping a Store frees its slot. At most `max_concurrent ×
+keep_resident_bytes` stay resident, and each concurrent Store reserves about
+12 GiB of address space while the Engine lives. Store limits, the null guard
+and [execution deadlines](execution-deadlines.md) apply unchanged on a reused
+heap. Scriptw state, Realms and host data are never pooled; only Wasmtime's
+heap memory is. Scriptw's own `run`, Test262 workers and retained hosts use
+on-demand allocation; the precompiled panel consumers use
+`PooledStores::sequential()`.
+
 ## Lossless string and byte transfer
 
 `ForeignValueType::StringUtf16` accepts primitive JavaScript strings and transfers

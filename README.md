@@ -134,6 +134,11 @@ Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and t
   removes access to the Store's GC heap and private linear memory, and the fault
   stops the code; this needs Unix signal handling and is exercised on Linux
   x86-64 ([contract](docs/rust-rewrite/contracts/execution-deadlines.md)).
+- **Pooled panel hosts:** from 2026-11-19 the precompiled panel consumers reuse
+  one kept-resident GC heap across fresh Stores, which cut those entries by
+  26–48%; panels dated earlier mapped a fresh heap per Store
+  ([measurements](docs/rust-rewrite/benchmarks.md#pooled-gc-heaps-2026-11-19)).
+  Embedders opt in with `configure_pooled_stores`.
 - **Runtime ABI 82:** rebuild Portable bundles and native images built under an
   earlier ABI ([details](docs/rust-rewrite/runtime-requirements.md#runtime-abi)).
 

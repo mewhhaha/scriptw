@@ -166,6 +166,41 @@ fn each_native_policy_sets_its_optimization_and_allocator_and_runs_a_linked_prog
 }
 
 #[test]
+fn a_full_store_pool_is_a_typed_error_and_a_dropped_store_frees_its_slot() {
+    let artifact = artifact(
+        "import {add} from 'dd:host'; print(add(20,22));",
+        registry(false),
+    );
+    let mut config = WasmtimeConfig::new();
+    configure_wasm_runtime(&mut config, NativeCompilationPolicy::Fast);
+    crate::configure_pooled_stores(&mut config, &crate::PooledStores::sequential());
+    let engine = WasmtimeEngine::new(&config).unwrap();
+    let runtime = EmbeddedRuntime::compile(&engine, &artifact).unwrap();
+    let mut first = store(&runtime, 0.0);
+    let mut first_linker = linker(&runtime);
+    runtime.register(&mut first, &mut first_linker).unwrap();
+    let instance = runtime.instantiate(&mut first, &mut first_linker).unwrap();
+    let mut second = store(&runtime, 0.0);
+    let mut second_linker = linker(&runtime);
+    runtime.register(&mut second, &mut second_linker).unwrap();
+    let error = runtime
+        .instantiate(&mut second, &mut second_linker)
+        .err()
+        .expect("a one-Store pool serves no second Store");
+    assert!(error.is_store_pool_exhausted(), "{error}");
+    drop((second_linker, second));
+    assert_output(instance.evaluate(&mut first).unwrap(), "42");
+    drop((first_linker, first));
+    for _ in 0..2 {
+        let mut store = store(&runtime, 0.0);
+        let mut linker = linker(&runtime);
+        runtime.register(&mut store, &mut linker).unwrap();
+        let instance = runtime.instantiate(&mut store, &mut linker).unwrap();
+        assert_output(instance.evaluate(&mut store).unwrap(), "42");
+    }
+}
+
+#[test]
 fn ordinary_linker_numeric_functions_keep_first_class_call_and_strict_number_semantics() {
     let artifact = artifact(
         r#"

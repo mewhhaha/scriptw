@@ -66,11 +66,16 @@ pub use embedding::{
 };
 mod execution_deadline;
 mod execution_failure;
+mod pooled_stores;
 pub use embedding::{
     configure_precompiled_wasm_runtime, configure_wasm_runtime, throw_foreign_error,
     EmbeddedEvaluation, EmbeddedInstance, EmbeddedRuntime, ForeignCompleter, ForeignValue,
     JsCompletion, JsPromiseState, JsValue, JsValueKind, NativeCompilationPolicy,
     PrecompiledEmbeddedProgram, WasmStoreState,
+};
+pub use pooled_stores::{
+    configure_pooled_stores, PooledStoreReset, PooledStores, MAX_POOLED_KEEP_RESIDENT_BYTES,
+    MAX_POOLED_STORES,
 };
 mod global_script_prelude;
 mod graph_observation;
@@ -1986,6 +1991,7 @@ pub struct EngineError {
     intl_artifact_identity_error: Option<IntlArtifactIdentityError>,
     wasmtime_policy: Option<WasmtimeRuntimePolicy>,
     execution_failure: Option<EngineExecutionFailure>,
+    store_pool_exhausted: bool,
 }
 
 /// Closed pre-instantiation failures for the Wasm Intl artifact/provider
@@ -2045,6 +2051,7 @@ impl EngineError {
             intl_artifact_identity_error: None,
             wasmtime_policy: None,
             execution_failure: None,
+            store_pool_exhausted: false,
         }
     }
 
@@ -2059,6 +2066,7 @@ impl EngineError {
             intl_artifact_identity_error: None,
             wasmtime_policy: None,
             execution_failure: None,
+            store_pool_exhausted: false,
         }
     }
 
@@ -2073,6 +2081,7 @@ impl EngineError {
             intl_artifact_identity_error: None,
             wasmtime_policy: None,
             execution_failure: None,
+            store_pool_exhausted: false,
         }
     }
 
@@ -2097,6 +2106,7 @@ impl EngineError {
             intl_artifact_identity_error: None,
             wasmtime_policy: Some(err.policy),
             execution_failure: None,
+            store_pool_exhausted: false,
         }
     }
 
@@ -2111,11 +2121,26 @@ impl EngineError {
             intl_artifact_identity_error: Some(error),
             wasmtime_policy: None,
             execution_failure: None,
+            store_pool_exhausted: false,
         }
+    }
+
+    fn from_store_pool_exhaustion(message: impl Into<String>) -> Self {
+        let mut error = Self::new(message);
+        error.store_pool_exhausted = true;
+        error
     }
 
     pub fn message(&self) -> &str {
         &self.message
+    }
+
+    /// Instantiation needed a GC heap, memory or instance from an Engine's
+    /// Store pool ([`configure_pooled_stores`]) while as many Stores as the
+    /// pool serves were alive. Nothing fell back to on-demand allocation;
+    /// dropping a Store frees its slots.
+    pub const fn is_store_pool_exhausted(&self) -> bool {
+        self.store_pool_exhausted
     }
 
     /// The optional differential oracle rejected its entry in its native

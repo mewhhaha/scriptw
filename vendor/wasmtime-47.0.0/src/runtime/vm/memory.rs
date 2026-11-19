@@ -452,14 +452,26 @@ impl Memory {
     /// multiple of the host page size within `byte_size()`. Returns `false`,
     /// changing nothing, for a backing whose pages this cannot protect.
     ///
+    /// A pooled memory's slot (or an on-demand memory's copy-on-write slot)
+    /// records only that its first `accessible` bytes are read-write; it
+    /// neither reads nor changes this prefix while the memory is in use. The
+    /// slot's reset writes from offset 0, so the caller must make the prefix
+    /// accessible again before the memory is deallocated. A slot that maps a
+    /// copy-on-write image is not protected here.
+    ///
     /// # Safety
-    /// While the prefix is inaccessible, nothing may access it.
+    /// While the prefix is inaccessible, nothing may access it, and it must be
+    /// accessible again before the memory is deallocated.
     pub(crate) unsafe fn set_prefix_access(&mut self, len: usize, accessible: bool) -> Result<bool> {
         assert!(len <= self.byte_size());
         let Memory::Local(memory) = self else {
             return Ok(false);
         };
-        if memory.memory_image.is_some() {
+        if memory
+            .memory_image
+            .as_ref()
+            .is_some_and(MemoryImageSlot::has_image)
+        {
             return Ok(false);
         }
         match memory.alloc.base() {

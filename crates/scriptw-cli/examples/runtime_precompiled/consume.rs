@@ -14,16 +14,17 @@ pub(super) fn run(
 ) -> Result<Value, String> {
     run_with_config(path, expected, samples, warmups, |config| {
         scriptw_engine::configure_precompiled_wasm_runtime(config);
-        Ok(())
+        configure_store_allocation(config)
     })
 }
 
+/// `configure` sets up the consumer Engine and describes its Store allocation.
 pub(super) fn run_with_config(
     path: &Path,
     expected: &str,
     samples: &str,
     warmups: &str,
-    configure: fn(&mut wasmtime::Config) -> Result<(), String>,
+    configure: fn(&mut wasmtime::Config) -> Result<Value, String>,
 ) -> Result<Value, String> {
     let samples: usize = samples.parse().map_err(|_| "invalid sample count")?;
     let warmups: usize = warmups.parse().map_err(|_| "invalid warmup count")?;
@@ -37,7 +38,7 @@ pub(super) fn run_with_config(
     let startup = residency::snapshot()?;
     let total_started = Instant::now();
     let mut config = wasmtime::Config::new();
-    configure(&mut config)?;
+    let store_allocation = configure(&mut config)?;
     if barriers.instruction_counting()? {
         config.profiler(wasmtime::ProfilingStrategy::PerfMap);
     }
@@ -116,6 +117,9 @@ pub(super) fn run_with_config(
     report["schema"] = json!("scriptw-precompiled-execution-v1");
     report["excluded_from_scored_cohorts"] = json!(true);
     report["compiler_enabled"] = json!(compiler_enabled);
+    // A pooled Store's drop keeps its GC heap pages resident, so
+    // `after_store_drop` RSS no longer falls back to `before_store`.
+    report["store_allocation"] = store_allocation;
     report["thread_cpu_observation_policy"] = json!(benchmark_thread_cpu::POLICY);
     report["native_load_process_memory"] = native_load_process_memory;
     report["image_sha256"] = json!(image_sha256);

@@ -2616,6 +2616,40 @@ evidence archive:
 [Workflow](../../CONTRIBUTING.md#react-and-edge-benchmarks).
 <!-- application-benchmarks-details:end -->
 
+### Pooled GC heaps (2026-11-19)
+
+From this change the precompiled panel consumers (`compiler_precompiled_baseline
+execute-scriptw`, `runtime_precompiled`, `scriptw-precompiled-consumer`) take each
+fresh Store's GC heap from a one-slot pool that keeps its dirty pages resident
+(`PooledStores::sequential()`, `PAGEMAP_SCAN` reset). Panels above, measured
+2026-11-17, mapped a fresh heap per Store; the reports now carry
+`store_allocation`, and `SCRIPTW_PRECOMPILED_STORE_ALLOCATION=on-demand` restores
+the old allocation for comparison. RSS after a Store drop no longer falls back to
+its value before the Store: up to 16 MiB of heap stays resident.
+
+One host build, pooled against on-demand, alternating fresh processes on CPU 3 of
+a shared 4-vCPU VM (two blocks of eight processes each; third warm entry of each
+process, after three warmups; minor faults inside the timed entry from the
+host's phase barriers):
+
+| Fixture | Faults on-demand → pooled | Entry ms on-demand → pooled, block 1 / block 2 (median, q1–q3) | Saved |
+| --- | ---: | --- | ---: |
+| edge-router | 123 → 3 | 0.419 (0.404–0.444) → 0.258 (0.253–0.462) / 0.407 → 0.270 (0.258–0.312) | 34–38% |
+| edge-html | 553 → 7 | 2.080 (2.023–2.214) → 1.376 (1.220–1.464) / 2.067 → 1.192 (1.161–1.273) | 34–42% |
+| react-ssr | 997 → 6 | 3.238 (3.168–3.348) → 2.029 (2.012–2.112) / 3.343 → 2.096 (2.061–2.276) | 37% |
+| retained-objects | 1,383 → 1 | 4.007 (3.772–4.798) → 2.856 (2.552–3.105) / 4.782 → 3.192 (3.174–3.538) | 29–33% |
+| objects (kernel) | 33 → 1 | 0.123 (0.106–0.181) → 0.091 (0.078–0.117) / 0.167 → 0.087 (0.082–0.094) | 26–48% |
+| integer (kernel) | 16 → 1 | 0.066 (0.056–0.079) → 0.047 (0.047–0.052) / 0.069 → 0.050 (0.048–0.056) | 27–28% |
+
+Thread CPU agrees within three points. The saving is larger than the faults'
+estimated in-situ cost of 1.0–1.4 µs each; the rest is not attributed. Store setup outside the timer is 0.01–0.04 ms
+shorter; Engine creation takes 0.03 ms longer to reserve the pool. Raising
+every Engine's linear-memory reservation from 1 to 4 GiB, which the pool
+requires, changed on-demand entries by +1–6% medians with overlapping quartiles
+(eight processes each, edge-router, edge-html, react-ssr, retained-objects).
+React SSR's private-linear-memory faults (2,247 on 2026-11-17) are gone since the
+runtime RegExp compiler was removed, so its remaining faults were all GC heap.
+
 ## Compilation time
 
 

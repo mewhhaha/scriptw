@@ -126,6 +126,9 @@ def checked_observations(report, actor, case, source_sha, identity, image, node)
         result.update(context_ns=context, source_compilation_ns=value['compilation_ns'])
     else:
         result['load_phases_ns'] = report['load_phases_ns']
+        # Pooled fresh-Store hosts keep GC heap pages resident between entries.
+        if 'store_allocation' in report:
+            result['store_allocation'] = report['store_allocation']
     return result
 
 

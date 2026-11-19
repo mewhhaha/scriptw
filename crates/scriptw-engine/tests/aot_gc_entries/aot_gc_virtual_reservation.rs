@@ -16,14 +16,16 @@ fn engine() -> wasmtime::Engine {
 // The virtual-reservation policy is intended for the current 64-bit baseline.
 #[cfg(target_pointer_width = "64")]
 #[test]
-fn public_runtime_configures_gc_reservation_independently_of_linear_memory() {
+fn public_runtime_reserves_the_gc_heap_and_linear_memory_alike() {
     let engine = engine();
     assert_eq!(engine.get_gc_heap_reservation(), 1_u64 << 32);
     assert_eq!(engine.get_gc_heap_initial_size(), 16 * 1024 * 1024);
     assert_eq!(engine.get_gc_heap_guard_size(), 32 * 1024 * 1024);
     assert_eq!(engine.get_gc_heap_reservation_for_growth(), 0);
     assert!(!engine.get_gc_heap_may_move());
-    assert_eq!(engine.get_memory_reservation(), 1024 * 1024 * 1024);
+    // Equal reservations let a Store pool serve GC heaps from memory slots;
+    // StoreLimits, not the reservation, caps a memory at 1 GiB.
+    assert_eq!(engine.get_memory_reservation(), 1_u64 << 32);
     assert_eq!(engine.get_memory_guard_size(), 32 * 1024 * 1024);
     assert_eq!(engine.get_memory_reservation_for_growth(), 0);
     // A deadline watches the private linear memory, which must not relocate.

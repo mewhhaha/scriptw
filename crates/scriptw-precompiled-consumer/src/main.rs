@@ -26,7 +26,7 @@ fn run() -> Result<Value, String> {
     match (args.first().map(String::as_str), args.len()) {
         (Some("identity"), 1) => { report["schema"] = json!("scriptw-precompiled-consumer-v1"); report["adapter"] = json!("shared"); },
         (Some("execute-scriptw"), 5) => {
-            report = consume::run_with_config(Path::new(&args[1]), &args[2], &args[3], &args[4], configure_consumer)?;
+            report = consume::run_with_config(Path::new(&args[1]), &args[2], &args[3], &args[4], configure_fresh_store_consumer)?;
             report["adapter"] = json!("scriptw");
         }
         (Some("execute-wasi"), 5) => {

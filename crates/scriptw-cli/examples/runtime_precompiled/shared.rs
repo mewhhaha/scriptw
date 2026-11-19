@@ -52,6 +52,41 @@ fn configure_consumer(config: &mut wasmtime::Config) -> Result<(), String> {
     Ok(())
 }
 
+/// Opt-in A/B control for the fresh-Store consumers: `pooled` (the default)
+/// or `on-demand`. Any other value is refused, never ignored.
+const STORE_ALLOCATION_VARIABLE: &str = "SCRIPTW_PRECOMPILED_STORE_ALLOCATION";
+
+/// Fresh-Store consumers run one Store after another, so their Engine takes
+/// GC heaps from a one-slot pool that keeps the heap's dirty pages resident
+/// (`PooledStores::sequential`). Returns the report's description.
+fn configure_store_allocation(config: &mut wasmtime::Config) -> Result<Value, String> {
+    match std::env::var(STORE_ALLOCATION_VARIABLE).as_deref() {
+        Err(std::env::VarError::NotPresent) | Ok("pooled") => {
+            let pool = scriptw_engine::PooledStores::sequential();
+            let reset = match scriptw_engine::configure_pooled_stores(config, &pool) {
+                scriptw_engine::PooledStoreReset::KeepDirtyPagesResident { bytes } => {
+                    json!({"mode": "keep-dirty-pages-resident", "keep_resident_bytes": bytes})
+                }
+                scriptw_engine::PooledStoreReset::ReleaseAll => {
+                    json!({"mode": "release-all", "reason": "PAGEMAP_SCAN unavailable"})
+                }
+            };
+            Ok(json!({"strategy": "pooled", "max_concurrent_stores": pool.max_concurrent().get(),
+                "reset": reset}))
+        }
+        Ok("on-demand") => Ok(json!({"strategy": "on-demand"})),
+        Ok(other) => Err(format!(
+            "{STORE_ALLOCATION_VARIABLE} must be pooled or on-demand, not {other:?}"
+        )),
+        Err(error) => Err(format!("{STORE_ALLOCATION_VARIABLE}: {error}")),
+    }
+}
+
+fn configure_fresh_store_consumer(config: &mut wasmtime::Config) -> Result<Value, String> {
+    configure_consumer(config)?;
+    configure_store_allocation(config)
+}
+
 fn shared_configuration() -> Value {
     json!({"native_compilation_mode":"size-optimized", "register_allocation":"backtracking",
         "target":"generic", "target_triple":env!("SCRIPTW_PERF_TARGET"),

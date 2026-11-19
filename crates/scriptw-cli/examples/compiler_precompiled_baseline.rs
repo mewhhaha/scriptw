@@ -57,7 +57,7 @@ fn execute_scriptw(args: &[String]) -> Result<Value, String> {
         &args[2],
         &args[3],
         &args[4],
-        configure_consumer,
+        configure_fresh_store_consumer,
     )?;
     for row in report["observations"]
         .as_array_mut()

@@ -33,7 +33,8 @@ Each watched range is published in a fixed table of atomics before access is
 removed, so a fault always finds it, and is cleared before the Store frees the
 memory. Only memory that cannot relocate is watched: the product configuration
 sets `gc_heap_may_move(false)` and `memory_may_move(false)`, and the linear
-memory reservation already equals the Store limit.
+memory reservation (4 GiB, equal to the GC heap's) is at least the Store
+limit.
 
 The GC heap's first page is its null guard: compiled code lets an access
 through a null reference fault there instead of testing the reference. A
@@ -41,6 +42,13 @@ request never publishes, removes or restores access to that page, so a fault
 is told apart by its address: a null access traps on the null reference, as
 the explicit test it replaces did, and a pending request is delivered at the
 next watched access or entry.
+
+A [pooled Engine](foreign-modules.md#pooled-stores) hands a returned GC heap
+to the next Store. Dropping a Store retires its interrupt state, which
+restores access and clears its watched ranges, and then the heap restores its
+null guard, before the pool resets the slot. A request still pending at the
+drop is released there, so the next Store on that slot starts with its whole
+heap accessible and its own guard.
 
 ## What compiled code must do
 
@@ -103,7 +111,9 @@ retried request. Nothing faults before a deadline.
 `vendor/wasmtime-47.0.0/tests/interrupt_handle.rs` covers a GC-heap loop, a
 linear-memory loop, host code that reaches protected memory, a request made
 while idle, cancellation, Store drop, concurrent Stores and a null access next
-to a request. Engine's `aot_execution_deadlines` tests stop an empty loop, a
+to a request. Engine's `aot_gc_pooled_stores` tests interrupt a Store on a
+reused pooled slot, drop one with a request pending, and check the next Store
+on that slot. Engine's `aot_execution_deadlines` tests stop an empty loop, a
 scalar loop, recursion and a generator loop through the poll; a sparse array
 search through the GC heap; a backtracking regular expression through linear
 memory; and a builtin that calls source code on every step. They also run a script within its budget

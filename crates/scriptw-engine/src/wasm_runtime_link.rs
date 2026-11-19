@@ -422,7 +422,10 @@ pub(super) fn instantiate(
             let runtime = linker
                 .instantiate(&mut *store, runtime_module)
                 .map_err(|err| {
-                    EngineError::new(format!("wasmtime runtime instantiate failed: {err:#}"))
+                    crate::pooled_stores::classify_allocation_error(
+                        err,
+                        "wasmtime runtime instantiate failed",
+                    )
                 })?;
             let namespace = scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE;
             let mut published = BTreeSet::new();
@@ -454,6 +457,8 @@ pub(super) fn instantiate(
     };
     let program = linker
         .instantiate(&mut *store, &modules.program)
-        .map_err(|err| EngineError::new(format!("wasmtime instantiate failed: {err:#}")))?;
+        .map_err(|err| {
+            crate::pooled_stores::classify_allocation_error(err, "wasmtime instantiate failed")
+        })?;
     Ok((program, runtime.unwrap_or(program)))
 }
