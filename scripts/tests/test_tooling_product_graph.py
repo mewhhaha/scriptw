@@ -30,7 +30,7 @@ import json, os, sys
 args = sys.argv[1:]
 with open(os.environ["CALLS"], "a") as stream:
     stream.write(json.dumps(args) + "\\n")
-package = args[args.index("-p") + 1]
+package = args[args.index("-p") + 1] if "-p" in args else "--workspace"
 kind = "oracle" if "--features" in args else "default"
 mode = os.environ.get("MODE", "clean")
 selected = os.environ.get("PACKAGE", package) == package
@@ -59,7 +59,10 @@ if (kind == "oracle" and mode != "missing-oracle") or (kind == "default" and mod
         result = self.audit("similar")
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = [json.loads(line) for line in (self.root / "calls").read_text().splitlines()]
-        self.assertEqual(len(calls), 4)
+        # engine, cli, the whole workspace and the oracle crate, then the
+        # three oracle feature queries.
+        self.assertEqual(len(calls), 7)
+        self.assertIn(["tree", "--locked", "--workspace", "--prefix", "none", "--format", "{p}"], calls)
         for args in calls:
             self.assertIn("--locked", args)
             self.assertEqual(args[args.index("--prefix") + 1], "none")
@@ -71,6 +74,15 @@ if (kind == "oracle" and mode != "missing-oracle") or (kind == "default" and mod
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("could not inspect", result.stderr)
                 self.assertIn("cargo query failed", result.stderr)
+
+    def test_default_workspace_graph_leak_is_rejected(self):
+        # `cargo build --workspace` compiles every member: an oracle reachable
+        # there is compiled by every workspace build even if no product links it.
+        for package in ("--workspace", "scriptw-spec-exec"):
+            with self.subTest(package=package):
+                result = self.audit("leak", package)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(f"default dependency graph of {package}", result.stderr)
 
     def test_failed_oracle_queries_reject_partial_output(self):
         result = self.audit("oracle-error")
