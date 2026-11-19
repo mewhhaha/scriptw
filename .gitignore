@@ -1,16 +1,18 @@
 *.wasm
-#*.csv
-*.txt
-# The generated Test262 publication is a required tracked JSON/text pair.
-!test262/snapshots/published-status-wasm-aot.txt
-!test262/snapshots/published-status-wasm-aot-*.txt
-# Pinned Unicode vectors are compile-time inputs for Segmenter tests.
-!crates/scriptw-intl/data/segmenter-icu-2/corpora/GraphemeBreakTest.txt
-!crates/scriptw-intl/data/segmenter-icu-2/corpora/WordBreakTest.txt
-!crates/scriptw-intl/data/segmenter-icu-2/corpora/SentenceBreakTest.txt
-# Pinned Intl generator inputs must survive fresh checkouts.
-!crates/scriptw-intl/data/numbering-tols-cldr-48/ucd/UnicodeData.txt
-!crates/scriptw-intl/data/locale-text-cldr-47/source/scriptMetadata.txt
+# Test262 runs write a `.txt` summary beside every snapshot JSON. Only the
+# publication pairs are tracked: the published status generation and the
+# aggregate it names. Text files elsewhere are ordinary sources.
+/test262/snapshots/**/*.txt
+!/test262/snapshots/published-status-wasm-aot*.txt
+!/test262/snapshots/*-aggregate-*.txt
+# Run droppings: per-case child snapshots and default-named (`latest`) runs.
+/test262/snapshots/**/*-case-*
+/test262/snapshots/**/latest-*
+# Cited as evidence by crates/scriptw-ir/src/lowering.rs.
+!/test262/snapshots/latest-5052292535410439978.json
+# Abandoned run families that nothing reads.
+/test262/snapshots/codex-debug-phase3j*
+/test262/snapshots/codex-published-wasm-aot-next*
 __pycache__/
 *.py[cod]
 *.exe

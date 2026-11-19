@@ -499,8 +499,8 @@ scriptw-engine` stops at the first failing binary, so pass `--no-fail-fast`.
 Do not edit a source file while a build or a suite is in flight: the runtime
 image and the emitter must come from one source state, or a host stops with
 "immutable runtime receipt failed admission". A Test262 run writes
-`test262/snapshots/latest-*` files; delete the untracked ones, the
-git-ignored `.txt` summary together with its `.json`, because a summary left
+git-ignored `test262/snapshots/latest-*` and per-case `*-case-*` files; delete
+a stale `.txt` summary together with its `.json`, because a summary left
 alone makes the next run of that subtree refuse.
 
 Each reference uses two blocks, eight fresh processes and seven measured calls
