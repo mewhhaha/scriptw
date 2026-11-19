@@ -1105,8 +1105,13 @@ static COMPILATION_JOBS: OnceLock<usize> = OnceLock::new();
 static EXPLICIT_COMPILATION_JOBS: OnceLock<usize> = OnceLock::new();
 static COMPILATION_POOL: OnceLock<Result<rayon::ThreadPool, String>> = OnceLock::new();
 
-/// Default Cranelift parallelism: half the logical CPUs, with a minimum of one.
-/// Test262's `--threads` remains a separate case-execution setting.
+/// Default Cranelift parallelism: a positive `SCRIPTW_JOBS` when the process
+/// environment sets one, otherwise half the logical CPUs, with a minimum of
+/// one. Test262's `--threads` remains a separate case-execution setting.
+///
+/// The CLI and the differential worker reject a malformed `SCRIPTW_JOBS`
+/// before they configure the pool; this embedder default ignores one rather
+/// than abort the host.
 pub fn default_compilation_jobs() -> usize {
     // This crate's unit tests share one process, and many of them configure
     // one job explicitly. A test that compiles without configuring must not
@@ -1114,6 +1119,16 @@ pub fn default_compilation_jobs() -> usize {
     // tests that then ask for one job would all be refused.
     if cfg!(test) {
         return 1;
+    }
+    // Integration-test binaries link this library without `cfg(test)`. The
+    // verification wrapper exports the one-job budget their explicit
+    // configuration requests, so an unconfigured first compilation chooses
+    // the same pool instead of a CPU-derived one that later requests refuse.
+    if let Some(jobs) = std::env::var("SCRIPTW_JOBS")
+        .ok()
+        .and_then(|value| value.parse::<std::num::NonZeroUsize>().ok())
+    {
+        return jobs.get();
     }
     std::thread::available_parallelism()
         .map(usize::from)

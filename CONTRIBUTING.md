@@ -495,9 +495,12 @@ machine; eight do not, and neither does a run beside a build.
 
 On a cloud machine, build with `--cloud --cloud-cpus auto` and run test
 binaries with `--cloud --cloud-worker-cpus auto`: the first form exports
-four compilation jobs, and tests that configure a one-job pool then fail
-with "Wasm compilation pool already configured for 4 jobs". `cargo test -p
-scriptw-engine` stops at the first failing binary, so pass `--no-fail-fast`.
+four compilation jobs as `SCRIPTW_JOBS`, which also sets the engine's default
+pool size, and tests that configure a one-job pool then fail with "Wasm
+compilation pool already configured for 4 jobs". The second form exports
+`SCRIPTW_JOBS=1`, so a test that compiles before configuring chooses the same
+one-job pool. `cargo test -p scriptw-engine` stops at the first failing
+binary, so pass `--no-fail-fast`.
 Do not edit a source file while a build or a suite is in flight: the runtime
 image and the emitter must come from one source state, or a host stops with
 "immutable runtime receipt failed admission". A Test262 run writes
