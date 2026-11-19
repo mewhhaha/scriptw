@@ -73,7 +73,7 @@ fn primitive_tables_check_producer_identity_before_host_image_emission() {
         &emission,
         &[
             "letintl_selection=inputs.intl_selection(intl_profile)?",
-            "emit_script(script,promise_rejection_policy,&intl_selection,snapshot,inputs,)",
+            "emit_script(script,promise_rejection_policy,&intl_selection,snapshot,inputs,profile,)",
             "fnemit_script(",
             "runtime_artifact_with_inputs(intl_selection,inputs)",
             "module_assembly::emit_script_module(",

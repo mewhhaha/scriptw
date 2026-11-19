@@ -68,10 +68,10 @@ fn shared_layouts_keep_physical_instance_roots_and_live_object_reads() {
     assert!(PLANNING.contains("site_records: std::cell::RefCell::new(Vec::new()),"));
     assert!(EMIT.contains("let position = self.functions.next_site_record(T::KIND)?;"));
     assert!(EMIT.contains("self.runtime_schema().site_record_global(position)"));
-    assert!(READ.contains("PropertyReadPlan::CachedStaticString => self.next_site_record().map(Some)"));
+    assert!(READ.contains(".next_profiled_site_record(crate::profile::SiteKind::PropertyWrite)"));
     assert!(READ.contains("let may_be_ordinary = target.possible_kinds.contains(ValueKind::Object);"));
     assert!(READ.contains("self.emit_static_read_site(name, may_be_ordinary, base, value, f)"));
-    assert!(SITE.contains("let global = self.next_site_record()?;"));
+    assert!(SITE.contains("self.next_profiled_site_record(crate::profile::SiteKind::PropertyRead)?;"));
     assert!(SITE.contains("crate::runtime_helpers::CachedPropertyReadArguments::new("));
     assert!(!READ.contains("OwnDataReadCacheSchema"));
     // The site reads only the record's shape and slot; R fills records.
