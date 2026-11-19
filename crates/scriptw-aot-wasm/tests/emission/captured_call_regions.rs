@@ -4,7 +4,7 @@ use crate::{
     scalar_masked_rows::{loops, read_only},
 };
 use scriptw_aot_wasm::emit;
-use scriptw_front::{ParseOptions, parse};
+use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::lower;
 use wasmparser::{Operator, Validator, WasmFeatures};
 
@@ -45,8 +45,10 @@ fn observed_arguments_and_large_forwarding_switches_keep_source_calls() {
             let original = include_str!("fixtures/numeric_body_args_unused.mjs");
             // Literal-index and length reads are projected; the object itself
             // and computed keys are not.
-            let observed =
-                original.replace("var original = value;", "var original = arguments[index & 1];");
+            let observed = original.replace(
+                "var original = value;",
+                "var original = arguments[index & 1];",
+            );
             let frame = include_str!("fixtures/numeric_body_frame_compact.mjs");
             let mut branches = String::from("switch(index & 255) {");
             for index in 0..256 {

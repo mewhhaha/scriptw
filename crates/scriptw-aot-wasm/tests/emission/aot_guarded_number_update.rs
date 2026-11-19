@@ -1,7 +1,7 @@
 use super::linked_bodies::{linked_bodies, runtime_function_imports};
-use scriptw_aot_wasm::{WasmRuntimeValueTag, emit};
-use scriptw_front::{ParseOptions, parse};
-use scriptw_ir::{ExprIr, NumericUpdateValueKind, StatementIr, lower};
+use scriptw_aot_wasm::{emit, WasmRuntimeValueTag};
+use scriptw_front::{parse, ParseOptions};
+use scriptw_ir::{lower, ExprIr, NumericUpdateValueKind, StatementIr};
 use wasmparser::{Operator, Parser, Payload, TypeRef, Validator, WasmFeatures};
 
 fn body_operators(bytes: &[u8], index: u32) -> Vec<Operator<'_>> {

@@ -1,7 +1,7 @@
 //! Operator sites and the native method share one whole-Completion R kernel;
 //! a source operator site enters it through a call-free entry that tail-calls it.
-use scriptw_aot_wasm::{WasmArtifact, emit};
-use scriptw_front::{ParseOptions, parse};
+use scriptw_aot_wasm::{emit, WasmArtifact};
+use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::lower;
 use wasmparser::{FuncType, Operator, Parser, Payload, TypeRef, ValType, Validator, WasmFeatures};
 
@@ -166,7 +166,11 @@ fn both_has_instance_entries_share_one_typed_whole_completion_kernel() {
             .filter_map(|(&source, &callee)| (callee == target).then_some(source))
             .collect::<Vec<_>>()
     };
-    assert_eq!(imported(entry.index).len(), 1, "P imports the single R entry");
+    assert_eq!(
+        imported(entry.index).len(),
+        1,
+        "P imports the single R entry"
+    );
     let record = bodies.unique("helper::instanceof_record");
     assert_eq!(
         imported(record.index).len(),
@@ -212,7 +216,11 @@ fn both_has_instance_entries_share_one_typed_whole_completion_kernel() {
         ],
         "the candidate's tag and reference, the constructor's reference and the site"
     );
-    assert_eq!(entry_signature.params().len(), 6, "then the Realm and the program");
+    assert_eq!(
+        entry_signature.params().len(),
+        6,
+        "then the Realm and the program"
+    );
     assert_eq!(
         entry_signature.results(),
         [ValType::I32],

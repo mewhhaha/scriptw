@@ -120,11 +120,11 @@ mod aot_numeric_body;
 
 mod aot_compact_for_in;
 
-mod aot_shape_transitions;
-mod aot_static_site_records;
-mod aot_identifier_cells_and_truncation;
-mod aot_unknown_operand_fast_paths;
-mod aot_general_path_shortcuts;
 mod aot_body_functions_named_like_vars_and_parameters;
 mod aot_body_vars_named_like_parameters;
+mod aot_general_path_shortcuts;
+mod aot_identifier_cells_and_truncation;
+mod aot_shape_transitions;
+mod aot_static_site_records;
 mod aot_store_and_allocation_paths;
+mod aot_unknown_operand_fast_paths;

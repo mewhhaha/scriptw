@@ -256,9 +256,7 @@ impl AnalysisBuilder<'_> {
                                 Binding::Identifier(_) => true,
                                 Binding::Pattern(pattern) => {
                                     parameters == PlainParameters::ExpressionFreePatterns
-                                        && function_environment::pattern_is_expression_free(
-                                            pattern,
-                                        )
+                                        && function_environment::pattern_is_expression_free(pattern)
                                 }
                             }
                     })

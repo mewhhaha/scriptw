@@ -1,4 +1,4 @@
-use boa_ast::{Module, Script, scope::Scope};
+use boa_ast::{scope::Scope, Module, Script};
 use boa_interner::Interner;
 use boa_parser::{Parser, Source};
 use std::ops::Deref;
@@ -19,20 +19,20 @@ mod utf16_source;
 // Re-export the authority instead of maintaining another Unicode classifier.
 pub use boa_parser::lexer::{is_identifier_part, is_identifier_start};
 pub use dynamic_function::{
-    FunctionParseKind, prepare_dynamic_function, prepare_dynamic_function_utf16,
+    prepare_dynamic_function, prepare_dynamic_function_utf16, FunctionParseKind,
 };
 pub use eval_source::{
-    DirectEvalParseContext, EvalInvocationContext, EvalParseContext, prepare_eval_source,
-    prepare_eval_source_utf16,
+    prepare_eval_source, prepare_eval_source_utf16, DirectEvalParseContext, EvalInvocationContext,
+    EvalParseContext,
 };
-pub use json::{JsonParseError, JsonValue, ParsedJson, parse_json};
+pub use json::{parse_json, JsonParseError, JsonValue, ParsedJson};
 pub use utf16_source::{
-    JS_STRING_SURROGATE_SENTINEL, SourceTextEncoding, decode_js_string_utf16,
-    encode_js_string_utf16,
+    decode_js_string_utf16, encode_js_string_utf16, SourceTextEncoding,
+    JS_STRING_SURROGATE_SENTINEL,
 };
 
 pub use early_error_code::{
-    EarlyErrorCode, NO_EARLY_ERROR_CODE, ParseClassified, classify_parse_failure,
+    classify_parse_failure, EarlyErrorCode, ParseClassified, NO_EARLY_ERROR_CODE,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1665,26 +1665,22 @@ var ref = async (aFalse = falseCount +=1, aString = stringCount += 1, aNaN = nan
             EarlyErrorCode::GeneratorDeclarationParametersContainYield,
         )
         .is_some());
-        assert!(
-            ParseClassified::from_early(EarlyErrorCode::AsyncDeclarationParametersContainAwait,)
-                .is_some()
-        );
-        assert!(
-            ParseClassified::from_early(EarlyErrorCode::GeneratorExpressionParametersContainYield,)
-                .is_some()
-        );
-        assert!(
-            ParseClassified::from_early(
-                EarlyErrorCode::AsyncGeneratorExpressionParametersContainYield,
-            )
-            .is_some()
-        );
-        assert!(
-            ParseClassified::from_early(
-                EarlyErrorCode::AsyncGeneratorExpressionParametersContainAwait,
-            )
-            .is_some()
-        );
+        assert!(ParseClassified::from_early(
+            EarlyErrorCode::AsyncDeclarationParametersContainAwait,
+        )
+        .is_some());
+        assert!(ParseClassified::from_early(
+            EarlyErrorCode::GeneratorExpressionParametersContainYield,
+        )
+        .is_some());
+        assert!(ParseClassified::from_early(
+            EarlyErrorCode::AsyncGeneratorExpressionParametersContainYield,
+        )
+        .is_some());
+        assert!(ParseClassified::from_early(
+            EarlyErrorCode::AsyncGeneratorExpressionParametersContainAwait,
+        )
+        .is_some());
         assert!(
             ParseClassified::from_early(EarlyErrorCode::GeneratorMethodParametersContainYield,)
                 .is_some()
@@ -1699,22 +1695,18 @@ var ref = async (aFalse = falseCount +=1, aString = stringCount += 1, aNaN = nan
         .is_some());
         assert!(ParseClassified::from_early(EarlyErrorCode::ArrowParametersContainYield).is_some());
         assert!(ParseClassified::from_early(EarlyErrorCode::ArrowParametersContainAwait).is_some());
-        assert!(
-            ParseClassified::from_early(
-                EarlyErrorCode::AsyncFunctionExpressionParametersContainAwait,
-            )
-            .is_some()
-        );
+        assert!(ParseClassified::from_early(
+            EarlyErrorCode::AsyncFunctionExpressionParametersContainAwait,
+        )
+        .is_some());
         assert!(
             ParseClassified::from_early(EarlyErrorCode::AsyncMethodParametersContainAwait)
                 .is_some()
         );
-        assert!(
-            ParseClassified::from_early(
-                EarlyErrorCode::CallableNonSimpleParametersContainUseStrict,
-            )
-            .is_some()
-        );
+        assert!(ParseClassified::from_early(
+            EarlyErrorCode::CallableNonSimpleParametersContainUseStrict,
+        )
+        .is_some());
         assert!(ParseClassified::from_early(EarlyErrorCode::DuplicateFormalParameter).is_some());
         assert!(ParseClassified::from_early(EarlyErrorCode::DuplicateCatchParameter).is_some());
         assert!(

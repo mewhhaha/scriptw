@@ -1844,7 +1844,11 @@ mod private_binding_name_tests {
             DERIVED_ACTIVATION_FUNCTION_NAME,
             AUTO_ACCESSOR_VALUE_NAME,
         ];
-        for name in fixed.iter().copied().chain(minted.iter().map(String::as_str)) {
+        for name in fixed
+            .iter()
+            .copied()
+            .chain(minted.iter().map(String::as_str))
+        {
             assert!(name.contains(PRIVATE_BINDING_NAME_MARK), "{name}");
             for options in [ParseOptions::script(), ParseOptions::module()] {
                 assert!(

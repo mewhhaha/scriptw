@@ -547,18 +547,28 @@ fn date_global_and_resolver_use_the_defining_realm_recipe_and_utc_alias_keeps_on
                 origin(&initial, position, local(args[2])) == Origin::Operation(markers[0])
             })
             .collect();
-        assert_eq!(rows.len(), 1, "{publisher} stores the recipe in one value row");
+        assert_eq!(
+            rows.len(),
+            1,
+            "{publisher} stores the recipe in one value row"
+        );
         let row = constant(&initial, rows[0], arguments(&initial, rows[0], 3)[1]);
         let publications = calls(&initial, batch);
-        assert_eq!(publications.len(), 1, "{publisher} publishes its bindings once");
+        assert_eq!(
+            publications.len(),
+            1,
+            "{publisher} publishes its bindings once"
+        );
         assert!(rows[0] < publications[0]);
         let (flags_at, size) = initial[..publications[0]]
             .iter()
             .enumerate()
             .rev()
             .find_map(|(position, op)| match op {
-                Operator::ArrayNewFixed { array_type_index, array_size }
-                    if *array_type_index == flags_type => Some((position, *array_size as usize)),
+                Operator::ArrayNewFixed {
+                    array_type_index,
+                    array_size,
+                } if *array_type_index == flags_type => Some((position, *array_size as usize)),
                 _ => None,
             })
             .expect("the batch carries one flag word per binding");

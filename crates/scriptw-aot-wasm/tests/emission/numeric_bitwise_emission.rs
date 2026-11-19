@@ -1,5 +1,5 @@
 use scriptw_aot_wasm::emit;
-use scriptw_front::{ParseOptions, parse};
+use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::lower;
 use std::collections::BTreeMap;
 use wasmparser::{ExternalKind, KnownCustom, Name, Operator, Parser, Payload, TypeRef};
@@ -133,12 +133,10 @@ fn numeric_module(bytes: &[u8], collect_calls: bool) -> NumericModule {
                         if let Name::Function(map) = subsection.expect("name subsection decodes") {
                             for naming in map {
                                 let naming = naming.expect("numeric function name decodes");
-                                assert!(
-                                    module
-                                        .names
-                                        .insert(naming.index, naming.name.to_owned())
-                                        .is_none()
-                                );
+                                assert!(module
+                                    .names
+                                    .insert(naming.index, naming.name.to_owned())
+                                    .is_none());
                             }
                         }
                     }

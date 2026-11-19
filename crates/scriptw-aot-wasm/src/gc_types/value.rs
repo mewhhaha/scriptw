@@ -4,6 +4,7 @@ use super::*;
 use crate::WasmRuntimeValueTag;
 
 mod binding_cell;
+mod code_unit_kernels;
 mod compact_array_recipes;
 mod instance_elements;
 mod native_direct_eval_compiler;
@@ -14,7 +15,6 @@ mod program_initialize;
 mod program_instance;
 mod prototype_reference;
 mod string_accumulator;
-mod code_unit_kernels;
 pub(crate) use code_unit_kernels::{
     emit_ascii_narrow_kernel, emit_ascii_widen_helper_body, emit_code_unit_find_kernel,
     emit_json_plain_run_helper_body,

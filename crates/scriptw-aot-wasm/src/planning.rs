@@ -3,8 +3,7 @@ mod module_graph;
 pub(crate) use module_graph::ModuleGraphPlan;
 use scriptw_ir::{ArrayAccumulationElementIr, ArrayAccumulationIr};
 use scriptw_ir::{
-    ArrayDestructuringEvaluationIr,
-    ObjectDestructuringPatternIr, OptionalChainOperationIr,
+    ArrayDestructuringEvaluationIr, ObjectDestructuringPatternIr, OptionalChainOperationIr,
 };
 use std::sync::{Arc, OnceLock};
 

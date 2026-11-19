@@ -1,12 +1,12 @@
 //! Data merges keep immutable accessor edges instead of rebuilding wrappers.
 use crate::{
     ordinary_receiver_definition::concrete_if_arms,
-    property_read_plans::{Module, calls},
+    property_read_plans::{calls, Module},
 };
 use scriptw_aot_wasm::{
-    GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot,
+    emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
 };
-use scriptw_front::{ParseOptions, parse};
+use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::lower;
 use wasmparser::{
     CompositeInnerType, HeapType, Operator, StorageType, UnpackedIndex, ValType, Validator,
@@ -27,13 +27,14 @@ fn concrete(value: ValType) -> u32 {
 fn edge_local(body: &[Operator<'_>], descriptor: u32, field: u32) -> u32 {
     body.windows(2)
         .find_map(|ops| match ops {
-            [
-                Operator::StructGet {
-                    struct_type_index,
-                    field_index,
-                },
-                Operator::LocalSet { local_index },
-            ] if *struct_type_index == descriptor && *field_index == field => Some(*local_index),
+            [Operator::StructGet {
+                struct_type_index,
+                field_index,
+            }, Operator::LocalSet { local_index }]
+                if *struct_type_index == descriptor && *field_index == field =>
+            {
+                Some(*local_index)
+            }
             _ => None,
         })
         .expect("the original descriptor edge is retained directly in a rooted GC local")

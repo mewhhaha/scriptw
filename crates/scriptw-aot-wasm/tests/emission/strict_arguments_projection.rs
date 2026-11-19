@@ -1,8 +1,8 @@
 //! Real vector bodies build no arguments object at entry and guard every
 //! projected read on whether a read has needed the object yet.
 use crate::{property_read_plans::Module, scalar_masked_rows::type_group_sizes};
-use scriptw_aot_wasm::{GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot};
-use scriptw_front::{ParseOptions, parse};
+use scriptw_aot_wasm::{emit_with_rooted_snapshot, GcSnapshotLayout, PromiseRejectionPolicy};
+use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::lower;
 use wasmparser::{Operator, Validator, WasmFeatures};
 
@@ -51,16 +51,11 @@ fn projected_entry(body: &[Operator<'_>], arguments: u32) -> Option<usize> {
         .windows(4)
         .enumerate()
         .filter_map(|(index, ops)| {
-            let [
-                Operator::ArrayLen,
-                Operator::LocalSet {
-                    local_index: stored,
-                },
-                Operator::LocalGet {
-                    local_index: loaded,
-                },
-                Operator::If { .. },
-            ] = ops
+            let [Operator::ArrayLen, Operator::LocalSet {
+                local_index: stored,
+            }, Operator::LocalGet {
+                local_index: loaded,
+            }, Operator::If { .. }] = ops
             else {
                 return None;
             };
@@ -70,7 +65,9 @@ fn projected_entry(body: &[Operator<'_>], arguments: u32) -> Option<usize> {
             let (snapshot, otherwise) = if_parts(body, index + 3);
             (otherwise.is_none()
                 && allocations(snapshot, arguments) == 0
-                && snapshot.iter().any(|op| matches!(op, Operator::ArrayGet { .. })))
+                && snapshot
+                    .iter()
+                    .any(|op| matches!(op, Operator::ArrayGet { .. })))
             .then_some(index + 3)
         })
         .collect::<Vec<_>>();
@@ -86,7 +83,9 @@ fn check_projection(body: &[Operator<'_>], arguments: u32, stored: u32) {
     // against Undefined) before answering from the vector.
     let mut guards = std::collections::BTreeMap::<u32, Vec<usize>>::new();
     for (index, ops) in body.windows(3).enumerate() {
-        if let [Operator::LocalGet { local_index }, Operator::I32Const { .. }, Operator::I32Eq] = ops {
+        if let [Operator::LocalGet { local_index }, Operator::I32Const { .. }, Operator::I32Eq] =
+            ops
+        {
             if let Some(offset) = body[index + 3..(index + 8).min(body.len())]
                 .iter()
                 .position(|op| matches!(op, Operator::If { .. }))
@@ -100,7 +99,11 @@ fn check_projection(body: &[Operator<'_>], arguments: u32, stored: u32) {
             }
         }
     }
-    assert_eq!(guards.len(), 1, "one materialized-object word guards every read");
+    assert_eq!(
+        guards.len(),
+        1,
+        "one materialized-object word guards every read"
+    );
     let reads = guards.into_values().next().unwrap();
     assert_eq!(reads.len(), 2, "index zero and length share that guard");
     assert_eq!(
@@ -123,7 +126,9 @@ fn check_projection(body: &[Operator<'_>], arguments: u32, stored: u32) {
             "vector reads have no lookup, allocation or callback"
         );
         assert!(
-            slow.unwrap().iter().any(|op| matches!(op, Operator::Call { .. })),
+            slow.unwrap()
+                .iter()
+                .any(|op| matches!(op, Operator::Call { .. })),
             "a read that needs the object retains the original operation"
         );
     }

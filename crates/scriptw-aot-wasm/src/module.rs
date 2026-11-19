@@ -5,8 +5,8 @@ use wasm_encoder::{
 
 use crate::emit::MainFunctionCompilation;
 use crate::emitted_function::ModuleFunctionTable;
-use crate::gc_types::RuntimeModuleTypes;
 pub(crate) use crate::gc_types::GlobalLedger;
+use crate::gc_types::RuntimeModuleTypes;
 
 mod typed_array_element_kind;
 pub(crate) use typed_array_element_kind::{TypedArrayContentType, TypedArrayElementKind};

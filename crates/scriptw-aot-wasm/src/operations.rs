@@ -1713,10 +1713,14 @@ impl<'a> FunctionBuilder<'a> {
         // nothing: its ToUint32 is a compile-time constant.
         let operands = |left: &ValueLocals, right: &ValueLocals| {
             (
-                BitwiseOperand::literal(lhs)
-                    .map_or(BitwiseOperand::Payload(left.scalar()), BitwiseOperand::Uint32),
-                BitwiseOperand::literal(rhs)
-                    .map_or(BitwiseOperand::Payload(right.scalar()), BitwiseOperand::Uint32),
+                BitwiseOperand::literal(lhs).map_or(
+                    BitwiseOperand::Payload(left.scalar()),
+                    BitwiseOperand::Uint32,
+                ),
+                BitwiseOperand::literal(rhs).map_or(
+                    BitwiseOperand::Payload(right.scalar()),
+                    BitwiseOperand::Uint32,
+                ),
             )
         };
         if lhs.kind == ValueKind::Number && rhs.kind == ValueKind::Number {

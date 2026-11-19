@@ -63,9 +63,10 @@ pub(super) fn agent_call(
                 let group = group.as_ref().ok_or_else(|| {
                     wasmtime::Error::msg("agent.start used without an active Test262 agent group")
                 })?;
-                let source = String::from_utf8(read_bytes(&caller, first, second)?).map_err(|err| {
-                    wasmtime::Error::msg(format!("Test262 agent source is not UTF-8: {err}"))
-                })?;
+                let source =
+                    String::from_utf8(read_bytes(&caller, first, second)?).map_err(|err| {
+                        wasmtime::Error::msg(format!("Test262 agent source is not UTF-8: {err}"))
+                    })?;
                 group.start(source).map_err(|err| {
                     wasmtime::Error::new(err).context("failed to compile or start Test262 agent")
                 })?;

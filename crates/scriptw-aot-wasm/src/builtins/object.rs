@@ -2,9 +2,9 @@
 use super::super::*;
 use crate::functions::{NonArrayRealmIntrinsicSlot, OrdinaryDefaultPrototype};
 use crate::gc_types::{
-    ArgumentsObject, CompletionLocals, DateObject, GcLocal, GcNullability,
-    NativeErrorObject, OrdinaryObject, PrimitiveBox, PrimitiveBoxSchema, RegExpObject, StoredValue,
-    StringValue, ValueLocals,
+    ArgumentsObject, CompletionLocals, DateObject, GcLocal, GcNullability, NativeErrorObject,
+    OrdinaryObject, PrimitiveBox, PrimitiveBoxSchema, RegExpObject, StoredValue, StringValue,
+    ValueLocals,
 };
 use crate::objects::{DescriptorFlag, DescriptorObjectFields, PropertyKeyLocals};
 use scriptw_ir::property_descriptor::Presence;

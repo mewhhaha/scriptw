@@ -18,9 +18,7 @@ use super::super::*;
 use super::temporal_calendar_arithmetic::{
     CompletedTemporalPartialReferenceLocals, TemporalCalendarDateLocals,
 };
-use super::temporal_plain_date::{
-    TemporalCalendarId, TemporalCalendarMonthCode,
-};
+use super::temporal_plain_date::{TemporalCalendarId, TemporalCalendarMonthCode};
 use crate::intrinsics::temporal::{TemporalIntrinsicFamily, TemporalPrototypeSource};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

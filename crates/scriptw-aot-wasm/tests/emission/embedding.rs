@@ -1,9 +1,9 @@
 //! Validate the real Portable bridge contract against its canonical GC types.
 use scriptw_aot_wasm::{
-    EMBEDDING_BYTES, EMBEDDING_BYTES_READ, EMBEDDING_CALL, EMBEDDING_CANCEL, EMBEDDING_CHECKPOINT,
-    EMBEDDING_EXPORT, EMBEDDING_PROMISE, EMBEDDING_READ, EMBEDDING_STRING, emit,
+    emit, EMBEDDING_BYTES, EMBEDDING_BYTES_READ, EMBEDDING_CALL, EMBEDDING_CANCEL,
+    EMBEDDING_CHECKPOINT, EMBEDDING_EXPORT, EMBEDDING_PROMISE, EMBEDDING_READ, EMBEDDING_STRING,
 };
-use scriptw_ir::{ModuleGraphSources, ModuleKey, ModuleSourceIr, lower_module_graph};
+use scriptw_ir::{lower_module_graph, ModuleGraphSources, ModuleKey, ModuleSourceIr};
 use std::collections::BTreeMap;
 use wasmparser::{ExternalKind, Parser, Payload, TypeRef, Validator, WasmFeatures};
 

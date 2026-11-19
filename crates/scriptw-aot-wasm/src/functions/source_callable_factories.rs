@@ -2,8 +2,8 @@
 
 use super::*;
 use crate::gc_types::{
-    BuiltinClosureCapture, FunctionObject, GcLocal,
-    GcStackReference, Nullable, RealmRecord, TemplateSource, ValueLocals,
+    BuiltinClosureCapture, FunctionObject, GcLocal, GcStackReference, Nullable, RealmRecord,
+    TemplateSource, ValueLocals,
 };
 
 impl FunctionBuilder<'_> {

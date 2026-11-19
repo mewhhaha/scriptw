@@ -3,11 +3,11 @@
 //! scalar-loop owners. This module authenticates callable/cell inputs only.
 use super::dense_array::{ReadKey, RegionInputSource};
 use super::*;
+use crate::arguments_protocol::ArgumentsProjectionRead;
 use scriptw_ir::{
     CapturedBindingIr, EnvironmentIdentifierOperationIr as EnvOp,
     EnvironmentIdentifierResolutionStart, FunctionIr, ProvenBindingCellOrigin,
 };
-use crate::arguments_protocol::ArgumentsProjectionRead;
 use std::sync::Arc;
 
 mod source;

@@ -432,7 +432,12 @@ fn embedded_runtime_executes_fresh_programs_without_a_native_runtime_compile() {
     }
     fs::create_dir_all(&disk.0).unwrap();
     let disk_backing = expected_native_backing(&disk.0);
-    let output = child(&executable, EMBEDDED_TEST, "consumer", &disk.0.join("consumer"));
+    let output = child(
+        &executable,
+        EMBEDDED_TEST,
+        "consumer",
+        &disk.0.join("consumer"),
+    );
     let trace = String::from_utf8_lossy(&output.stderr);
     assert_embedded_compilation_modes(&trace);
     assert_native_backing(&trace, disk_backing);

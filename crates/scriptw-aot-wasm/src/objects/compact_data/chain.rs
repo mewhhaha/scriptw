@@ -127,7 +127,11 @@ impl FunctionBuilder<'_> {
     /// Leaves on the stack whether the header of an Array answers for a
     /// property key: a Symbol, or a String that cannot be an array index and
     /// whose hash differs from "length"'s. Every other key reports false.
-    pub(crate) fn emit_header_named_property_key_i32(&mut self, key: &ValueLocals, f: &mut Function) {
+    pub(crate) fn emit_header_named_property_key_i32(
+        &mut self,
+        key: &ValueLocals,
+        f: &mut Function,
+    ) {
         let s = self.runtime_schema();
         let named = s.reserve_i32_local(f);
         named.set_constant(0, f);

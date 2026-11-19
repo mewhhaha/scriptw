@@ -5,8 +5,8 @@
 //! the old dense graph stays rooted until every replacement node is complete.
 use super::*;
 use crate::gc_types::{
-    ArrayIndexBucketTable, ArrayIndexEntry, ArrayIndexKeyConstruction,
-    ArrayIndexedStorageMode, ArrayObject, ArrayObjectSchema, IndexedTable,
+    ArrayIndexBucketTable, ArrayIndexEntry, ArrayIndexKeyConstruction, ArrayIndexedStorageMode,
+    ArrayObject, ArrayObjectSchema, IndexedTable,
 };
 
 const DENSE_INDEX_LIMIT: i64 = 1 << 20;

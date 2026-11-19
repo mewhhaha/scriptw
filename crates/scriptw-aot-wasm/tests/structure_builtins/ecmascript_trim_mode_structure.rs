@@ -30,10 +30,8 @@ fn ecmascript_trim_mode_is_crate_internal_and_closed() {
         1
     );
     assert!(!OPERATIONS_SOURCE.contains("pub use string_trim::EcmaTrimMode;"));
-    assert!(
-        STRING_BUILTINS_SOURCE
-            .contains("use crate::operations::EcmaTrimMode as StringTrimOperation;")
-    );
+    assert!(STRING_BUILTINS_SOURCE
+        .contains("use crate::operations::EcmaTrimMode as StringTrimOperation;"));
     assert!(!STRING_BUILTINS_SOURCE.contains("enum StringTrimOperation"));
     assert_eq!(
         compact(bounded(

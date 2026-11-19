@@ -1,10 +1,10 @@
 //! Fixed push entries retain real code/Realm proofs and allocate argv only on
 //! the saved-operand fallback, with canonical packed publication in R.
-use super::property_read_plans::{Module, calls};
+use super::property_read_plans::{calls, Module};
 use scriptw_aot_wasm::{
-    GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot,
+    emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
 };
-use scriptw_front::{ParseOptions, parse};
+use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::lower;
 use wasmparser::{
     CompositeInnerType, HeapType, Operator, StorageType, UnpackedIndex, ValType, Validator,

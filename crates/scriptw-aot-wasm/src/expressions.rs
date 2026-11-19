@@ -1,7 +1,6 @@
 use super::*;
 use crate::gc_types::{
-    GcLocal, GcOperand, I32Local, NonNullable, Nullable, ScalarValue,
-    StringValue, ValueLocals,
+    GcLocal, GcOperand, I32Local, NonNullable, Nullable, ScalarValue, StringValue, ValueLocals,
 };
 use crate::operations::PropertyKeyLocals;
 use scriptw_ir::{NativeErrorKind, StaticRegExpCompilation};

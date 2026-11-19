@@ -1,7 +1,7 @@
 //! The actual cursor uses canonical hashed Set storage in both R and P.
 use crate::property_read_plans::Module;
-use scriptw_front::{ParseOptions, parse};
-use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};
+use scriptw_front::{parse, ParseOptions};
+use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};
 use wasmparser::{
     CompositeInnerType, HeapType, Operator, RefType, StorageType, StructType, UnpackedIndex,
     ValType, Validator, WasmFeatures,

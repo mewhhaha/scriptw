@@ -45,8 +45,10 @@ impl Bridges {
             call,
             promise,
             realm: roots.get_global(&mut *store, scriptw_aot_wasm::SNAPSHOT_ENTRY_REALM_EXPORT),
-            module_status: program
-                .get_export(&mut *store, scriptw_aot_wasm::MODULE_EVALUATION_STATUS_EXPORT),
+            module_status: program.get_export(
+                &mut *store,
+                scriptw_aot_wasm::MODULE_EVALUATION_STATUS_EXPORT,
+            ),
         }
     }
 }

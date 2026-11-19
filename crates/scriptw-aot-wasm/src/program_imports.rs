@@ -207,7 +207,8 @@ impl Reencode for Rewrite<'_> {
             .get(self.body_sizes.len())
             .ok_or_else(|| user("a code body has no recorded index operands"))?;
         let bytes = self.bytes;
-        self.rewrite_body(&bytes[func.range()], operands).map_err(user)?;
+        self.rewrite_body(&bytes[func.range()], operands)
+            .map_err(user)?;
         code.raw(&self.body);
         self.body_sizes.push(self.body.len());
         Ok(())

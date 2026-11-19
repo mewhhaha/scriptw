@@ -62,7 +62,7 @@ mod pure_realm_discovery;
 mod realm_request;
 pub(crate) use pure_realm_discovery::PureRealmDiscovery;
 mod record;
-pub use realm_request::{RealmModuleResolutionIr, scan_script_realm_module_requests};
+pub use realm_request::{scan_script_realm_module_requests, RealmModuleResolutionIr};
 mod resolved_binding;
 mod source;
 mod synchronous_definition;
@@ -77,14 +77,14 @@ pub use import_phase::ImportPhaseIr;
 pub use link::*;
 pub use link_error::ModuleLinkErrorIr;
 pub use loaded_sources::{ModuleGraphSources, ModuleKindIr, ModuleSourceIr};
-pub use module_key::{ANONYMOUS_MODULE_KEY, ModuleKey, ModuleRecordKey};
+pub use module_key::{ModuleKey, ModuleRecordKey, ANONYMOUS_MODULE_KEY};
 pub use module_unit::ModuleUnitIr;
 pub use namespace::*;
 pub(crate) use record::script_dynamic_import_sites;
 pub use record::*;
 pub use resolved_binding::{ModuleBindingNameIr, ResolvedBindingIr};
 
-pub(crate) use admission::{GraphAdmission, link_complete_catalog, link_loaded_graph};
+pub(crate) use admission::{link_complete_catalog, link_loaded_graph, GraphAdmission};
 pub(crate) use dynamic::lower_import_call;
 #[cfg(test)]
 pub(crate) use graph::link;

@@ -107,8 +107,8 @@ impl FunctionBuilder<'_> {
 
     pub(crate) fn compile_compact_data_define_helper(&mut self) -> Result<Function, EmitError> {
         let mut body = self.begin_helper_body(RuntimeHelperId::CompactDataDefine);
-        let p =
-            self.helper_parameters::<crate::runtime_helpers::CompactDataDefineParameters>(&mut body);
+        let p = self
+            .helper_parameters::<crate::runtime_helpers::CompactDataDefineParameters>(&mut body);
         let f = &mut body;
         let s = self.runtime_schema();
         let handled = s.reserve_i32_local(f);
@@ -127,10 +127,9 @@ impl FunctionBuilder<'_> {
         base.is_subtype::<CompactDataStorage>(s, f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(exit, f);
-        let compact = s.reserve_gc_local(f).initialize(
-            base.load(s, f).cast_subtype::<CompactDataStorage>(s, f),
-            f,
-        );
+        let compact = s
+            .reserve_gc_local(f)
+            .initialize(base.load(s, f).cast_subtype::<CompactDataStorage>(s, f), f);
         let shape = s.reserve_gc_local(f).initialize(
             s.field(CompactDataStorageSchema::SHAPE)
                 .read(&compact, s, f)
@@ -139,14 +138,14 @@ impl FunctionBuilder<'_> {
         );
         // Native metadata shapes carry other attributes; one word covers
         // every key, so only an all-default shape can take a default key.
-        s.field(CompactDataShapeSchema::ATTRIBUTES).read(&shape, s, f);
+        s.field(CompactDataShapeSchema::ATTRIBUTES)
+            .read(&shape, s, f);
         f.instruction(&Instruction::I32Const(default_data_attributes().as_i32()));
         f.instruction(&Instruction::I32Ne);
         self.emit_branch_if_to_target(exit, f);
-        let name = s.reserve_gc_local(f).initialize(
-            p.key.value().cast_reference::<StringValue>(s, f),
-            f,
-        );
+        let name = s
+            .reserve_gc_local(f)
+            .initialize(p.key.value().cast_reference::<StringValue>(s, f), f);
         let hash = s.reserve_i64_local(f);
         self.emit_string_key_hash(&name, hash, f);
         let slot = s.reserve_i32_local(f);
@@ -161,7 +160,8 @@ impl FunctionBuilder<'_> {
         self.emit_branch_to_target(exit, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        s.field(OrdinaryObjectSchema::EXTENSIBLE).read(&p.object, s, f);
+        s.field(OrdinaryObjectSchema::EXTENSIBLE)
+            .read(&p.object, s, f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(exit, f);
         let keys = s.reserve_gc_local(f).initialize(
@@ -221,12 +221,14 @@ impl FunctionBuilder<'_> {
         let child = s
             .reserve_gc_local::<CompactDataShape, Nullable>(f)
             .initialize_null(s, f);
-        let table = s.reserve_gc_local::<CompactShapeTable, Nullable>(f).initialize(
-            s.field(CompactDataShapeSchema::TRANSITIONS)
-                .read(shape, s, f)
-                .reference(),
-            f,
-        );
+        let table = s
+            .reserve_gc_local::<CompactShapeTable, Nullable>(f)
+            .initialize(
+                s.field(CompactDataShapeSchema::TRANSITIONS)
+                    .read(shape, s, f)
+                    .reference(),
+                f,
+            );
         let used = s.reserve_i32_local(f);
         let capacity = s.reserve_i32_local(f);
         self.emit_compact_transition_scan(&table, count, name, hash, &child, used, capacity, f);
@@ -548,7 +550,10 @@ impl FunctionBuilder<'_> {
         }
         s.release_i32_local(slot, f);
         moved.clear(f);
-        extended.replace(array.load(s, f).upcast::<CompactDataStorage>().nullable(), f);
+        extended.replace(
+            array.load(s, f).upcast::<CompactDataStorage>().nullable(),
+            f,
+        );
         array.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -583,7 +588,10 @@ impl FunctionBuilder<'_> {
             ),
             f,
         );
-        extended.replace(first.load(s, f).upcast::<CompactDataStorage>().nullable(), f);
+        extended.replace(
+            first.load(s, f).upcast::<CompactDataStorage>().nullable(),
+            f,
+        );
         first.clear(f);
         f.instruction(&Instruction::Else);
         count.load(f);
@@ -620,11 +628,17 @@ impl FunctionBuilder<'_> {
         );
         references.clear(f);
         scalars.clear(f);
-        extended.replace(shared.load(s, f).upcast::<CompactDataStorage>().nullable(), f);
+        extended.replace(
+            shared.load(s, f).upcast::<CompactDataStorage>().nullable(),
+            f,
+        );
         shared.clear(f);
         f.instruction(&Instruction::Else);
         let grown = self.emit_grow_compact_array_storage(&array, &tags, child, count, f);
-        extended.replace(grown.load(s, f).upcast::<CompactDataStorage>().nullable(), f);
+        extended.replace(
+            grown.load(s, f).upcast::<CompactDataStorage>().nullable(),
+            f,
+        );
         grown.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);

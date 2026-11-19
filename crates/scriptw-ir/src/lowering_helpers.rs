@@ -14,8 +14,7 @@ pub(crate) use crate::async_pattern_source::{
 
 pub(crate) use crate::async_with_source::{
     append_async_statement_protocol_items, append_async_statement_protocol_states,
-    contains_plain_async_phase, AsyncWithSource,
-    AsyncWithSourceStates,
+    contains_plain_async_phase, AsyncWithSource, AsyncWithSourceStates,
 };
 
 #[path = "generator_with_source.rs"]
@@ -36,12 +35,11 @@ pub(crate) use crate::generator_value_branch_source::{
     GeneratorArrayPatternSource, GeneratorArrayPatternSourceStates,
     GeneratorCompoundAssignmentOperation, GeneratorDeleteOperand, GeneratorExpressionSourcePlan,
     GeneratorGroupedOptionalInvocationSource, GeneratorGroupedOptionalReferenceSource,
-    GeneratorObjectPatternSource, GeneratorOptionalArgumentSource,
-    GeneratorOptionalChainLink, GeneratorOptionalChainSource, GeneratorOptionalChainStates,
-    GeneratorOptionalDeleteSource, GeneratorOptionalDeleteTerminal, GeneratorOptionalKeySource,
-    GeneratorOptionalOperandSource, GeneratorPatternAssignmentSource,
-    GeneratorPatternInitializerSource, GeneratorValueBranchAdmission, GeneratorValueBranchKind,
-    GeneratorValueBranchSource,
+    GeneratorObjectPatternSource, GeneratorOptionalArgumentSource, GeneratorOptionalChainLink,
+    GeneratorOptionalChainSource, GeneratorOptionalChainStates, GeneratorOptionalDeleteSource,
+    GeneratorOptionalDeleteTerminal, GeneratorOptionalKeySource, GeneratorOptionalOperandSource,
+    GeneratorPatternAssignmentSource, GeneratorPatternInitializerSource,
+    GeneratorValueBranchAdmission, GeneratorValueBranchKind, GeneratorValueBranchSource,
 };
 
 #[path = "generator_switch_source.rs"]

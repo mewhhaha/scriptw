@@ -755,10 +755,8 @@ mod tests {
     fn a_literal_return_proves_caller_flow_preservation() {
         let body = body_with(StatementIr::Return(TypedExpr::undefined()));
 
-        assert!(
-            SourceCallFlowEffects::for_finalized_invocation(&[], &body)
-                .proves_no_flow_invalidation()
-        );
+        assert!(SourceCallFlowEffects::for_finalized_invocation(&[], &body)
+            .proves_no_flow_invalidation());
     }
 
     #[test]
@@ -772,10 +770,8 @@ mod tests {
         );
         let body = body_with(StatementIr::Return(call));
 
-        assert!(
-            !SourceCallFlowEffects::for_finalized_invocation(&[], &body)
-                .proves_no_flow_invalidation()
-        );
+        assert!(!SourceCallFlowEffects::for_finalized_invocation(&[], &body)
+            .proves_no_flow_invalidation());
     }
 
     #[test]
@@ -827,10 +823,8 @@ mod tests {
         let conversion = TypedExpr::spec_to_string(TypedExpr::undefined());
         let body = body_with(StatementIr::Return(conversion));
 
-        assert!(
-            SourceCallFlowEffects::for_finalized_invocation(&[], &body)
-                .proves_no_flow_invalidation()
-        );
+        assert!(SourceCallFlowEffects::for_finalized_invocation(&[], &body)
+            .proves_no_flow_invalidation());
     }
 
     #[test]
@@ -842,10 +836,8 @@ mod tests {
         let conversion = TypedExpr::spec_to_string(object);
         let body = body_with(StatementIr::Return(conversion));
 
-        assert!(
-            !SourceCallFlowEffects::for_finalized_invocation(&[], &body)
-                .proves_no_flow_invalidation()
-        );
+        assert!(!SourceCallFlowEffects::for_finalized_invocation(&[], &body)
+            .proves_no_flow_invalidation());
     }
 
     #[test]

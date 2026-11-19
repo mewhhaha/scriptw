@@ -538,7 +538,11 @@ mod tests {
                         .into_parts();
                 assert_eq!(storage, function.owned_env_bindings.as_slice());
                 assert!(
-                    arguments.take_for_binding().unwrap().into_present().is_none(),
+                    arguments
+                        .take_for_binding()
+                        .unwrap()
+                        .into_present()
+                        .is_none(),
                     "{source}"
                 );
             });

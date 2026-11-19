@@ -666,10 +666,9 @@ impl Function {
                     // The label is the head; only the body's end falls out.
                     FrameKind::Loop | FrameKind::Function => current,
                     // The arm without code falls through from the opener.
-                    FrameKind::IfThen => meet_reaching(
-                        meet_reaching(frame.label, &frame.other_arm),
-                        &current,
-                    ),
+                    FrameKind::IfThen => {
+                        meet_reaching(meet_reaching(frame.label, &frame.other_arm), &current)
+                    }
                     FrameKind::Block
                     | FrameKind::IfElse
                     | FrameKind::TryTable
@@ -839,8 +838,13 @@ impl Function {
         // Facts follow the instruction only once it is admitted, so a
         // rejected instruction changes nothing.
         let enclosing_depth = self.frames.len();
-        let closing = matches!(instruction, Instruction::End | Instruction::Delegate(_))
-            .then(|| self.frames.last().expect("an open frame was checked above").kind);
+        let closing =
+            matches!(instruction, Instruction::End | Instruction::Delegate(_)).then(|| {
+                self.frames
+                    .last()
+                    .expect("an open frame was checked above")
+                    .kind
+            });
 
         match instruction {
             Instruction::Block(_) => self.frames.push(Frame::new(

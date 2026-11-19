@@ -31,7 +31,9 @@ fn run(source: &str, module: bool) {
     );
     assert_eq!(
         outcome.output_events,
-        [HostOutputEvent::PrintLine("private binding names ok 23".into())],
+        [HostOutputEvent::PrintLine(
+            "private binding names ok 23".into()
+        )],
         "module={module}"
     );
 }

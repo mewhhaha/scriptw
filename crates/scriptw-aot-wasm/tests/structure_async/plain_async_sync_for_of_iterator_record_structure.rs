@@ -1121,7 +1121,9 @@ fn runtime_oracles_cover_acquisition_close_errors_strings_and_fresh_bindings() {
     assert!(PATTERN_CONTRACT.contains("assignment patterns and `var` binding patterns"));
     assert!(PATTERN_CONTRACT.contains("wasm_plain_async_sync_for_of_nonlexical_pattern_heads.js"));
     assert!(LEXICAL_PATTERN_CONTRACT.contains("public storage enum has exactly those three cases"));
-    assert!(LEXICAL_PATTERN_CONTRACT.contains("wasm_plain_async_sync_for_of_lexical_pattern_heads.js"));
+    assert!(
+        LEXICAL_PATTERN_CONTRACT.contains("wasm_plain_async_sync_for_of_lexical_pattern_heads.js")
+    );
 }
 
 #[test]

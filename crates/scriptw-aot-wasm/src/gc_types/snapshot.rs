@@ -40,7 +40,8 @@ snapshot_layouts!(PropertyValue => PropertyValue, Stored => StoredValue, String 
 /// shapes plain data adds reach by transitions. Array storages may carry
 /// spare slots beyond it; only the shape's keys are properties.
 pub const SNAPSHOT_COMPACT_PROPERTY_LIMIT: u32 = crate::objects::MAX_COMPACT_SHAPE_KEYS as u32;
-const _: () = assert!(crate::objects::MAX_COMPACT_DATA_FIELDS as u32 <= SNAPSHOT_COMPACT_PROPERTY_LIMIT);
+const _: () =
+    assert!(crate::objects::MAX_COMPACT_DATA_FIELDS as u32 <= SNAPSHOT_COMPACT_PROPERTY_LIMIT);
 
 pub const SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT: &str = "scriptw_snapshot_resolve_property_value";
 pub const SNAPSHOT_ENSURE_PROPERTY_STORAGE_EXPORT: &str =

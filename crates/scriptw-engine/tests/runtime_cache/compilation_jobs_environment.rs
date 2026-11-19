@@ -48,7 +48,12 @@ fn unconfigured_compilation_pool_honours_scriptw_jobs() {
     ] {
         let mut command = Command::new(&executable);
         command
-            .args(["--exact", &libtest_path(TEST), "--nocapture", "--test-threads=1"])
+            .args([
+                "--exact",
+                &libtest_path(TEST),
+                "--nocapture",
+                "--test-threads=1",
+            ])
             .env(EXPECTED, expected.to_string());
         match scriptw_jobs {
             Some(value) => command.env("SCRIPTW_JOBS", value),

@@ -369,13 +369,16 @@ fn runtime_string_resolver_publishes_the_sealed_raw_hash_with_its_rooted_utf16_s
         })
         .expect("resolver loads the exact sealed 64-bit raw hash");
     // The String is born with its hash and with no dictionary position hint.
-    assert!(ops.windows(7).any(|window| matches!(window,
-        [Operator::ArrayNewData { .. }, Operator::LocalSet { local_index: saved },
-         Operator::LocalGet { local_index: loaded }, Operator::RefAsNonNull,
-         Operator::LocalGet { local_index: raw_hash }, Operator::I32Const { value: -1 },
-         Operator::StructNew { struct_type_index }]
-            if saved == loaded && *raw_hash == hash && *struct_type_index == string_type
-    )), "the exact UTF16 backing is rooted until the same row's hash publishes with it");
+    assert!(
+        ops.windows(7).any(|window| matches!(window,
+            [Operator::ArrayNewData { .. }, Operator::LocalSet { local_index: saved },
+             Operator::LocalGet { local_index: loaded }, Operator::RefAsNonNull,
+             Operator::LocalGet { local_index: raw_hash }, Operator::I32Const { value: -1 },
+             Operator::StructNew { struct_type_index }]
+                if saved == loaded && *raw_hash == hash && *struct_type_index == string_type
+        )),
+        "the exact UTF16 backing is rooted until the same row's hash publishes with it"
+    );
     assert!(
         ops.iter().all(|op| !matches!(
             op,

@@ -425,12 +425,14 @@ impl FunctionBuilder<'_> {
             );
         derived.load(schema, f).is_null(f);
         self.open_frame(ControlFrameKind::If, f);
-        let built = schema.helper_reference_on_stack(schema.call_helper(
-            crate::runtime_helpers::CompactShapeIndexArguments::new(shape),
-            self.runtime_helper_base()
-                .expect("compact probes require the registered shape index kernel"),
-            f,
-        ));
+        let built = schema.helper_reference_on_stack(
+            schema.call_helper(
+                crate::runtime_helpers::CompactShapeIndexArguments::new(shape),
+                self.runtime_helper_base()
+                    .expect("compact probes require the registered shape index kernel"),
+                f,
+            ),
+        );
         derived.replace(built.nullable(), f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -527,10 +529,9 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        let index = schema.reserve_gc_local(&mut f).initialize(
-            buckets.filled(GcOperand::i32(0), capacity, &mut f),
-            &mut f,
-        );
+        let index = schema
+            .reserve_gc_local(&mut f)
+            .initialize(buckets.filled(GcOperand::i32(0), capacity, &mut f), &mut f);
         let slot = schema.reserve_i32_local(&mut f);
         let bucket = schema.reserve_i32_local(&mut f);
         let ordinal = schema.reserve_i32_local(&mut f);
@@ -560,7 +561,9 @@ impl FunctionBuilder<'_> {
         bucket.store(&mut f);
         let placed = self.open_frame(ControlFrameKind::Block, &mut f);
         let probing = self.open_frame(ControlFrameKind::Loop, &mut f);
-        buckets.read(&index, bucket, schema, &mut f).store(ordinal, &mut f);
+        buckets
+            .read(&index, bucket, schema, &mut f)
+            .store(ordinal, &mut f);
         ordinal.load(&mut f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(placed, &mut f);
@@ -581,7 +584,13 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(1));
         f.instruction(&Instruction::I32Add);
         ordinal.store(&mut f);
-        buckets.write(&index, bucket, GcOperand::i32_local(ordinal), schema, &mut f);
+        buckets.write(
+            &index,
+            bucket,
+            GcOperand::i32_local(ordinal),
+            schema,
+            &mut f,
+        );
         ordinal.load(&mut f);
         slot.store(&mut f);
         self.emit_branch_to_target(each, &mut f);
@@ -1648,10 +1657,9 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Eqz);
         f.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, f);
-        let stored = schema.reserve_gc_local(f).initialize(
-            schema.struct_type::<StoredValue>().from_value(value, f),
-            f,
-        );
+        let stored = schema
+            .reserve_gc_local(f)
+            .initialize(schema.struct_type::<StoredValue>().from_value(value, f), f);
         schema.field(PropertyDescriptorSchema::VALUE).write(
             &present,
             GcOperand::subtype_reference(&stored, schema),

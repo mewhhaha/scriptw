@@ -1,12 +1,12 @@
 //! Function header admission shares the live own-data decoder, not snapshots.
 use crate::{
     linked_bodies::module_bodies,
-    property_read_plans::{Module, calls},
+    property_read_plans::{calls, Module},
 };
 use scriptw_aot_wasm::{
-    GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot,
+    emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
 };
-use scriptw_front::{ParseOptions, parse};
+use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::lower;
 use wasmparser::{HeapType, Operator, Parser, Payload, UnpackedIndex, Validator, WasmFeatures};
 

@@ -1,7 +1,7 @@
 use super::*;
 use crate::gc_types::{
-    ArrayObject, ArrayObjectSchema, GcLocal, GcNullability, GcOperand, I32Local,
-    StoredValue, ValueArray, ValueLocals,
+    ArrayObject, ArrayObjectSchema, GcLocal, GcNullability, GcOperand, I32Local, StoredValue,
+    ValueArray, ValueLocals,
 };
 
 /// A private GC buffer snapshots each evaluated value once. Capacity is never

@@ -156,7 +156,10 @@ fn transition_kernel_guards_precede_every_mutation() {
             "OrdinaryObjectSchema::PROPERTIES",
         ],
     );
-    assert_eq!(extend.matches("OrdinaryObjectSchema::PROPERTIES").count(), 1);
+    assert_eq!(
+        extend.matches("OrdinaryObjectSchema::PROPERTIES").count(),
+        1
+    );
 }
 
 #[test]

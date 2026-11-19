@@ -4,8 +4,8 @@ use super::*;
 
 mod choice_entries;
 pub(super) use choice_entries::{
-    CheckedTemplateRunNode, ChoiceEntryKind, ChoiceSnapshotView,
-    ChoiceSnapshotWord, ChoiceStack, SnapshotChoice,
+    CheckedTemplateRunNode, ChoiceEntryKind, ChoiceSnapshotView, ChoiceSnapshotWord, ChoiceStack,
+    SnapshotChoice,
 };
 
 /// Owning the tail is required to publish any choice frame. The actual cursor

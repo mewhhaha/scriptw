@@ -446,13 +446,11 @@ mod tests {
         let cache = PreparedSourceCache::default();
         assert!(PureRealmDiscovery::default().discover(&invalid, &cache));
         assert!(cache.realm_module_requests().is_empty());
-        assert!(
-            cache
-                .parse_script(
-                    &crate::PreparedScriptKind::ShadowRealmEvaluate,
-                    &crate::encode_js_string_utf16(&[0xd800]),
-                )
-                .is_err()
-        );
+        assert!(cache
+            .parse_script(
+                &crate::PreparedScriptKind::ShadowRealmEvaluate,
+                &crate::encode_js_string_utf16(&[0xd800]),
+            )
+            .is_err());
     }
 }

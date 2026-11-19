@@ -87,8 +87,7 @@ fn observed_and_arrow_captured_module_context_keeps_real_cells() {
         "make",
         |counts| {
             assert_eq!(
-                counts,
-                [0; 6],
+                counts, [0; 6],
                 "an owner's own observation keeps its arguments binding private"
             );
         },

@@ -1,6 +1,6 @@
 //! First data properties of a fresh plain object, published in one call.
-use super::*;
 use super::property_storage::PreparedOrdinaryPropertyKey;
+use super::*;
 use crate::gc_types::{IntrinsicPropertyValueCache, PooledStringTable};
 
 /// The three data attributes of one fresh row, packed as the emitter writes
@@ -20,7 +20,11 @@ impl FreshDataAttributes {
     pub(crate) fn word(self) -> i32 {
         (if self.writable { Self::WRITABLE } else { 0 })
             | (if self.enumerable { Self::ENUMERABLE } else { 0 })
-            | (if self.configurable { Self::CONFIGURABLE } else { 0 })
+            | (if self.configurable {
+                Self::CONFIGURABLE
+            } else {
+                0
+            })
     }
 }
 
@@ -33,16 +37,16 @@ impl FunctionBuilder<'_> {
     pub(crate) fn compile_fresh_data_properties_publish_helper(
         &mut self,
     ) -> Result<Function, EmitError> {
-        let mut f = self.begin_helper_body(
-            crate::runtime_helpers::RuntimeHelperId::FreshDataPropertiesPublish,
-        );
+        let mut f = self
+            .begin_helper_body(crate::runtime_helpers::RuntimeHelperId::FreshDataPropertiesPublish);
         let p = self
             .helper_parameters::<crate::runtime_helpers::FreshDataPropertiesPublishParameters>(
                 &mut f,
             );
         let s = self.runtime_schema();
         let count = s.reserve_i32_local(&mut f);
-        s.array_type::<PooledStringTable>().length(&p.keys, s, &mut f);
+        s.array_type::<PooledStringTable>()
+            .length(&p.keys, s, &mut f);
         count.store(&mut f);
         s.array_type::<IntrinsicPropertyValueCache>()
             .length(&p.values, s, &mut f);
@@ -154,10 +158,9 @@ impl FunctionBuilder<'_> {
                 .reference(),
             &mut f,
         );
-        let text = s.reserve_gc_local(&mut f).initialize(
-            maybe_key.load(s, &mut f).require_non_null(&mut f),
-            &mut f,
-        );
+        let text = s
+            .reserve_gc_local(&mut f)
+            .initialize(maybe_key.load(s, &mut f).require_non_null(&mut f), &mut f);
         maybe_key.clear(&mut f);
         let key = PropertyKeyLocals::from_string(s, &text, &mut f);
         text.clear(&mut f);
@@ -167,10 +170,9 @@ impl FunctionBuilder<'_> {
                 .reference(),
             &mut f,
         );
-        let value = s.reserve_gc_local(&mut f).initialize(
-            maybe_value.load(s, &mut f).require_non_null(&mut f),
-            &mut f,
-        );
+        let value = s
+            .reserve_gc_local(&mut f)
+            .initialize(maybe_value.load(s, &mut f).require_non_null(&mut f), &mut f);
         maybe_value.clear(&mut f);
         s.array_type::<OrdinaryPropertyIndex>()
             .read(&p.flags, row, s, &mut f)

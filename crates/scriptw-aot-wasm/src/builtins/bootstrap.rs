@@ -3,9 +3,7 @@ use crate::functions::{NonArrayRealmIntrinsicSlot, RealmFunctionMaterializationC
 use crate::gc_types::*;
 use crate::intrinsics::IntrinsicKey;
 use crate::intrinsics::IntrinsicPropertyLayoutId;
-use crate::objects::{
-    AccessorDescriptor, AccessorGetter, FreshDataAttributes,
-};
+use crate::objects::{AccessorDescriptor, AccessorGetter, FreshDataAttributes};
 use scriptw_ir::StandardBuiltinInstaller;
 
 mod error_initialization;
@@ -16,9 +14,9 @@ mod regexp_initialization;
 pub(crate) use regexp_initialization::RegExpIntrinsicBuild;
 mod binary_data_initialization;
 pub(crate) use binary_data_initialization::BinaryDataIntrinsicBuild;
-mod intl_initialization;
 mod demand_constructors;
 mod global_publication;
+mod intl_initialization;
 use global_publication::GlobalBindingPublication;
 mod realm_initialization;
 pub(crate) use intl_initialization::IntlIntrinsicBuild;
@@ -941,12 +939,10 @@ impl<'a> FunctionBuilder<'a> {
             prototype.clear(function);
             array.clear(function);
         }
-        for (builtin, slot) in [
-            (
-                StandardBuiltinId::StringConstructor,
-                NonArrayRealmIntrinsicSlot::StringPrototype,
-            ),
-        ] {
+        for (builtin, slot) in [(
+            StandardBuiltinId::StringConstructor,
+            NonArrayRealmIntrinsicSlot::StringPrototype,
+        )] {
             if self
                 .runtime_bootstrap_plan
                 .should_initialize_standard_builtin(builtin)
@@ -1203,10 +1199,12 @@ impl<'a> FunctionBuilder<'a> {
                 }
                 GlobalPropertyInitializerIr::BuiltinFunction(builtin) => {
                     if *builtin == StandardBuiltinId::RegExpConstructor {
-                        Some(self.emit_deferred_regexp_constructor_value(
-                            &bootstrap.realm,
-                            function,
-                        )?)
+                        Some(
+                            self.emit_deferred_regexp_constructor_value(
+                                &bootstrap.realm,
+                                function,
+                            )?,
+                        )
                     } else if *builtin == StandardBuiltinId::DateConstructor {
                         Some(self.emit_deferred_date_constructor_value(&bootstrap.realm, function)?)
                     } else if let Some(constructor) =
@@ -1233,16 +1231,12 @@ impl<'a> FunctionBuilder<'a> {
                             &bootstrap.realm,
                             function,
                         )?)
-                    } else if let Some(method) =
-                        match self.functions.get(&builtin.function_id()) {
-                            Some(meta) => {
-                                crate::intrinsics::DeferredIntrinsicMethod::validated_global(
-                                    *builtin, meta,
-                                )?
-                            }
-                            None => None,
-                        }
-                    {
+                    } else if let Some(method) = match self.functions.get(&builtin.function_id()) {
+                        Some(meta) => crate::intrinsics::DeferredIntrinsicMethod::validated_global(
+                            *builtin, meta,
+                        )?,
+                        None => None,
+                    } {
                         Some(self.emit_deferred_global_function_value(
                             method,
                             &bootstrap.realm,

@@ -1,6 +1,6 @@
 //! Realm creation leaves every demand constructor to its first canonical read.
-use super::*;
 use super::error_demand_initialization::{body, named};
+use super::*;
 use crate::heap::DemandConstructor;
 
 #[test]

@@ -1,14 +1,14 @@
 //! ForIn consumes descriptor predicates without materializing an ordinary snapshot.
 use crate::{
     ordinary_receiver_definition::concrete_if_arms,
-    property_read_plans::{Module, calls},
+    property_read_plans::{calls, Module},
     scalar_masked_rows::type_group_sizes,
 };
 use scriptw_aot_wasm::{
-    GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot,
+    emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
 };
-use scriptw_front::{ParseOptions, parse};
-use scriptw_ir::{HostSurfacePolicy, lower_with_host_surface_policy};
+use scriptw_front::{parse, ParseOptions};
+use scriptw_ir::{lower_with_host_surface_policy, HostSurfacePolicy};
 use wasmparser::{HeapType, Operator, UnpackedIndex, ValType, Validator, WasmFeatures};
 
 #[test]
@@ -87,9 +87,11 @@ fn for_in_reads_flags_without_cloning_descriptors_and_keeps_exotic_lookup() {
     );
     let arm = arms[0];
     let tests_layout = |layout: u32| {
-        arm.iter().any(|op| matches!(op,
+        arm.iter().any(|op| {
+            matches!(op,
         Operator::RefTestNonNull { hty: HeapType::Concrete(UnpackedIndex::Module(index)) }
-            if *index == layout))
+            if *index == layout)
+        })
     };
     for sealed in [
         GcSnapshotLayout::InlineCompactStorage,

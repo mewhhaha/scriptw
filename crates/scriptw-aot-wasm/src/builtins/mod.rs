@@ -62,9 +62,7 @@ mod math;
 mod number;
 mod object;
 mod promise;
-pub(crate) use promise::{
-    AsyncGeneratorCompleteStepKind, ModuleReactionContinuation,
-};
+pub(crate) use promise::{AsyncGeneratorCompleteStepKind, ModuleReactionContinuation};
 mod proxy;
 mod reflect;
 mod regexp;

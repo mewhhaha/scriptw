@@ -328,23 +328,21 @@ export const value = 1;
             );
         }
         assert_eq!(graph.modules.len(), 4);
-        assert!(
-            prepared
-                .ir
-                .script
-                .as_ref()
-                .unwrap()
-                .prepared_scripts
-                .iter()
-                .any(|script| {
-                    script.kind == scriptw_ir::PreparedScriptKind::ShadowRealmEvaluate
-                        && script.source == "new.target"
-                        && matches!(
-                            script.outcome,
-                            scriptw_ir::PreparedScriptOutcome::DeferredSyntaxError { .. }
-                        )
-                })
-        );
+        assert!(prepared
+            .ir
+            .script
+            .as_ref()
+            .unwrap()
+            .prepared_scripts
+            .iter()
+            .any(|script| {
+                script.kind == scriptw_ir::PreparedScriptKind::ShadowRealmEvaluate
+                    && script.source == "new.target"
+                    && matches!(
+                        script.outcome,
+                        scriptw_ir::PreparedScriptOutcome::DeferredSyntaxError { .. }
+                    )
+            }));
         let first_key = program_cache_key(source, ParseGoal::Script, &options, Some(graph));
         let final_ir = prepared.ir.clone();
         let unit = engine.compile_prepared_on_current_thread(prepared).unwrap();
@@ -489,14 +487,12 @@ export const value = 1;
             .expect("prepared import owns its Script graph");
         assert_eq!(graph.modules.len(), 2);
         assert_eq!(graph.modules[0].goal(), ParseGoal::Script);
-        assert!(
-            graph
-                .resolutions
-                .iter()
-                .any(|(owner, request, target)| *owner == graph.entry
-                    && request.specifier() == "./value.js"
-                    && *target == 1)
-        );
+        assert!(graph
+            .resolutions
+            .iter()
+            .any(|(owner, request, target)| *owner == graph.entry
+                && request.specifier() == "./value.js"
+                && *target == 1));
         assert!(
             graph.realm_requests.is_empty(),
             "an eval import is not a Realm-origin request"

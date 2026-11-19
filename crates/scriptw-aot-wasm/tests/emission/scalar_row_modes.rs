@@ -3,8 +3,8 @@
 mod row_loop_operators;
 use crate::{property_read_plans::Module, scalar_masked_rows::type_group_sizes};
 use row_loop_operators::{closed_number_loops, normalize};
-use scriptw_aot_wasm::{GcSnapshotLayout, PromiseRejectionPolicy, emit_with_rooted_snapshot};
-use scriptw_front::{ParseOptions, parse};
+use scriptw_aot_wasm::{emit_with_rooted_snapshot, GcSnapshotLayout, PromiseRejectionPolicy};
+use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::lower;
 use wasmparser::{
     CompositeInnerType, HeapType, Operator, UnpackedIndex, ValType, Validator, WasmFeatures,

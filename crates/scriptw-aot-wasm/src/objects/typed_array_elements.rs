@@ -1,9 +1,9 @@
 use super::*;
 use crate::gc_types::{
-    ArrayBufferSchema, BigIntConstruction, BigIntLimbArray, BigIntValue,
-    BigIntValueSchema, BufferOwner, BufferOwnerKind, BufferOwnerSchema, BufferView,
-    BufferViewSchema, ByteArray, GcHostImport, GcI32Constant, HostResource, HostResourceSchema,
-    I64Local, RuntimeSchema, SharedArrayBufferSchema, TypedArrayObject, TypedArrayObjectSchema,
+    ArrayBufferSchema, BigIntConstruction, BigIntLimbArray, BigIntValue, BigIntValueSchema,
+    BufferOwner, BufferOwnerKind, BufferOwnerSchema, BufferView, BufferViewSchema, ByteArray,
+    GcHostImport, GcI32Constant, HostResource, HostResourceSchema, I64Local, RuntimeSchema,
+    SharedArrayBufferSchema, TypedArrayObject, TypedArrayObjectSchema,
 };
 
 /// A view is acquired after observable conversion and owns the exact backing

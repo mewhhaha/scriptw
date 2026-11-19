@@ -3,9 +3,8 @@ use crate::functions::FunctionNamePrefix;
 use crate::gc_types::{
     CompletionLocals, GcLocal, GcOperand, GcStackReference, I32Local, I64Local, Nullable,
     OrdinaryObject, OrdinaryObjectSchema, OrdinaryPropertyIndex, OrdinaryPropertyStorage,
-    OrdinaryPropertyStorageSchema, PropertyDescriptor,
-    PropertyDescriptorSchema, PropertyEntry, PropertyEntrySchema, PropertyTable, ProxyObject,
-    ScalarValue, StoredValue, ValueLocals,
+    OrdinaryPropertyStorageSchema, PropertyDescriptor, PropertyDescriptorSchema, PropertyEntry,
+    PropertyEntrySchema, PropertyTable, ProxyObject, ScalarValue, StoredValue, ValueLocals,
 };
 use crate::operations::BigIntNumberPolicy;
 pub(crate) use crate::operations::PropertyKeyLocals;
@@ -16,8 +15,8 @@ use scriptw_ir::{ComputedPropertyNameInferenceIr, ObjectMethodFunctionIr};
 // The Property Descriptor lattice follows ECMA-262 6.2.6.
 use scriptw_ir::property_descriptor::{
     classify, DescriptorCarrier, DescriptorClassification, DescriptorField, DescriptorSide,
-    KindTerms, PartialDescriptor, Presence, PropertyDescriptorKind,
-    ValidatedDescriptor, TO_PROPERTY_DESCRIPTOR_ORDER,
+    KindTerms, PartialDescriptor, Presence, PropertyDescriptorKind, ValidatedDescriptor,
+    TO_PROPERTY_DESCRIPTOR_ORDER,
 };
 
 mod accessor_descriptor;
@@ -51,8 +50,8 @@ mod own_property;
 mod packed_array_builtin;
 mod packed_array_index;
 mod plain_data_literal;
-pub(crate) use plain_data_literal::MAX_COMPACT_DATA_FIELDS;
 pub(crate) use compact_data::MAX_COMPACT_SHAPE_KEYS;
+pub(crate) use plain_data_literal::MAX_COMPACT_DATA_FIELDS;
 mod runtime_helpers;
 mod simple_own_data_read;
 mod sparse_array_index;
@@ -68,8 +67,8 @@ mod private_elements;
 mod property_read_plan;
 mod property_storage;
 mod proxy_own_keys_list;
-mod regexp_literal;
 mod proxy_target_descriptor;
+mod regexp_literal;
 pub(crate) use proxy_target_descriptor::CompletedProxyTargetDescriptor;
 mod raw_numeric_array_read;
 mod typed_array_elements;

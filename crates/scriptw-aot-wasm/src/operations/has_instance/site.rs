@@ -243,14 +243,12 @@ impl FunctionBuilder<'_> {
         // Every dictionary entry stores its key's hash, and a Symbol is
         // given its hash identity the first time it is hashed, so until
         // then no dictionary holds it.
-        let symbol = s
-            .reserve_gc_local::<SymbolValue, Nullable>(f)
-            .initialize(
-                s.field(InstanceofSiteRecordSchema::HAS_INSTANCE)
-                    .read(record, s, f)
-                    .reference(),
-                f,
-            );
+        let symbol = s.reserve_gc_local::<SymbolValue, Nullable>(f).initialize(
+            s.field(InstanceofSiteRecordSchema::HAS_INSTANCE)
+                .read(record, s, f)
+                .reference(),
+            f,
+        );
         s.field(SymbolValueSchema::KEY_HASH_ID).read(&symbol, s, f);
         symbol.clear(f);
         f.instruction(&Instruction::I64Const(0));

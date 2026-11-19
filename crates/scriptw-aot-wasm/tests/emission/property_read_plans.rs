@@ -1,10 +1,10 @@
 //! Source reads call the typed runtime owner for live cache hits and complete Get.
 use scriptw_aot_wasm::{
-    GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy, RUNTIME_IMPORT_NAMESPACE,
-    emit_with_rooted_snapshot,
+    emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
+    RUNTIME_IMPORT_NAMESPACE,
 };
-use scriptw_front::{ParseOptions, parse};
-use scriptw_ir::{ExprIr, PropertyKeyIr, SpecOperationIr, StatementIr, ValueKind, lower};
+use scriptw_front::{parse, ParseOptions};
+use scriptw_ir::{lower, ExprIr, PropertyKeyIr, SpecOperationIr, StatementIr, ValueKind};
 use std::collections::BTreeMap;
 use wasmparser::{
     CompositeInnerType, ExternalKind, HeapType, KnownCustom, Name, Operator, Parser, Payload,
@@ -106,9 +106,10 @@ impl<'a> Module<'a> {
                             {
                                 for name in map {
                                     let name = name.expect("property-read function name decodes");
-                                    assert!(
-                                        module.names.insert(name.index, name.name.into()).is_none()
-                                    );
+                                    assert!(module
+                                        .names
+                                        .insert(name.index, name.name.into())
+                                        .is_none());
                                 }
                             }
                         }
@@ -245,16 +246,16 @@ fn assert_numeric_probe_before_conversion(
     assert!(
         guard.iter().any(|op| matches!(op, Operator::F64Ge))
             && guard.iter().any(|op| matches!(op, Operator::F64Lt))
-            && guard.iter().any(|op| matches!(op, Operator::I64TruncSatF64S))
-            && guard.iter().any(|op| matches!(op, Operator::F64ConvertI64S))
+            && guard
+                .iter()
+                .any(|op| matches!(op, Operator::I64TruncSatF64S))
+            && guard
+                .iter()
+                .any(|op| matches!(op, Operator::F64ConvertI64S))
             && guard.iter().any(|op| matches!(op, Operator::F64Eq)),
         "finite integral index guards precede the trapping cast"
     );
-    let [
-        Operator::LocalGet { .. },
-        Operator::BrIf { relative_depth },
-        ..,
-    ] = &body[end + 1..]
+    let [Operator::LocalGet { .. }, Operator::BrIf { relative_depth }, ..] = &body[end + 1..]
     else {
         panic!("the completed probe's handled flag controls the property exit");
     };

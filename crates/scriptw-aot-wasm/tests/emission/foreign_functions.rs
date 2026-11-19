@@ -1,13 +1,13 @@
 //! Real module lowering, P import indices/wrappers, and the shared R boundary.
 use scriptw_aot_wasm::{
-    RUNTIME_IMPORT_NAMESPACE, WasmArtifact, emit, foreign_registry_from_module,
+    emit, foreign_registry_from_module, WasmArtifact, RUNTIME_IMPORT_NAMESPACE,
 };
 use scriptw_ir::foreign::{
     ForeignErrorTag, ForeignFunctionDeclaration, ForeignModuleDeclaration, ForeignResultType,
     ForeignValueType,
 };
 use scriptw_ir::{
-    ModuleGraphSources, ModuleKey, ModuleRequestKeyIr, ModuleSourceIr, lower_module_graph,
+    lower_module_graph, ModuleGraphSources, ModuleKey, ModuleRequestKeyIr, ModuleSourceIr,
 };
 use wasmparser::{
     CompositeInnerType, Operator, Parser, Payload, SubType, TypeRef, Validator, WasmFeatures,
@@ -197,11 +197,9 @@ fn assert_foreign_wrappers() {
                 for export in exports {
                     let export = export.unwrap();
                     if export.kind == wasmparser::ExternalKind::Func {
-                        assert!(
-                            runtime_exports
-                                .insert(export.name.to_owned(), export.index)
-                                .is_none()
-                        );
+                        assert!(runtime_exports
+                            .insert(export.name.to_owned(), export.index)
+                            .is_none());
                     }
                 }
             }

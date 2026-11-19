@@ -157,7 +157,11 @@ fn ordinary_global_properties_retain_closed_defining_realm_recipes_and_never_res
     assert!(global.contains("Some(self.emit_deferred_binary_data_constructor_value("));
     // The recipe joins the batch that publishes every binding in its plan
     // order with the binding's own attributes.
-    let batch = bounded(BOOTSTRAP, "let property_value = match deferred {", "publication.publish(");
+    let batch = bounded(
+        BOOTSTRAP,
+        "let property_value = match deferred {",
+        "publication.publish(",
+    );
     assert!(batch.contains("publication.push("));
     assert!(batch.contains("writable: binding.initializer.writable()"));
     let publication = bounded(

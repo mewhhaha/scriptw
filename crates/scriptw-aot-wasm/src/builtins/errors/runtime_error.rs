@@ -2,8 +2,7 @@ use super::*;
 use crate::functions::NonArrayRealmIntrinsicSlot;
 use crate::gc_types::{
     CompletionLocals, Environment, EnvironmentSchema, FunctionContext, FunctionContextSchema,
-    GcLocal, GcOperand, NativeErrorObject, Nullable, RealmRecord,
-    StringValue, ValueLocals,
+    GcLocal, GcOperand, NativeErrorObject, Nullable, RealmRecord, StringValue, ValueLocals,
 };
 use crate::module::ThrowDiagnosticRole;
 use crate::operations::PropertyKeyLocals;

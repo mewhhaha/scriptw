@@ -61,10 +61,16 @@ impl FunctionBuilder<'_> {
         let mut function = self.begin_helper_body(RuntimeHelperId::RealmEnsureConstructor);
         let parameters = self.helper_parameters::<RealmEnsureConstructorParameters>(&mut function);
         let schema = self.runtime_schema();
-        let context =
-            self.emit_realm_function_materialization_context_from_realm(&parameters.realm, &mut function);
+        let context = self.emit_realm_function_materialization_context_from_realm(
+            &parameters.realm,
+            &mut function,
+        );
         for demand in DemandConstructor::ALL {
-            if self.functions.get(&demand.builtin().function_id()).is_none() {
+            if self
+                .functions
+                .get(&demand.builtin().function_id())
+                .is_none()
+            {
                 continue;
             }
             self.validate_demand_constructor(demand)?;

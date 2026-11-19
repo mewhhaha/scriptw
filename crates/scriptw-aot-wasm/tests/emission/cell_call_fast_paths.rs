@@ -1,10 +1,10 @@
 //! Proven declarative Calls read live cells; unresolved References keep their owner.
 use crate::property_read_plans::Module;
-use scriptw_aot_wasm::{GcHostField, emit};
-use scriptw_front::{ParseOptions, parse};
+use scriptw_aot_wasm::{emit, GcHostField};
+use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::{
-    EnvironmentIdentifierOperationIr as Operation, EnvironmentIdentifierResolutionStart as Start,
-    ExprIr, StatementIr, Strictness, lower,
+    lower, EnvironmentIdentifierOperationIr as Operation,
+    EnvironmentIdentifierResolutionStart as Start, ExprIr, StatementIr, Strictness,
 };
 use wasmparser::{
     CompositeInnerType, HeapType, Operator, StorageType, UnpackedIndex, ValType, Validator,

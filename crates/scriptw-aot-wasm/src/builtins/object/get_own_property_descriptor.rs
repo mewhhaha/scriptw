@@ -1,8 +1,8 @@
 //! Public FromPropertyDescriptor materialization over private [[GetOwnProperty]].
 use super::*;
 use crate::gc_types::{
-    CompletionLocals, GcLocal, PropertyDescriptor, PropertyDescriptorSchema,
-    StoredValue, ValueLocals,
+    CompletionLocals, GcLocal, PropertyDescriptor, PropertyDescriptorSchema, StoredValue,
+    ValueLocals,
 };
 use crate::objects::{
     DescriptorFlag, DescriptorObjectFields, DescriptorObjectPrototype, PropertyKeyLocals,

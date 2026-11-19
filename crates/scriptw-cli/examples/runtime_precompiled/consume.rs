@@ -211,7 +211,10 @@ fn collect_observations<const WINDOWS: bool>(
                 .evaluate_profiled(&mut store)
                 .map_err(|e| e.to_string())?;
             let entry_caller_thread_cpu = benchmark_thread_cpu::finish(entry_caller_cpu_started);
-            (outcome, Some((execution_thread_cpu, entry_caller_thread_cpu)))
+            (
+                outcome,
+                Some((execution_thread_cpu, entry_caller_thread_cpu)),
+            )
         };
         let execution_ns = started.elapsed().as_nanos();
         #[cfg(feature = "benchmark-module-images")]

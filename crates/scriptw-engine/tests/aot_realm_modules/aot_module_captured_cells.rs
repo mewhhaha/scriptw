@@ -1,8 +1,8 @@
 use scriptw_engine::{
-    CompileOptions, EmbeddedEvaluation, EmbeddedInstance, EmbeddedRuntime, Engine,
-    ExecutionBackend, ForeignValue, HostOutputEvent, JsCompletion, JsValue,
-    NativeCompilationPolicy, ObservedCompletion, RealmBuilder, RunOptions, WasmStoreState,
-    configure_compilation_jobs, configure_wasm_runtime,
+    configure_compilation_jobs, configure_wasm_runtime, CompileOptions, EmbeddedEvaluation,
+    EmbeddedInstance, EmbeddedRuntime, Engine, ExecutionBackend, ForeignValue, HostOutputEvent,
+    JsCompletion, JsValue, NativeCompilationPolicy, ObservedCompletion, RealmBuilder, RunOptions,
+    WasmStoreState,
 };
 
 fn assert_output(source: &str, module: bool, expected: &[&str]) {

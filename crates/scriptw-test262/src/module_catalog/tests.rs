@@ -89,31 +89,23 @@ fn catalog_eligibility_preserves_javascript_trivia_and_escaped_requests() {
 fn catalog_distinguishes_rejected_requests_from_failed_fixture_traversal() {
     let directory = Directory::new();
     let mut catalog = empty_catalog(&directory);
-    assert!(
-        catalog
-            .resolve(&directory.0, "./missing.js", &[])
-            .unwrap()
-            .is_none()
-    );
+    assert!(catalog
+        .resolve(&directory.0, "./missing.js", &[])
+        .unwrap()
+        .is_none());
     fs::write(directory.0.join("invalid_FIXTURE.js"), [255]).unwrap();
-    assert!(
-        catalog
-            .resolve(&directory.0, "./invalid_FIXTURE.js", &[])
-            .unwrap()
-            .is_none()
-    );
-    assert!(
-        catalog
-            .resolve(&directory.0, "./invalid_FIXTURE.js/child.js", &[])
-            .unwrap()
-            .is_none()
-    );
-    assert!(
-        catalog
-            .resolve(&directory.0, "./invalid\0.js", &[])
-            .unwrap()
-            .is_none()
-    );
+    assert!(catalog
+        .resolve(&directory.0, "./invalid_FIXTURE.js", &[])
+        .unwrap()
+        .is_none());
+    assert!(catalog
+        .resolve(&directory.0, "./invalid_FIXTURE.js/child.js", &[])
+        .unwrap()
+        .is_none());
+    assert!(catalog
+        .resolve(&directory.0, "./invalid\0.js", &[])
+        .unwrap()
+        .is_none());
     let invalid_directory = directory.0.join("invalid_FIXTURE.js");
     let error = catalog
         .fixture_rows(&directory.0, &invalid_directory)
@@ -181,11 +173,9 @@ fn catalog_reads_binary_fixtures_and_retains_mixed_records_at_one_url() {
         .resolve(&referrer, &request("./raw_FIXTURE.png", true))
         .unwrap();
     assert_eq!(image.payload_bytes(), &[0, 255, 128, 10]);
-    assert!(
-        graph
-            .resolve(&referrer, &request("./raw_FIXTURE.png", false))
-            .is_none()
-    );
+    assert!(graph
+        .resolve(&referrer, &request("./raw_FIXTURE.png", false))
+        .is_none());
     assert_eq!(
         graph
             .resolve(&referrer, &request("./empty_FIXTURE.txt", true))
@@ -221,21 +211,17 @@ fn text_catalog_keeps_self_import_raw_and_admits_computed_json_text() {
         .unwrap();
     assert_eq!(own.kind(), EmbeddedModuleKind::Text);
     assert_eq!(own.source_text(), Some(source));
-    assert!(
-        graph
-            .module(graph.entry().identity(), EmbeddedModuleKind::SourceText)
-            .is_some()
-    );
+    assert!(graph
+        .module(graph.entry().identity(), EmbeddedModuleKind::SourceText)
+        .is_some());
     let data = graph
         .resolve(&referrer, &text_request("./raw_FIXTURE.json"))
         .unwrap();
     assert_eq!(data.kind(), EmbeddedModuleKind::Text);
     assert_eq!(data.source_text(), Some(raw));
-    assert!(
-        graph
-            .resolve(&referrer, &text_request("./invalid_FIXTURE.txt"))
-            .is_none()
-    );
+    assert!(graph
+        .resolve(&referrer, &text_request("./invalid_FIXTURE.txt"))
+        .is_none());
 }
 
 #[test]
@@ -416,16 +402,12 @@ fn finite_direct_eval_imports_declare_only_actual_script_referrer_edges() {
         graph.resolve(&referrer, &request).unwrap().source_text(),
         Some("export default 42;")
     );
-    assert!(
-        graph
-            .resolve(&EmbeddedModuleReferrer::Realm, &request)
-            .is_none()
-    );
-    assert!(
-        graph
-            .resolve(&EmbeddedModuleReferrer::Unlocated, &request)
-            .is_none()
-    );
+    assert!(graph
+        .resolve(&EmbeddedModuleReferrer::Realm, &request)
+        .is_none());
+    assert!(graph
+        .resolve(&EmbeddedModuleReferrer::Unlocated, &request)
+        .is_none());
     let unrelated =
         scriptw_engine::EmbeddedModuleRequest::try_new("./unrelated_FIXTURE.js", Vec::new())
             .unwrap();
@@ -466,11 +448,9 @@ fn unproved_eval_requests_do_not_authorize_available_fixture_files() {
             }
         };
         assert!(graph.resolve(&referrer, &request).is_none());
-        assert!(
-            graph
-                .resolve(&EmbeddedModuleReferrer::Realm, &request)
-                .is_none()
-        );
+        assert!(graph
+            .resolve(&EmbeddedModuleReferrer::Realm, &request)
+            .is_none());
     }
 }
 

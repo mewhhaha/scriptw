@@ -3,15 +3,14 @@ use crate::emit::ControlTarget;
 use crate::functions::NonArrayRealmIntrinsicSlot;
 use crate::gc_types::{
     ArrayObject, ArrayObjectSchema, BoundFunction, BoundFunctionSchema, CompactDataStorage,
-    CompletionLocals, ExecutableCodeKind, ExecutableCodeSchema, FunctionContextSchema,
-    EqRefLocal, GcI32Constant, GcNullability, GcOperand, GcStackReference, GcSubtype,
-    IntrinsicPropertyStorage, IntrinsicPropertyStorageSchema, IntrinsicPropertyValueCache,
-    JavaScriptObject, JavaScriptReference, NonNullable, Nullable, OrdinaryObject,
-    OrdinaryObjectSchema, OrdinaryPropertyStorage, OrdinaryPropertyStorageSchema,
-    ObjectPropertyStorage, OwnDataReadCache, OwnDataReadCacheSchema, OwnDataReadCacheTable,
-    PropertyDescriptor, PropertyDescriptorSchema, PropertyEntry, PropertyEntrySchema,
-    PropertyTable, PropertyValue, RealmRecord, StoredValue, StoredValueSchema, SymbolValue,
-    SymbolValueSchema,
+    CompletionLocals, EqRefLocal, ExecutableCodeKind, ExecutableCodeSchema, FunctionContextSchema,
+    GcI32Constant, GcNullability, GcOperand, GcStackReference, GcSubtype, IntrinsicPropertyStorage,
+    IntrinsicPropertyStorageSchema, IntrinsicPropertyValueCache, JavaScriptObject,
+    JavaScriptReference, NonNullable, Nullable, ObjectPropertyStorage, OrdinaryObject,
+    OrdinaryObjectSchema, OrdinaryPropertyStorage, OrdinaryPropertyStorageSchema, OwnDataReadCache,
+    OwnDataReadCacheSchema, OwnDataReadCacheTable, PropertyDescriptor, PropertyDescriptorSchema,
+    PropertyEntry, PropertyEntrySchema, PropertyTable, PropertyValue, RealmRecord, StoredValue,
+    StoredValueSchema, SymbolValue, SymbolValueSchema,
 };
 use crate::runtime_helpers::{
     HasInstanceArguments, HasInstanceParameters, HelperParameters, InstanceofEntryArguments,
@@ -139,7 +138,9 @@ impl CandidateObject<'_> {
         f: &mut Function,
     ) -> GcStackReference<T> {
         match self {
-            Self::Reference(reference) => reference.sealed_reference_or_branch::<T>(schema, other, f),
+            Self::Reference(reference) => {
+                reference.sealed_reference_or_branch::<T>(schema, other, f)
+            }
             Self::Prototype(reference) => reference.sealed_subtype_or_branch::<T>(schema, other, f),
         }
     }
@@ -689,15 +690,13 @@ impl FunctionBuilder<'_> {
             .read(&dictionary, s, f);
         f.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(miss, f);
-        let entries = s
-            .reserve_gc_local::<PropertyTable, Nullable>(f)
-            .initialize(
-                s.field(OrdinaryPropertyStorageSchema::ENTRIES)
-                    .read(&dictionary, s, f)
-                    .reference()
-                    .nullable(),
-                f,
-            );
+        let entries = s.reserve_gc_local::<PropertyTable, Nullable>(f).initialize(
+            s.field(OrdinaryPropertyStorageSchema::ENTRIES)
+                .read(&dictionary, s, f)
+                .reference()
+                .nullable(),
+            f,
+        );
         dictionary.clear(f);
         position.load(f);
         s.array_type::<PropertyTable>().length(&entries, s, f);
@@ -715,15 +714,13 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local::<PropertyEntry, Nullable>(f)
             .initialize(slot.non_null_or_branch(label, f).nullable(), f);
         slot.clear(f);
-        let stored_key = s
-            .reserve_gc_local::<StoredValue, Nullable>(f)
-            .initialize(
-                s.field(PropertyEntrySchema::KEY)
-                    .read(&entry, s, f)
-                    .reference()
-                    .nullable(),
-                f,
-            );
+        let stored_key = s.reserve_gc_local::<StoredValue, Nullable>(f).initialize(
+            s.field(PropertyEntrySchema::KEY)
+                .read(&entry, s, f)
+                .reference()
+                .nullable(),
+            f,
+        );
         s.field(StoredValueSchema::REFERENCE)
             .read(&stored_key, s, f);
         stored_key.clear(f);
@@ -748,15 +745,13 @@ impl FunctionBuilder<'_> {
         ));
         f.instruction(&Instruction::I32And);
         self.emit_branch_if_to_target(miss, f);
-        let data = s
-            .reserve_gc_local::<PropertyValue, Nullable>(f)
-            .initialize(
-                s.field(PropertyDescriptorSchema::VALUE)
-                    .read(&descriptor, s, f)
-                    .reference()
-                    .nullable(),
-                f,
-            );
+        let data = s.reserve_gc_local::<PropertyValue, Nullable>(f).initialize(
+            s.field(PropertyDescriptorSchema::VALUE)
+                .read(&descriptor, s, f)
+                .reference()
+                .nullable(),
+            f,
+        );
         descriptor.clear(f);
         let stored = s.reserve_gc_local::<StoredValue, Nullable>(f).initialize(
             data.sealed_subtype_or_branch::<StoredValue>(s, label, f)
@@ -813,14 +808,12 @@ impl FunctionBuilder<'_> {
             .length(&groups, s, f);
         f.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(miss, f);
-        let value = s
-            .reserve_gc_local::<PropertyValue, Nullable>(f)
-            .initialize(
-                s.array_type::<IntrinsicPropertyValueCache>()
-                    .read(&groups, group, s, f)
-                    .reference(),
-                f,
-            );
+        let value = s.reserve_gc_local::<PropertyValue, Nullable>(f).initialize(
+            s.array_type::<IntrinsicPropertyValueCache>()
+                .read(&groups, group, s, f)
+                .reference(),
+            f,
+        );
         groups.clear(f);
         s.release_i32_local(group, f);
         let stored = s.reserve_gc_local::<StoredValue, Nullable>(f).initialize(
@@ -1064,14 +1057,12 @@ impl FunctionBuilder<'_> {
         self.emit_branch_to_target(done, f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        let array = s
-            .reserve_gc_local::<ArrayObject, Nullable>(f)
-            .initialize(
-                subject
-                    .sealed_layout_or_branch::<ArrayObject>(s, self.local_branch_label(miss), f)
-                    .nullable(),
-                f,
-            );
+        let array = s.reserve_gc_local::<ArrayObject, Nullable>(f).initialize(
+            subject
+                .sealed_layout_or_branch::<ArrayObject>(s, self.local_branch_label(miss), f)
+                .nullable(),
+            f,
+        );
         let header = s
             .reserve_gc_local::<OrdinaryObject, Nullable>(f)
             .initialize(

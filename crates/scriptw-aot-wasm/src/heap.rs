@@ -443,7 +443,9 @@ impl DemandConstructor {
     }
 
     pub(crate) fn from_builtin(builtin: scriptw_ir::StandardBuiltinId) -> Option<Self> {
-        Self::ALL.into_iter().find(|demand| demand.builtin() == builtin)
+        Self::ALL
+            .into_iter()
+            .find(|demand| demand.builtin() == builtin)
     }
 
     pub(crate) fn from_slot(slot: crate::functions::NonArrayRealmIntrinsicSlot) -> Option<Self> {

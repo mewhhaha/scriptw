@@ -1,10 +1,10 @@
 //! Parsed-source executions and the Realm's GetTemplateObject cache.
 use super::*;
 use crate::gc_types::{
-    ArrayObject, FunctionContext, FunctionContextSchema, GcLocal, GcOperand,
-    GcStackReference, Nullable, OrdinaryObject, OrdinaryObjectSchema, PropertyDescriptor,
-    RealmRecord, RealmRecordSchema, StoredValue, TemplateSiteTable, TemplateSource,
-    TemplateSourceSchema, ValueLocals,
+    ArrayObject, FunctionContext, FunctionContextSchema, GcLocal, GcOperand, GcStackReference,
+    Nullable, OrdinaryObject, OrdinaryObjectSchema, PropertyDescriptor, RealmRecord,
+    RealmRecordSchema, StoredValue, TemplateSiteTable, TemplateSource, TemplateSourceSchema,
+    ValueLocals,
 };
 use crate::operations::PropertyKeyLocals;
 use scriptw_ir::{TemplateObjectIr, TemplateSourceIr};

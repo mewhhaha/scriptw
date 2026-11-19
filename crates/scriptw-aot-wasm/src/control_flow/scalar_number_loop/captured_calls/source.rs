@@ -214,8 +214,14 @@ mod tests {
     fn source_candidates_refuse_arguments_observers_and_mutable_object_writes() {
         let admitted = "export function step(row,i){return arguments[0].x+arguments.length+i;}";
         let ir = scriptw_ir::lower(&parse(admitted, ParseOptions::module()).unwrap());
-        let plans: Vec<_> = ir.script.as_ref().unwrap().functions.iter()
-            .filter_map(CapturedCallSource::new).collect();
+        let plans: Vec<_> = ir
+            .script
+            .as_ref()
+            .unwrap()
+            .functions
+            .iter()
+            .filter_map(CapturedCallSource::new)
+            .collect();
         assert_eq!(plans.len(), 1, "own reads of a strict source are projected");
         assert!(plans[0].arguments.is_some());
         for source in [

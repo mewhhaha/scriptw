@@ -1,10 +1,10 @@
 //! Catalog expressions retain their kernels while publishing only their value output.
 use crate::property_read_plans::Module;
 use scriptw_aot_wasm::emit;
-use scriptw_front::{ParseOptions, parse};
+use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::{
-    AbruptCapability, ExprIr, NormalResult, SpecOperationIr, StatementIr, TypedExpr, ValueInfo,
-    ValueKind, lower,
+    lower, AbruptCapability, ExprIr, NormalResult, SpecOperationIr, StatementIr, TypedExpr,
+    ValueInfo, ValueKind,
 };
 use wasmparser::{Operator, Validator, WasmFeatures};
 

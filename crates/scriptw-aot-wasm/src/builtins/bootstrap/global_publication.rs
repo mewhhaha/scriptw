@@ -34,8 +34,7 @@ impl GlobalBindingPublication {
         let schema = builder.runtime_schema();
         let row = schema.reserve_i32_local(function);
         row.set_constant(
-            i32::try_from(count)
-                .map_err(|_| EmitError::unsupported("too many global bindings"))?,
+            i32::try_from(count).map_err(|_| EmitError::unsupported("too many global bindings"))?,
             function,
         );
         let keys = schema.reserve_gc_local(function).initialize(
@@ -45,9 +44,11 @@ impl GlobalBindingPublication {
             function,
         );
         let values = schema.reserve_gc_local(function).initialize(
-            schema
-                .array_type::<IntrinsicPropertyValueCache>()
-                .filled(GcOperand::null(schema), row, function),
+            schema.array_type::<IntrinsicPropertyValueCache>().filled(
+                GcOperand::null(schema),
+                row,
+                function,
+            ),
             function,
         );
         Ok(Self {
@@ -110,9 +111,10 @@ impl GlobalBindingPublication {
         }
         let schema = builder.runtime_schema();
         let flags = schema.reserve_gc_local(function).initialize(
-            schema
-                .array_type::<OrdinaryPropertyIndex>()
-                .fixed(self.flags.iter().map(|word| GcOperand::i32(*word)), function),
+            schema.array_type::<OrdinaryPropertyIndex>().fixed(
+                self.flags.iter().map(|word| GcOperand::i32(*word)),
+                function,
+            ),
             function,
         );
         let header = schema.reserve_gc_local(function).initialize(

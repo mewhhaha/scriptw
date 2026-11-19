@@ -1,6 +1,6 @@
 //! Per-Engine native admission and a transient private Cargo-byte lease.
-use super::*;
 use super::native_backing::NativeLoadPath;
+use super::*;
 
 impl EmbeddedNativeRuntime {
     pub(super) fn accepts_native(&self, image: &scriptw_runtime_image::NativeRuntimeBytes) -> bool {
@@ -98,7 +98,12 @@ impl EmbeddedNativeRuntime {
 
     /// Both admitted load paths report the same hit line; only `backing`
     /// differs.
-    fn trace_hit(&self, native_bytes: u64, backing: NativeLoadPath, mode: WasmNativeCompilationMode) {
+    fn trace_hit(
+        &self,
+        native_bytes: u64,
+        backing: NativeLoadPath,
+        mode: WasmNativeCompilationMode,
+    ) {
         if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
             eprintln!(
                 "scriptw wasm trace: runtime-native-bundle hit: {} bytes, backing: {} (runtime: {}, execution: {}, source: {:?})",

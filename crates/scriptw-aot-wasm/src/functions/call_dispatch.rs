@@ -3,7 +3,8 @@
 use super::*;
 use crate::emit::AccessorThrowRouting;
 use crate::gc_types::{
-    ArrayObject, BoundFunction, CompletionLocals, FunctionObject, GcLocal, GcNullability, ProxyObject, StoredValue, ValueArray, ValueLocals,
+    ArrayObject, BoundFunction, CompletionLocals, FunctionObject, GcLocal, GcNullability,
+    ProxyObject, StoredValue, ValueArray, ValueLocals,
 };
 use crate::objects::ProxyRevocationRoute;
 

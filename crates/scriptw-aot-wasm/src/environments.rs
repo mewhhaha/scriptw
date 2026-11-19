@@ -343,8 +343,7 @@ impl<'a> FunctionBuilder<'a> {
     /// so a source body of a program that declares none reads only unlinked
     /// cells; runtime helpers read the cells of any program.
     pub(crate) fn cells_may_be_linked(&self) -> bool {
-        !self.has_source_execution_environment()
-            || self.functions.declares_module_import_bindings()
+        !self.has_source_execution_environment() || self.functions.declares_module_import_bindings()
     }
 
     pub(crate) fn emit_initialize_indirect_binding(

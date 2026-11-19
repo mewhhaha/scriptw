@@ -1516,17 +1516,15 @@ impl<'a> FunctionBuilder<'a> {
         roots: &[&ValueLocals],
         function: &mut Function,
     ) {
-        pending.kind().if_equal_escape(
-            CompletionKind::Throw.code() as i32,
-            function,
-            |function| {
+        pending
+            .kind()
+            .if_equal_escape(CompletionKind::Throw.code() as i32, function, |function| {
                 self.completion.copy_from(pending, function);
                 for root in roots {
                     root.reference().clear(function);
                 }
                 self.emit_propagate_current_throw(function);
-            },
-        );
+            });
     }
     pub(crate) fn emit_clear_throw_diagnostic(
         &self,

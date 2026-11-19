@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use scriptw_aot_wasm::emit;
-use scriptw_front::{ParseOptions, parse};
+use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::lower;
 use wasmparser::{Operator, Validator, WasmFeatures};
 
@@ -57,12 +57,8 @@ fn check_guards(body: &[Operator<'_>]) -> usize {
     let mut guards = BTreeMap::new();
     let mut all_guards = 0;
     for (index, window) in body.windows(4).enumerate() {
-        let [
-            Operator::LocalGet { local_index },
-            Operator::I32Const { value: 1 },
-            Operator::I32Eq,
-            Operator::If { .. },
-        ] = window
+        let [Operator::LocalGet { local_index }, Operator::I32Const { value: 1 }, Operator::I32Eq, Operator::If { .. }] =
+            window
         else {
             continue;
         };

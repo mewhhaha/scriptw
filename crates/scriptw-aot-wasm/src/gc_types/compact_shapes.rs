@@ -29,7 +29,9 @@ impl CompactShapeGlobals {
             configurable: true,
         }
         .descriptor_word();
-        let null = |layout| Instruction::RefNull(layouts.reference(layout, GcNullability::Nullable).heap_type);
+        let null = |layout| {
+            Instruction::RefNull(layouts.reference(layout, GcNullability::Nullable).heap_type)
+        };
         globals.global(
             GlobalType {
                 val_type: ValType::Ref(
@@ -47,7 +49,9 @@ impl CompactShapeGlobals {
                 Instruction::I32Const(1),
                 null(CompactShapeTable::LAYOUT),
                 null(OrdinaryPropertyIndex::LAYOUT),
-                Instruction::StructNew(layouts.struct_type::<CompactDataShape>().type_index().raw()),
+                Instruction::StructNew(
+                    layouts.struct_type::<CompactDataShape>().type_index().raw(),
+                ),
                 Instruction::ArrayNewFixed {
                     array_type_index: layouts.array_type::<CompactTagArray>().type_index().raw(),
                     array_size: 0,

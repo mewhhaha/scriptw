@@ -1,9 +1,9 @@
 //! P calls shared R publication, physical Number/bitmap and descriptor owners.
 use scriptw_aot_wasm::{
-    GcSnapshotLayout, PromiseRejectionPolicy, RUNTIME_IMPORT_NAMESPACE, emit_with_rooted_snapshot,
+    emit_with_rooted_snapshot, GcSnapshotLayout, PromiseRejectionPolicy, RUNTIME_IMPORT_NAMESPACE,
 };
-use scriptw_front::{ParseOptions, parse};
-use scriptw_ir::{ExprIr, SpecOperationIr, StatementIr, lower};
+use scriptw_front::{parse, ParseOptions};
+use scriptw_ir::{lower, ExprIr, SpecOperationIr, StatementIr};
 use std::collections::BTreeMap;
 use wasmparser::{
     ExternalKind, HeapType, KnownCustom, Name, Operator, Parser, Payload, TypeRef, UnpackedIndex,

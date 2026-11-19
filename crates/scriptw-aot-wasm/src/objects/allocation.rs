@@ -41,9 +41,7 @@ impl FunctionBuilder<'_> {
         )))
     }
 
-    pub(crate) fn compile_compact_object_allocate_helper(
-        &mut self,
-    ) -> Result<Function, EmitError> {
+    pub(crate) fn compile_compact_object_allocate_helper(&mut self) -> Result<Function, EmitError> {
         let mut function = self.begin_helper_body(RuntimeHelperId::CompactObjectAllocate);
         let parameters = self
             .helper_parameters::<crate::runtime_helpers::CompactObjectAllocateParameters>(

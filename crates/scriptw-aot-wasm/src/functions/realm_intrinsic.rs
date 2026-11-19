@@ -143,7 +143,8 @@ impl FunctionBuilder<'_> {
                 .bind(schema, schema.reserve_gc_local(function), function);
             namespace.clear(function);
         }
-        let stored = self.emit_load_realm_intrinsic_stored_at_index(realm, slot.gc_index(), function);
+        let stored =
+            self.emit_load_realm_intrinsic_stored_at_index(realm, slot.gc_index(), function);
         if crate::heap::DemandConstructor::from_slot(slot).is_some() {
             self.emit_ensure_demand_constructor(realm, &stored, None, slot.gc_index(), function);
         }
@@ -168,7 +169,9 @@ impl FunctionBuilder<'_> {
             .read(stored, schema, function)
             .store(slot, function);
         slot.load(function);
-        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Undefined as i32));
+        function.instruction(&Instruction::I32Const(
+            WasmRuntimeValueTag::Undefined as i32,
+        ));
         function.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, function);
         match dynamic {

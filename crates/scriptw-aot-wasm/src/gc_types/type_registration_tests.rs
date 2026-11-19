@@ -412,7 +412,10 @@ fn ordinary_storage_subtypes_and_cache_metadata_are_encoded_in_the_single_core_g
     // table and key index, which reference shapes and integers, are filled in.
     assert!(shape[..3].iter().all(|field| !field.mutable));
     assert!(shape[3..].iter().all(|field| field.mutable));
-    assert_eq!(shape[3].element_type, reference(GcLayout::CompactShapeTable, true));
+    assert_eq!(
+        shape[3].element_type,
+        reference(GcLayout::CompactShapeTable, true)
+    );
     assert_eq!(
         shape[4].element_type,
         reference(GcLayout::OrdinaryPropertyIndex, true)

@@ -1,14 +1,14 @@
 //! Internal definitions admit canonical storage without expanding source accessors.
 use super::{
     ordinary_receiver_definition::concrete_if_arms,
-    property_read_plans::{Module, calls},
+    property_read_plans::{calls, Module},
     scalar_masked_rows::type_group_sizes,
 };
 use scriptw_aot_wasm::{
-    GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy, RUNTIME_IMPORT_NAMESPACE,
-    emit_with_rooted_snapshot,
+    emit_with_rooted_snapshot, GcSnapshotField, GcSnapshotLayout, PromiseRejectionPolicy,
+    RUNTIME_IMPORT_NAMESPACE,
 };
-use scriptw_front::{ParseOptions, parse};
+use scriptw_front::{parse, ParseOptions};
 use scriptw_ir::lower;
 use wasmparser::{ExternalKind, Operator, Parser, Payload, TypeRef, Validator, WasmFeatures};
 

@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet, hash_map::DefaultHasher};
+use std::collections::{hash_map::DefaultHasher, BTreeMap, BTreeSet};
 use std::fmt::{self, Write as _};
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -15,10 +15,9 @@ use std::time::Duration;
 use std::time::Instant;
 
 use scriptw_engine::{
-    CompileOptions, Engine, EngineError, ExecutionBackend, HostHooks, HostSurfacePolicy,
-    ModuleLoadingPolicy, PromiseRejectionPolicy, RealmBuilder, RunOptions,
-    WasmExecutionFailureKind, compilation_jobs, wasm_aot_module_is_cached,
-    wasm_aot_script_is_cached,
+    compilation_jobs, wasm_aot_module_is_cached, wasm_aot_script_is_cached, CompileOptions, Engine,
+    EngineError, ExecutionBackend, HostHooks, HostSurfacePolicy, ModuleLoadingPolicy,
+    PromiseRejectionPolicy, RealmBuilder, RunOptions, WasmExecutionFailureKind,
 };
 use scriptw_ir::{
     ConformanceOwner, EarlyErrorCode, IrDiagnosticPhase, NativeErrorKind, UnsupportedFeature,
@@ -34,11 +33,11 @@ mod frontmatter;
 mod module_catalog;
 mod performance_evidence;
 mod snapshot_admission;
-use snapshot_admission::{AdmittedSnapshot, decode_snapshot_bytes, read_snapshot_file};
+use snapshot_admission::{decode_snapshot_bytes, read_snapshot_file, AdmittedSnapshot};
 mod snapshot_publication;
 pub use snapshot_publication::write_snapshot_file as atomic_write;
 mod status_generation;
-pub use status_generation::{PublishedStatusPaths, publish_status_generation};
+pub use status_generation::{publish_status_generation, PublishedStatusPaths};
 mod source_pins;
 mod suite_identity;
 pub use performance_evidence::ConformancePerformanceEvidence;
@@ -50,8 +49,8 @@ pub mod conformance_closure;
 pub mod differential;
 
 use attempt_journal::{
-    AdmittedCase, AttemptJournal, AttemptJournalIdentity, CaseAdmission, CaseStrikes,
-    CrashStrikeLimit, plan_run_phases,
+    plan_run_phases, AdmittedCase, AttemptJournal, AttemptJournalIdentity, CaseAdmission,
+    CaseStrikes, CrashStrikeLimit,
 };
 
 const TOP_LEVEL_FILTERS: [&str; 6] = [
@@ -849,8 +848,8 @@ enum PreludeHostOwnership {
 
 mod complete_wasm_aot_host_prelude {
     use super::{
-        WASM_AOT_ACTIVE_CREATE_REALM, WASM_AOT_ACTIVE_REALM_GLOBAL, WASM_AOT_HOST_PRELUDE,
-        WASM_AOT_INACTIVE_CREATE_REALM, WASM_AOT_INACTIVE_REALM_GLOBAL, WasmAotRealmActivation,
+        WasmAotRealmActivation, WASM_AOT_ACTIVE_CREATE_REALM, WASM_AOT_ACTIVE_REALM_GLOBAL,
+        WASM_AOT_HOST_PRELUDE, WASM_AOT_INACTIVE_CREATE_REALM, WASM_AOT_INACTIVE_REALM_GLOBAL,
     };
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2921,7 +2920,9 @@ fn run_case_worker_with_preludes(
     config.execution_role = CaseExecutionRole::SingleCaseWorker(requested);
     config.case_runner_bin = None;
     match preludes {
-        Some(preludes) => run_full_with_manifest_and_preludes(&config, run_config, manifest, preludes),
+        Some(preludes) => {
+            run_full_with_manifest_and_preludes(&config, run_config, manifest, preludes)
+        }
         None => run_full_with_manifest(&config, run_config, manifest),
     }
 }
@@ -10484,11 +10485,9 @@ function $DONE(error) {
         ] {
             let list =
                 TestExecutionList::parse("strict-script:language/fail/parse-negative.js").unwrap();
-            assert!(
-                run_execution_list(&fixture_config(), config, list)
-                    .unwrap_err()
-                    .contains("cannot also select")
-            );
+            assert!(run_execution_list(&fixture_config(), config, list)
+                .unwrap_err()
+                .contains("cannot also select"));
         }
     }
 
@@ -10545,16 +10544,12 @@ function $DONE(error) {
                 .expect_err("a shard manifest must reject duplicate execution ids")
                 .contains("unique executions")
         );
-        assert!(
-            validate_manifest_execution_set(&first, &duplicate)
-                .expect_err("dispatch must reject a duplicate selected execution")
-                .contains("duplicate ids")
-        );
-        assert!(
-            validate_manifest_execution_set(&discovered, &first.cases)
-                .expect_err("a shard selection must not run under the full-suite manifest")
-                .contains("does not exactly match")
-        );
+        assert!(validate_manifest_execution_set(&first, &duplicate)
+            .expect_err("dispatch must reject a duplicate selected execution")
+            .contains("duplicate ids"));
+        assert!(validate_manifest_execution_set(&discovered, &first.cases)
+            .expect_err("a shard selection must not run under the full-suite manifest")
+            .contains("does not exactly match"));
     }
 
     #[test]
@@ -10919,9 +10914,7 @@ function $DONE(error) {
         host_case.original_source = Arc::from("$262.gc();".to_string());
         let materialized = materialize_test(&host_case, &wasm_aot)
             .expect("embedded wasm-aot profile should materialize its host");
-        assert!(
-            script_fixture_ledger(&host_case, &materialized).starts_with(WASM_AOT_HOST_PRELUDE)
-        );
+        assert!(script_fixture_ledger(&host_case, &materialized).starts_with(WASM_AOT_HOST_PRELUDE));
 
         let wasm_aot_host_only = real_wasm_aot_host_only_preludes();
         assert_eq!(
@@ -10940,9 +10933,7 @@ function $DONE(error) {
         );
         let materialized = materialize_test(&host_case, &wasm_aot_host_only)
             .expect("embedded wasm-aot host-only profile should materialize its host");
-        assert!(
-            script_fixture_ledger(&host_case, &materialized).starts_with(WASM_AOT_HOST_PRELUDE)
-        );
+        assert!(script_fixture_ledger(&host_case, &materialized).starts_with(WASM_AOT_HOST_PRELUDE));
     }
 
     #[test]
@@ -11317,18 +11308,16 @@ export const value = helperRead();
             (failure.kind, failure.outcome),
             (FailureKind::HostHarness, OutcomeKind::Bug)
         );
-        assert!(
-            with_case_cleanup(
-                &case,
-                Ok(TestResult {
-                    test_id: case.execution_id.clone(),
-                    status: TestStatus::Passed,
-                    duration_ms: Some(1)
-                }),
-                Err("cleanup failed".into())
-            )
-            .is_err()
-        );
+        assert!(with_case_cleanup(
+            &case,
+            Ok(TestResult {
+                test_id: case.execution_id.clone(),
+                status: TestStatus::Passed,
+                duration_ms: Some(1)
+            }),
+            Err("cleanup failed".into())
+        )
+        .is_err());
     }
 
     #[test]
@@ -11543,14 +11532,10 @@ export const value = helperRead();
             let materialized =
                 materialize_test(&case, &preludes).expect("non-realm host case should materialize");
 
-            assert!(
-                script_fixture_ledger(&case, &materialized)
-                    .contains(WASM_AOT_INACTIVE_REALM_GLOBAL)
-            );
-            assert!(
-                script_fixture_ledger(&case, &materialized)
-                    .contains(WASM_AOT_INACTIVE_CREATE_REALM)
-            );
+            assert!(script_fixture_ledger(&case, &materialized)
+                .contains(WASM_AOT_INACTIVE_REALM_GLOBAL));
+            assert!(script_fixture_ledger(&case, &materialized)
+                .contains(WASM_AOT_INACTIVE_CREATE_REALM));
             assert!(!script_fixture_ledger(&case, &materialized).contains("__scriptwCreateRealm"));
             assert_eq!(
                 script_fixture_ledger(&case, &materialized),
@@ -11619,10 +11604,8 @@ export const value = helperRead();
             assert!(
                 script_fixture_ledger(&case, &materialized).contains(WASM_AOT_ACTIVE_CREATE_REALM)
             );
-            assert!(
-                !script_fixture_ledger(&case, &materialized)
-                    .contains(WASM_AOT_INACTIVE_CREATE_REALM)
-            );
+            assert!(!script_fixture_ledger(&case, &materialized)
+                .contains(WASM_AOT_INACTIVE_CREATE_REALM));
             assert_eq!(
                 script_fixture_ledger(&case, &materialized),
                 format!(
@@ -11642,14 +11625,10 @@ export const value = helperRead();
         included_realm_case.includes = vec!["realmBoundary.js".to_string()];
         let materialized = materialize_test(&included_realm_case, &preludes)
             .expect("included realm host case should materialize");
-        assert!(
-            script_fixture_ledger(&included_realm_case, &materialized)
-                .contains(WASM_AOT_ACTIVE_REALM_GLOBAL)
-        );
-        assert!(
-            script_fixture_ledger(&included_realm_case, &materialized)
-                .contains(WASM_AOT_ACTIVE_CREATE_REALM)
-        );
+        assert!(script_fixture_ledger(&included_realm_case, &materialized)
+            .contains(WASM_AOT_ACTIVE_REALM_GLOBAL));
+        assert!(script_fixture_ledger(&included_realm_case, &materialized)
+            .contains(WASM_AOT_ACTIVE_CREATE_REALM));
         assert_eq!(
             script_fixture_ledger(&included_realm_case, &materialized),
             format!(
@@ -12534,11 +12513,9 @@ if ($262.getGlobal('__scriptwHostAccessorSentinel') !== 13) {
         };
         assert_eq!(failure.kind, FailureKind::Parser);
         assert!(failure.detail.contains("expected TypeError"));
-        assert!(
-            failure
-                .detail
-                .contains("got E_OBJECT_DUPLICATE_PROTO SyntaxError")
-        );
+        assert!(failure
+            .detail
+            .contains("got E_OBJECT_DUPLICATE_PROTO SyntaxError"));
     }
 
     #[test]
@@ -12983,10 +12960,8 @@ print('Test262:AsyncTestComplete');
 
         assert!(script_fixture_ledger(&case, &materialized).contains("assert.sameValue"));
         assert!(script_fixture_ledger(&case, &materialized).contains("full compare"));
-        assert!(
-            script_fixture_ledger(&case, &materialized)
-                .contains("var TypedArray = Object.getPrototypeOf(Int8Array);")
-        );
+        assert!(script_fixture_ledger(&case, &materialized)
+            .contains("var TypedArray = Object.getPrototypeOf(Int8Array);"));
     }
 
     #[test]
@@ -13011,11 +12986,9 @@ print('Test262:AsyncTestComplete');
 
         assert!(script_fixture_ledger(&case, &materialized).contains("full same value"));
         assert!(script_fixture_ledger(&case, &materialized).contains("full compare"));
-        assert!(
-            materialized
-                .source
-                .contains("assert(compareArray(new Uint8Array([1]), [1])")
-        );
+        assert!(materialized
+            .source
+            .contains("assert(compareArray(new Uint8Array([1]), [1])"));
     }
 
     #[test]
@@ -13521,11 +13494,9 @@ print('Test262:AsyncTestComplete');
 
         let materialized = materialize_test(&case, &store).expect("materialization should work");
         assert!(script_fixture_ledger(&case, &materialized).contains("full assert"));
-        assert!(
-            materialized
-                .source
-                .contains("assert.notSameValue(value, false")
-        );
+        assert!(materialized
+            .source
+            .contains("assert.notSameValue(value, false"));
     }
 
     #[test]
@@ -13550,18 +13521,14 @@ print('Test262:AsyncTestComplete');
 
         assert!(script_fixture_ledger(&case, &materialized).contains("function Test262Error"));
         assert!(!script_fixture_ledger(&case, &materialized).contains("var $262"));
-        assert!(
-            materialized
-                .used_preludes
-                .iter()
-                .any(|(name, _)| name == "sta-preamble.js")
-        );
-        assert!(
-            !materialized
-                .used_preludes
-                .iter()
-                .any(|(name, _)| name == "sta.js")
-        );
+        assert!(materialized
+            .used_preludes
+            .iter()
+            .any(|(name, _)| name == "sta-preamble.js"));
+        assert!(!materialized
+            .used_preludes
+            .iter()
+            .any(|(name, _)| name == "sta.js"));
     }
 
     #[test]
@@ -14177,10 +14144,8 @@ const MyBigInt64Array = subClass('BigInt64Array');"#;
 
         let local_materialized = materialize_test(&case, &real_wasm_aot_preludes())
             .expect("local intrinsic case should materialize");
-        assert!(
-            script_fixture_ledger(&case, &local_materialized)
-                .contains("Reflect.construct(function(){}, [], f);")
-        );
+        assert!(script_fixture_ledger(&case, &local_materialized)
+            .contains("Reflect.construct(function(){}, [], f);"));
         assert!(local_materialized.used_preludes.contains(&(
             "isConstructor.js".to_string(),
             PreludeOrigin::VendoredHarness
@@ -14197,17 +14162,13 @@ const MyBigInt64Array = subClass('BigInt64Array');"#;
         );
         let vendored_materialized = materialize_test(&case, &vendored_store)
             .expect("literal helper case should materialize");
-        assert!(
-            script_fixture_ledger(&case, &vendored_materialized)
-                .contains("Reflect.construct(function(){}, [], f);")
-        );
+        assert!(script_fixture_ledger(&case, &vendored_materialized)
+            .contains("Reflect.construct(function(){}, [], f);"));
         assert!(script_fixture_ledger(&case, &vendored_materialized).contains("return false;"));
         assert!(script_fixture_ledger(&case, &vendored_materialized).contains("return true;"));
-        assert!(
-            vendored_materialized
-                .source
-                .ends_with(case.original_source.as_ref())
-        );
+        assert!(vendored_materialized
+            .source
+            .ends_with(case.original_source.as_ref()));
 
         let mut changed_store = real_wasm_aot_preludes();
         let mut changed_prelude = changed_store
@@ -14228,15 +14189,11 @@ const MyBigInt64Array = subClass('BigInt64Array');"#;
         );
         let changed_materialized = materialize_test(&case, &changed_store)
             .expect("changed constructor helper should materialize safely");
-        assert!(
-            script_fixture_ledger(&case, &changed_materialized)
-                .contains("// changed constructor helper")
-        );
-        assert!(
-            changed_materialized
-                .source
-                .ends_with(case.original_source.as_ref())
-        );
+        assert!(script_fixture_ledger(&case, &changed_materialized)
+            .contains("// changed constructor helper"));
+        assert!(changed_materialized
+            .source
+            .ends_with(case.original_source.as_ref()));
     }
 
     #[test]
@@ -14560,12 +14517,10 @@ const MyBigInt64Array = subClass('BigInt64Array');"#;
                 "{}",
                 contract.method
             );
-            assert!(
-                contract
-                    .changed_suffixes
-                    .iter()
-                    .all(|suffix| !contract.without_test_typed_array_suffixes.contains(suffix))
-            );
+            assert!(contract
+                .changed_suffixes
+                .iter()
+                .all(|suffix| !contract.without_test_typed_array_suffixes.contains(suffix)));
 
             let prefix = format!("built-ins/TypedArray/prototype/{}/", contract.method);
             let mut executions = Vec::new();
@@ -15244,20 +15199,16 @@ const MyBigInt64Array = subClass('BigInt64Array');"#;
             assert_eq!(prelude.origin, PreludeOrigin::VendoredHarness, "{name}");
             assert_eq!(prelude.contents, vendored_harness_source(name), "{name}");
         }
-        assert!(
-            local_store
-                .get("assert.js")
-                .expect("local store should contain assert.js")
-                .contents
-                .contains("Test262Error")
-        );
-        assert!(
-            vendored_store
-                .get("assert.js")
-                .expect("vendored store should contain assert.js")
-                .contents
-                .contains("Test262Error")
-        );
+        assert!(local_store
+            .get("assert.js")
+            .expect("local store should contain assert.js")
+            .contents
+            .contains("Test262Error"));
+        assert!(vendored_store
+            .get("assert.js")
+            .expect("vendored store should contain assert.js")
+            .contents
+            .contains("Test262Error"));
 
         for contract in DIRECTORIES {
             let prefix = format!("built-ins/TypedArray/prototype/{}/", contract.method);
@@ -16337,26 +16288,18 @@ const MyBigInt64Array = subClass('BigInt64Array');"#;
                 .collect::<Vec<_>>(),
             [88, 4]
         );
-        assert!(
-            FULL_VENDORED
-                .windows(2)
-                .all(|cases| cases[0].suffix < cases[1].suffix)
-        );
-        assert!(
-            NO_TEST_TYPED_ARRAY
-                .windows(2)
-                .all(|cases| cases[0].suffix < cases[1].suffix)
-        );
-        assert!(
-            PROPERTY_HELPER_SUFFIXES
-                .windows(2)
-                .all(|suffixes| suffixes[0] < suffixes[1])
-        );
-        assert!(
-            TEST262_ERROR_SUFFIXES
-                .windows(2)
-                .all(|suffixes| suffixes[0] < suffixes[1])
-        );
+        assert!(FULL_VENDORED
+            .windows(2)
+            .all(|cases| cases[0].suffix < cases[1].suffix));
+        assert!(NO_TEST_TYPED_ARRAY
+            .windows(2)
+            .all(|cases| cases[0].suffix < cases[1].suffix));
+        assert!(PROPERTY_HELPER_SUFFIXES
+            .windows(2)
+            .all(|suffixes| suffixes[0] < suffixes[1]));
+        assert!(TEST262_ERROR_SUFFIXES
+            .windows(2)
+            .all(|suffixes| suffixes[0] < suffixes[1]));
 
         let repo_root = repo_root();
         let test_root = repo_root.join("test262/vendor/test262/test");
@@ -16465,20 +16408,16 @@ const MyBigInt64Array = subClass('BigInt64Array');"#;
             assert_eq!(prelude.origin, PreludeOrigin::VendoredHarness, "{name}");
             assert_eq!(prelude.contents, vendored_harness_source(name), "{name}");
         }
-        assert!(
-            local_store
-                .get("assert.js")
-                .expect("local store should contain assert.js")
-                .contents
-                .contains("Test262Error")
-        );
-        assert!(
-            vendored_store
-                .get("assert.js")
-                .expect("vendored store should contain assert.js")
-                .contents
-                .contains("Test262Error")
-        );
+        assert!(local_store
+            .get("assert.js")
+            .expect("local store should contain assert.js")
+            .contents
+            .contains("Test262Error"));
+        assert!(vendored_store
+            .get("assert.js")
+            .expect("vendored store should contain assert.js")
+            .contents
+            .contains("Test262Error"));
         for (store_name, store) in [("local", &local_store), ("vendored", &vendored_store)] {
             let test_typed_array = store
                 .get("testTypedArray.js")
@@ -16779,10 +16718,8 @@ const MyBigInt64Array = subClass('BigInt64Array');"#;
         let materialized = materialize_test(&case, &store).expect("materialization should work");
 
         assert!(materialized.source.ends_with(original_source));
-        assert!(
-            script_fixture_ledger(&case, &materialized)
-                .contains("Only values between 0 and 2**53 - 1")
-        );
+        assert!(script_fixture_ledger(&case, &materialized)
+            .contains("Only values between 0 and 2**53 - 1"));
         assert!(materialized.used_preludes.contains(&(
             "testTypedArray.js".to_string(),
             PreludeOrigin::VendoredHarness
@@ -17922,15 +17859,10 @@ const MyBigInt64Array = subClass('BigInt64Array');"#;
                     "{}",
                     case.execution_id()
                 );
-                assert!(
-                    !script_fixture_ledger(&case, &local_materialized).contains(
-                        "function selectCtorArgFactories(includeFeatures, excludeFeatures)"
-                    )
-                );
-                assert!(
-                    !script_fixture_ledger(&case, &local_materialized)
-                        .contains("function invokeForConstructor(f, constructor, argFactory)")
-                );
+                assert!(!script_fixture_ledger(&case, &local_materialized)
+                    .contains("function selectCtorArgFactories(includeFeatures, excludeFeatures)"));
+                assert!(!script_fixture_ledger(&case, &local_materialized)
+                    .contains("function invokeForConstructor(f, constructor, argFactory)"));
 
                 let vendored_materialized = materialize_test(&case, &vendored_store)
                     .unwrap_or_else(|error| {
@@ -17976,15 +17908,10 @@ const MyBigInt64Array = subClass('BigInt64Array');"#;
                     "{}",
                     case.execution_id()
                 );
-                assert!(
-                    !script_fixture_ledger(&case, &vendored_materialized).contains(
-                        "function selectCtorArgFactories(includeFeatures, excludeFeatures)"
-                    )
-                );
-                assert!(
-                    !script_fixture_ledger(&case, &vendored_materialized)
-                        .contains("function invokeForConstructor(f, constructor, argFactory)")
-                );
+                assert!(!script_fixture_ledger(&case, &vendored_materialized)
+                    .contains("function selectCtorArgFactories(includeFeatures, excludeFeatures)"));
+                assert!(!script_fixture_ledger(&case, &vendored_materialized)
+                    .contains("function invokeForConstructor(f, constructor, argFactory)"));
             }
         }
     }
@@ -18025,14 +17952,10 @@ const MyBigInt64Array = subClass('BigInt64Array');"#;
                     .expect("callable helper must materialize unchanged");
                 assert!(script_fixture_ledger(&case, &materialized).contains(&prelude.contents));
                 assert!(materialized.source.ends_with(case.original_source.as_ref()));
-                assert!(
-                    !script_fixture_ledger(&case, &materialized)
-                        .contains("__scriptwValidateNativeFunctionSource")
-                );
-                assert!(
-                    !script_fixture_ledger(&case, &materialized)
-                        .contains("var isConstructor = __scriptwIsConstructor")
-                );
+                assert!(!script_fixture_ledger(&case, &materialized)
+                    .contains("__scriptwValidateNativeFunctionSource"));
+                assert!(!script_fixture_ledger(&case, &materialized)
+                    .contains("var isConstructor = __scriptwIsConstructor"));
             }
         }
     }
@@ -18758,14 +18681,10 @@ const MyBigInt64Array = subClass('BigInt64Array');"#;
             assert!(
                 script_fixture_ledger(&case, &materialized).contains(WASM_AOT_ACTIVE_CREATE_REALM)
             );
-            assert!(
-                !script_fixture_ledger(&case, &materialized)
-                    .contains(WASM_AOT_INACTIVE_REALM_GLOBAL)
-            );
-            assert!(
-                !script_fixture_ledger(&case, &materialized)
-                    .contains(WASM_AOT_INACTIVE_CREATE_REALM)
-            );
+            assert!(!script_fixture_ledger(&case, &materialized)
+                .contains(WASM_AOT_INACTIVE_REALM_GLOBAL));
+            assert!(!script_fixture_ledger(&case, &materialized)
+                .contains(WASM_AOT_INACTIVE_CREATE_REALM));
         }
     }
 
@@ -19505,8 +19424,8 @@ const MyBigInt64Array = subClass('BigInt64Array');"#;
     }
 
     #[test]
-    fn typed_array_to_locale_string_cases_preserve_pinned_sources_and_full_test_typed_array_prelude()
-     {
+    fn typed_array_to_locale_string_cases_preserve_pinned_sources_and_full_test_typed_array_prelude(
+    ) {
         const TEST_TYPED_ARRAY: &[&str] = &["testTypedArray.js"];
         const TEST_TYPED_ARRAY_COMPARE_ARRAY: &[&str] = &["testTypedArray.js", "compareArray.js"];
         const TEST_TYPED_ARRAY_DETACH: &[&str] = &["testTypedArray.js", "detachArrayBuffer.js"];
@@ -19754,11 +19673,9 @@ const MyBigInt64Array = subClass('BigInt64Array');"#;
         ];
 
         assert!(CASES.windows(2).all(|cases| cases[0].0 < cases[1].0));
-        assert!(
-            NO_TEST_TYPED_ARRAY_CASES
-                .windows(2)
-                .all(|cases| cases[0].0 < cases[1].0)
-        );
+        assert!(NO_TEST_TYPED_ARRAY_CASES
+            .windows(2)
+            .all(|cases| cases[0].0 < cases[1].0));
 
         let repo_root = repo_root();
         let test_root = repo_root.join("test262/vendor/test262/test");
@@ -21656,10 +21573,8 @@ const MyBigInt64Array = subClass('BigInt64Array');"#;
             .expect("materialization should work");
 
         assert!(materialized.source.ends_with(&original_source));
-        assert!(
-            script_fixture_ledger(&case, &materialized)
-                .contains("Array.from(Array.prototype.keys.call(fixedLength))")
-        );
+        assert!(script_fixture_ledger(&case, &materialized)
+            .contains("Array.from(Array.prototype.keys.call(fixedLength))"));
         assert!(!script_fixture_ledger(&case, &materialized).contains("function IteratorToArray"));
     }
 
@@ -21697,19 +21612,13 @@ const MyBigInt64Array = subClass('BigInt64Array');"#;
         );
         assert!(materialized.source.ends_with(&original_source));
         assert!(script_fixture_ledger(&case, &materialized).contains("new Function"));
-        assert!(
-            script_fixture_ledger(&case, &materialized)
-                .contains("function TestIterationAndResize(")
-        );
-        assert!(
-            !script_fixture_ledger(&case, &materialized)
-                .contains("class MyUint8Array extends Uint8Array {}")
-        );
+        assert!(script_fixture_ledger(&case, &materialized)
+            .contains("function TestIterationAndResize("));
+        assert!(!script_fixture_ledger(&case, &materialized)
+            .contains("class MyUint8Array extends Uint8Array {}"));
         assert!(!script_fixture_ledger(&case, &materialized).contains("function ConsumeIterator("));
-        assert!(
-            script_fixture_ledger(&case, &materialized)
-                .contains("for (let [key, value] of Array.prototype.entries.call(ta)) {")
-        );
+        assert!(script_fixture_ledger(&case, &materialized)
+            .contains("for (let [key, value] of Array.prototype.entries.call(ta)) {"));
         assert!(
             script_fixture_ledger(&case, &materialized).contains("Array.from(ArrayEntriesHelper(")
         );
@@ -21800,10 +21709,8 @@ const ctors = [MyUint8Array, MyFloat32Array, MyBigInt64Array];
         let materialized = materialize_test(&case, &store).expect("materialization should work");
 
         assert!(script_fixture_ledger(&case, &materialized).contains("new Function"));
-        assert!(
-            !script_fixture_ledger(&case, &materialized)
-                .contains("class MyUint8Array extends Uint8Array {}")
-        );
+        assert!(!script_fixture_ledger(&case, &materialized)
+            .contains("class MyUint8Array extends Uint8Array {}"));
         assert!(materialized.source.ends_with(case.original_source.as_ref()));
     }
 
@@ -21875,10 +21782,8 @@ const ctors = [MyUint8Array, MyFloat32Array, MyBigInt64Array];
                 TestExecutionMode::StrictScript,
             ]
         );
-        assert!(
-            original_source
-                .contains("assert.sameValue(Error.isError(new other.SuppressedError()), true);")
-        );
+        assert!(original_source
+            .contains("assert.sameValue(Error.isError(new other.SuppressedError()), true);"));
 
         for case in cases {
             assert!(case.includes.is_empty(), "{}", case.execution_id());
@@ -21903,14 +21808,10 @@ const ctors = [MyUint8Array, MyFloat32Array, MyBigInt64Array];
             assert!(
                 script_fixture_ledger(&case, &materialized).contains(WASM_AOT_ACTIVE_CREATE_REALM)
             );
-            assert!(
-                !script_fixture_ledger(&case, &materialized)
-                    .contains(WASM_AOT_INACTIVE_REALM_GLOBAL)
-            );
-            assert!(
-                !script_fixture_ledger(&case, &materialized)
-                    .contains(WASM_AOT_INACTIVE_CREATE_REALM)
-            );
+            assert!(!script_fixture_ledger(&case, &materialized)
+                .contains(WASM_AOT_INACTIVE_REALM_GLOBAL));
+            assert!(!script_fixture_ledger(&case, &materialized)
+                .contains(WASM_AOT_INACTIVE_CREATE_REALM));
             assert_eq!(
                 materialized.used_preludes,
                 vec![
@@ -21946,12 +21847,10 @@ const ctors = [MyUint8Array, MyFloat32Array, MyBigInt64Array];
             let case = parse_test_case(path.clone(), root.join(&path), original.clone());
             let materialized = materialize_test(&case, &preludes).expect("original materializes");
             assert!(materialized.source.ends_with(&original), "{path}");
-            assert!(
-                materialized
-                    .used_preludes
-                    .iter()
-                    .any(|(name, _)| name == "assert.js")
-            );
+            assert!(materialized
+                .used_preludes
+                .iter()
+                .any(|(name, _)| name == "assert.js"));
         }
     }
 
@@ -22324,21 +22223,13 @@ const ctors = [MyUint8Array, MyFloat32Array, MyBigInt64Array];
                     script_fixture_ledger(&case, &materialized).contains("assert.throws(TypeError")
                 );
                 if file == "this-is-not-object.js" {
-                    assert!(
-                        script_fixture_ledger(&case, &materialized)
-                            .contains("getter.call(undefined)")
-                    );
+                    assert!(script_fixture_ledger(&case, &materialized)
+                        .contains("getter.call(undefined)"));
                     assert!(script_fixture_ledger(&case, &materialized).contains("getter.call(s)"));
                 } else {
-                    assert!(
-                        script_fixture_ledger(&case, &materialized).contains("getter.call({})")
-                    );
-                    assert!(
-                        script_fixture_ledger(&case, &materialized).contains("getter.call(ta)")
-                    );
-                    assert!(
-                        script_fixture_ledger(&case, &materialized).contains("getter.call(dv)")
-                    );
+                    assert!(script_fixture_ledger(&case, &materialized).contains("getter.call({})"));
+                    assert!(script_fixture_ledger(&case, &materialized).contains("getter.call(ta)"));
+                    assert!(script_fixture_ledger(&case, &materialized).contains("getter.call(dv)"));
                 }
             }
         }
@@ -22352,15 +22243,11 @@ const ctors = [MyUint8Array, MyFloat32Array, MyBigInt64Array];
         let materialized =
             materialize_test(&changed_case, &store).expect("changed case should materialize");
 
-        assert!(
-            materialized
-                .source
-                .ends_with(changed_case.original_source.as_ref())
-        );
-        assert!(
-            script_fixture_ledger(&changed_case, &materialized)
-                .contains("var sourceDriftMarker = true;")
-        );
+        assert!(materialized
+            .source
+            .ends_with(changed_case.original_source.as_ref()));
+        assert!(script_fixture_ledger(&changed_case, &materialized)
+            .contains("var sourceDriftMarker = true;"));
     }
 
     #[test]
@@ -24114,27 +24001,17 @@ const ctors = [MyUint8Array, MyFloat32Array, MyBigInt64Array];
                 materialized.source.ends_with(case.original_source.as_ref()),
                 "{path}"
             );
-            assert!(
-                script_fixture_ledger(&case, &materialized).contains("assert.throws(TypeError")
-            );
+            assert!(script_fixture_ledger(&case, &materialized).contains("assert.throws(TypeError"));
             if file == "context-is-not-object.js" {
-                assert!(
-                    script_fixture_ledger(&case, &materialized)
-                        .contains("ArrayBuffer.prototype.slice.call(undefined)")
-                );
-                assert!(
-                    script_fixture_ledger(&case, &materialized)
-                        .contains("ArrayBuffer.prototype.slice.call(Symbol())")
-                );
+                assert!(script_fixture_ledger(&case, &materialized)
+                    .contains("ArrayBuffer.prototype.slice.call(undefined)"));
+                assert!(script_fixture_ledger(&case, &materialized)
+                    .contains("ArrayBuffer.prototype.slice.call(Symbol())"));
             } else {
-                assert!(
-                    script_fixture_ledger(&case, &materialized)
-                        .contains("ArrayBuffer.prototype.slice.call({})")
-                );
-                assert!(
-                    script_fixture_ledger(&case, &materialized)
-                        .contains("ArrayBuffer.prototype.slice.call([])")
-                );
+                assert!(script_fixture_ledger(&case, &materialized)
+                    .contains("ArrayBuffer.prototype.slice.call({})"));
+                assert!(script_fixture_ledger(&case, &materialized)
+                    .contains("ArrayBuffer.prototype.slice.call([])"));
             }
         }
 
@@ -24147,15 +24024,11 @@ const ctors = [MyUint8Array, MyFloat32Array, MyBigInt64Array];
         let materialized =
             materialize_test(&changed_case, &store).expect("changed case should materialize");
 
-        assert!(
-            materialized
-                .source
-                .ends_with(changed_case.original_source.as_ref())
-        );
-        assert!(
-            script_fixture_ledger(&changed_case, &materialized)
-                .contains("var sourceDriftMarker = true;")
-        );
+        assert!(materialized
+            .source
+            .ends_with(changed_case.original_source.as_ref()));
+        assert!(script_fixture_ledger(&changed_case, &materialized)
+            .contains("var sourceDriftMarker = true;"));
     }
 
     #[test]
@@ -24241,12 +24114,10 @@ const ctors = [MyUint8Array, MyFloat32Array, MyBigInt64Array];
         assert_eq!(summary.passed, 191);
         assert_eq!(summary.failed, 0);
         assert!(summary.entries.len() >= TOP_LEVEL_FILTERS.len());
-        assert!(
-            summary
-                .entries
-                .iter()
-                .any(|entry| entry.filter == "language/pass")
-        );
+        assert!(summary
+            .entries
+            .iter()
+            .any(|entry| entry.filter == "language/pass"));
     }
 
     #[test]
@@ -24967,11 +24838,9 @@ const ctors = [MyUint8Array, MyFloat32Array, MyBigInt64Array];
         .expect("rebuild from node snapshots should work");
         assert_eq!(rebuilt.len(), 1);
         assert_eq!(rebuilt[0].node_id, first_summary.node_id);
-        assert!(
-            !rebuilt
-                .iter()
-                .any(|entry| entry.node_id == second_summary.node_id)
-        );
+        assert!(!rebuilt
+            .iter()
+            .any(|entry| entry.node_id == second_summary.node_id));
 
         let mut foreign = original;
         foreign
@@ -25495,12 +25364,10 @@ const ctors = [MyUint8Array, MyFloat32Array, MyBigInt64Array];
             .collect();
         let before = summarize_results(&original);
         assert_eq!(before.slowest_tests.len(), 10);
-        assert!(
-            !before
-                .slowest_tests
-                .iter()
-                .any(|(id, _)| id == &cases[11].execution_id)
-        );
+        assert!(!before
+            .slowest_tests
+            .iter()
+            .any(|(id, _)| id == &cases[11].execution_id));
         write_resume_case_checkpoint(
             &config,
             &manifest,
@@ -25989,36 +25856,30 @@ const ctors = [MyUint8Array, MyFloat32Array, MyBigInt64Array];
                 panic!("resume checkpoint identity should permit a unique case subset");
             };
         }
-        assert!(
-            direct_snapshot_case_requirement(
-                DirectSnapshotKind::ResumeCheckpoint,
-                &CheckpointRunIdentity::admitted_by_test("shard-1/2", &[]),
-                "shard-2/2",
-                None,
-                &[],
-            )
-            .is_err()
-        );
-        assert!(
-            direct_snapshot_case_requirement(
-                DirectSnapshotKind::ResumeCheckpoint,
-                &CheckpointRunIdentity::admitted_by_test("shard-1/2", &[]),
-                "shard-01/02",
-                None,
-                &[],
-            )
-            .is_err()
-        );
-        assert!(
-            direct_snapshot_case_requirement(
-                DirectSnapshotKind::SingleCaseChild,
-                &CheckpointRunIdentity::full(),
-                "matrix-filter-leaf",
-                None,
-                &[],
-            )
-            .is_err()
-        );
+        assert!(direct_snapshot_case_requirement(
+            DirectSnapshotKind::ResumeCheckpoint,
+            &CheckpointRunIdentity::admitted_by_test("shard-1/2", &[]),
+            "shard-2/2",
+            None,
+            &[],
+        )
+        .is_err());
+        assert!(direct_snapshot_case_requirement(
+            DirectSnapshotKind::ResumeCheckpoint,
+            &CheckpointRunIdentity::admitted_by_test("shard-1/2", &[]),
+            "shard-01/02",
+            None,
+            &[],
+        )
+        .is_err());
+        assert!(direct_snapshot_case_requirement(
+            DirectSnapshotKind::SingleCaseChild,
+            &CheckpointRunIdentity::full(),
+            "matrix-filter-leaf",
+            None,
+            &[],
+        )
+        .is_err());
 
         write_resume_case_checkpoint(
             &config,
@@ -27425,16 +27286,12 @@ const ctors = [MyUint8Array, MyFloat32Array, MyBigInt64Array];
             .collect::<Vec<_>>();
         let nodes = build_matrix_nodes_for_root("built-ins", &cases, 3, 2);
         assert_eq!(nodes.len(), 4);
-        assert!(
-            nodes
-                .iter()
-                .all(|node| node.node_kind == MatrixNodeKind::ChunkLeaf)
-        );
-        assert!(
-            nodes
-                .iter()
-                .all(|node| node.filter == "built-ins/RegExp/property-escapes")
-        );
+        assert!(nodes
+            .iter()
+            .all(|node| node.node_kind == MatrixNodeKind::ChunkLeaf));
+        assert!(nodes
+            .iter()
+            .all(|node| node.filter == "built-ins/RegExp/property-escapes"));
         assert!(nodes.iter().all(|node| !node.node_id.ends_with(".js")));
         assert_eq!(
             nodes[0].node_id,
@@ -27712,23 +27569,21 @@ const ctors = [MyUint8Array, MyFloat32Array, MyBigInt64Array];
         assert!(err.to_string().contains("aggregate totals"));
 
         kinds.insert(FailureKind::Runtime, 1);
-        assert!(
-            validate_summary_count_contract(
-                "synthetic node",
-                1,
-                1,
-                0,
-                &kinds,
-                &BTreeMap::from([
-                    (OutcomeKind::Success, 1),
-                    (OutcomeKind::NotImplemented, 0),
-                    (OutcomeKind::Crash, 0),
-                    (OutcomeKind::Bug, 0),
-                ]),
-                &origins,
-            )
-            .is_err()
-        );
+        assert!(validate_summary_count_contract(
+            "synthetic node",
+            1,
+            1,
+            0,
+            &kinds,
+            &BTreeMap::from([
+                (OutcomeKind::Success, 1),
+                (OutcomeKind::NotImplemented, 0),
+                (OutcomeKind::Crash, 0),
+                (OutcomeKind::Bug, 0),
+            ]),
+            &origins,
+        )
+        .is_err());
     }
 
     #[test]
@@ -28861,15 +28716,13 @@ const ctors = [MyUint8Array, MyFloat32Array, MyBigInt64Array];
         assert_eq!(progress.resolved_snapshot_name, "published-elsewhere");
         assert!(progress.is_complete());
         assert_eq!(progress.summary.failed, 1);
-        assert!(
-            progress
-                .snapshot_paths
-                .json_path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .expect("snapshot path should have a name")
-                .starts_with("published-elsewhere-aggregate-")
-        );
+        assert!(progress
+            .snapshot_paths
+            .json_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .expect("snapshot path should have a name")
+            .starts_with("published-elsewhere-aggregate-"));
 
         let verified =
             load_verified_aggregate_summary(&config, "latest", ExecutionBackend::SpecExec)
@@ -29380,18 +29233,14 @@ const ctors = [MyUint8Array, MyFloat32Array, MyBigInt64Array];
             .unwrap(),
             assigned
         );
-        assert!(
-            serde_json::from_str::<BacklogOwnership>(
-                r#"{"owner_task_id":"T23","debt_category":"unclassified"}"#
-            )
-            .is_err()
-        );
-        assert!(
-            serde_json::from_str::<BacklogOwnership>(
-                r#"{"owner_task_id":"T26-unclassified","debt_category":"semantic"}"#
-            )
-            .is_err()
-        );
+        assert!(serde_json::from_str::<BacklogOwnership>(
+            r#"{"owner_task_id":"T23","debt_category":"unclassified"}"#
+        )
+        .is_err());
+        assert!(serde_json::from_str::<BacklogOwnership>(
+            r#"{"owner_task_id":"T26-unclassified","debt_category":"semantic"}"#
+        )
+        .is_err());
     }
 
     #[test]
@@ -29851,9 +29700,7 @@ assert.sameValue(bytes[3], 0);
         let case = synthetic_case("built-ins/Atomics/load/no-helper.js");
         let materialized =
             materialize_test(&case, &preludes).expect("non-helper case should materialize");
-        assert!(
-            !script_fixture_ledger(&case, &materialized).contains(WASM_AOT_AGENT_TIMER_PRELUDE)
-        );
+        assert!(!script_fixture_ledger(&case, &materialized).contains(WASM_AOT_AGENT_TIMER_PRELUDE));
     }
 
     #[test]
@@ -29873,14 +29720,10 @@ assert.sameValue(bytes[3], 0);
 
         let materialized = materialize_test(&case, &store).expect("materialization should work");
 
-        assert!(
-            script_fixture_ledger(&case, &materialized)
-                .contains("var __globalObject = Function(\"return this;\")();")
-        );
-        assert!(
-            !script_fixture_ledger(&case, &materialized)
-                .contains("var __globalObject = globalThis;")
-        );
+        assert!(script_fixture_ledger(&case, &materialized)
+            .contains("var __globalObject = Function(\"return this;\")();"));
+        assert!(!script_fixture_ledger(&case, &materialized)
+            .contains("var __globalObject = globalThis;"));
     }
 
     #[test]
@@ -30104,16 +29947,12 @@ assert.sameValue(bytes[3], 0);
             SnapshotArtifactKind::decode(SNAPSHOT_VERSION, Some(ArtifactProducer::CURRENT)),
             Ok(SnapshotArtifactKind::CurrentScriptwV8)
         );
-        assert!(
-            SnapshotArtifactKind::decode(SNAPSHOT_VERSION, None)
-                .expect_err("current snapshots require an explicit producer")
-                .contains("missing required producer scriptw")
-        );
-        assert!(
-            SnapshotArtifactKind::decode(SNAPSHOT_VERSION + 1, None)
-                .expect_err("unknown snapshot versions must fail")
-                .contains("unsupported snapshot_version")
-        );
+        assert!(SnapshotArtifactKind::decode(SNAPSHOT_VERSION, None)
+            .expect_err("current snapshots require an explicit producer")
+            .contains("missing required producer scriptw"));
+        assert!(SnapshotArtifactKind::decode(SNAPSHOT_VERSION + 1, None)
+            .expect_err("unknown snapshot versions must fail")
+            .contains("unsupported snapshot_version"));
         assert!(serde_json::from_str::<ArtifactProducer>(r#""other""#).is_err());
         assert_eq!(
             parse_snapshot_execution_backend("spec-exec"),
@@ -30123,11 +29962,9 @@ assert.sameValue(bytes[3], 0);
             parse_snapshot_execution_backend("wasm-aot"),
             Ok(ExecutionBackend::WasmAot)
         );
-        assert!(
-            parse_snapshot_execution_backend("future-backend")
-                .expect_err("snapshot backend spellings form a closed domain")
-                .contains("unknown execution_backend")
-        );
+        assert!(parse_snapshot_execution_backend("future-backend")
+            .expect_err("snapshot backend spellings form a closed domain")
+            .contains("unknown execution_backend"));
         let case = synthetic_case("schema/backend.js");
         let manifest = SuiteManifest {
             pinned_revisions: PinnedRevisions {
@@ -30153,20 +29990,16 @@ assert.sameValue(bytes[3], 0);
             .expect("running compiler identity must be captured"),
         );
         file.execution_backend = "future-backend".to_string();
-        assert!(
-            snapshot_from_file(file)
-                .expect_err("current snapshots must reject unknown backend spellings")
-                .contains("unknown execution_backend")
-        );
+        assert!(snapshot_from_file(file)
+            .expect_err("current snapshots must reject unknown backend spellings")
+            .contains("unknown execution_backend"));
         assert_eq!(
             PublicationBackend::try_from(ExecutionBackend::WasmAot),
             Ok(PublicationBackend::WasmAot)
         );
-        assert!(
-            PublicationBackend::try_from(ExecutionBackend::SpecExec)
-                .expect_err("the oracle backend must never enter publication state")
-                .contains("oracle-only")
-        );
+        assert!(PublicationBackend::try_from(ExecutionBackend::SpecExec)
+            .expect_err("the oracle backend must never enter publication state")
+            .contains("oracle-only"));
     }
     fn compiler_provenance_snapshot_fixture() -> ProgressSnapshot {
         aggregate_snapshot(
@@ -30234,11 +30067,9 @@ assert.sameValue(bytes[3], 0);
             current["compiler_identity"].clone(),
         ] {
             legacy["compiler_identity"] = identity;
-            assert!(
-                decode_snapshot_value_for_test(&legacy)
-                    .expect_err("v7 may not carry even null compiler binding")
-                    .contains("must omit compiler_identity")
-            );
+            assert!(decode_snapshot_value_for_test(&legacy)
+                .expect_err("v7 may not carry even null compiler binding")
+                .contains("must omit compiler_identity"));
         }
     }
 
@@ -30375,11 +30206,9 @@ assert.sameValue(bytes[3], 0);
             assert_eq!(fs::read_to_string(&txt_path).unwrap(), "original summary\n");
         }
         fs::remove_file(&json_path).unwrap();
-        assert!(
-            write_snapshot(&config, &snapshot, "bound")
-                .expect_err("text without JSON has no compiler authority")
-                .contains("unbound summary")
-        );
+        assert!(write_snapshot(&config, &snapshot, "bound")
+            .expect_err("text without JSON has no compiler authority")
+            .contains("unbound summary"));
         assert_eq!(fs::read_to_string(&txt_path).unwrap(), "original summary\n");
         fs::remove_dir_all(&config.snapshot_dir).unwrap();
     }

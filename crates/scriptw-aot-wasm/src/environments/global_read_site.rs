@@ -37,17 +37,17 @@
 //! A site whose record misses asks for a new one, a bounded number of times,
 //! so a name defined after the site first ran, or deleted and defined again,
 //! is answered inline once more.
-use super::*;
 use super::environment_reference::EnvironmentIdentifierRead;
+use super::*;
+use crate::emit::ControlTarget;
 use crate::gc_types::{
     GcOperand, GlobalAbsenceWitness, GlobalAbsenceWitnessSchema, GlobalReadSiteRecord,
-    GlobalReadSiteRecordSchema, IntrinsicPropertyStorage, JavaScriptObject,
-    ObjectPropertyStorage, OrdinaryObject, OrdinaryObjectSchema, OrdinaryPropertyStorage,
-    OrdinaryPropertyStorageSchema, PropertyDescriptor, PropertyDescriptorSchema, PropertyEntry,
-    PropertyEntrySchema, PropertyTable, PropertyValue, RealmRecord, RealmRecordSchema,
-    SiteRecordGlobal, StoredValueSchema,
+    GlobalReadSiteRecordSchema, IntrinsicPropertyStorage, JavaScriptObject, ObjectPropertyStorage,
+    OrdinaryObject, OrdinaryObjectSchema, OrdinaryPropertyStorage, OrdinaryPropertyStorageSchema,
+    PropertyDescriptor, PropertyDescriptorSchema, PropertyEntry, PropertyEntrySchema,
+    PropertyTable, PropertyValue, RealmRecord, RealmRecordSchema, SiteRecordGlobal,
+    StoredValueSchema,
 };
-use crate::emit::ControlTarget;
 use crate::heap::DescriptorMask;
 use crate::operations::PropertyKeyLocals;
 use crate::runtime_helpers::{

@@ -393,4 +393,3 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(slot, f);
     }
 }
-
