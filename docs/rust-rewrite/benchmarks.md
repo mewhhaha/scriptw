@@ -2627,6 +2627,14 @@ fresh Store's GC heap from a one-slot pool that keeps its dirty pages resident
 the old allocation for comparison. RSS after a Store drop no longer falls back to
 its value before the Store: up to 16 MiB of heap stays resident.
 
+The Scriptc actor runs through the same host's WASI adapter, which takes its
+program's linear memory from the same one-slot, kept-resident pool (it has no GC
+heap); `SCRIPTW_PRECOMPILED_STORE_ALLOCATION` switches both adapters, both record
+`store_allocation`, and the application, runtime-comparison and precompiled
+publishers refuse a campaign whose Scriptw and Scriptc processes differ in it. V8
+keeps its own process heap across fresh contexts. Application and kernel panels
+dated before 2026-11-19 mapped Stores on demand for both Wasm actors.
+
 One host build, pooled against on-demand, alternating fresh processes on CPU 3 of
 a shared 4-vCPU VM (two blocks of eight processes each; third warm entry of each
 process, after three warmups; minor faults inside the timed entry from the
@@ -2649,6 +2657,19 @@ requires, changed on-demand entries by +1–6% medians with overlapping quartile
 (eight processes each, edge-router, edge-html, react-ssr, retained-objects).
 React SSR's private-linear-memory faults (2,247 on 2026-11-17) are gone since the
 runtime RegExp compiler was removed, so its remaining faults were all GC heap.
+
+Scriptc 0.4.5 programs (Zig 0.16 WASI build, 267-page initial memory), same
+method and host build, `execute-wasi`:
+
+| Fixture | Faults on-demand → pooled | Entry ms on-demand → pooled, block 1 / block 2 (median, q1–q3) | Saved |
+| --- | ---: | --- | ---: |
+| edge-router | 67 → 4–5 | 0.419 (0.395–0.516) → 0.326 (0.305–0.381) / 0.419 (0.409–0.491) → 0.329 (0.314–0.335) | 21–22% |
+| edge-html | 70 → 4–5 | 0.697 (0.631–0.838) → 0.474 (0.456–0.585) / 0.622 (0.571–0.668) → 0.555 (0.548–0.571) | 11–32% |
+| objects (kernel) | 68 → 2 | 0.371 (0.322–0.389) → 0.265 (0.254–0.343) / 0.403 (0.331–0.543) → 0.313 (0.299–0.345) | 22–29% |
+| integer (kernel) | 20 → 2 | 0.052 (0.051–0.058) → 0.028 (0.027–0.031) / 0.056 (0.051–0.080) → 0.026 (0.023–0.029) | 46–53% |
+
+Thread CPU agrees within one point. Pooling one actor and not the other would
+have credited Scriptw with 11–53% that belongs to allocation, not compiled code.
 
 ## Compilation time
 

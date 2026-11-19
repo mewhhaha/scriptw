@@ -17,6 +17,7 @@ import tarfile
 import tempfile
 
 from benchmark_charts import gallery, render as render_card
+from benchmark_metrics import uniform_store_allocation
 
 SCHEMA = 'scriptw-precompiled-comparison-v1'
 RUNTIMES = ('scriptw', 'scriptc')
@@ -654,6 +655,11 @@ def load_report(path, archive=None):
         observations, matched = _consumer(raw, report, image, case, runtime)
         require(matched is (attempt['status'] == 'ok'), 'attempt status hides output failure or success')
         by_key[round_index, name, runtime] = (attempt['status'], raw)
+    try:
+        uniform_store_allocation((runtime, raw.get('store_allocation'))
+                                 for (_, _, runtime), (_, raw) in by_key.items() if raw is not None)
+    except ValueError as error:
+        require(False, str(error))
     require(len(consumed) == len(set(consumed))
             and consumed == [row['id'] for row in report['commands'] if row['kind'] == 'consume'],
             'consumer commands are omitted/reused/out of order')

@@ -108,6 +108,27 @@ class RuntimeComparisonTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             bench.reduce_rows([rows[1], rows[0], *rows[2:]], names)
 
+    def test_wasm_actors_must_share_one_store_allocation(self):
+        identity = dict(source_fingerprint='a' * 64, executable_sha256='b' * 64, shared_configuration={})
+        image = dict(image_sha256='c' * 64, wasm_sha256='d' * 64)
+        case = dict(file='case.js', stdout='ok\n')
+        pooled = dict(strategy='pooled', max_concurrent_stores=1,
+                      reset=dict(mode='keep-dirty-pages-resident', keep_resident_bytes=16 * 1024**2))
+        cpu = dict(status='sampled', scope='execution-worker-thread', elapsed_ns=5)
+        raw = dict(identity, **image, schema='scriptw-precompiled-wasi-execution-v1', compiler_enabled=False,
+                   comparison_cohort='scriptw-precompiled-comparison-v1', excluded_from_ordinary_cohorts=True,
+                   samples=3, warmups=1, store_allocation=pooled,
+                   observations=[dict(warmup=index == 0, stdout='ok\n', matched=True, completion='normal', stderr='',
+                                      execution_thread_cpu=cpu, phases_ns=dict(execution=10)) for index in range(4)])
+        checked = bench.checked_observations(raw, 'scriptc', case, 'source', identity, image, None, 3, 1)
+        self.assertEqual(checked['store_allocation'], pooled)
+        rows = [dict(actor='scriptw', store_allocation=pooled), dict(actor='scriptc', **checked), dict(actor='v8')]
+        self.assertEqual(bench.campaign_store_allocation(rows), pooled)
+        self.assertIsNone(bench.campaign_store_allocation([dict(actor='scriptw'), dict(actor='scriptc'), dict(actor='v8')]))
+        for other in (dict(strategy='on-demand'), None):
+            rows[1] = dict(actor='scriptc', store_allocation=other)
+            with self.subTest(other=other), self.assertRaisesRegex(ValueError, 'differ in store allocation'):
+                bench.campaign_store_allocation(rows)
 
     def summary(self, scriptw, other):
         names = [f'case{index}.js' for index in range(17)]

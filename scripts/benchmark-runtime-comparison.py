@@ -32,7 +32,7 @@ import sys
 import tarfile
 import tempfile
 
-from benchmark_metrics import digest, execution_thread_cpu, measure_process
+from benchmark_metrics import digest, execution_thread_cpu, measure_process, uniform_store_allocation
 from limited_verification import kernel_group, limited_environment, require_cloud_budget, require_kernel_budget
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -160,9 +160,18 @@ def checked_observations(report, actor, case, source_sha, identity, image, node,
     if actor == 'v8':
         return dict(wall_ns=[row['execution_ns'] for row in measured],
                     context_ns=[row['context_ns'] for row in measured], compilation_ns=value['compilation_ns'])
-    return dict(wall_ns=[row['phases_ns']['execution'] for row in measured],
-                worker_cpu_ns=[row['execution_thread_cpu']['elapsed_ns'] for row in measured],
-                phases_ns=[row['phases_ns'] for row in measured])
+    result = dict(wall_ns=[row['phases_ns']['execution'] for row in measured],
+                  worker_cpu_ns=[row['execution_thread_cpu']['elapsed_ns'] for row in measured],
+                  phases_ns=[row['phases_ns'] for row in measured])
+    # Pooled fresh-Store hosts keep Store memory resident between entries.
+    if 'store_allocation' in report:
+        result['store_allocation'] = report['store_allocation']
+    return result
+
+
+def campaign_store_allocation(rows):
+    """The Store allocation shared by every Scriptw and Scriptc process, preflight included."""
+    return uniform_store_allocation((row['actor'], row.get('store_allocation')) for row in rows if row['actor'] != 'v8')
 
 
 def reduce_rows(rows, names):
@@ -380,6 +389,8 @@ def measure(args):
     for name in ('integer.js', 'dynamic-string-4096.js', 'join-mixed-1024.js'):
         for actor in RUNTIMES:
             report['preflight'].append(invoke(dict(actor=actor, case=name), len(report['preflight']), preflight=True))
+    # Stop before the campaign, not only at publication, if the Wasm actors are allocated differently.
+    campaign_store_allocation(report['preflight'])
     save(output / 'preflight.json', dict(status='passed', processes=9, checked_entries=36, records=report['preflight']))
     print('PREFLIGHT9/36 PASS', flush=True)
     for entry in plan['process_plan']:
@@ -729,6 +740,7 @@ def checked_campaign(campaign):
                                            report['consumer_identity'], image, report['node_identity'], count, warm)
             assert all(row[key] == value for key, value in checked.items())
             assert row['resources']['exit_code'] == 0 and not row['resources']['timed_out']
+    campaign_store_allocation(report['rows'] + report['preflight'])
     return report
 
 
@@ -818,6 +830,7 @@ def publish(args):
         processes=408, processes_per_actor_case=8, measured_entries_per_process=report['plan']['samples'],
         warmups_per_process=report['plan']['warmups'], preflight=dict(processes=9, checked_entries=36),
         policy=report['policy'], comparisons=summary, machine=report['plan']['machine'],
+        store_allocation=campaign_store_allocation(rows + report['preflight']),
         parent_qualification=dict(report['plan']['parent_qualification'], source=qualification['kind']),
         reference17=dict(evidence=dict(path='analysis.json', sha256=digest(campaign / 'analysis.json'))),
         evidence=dict(archive=str(archive), sha256=digest(root / archive), bytes=(root / archive).stat().st_size,

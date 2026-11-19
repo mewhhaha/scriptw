@@ -1,4 +1,5 @@
-//! Benchmark-only WASI adapter, with the same native tier as Scriptw P and R.
+//! Benchmark-only WASI adapter, with the same native tier and Store
+//! allocation as Scriptw P and R.
 use super::*;
 use std::time::Instant;
 use wasmtime::{Engine, Module};
@@ -23,7 +24,10 @@ pub(super) fn execute(
     let startup = residency::snapshot()?;
     let total = Instant::now();
     let mut config = wasmtime::Config::new();
-    configure_consumer(&mut config)?;
+    // The program's linear memory comes from the same one-slot, kept-resident
+    // pool as Scriptw's GC heap (or on demand for both), so the two adapters
+    // differ in compiled code, not in how their Stores are allocated.
+    let store_allocation = configure_fresh_store_consumer(&mut config)?;
     let started = Instant::now();
     let engine = Engine::new(&config).map_err(|e| e.to_string())?;
     let engine_ns = started.elapsed().as_nanos();
@@ -68,6 +72,9 @@ pub(super) fn execute(
     report["schema"] = json!("scriptw-precompiled-wasi-execution-v1");
     report["excluded_from_scored_cohorts"] = json!(true);
     report["compiler_enabled"] = json!(false);
+    // A pooled Store's drop keeps its linear memory pages resident, so
+    // `after_store_drop` RSS no longer falls back to `before_store`.
+    report["store_allocation"] = store_allocation;
     report["thread_cpu_observation_policy"] = json!(crate::benchmark_thread_cpu::POLICY);
     report["native_load_process_memory"] = load_memory;
     report["image_sha256"] = json!(image_sha256);

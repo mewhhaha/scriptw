@@ -57,8 +57,10 @@ fn configure_consumer(config: &mut wasmtime::Config) -> Result<(), String> {
 const STORE_ALLOCATION_VARIABLE: &str = "SCRIPTW_PRECOMPILED_STORE_ALLOCATION";
 
 /// Fresh-Store consumers run one Store after another, so their Engine takes
-/// GC heaps from a one-slot pool that keeps the heap's dirty pages resident
-/// (`PooledStores::sequential`). Returns the report's description.
+/// each Store's memory (Scriptw's GC heap, the WASI program's linear memory)
+/// from a one-slot pool that keeps its dirty pages resident
+/// (`PooledStores::sequential`). Both adapters of a host apply this one
+/// policy. Returns the report's description.
 fn configure_store_allocation(config: &mut wasmtime::Config) -> Result<Value, String> {
     match std::env::var(STORE_ALLOCATION_VARIABLE).as_deref() {
         Err(std::env::VarError::NotPresent) | Ok("pooled") => {

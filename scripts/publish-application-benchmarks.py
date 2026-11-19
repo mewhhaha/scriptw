@@ -21,7 +21,7 @@ import tempfile
 
 import importlib.util
 
-from application_benchmarks import ACTORS, SCHEMA, load_report, require
+from application_benchmarks import ACTORS, SCHEMA, campaign_store_allocation, load_report, require
 from benchmark_metrics import digest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -199,6 +199,8 @@ def authority_for(portable, react, receipts, archive, identity):
         machine=dict(summary=summary, portable=portable['machine'], react=react['machine']),
         versions=dict(react=react['versions'], node=portable['node_identity']['versions'], chromium=versions.pop()),
         portable=portable['summary'],
+        # Scriptw and Scriptc share it; load_report refused a campaign where they differ.
+        store_allocation=campaign_store_allocation(portable),
         react_reference_medians_ms={row['case']: row['process_medians_ns']['median'] / 1e6 for row in react['summaries']},
         standalone=attempts, failures=failures,
         coverage=dict(portable_attempted_processes=len(rows),

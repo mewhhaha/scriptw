@@ -8,7 +8,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
-from application_benchmarks import (ACTORS, SAMPLES, WARMUPS, SCHEMA, checked_observations,
+from application_benchmarks import (ACTORS, SAMPLES, WARMUPS, SCHEMA, campaign_store_allocation, checked_observations,
     checked_product_stdout, load_report, process_plan, summarize, validate_manifest)
 from benchmark_metrics import digest
 
@@ -196,6 +196,53 @@ class ApplicationBenchmarkTests(unittest.TestCase):
             path.write_text(json.dumps(report))
             with self.assertRaises(ValueError):
                 load_report(path)
+
+    def test_publication_refuses_wasm_actors_that_differ_in_store_allocation(self):
+        pooled = dict(strategy='pooled', max_concurrent_stores=1,
+                      reset=dict(mode='keep-dirty-pages-resident', keep_resident_bytes=16 * 1024**2))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'sources').mkdir()
+            source = root / 'sources' / CASE['file']
+            source.write_text('print(42);\n')
+            available = {CASE['file']: list(ACTORS)}
+            report = dict(schema=SCHEMA, status='complete', workloads=[CASE], plan=dict(available=available),
+                          preparations={CASE['file']: {actor: dict(status='prepared', stage='execution', image=IMAGE)
+                                                       for actor in ACTORS}},
+                          consumer_identity=IDENTITY, node_identity=NODE,
+                          inputs_before={'source': 'same'}, inputs_after={'source': 'same'})
+            path = root / 'report.json'
+
+            def publishable(allocations):
+                report['rows'] = []
+                for index, entry in enumerate(process_plan([CASE['file']], available)):
+                    actor = entry['actor']
+                    raw = v8_report(digest(source)) if actor == 'v8' else wasm_report(actor)
+                    if allocations.get(actor) is not None:
+                        raw['store_allocation'] = allocations[actor]
+                    stdout, stderr = root / f'{index}.stdout', root / f'{index}.stderr'
+                    stdout.write_text(json.dumps(raw))
+                    stderr.write_text('')
+                    row = dict(entry, status='sampled', stage='execution', stdout=stdout.name, stderr=stderr.name,
+                               stdout_sha256=digest(stdout), stderr_sha256=digest(stderr),
+                               resources=dict(exit_code=0, timed_out=False, elapsed_ns=3000, peak_rss_bytes=1024))
+                    row.update(checked_observations(raw, actor, CASE, digest(source), IDENTITY, IMAGE, NODE))
+                    report['rows'].append(row)
+                report['retained_files'] = [dict(path=str(item.relative_to(root)), bytes=item.stat().st_size,
+                                                 sha256=digest(item))
+                                            for item in sorted(root.rglob('*')) if item.is_file() and item != path]
+                report['summary'] = summarize(report)
+                path.write_text(json.dumps(report))
+                return campaign_store_allocation(load_report(path))
+
+            self.assertEqual(publishable(dict(scriptw=pooled, scriptc=pooled)), pooled)
+            # Reports from before pooled hosts record no allocation for either actor.
+            self.assertIsNone(publishable({}))
+            for allocations in (dict(scriptw=pooled, scriptc=dict(strategy='on-demand')),
+                                dict(scriptw=pooled),
+                                dict(scriptw=pooled, scriptc=dict(pooled, reset=dict(mode='release-all')))):
+                with self.subTest(allocations=allocations), self.assertRaisesRegex(ValueError, 'differ in store allocation'):
+                    publishable(allocations)
 
 
 if __name__ == '__main__':

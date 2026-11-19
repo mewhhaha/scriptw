@@ -77,6 +77,26 @@ def execution_thread_cpu(observation):
     return cpu
 
 
+def uniform_store_allocation(processes):
+    """The one Store allocation of every Wasmtime process in a campaign.
+
+    `processes` yields (actor, report store_allocation or None). Scriptw and
+    Scriptc run through one host; a campaign whose processes allocated Stores
+    differently (pooled against on-demand, or another pool or reset) would
+    compare allocators rather than compiled code and is refused. Reports from
+    before 2026-11-19 record nothing (every Store was then mapped on demand);
+    such a campaign stays admissible only if no process records an allocation.
+    V8 has no Store: it keeps its process heap across fresh contexts.
+    """
+    seen = {}
+    for actor, allocation in processes:
+        seen.setdefault(json.dumps(allocation, sort_keys=True), set()).add(actor)
+    if len(seen) > 1:
+        raise ValueError('actors differ in store allocation: ' + '; '.join(
+            f"{'/'.join(sorted(actors))}: {allocation}" for allocation, actors in sorted(seen.items())))
+    return json.loads(next(iter(seen))) if seen else None
+
+
 def measure_process(command, *, cwd, env, stdout, stderr, timeout, time_binary=None):
     """GNU time observes the actual exec child's kernel-recorded RSS peak.
 

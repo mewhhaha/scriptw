@@ -218,7 +218,9 @@ and [execution deadlines](execution-deadlines.md) apply unchanged on a reused
 heap. Scriptw state, Realms and host data are never pooled; only Wasmtime's
 heap memory is. Scriptw's own `run`, Test262 workers and retained hosts use
 on-demand allocation; the precompiled panel consumers use
-`PooledStores::sequential()`.
+`PooledStores::sequential()`, and so does their benchmark-only WASI adapter,
+whose non-GC program takes one slot for the linear memory it defines, under the
+same keep-resident reset.
 
 ## Lossless string and byte transfer
 

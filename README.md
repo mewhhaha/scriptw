@@ -136,7 +136,9 @@ Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and t
   x86-64 ([contract](docs/rust-rewrite/contracts/execution-deadlines.md)).
 - **Pooled panel hosts:** from 2026-11-19 the precompiled panel consumers reuse
   one kept-resident GC heap across fresh Stores, which cut those entries by
-  26–48%; panels dated earlier mapped a fresh heap per Store
+  26–48%; the Scriptc actor's linear memory gets the same pool (11–53% shorter
+  entries), and publication refuses actors that differ. Panels dated earlier
+  mapped fresh Store memory for both
   ([measurements](docs/rust-rewrite/benchmarks.md#pooled-gc-heaps-2026-11-19)).
   Embedders opt in with `configure_pooled_stores`.
 - **Runtime ABI 82:** rebuild Portable bundles and native images built under an

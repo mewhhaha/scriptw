@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 import statistics
 
-from benchmark_metrics import digest
+from benchmark_metrics import digest, uniform_store_allocation
 
 SCHEMA = 'scriptw-application-benchmarks-v1'
 ACTORS = ('scriptw', 'scriptc', 'v8')
@@ -126,10 +126,19 @@ def checked_observations(report, actor, case, source_sha, identity, image, node)
         result.update(context_ns=context, source_compilation_ns=value['compilation_ns'])
     else:
         result['load_phases_ns'] = report['load_phases_ns']
-        # Pooled fresh-Store hosts keep GC heap pages resident between entries.
+        # Pooled fresh-Store hosts keep Store memory resident between entries.
         if 'store_allocation' in report:
             result['store_allocation'] = report['store_allocation']
     return result
+
+
+def campaign_store_allocation(report):
+    """The Store allocation shared by every sampled Scriptw and Scriptc process."""
+    try:
+        return uniform_store_allocation((row['actor'], row.get('store_allocation')) for row in report['rows']
+                                        if row['status'] == 'sampled' and row['actor'] != 'v8')
+    except ValueError as error:
+        require(False, str(error))
 
 
 def machine_identity():
@@ -232,4 +241,5 @@ def load_report(path):
                                       image, report['node_identity'])
         require(all(row.get(key) == value for key, value in values.items()), 'derived execution data differs from raw log')
         require(not (path.parent / row['stderr']).read_bytes(), 'sampled execution has stderr')
+    campaign_store_allocation(report)
     return report

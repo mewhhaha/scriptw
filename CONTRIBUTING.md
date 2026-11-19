@@ -218,6 +218,12 @@ authority entry (default `private_numeric_facts`). Each actor runs in eight fres
 per case, with 21 measurements and ten checked warmups per process. V8 context
 creation is captured separately from its public-entry timer.
 
+The shared host gives Scriptw and Scriptc the same Store allocation: a one-slot,
+kept-resident pool by default, or on-demand mappings for both under
+`SCRIPTW_PRECOMPILED_STORE_ALLOCATION=on-demand`. Each Wasm report records its
+`store_allocation`; the runtime-comparison preflight and both panels' publishers
+refuse a campaign whose Scriptw and Scriptc processes differ.
+
 For JavaScript-to-portable-Wasm compilation, select a frozen ordinary CLI
 (`scriptw`, not a precompiled execution host), Scriptc 0.4.5 and Zig 0.16.0:
 

@@ -10,7 +10,7 @@ import re
 import statistics
 import tarfile
 
-from application_benchmarks import (ACTORS, SCHEMA, checked_observations, require,
+from application_benchmarks import (ACTORS, SCHEMA, campaign_store_allocation, checked_observations, require,
                                     checked_product_stdout, successful_process, summarize, validate_manifest)
 from benchmark_charts import gallery, render
 from benchmark_metrics import digest, summary
@@ -376,6 +376,7 @@ def portable_rows(files, receipt, fingerprint):
             sha(encoded(files, base / 'sources' / case['file'])), report['consumer_identity'], image, report['node_identity'])
         require(all(row.get(key) == value for key, value in values.items())
                 and not encoded(files, base / row['stderr']), 'portable observation differs from raw output')
+    campaign_store_allocation(report)
     rows = []
     for item in report['summary']:
         runtimes = {}
