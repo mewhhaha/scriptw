@@ -8,6 +8,9 @@ use super::*;
 use crate::gc_types::*;
 
 mod cache;
+#[cfg(test)]
+pub(crate) use cache::dump_slot_for_test;
+pub(crate) use cache::{emit_profile_dump, observe_dump_slot, DUMP_SLOT_BYTES};
 mod chain;
 mod computed;
 mod native_function;

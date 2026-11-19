@@ -31,6 +31,8 @@
 //! recipe or a dictionary holder whose key index cannot prove absence,
 //! misses.
 use super::holder::{HolderReceiverKind, RecipeValues};
+#[cfg(test)]
+use super::proof_trace::ProofStep;
 use super::write::DictionaryAbsence;
 use super::*;
 use crate::emit::ControlTarget;
@@ -43,7 +45,7 @@ use crate::gc_types::{
 };
 
 /// A compact storage of one of its two sealed layouts.
-enum CompactStorage {
+pub(super) enum CompactStorage {
     Array(GcLocal<ArrayCompactDataStorage>),
     Inline(GcLocal<InlineCompactDataStorage>),
 }
@@ -51,14 +53,31 @@ enum CompactStorage {
 /// The sealed compact layouts, in the order an entry tests them.
 const COMPACT_LAYOUTS: [CompactLayout; 2] = [CompactLayout::Array, CompactLayout::Inline];
 
-#[derive(Clone, Copy)]
-enum CompactLayout {
+/// The storage of a prototype that holds a record's place.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum HolderStorage {
+    Intrinsic,
+    Compact(CompactLayout),
+    Dictionary,
+}
+
+/// The holder storages, in the order an entry tests them; a holder on
+/// none of them misses.
+const HOLDER_STORAGES: [HolderStorage; 4] = [
+    HolderStorage::Intrinsic,
+    HolderStorage::Compact(COMPACT_LAYOUTS[0]),
+    HolderStorage::Compact(COMPACT_LAYOUTS[1]),
+    HolderStorage::Dictionary,
+];
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum CompactLayout {
     Array,
     Inline,
 }
 
 impl CompactStorage {
-    fn shape(
+    pub(super) fn shape(
         &self,
         schema: &RuntimeSchema,
         f: &mut Function,
@@ -86,7 +105,7 @@ impl CompactStorage {
         }
     }
 
-    fn clear(self, f: &mut Function) {
+    pub(super) fn clear(self, f: &mut Function) {
         match self {
             Self::Array(storage) => storage.clear(f),
             Self::Inline(storage) => storage.clear(f),
@@ -95,7 +114,7 @@ impl CompactStorage {
 }
 
 /// The primitive receivers whose records name their Realm's prototype.
-const PRIMITIVE_RECEIVERS: [(
+pub(super) const PRIMITIVE_RECEIVERS: [(
     WasmRuntimeValueTag,
     HolderReceiverKind,
     NonArrayRealmIntrinsicSlot,
@@ -140,7 +159,7 @@ const WALKED_PRIMITIVES: [(WasmRuntimeValueTag, NonArrayRealmIntrinsicSlot); 5] 
 /// record can name, in the order the entry tests a receiver that the site's
 /// hint does not place. A record never names an index or "length", which an
 /// Array and a String wrapper own outside the header.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum ReceiverLayout {
     Ordinary,
     Function,
@@ -153,7 +172,7 @@ pub(super) enum ReceiverLayout {
     Promise,
 }
 
-const RECEIVER_LAYOUTS: [ReceiverLayout; 9] = [
+pub(super) const RECEIVER_LAYOUTS: [ReceiverLayout; 9] = [
     ReceiverLayout::Ordinary,
     ReceiverLayout::Function,
     ReceiverLayout::Array,
@@ -214,15 +233,15 @@ impl ReceiverLayout {
 
 /// The sealed storage layouts of an ordinary header, in the order the entry
 /// tests a storage that the site's hint does not place.
-#[derive(Clone, Copy)]
-enum ReceiverStorage {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum ReceiverStorage {
     Array,
     Inline,
     Dictionary,
     Intrinsic,
 }
 
-const RECEIVER_STORAGES: [ReceiverStorage; 4] = [
+pub(super) const RECEIVER_STORAGES: [ReceiverStorage; 4] = [
     ReceiverStorage::Array,
     ReceiverStorage::Inline,
     ReceiverStorage::Dictionary,
@@ -231,9 +250,9 @@ const RECEIVER_STORAGES: [ReceiverStorage; 4] = [
 
 impl ReceiverStorage {
     /// A site's hint holds the storage layout above the header layout.
-    const HINT_SHIFT: u32 = 4;
+    pub(super) const HINT_SHIFT: u32 = 4;
 
-    const fn word(self) -> i32 {
+    pub(super) const fn word(self) -> i32 {
         self as i32
     }
 
@@ -323,6 +342,7 @@ struct ReadReceiver<'a> {
 
 impl FunctionBuilder<'_> {
     pub(crate) fn compile_cached_property_read_helper(&mut self) -> Result<Function, EmitError> {
+        proof_step!(ProofStep::ReadEntry);
         let mut body = self.begin_helper_body(RuntimeHelperId::CachedPropertyRead);
         let p = self
             .helper_parameters::<crate::runtime_helpers::CachedPropertyReadParameters>(&mut body);
@@ -341,6 +361,7 @@ impl FunctionBuilder<'_> {
         );
         p.release(f);
         f.instruction(&Instruction::End);
+        proof_step!(ProofStep::ReadEntryEnd);
         Ok(self.finish_function(body))
     }
 
@@ -412,7 +433,16 @@ impl FunctionBuilder<'_> {
             intrinsic.clear(f);
             self.emit_record_scan(&head, f, |builder, candidate, next, f| {
                 builder.emit_receiver_rule_or_branch(candidate, kind, None, next, f);
-                builder.emit_recorded_place_hit(candidate, &holder, &key, &value, found, next, f)
+                builder.emit_recorded_place_hit(
+                    candidate,
+                    &holder,
+                    &key,
+                    &value,
+                    found,
+                    next,
+                    ReadAnswer::Return,
+                    f,
+                )
             })?;
             holder.clear(f);
             self.emit_branch_to_target(exhausted, f);
@@ -688,39 +718,22 @@ impl FunctionBuilder<'_> {
             // shape that lacks it. Only an object or a function owns it.
             if proofs == Proofs::Object {
                 let rule = builder.open_frame(ControlFrameKind::Block, f);
-                let _ = shape.load(s, f);
-                s.field(OwnDataReadCacheSchema::SHAPE).read(candidate, s, f);
-                f.instruction(&Instruction::RefEq);
-                f.instruction(&Instruction::I32Eqz);
-                builder.emit_branch_if_to_target(rule, f);
-                let slot = s.reserve_i32_local(f);
-                s.field(OwnDataReadCacheSchema::SLOT)
-                    .read(candidate, s, f)
-                    .store(slot, f);
-                slot.load(f);
-                f.instruction(&Instruction::I32Const(0));
-                f.instruction(&Instruction::I32GeS);
-                builder.open_frame(ControlFrameKind::If, f);
-                match &storage {
-                    CompactStorage::Array(array) => {
-                        builder.emit_array_compact_value_at(array, slot, value, f)
-                    }
-                    CompactStorage::Inline(inline) => {
-                        builder.emit_inline_compact_recorded_value_at(inline, slot, value, f)
-                    }
-                }
-                emit_return_normal(value, f);
-                builder.pop_control(ControlFrameKind::If);
-                f.instruction(&Instruction::End);
+                let slot = builder.emit_recorded_shape_slot_or_branch(candidate, &shape, rule, f);
+                builder.emit_recorded_own_slot_hit(&storage, slot, value, ReadAnswer::Return, f);
                 // Only an actual ordinary object registers a closed tail.
                 class.load(f);
                 f.instruction(&Instruction::I32Const(ReceiverClass::Ordinary.word()));
                 f.instruction(&Instruction::I32Ne);
                 builder.emit_branch_if_to_target(rule, f);
-                builder.emit_recorded_closed_tail_or_branch(&object, slot, rule, f)?;
+                builder.emit_recorded_closed_tail_hit(
+                    &object,
+                    slot,
+                    value,
+                    rule,
+                    ReadAnswer::Return,
+                    f,
+                )?;
                 s.release_i32_local(slot, f);
-                value.set_undefined(f);
-                emit_return_normal(value, f);
                 builder.pop_control(ControlFrameKind::Block);
                 f.instruction(&Instruction::End);
             }
@@ -734,7 +747,15 @@ impl FunctionBuilder<'_> {
                 f,
             );
             builder.emit_prototype_place_hit(
-                candidate, &object, &prototype, key, value, found, next, f,
+                candidate,
+                &object,
+                &prototype,
+                key,
+                value,
+                found,
+                next,
+                ReadAnswer::Return,
+                f,
             )
         })?;
         // A composite layout's own properties are never probed.
@@ -810,7 +831,15 @@ impl FunctionBuilder<'_> {
                 f,
             );
             builder.emit_prototype_place_hit(
-                candidate, &object, &prototype, key, value, found, next, f,
+                candidate,
+                &object,
+                &prototype,
+                key,
+                value,
+                found,
+                next,
+                ReadAnswer::Return,
+                f,
             )
         })?;
         self.emit_probed_dictionary_read(
@@ -1033,8 +1062,17 @@ impl FunctionBuilder<'_> {
             f.instruction(&Instruction::I32Const(HolderReceiverKind::None.word()));
             f.instruction(&Instruction::I32Eq);
             builder.emit_branch_if_to_target(next, f);
-            builder
-                .emit_prototype_place_hit(candidate, object, prototype, key, value, found, next, f)
+            builder.emit_prototype_place_hit(
+                candidate,
+                object,
+                prototype,
+                key,
+                value,
+                found,
+                next,
+                ReadAnswer::Return,
+                f,
+            )
         })
     }
 
@@ -1042,7 +1080,7 @@ impl FunctionBuilder<'_> {
     /// record and the label that leaves it for the next. `proofs` returns
     /// from the function when a record answers; this falls through when the
     /// chain has no further record.
-    fn emit_record_scan(
+    pub(super) fn emit_record_scan(
         &mut self,
         head: &GcLocal<OwnDataReadCache>,
         f: &mut Function,
@@ -1053,6 +1091,7 @@ impl FunctionBuilder<'_> {
             &mut Function,
         ) -> Result<(), EmitError>,
     ) -> Result<(), EmitError> {
+        proof_step!(ProofStep::RecordScan);
         let s = self.runtime_schema();
         let cursor = s
             .reserve_gc_local::<OwnDataReadCache, Nullable>(f)
@@ -1087,13 +1126,14 @@ impl FunctionBuilder<'_> {
     /// The ordinary header of a receiver with the sealed layout `layout`;
     /// every other value branches to `other`. One cast test admits the
     /// layout and its header is projected right after it.
-    fn emit_layout_header_or_branch(
+    pub(super) fn emit_layout_header_or_branch(
         &mut self,
         layout: ReceiverLayout,
         target: &ValueLocals,
         other: ControlTarget,
         f: &mut Function,
     ) -> GcStackReference<OrdinaryObject> {
+        proof_step!(ProofStep::LayoutHeader(layout));
         let s = self.runtime_schema();
         let label = self.local_branch_label(other);
         macro_rules! composite {
@@ -1206,10 +1246,10 @@ impl FunctionBuilder<'_> {
         header.clear(f);
     }
 
-    /// Returns the value at the record's place on the live [[Prototype]] of
+    /// Answers the value at the record's place on the live [[Prototype]] of
     /// the receiver whose header is `object`, or branches to `miss`.
     #[allow(clippy::too_many_arguments)]
-    fn emit_prototype_place_hit(
+    pub(super) fn emit_prototype_place_hit(
         &mut self,
         record: &GcLocal<OwnDataReadCache>,
         object: &GcLocal<OrdinaryObject>,
@@ -1218,8 +1258,40 @@ impl FunctionBuilder<'_> {
         value: &ValueLocals,
         found: I32Local,
         miss: ControlTarget,
+        answer: ReadAnswer,
         f: &mut Function,
     ) -> Result<(), EmitError> {
+        self.emit_prototype_place_hit_on(
+            &HOLDER_STORAGES,
+            record,
+            object,
+            prototype,
+            key,
+            value,
+            found,
+            miss,
+            answer,
+            f,
+        )
+    }
+
+    /// [`Self::emit_prototype_place_hit`] for a holder on one of `storages`:
+    /// a holder on any other storage falls through.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn emit_prototype_place_hit_on(
+        &mut self,
+        storages: &[HolderStorage],
+        record: &GcLocal<OwnDataReadCache>,
+        object: &GcLocal<OrdinaryObject>,
+        prototype: &GcLocal<JavaScriptObject, Nullable>,
+        key: &PropertyKeyLocals,
+        value: &ValueLocals,
+        found: I32Local,
+        miss: ControlTarget,
+        answer: ReadAnswer,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        proof_step!(ProofStep::PrototypePlace);
         let s = self.runtime_schema();
         prototype.replace(
             s.field(OrdinaryObjectSchema::PROTOTYPE)
@@ -1228,7 +1300,9 @@ impl FunctionBuilder<'_> {
             f,
         );
         let holder = self.emit_prototype_header_or_branch(prototype, miss, f);
-        self.emit_recorded_place_hit(record, &holder, key, value, found, miss, f)?;
+        self.emit_recorded_place_hit_on(
+            storages, record, &holder, key, value, found, miss, answer, f,
+        )?;
         holder.clear(f);
         Ok(())
     }
@@ -1586,12 +1660,13 @@ impl FunctionBuilder<'_> {
     /// The ordinary header of a Realm's String or Number prototype, a
     /// primitive wrapper or an ordinary object; anything else branches to
     /// `miss`.
-    fn emit_realm_prototype_header_or_branch(
+    pub(super) fn emit_realm_prototype_header_or_branch(
         &mut self,
         prototype: &ValueLocals,
         miss: ControlTarget,
         f: &mut Function,
     ) -> GcLocal<OrdinaryObject> {
+        proof_step!(ProofStep::RealmPrototypeHeader);
         let s = self.runtime_schema();
         let header = s
             .reserve_gc_local::<OrdinaryObject, Nullable>(f)
@@ -1634,13 +1709,14 @@ impl FunctionBuilder<'_> {
 
     /// The storage as `layout`, after branching to `other` for any other
     /// storage.
-    fn emit_compact_storage_or_branch(
+    pub(super) fn emit_compact_storage_or_branch(
         &mut self,
         layout: CompactLayout,
         base: &GcLocal<ObjectPropertyStorage>,
         other: ControlTarget,
         f: &mut Function,
     ) -> CompactStorage {
+        proof_step!(ProofStep::CompactStorage(layout));
         let s = self.runtime_schema();
         let label = self.local_branch_label(other);
         match layout {
@@ -1667,12 +1743,13 @@ impl FunctionBuilder<'_> {
 
     /// Branches to `miss` unless the dictionary has no own property: every
     /// live entry sits below the insertion extent.
-    fn emit_empty_dictionary_or_branch(
+    pub(super) fn emit_empty_dictionary_or_branch(
         &self,
         dictionary: &GcLocal<OrdinaryPropertyStorage>,
         miss: ControlTarget,
         f: &mut Function,
     ) {
+        proof_step!(ProofStep::EmptyDictionary);
         let s = self.runtime_schema();
         s.field(OrdinaryPropertyStorageSchema::LENGTH)
             .read(dictionary, s, f);
@@ -1683,7 +1760,7 @@ impl FunctionBuilder<'_> {
     /// receiver's: its kind, and the compact `shape` that proves an
     /// ordinary receiver lacks the key (None for an empty dictionary and
     /// for primitives).
-    fn emit_receiver_rule_or_branch(
+    pub(super) fn emit_receiver_rule_or_branch(
         &self,
         record: &GcLocal<OwnDataReadCache>,
         kind: HolderReceiverKind,
@@ -1691,6 +1768,10 @@ impl FunctionBuilder<'_> {
         miss: ControlTarget,
         f: &mut Function,
     ) {
+        proof_step!(ProofStep::ReceiverRule {
+            kind: kind.word(),
+            shape: shape.is_some(),
+        });
         let s = self.runtime_schema();
         s.field(OwnDataReadCacheSchema::RECEIVER_KIND)
             .read(record, s, f);
@@ -1712,10 +1793,10 @@ impl FunctionBuilder<'_> {
         self.emit_branch_if_to_target(miss, f);
     }
 
-    /// Returns the value at the record's place on `holder`, the receiver's
+    /// Answers the value at the record's place on `holder`, the receiver's
     /// prototype, or branches to `miss`.
     #[allow(clippy::too_many_arguments)]
-    fn emit_recorded_place_hit(
+    pub(super) fn emit_recorded_place_hit(
         &mut self,
         record: &GcLocal<OwnDataReadCache>,
         holder: &GcLocal<OrdinaryObject>,
@@ -1723,8 +1804,40 @@ impl FunctionBuilder<'_> {
         value: &ValueLocals,
         found: I32Local,
         miss: ControlTarget,
+        answer: ReadAnswer,
         f: &mut Function,
     ) -> Result<(), EmitError> {
+        self.emit_recorded_place_hit_on(
+            &HOLDER_STORAGES,
+            record,
+            holder,
+            key,
+            value,
+            found,
+            miss,
+            answer,
+            f,
+        )
+    }
+
+    /// Answers the value at the record's place on `holder` when the
+    /// holder's storage is one of `storages`, taken in the entry's order, or
+    /// branches to `miss`; a holder on any other storage falls through.
+    /// Every storage of the entry's order branches to `miss` instead.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn emit_recorded_place_hit_on(
+        &mut self,
+        storages: &[HolderStorage],
+        record: &GcLocal<OwnDataReadCache>,
+        holder: &GcLocal<OrdinaryObject>,
+        key: &PropertyKeyLocals,
+        value: &ValueLocals,
+        found: I32Local,
+        miss: ControlTarget,
+        answer: ReadAnswer,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        proof_step!(ProofStep::RecordedPlace);
         let s = self.runtime_schema();
         let holder_base = s.reserve_non_null_gc_local(f).initialize(
             s.field(OrdinaryObjectSchema::PROPERTIES)
@@ -1737,87 +1850,99 @@ impl FunctionBuilder<'_> {
             .read(record, s, f)
             .store(slot, f);
         found.set_constant(0, f);
-        // An intrinsic layout is immutable: storage at the recorded address
-        // has the same rows, and keeps each materialized value in its group.
-        let other = self.open_frame(ControlFrameKind::Block, f);
-        let intrinsic = s.reserve_non_null_gc_local(f).initialize(
-            holder_base.sealed_subtype_or_branch::<IntrinsicPropertyStorage>(
-                s,
-                self.local_branch_label(other),
-                f,
-            ),
-            f,
-        );
-        s.field(IntrinsicPropertyStorageSchema::ADDRESS)
-            .read(&intrinsic, s, f);
-        s.field(OwnDataReadCacheSchema::HOLDER_LAYOUT)
-            .read(record, s, f);
-        f.instruction(&Instruction::I32Ne);
-        self.emit_branch_if_to_target(miss, f);
-        slot.load(f);
-        f.instruction(&Instruction::I32Const(0));
-        f.instruction(&Instruction::I32GeS);
-        f.instruction(&Instruction::If(BlockType::Empty));
-        self.emit_materialized_intrinsic_group(&intrinsic, slot, value, found, f);
-        f.instruction(&Instruction::Else);
-        self.emit_recorded_holder_absence(holder, slot, value, found, miss, f)?;
-        f.instruction(&Instruction::End);
-        intrinsic.clear(f);
-        self.emit_found_return_or_miss(found, value, miss, f);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
-        // A compact shape is immutable: the same shape has the key at the
-        // same slot, or lacks it.
-        for layout in COMPACT_LAYOUTS {
-            let other = self.open_frame(ControlFrameKind::Block, f);
-            let storage = self.emit_compact_storage_or_branch(layout, &holder_base, other, f);
-            let _ = storage.shape(s, f);
-            s.field(OwnDataReadCacheSchema::HOLDER_SHAPE)
-                .read(record, s, f);
-            f.instruction(&Instruction::RefEq);
-            f.instruction(&Instruction::I32Eqz);
-            self.emit_branch_if_to_target(miss, f);
-            slot.load(f);
-            f.instruction(&Instruction::I32Const(0));
-            f.instruction(&Instruction::I32GeS);
-            f.instruction(&Instruction::If(BlockType::Empty));
-            match &storage {
-                CompactStorage::Array(array) => {
-                    self.emit_array_compact_value_at(array, slot, value, f)
+        for storage in storages {
+            proof_step!(ProofStep::HolderStorage(*storage));
+            match *storage {
+                // An intrinsic layout is immutable: storage at the recorded
+                // address has the same rows, and keeps each materialized
+                // value in its group.
+                HolderStorage::Intrinsic => {
+                    let other = self.open_frame(ControlFrameKind::Block, f);
+                    let intrinsic = s.reserve_non_null_gc_local(f).initialize(
+                        holder_base.sealed_subtype_or_branch::<IntrinsicPropertyStorage>(
+                            s,
+                            self.local_branch_label(other),
+                            f,
+                        ),
+                        f,
+                    );
+                    s.field(IntrinsicPropertyStorageSchema::ADDRESS)
+                        .read(&intrinsic, s, f);
+                    s.field(OwnDataReadCacheSchema::HOLDER_LAYOUT)
+                        .read(record, s, f);
+                    f.instruction(&Instruction::I32Ne);
+                    self.emit_branch_if_to_target(miss, f);
+                    slot.load(f);
+                    f.instruction(&Instruction::I32Const(0));
+                    f.instruction(&Instruction::I32GeS);
+                    f.instruction(&Instruction::If(BlockType::Empty));
+                    self.emit_materialized_intrinsic_group(&intrinsic, slot, value, found, f);
+                    f.instruction(&Instruction::Else);
+                    self.emit_recorded_holder_absence(holder, slot, value, found, miss, f)?;
+                    f.instruction(&Instruction::End);
+                    intrinsic.clear(f);
+                    self.emit_found_answer_or_miss(found, value, miss, answer, f);
+                    self.pop_control(ControlFrameKind::Block);
+                    f.instruction(&Instruction::End);
                 }
-                CompactStorage::Inline(inline) => {
-                    self.emit_inline_compact_recorded_value_at(inline, slot, value, f)
+                // A compact shape is immutable: the same shape has the key
+                // at the same slot, or lacks it.
+                HolderStorage::Compact(layout) => {
+                    let other = self.open_frame(ControlFrameKind::Block, f);
+                    let storage =
+                        self.emit_compact_storage_or_branch(layout, &holder_base, other, f);
+                    let _ = storage.shape(s, f);
+                    s.field(OwnDataReadCacheSchema::HOLDER_SHAPE)
+                        .read(record, s, f);
+                    f.instruction(&Instruction::RefEq);
+                    f.instruction(&Instruction::I32Eqz);
+                    self.emit_branch_if_to_target(miss, f);
+                    slot.load(f);
+                    f.instruction(&Instruction::I32Const(0));
+                    f.instruction(&Instruction::I32GeS);
+                    f.instruction(&Instruction::If(BlockType::Empty));
+                    match &storage {
+                        CompactStorage::Array(array) => {
+                            self.emit_array_compact_value_at(array, slot, value, f)
+                        }
+                        CompactStorage::Inline(inline) => {
+                            self.emit_inline_compact_recorded_value_at(inline, slot, value, f)
+                        }
+                    }
+                    found.set_constant(1, f);
+                    f.instruction(&Instruction::Else);
+                    self.emit_recorded_holder_absence(holder, slot, value, found, miss, f)?;
+                    f.instruction(&Instruction::End);
+                    storage.clear(f);
+                    self.emit_found_answer_or_miss(found, value, miss, answer, f);
+                    self.pop_control(ControlFrameKind::Block);
+                    f.instruction(&Instruction::End);
+                }
+                // A dictionary entry is confirmed by its own key at the
+                // position.
+                HolderStorage::Dictionary => {
+                    let dictionary = s.reserve_non_null_gc_local(f).initialize(
+                        holder_base.sealed_subtype_or_branch::<OrdinaryPropertyStorage>(
+                            s,
+                            self.local_branch_label(miss),
+                            f,
+                        ),
+                        f,
+                    );
+                    self.emit_dictionary_position_read_with(
+                        &dictionary,
+                        slot,
+                        key,
+                        value,
+                        found,
+                        RecipeValues::Decline,
+                        f,
+                    );
+                    dictionary.clear(f);
+                    self.emit_found_answer_or_miss(found, value, miss, answer, f);
                 }
             }
-            found.set_constant(1, f);
-            f.instruction(&Instruction::Else);
-            self.emit_recorded_holder_absence(holder, slot, value, found, miss, f)?;
-            f.instruction(&Instruction::End);
-            storage.clear(f);
-            self.emit_found_return_or_miss(found, value, miss, f);
-            self.pop_control(ControlFrameKind::Block);
-            f.instruction(&Instruction::End);
         }
-        // A dictionary entry is confirmed by its own key at the position.
-        let dictionary = s.reserve_non_null_gc_local(f).initialize(
-            holder_base.sealed_subtype_or_branch::<OrdinaryPropertyStorage>(
-                s,
-                self.local_branch_label(miss),
-                f,
-            ),
-            f,
-        );
-        self.emit_dictionary_position_read_with(
-            &dictionary,
-            slot,
-            key,
-            value,
-            found,
-            RecipeValues::Decline,
-            f,
-        );
-        dictionary.clear(f);
-        self.emit_found_return_or_miss(found, value, miss, f);
         s.release_i32_local(slot, f);
         holder_base.clear(f);
         Ok(())
@@ -1842,18 +1967,108 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    fn emit_found_return_or_miss(
+    fn emit_found_answer_or_miss(
         &self,
         found: I32Local,
         value: &ValueLocals,
         miss: ControlTarget,
+        answer: ReadAnswer,
         f: &mut Function,
     ) {
         found.load(f);
         f.instruction(&Instruction::If(BlockType::Empty));
-        emit_return_normal(value, f);
+        answer.emit(self, value, f);
         f.instruction(&Instruction::End);
         self.emit_branch_to_target(miss, f);
+    }
+
+    /// The slot of a record whose shape is the receiver's live compact
+    /// `shape`, in a new local the caller releases; any other record
+    /// branches to `miss`.
+    pub(super) fn emit_recorded_shape_slot_or_branch(
+        &self,
+        record: &GcLocal<OwnDataReadCache>,
+        shape: &GcLocal<CompactDataShape>,
+        miss: ControlTarget,
+        f: &mut Function,
+    ) -> I32Local {
+        proof_step!(ProofStep::RecordedShape);
+        let s = self.runtime_schema();
+        let _ = shape.load(s, f);
+        s.field(OwnDataReadCacheSchema::SHAPE).read(record, s, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, f);
+        let slot = s.reserve_i32_local(f);
+        s.field(OwnDataReadCacheSchema::SLOT)
+            .read(record, s, f)
+            .store(slot, f);
+        slot
+    }
+
+    /// Answers the own value at `slot` of a record whose shape is the
+    /// storage's: a shape is immutable, so a nonnegative slot holds the
+    /// key's value whatever happened since the record was made. A negative
+    /// slot falls through.
+    pub(super) fn emit_recorded_own_slot_hit(
+        &mut self,
+        storage: &CompactStorage,
+        slot: I32Local,
+        value: &ValueLocals,
+        answer: ReadAnswer,
+        f: &mut Function,
+    ) {
+        proof_step!(ProofStep::RecordedOwnSlot);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32GeS);
+        self.open_frame(ControlFrameKind::If, f);
+        match storage {
+            CompactStorage::Array(array) => self.emit_array_compact_value_at(array, slot, value, f),
+            CompactStorage::Inline(inline) => {
+                self.emit_inline_compact_recorded_value_at(inline, slot, value, f)
+            }
+        }
+        answer.emit(self, value, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+    }
+
+    /// Answers undefined when the chain above the actual ordinary object
+    /// `object`, whose live shape a record proved lacks the key, is the
+    /// closed tail the record registered as `slot`; branches to `miss`
+    /// otherwise.
+    pub(super) fn emit_recorded_closed_tail_hit(
+        &mut self,
+        object: &GcLocal<OrdinaryObject>,
+        slot: I32Local,
+        value: &ValueLocals,
+        miss: ControlTarget,
+        answer: ReadAnswer,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        proof_step!(ProofStep::RecordedClosedTail);
+        self.emit_recorded_closed_tail_or_branch(object, slot, miss, f)?;
+        value.set_undefined(f);
+        answer.emit(self, value, f);
+        Ok(())
+    }
+}
+
+/// Where a proof sends the value it proved: the hit entry returns it as its
+/// normal completion; a profiled P site branches with it to its join.
+#[derive(Clone, Copy)]
+pub(super) enum ReadAnswer {
+    Return,
+    Branch(ControlTarget),
+}
+
+impl ReadAnswer {
+    fn emit(self, builder: &FunctionBuilder<'_>, value: &ValueLocals, f: &mut Function) {
+        match self {
+            Self::Return => emit_return_normal(value, f),
+            Self::Branch(join) => builder.emit_branch_to_target(join, f),
+        }
     }
 }
 

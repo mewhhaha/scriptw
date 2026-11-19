@@ -65,6 +65,22 @@ impl ProgramInitializeIndex {
     }
 }
 
+/// Only a Collect-mode P layout mints its profile dump's index, the last
+/// defined function.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ProfileDumpIndex(u32);
+impl ProfileDumpIndex {
+    pub(crate) const fn raw(self) -> u32 {
+        self.0
+    }
+    pub(crate) fn assert_body_index(self, actual: u32) {
+        assert_eq!(
+            self.0, actual,
+            "profile dump emitted outside its planned index"
+        );
+    }
+}
+
 /// The script's source functions split at the runtime/program boundary. Each
 /// list keeps the script's own order.
 pub(crate) struct SourceFunctions<'a> {
@@ -233,6 +249,8 @@ pub(crate) struct FunctionIndexLayout {
     program_binary_numeric: u32,
     program_local_arguments: u32,
     program_helpers: u32,
+    /// A Collect-mode P's profile dump follows every other body.
+    profile_dump: bool,
 }
 
 fn count(value: usize) -> u32 {
@@ -279,6 +297,7 @@ impl FunctionIndexLayout {
             program_binary_numeric: count(program_binary_numeric),
             program_local_arguments: count(program_local_arguments),
             program_helpers: count(program_helpers),
+            profile_dump: false,
         };
         // Fails here, once, if the whole space does not fit.
         layout.program_helper_end();
@@ -482,9 +501,32 @@ impl FunctionIndexLayout {
         Self::add(self.program_local_arguments_end(), self.program_helpers)
     }
 
+    /// Plans a profile dump after every other P body of a Collect-mode P.
+    pub(crate) fn with_profile_dump(
+        mut self,
+        present: bool,
+        kind: ModuleKind<'_>,
+    ) -> Result<Self, crate::EmitError> {
+        if present && matches!(kind, ModuleKind::Runtime(_)) {
+            return Err(crate::EmitError::unsupported(
+                "compiler invariant: the runtime module has no profile dump",
+            ));
+        }
+        self.program_helper_end().checked_add(1).ok_or_else(|| {
+            crate::EmitError::unsupported("the profile dump exceeds the function index space")
+        })?;
+        self.profile_dump = present;
+        Ok(self)
+    }
+
+    pub(crate) fn profile_dump_index(&self) -> Option<ProfileDumpIndex> {
+        self.profile_dump
+            .then(|| ProfileDumpIndex(self.program_helper_end()))
+    }
+
     /// Every defined function: what `ref.func` may name, for the declarative
     /// element segment.
     pub(crate) fn defined_functions(&self) -> std::ops::Range<u32> {
-        self.imported..self.program_helper_end()
+        self.imported..Self::add(self.program_helper_end(), u32::from(self.profile_dump))
     }
 }

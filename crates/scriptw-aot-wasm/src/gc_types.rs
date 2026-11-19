@@ -442,6 +442,23 @@ impl<T> Clone for SiteRecordGlobal<T> {
 }
 impl<T> Copy for SiteRecordGlobal<T> {}
 
+impl<T> SiteRecordGlobal<T> {
+    /// Tells this global from the module's other site record globals; an
+    /// emission-time identity only, not the final Wasm index.
+    pub(crate) fn identity(self) -> u32 {
+        self.index
+    }
+
+    /// A global at `index`, for tests that need no module.
+    #[cfg(test)]
+    pub(crate) fn for_test(index: u32) -> Self {
+        Self {
+            index,
+            record: std::marker::PhantomData,
+        }
+    }
+}
+
 impl<T: SiteRecordType> SiteRecordGlobal<T> {
     /// Pushes the record, null until the site stores one.
     pub(crate) fn load(

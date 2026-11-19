@@ -78,6 +78,7 @@ pub(crate) fn emit_runtime_global_script_module(
         validated.selection(),
         Some(NativeProgramFactory::GlobalScript(program)),
         Some(validated),
+        crate::profile::ProfileUse::None,
     )
 }
 
@@ -94,5 +95,6 @@ pub(crate) fn emit_runtime_direct_eval_module(
         validated.selection(),
         Some(NativeProgramFactory::DirectEval(program)),
         Some(validated),
+        crate::profile::ProfileUse::None,
     )
 }

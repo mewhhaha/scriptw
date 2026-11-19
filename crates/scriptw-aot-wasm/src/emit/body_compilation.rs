@@ -123,6 +123,7 @@ impl<'a> FunctionBuilder<'a> {
             self.deadline_polls = DeadlinePolls::Source;
         }
         self.emit_deadline_poll(&mut function);
+        self.emit_profile_body_entry(&mut function)?;
 
         self.push_scope();
         if self.uses_heap {

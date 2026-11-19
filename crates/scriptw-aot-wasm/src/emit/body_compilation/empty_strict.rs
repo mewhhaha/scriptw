@@ -10,6 +10,7 @@ impl FunctionBuilder<'_> {
         // The admission proof excludes parameter effects, closures and all body
         // statements, so no observer can reach an allocated binding environment.
         let mut function = self.take_owned_body();
+        self.emit_profile_body_entry(&mut function)?;
         self.push_scope();
         self.init_template_source_execution(&mut function)?;
         // Strict bodies still own the source-depth guard and the active-callable

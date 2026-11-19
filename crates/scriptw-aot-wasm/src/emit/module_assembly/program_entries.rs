@@ -12,6 +12,7 @@ pub(crate) fn emit_script_module(
     kind: ModuleKind<'_>,
     promise_rejection_policy: PromiseRejectionPolicy,
     intl_selection: &IntlDataSelection,
+    profile: crate::profile::ProfileUse,
 ) -> Result<EmittedModule, EmitError> {
     emit_script_module_with_factory(
         script,
@@ -20,6 +21,7 @@ pub(crate) fn emit_script_module(
         intl_selection,
         None,
         None,
+        profile,
     )
 }
 
@@ -36,6 +38,7 @@ pub(crate) fn emit_runtime_function_module(
         validated.selection(),
         Some(NativeProgramFactory::Function(program)),
         Some(validated),
+        crate::profile::ProfileUse::None,
     )
 }
 

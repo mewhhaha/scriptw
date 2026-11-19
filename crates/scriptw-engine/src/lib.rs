@@ -3236,6 +3236,7 @@ impl Engine {
                     .map(|cache| cache as &dyn scriptw_aot_wasm::RuntimeArtifactCache),
                 source_compilation_profile,
             ),
+            scriptw_aot_wasm::ProfileMode::None,
         ) {
             Ok(wasm) => {
                 // `scriptw build wasm` and the Test262 wasm-aot backend both reach
@@ -3685,6 +3686,7 @@ impl Engine {
                     .map(|cache| cache as &dyn scriptw_aot_wasm::RuntimeArtifactCache),
                 scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost,
             ),
+            scriptw_aot_wasm::ProfileMode::None,
         )
         .map_err(|err| EngineError::from_wasm_emit_error(&unit.ir, err))?;
         if std::env::var_os("SCRIPTW_WASM_TRACE_DUMP").is_some() {

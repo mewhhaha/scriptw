@@ -3855,6 +3855,13 @@ pub(crate) struct FunctionMetaRegistry {
     /// How many static property sites of this module keep their record in
     /// a global of their own; each new site takes the next one.
     site_records: std::cell::RefCell<Vec<crate::gc_types::SiteRecordKind>>,
+    /// The profiled sites among them, in the order the module's bodies
+    /// asked for them, enumerated alike whatever the profile.
+    profile_sites: std::cell::RefCell<crate::profile::SiteMapBuilder>,
+    /// The execution profile this module's P is specialised by or collects.
+    profile: crate::profile::ProfileUse,
+    /// A Collect-mode P's counters, as its bodies are emitted.
+    profile_collector: Option<std::cell::RefCell<crate::profile::collect::Collector>>,
     /// Whether the program declares a module import binding, the only cell
     /// whose TARGET ever links to another cell. True unless the program's
     /// IR proves otherwise.
@@ -3917,6 +3924,95 @@ impl FunctionMetaRegistry {
         self.site_records.borrow().clone()
     }
 
+    /// Specialises this module's P by `profile`, or instruments it to
+    /// collect one in the profile memory `memory`.
+    pub(crate) fn with_profile(
+        mut self,
+        profile: crate::profile::ProfileUse,
+        memory: crate::profile::collect::ProfileMemory,
+    ) -> Self {
+        self.profile_collector = match &profile {
+            crate::profile::ProfileUse::Collect(identity) => Some(std::cell::RefCell::new(
+                crate::profile::collect::Collector::new(identity.clone(), memory),
+            )),
+            crate::profile::ProfileUse::None | crate::profile::ProfileUse::Apply(_) => None,
+        };
+        self.profile = profile;
+        self
+    }
+
+    /// The reference of a new profiled site of `body`, whose record is in
+    /// `global`; a Collect-mode P gives it its counter.
+    pub(crate) fn next_profile_site(
+        &self,
+        body: crate::profile::SiteBody,
+        kind: crate::profile::SiteKind,
+        global: crate::gc_types::SiteRecordGlobal,
+    ) -> Result<crate::profile::SiteRef, EmitError> {
+        let site = self.profile_sites.borrow_mut().next(body, kind)?;
+        if let Some(collector) = &self.profile_collector {
+            collector.borrow_mut().site(&site, global)?;
+        }
+        Ok(site)
+    }
+
+    /// The specialisation the profile selects for a static read site.
+    pub(crate) fn read_specialisation(
+        &self,
+        site: &crate::profile::SiteRef,
+    ) -> Option<crate::profile::ReadSpecialisation> {
+        match &self.profile {
+            crate::profile::ProfileUse::Apply(profile) => profile.read_specialisation(site),
+            crate::profile::ProfileUse::None | crate::profile::ProfileUse::Collect(_) => None,
+        }
+    }
+
+    /// In a Collect-mode P, the counter of the site whose record is in
+    /// `global`.
+    pub(crate) fn profile_site_counter(
+        &self,
+        global: crate::gc_types::SiteRecordGlobal,
+    ) -> Option<crate::profile::collect::Counter> {
+        self.profile_collector
+            .as_ref()
+            .and_then(|collector| collector.borrow().site_counter(global))
+    }
+
+    /// In a Collect-mode P, the entry counter of `body`.
+    pub(crate) fn profile_body_counter(
+        &self,
+        body: crate::profile::SiteBody,
+    ) -> Result<Option<crate::profile::collect::Counter>, EmitError> {
+        self.profile_collector
+            .as_ref()
+            .map(|collector| collector.borrow_mut().body_counter(body))
+            .transpose()
+    }
+
+    /// In a Collect-mode P whose every body is emitted, what module
+    /// assembly adds: the profile memory, its dump and its section.
+    pub(crate) fn finish_profile_collection(
+        &self,
+    ) -> Result<Option<crate::profile::collect::CollectedLayout>, EmitError> {
+        let site_map = self.profile_sites.borrow().finish();
+        self.profile_collector
+            .as_ref()
+            .map(|collector| collector.borrow().finish(&site_map))
+            .transpose()
+    }
+
+    /// The module's site map, once every body is emitted. A profiled module
+    /// fails unless it is the map the profile was trained on.
+    pub(crate) fn finish_site_map(&self) -> Result<crate::profile::SiteMap, EmitError> {
+        let site_map = self.profile_sites.borrow().finish();
+        if let crate::profile::ProfileUse::Apply(profile) = &self.profile {
+            profile
+                .require_site_map(&site_map)
+                .map_err(crate::profile::ProfileError::into_emit_error)?;
+        }
+        Ok(site_map)
+    }
+
     /// Records whether the program declares any module import binding.
     pub(crate) fn with_module_import_bindings(mut self, declared: bool) -> Self {
         self.module_import_bindings = declared;
@@ -3974,6 +4070,9 @@ impl FunctionMetaRegistry {
             compact_shape_sites: std::cell::RefCell::new(BTreeMap::new()),
             next_own_data_read_site: std::cell::Cell::new(0),
             site_records: std::cell::RefCell::new(Vec::new()),
+            profile_sites: std::cell::RefCell::new(Default::default()),
+            profile: crate::profile::ProfileUse::None,
+            profile_collector: None,
             module_import_bindings: true,
             foreign_imports: crate::foreign::ForeignImportPlan::default(),
             module_graph,
