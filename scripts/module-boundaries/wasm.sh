@@ -430,8 +430,11 @@ if [[ "$source_body_compiler_code" != *'ifself.is_main(){letindex=initializer.ex
   || [[ "$source_body_compiler_code" != *'letprogram=self.runtime_schema().call_program_initialize(index,&mutfunction);self.bind_entry_program(program,&mutfunction);'* ]]; then
   fail 'heap source main must bind the P returned by its typed initializer before executing source'
 fi
-require_fixed_string_count "$wasm_module_assembly" 'compile_pooled_strings_initialize_helper' 1 'runtime assembly consumes the canonical pooled-string helper'
-module_assembly_code="$(tr -d '[:space:]' < "$wasm_module_assembly")"
+# Both rules read code only: a commented-out registration must not stand in for
+# a deleted one.
+module_assembly_code_lines="$(rust_code_without_comments "$wasm_module_assembly")"
+require_text_regex_count "$module_assembly_code_lines" 'compile_pooled_strings_initialize_helper' 1 'runtime assembly consumes the canonical pooled-string helper'
+module_assembly_code="$(printf '%s\n' "$module_assembly_code_lines" | tr -d '[:space:]')"
 # register_runtime_helper! takes several `Id, compiler;` pairs per invocation;
 # the pair must be one whole pair inside exactly one such invocation.
 pooled_strings_registrations="$(printf '%s\n' "$module_assembly_code" | awk '

@@ -201,6 +201,55 @@ require_tree_regex_count() {
   fi
 }
 
+# Prints a Rust source with `//` and (nested) `/* */` comments removed and string
+# and character literals kept, one output line per input line. Rules that look
+# for code use it so a commented-out call cannot stand in for a deleted one.
+# Raw strings are read as ordinary strings.
+rust_code_without_comments() {
+  awk '
+    {
+      line = $0
+      output = ""
+      length_ = length(line)
+      for (position = 1; position <= length_; position++) {
+        character = substr(line, position, 1)
+        following = substr(line, position + 1, 1)
+        if (block_depth > 0) {
+          if (character == "*" && following == "/") { block_depth--; position++ }
+          else if (character == "/" && following == "*") { block_depth++; position++ }
+          continue
+        }
+        if (quoted) {
+          output = output character
+          if (character == "\\") { output = output following; position++ }
+          else if (character == "\"") quoted = 0
+          continue
+        }
+        if (character == "\"") { quoted = 1; output = output character; continue }
+        if (character == "'"'"'") {
+          # A character literal, not a lifetime: copy it whole.
+          if (following == "\\") {
+            closing = index(substr(line, position + 2), "'"'"'")
+            if (closing > 0) {
+              output = output substr(line, position, closing + 2)
+              position += closing + 1
+              continue
+            }
+          } else if (substr(line, position + 2, 1) == "'"'"'") {
+            output = output substr(line, position, 3)
+            position += 2
+            continue
+          }
+        }
+        if (character == "/" && following == "/") break
+        if (character == "/" && following == "*") { block_depth = 1; position++; continue }
+        output = output character
+      }
+      print output
+    }
+  ' "$1"
+}
+
 # Shared item reader must precede every guard that consumes its projection.
 braced_rust_item_source() {
   source_file="$1"

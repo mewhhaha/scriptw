@@ -1034,8 +1034,9 @@ require_fixed_string_count \
   1 \
   'checked named-record generator plan consumer'
 # The formatted call spans lines; its arguments are the retained lowered body
-# and the source plan.
-generator_plan_call_code="$(tr -d '[:space:]' < crates/scriptw-ir/src/lowering/function_definition.rs)"
+# and the source plan. Comments are removed first, so a commented-out call
+# cannot stand in for the real one.
+generator_plan_call_code="$(rust_code_without_comments crates/scriptw-ir/src/lowering/function_definition.rs | tr -d '[:space:]')"
 generator_plan_call_count="$({ printf '%s\n' "$generator_plan_call_code" | grep -oF 'lowerer.generator_plan_for_lowered_named_environment(body.as_ref().expect("emissionretainsthebody"),source_plan,)' || true; } | wc -l | tr -d '[:space:]')"
 if [ "$generator_plan_call_count" -ne 1 ]; then
   fail "crates/scriptw-ir/src/lowering/function_definition.rs must derive the named-record generator plan from the retained body and source plan (found $generator_plan_call_count)"
