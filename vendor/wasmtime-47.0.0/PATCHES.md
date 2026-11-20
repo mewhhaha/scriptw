@@ -67,10 +67,14 @@ initialisation; this relies on the copying collector reaching objects from
 roots only and keeping its allocation pointer outside the heap. Nothing in the compiled-code or
 VMContext ABI changes. `tests/interrupt_handle.rs` covers GC-heap and
 linear-memory loops, host code reaching protected memory, idle requests,
-cancellation, store drop and concurrent stores; `interrupt::tests` claims
-three chunks' worth of slots, and the engine's
+cancellation, store drop and concurrent stores, and `interrupt::tests`
+claims three chunks' worth of slots; no repository command runs these
+vendored tests. The engine's
 `every_one_of_many_concurrently_interrupted_stores_stops` stops 80 spinning
-stores at once. See the
+stores at once and does run. The fault handler walks every chunk ever
+appended, so after a burst of N concurrently interrupted watched memories
+each later fault (null-guard traps included) reads about N atomics more, for
+the life of the process. See the
 [deadline contract](../../docs/rust-rewrite/contracts/execution-deadlines.md).
 
 ## Per-operation host costs
@@ -314,11 +318,17 @@ guard above must hold on such a slot too.
   reports never-populated pages as `WRITTEN` too, so every page of the range
   would be zeroed and populated. Which kernels do that is also why the five
   upstream `pagemap::tests` that expect holes to be unwritten fail here. The
-  engine's `a_swapped_out_dirty_page_reads_zero_in_the_next_store` pages
-  dirty memory out with `MADV_PAGEOUT` before the drop; it needs an active
-  swap device, which the verification wrapper's swap-free cgroups never have,
-  so it is `#[ignore]`d with that reason and fails, rather than passing, when
-  run without one.
+  scan's filter and its region handling are `DirtyPageScan` and
+  `reset_regions`; `wasmtime::_internal::model_dirty_page_reset` runs that
+  handling on given page categories, with the kernel's selection modelled, and
+  the engine's `the_reset_releases_swapped_dirty_pages_and_zeroes_present_ones`
+  drives it with swapped, migrating, present, zero-page, file and
+  never-populated pages. The engine's
+  `a_swapped_out_dirty_page_reads_zero_in_the_next_store` pages real dirty
+  memory out with `MADV_PAGEOUT` before the drop; it needs an active swap
+  device, which the verification wrapper's swap-free cgroups never have, so
+  it is `#[ignore]`d with that reason and fails, rather than passing, when run
+  without one.
 - Tests: the engine's `aot_gc_pooled_stores` (a null access traps on each
   reused slot and after a collection; an interrupted Store and one dropped
   with a request pending hand the next Store an accessible heap with its

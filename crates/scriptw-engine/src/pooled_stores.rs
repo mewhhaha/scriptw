@@ -204,9 +204,10 @@ pub(crate) fn classify_allocation_error(error: wasmtime::Error, context: &str) -
         EngineError::from_store_pool_limit(format!(
             "{context}: a Store pool limit is reached: {error:#}. Either the pool's other \
              live Stores hold its slots (dropping one frees them), or this Store needs more \
-             than {CORE_INSTANCES_PER_STORE} core instances, {MEMORY_SLOTS_PER_STORE} memories \
-             (its GC heap included) or {CORE_INSTANCES_PER_STORE} tables, which no drop frees \
-             once it is the only Store"
+             than its share (1 GC heap, {CORE_INSTANCES_PER_STORE} core instances, \
+             {MEMORY_SLOTS_PER_STORE} memories with its GC heap, {CORE_INSTANCES_PER_STORE} \
+             tables, 1 stack) while the others use theirs; no drop helps a Store that needs \
+             more than the whole pool"
         ))
     } else {
         EngineError::new(format!("{context}: {error:#}"))
@@ -278,5 +279,40 @@ mod tests {
         // The caller's Config is untouched and still makes on-demand Engines.
         let on_demand = wasmtime::Engine::new(&config).unwrap();
         assert!(on_demand.pooling_allocator_metrics().is_none());
+    }
+
+    /// The reset a host without `PAGEMAP_SCAN` uses, run on any host: a
+    /// reused slot reads zeros after every page was released.
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn the_release_all_reset_hands_the_next_store_a_zeroed_slot() {
+        let mut config = wasmtime::Config::new();
+        crate::configure_wasm_runtime(
+            &mut config,
+            crate::NativeCompilationPolicy::Fast,
+            crate::CompilationJobs::current(),
+        );
+        let reset = configure_with_pagemap(&mut config, &PooledStores::sequential(), false);
+        assert_eq!(reset, PooledStoreReset::ReleaseAll);
+        let engine = wasmtime::Engine::new(&config).unwrap();
+        // (module (memory (export "memory") 2))
+        let module = wasmtime::Module::new(
+            &engine,
+            b"\0asm\x01\0\0\0\x05\x03\x01\x00\x02\x07\x0a\x01\x06memory\x02\x00",
+        )
+        .unwrap();
+        let mut base = None;
+        for round in 0..3u8 {
+            let mut store = wasmtime::Store::new(&engine, ());
+            let instance = wasmtime::Instance::new(&mut store, &module, &[]).unwrap();
+            let memory = instance.get_memory(&mut store, "memory").unwrap();
+            let address = memory.data_ptr(&store) as usize;
+            assert_eq!(*base.get_or_insert(address), address, "the slot is reused");
+            assert!(
+                memory.data(&store).iter().all(|byte| *byte == 0),
+                "round {round} reads an earlier Store's bytes"
+            );
+            memory.data_mut(&mut store).fill(round + 1);
+        }
     }
 }

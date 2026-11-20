@@ -291,11 +291,37 @@ accepts `--case <file.js>`.
   [patch notes](../../vendor/wasmtime-47.0.0/PATCHES.md#pooled-gc-heaps)).
   Owner: vendored Wasmtime patches (make the tests kernel-independent and
   runnable from the repository).
-- The swapped-page reset of pooled Stores
-  (`a_swapped_out_dirty_page_reads_zero_in_the_next_store`) is `#[ignore]`d:
-  it needs an active swap device, and the cloud machine has none and the
-  verification wrapper requires `memory.swap.max = 0`. Owner: pooled-store
-  runtime (run it with `--ignored` on a host with swap before each release).
+- The swapped-page reset of pooled Stores has no end-to-end run:
+  `a_swapped_out_dirty_page_reads_zero_in_the_next_store` is `#[ignore]`d
+  because it needs an active swap device, and the cloud machine has none and
+  the verification wrapper requires `memory.swap.max = 0`. The reset's
+  classification and region handling do run, on modelled kernel categories
+  (`the_reset_releases_swapped_dirty_pages_and_zeroes_present_ones`); what
+  only the ignored test covers is the kernel reporting a real swapped page as
+  the model says. Owner: pooled-store runtime (a CI runner with a swap device
+  or zram running this test).
+- On an on-demand Engine, a Store's GC heap is bounded only by its 4 GiB
+  reservation unless the embedder attaches a limiter (`limits_mut` holds the
+  1 GiB cap); the private and shared memories carry the cap in their types and
+  a pooled Engine caps the heap. Wasmtime has no on-demand GC heap maximum
+  and the embedder owns the Store's limiter, so closing it needs either
+  Scriptw-owned limiting in the embedding API or a vendored heap maximum.
+  Owner: embedding API.
+- Smaller runtime review items left open, each with its reason: an
+  embedder's own `Module::new` on a parallel Engine still compiles on Rayon's
+  global pool (Scriptw cannot route it; foreign-modules.md says so);
+  `configure_compilation_jobs` caches a failed pool build for the process;
+  `EngineError` keeps `store_pool_limit_reached: bool` beside mutually
+  exclusive `Option` fields (part of the typed error kinds decision);
+  `default_compilation_jobs` keeps a `cfg!(test)` branch; no test drops a
+  pooled Store while a panic or trap unwinds out of a host call; a killed `scriptw precompile`
+  leaves its transaction file (removing files by a dead PID is not safe across
+  PID namespaces). Owner: embedding API.
+- Compiler review refactors not taken, each because it prevents no current
+  mistake: `SpecOperationResultLocals::{Expression, Call}` as one struct,
+  `ArgumentsProjectionRead::Index` carrying its key (26 sites), and an
+  `Option<(projection, positional)>` pairing in the captured-call proof.
+  Owner: emitter.
 - The function completion kind is Normal at every normal program point, which
   is what licensed dropping the `set_completion_kind(Normal)` writes in
   `a9c732611`; it is still unchecked. A debug-only trap at `project` and at

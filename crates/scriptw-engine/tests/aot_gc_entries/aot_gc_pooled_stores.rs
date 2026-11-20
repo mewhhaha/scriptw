@@ -410,7 +410,7 @@ fn a_reused_slot_is_zero_past_keep_resident_and_past_the_scans_region_limit() {
         assert_zeroed(&store, &memory, &format!("round {round}"));
         let data = memory.data_mut(&mut store);
         match round {
-            // Every other Wasm page, at a varying offset: 162 separate
+            // Every other Wasm page, at a varying offset: 160 separate
             // dirty regions on any host page size up to 64 KiB.
             0 => {
                 for page in (0..pages as usize).step_by(2) {
@@ -515,6 +515,43 @@ fn concurrent_pooled_stores_never_see_each_others_bytes() {
     for thread in threads {
         thread.join().unwrap();
     }
+}
+
+/// The reset's classification of dirty pages, on `PAGEMAP_SCAN` categories
+/// as the kernel reports them (`PAGE_IS_*`), run through the reset's own
+/// region handling. This host cannot swap pages out, so this is what covers
+/// the swapped and migrating cases here: a written page that is a swap or
+/// migration entry when the Store drops must be released, not skipped.
+#[cfg(all(target_os = "linux", target_pointer_width = "64"))]
+#[test]
+fn the_reset_releases_swapped_dirty_pages_and_zeroes_present_ones() {
+    use wasmtime::_internal::{model_dirty_page_reset, DirtyPageReset::*};
+    const WRITTEN: u64 = 1 << 1;
+    const FILE: u64 = 1 << 2;
+    const PRESENT: u64 = 1 << 3;
+    const SWAPPED: u64 = 1 << 4;
+    const PFNZERO: u64 = 1 << 5;
+    const HUGE: u64 = 1 << 6;
+    let pages = [
+        // Never populated: 6.18 still says WRITTEN.
+        (WRITTEN, Untouched),
+        (0, Untouched),
+        // Written and present.
+        (PRESENT | WRITTEN, Zeroed),
+        (PRESENT | WRITTEN, Zeroed),
+        // Written, then swapped out or being migrated.
+        (SWAPPED | WRITTEN, Decommitted),
+        (SWAPPED | WRITTEN, Decommitted),
+        (PRESENT | WRITTEN | HUGE, Zeroed),
+        // Only read: the zero page, an image's page-cache page (present or
+        // being migrated).
+        (PRESENT | WRITTEN | PFNZERO, Untouched),
+        (PRESENT | WRITTEN | FILE, Untouched),
+        (SWAPPED | WRITTEN | FILE, Untouched),
+        (SWAPPED | WRITTEN, Decommitted),
+    ];
+    let reset = model_dirty_page_reset(&pages.map(|(bits, _)| bits));
+    assert_eq!(reset, pages.map(|(_, expected)| expected));
 }
 
 /// A dirty page that is swapped out when its Store drops is not present, so

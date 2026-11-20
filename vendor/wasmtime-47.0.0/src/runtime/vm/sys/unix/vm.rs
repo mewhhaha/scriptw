@@ -7,6 +7,13 @@ use std::io;
 use std::sync::Arc;
 
 pub use super::pagemap::{PageMap, reset_with_pagemap};
+#[cfg(all(
+    target_os = "linux",
+    target_pointer_width = "64",
+    feature = "std",
+    feature = "pooling-allocator"
+))]
+pub use super::pagemap::{DirtyPageReset, model_dirty_page_reset};
 
 pub unsafe fn expose_existing_mapping(ptr: *mut u8, len: usize) -> io::Result<()> {
     unsafe {

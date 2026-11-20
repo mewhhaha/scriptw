@@ -124,6 +124,14 @@ pub use crate::runtime::vm::stack_switching::*;
 pub use crate::runtime::vm::store_box::*;
 #[cfg(feature = "std")]
 pub use crate::runtime::vm::sys::mmap::open_file_for_mmap;
+#[cfg(all(
+    unix,
+    target_os = "linux",
+    target_pointer_width = "64",
+    feature = "std",
+    feature = "pooling-allocator"
+))]
+pub use crate::runtime::vm::sys::vm::{DirtyPageReset, model_dirty_page_reset};
 #[cfg(has_host_compiler_backend)]
 pub use crate::runtime::vm::sys::unwind::UnwindRegistration;
 pub use crate::runtime::vm::table::{Table, TableElementType};

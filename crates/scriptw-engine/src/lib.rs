@@ -2302,10 +2302,11 @@ impl EngineError {
     /// Engine's Store pool ([`PooledStores::engine`]) and the pool had none
     /// left. Nothing fell back to on-demand allocation. Either the pool's
     /// other live Stores hold the slots, and dropping one frees them, or this
-    /// Store needs more than its share (2 core instances, 3 memories with its
-    /// GC heap, 2 tables): then it can fail even as the only live Store, and
-    /// no drop helps. The embedder, which holds the Stores, can tell the two
-    /// apart. A GC heap that host code allocates before `instantiate` (a
+    /// Store needs more than its share (1 GC heap, 2 core instances, 3
+    /// memories with its GC heap, 2 tables, 1 stack) while the others use
+    /// theirs: a drop may make room, but a Store that needs more than the
+    /// whole pool fails even as the only live Store. The embedder, which
+    /// holds the Stores, can tell these apart. A GC heap that host code allocates before `instantiate` (a
     /// `StructRef::new` on a fresh Store) reports Wasmtime's own
     /// `PoolConcurrencyLimitError` instead.
     pub const fn is_store_pool_limit_reached(&self) -> bool {

@@ -202,7 +202,9 @@ quotas). The Scriptw CLI keeps its own default of half the CPUs.
 `configure_wasm_runtime` turns Wasmtime's parallel compilation on exactly when
 the count exceeds one, and `EmbeddedRuntime::compile` and `precompile` refuse an
 Engine whose flag disagrees: a parallel Engine compiling outside the pool would
-use Rayon's global pool, one thread per CPU. Each extra job costs memory, and
+use Rayon's global pool, one thread per CPU. The embedder's own
+`wasmtime::Module::new` on such an Engine (a WASI adapter, a foreign Wasm
+module) does compile on that global pool; Scriptw cannot route it. Each extra job costs memory, and
 there is no byte-valued cap because Cranelift cannot enforce one. On the RSC
 bundle with two CPUs (medians of three), a second job cut native preparation
 from 7.61 to 4.07 s under `Speed` and from 4.77 to 2.42 s under `Fast`, and
@@ -213,7 +215,12 @@ images.
 
 `EmbeddedRuntime::new_state(realm, user_data)` creates opaque Scriptw state with
 typed embedder data. The caller owns the `Store`, `Linker`, resource limiter,
-fuel policy and any [execution deadline](execution-deadlines.md). `register` installs the checked Scriptw host
+fuel policy and any [execution deadline](execution-deadlines.md). The state
+carries `StoreLimits` at the 1 GiB Store cap; attach them with
+`store.limiter(|state| state.limits_mut())` or install another limiter. Scriptw's
+private and shared memories carry the cap in their types, but on an on-demand
+Engine without a limiter the Store's GC heap is bounded only by its 4 GiB
+reservation (a pooled Engine caps it at 1 GiB). `register` installs the checked Scriptw host
 functions/resources and any explicitly declared error tag. The embedder adds
 its own ordinary `linker.func_wrap("dd", "add", ...)` implementation.
 `instantiate` checks required native function types before R/P initialization.
@@ -272,10 +279,12 @@ the pool's capacity fails at `instantiate` with an error whose
 `is_store_pool_limit_reached()` is true; nothing falls back to on-demand
 allocation, and dropping a Store frees its slot. The same error reports a
 Store that needs more than its share of the pool (2 core instances, 3
-memories with its GC heap, 2 tables) while the others hold theirs; such a
-Store fails even alone, so a retry after a drop helps only while the embedder
-still holds another Store. Each pooled memory is also capped by the pool's
-`max_memory_size` (the 1 GiB Store cap). At most `max_concurrent ×
+memories with its GC heap, 2 tables, one GC heap and one stack) while the
+others use theirs. It succeeds while enough other Stores leave room, and a
+drop can make that room; it fails even alone only when it needs more than the
+whole pool (with `max_concurrent = 1`, more than its share). Each pooled
+memory and GC heap is also capped by the pool's `max_memory_size` (the 1 GiB
+Store cap). At most `max_concurrent ×
 keep_resident_bytes` stay resident, and each concurrent Store reserves about
 12 GiB of address space while the Engine lives. Store limits, the null guard
 and [execution deadlines](execution-deadlines.md) apply unchanged on a reused

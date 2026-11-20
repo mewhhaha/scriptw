@@ -552,4 +552,13 @@ fn _assertions_lib() {
 pub mod _internal {
     // Exported just for the CLI.
     pub use crate::runtime::vm::MmapVec;
+    // Scriptw: the pooled reset's page classification, for embedder tests on
+    // hosts that cannot swap pages out.
+    #[cfg(all(
+        target_os = "linux",
+        target_pointer_width = "64",
+        feature = "std",
+        feature = "pooling-allocator"
+    ))]
+    pub use crate::runtime::vm::{DirtyPageReset, model_dirty_page_reset};
 }

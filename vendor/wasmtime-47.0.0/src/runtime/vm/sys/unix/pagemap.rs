@@ -300,19 +300,10 @@ pub unsafe fn reset_with_pagemap(
         // We specifically want pages that are NOT backed by the zero page or
         // backed by files. Such pages mean that they haven't changed from their
         // original contents, so they're inverted.
-        .category_inverted(Categories::PFNZERO | Categories::FILE)
-        // Search for pages that are written as those are the dirty pages.
-        // Additionally search for the zero page/file page as those are
-        // inverted above meaning we're searching for pages that specifically
-        // don't have those flags.
-        .category_mask(Categories::WRITTEN | Categories::PFNZERO | Categories::FILE)
-        // A dirty page is present or, when reclaim swapped it out or the
-        // kernel is migrating it, a swap entry. Never-populated pages are
-        // neither (some kernels still report them `WRITTEN`).
-        .category_anyof_mask(Categories::PRESENT | Categories::SWAPPED)
-        // Return only whether a region is swapped, which decides how it is
-        // reset; regions of either kind stay as large as possible.
-        .return_mask(Categories::SWAPPED)
+        .category_inverted(DirtyPageScan::INVERTED)
+        .category_mask(DirtyPageScan::MASK)
+        .category_anyof_mask(DirtyPageScan::ANY_OF)
+        .return_mask(DirtyPageScan::RETURNED)
         .build(&mut storage);
 
     // SAFETY: this should be a safe ioctl as we control the fd we're operating
@@ -342,19 +333,19 @@ pub unsafe fn reset_with_pagemap(
     // For all present regions that were written in the scan reset them
     // manually, decommit the swapped ones, then afterwards decommit everything
     // the scan did not reach.
-    let mut bytes_resident = 0;
-    for region in result.regions() {
-        if region.categories().contains(Categories::SWAPPED) {
-            decommit(region.start().cast_mut(), region.len());
-            continue;
-        }
-        // SAFETY: we're relying on Linux to pass in valid region ranges within
-        // the `ptr/len` we specified to the original syscall.
-        unsafe {
-            reset_manually(&mut *region.region().cast_mut());
-        }
-        bytes_resident += region.len();
-    }
+    //
+    // SAFETY: we're relying on Linux to pass in valid region ranges within
+    // the `ptr/len` we specified to the original syscall.
+    let bytes_resident = unsafe {
+        reset_regions(
+            result
+                .regions()
+                .iter()
+                .map(|region| (region.start().cast_mut(), region.len(), region.categories())),
+            &mut reset_manually,
+            &mut decommit,
+        )
+    };
 
     // Report everything after `walk_end` to the end of memory as memory that
     // must be decommitted as the scan didn't reach it. Note that if `walk_end`
@@ -364,6 +355,132 @@ pub unsafe fn reset_with_pagemap(
     decommit(result.walk_end().cast_mut(), len.byte_count() - scan_size);
 
     bytes_resident
+}
+
+/// The `PAGEMAP_SCAN` filter of the reset: written pages that are present or
+/// swapped and are not the zero page or a file page.
+///
+/// * `WRITTEN` with `PFNZERO | FILE` inverted: the dirty pages. A page only
+///   read maps the zero page or the file page, which `WRITTEN` alone does not
+///   exclude without uffd write protection.
+/// * `PRESENT | SWAPPED`, any of (Scriptw patch; upstream required
+///   `PRESENT`): a dirty page that reclaim swapped out, or that compaction,
+///   NUMA balancing or a THP collapse is migrating, is a swap entry when the
+///   scan runs, and upstream skipped it, leaving a previous Store's bytes in
+///   the slot. A never-populated page is neither; some kernels (6.18 among
+///   them) still report it `WRITTEN`, so `WRITTEN` alone would select every
+///   page of the range.
+/// * Only `SWAPPED` is returned, which decides how a region is reset.
+struct DirtyPageScan;
+
+impl DirtyPageScan {
+    const INVERTED: Categories = Categories::PFNZERO.union(Categories::FILE);
+    const MASK: Categories = Categories::WRITTEN
+        .union(Categories::PFNZERO)
+        .union(Categories::FILE);
+    const ANY_OF: Categories = Categories::PRESENT.union(Categories::SWAPPED);
+    const RETURNED: Categories = Categories::SWAPPED;
+}
+
+/// Resets the regions a scan reported, given with their returned categories:
+/// a present one in place, a swapped one by `decommit` (writing it would
+/// first read it back from swap). Returns the bytes left resident.
+///
+/// # Safety
+///
+/// Every region must be valid to write.
+unsafe fn reset_regions(
+    regions: impl Iterator<Item = (*mut u8, usize, Categories)>,
+    reset_manually: &mut impl FnMut(&mut [u8]),
+    decommit: &mut impl FnMut(*mut u8, usize),
+) -> usize {
+    let mut bytes_resident = 0;
+    for (start, len, categories) in regions {
+        if categories.contains(Categories::SWAPPED) {
+            decommit(start, len);
+            continue;
+        }
+        // SAFETY: the caller's contract.
+        unsafe {
+            reset_manually(&mut *ptr::slice_from_raw_parts_mut(start, len));
+        }
+        bytes_resident += len;
+    }
+    bytes_resident
+}
+
+/// How the reset leaves one page of a slot.
+#[cfg(feature = "pooling-allocator")]
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DirtyPageReset {
+    /// Not reported: never written since the last reset, so already
+    /// original.
+    Untouched,
+    /// Zeroed in place and kept resident.
+    Zeroed,
+    /// Decommitted.
+    Decommitted,
+}
+
+/// Runs the reset's region handling on pages whose `PAGEMAP_SCAN` category
+/// bits (`PAGE_IS_*`) are `pages`, with the kernel's selection modelled
+/// (`pagemap_scan_is_interesting_page`: the categories xor the inverted set
+/// must contain the whole mask and meet the any-of set; matching neighbours
+/// with equal returned categories form one region). This is the classification
+/// a host without a swap device cannot exercise with real swapped pages.
+#[cfg(feature = "pooling-allocator")]
+#[doc(hidden)]
+pub fn model_dirty_page_reset(pages: &[u64]) -> Vec<DirtyPageReset> {
+    const PAGE: usize = 4096;
+    let interesting = |bits: u64| {
+        let categories = Categories::from_bits_retain(bits) ^ DirtyPageScan::INVERTED;
+        categories.contains(DirtyPageScan::MASK) && categories.intersects(DirtyPageScan::ANY_OF)
+    };
+    let mut regions: Vec<(usize, usize, Categories)> = Vec::new();
+    for (index, bits) in pages.iter().enumerate() {
+        if !interesting(*bits) {
+            continue;
+        }
+        let returned = Categories::from_bits_retain(*bits) & DirtyPageScan::RETURNED;
+        match regions.last_mut() {
+            Some((start, len, categories))
+                if *start + *len == index * PAGE && *categories == returned =>
+            {
+                *len += PAGE;
+            }
+            _ => regions.push((index * PAGE, PAGE, returned)),
+        }
+    }
+    let mut outcome = vec![DirtyPageReset::Untouched; pages.len()];
+    let mut memory = vec![0xa5u8; pages.len() * PAGE];
+    let base = memory.as_mut_ptr();
+    let mut zeroed = Vec::new();
+    let mut decommitted = Vec::new();
+    // SAFETY: every region lies inside `memory`.
+    unsafe {
+        reset_regions(
+            regions
+                .iter()
+                .map(|(start, len, categories)| (base.add(*start), *len, *categories)),
+            &mut |region: &mut [u8]| {
+                region.fill(0);
+                zeroed.push((region.as_ptr().addr() - base.addr(), region.len()));
+            },
+            &mut |start: *mut u8, len: usize| decommitted.push((start.addr() - base.addr(), len)),
+        );
+    }
+    for (list, reset) in [
+        (zeroed, DirtyPageReset::Zeroed),
+        (decommitted, DirtyPageReset::Decommitted),
+    ] {
+        for (start, len) in list {
+            for page in start / PAGE..(start + len) / PAGE {
+                outcome[page] = reset;
+            }
+        }
+    }
+    outcome
 }
 
 mod ioctl {
