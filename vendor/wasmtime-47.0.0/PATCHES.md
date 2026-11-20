@@ -293,6 +293,24 @@ guard above must hold on such a slot too.
   `wasmtime-wasi` does through feature unification, and the default of
   1,000 64-MiB fiber stacks would map 64 GiB and protect 1,000 guard pages at
   every Engine creation.
+- `src/runtime/vm/sys/unix/pagemap.rs`: the `PAGEMAP_SCAN` reset that keeps
+  dirty pages resident searched for pages that are written *and present*. A
+  dirty page that reclaim had swapped out, or that compaction, NUMA balancing
+  or a THP collapse was migrating, is a swap entry at that moment (`SWAPPED`,
+  `WRITTEN`): it matched nothing, lay before the scan's end, and so was
+  neither zeroed nor decommitted, and the next Store on the slot read the
+  previous Store's bytes. The scan now takes written pages that are present
+  *or* swapped (`category_anyof_mask`), returns the `SWAPPED` category, zeroes
+  present regions in place and decommits swapped ones (no swap-in to
+  overwrite them). Dropping `PRESENT` alone would be wrong: this 6.18 kernel
+  reports never-populated pages as `WRITTEN` too, so every page of the range
+  would be zeroed and populated. Which kernels do that is also why the five
+  upstream `pagemap::tests` that expect holes to be unwritten fail here. The
+  engine's `a_swapped_out_dirty_page_reads_zero_in_the_next_store` pages
+  dirty memory out with `MADV_PAGEOUT` before the drop; it needs an active
+  swap device, which the verification wrapper's swap-free cgroups never have,
+  so it is `#[ignore]`d with that reason and fails, rather than passing, when
+  run without one.
 - Tests: the engine's `aot_gc_pooled_stores` (a null access traps on each
   reused slot and after a collection; an interrupted Store and one dropped
   with a request pending hand the next Store an accessible heap with its

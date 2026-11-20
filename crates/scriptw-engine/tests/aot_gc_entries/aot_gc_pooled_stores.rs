@@ -4,8 +4,9 @@
 use scriptw_engine::{
     configure_wasm_runtime, NativeCompilationPolicy, PooledStoreReset, PooledStores,
 };
+use std::num::NonZeroU32;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Barrier};
 use std::time::Duration;
 use wasmtime::{
     ArrayRef, ArrayRefPre, ArrayType, Config, Engine, FieldType, Func, Instance, InterruptHandle,
@@ -323,4 +324,241 @@ fn a_full_store_pool_refuses_another_store_until_one_is_dropped() {
     drop(first);
     let mut next = HeapStore::new(&engine, &module, STORE_LIMIT).unwrap();
     next.assert_null_access_traps();
+}
+
+// (module (memory (export "memory") PAGES))
+fn exported_memory_module(engine: &Engine, pages: u32) -> Module {
+    let mut limits = vec![1, 0];
+    let mut remaining = pages;
+    loop {
+        let byte = (remaining & 0x7f) as u8;
+        remaining >>= 7;
+        if remaining == 0 {
+            limits.push(byte);
+            break;
+        }
+        limits.push(byte | 0x80);
+    }
+    module(engine, &[(5, &limits), (7, b"\x01\x06memory\x02\x00")])
+}
+
+const WASM_PAGE: usize = 64 * 1024;
+
+/// Every byte of the Store's exported memory is zero.
+fn assert_zeroed(store: &Store<StoreLimits>, memory: &wasmtime::Memory, context: &str) {
+    let data = memory.data(store);
+    if let Some(offset) = data.iter().position(|byte| *byte != 0) {
+        panic!(
+            "{context}: byte {offset:#x} of {:#x} is {:#04x}, left by an earlier Store",
+            data.len(),
+            data[offset]
+        );
+    }
+}
+
+fn limited_store(engine: &Engine) -> Store<StoreLimits> {
+    let mut store = Store::new(
+        engine,
+        StoreLimitsBuilder::new().memory_size(STORE_LIMIT).build(),
+    );
+    store.limiter(|limits| limits);
+    store
+}
+
+/// Whether each host page of `bytes` at `base` is present, from
+/// `/proc/self/pagemap` (bit 63 present, bit 62 swapped).
+#[cfg(target_os = "linux")]
+fn page_states(base: *const u8, bytes: usize) -> Vec<(bool, bool)> {
+    use std::io::{Read, Seek, SeekFrom};
+    let page = rustix::param::page_size();
+    let mut pagemap = std::fs::File::open("/proc/self/pagemap").unwrap();
+    pagemap
+        .seek(SeekFrom::Start((base as u64 / page as u64) * 8))
+        .unwrap();
+    let mut entries = vec![0u8; bytes.div_ceil(page) * 8];
+    pagemap.read_exact(&mut entries).unwrap();
+    entries
+        .chunks_exact(8)
+        .map(|entry| {
+            let entry = u64::from_le_bytes(entry.try_into().unwrap());
+            (entry >> 63 & 1 == 1, entry >> 62 & 1 == 1)
+        })
+        .collect()
+}
+
+/// More dirty memory than the pool keeps resident, and more separate dirty
+/// regions than one `PAGEMAP_SCAN` reports (32): the scan stops early and the
+/// rest of the slot is released, so the next Store on the same slot reads
+/// zeros everywhere.
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn a_reused_slot_is_zero_past_keep_resident_and_past_the_scans_region_limit() {
+    let engine = pooled_engine();
+    let pages = (KEEP_RESIDENT / WASM_PAGE) as u32 + 64;
+    let module = exported_memory_module(&engine, pages);
+    let mut base = None;
+    for round in 0..3 {
+        let mut store = limited_store(&engine);
+        let instance = Instance::new(&mut store, &module, &[]).unwrap();
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let address = memory.data_ptr(&store) as usize;
+        assert_eq!(
+            *base.get_or_insert(address),
+            address,
+            "the one-Store pool hands the module its slot again"
+        );
+        assert_zeroed(&store, &memory, &format!("round {round}"));
+        let data = memory.data_mut(&mut store);
+        match round {
+            // Every other Wasm page, at a varying offset: 162 separate
+            // dirty regions on any host page size up to 64 KiB.
+            0 => {
+                for page in (0..pages as usize).step_by(2) {
+                    data[page * WASM_PAGE + (page % 7) * 4096 + 13] = 0xa5;
+                }
+            }
+            // Every byte: 20 MiB dirty against 16 MiB kept resident.
+            1 => data.fill(0x5a),
+            _ => {}
+        }
+    }
+}
+
+/// A GC heap's slot goes back to the shared memory pool, and the next Store
+/// can get it as a linear memory: none of the heap's objects show through.
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn a_gc_heap_slot_reused_as_linear_memory_shows_none_of_the_heaps_bytes() {
+    let engine = pooled_engine();
+    let heap_module = heap_module(&engine);
+    let memory_module = exported_memory_module(&engine, (KEEP_RESIDENT / WASM_PAGE) as u32);
+    let mut heap = HeapStore::new(&engine, &heap_module, STORE_LIMIT).unwrap();
+    let bytes_type = ArrayType::new(&engine, FieldType::new(Mutability::Var, StorageType::I8));
+    let bytes = ArrayRefPre::new(&mut heap.store, bytes_type);
+    let mut kept = Vec::new();
+    for fill in [0xab, 0xcd, 0xef] {
+        // Each array is larger than a quarter of the nursery, so it is
+        // allocated in the old space: the heap's pages fill well past it.
+        kept.push(ArrayRef::new(&mut heap.store, &bytes, &Val::I32(fill), 3 << 20).unwrap());
+    }
+    for _ in 0..1000 {
+        heap.cell(0x7777_7777);
+    }
+    assert_eq!(
+        kept[2].get(&mut heap.store, 0).unwrap().unwrap_i32() as u8,
+        0xef
+    );
+    drop(kept);
+    drop(heap);
+    // The heap's slot is the pool's only warm slot, and a one-Store pool
+    // keeps at most one warm: the memory gets that slot.
+    let mut store = limited_store(&engine);
+    let instance = Instance::new(&mut store, &memory_module, &[]).unwrap();
+    let memory = instance.get_memory(&mut store, "memory").unwrap();
+    #[cfg(target_os = "linux")]
+    if let PooledStoreReset::KeepDirtyPagesResident { .. } = PooledStores::sequential().reset() {
+        // Before anything touches the memory: pages the heap dirtied are
+        // still resident, so this is the heap's slot, zeroed in place.
+        let resident = page_states(memory.data_ptr(&store), memory.data_size(&store))
+            .iter()
+            .filter(|(present, _)| *present)
+            .count();
+        assert!(resident > 0, "the memory reuses the GC heap's warm slot");
+    }
+    assert_zeroed(&store, &memory, "linear memory on a former GC heap slot");
+}
+
+/// Several pooled Stores alive at once on several threads, each dirtying
+/// its memory and its GC heap: no Store ever sees another's bytes.
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn concurrent_pooled_stores_never_see_each_others_bytes() {
+    const THREADS: u32 = 4;
+    let (engine, _) = pooled_engine_for(
+        PooledStores::new(NonZeroU32::new(THREADS).unwrap(), KEEP_RESIDENT).unwrap(),
+    );
+    let heap_module = heap_module(&engine);
+    let memory_module = exported_memory_module(&engine, 64);
+    let start = Arc::new(Barrier::new(THREADS as usize));
+    let threads = (0..THREADS)
+        .map(|thread| {
+            let (engine, heap_module, memory_module, start) = (
+                engine.clone(),
+                heap_module.clone(),
+                memory_module.clone(),
+                start.clone(),
+            );
+            std::thread::spawn(move || {
+                start.wait();
+                for round in 0..12 {
+                    let mut heap = HeapStore::new(&engine, &heap_module, STORE_LIMIT).unwrap();
+                    let instance = Instance::new(&mut heap.store, &memory_module, &[]).unwrap();
+                    let memory = instance.get_memory(&mut heap.store, "memory").unwrap();
+                    assert_zeroed(
+                        &heap.store,
+                        &memory,
+                        &format!("thread {thread} round {round}"),
+                    );
+                    let marker = (thread * 16 + round + 1) as u8;
+                    memory.data_mut(&mut heap.store).fill(marker);
+                    let value = i32::from_ne_bytes([marker; 4]);
+                    let cells = (0..2000).map(|_| heap.cell(value)).collect::<Vec<_>>();
+                    for cell in cells {
+                        assert_eq!(heap.read(Some(cell)).unwrap(), value);
+                    }
+                    heap.assert_null_access_traps();
+                    assert!(memory.data(&heap.store).iter().all(|byte| *byte == marker));
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+    for thread in threads {
+        thread.join().unwrap();
+    }
+}
+
+/// A dirty page that is swapped out when its Store drops is not present, so
+/// a reset that zeroes only present dirty pages left it, and the next Store
+/// read the previous Store's bytes. This pages dirty memory out with
+/// `MADV_PAGEOUT` and needs an active swap device to do so.
+#[cfg(all(target_os = "linux", target_pointer_width = "64"))]
+#[test]
+#[ignore = "needs an active swap device, which the cloud machine and the verification \
+            wrapper (memory.swap.max = 0) never have; run with --ignored on a host with swap"]
+fn a_swapped_out_dirty_page_reads_zero_in_the_next_store() {
+    assert!(
+        wasmtime::PoolingAllocationConfig::is_pagemap_scan_available(),
+        "this kernel has no PAGEMAP_SCAN: the pool releases every page, and the \
+         swapped-page reset cannot be exercised here"
+    );
+    let engine = pooled_engine();
+    let pages = 64u32;
+    let module = exported_memory_module(&engine, pages);
+    let bytes = pages as usize * WASM_PAGE;
+    let mut base = None;
+    for round in 0..2 {
+        let mut store = limited_store(&engine);
+        let instance = Instance::new(&mut store, &module, &[]).unwrap();
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let address = memory.data_ptr(&store);
+        assert_eq!(*base.get_or_insert(address as usize), address as usize);
+        assert_zeroed(&store, &memory, &format!("round {round}"));
+        if round == 1 {
+            break;
+        }
+        memory.data_mut(&mut store).fill(0xc3);
+        // SAFETY: the range is this Store's live, accessible linear memory;
+        // MADV_PAGEOUT only asks the kernel to reclaim it.
+        unsafe { rustix::mm::madvise(address.cast(), bytes, rustix::mm::Advice::LinuxPageOut) }
+            .expect("MADV_PAGEOUT (Linux 5.4 and later)");
+        let swapped = page_states(address, bytes)
+            .iter()
+            .filter(|(_, swapped)| *swapped)
+            .count();
+        assert!(
+            swapped > 0,
+            "no page of the dirty memory was swapped out: this host has no usable swap \
+             device, so the swapped-page reset cannot be exercised here"
+        );
+    }
 }

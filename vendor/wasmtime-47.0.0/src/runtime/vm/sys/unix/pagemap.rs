@@ -136,7 +136,7 @@ impl PageMap {
 /// this function will perform a scan of `ptr` for `len` bytes which will search
 /// for pages that:
 ///
-/// * Are present.
+/// * Are present, or swapped out (which includes migration entries).
 /// * Have been written.
 /// * Are NOT backed by the "zero" page.
 /// * Are NOT backed by a "file" page.
@@ -170,9 +170,17 @@ impl PageMap {
 /// Putting this all together this helps explain the search criteria for
 /// `PAGEMAP_SCAN`, notably:
 ///
-/// * `Categories::PRESENT` - we're only interested in present pages, anything
-///   unmapped wasn't touched by the guest so no need for the host to touch it
-///   either.
+/// * `Categories::PRESENT | Categories::SWAPPED` (any of) - a page whose PTE
+///   is neither present nor a swap entry was never populated, so the guest
+///   left nothing there. A dirty page is not necessarily present at the moment
+///   of the scan: reclaim may have swapped it out, and compaction, NUMA
+///   balancing or a THP collapse may be migrating it. The kernel reports both
+///   of those as a swap entry (`SWAPPED`, `WRITTEN` unless uffd-wp), so both
+///   categories are searched (Scriptw patch; upstream required `PRESENT` and
+///   skipped such pages, leaving a previous Store's bytes in the slot). The
+///   "any of" mask matters: some kernels (6.18 among them) also report
+///   unpopulated pages as `WRITTEN`, so `WRITTEN` alone would select every
+///   page of the range.
 ///
 /// * `Categories::WRITTEN` - if a page was only read by the guest no need to
 ///   take a look at it as the contents aren't changed from the initial image.
@@ -186,8 +194,13 @@ impl PageMap {
 ///   didn't write to it, so the page can be skipped.
 ///
 /// The `PAGEMAP_SCAN` will report back a set of contiguous regions of memory
-/// which match our scan flags that we're looking for. Each of these regions is
-/// then passed to `reset_manually` as-is. The ioctl will additionally then
+/// which match our scan flags that we're looking for, each with its `SWAPPED`
+/// category. A present region is passed to `reset_manually` as-is. A swapped
+/// region is passed to `decommit` instead: writing it would first read it back
+/// from swap only to overwrite it, and a page that is swapped in or migrated
+/// back between the scan and the decommit is discarded all the same. Either
+/// way every reported page reads as its original contents afterwards, which is
+/// what makes skipping the unreported ones sound. The ioctl will additionally then
 /// report a "walk_end" address which is the last address it considered before
 /// the scan was halted. A scan can stop for 3 reasons:
 ///
@@ -288,17 +301,18 @@ pub unsafe fn reset_with_pagemap(
         // backed by files. Such pages mean that they haven't changed from their
         // original contents, so they're inverted.
         .category_inverted(Categories::PFNZERO | Categories::FILE)
-        // Search for pages that are written and present as those are the dirty
-        // pages. Additionally search for the zero page/file page as those are
+        // Search for pages that are written as those are the dirty pages.
+        // Additionally search for the zero page/file page as those are
         // inverted above meaning we're searching for pages that specifically
         // don't have those flags.
-        .category_mask(
-            Categories::WRITTEN | Categories::PRESENT | Categories::PFNZERO | Categories::FILE,
-        )
-        // Don't return any categories back. This helps group regions together
-        // since the reported set of categories is always empty and we otherwise
-        // aren't looking for anything in particular.
-        .return_mask(Categories::empty())
+        .category_mask(Categories::WRITTEN | Categories::PFNZERO | Categories::FILE)
+        // A dirty page is present or, when reclaim swapped it out or the
+        // kernel is migrating it, a swap entry. Never-populated pages are
+        // neither (some kernels still report them `WRITTEN`).
+        .category_anyof_mask(Categories::PRESENT | Categories::SWAPPED)
+        // Return only whether a region is swapped, which decides how it is
+        // reset; regions of either kind stay as large as possible.
+        .return_mask(Categories::SWAPPED)
         .build(&mut storage);
 
     // SAFETY: this should be a safe ioctl as we control the fd we're operating
@@ -325,10 +339,15 @@ pub unsafe fn reset_with_pagemap(
         },
     };
 
-    // For all regions that were written in the scan reset them manually, then
-    // afterwards decommit everything else.
+    // For all present regions that were written in the scan reset them
+    // manually, decommit the swapped ones, then afterwards decommit everything
+    // the scan did not reach.
     let mut bytes_resident = 0;
     for region in result.regions() {
+        if region.categories().contains(Categories::SWAPPED) {
+            decommit(region.start().cast_mut(), region.len());
+            continue;
+        }
         // SAFETY: we're relying on Linux to pass in valid region ranges within
         // the `ptr/len` we specified to the original syscall.
         unsafe {
@@ -465,7 +484,6 @@ mod ioctl {
         ///
         /// For more detail see the `pagemap_scan_is_interesting_page` function
         /// in the Linux kernel source.
-        #[expect(dead_code, reason = "bindings for the future if we need them")]
         pub fn category_anyof_mask(&mut self, flags: Categories) -> &mut PageMapScanBuilder {
             self.pm_scan_arg.category_anyof_mask = flags;
             self
@@ -577,10 +595,6 @@ mod ioctl {
         /// Note that this will only contain categories specified in
         /// [`PageMapScanBuilder::return_mask`].
         #[inline]
-        #[cfg_attr(
-            not(test),
-            expect(dead_code, reason = "bindings for the future if we need them")
-        )]
         pub fn categories(&self) -> Categories {
             self.0.categories
         }

@@ -257,8 +257,11 @@ touch of an on-demand heap page faults (about 1–1.4 µs on the measured host),
 so a pooled heap removes most of a short entry's faults; see the
 [measurements](../benchmarks.md#pooled-gc-heaps-2026-11-19).
 
-The call returns how the host resets a heap. With Linux's `PAGEMAP_SCAN` (6.7
-and later) only dirty pages are zeroed (`KeepDirtyPagesResident`). Without it,
+The call also returns how the host resets a heap (`pool.reset()` says the
+same). With Linux's `PAGEMAP_SCAN` (6.7 and later) only dirty pages are
+zeroed (`KeepDirtyPagesResident`); a dirty page that is swapped out or being
+migrated when its Store drops is released instead, so the next Store reads
+zeros either way. Without it,
 keeping 16 MiB would zero all of it at every drop, so the pool releases every
 page instead (`ReleaseAll`) and only reuses mappings. Creating a Store beyond
 the pool's capacity fails at `instantiate` with an error whose

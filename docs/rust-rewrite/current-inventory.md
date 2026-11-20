@@ -283,10 +283,19 @@ accepts `--case <file.js>`.
   cloud machine. No repository command runs them: Cargo refuses
   `cargo test -p wasmtime` because the vendored crate is not a workspace
   member and has dev-dependencies, so they cannot enter the
-  `known-failures.tsv` ledger, whose rows libtest enforces. Owner: vendored
-  Wasmtime patches (attribute the failures against a standalone checkout of
-  `vendor/wasmtime-47.0.0` on this kernel).
-
+  `known-failures.tsv` ledger, whose rows libtest enforces. Cause: the tests
+  expect never-populated pages to be reported unwritten, and the cloud
+  machine's 6.18 kernel reports them `WRITTEN` (a `PAGEMAP_SCAN` probe of an
+  anonymous mapping returns category `0x2` for its holes); the product scan
+  does not depend on it (see the pagemap entry in the Wasmtime
+  [patch notes](../../vendor/wasmtime-47.0.0/PATCHES.md#pooled-gc-heaps)).
+  Owner: vendored Wasmtime patches (make the tests kernel-independent and
+  runnable from the repository).
+- The swapped-page reset of pooled Stores
+  (`a_swapped_out_dirty_page_reads_zero_in_the_next_store`) is `#[ignore]`d:
+  it needs an active swap device, and the cloud machine has none and the
+  verification wrapper requires `memory.swap.max = 0`. Owner: pooled-store
+  runtime (run it with `--ignored` on a host with swap before each release).
 ## Conformance boundaries
 
 Keep the four original upstream disagreements counted as failures. Their exact
