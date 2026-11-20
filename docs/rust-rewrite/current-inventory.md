@@ -313,46 +313,108 @@ accepts `--case <file.js>`.
   `Array.prototype.join`, the replacement builders and RegExp `source`. The
   other builders still grow without it: JSON.stringify's output accumulator
   (whose growth path has no completion to throw into), case mapping,
-  `normalize`, the URI and `escape` encoders, `String.raw`, Intl formatting
-  and the internal concatenations of names and messages. A result past the
+  `normalize`, the URI and `escape` encoders, `String.raw`,
+  `TextDecoder.prototype.decode` (which checks only `i32::MAX`, so decoding a
+  200 MB Uint8Array traps), `RegExp.prototype.toString`, Intl formatting
+  and the internal concatenations of names and messages. `join` checks the
+  limit, but it keeps its element Strings live beside the growing result
+  (about six bytes per unit, not the four the limit assumes), so a join of
+  distinct Strings near the limit can still trap. The limit's 1 GiB premise
+  holds only with the Store's own limiter (see the on-demand GC heap item).
+  A template literal checks the limit at each concatenation, so a RangeError
+  at `${a}${b}` precedes the side effects of a later `${c}`; ECMA-262
+  concatenates only after evaluating every substitution, and V8 throws
+  early as Scriptw does. A result past the
   limit there traps on heap exhaustion instead of throwing. Fix: give the
   accumulator's `reserve` an overflow exit that the serializer routes to a
   RangeError, and route each remaining builder's final length through the
   same check. Owner: string built-ins.
-- Native compilation of one large Wasm function is superlinear in time and
-  memory, so large single bodies and deep nesting stay costly though they no
-  longer overflow a stack (measured 2026-11-20 with the product CLI, one
-  process each). A top-level script body costs about 990 Wasm bytes per
-  global `x++` statement (the global-binding write and its fallbacks; the
-  same statements in a function body cost about 250): 600 of them make one
-  594 KB function that `scriptw run` (Fast policy, single-pass register
-  allocation) compiles in 22.8 s at 400 MB RSS (200: 2.7 s; 400: 8.0 s),
-  and 800 `if (x == i) { x++ }` statements make 1.3 MB that take 97 s and
-  2.0 GB. `precompile --policy speed` (backtracking allocation) compiles the
-  latter in 8.7 s at 2.1 GB, `--policy fast` in 110 s at 1.9 GB, so the time
-  is in the single-pass allocator and the memory in compiling the one
-  function; Wasm emission takes 0.4 s and 51 MB. Source nested just below
-  `MAX_NESTING_DEPTH` (997 levels) compiles and runs everywhere without a
-  stack overflow, but its memory grows superlinearly with depth for some
-  constructs: parentheses 81 MB, arrays 220 MB, blocks 53 MB, nested
-  functions 304 MB, `else if` chains 1.2 GB, conditional chains 558 MB,
-  templates 3.2 GB, chained assignment 4.1 GB, binding patterns 9.2 GB,
-  object literals 9.7 GB (500 levels: 2.7 GB; emission itself 1 GB at 997),
-  and nested `class extends` heritage already 3.5 GB and 62 s at 250 levels
-  (emission 3.6 GB at 500). The parser limit is the stack bound, not a
-  memory bound; lowering it to fit the deepest-cost construct in 4 GiB would
-  reject ordinary 500-branch `else if` chains. Fix: split a large script or
-  function body into several Wasm functions at statement boundaries (the
-  emitter keeps one function per body today), find the single-pass
-  allocator's superlinear step, and remove the per-level duplication behind
-  class heritage and object literal emission. Owner: AOT codegen and native
-  compilation.
+- Compile memory has no budget, and an embedder compiling untrusted source
+  must run compilation under an OS memory limit (cgroup, `ulimit -v`,
+  container): a few kilobytes of nested source can still take gigabytes. This
+  is a product exposure, not only a performance note. Fixed root causes
+  (2026-11-20, each measured one process under a 4 GiB cgroup):
+  `cranelift-frontend`'s SSA builder kept a dense map over every block for
+  every variable (a 2,000-term top-level `+` chain took 2.6 GB to compile with
+  the Fast policy, now 387 MB; 2,000 nested `else if` branches no longer
+  exceed 4 GiB), Wasmtime's frame-reload pass kept a known set per block that
+  grew with nesting depth (500 `else if` branches: 955 MB to 216 MB; 1,000:
+  3.3 GB to 392 MB), and Boa's parser cloned every parenthesized expression's
+  whole subtree once per enclosing parenthesis. Still open, each growing
+  faster than the source: native compilation time of one large function with
+  the single-pass allocator (1,500 `else if` branches: 103 s; a 2,000-term
+  top-level `+` chain: 27 s), backtracking allocation memory (1,500 `else if`:
+  1.4 GB; a 1,000-term top-level `+` chain: 1.6 GB, 2.8 GB once the chain is
+  split into temporaries), SSA values in deeply nested member chains (1,000
+  links: 1.5 GB, from block parameters), and the earlier measurements of object
+  literals, binding patterns, templates, chained assignment and class heritage
+  near the nesting limit (9.7, 9.2, 3.2, 4.1 GB at 997 levels and 3.5 GB at
+  250 for heritage, before these fixes; source nested 997 levels did not
+  compile everywhere: heritage at 997 never finished). The parser weights
+  `else if` and member chains for their compile cost, not only their stack
+  (see the source nesting limit in
+  [runtime requirements](runtime-requirements.md#implementation-limits)); the
+  other constructs are not weighted yet. One Wasm function body is limited to
+  7,654,321 bytes by the validator, so a top-level script of about 20,000
+  global `+` terms is a compile error. The CLI's `scriptw build wasm` and
+  `precompile` of the 64 KB RSC bundle (`target/rsc-fixtures/rsc.js`) exceed
+  4 GiB with the binaries before and after these fixes. Fix: split a large
+  script or function body into several Wasm functions at statement
+  boundaries, find the single-pass allocator's superlinear step, weight the
+  remaining constructs or make their emission linear, and give the embedding
+  API a compile memory budget with a typed error. Owner: AOT codegen and
+  native compilation.
+- Left-deep binary, logical, `??` and comma chains are walked without
+  recursion by the parser, Boa's visitors and the tree's Drop and Clone, and
+  lowering splits chains of more than 256 operators into temporaries
+  (`ChainSegments`). Generator and async function bodies are still lowered by
+  passes that recurse per operator, so there an operator costs half a nesting
+  level (about 2,000 per chain). Dynamic `Function` source candidates give up
+  on `+` chains of more than 64 operators. Conditional (`a ? b : c ? ...`)
+  chains still nest one AssignmentExpression per `?`, so about 1,000 compile.
+  Every right operand of `||`, `&&` and `??` (like every conditionally
+  reached expression) is lowered between two snapshots of all flow facts
+  (`capture_conditional_flow_facts` clones every binding's value information
+  and shape), so long logical chains compile slowly: a function returning a
+  2,000-link `||` chain takes 26 s to lower and emit, 10,000 links 294 s.
+  Fix: snapshot only facts the operand can change, or keep facts in
+  persistent maps. Owner: front end and lowering.
+- Correctness-batch review items left open, each with its reason: the cost of
+  the native recursion guard on the hot path (an entry test in `proxy_call` and
+  an eight-instruction bracket around each counted call) has no Callgrind or
+  P/R size measurement yet, and the entry test could move to the native-call
+  arm so that `return_call` entries into source bodies skip it (owner: emitter,
+  measured with the RSC Callgrind tooling); `open_counted_calls` takes a raw
+  global index rather than the `NativeRecursionDepthGlobal` newtype, which
+  prevents no mistake while its one caller passes the schema's own global
+  (the scope is now closed on an error return too); the bind limit counts
+  bound functions and callable Proxies, but a user function whose `name`
+  getter returns its target's name can still forward a growing name between
+  binds, which is ordinary user allocation bounded by the String limit and the
+  heap; and regular expression literals nest at most 1,000 groups where V8
+  compiles about 10,000 (the pattern parsers recurse per group). The earlier
+  compile memory figures of 9 to 14 GB were taken above the 4 GiB
+  verification cap; the figures in the compile memory item were taken under
+  it. Owners: emitter (first two), runtime built-ins (bind), front end
+  (pattern nesting).
 - BigInt multiplication, division and radix conversion are quadratic
   (schoolbook digits; conversion divides by the largest radix power per
   pass). Values near `MAX_BIGINT_BITS` are bounded but slow: squaring a
-  2^26-bit value takes hours. V8 uses Karatsuba/Toom/FFT and
-  divide-and-conquer conversion. Owner: BigInt arithmetic (performance, not
-  correctness).
+  2^26-bit value takes hours. `**` throws at once when its result provably
+  exceeds the limit (the bound is within e / 2^19 bits of the true size), so
+  only a power whose result fits, or comes within that margin, computes for
+  long; a work budget that refused a fitting result would be a RangeError the
+  spec does not allow, so an embedder bounds the time with its execution
+  deadline. V8 uses Karatsuba/Toom/FFT and divide-and-conquer conversion.
+  Owner: BigInt arithmetic (performance, not correctness).
+- The BigInt limit is counted in 32-bit digits (3,997,695) while values are
+  stored in 64-bit limbs, so the limit is not one exact size: `1n << 127926238n`
+  throws though its result fits, a value with an odd number of digits at the
+  limit decodes to one digit more than the limit, so `x > 0n` and `-x` of
+  `(1n << 63n) << 127926175n` throw, and working buffers reserve a digit of
+  slack. Fix: define the limit once in limbs, size buffers by what the
+  normalized result can reach and check the normalized length. Owner: BigInt
+  arithmetic.
 - Smaller runtime review items left open, each with its reason: an
   embedder's own `Module::new` on a parallel Engine still compiles on Rayon's
   global pool (Scriptw cannot route it; foreign-modules.md says so);
@@ -366,8 +428,8 @@ accepts `--case <file.js>`.
   tests share one process and most configure one job explicitly; without it
   an unconfigured test would fix a CPU-derived count first and every later
   one-job request would be refused; integration tests use `SCRIPTW_JOBS`
-  instead, and removing the branch waits on the B4 test-harness change in
-  target/review/PLAN.md); no test drops a pooled Store while a panic or trap
+  instead, and removing the branch waits on the test-harness change that
+  gives every engine unit test an explicit job count); no test drops a pooled Store while a panic or trap
   unwinds out of a host call (the drop path is the same `Drop` that ordinary
   Store teardown runs and the pooled-store tests cover, and the trap case is
   covered by the interrupted-Store test; a panic through a host call needs a

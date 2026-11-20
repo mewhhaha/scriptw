@@ -29,6 +29,11 @@ WRAPPER = '\nexport const run = globalThis.applicationRun;\nexport function enco
 FIELDS = ('memory.max', 'memory.swap.max', 'memory.oom.group', 'cpu.max', 'memory.events')
 
 
+# A host run with any of these hooks is excluded from scored cohorts; the
+# report carries the hook's key (see crates/scriptw-cli/examples/rsc_baseline.rs).
+EXCLUDED_REPORT_MARKERS = frozenset(
+    {'profiling', 'artifact_dump', 'precompiled_image', 'execution_profile', 'portable_bundle'})
+
 def require(condition, message):
     if not condition:
         raise ValueError(message)
@@ -105,7 +110,7 @@ def check_report(raw, plan, inputs, support, samples, warmups, host_sha, native_
     else:
         require(raw.get('schema') == 'scriptw-react-retained-baseline-v1'
                 and raw.get('status') == 'complete'
-                and not {'profiling', 'artifact_dump', 'precompiled_image'} & raw.keys()
+                and not EXCLUDED_REPORT_MARKERS & raw.keys()
                 and raw.get('case_selection') == case, 'incomplete, profiled or wrong Scriptw case')
         require(raw.get('executable_sha256') == host_sha and raw.get('native_mode') == native_mode,
                 'host identity/policy differs')

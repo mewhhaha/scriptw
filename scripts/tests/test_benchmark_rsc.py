@@ -108,7 +108,8 @@ class Calls(unittest.TestCase):
             return m.check_report(report, dict(actor='scriptw', case='rsc-sync'), {},
                                   {'expected': {'rsc-sync': '"flight"\n'}}, 2, 2, 'host', 'fast')
         self.assertEqual(check(raw)['request_ns']['median'], 6)
-        for marker in ('profiling', 'artifact_dump', 'precompiled_image'):
+        for marker in ('profiling', 'artifact_dump', 'precompiled_image', 'execution_profile',
+                       'portable_bundle'):
             altered = copy.deepcopy(raw)
             altered[marker] = {'excluded_from_scored_cohorts': True}
             with self.subTest(marker=marker), self.assertRaises(ValueError):
