@@ -123,8 +123,21 @@ fn deferred_writes(operators: &[Operator<'_>], resolve: u32) -> (Origin, Vec<Wri
             Operator::RefAsNonNull
             | Operator::RefCastNonNull { .. }
             | Operator::RefCastNullable { .. } => {}
-            Operator::RefNull { .. } | Operator::I32Const { .. } | Operator::I64Const { .. } => {
+            Operator::RefNull { .. }
+            | Operator::I32Const { .. }
+            | Operator::I64Const { .. }
+            // The native recursion count bracketing a call in a counted
+            // scope (`Function::open_counted_calls`).
+            | Operator::GlobalGet { .. } => {
                 stack.push(Origin::Other);
+            }
+            Operator::I32Add => {
+                stack.pop().unwrap();
+                stack.pop().unwrap();
+                stack.push(Origin::Other);
+            }
+            Operator::GlobalSet { .. } => {
+                stack.pop().unwrap();
             }
             Operator::StructGet {
                 struct_type_index,

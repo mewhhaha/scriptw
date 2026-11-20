@@ -549,9 +549,20 @@ fn physical_canonical_error_reads_ensure_the_same_realm_before_table_access() {
                 let projection = ops[call + 1..position].iter().position(|op| matches!(op,
                     Operator::StructGet { struct_type_index, field_index } if *struct_type_index == realm && *field_index == field))
                     .map(|offset| call + 1 + offset).expect("read the ensured Realm's table");
+                // A call in a counted scope is bracketed by the native
+                // recursion count (`Function::open_counted_calls`); the
+                // argument precedes that bracket.
+                let arguments_end = match &ops[call.saturating_sub(4)..call] {
+                    [Operator::GlobalGet { global_index: get }, Operator::I32Const { value: 1 }, Operator::I32Add, Operator::GlobalSet { global_index: set }]
+                        if get == set =>
+                    {
+                        call - 4
+                    }
+                    _ => call,
+                };
                 let [Operator::LocalGet {
                     local_index: ensured_realm,
-                }, Operator::RefAsNonNull] = &ops[call - 2..call]
+                }, Operator::RefAsNonNull] = &ops[arguments_end - 2..arguments_end]
                 else {
                     panic!("ensure receives its actual defining Realm");
                 };

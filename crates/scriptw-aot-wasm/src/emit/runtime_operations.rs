@@ -93,13 +93,18 @@ impl<'a> FunctionBuilder<'a> {
         let parameters =
             self.helper_parameters::<crate::runtime_helpers::ProxyCallParameters>(&mut function);
         let result = self.runtime_schema().reserve_completion(&mut function);
-        self.emit_proxy_call_dispatch(
-            &parameters.callee,
-            &parameters.this_value,
-            &parameters.arguments,
-            &result,
-            &mut function,
-        )?;
+        // Helpers reach built-ins through this kernel, and built-ins reach
+        // helpers that call it again (`Array.prototype.join` converting a
+        // nested Array, a bound function's target): a guarded recursive edge.
+        self.emit_native_recursion_guard(&result, &mut function, |builder, function| {
+            builder.emit_proxy_call_dispatch(
+                &parameters.callee,
+                &parameters.this_value,
+                &parameters.arguments,
+                &result,
+                function,
+            )
+        })?;
         result.emit(&mut function);
         result.clear(&mut function);
         self.clear_helper_execution_realm(&mut function);

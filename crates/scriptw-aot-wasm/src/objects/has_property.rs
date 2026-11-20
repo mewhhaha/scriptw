@@ -160,18 +160,19 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, function);
         self.emit_object_boolean_result(boolean, result, function);
         function.instruction(&Instruction::Else);
-        schema
-            .call_helper(
-                crate::runtime_helpers::ObjectHasPropertyArguments::new(
-                    &value,
-                    key,
-                    self.current_environment(),
-                    self.current_program(),
-                ),
-                self.runtime_helper_base()?,
-                function,
-            )
-            .store(result, function);
+        // OrdinaryHasProperty returns parent.[[HasProperty]](P): a tail call,
+        // so a prototype chain of any length runs in one helper frame instead
+        // of exhausting the Wasm stack.
+        schema.return_call_helper(
+            crate::runtime_helpers::ObjectHasPropertyArguments::new(
+                &value,
+                key,
+                self.current_environment(),
+                self.current_program(),
+            ),
+            self.runtime_helper_base()?,
+            function,
+        );
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);

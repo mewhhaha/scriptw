@@ -572,6 +572,33 @@ impl<'a> FunctionBuilder<'a> {
 
     /// Validates the actual revocation field before exposing either slot.
     /// Both the successful continuation and the error retire their roots here.
+    /// Emits `body`, a recursive edge of the runtime helpers, one guarded
+    /// recursion deeper, or completes `result` with a RangeError when the
+    /// implementation's bound on nested helper recursion is reached (see
+    /// `gc_types::native_recursion_depth`). Every call `body` makes counts
+    /// one level while it runs.
+    pub(crate) fn emit_native_recursion_guard(
+        &mut self,
+        result: &CompletionLocals,
+        function: &mut Function,
+        body: impl FnOnce(&mut Self, &mut Function) -> Result<(), EmitError>,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        schema.emit_native_recursion_exhausted_i32(function);
+        self.open_frame(ControlFrameKind::If, function);
+        self.emit_throw_runtime_error(
+            scriptw_ir::NativeErrorKind::RangeError,
+            RuntimeErrorMessage::MAXIMUM_NATIVE_RECURSION_DEPTH_EXCEEDED,
+            result,
+            function,
+        )?;
+        function.instruction(&Instruction::Else);
+        schema.emit_native_recursion_counted(function, |function| body(self, function))?;
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        Ok(())
+    }
+
     pub(crate) fn emit_load_live_proxy_slots(
         &mut self,
         proxy: &GcLocal<crate::gc_types::ProxyObject>,
@@ -629,7 +656,11 @@ impl<'a> FunctionBuilder<'a> {
                 )?,
         }
         function.instruction(&Instruction::Else);
-        consume(self, &slots, function)?;
+        // Every Proxy internal method can forward to a target that is itself
+        // a Proxy, as deeply as the program nested them.
+        self.emit_native_recursion_guard(result, function, |builder, function| {
+            consume(builder, &slots, function)
+        })?;
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         slots.clear(function);
@@ -2587,20 +2618,21 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I32And);
         schema.release_i32_local(closed, function);
         self.open_frame(ControlFrameKind::If, function);
-        schema
-            .call_helper(
-                crate::runtime_helpers::OrdinarySetArguments::new(
-                    &prototype,
-                    receiver,
-                    key,
-                    value,
-                    self.current_environment(),
-                    self.current_program(),
-                ),
-                self.runtime_helper_base()?,
-                function,
-            )
-            .store(result, function);
+        // OrdinarySetWithOwnDescriptor returns parent.[[Set]](P, V, Receiver):
+        // a tail call, so a prototype chain of any length runs in one helper
+        // frame instead of exhausting the Wasm stack.
+        schema.return_call_helper(
+            crate::runtime_helpers::OrdinarySetArguments::new(
+                &prototype,
+                receiver,
+                key,
+                value,
+                self.current_environment(),
+                self.current_program(),
+            ),
+            self.runtime_helper_base()?,
+            function,
+        );
         function.instruction(&Instruction::Else);
         self.emit_ordinary_set_data_on_receiver_result(receiver, key, value, result, function)?;
         self.pop_control(ControlFrameKind::If);

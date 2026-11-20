@@ -35,6 +35,7 @@ runtime_error_message_catalog! {
     FOREIGN_HOST_OPERATION_FAILED => "Foreign host operation failed",
     FOREIGN_HOST_OPERATION_CANCELLED => "Host operation cancelled",
     MAXIMUM_SOURCE_CALL_STACK_SIZE_EXCEEDED => "Maximum source call stack size exceeded",
+    MAXIMUM_NATIVE_RECURSION_DEPTH_EXCEEDED => "Maximum nested built-in operation depth exceeded",
     STREAM_REQUIRES_NEW => "ReadableStream constructor requires new",
     STREAM_ILLEGAL_CONSTRUCTOR => "ReadableByteStreamController cannot be constructed directly",
     STREAM_RECEIVER => "Stream operation called on an incompatible receiver",

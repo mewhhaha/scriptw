@@ -73,7 +73,7 @@ every engine or a fallback implementation for engines missing Wasm GC.
 
 ## Runtime ABI
 
-The runtime ABI is **82**. Portable bundles and native images built under an
+The runtime ABI is **83**. Portable bundles and native images built under an
 earlier ABI must be rebuilt. ABIs 58 to 77 added per-site read, write,
 `instanceof` and global read records, a dictionary position hint on Strings,
 further native call entries, one JSON output accumulator, compact shape
@@ -84,7 +84,8 @@ branch hinting section in P and R and a Symbol row count in intrinsic
 layouts. ABIs 78 to 82 make the Error family with DOMException, twenty-six
 constructors and the ordinary global functions demand-built, and publish a new
 global object's bindings in one call
-([contract](contracts/lazy-runtime-values.md)). `LAYOUT_VERSION` in `crates/scriptw-aot-wasm/src/runtime_artifact.rs`
+([contract](contracts/lazy-runtime-values.md)). ABI 83 adds the native
+recursion depth global that bounds helper recursion. `LAYOUT_VERSION` in `crates/scriptw-aot-wasm/src/runtime_artifact.rs`
 records each step.
 
 ## Dynamic source: eval and Function constructors

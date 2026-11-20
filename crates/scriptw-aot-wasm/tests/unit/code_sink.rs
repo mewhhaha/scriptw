@@ -335,3 +335,49 @@ fn valid_control_flow_keeps_exact_encoder_bytes_and_validates() {
         .validate_all(&module.finish())
         .expect("structured control-flow bytes must validate");
 }
+
+#[test]
+fn a_counted_call_scope_brackets_each_call_and_nothing_else() {
+    let mut function = empty_body();
+    function.instruction(&Instruction::I32Const(1));
+    function.instruction(&Instruction::Drop);
+    let scope = function.open_counted_calls(7);
+    function.instruction(&Instruction::Call(3));
+    function.instruction(&Instruction::Drop);
+    function.close_counted_calls(scope);
+    function.instruction(&Instruction::Call(4));
+    function.instruction(&Instruction::End);
+    let mut bytes = Vec::new();
+    wasm_encoder::Encode::encode(&function.into_body(), &mut bytes);
+    let mut expected = Vec::new();
+    let mut reference = wasm_encoder::Function::new([]);
+    for instruction in [
+        Instruction::I32Const(1),
+        Instruction::Drop,
+        Instruction::GlobalGet(7),
+        Instruction::I32Const(1),
+        Instruction::I32Add,
+        Instruction::GlobalSet(7),
+        Instruction::Call(3),
+        Instruction::GlobalGet(7),
+        Instruction::I32Const(-1),
+        Instruction::I32Add,
+        Instruction::GlobalSet(7),
+        Instruction::Drop,
+        Instruction::Call(4),
+        Instruction::End,
+    ] {
+        reference.instruction(&instruction);
+    }
+    wasm_encoder::Encode::encode(&reference, &mut expected);
+    assert_eq!(bytes, expected);
+}
+
+#[test]
+#[should_panic(expected = "close innermost first")]
+fn counted_call_scopes_close_innermost_first() {
+    let mut function = empty_body();
+    let outer = function.open_counted_calls(1);
+    let _inner = function.open_counted_calls(2);
+    function.close_counted_calls(outer);
+}

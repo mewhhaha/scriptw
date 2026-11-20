@@ -33,19 +33,33 @@ impl FunctionBuilder<'_> {
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
         let result = s.reserve_completion(f);
-        s.call_helper(
-            JsonStringifyValueArguments::new(
-                holder,
-                key,
-                fetched,
-                context,
-                indent,
-                self.current_program(),
-            ),
-            self.runtime_helper_base()?,
+        // Nested containers recurse through this helper as deeply as the
+        // value nests: a guarded recursive edge (see
+        // `emit_native_recursion_guard`).
+        s.emit_native_recursion_exhausted_i32(f);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_throw_runtime_error(
+            NativeErrorKind::RangeError,
+            RuntimeErrorMessage::MAXIMUM_NATIVE_RECURSION_DEPTH_EXCEEDED,
+            &result,
             f,
-        )
-        .store(&result, f);
+        )?;
+        f.instruction(&Instruction::Else);
+        let base = self.runtime_helper_base()?;
+        let arguments = JsonStringifyValueArguments::new(
+            holder,
+            key,
+            fetched,
+            context,
+            indent,
+            self.current_program(),
+        );
+        s.emit_native_recursion_counted(f, |f| {
+            s.call_helper(arguments, base, f).store(&result, f);
+            Ok::<(), EmitError>(())
+        })?;
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         self.completion().copy_from(&result, f);
         self.emit_propagate_current_throw_if_needed(f);
         out.copy_from(result.value(), f);

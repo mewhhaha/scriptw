@@ -41,6 +41,14 @@ impl BranchDepth {
     }
 }
 
+/// An open counted-call scope (see [`Function::open_counted_calls`]). Not
+/// copyable: exactly one close consumes it.
+#[must_use = "a counted-call scope must be closed"]
+#[derive(Debug)]
+pub(crate) struct CountedCalls {
+    depth: u32,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum FrameKind {
     Function,
@@ -454,6 +462,8 @@ pub(crate) struct Function {
     /// The constant the previous instruction pushed, for the next store.
     pushed_i32_constant: Option<i32>,
     checked_escape_frames: Vec<LabelDepth>,
+    /// Depth globals of the open counted-call scopes, innermost last.
+    counted_calls: Vec<u32>,
     last_instruction_escapes: bool,
     /// Operator ordinal of each hinted branch, and whether it is likely taken.
     branch_hints: std::collections::BTreeMap<u32, bool>,
@@ -489,6 +499,7 @@ impl Clone for Function {
             frame_i32_facts: self.frame_i32_facts.clone(),
             pushed_i32_constant: self.pushed_i32_constant,
             checked_escape_frames: self.checked_escape_frames.clone(),
+            counted_calls: self.counted_calls.clone(),
             last_instruction_escapes: self.last_instruction_escapes,
             branch_hints: self.branch_hints.clone(),
             rare_labels: self.rare_labels.clone(),
@@ -525,6 +536,7 @@ impl Function {
             frame_i32_facts: vec![FrameI32Facts::default()],
             pushed_i32_constant: None,
             checked_escape_frames: Vec::new(),
+            counted_calls: Vec::new(),
             last_instruction_escapes: false,
             branch_hints: std::collections::BTreeMap::new(),
             rare_labels: Vec::new(),
@@ -831,6 +843,34 @@ impl Function {
         u32::try_from(self.frames.len()).expect("Wasm label depth exceeds u32")
     }
 
+    /// Opens a scope in which every call (`call`, `call_ref`,
+    /// `call_indirect`) is bracketed by an increment and a decrement of the
+    /// i32 global `depth`, so the global counts the scope's calls that are
+    /// still executing. The bracket is the call itself: no branch, return or
+    /// throw can come between the call and its decrement, so the count stays
+    /// balanced however the surrounding code exits. Scopes nest; the
+    /// innermost global counts.
+    pub(crate) fn open_counted_calls(&mut self, depth: u32) -> CountedCalls {
+        self.counted_calls.push(depth);
+        CountedCalls { depth }
+    }
+
+    /// Closes the innermost counted-call scope.
+    pub(crate) fn close_counted_calls(&mut self, scope: CountedCalls) {
+        assert_eq!(
+            self.counted_calls.pop(),
+            Some(scope.depth),
+            "counted-call scopes close innermost first"
+        );
+    }
+
+    fn adjust_counted_calls(&mut self, depth: u32, delta: i32) {
+        self.uncounted_instruction(&Instruction::GlobalGet(depth));
+        self.uncounted_instruction(&Instruction::I32Const(delta));
+        self.uncounted_instruction(&Instruction::I32Add);
+        self.uncounted_instruction(&Instruction::GlobalSet(depth));
+    }
+
     fn check_branch(&self, label: u32) {
         assert!(
             label < self.depth(),
@@ -848,6 +888,21 @@ impl Function {
 
     /// Account for an instruction before appending its bytes.
     pub(crate) fn instruction(&mut self, instruction: &Instruction<'_>) -> &mut Self {
+        if let Some(&depth) = self.counted_calls.last() {
+            if matches!(
+                instruction,
+                Instruction::Call(_) | Instruction::CallRef(_) | Instruction::CallIndirect { .. }
+            ) {
+                self.adjust_counted_calls(depth, 1);
+                self.uncounted_instruction(instruction);
+                self.adjust_counted_calls(depth, -1);
+                return self;
+            }
+        }
+        self.uncounted_instruction(instruction)
+    }
+
+    fn uncounted_instruction(&mut self, instruction: &Instruction<'_>) -> &mut Self {
         if self.frames.is_empty() {
             if matches!(instruction, Instruction::End) {
                 panic!(

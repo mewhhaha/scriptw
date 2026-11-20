@@ -161,7 +161,11 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // unescape as DeferredIntrinsicValue recipes that the method resolver
 // materializes on first observation; eval and canonical-slot functions stay
 // eager.
-const LAYOUT_VERSION: u32 = 82;
+// Version 83 adds the native recursion depth global beside the source
+// activation depth: guarded helper recursion (Proxy forwarding, JSON
+// serialization, calls from helpers) counts its calls there and throws a
+// RangeError at the bound instead of exhausting the Wasm stack.
+const LAYOUT_VERSION: u32 = 83;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

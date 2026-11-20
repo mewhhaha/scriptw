@@ -36,7 +36,9 @@ mod value;
 pub(crate) use value::*;
 mod host;
 pub use host::*;
+mod native_recursion_depth;
 mod snapshot;
+use native_recursion_depth::NativeRecursionDepthGlobal;
 mod source_activation_depth;
 pub(crate) use source_activation_depth::SourceActivationDepth;
 use source_activation_depth::SourceActivationDepthGlobal;
@@ -521,6 +523,7 @@ impl RuntimeGcTypes {
         let current_realm = GcRootGlobal::declare(&self.layouts, &mut globals);
         let active_source_function = GcRootGlobal::declare(&self.layouts, &mut globals);
         let source_activation_depth = SourceActivationDepthGlobal::declare(&mut globals);
+        let native_recursion_depth = NativeRecursionDepthGlobal::declare(&mut globals);
         let throw_name = GcRootGlobal::declare(&self.layouts, &mut globals);
         let throw_message = GcRootGlobal::declare(&self.layouts, &mut globals);
         let throw_constructor_name = GcRootGlobal::declare(&self.layouts, &mut globals);
@@ -562,6 +565,7 @@ impl RuntimeGcTypes {
             current_realm,
             active_source_function,
             source_activation_depth,
+            native_recursion_depth,
             throw_name,
             throw_message,
             throw_constructor_name,
@@ -895,6 +899,7 @@ pub(crate) struct RuntimeSchema {
     current_realm: GcRootGlobal<RealmRecord>,
     active_source_function: GcRootGlobal<FunctionObject>,
     source_activation_depth: SourceActivationDepthGlobal,
+    native_recursion_depth: NativeRecursionDepthGlobal,
     throw_name: GcRootGlobal<StringValue>,
     throw_message: GcRootGlobal<StringValue>,
     throw_constructor_name: GcRootGlobal<StringValue>,
