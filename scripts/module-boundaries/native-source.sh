@@ -100,14 +100,11 @@ require_fixed_string_count "$native_global_compiler" \
   '.gc_host_import(GcHostImport::CompileGlobalScript)' 1 'actual global-only native compiler consumer'
 require_fixed_string_count "$native_global_script" \
   'let unit = require_root_source_row(program, first)?;' 1 'exact source/kind/root witness admission'
-# Layout 21 introduced the typed native global-source contract; every later
-# layout keeps it. Pinning 21 itself went stale with the next ABI bump.
-require_regex_count crates/scriptw-aot-wasm/src/runtime_artifact.rs \
-  '^const LAYOUT_VERSION: u32 = [0-9]+;$' 1 'current runtime layout version'
-native_global_layout_version="$(sed -nE 's/^const LAYOUT_VERSION: u32 = ([0-9]+);$/\1/p' crates/scriptw-aot-wasm/src/runtime_artifact.rs | head -n 1)"
-if [ -z "$native_global_layout_version" ] || [ "$native_global_layout_version" -lt 21 ]; then
-  fail "crates/scriptw-aot-wasm/src/runtime_artifact.rs must keep a layout version of at least 21 (the typed native global-source runtime contract)"
-fi
+# Layout 21 introduced the typed native global-source contract. The pin is the
+# current layout on purpose: whoever bumps the runtime ABI must revisit these
+# native global-source rules and then update the number here.
+require_fixed_string_count crates/scriptw-aot-wasm/src/runtime_artifact.rs \
+  'const LAYOUT_VERSION: u32 = 82;' 1 'current typed native global-source runtime contract (layout 82)'
 for native_global_raw_test in \
   crates/scriptw-aot-wasm/src/runtime_artifact/cache/tests.rs \
   crates/scriptw-aot-wasm/src/runtime_artifact/build_package/tests.rs; do

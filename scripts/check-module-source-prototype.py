@@ -19,11 +19,11 @@ def check(root: Path, overrides=None):
     def compact(relative):
         return re.sub(r"\s+", "", re.sub(r"//[^\n]*", "", source(relative)))
     slots = compact(A + "functions.rs")
-    # The table grew past 159 entries (40ff4b4ba); slot 158 must stay inside it.
-    table_length = re.search(r"constTABLE_LENGTH:u32=(\d+);", slots)
+    # Pinned to the current table (179 entries since 40ff4b4ba): a resize must
+    # revisit slot 158's allocation and update this number.
     need("AbstractModuleSourcePrototype,ModuleSourcePrototype," in slots and
          "Self::ModuleSourcePrototype=>158," in slots and
-         table_length is not None and int(table_length.group(1)) > 158,
+         "constTABLE_LENGTH:u32=179;" in slots,
          "closed host prototype slot has its own allocated entry")
     indexes = re.findall(r"Self::\w+=>158,", slots)
     need(indexes == ["Self::ModuleSourcePrototype=>158,"], "host prototype slot has no intrinsic alias")
@@ -48,6 +48,13 @@ def check(root: Path, overrides=None):
             break
     need(init.count("NonArrayRealmIntrinsicSlot::ModuleSourcePrototype,") == 1,
          "one defining-Realm bootstrap owner publishes the host prototype")
+    # The eager layout row is the accessor install the header allocation replaced.
+    eager = compact(A + "intrinsics/property_layouts/eager.rs")
+    need(eager.count("Layout::AbstractModuleSourcePrototype=>{plan.constructor(Slot::AbstractModuleSourceConstructor)?;"
+                     "getter(plan,IntrinsicKey::Symbol(WellKnownSymbol::ToStringTag),"
+                     "Builtin::AbstractModuleSourcePrototypeToStringTagGetter,)?;}") == 1 and
+         eager.count("Slot::AbstractModuleSourcePrototype=>Some(Layout::AbstractModuleSourcePrototype),") == 1,
+         "abstract prototype layout carries its constructor row and @@toStringTag getter")
     cell = compact(A + "modules/source.rs")
     need(".field(ModuleRecordSchema::REALM)" in cell and
          "self.emit_load_non_array_realm_intrinsic(&realm,NonArrayRealmIntrinsicSlot::ModuleSourcePrototype,&prototype,function,);" in cell and
