@@ -155,9 +155,20 @@ fn a_cli_precompiled_image_runs_through_the_embedding_precompiled_path() {
     .expect("fixture source should be written");
     let image = directory.0.join("app.swep");
     let mut published = None;
-    // A second run replaces the first image atomically.
-    for _ in 0..2 {
-        let output = Command::new(env!("CARGO_BIN_EXE_scriptw"))
+    // A second run replaces the first image atomically, under umask 077: the
+    // image it publishes must not be readable by anyone else.
+    for restrictive_umask in [false, true] {
+        let mut command = if restrictive_umask {
+            let mut command = Command::new("sh");
+            command
+                .arg("-c")
+                .arg("umask 077 && exec \"$0\" \"$@\"")
+                .arg(env!("CARGO_BIN_EXE_scriptw"));
+            command
+        } else {
+            Command::new(env!("CARGO_BIN_EXE_scriptw"))
+        };
+        let output = command
             .args(["--jobs", "1", "precompile", "--policy", "fast"])
             .arg(&source)
             .arg("-o")
@@ -181,7 +192,8 @@ fn a_cli_precompiled_image_runs_through_the_embedding_precompiled_path() {
     #[cfg(unix)]
     assert_eq!(
         std::os::unix::fs::PermissionsExt::mode(&permissions) & 0o777,
-        0o444
+        0o400,
+        "read-only, and only as readable as umask 077 allows"
     );
     let mut names: Vec<_> = fs::read_dir(&directory.0)
         .unwrap()

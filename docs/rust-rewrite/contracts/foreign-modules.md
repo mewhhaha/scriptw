@@ -93,8 +93,10 @@ scriptw [--jobs N] precompile [--policy speed|fast] [--module] app.mjs -o app.sw
 It compiles the JavaScript to Portable Wasm and calls `EmbeddedRuntime::precompile`
 on an Engine from `configure_wasm_runtime` (default policy `speed`; `.mjs` or
 `--module` selects the module goal, as for `run`). It writes a synced temporary
-sibling with mode 0444 and renames it over the output, so a reader sees the old
-or the complete new image, never a partial one. The server reads the file, calls
+sibling (named with the process id and a random suffix, so one a killed run
+left never blocks a later run) without write bits, as readable as the umask
+allows (0444 under umask 022, 0400 under 077), and renames it over the output,
+so a reader sees the old or the complete new image, never a partial one. The server reads the file, calls
 the unsafe `PrecompiledEmbeddedProgram::from_bytes`, configures its Engine with
 `configure_precompiled_wasm_runtime` and calls `EmbeddedRuntime::from_precompiled`;
 it needs no JavaScript or Wasm compiler. An image loads only under the same
@@ -103,7 +105,9 @@ fingerprint and the Wasmtime configuration must match, and the server's CPU must
 support every CPU feature the producing host enabled (produce on the deployment
 CPU type). Minimal Intl is required. Loading stays `unsafe`: the SHA-256 and
 framing checks detect damage, not tampering, so let only the deployment principal
-write the image and the server principal only read it.
+write the image and the server principal only read it. The file mode does not
+stop replacement: renaming over the image needs only write access to its
+directory, so the directory, not the mode, is the trust boundary.
 
 On the RSC bundle (`rsc_baseline`, two CPUs, medians of three), loading a Speed
 image and serving the first request took 0.142 s and peaked at 45 MiB, against

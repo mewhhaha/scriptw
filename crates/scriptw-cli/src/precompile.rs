@@ -136,6 +136,11 @@ pub(super) fn command(
 
 /// Write a synced read-only sibling, then rename it over `path`: a reader sees
 /// either the previous image or the complete new one, never a partial file.
+///
+/// The image's mode is the creation mode the umask allows, without write
+/// bits (0444 under the usual umask 022, 0400 under 077). The mode does not
+/// protect the image from replacement: rename needs only write access to the
+/// directory, so the directory is the trust boundary.
 fn publish(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let name = path
         .file_name()
@@ -144,32 +149,19 @@ fn publish(path: &Path, bytes: &[u8]) -> Result<(), String> {
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
-    let mut temporary_name = std::ffi::OsString::from(".");
-    temporary_name.push(name);
-    temporary_name.push(format!(".scriptw-precompile-{}.tmp", std::process::id()));
-    let temporary = parent.join(temporary_name);
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o444);
-    let mut file = options.open(&temporary).map_err(|error| {
-        format!(
-            "cannot create precompiled image transaction {}: {error}",
-            temporary.display()
-        )
-    })?;
+    let (temporary, mut file) = create_transaction(parent, name)?;
     let result: Result<(), String> = (|| {
         file.write_all(bytes)
             .and_then(|()| file.sync_all())
             .map_err(|error| format!("cannot write {}: {error}", temporary.display()))?;
-        // The mode is also set explicitly: creation masks it with the umask.
+        // Creation already masked 0444 with the umask; this clears the
+        // write bits where creation could not (and on other platforms),
+        // never adding a read bit the umask removed.
         let mut permissions = file
             .metadata()
             .map_err(|error| format!("cannot inspect {}: {error}", temporary.display()))?
             .permissions();
         permissions.set_readonly(true);
-        #[cfg(unix)]
-        std::os::unix::fs::PermissionsExt::set_mode(&mut permissions, 0o444);
         file.set_permissions(permissions)
             .map_err(|error| format!("cannot make {} read-only: {error}", temporary.display()))?;
         drop(file);
@@ -191,6 +183,45 @@ fn publish(path: &Path, bytes: &[u8]) -> Result<(), String> {
             format!("precompiled image was published but directory sync failed: {error}")
         })?;
     Ok(())
+}
+
+/// Creates a new transaction file next to the image. Its name carries the
+/// process id and a random suffix, so a file a killed run left behind (whose
+/// process id a later run may have again) never blocks publication.
+fn create_transaction(
+    parent: &Path,
+    name: &std::ffi::OsStr,
+) -> Result<(std::path::PathBuf, fs::File), String> {
+    use std::hash::{BuildHasher, Hasher};
+    let mut attempts = 0;
+    loop {
+        let random = std::collections::hash_map::RandomState::new()
+            .build_hasher()
+            .finish();
+        let mut temporary_name = std::ffi::OsString::from(".");
+        temporary_name.push(name);
+        temporary_name.push(format!(
+            ".scriptw-precompile-{}-{random:016x}.tmp",
+            std::process::id()
+        ));
+        let temporary = parent.join(temporary_name);
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o444);
+        match options.open(&temporary) {
+            Ok(file) => return Ok((temporary, file)),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists && attempts < 8 => {
+                attempts += 1;
+            }
+            Err(error) => {
+                return Err(format!(
+                    "cannot create precompiled image transaction {}: {error}",
+                    temporary.display()
+                ))
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -258,11 +289,19 @@ mod tests {
         assert_eq!(fs::read(&image).unwrap(), b"second");
         let permissions = fs::metadata(&image).unwrap().permissions();
         assert!(permissions.readonly());
-        #[cfg(unix)]
-        assert_eq!(
-            std::os::unix::fs::PermissionsExt::mode(&permissions) & 0o777,
-            0o444
-        );
+        #[cfg(target_os = "linux")]
+        {
+            let umask = fs::read_to_string("/proc/self/status")
+                .unwrap()
+                .lines()
+                .find_map(|line| line.strip_prefix("Umask:"))
+                .map(|mask| u32::from_str_radix(mask.trim(), 8).unwrap())
+                .unwrap();
+            assert_eq!(
+                std::os::unix::fs::PermissionsExt::mode(&permissions) & 0o777,
+                0o444 & !umask
+            );
+        }
         assert_eq!(fs::read_dir(&directory).unwrap().count(), 1);
         fs::remove_dir_all(&directory).unwrap();
     }
