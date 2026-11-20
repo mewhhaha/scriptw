@@ -3589,6 +3589,26 @@ where
     }
 }
 
+/// The longest String the implementation creates, derived from the heap a
+/// product Store has. ECMA-262 allows 2^53 - 1 code units and V8 2^29 - 24,
+/// but a Store's GC heap is capped at 1 GiB (`WASM_STORE_MEMORY_CAP_BYTES`,
+/// the pooled heap size and the embedding's `StoreLimits`) and its copying
+/// collector keeps half of it as the idle semi-space, so at most 512 MiB is
+/// live. A String is a flat `CodeUnitArray` of two bytes per unit, and
+/// building one by concatenation keeps its operands (as many units again)
+/// live beside it: four bytes per result unit. Measured on the product CLI
+/// (2026-11-20), two distinct halves concatenate into at most 129.8 million
+/// units, 495 MiB live, so the runtime's own live data is about 17 MiB; with
+/// 24 MiB reserved the bound is (512 - 24) MiB / 4 = 2^27 - 6 * 2^20 code
+/// units. Past it an operation throws a catchable RangeError before
+/// allocating, where the allocation itself would trap; V8's length cannot be
+/// allocated in this heap at all. A String within the limit can still
+/// exhaust a heap that other live values fill (or that earlier growth
+/// fragmented), which traps as a Store resource limit.
+pub(crate) const MAX_STRING_LENGTH: i64 = STRING_LIVE_HEAP_BYTES / 4;
+/// The live semi-space of the 1 GiB Store heap, less the runtime's reserve.
+const STRING_LIVE_HEAP_BYTES: i64 = (512 << 20) - (24 << 20);
+
 /// Code-unit copies at or below this length run element by element. A bulk
 /// `array.copy` of a dynamic length is a host `memmove` call whose fixed
 /// transition cost exceeds a short inline loop.

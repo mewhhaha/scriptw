@@ -307,6 +307,18 @@ accepts `--case <file.js>`.
   and the embedder owns the Store's limiter, so closing it needs either
   Scriptw-owned limiting in the embedding API or a vendored heap maximum.
   Owner: embedding API.
+- The String length limit (`MAX_STRING_LENGTH`, [implementation
+  limits](runtime-requirements.md#implementation-limits)) is checked by
+  `repeat`, `padStart`/`padEnd`, `+` and template literals, `concat`,
+  `Array.prototype.join`, the replacement builders and RegExp `source`. The
+  other builders still grow without it: JSON.stringify's output accumulator
+  (whose growth path has no completion to throw into), case mapping,
+  `normalize`, the URI and `escape` encoders, `String.raw`, Intl formatting
+  and the internal concatenations of names and messages. A result past the
+  limit there traps on heap exhaustion instead of throwing. Fix: give the
+  accumulator's `reserve` an overflow exit that the serializer routes to a
+  RangeError, and route each remaining builder's final length through the
+  same check. Owner: string built-ins.
 - Native compilation of one large Wasm function is superlinear in time and
   memory, so large single bodies and deep nesting stay costly though they no
   longer overflow a stack (measured 2026-11-20 with the product CLI, one
@@ -335,6 +347,12 @@ accepts `--case <file.js>`.
   allocator's superlinear step, and remove the per-level duplication behind
   class heritage and object literal emission. Owner: AOT codegen and native
   compilation.
+- BigInt multiplication, division and radix conversion are quadratic
+  (schoolbook digits; conversion divides by the largest radix power per
+  pass). Values near `MAX_BIGINT_BITS` are bounded but slow: squaring a
+  2^26-bit value takes hours. V8 uses Karatsuba/Toom/FFT and
+  divide-and-conquer conversion. Owner: BigInt arithmetic (performance, not
+  correctness).
 - Smaller runtime review items left open, each with its reason: an
   embedder's own `Module::new` on a parallel Engine still compiles on Rayon's
   global pool (Scriptw cannot route it; foreign-modules.md says so);

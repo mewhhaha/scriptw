@@ -498,6 +498,26 @@ impl FunctionBuilder<'_> {
             let part = s
                 .reserve_gc_local(f)
                 .initialize(pending.value().cast_reference::<StringValue>(s, f), f);
+            // R + nextString past `MAX_STRING_LENGTH` is a RangeError before
+            // a later argument's ToString runs, as in the batched path.
+            let total = s.reserve_i64_local(f);
+            let length = s.reserve_i64_local(f);
+            b.emit_native_gc_string_length(&current, total, f);
+            b.emit_native_gc_string_length(&part, length, f);
+            total.load(f);
+            length.load(f);
+            f.instruction(&Instruction::I64Add);
+            f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
+            f.instruction(&Instruction::I64GtU);
+            s.release_i64_local(length, f);
+            s.release_i64_local(total, f);
+            b.emit_native_string_error_if(
+                RuntimeErrorMessage::STRING_LENGTH_EXCEEDS_IMPLEMENTATION_LIMIT,
+                NativeErrorKind::RangeError,
+                output,
+                exit,
+                f,
+            )?;
             current.replace(b.emit_concat_gc_strings(&current, &part, f), f);
             part.clear(f);
             index.load(f);
@@ -818,12 +838,12 @@ impl FunctionBuilder<'_> {
             f.instruction(&Instruction::I32Eqz);
             b.open_frame(ControlFrameKind::If, f);
             count.load(f);
-            f.instruction(&Instruction::I64Const(u32::MAX as i64));
+            f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
             length.load(f);
             f.instruction(&Instruction::I64DivU);
             f.instruction(&Instruction::I64GtU);
             b.emit_native_string_error_if(
-                RuntimeErrorMessage::REPEAT_RESULT_WOULD_EXCEED_MAXIMUM_STRING_LENGTH,
+                RuntimeErrorMessage::STRING_LENGTH_EXCEEDS_IMPLEMENTATION_LIMIT,
                 NativeErrorKind::RangeError,
                 output,
                 exit,
@@ -935,10 +955,10 @@ impl FunctionBuilder<'_> {
             b.emit_branch_if_to_target(exit, f);
             // The empty filler returns before enforcing the engine's GC extent.
             target.load(f);
-            f.instruction(&Instruction::I64Const(u32::MAX as i64));
+            f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
             f.instruction(&Instruction::I64GtU);
             b.emit_native_string_error_if(
-                RuntimeErrorMessage::REPEAT_RESULT_WOULD_EXCEED_MAXIMUM_STRING_LENGTH,
+                RuntimeErrorMessage::STRING_LENGTH_EXCEEDS_IMPLEMENTATION_LIMIT,
                 NativeErrorKind::RangeError,
                 output,
                 exit,

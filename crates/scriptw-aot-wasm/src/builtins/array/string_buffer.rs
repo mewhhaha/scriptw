@@ -26,6 +26,34 @@ impl ArrayStringBuffer {
         }
     }
 
+    /// Leaves 1 when appending `part` would make the result longer than
+    /// `MAX_STRING_LENGTH`; the caller throws the RangeError before
+    /// appending, ahead of any later observable element read.
+    pub(super) fn append_exceeds_limit_i32(
+        &self,
+        part: &GcLocal<StringValue>,
+        schema: &RuntimeSchema,
+        f: &mut Function,
+    ) {
+        let units = schema.reserve_gc_local(f).initialize(
+            schema
+                .field(StringValueSchema::CODE_UNITS)
+                .read(part, schema, f)
+                .reference(),
+            f,
+        );
+        self.length.load(f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        schema
+            .array_type::<crate::gc_types::CodeUnitArray>()
+            .length(&units, schema, f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        f.instruction(&Instruction::I64Add);
+        f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
+        f.instruction(&Instruction::I64GtU);
+        units.clear(f);
+    }
+
     pub(super) fn append(
         &self,
         part: &GcLocal<StringValue>,
@@ -53,8 +81,7 @@ impl ArrayStringBuffer {
         self.length.load(f);
         f.instruction(&Instruction::I32LtU);
         f.instruction(&Instruction::If(BlockType::Empty));
-        // Identical unsigned-length resource boundary to pairwise concat,
-        // reached before any later observable element read or conversion.
+        // Unreachable: callers check `append_exceeds_limit_i32` first.
         f.instruction(&Instruction::Unreachable);
         f.instruction(&Instruction::End);
         required.load(f);
@@ -85,6 +112,19 @@ impl ArrayStringBuffer {
         f.instruction(&Instruction::I32LtU);
         f.instruction(&Instruction::If(BlockType::Empty));
         required.load(f);
+        grown.store(f);
+        f.instruction(&Instruction::End);
+        // Never reserve past the longest String a join may produce: the
+        // caller checked `required` against it, and a doubled backing above
+        // it could exhaust the heap a result within the limit fits.
+        grown.load(f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
+        f.instruction(&Instruction::I64GtU);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        f.instruction(&Instruction::I32Const(
+            i32::try_from(crate::gc_types::MAX_STRING_LENGTH).expect("the String limit is an i32"),
+        ));
         grown.store(f);
         f.instruction(&Instruction::End);
         self.construction.grow(grown, self.length, schema, f);

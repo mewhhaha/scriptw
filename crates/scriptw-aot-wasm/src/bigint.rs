@@ -20,11 +20,20 @@ pub(crate) const BIGINT_DIVISION_BY_ZERO_MESSAGE: RuntimeErrorMessage =
     RuntimeErrorMessage::BIGINT_DIVISION_BY_ZERO;
 pub(crate) const BIGINT_EXPONENT_MESSAGE: RuntimeErrorMessage =
     RuntimeErrorMessage::BIGINT_EXPONENT_MUST_BE_NON_NEGATIVE;
-pub(crate) const BIGINT_SHIFT_RESOURCE_MESSAGE: RuntimeErrorMessage =
-    RuntimeErrorMessage::BIGINT_SHIFT_RESULT_EXCEEDS_THE_ENGINE_RESOURCE_LIMIT;
+pub(crate) const BIGINT_SIZE_LIMIT_MESSAGE: RuntimeErrorMessage =
+    RuntimeErrorMessage::BIGINT_SIZE_EXCEEDS_IMPLEMENTATION_LIMIT;
 const DIGIT_MASK: i64 = 0xffff_ffff;
-// Array indices are i32. Length checks occur before a narrowing conversion.
-const MAX_BIGINT_DIGITS: i64 = i32::MAX as i64 - 1;
+/// The implementation limit on BigInt magnitudes, derived from the String
+/// limit: ToString of a BigInt cannot throw (ECMA-262 BigInt::toString), and
+/// its longest form is radix 2, one character per bit plus a sign, so a
+/// magnitude may have at most `MAX_STRING_LENGTH - 1` bits (about 2^27, where
+/// V8 allows 2^30). An operation whose result needs more storage throws a
+/// RangeError before allocating. Multiplication and radix conversion are
+/// quadratic, so values near the limit are slow but bounded.
+pub(crate) const MAX_BIGINT_BITS: i64 = crate::gc_types::MAX_STRING_LENGTH - 1;
+/// Working digits are base 2^32; every allocation checks this before the
+/// narrowing to an i32 array length.
+const MAX_BIGINT_DIGITS: i64 = MAX_BIGINT_BITS / 32;
 
 impl FunctionBuilder<'_> {
     pub(crate) fn emit_number_to_bigint_locals(
@@ -186,7 +195,7 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I64Const(MAX_BIGINT_DIGITS));
         function.instruction(&Instruction::I64GtU);
         self.open_frame(ControlFrameKind::If, function);
-        self.emit_bigint_error(BIGINT_SHIFT_RESOURCE_MESSAGE, function)?;
+        self.emit_bigint_error(BIGINT_SIZE_LIMIT_MESSAGE, function)?;
         self.emit_branch_to_target(exit, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
@@ -1343,7 +1352,7 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I64Const(2));
         function.instruction(&Instruction::I64GtU);
         function.instruction(&Instruction::If(BlockType::Empty));
-        self.emit_bigint_error(BIGINT_SHIFT_RESOURCE_MESSAGE, function)?;
+        self.emit_bigint_error(BIGINT_SIZE_LIMIT_MESSAGE, function)?;
         function.instruction(&Instruction::Else);
 
         function.instruction(&Instruction::I64Const(0));
@@ -1371,7 +1380,7 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I64Const(MAX_BIGINT_DIGITS));
         function.instruction(&Instruction::I64GtU);
         function.instruction(&Instruction::If(BlockType::Empty));
-        self.emit_bigint_error(BIGINT_SHIFT_RESOURCE_MESSAGE, function)?;
+        self.emit_bigint_error(BIGINT_SIZE_LIMIT_MESSAGE, function)?;
         function.instruction(&Instruction::Else);
 
         lhs_len.load(function);
@@ -1384,7 +1393,7 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I64Const(MAX_BIGINT_DIGITS));
         function.instruction(&Instruction::I64GtU);
         function.instruction(&Instruction::If(BlockType::Empty));
-        self.emit_bigint_error(BIGINT_SHIFT_RESOURCE_MESSAGE, function)?;
+        self.emit_bigint_error(BIGINT_SIZE_LIMIT_MESSAGE, function)?;
         function.instruction(&Instruction::Else);
 
         self.emit_bigint_digits_alloc(res_len, &res_ptr, exit, function)?;
@@ -2093,6 +2102,83 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
+    /// Leaves 1 when |base| >= 2 and |base|^exponent has more than
+    /// `MAX_BIGINT_BITS` bits by the lower bound 2^max(e, (b - 1) e).
+    fn emit_bigint_power_exceeds_limit_i32(
+        &mut self,
+        lhs_ptr: &BigIntConstruction,
+        lhs_len: I64Local,
+        rhs_ptr: &BigIntConstruction,
+        rhs_len: I64Local,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        let index = schema.reserve_i64_local(function);
+        let digit = schema.reserve_i64_local(function);
+        let factor = schema.reserve_i64_local(function);
+        let exponent = schema.reserve_i64_local(function);
+        let exceeds = schema.reserve_i32_local(function);
+        function.instruction(&Instruction::I32Const(0));
+        exceeds.store(function);
+        function.instruction(&Instruction::I64Const(0));
+        index.store(function);
+        self.emit_bigint_digit_load_or_zero(lhs_ptr, lhs_len, index, digit, function);
+        lhs_len.load(function);
+        function.instruction(&Instruction::I64Const(1));
+        function.instruction(&Instruction::I64GtU);
+        digit.load(function);
+        function.instruction(&Instruction::I64Const(1));
+        function.instruction(&Instruction::I64GtU);
+        function.instruction(&Instruction::I32Or);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        // factor = max(1, b - 1) for the base's bit length b.
+        lhs_len.load(function);
+        function.instruction(&Instruction::I64Const(1));
+        function.instruction(&Instruction::I64Sub);
+        index.store(function);
+        self.emit_bigint_digit_load(lhs_ptr, index, digit, function);
+        index.load(function);
+        function.instruction(&Instruction::I64Const(32));
+        function.instruction(&Instruction::I64Mul);
+        function.instruction(&Instruction::I64Const(63));
+        digit.load(function);
+        function.instruction(&Instruction::I64Clz);
+        function.instruction(&Instruction::I64Sub);
+        function.instruction(&Instruction::I64Add);
+        factor.store(function);
+        factor.load(function);
+        function.instruction(&Instruction::I64Eqz);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        function.instruction(&Instruction::I64Const(1));
+        factor.store(function);
+        function.instruction(&Instruction::End);
+        // An exponent of more than one digit is at least 2^32.
+        function.instruction(&Instruction::I64Const(MAX_BIGINT_BITS));
+        exponent.store(function);
+        rhs_len.load(function);
+        function.instruction(&Instruction::I64Const(1));
+        function.instruction(&Instruction::I64LeU);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        function.instruction(&Instruction::I64Const(0));
+        index.store(function);
+        self.emit_bigint_digit_load_or_zero(rhs_ptr, rhs_len, index, exponent, function);
+        function.instruction(&Instruction::End);
+        // factor <= 2^26 and exponent < 2^32: the product fits.
+        factor.load(function);
+        exponent.load(function);
+        function.instruction(&Instruction::I64Mul);
+        function.instruction(&Instruction::I64Const(MAX_BIGINT_BITS));
+        function.instruction(&Instruction::I64GeU);
+        exceeds.store(function);
+        function.instruction(&Instruction::End);
+        exceeds.load(function);
+        schema.release_i32_local(exceeds, function);
+        schema.release_i64_local(exponent, function);
+        schema.release_i64_local(factor, function);
+        schema.release_i64_local(digit, function);
+        schema.release_i64_local(index, function);
+    }
+
     fn emit_bigint_pow(
         &mut self,
         lhs_sign: I64Local,
@@ -2153,6 +2239,14 @@ impl FunctionBuilder<'_> {
         bits.store(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
+        // |base| >= 2 makes |base|^e at least 2^max(e, (b - 1) e) for a base
+        // of b bits. When that alone exceeds the size limit the result
+        // certainly does, so throw before any squaring rather than square
+        // toward it for hours; 0, 1 and -1 stay exact for every exponent.
+        self.emit_bigint_power_exceeds_limit_i32(lhs_ptr, lhs_len, rhs_ptr, rhs_len, function);
+        self.open_frame(ControlFrameKind::If, function);
+        self.emit_bigint_error(BIGINT_SIZE_LIMIT_MESSAGE, function)?;
+        function.instruction(&Instruction::Else);
         function.instruction(&Instruction::I64Const(1));
         res_len.store(function);
         function.instruction(&Instruction::I64Const(1));
@@ -2245,6 +2339,8 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::End);
         function.instruction(&Instruction::End);
         res_sign.store(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         schema.release_i64_local(odd, function);

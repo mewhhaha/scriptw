@@ -98,10 +98,10 @@ impl FunctionBuilder<'_> {
         cursor.changed.load(function);
         self.open_frame(ControlFrameKind::If, function);
         cursor.output_length.load(function);
-        function.instruction(&Instruction::I64Const(i64::from(u32::MAX)));
+        function.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
         function.instruction(&Instruction::I64GtU);
         self.emit_native_string_error_if(
-            RuntimeErrorMessage::REGEXP_SOURCE_WOULD_EXCEED_MAXIMUM_STRING_LENGTH,
+            RuntimeErrorMessage::STRING_LENGTH_EXCEEDS_IMPLEMENTATION_LIMIT,
             NativeErrorKind::RangeError,
             completion,
             exit,

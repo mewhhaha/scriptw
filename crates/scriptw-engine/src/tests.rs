@@ -83,6 +83,10 @@ fn product_wasmtime_profiles_require_copying_weak_capability() {
         assert_eq!(engine.get_async_stack_size(), ENGINE_WORKER_STACK_SIZE);
         assert!(engine.get_max_wasm_stack() < engine.get_async_stack_size());
         assert_eq!(engine.get_collector(), Some(wasmtime::Collector::Copying));
+        // scriptw-aot-wasm derives `MAX_STRING_LENGTH`, and from it
+        // `MAX_BIGINT_BITS`, from this 1 GiB cap under the copying collector
+        // (a 512 MiB live semi-space); a change must revisit both limits.
+        assert_eq!(crate::WASM_STORE_MEMORY_CAP_BYTES, 1 << 30);
         assert!(engine.get_wasm_features().threads());
         assert!(engine.get_shared_memory());
         let memory = WasmtimeSharedMemory::new(&engine, wasmtime::MemoryType::shared(1, 1))

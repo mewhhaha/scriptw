@@ -36,6 +36,7 @@ mod aot_function_coercion;
 mod aot_function_names;
 mod aot_has_instance_local_arguments;
 mod aot_has_property_helper;
+mod aot_implementation_limits;
 mod aot_indexed_collection_invocation;
 mod aot_instanceof_abrupt_completion;
 mod aot_internal_definition;

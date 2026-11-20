@@ -4632,7 +4632,9 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     /// Repeated division works on a private construction buffer. Published
-    /// BigInt limbs stay immutable, unsigned, and canonical throughout.
+    /// BigInt limbs stay immutable, unsigned, and canonical throughout. Each
+    /// division takes one chunk of several digits (nine for radix 10), so a
+    /// conversion is about nine times cheaper than one division per digit.
     fn emit_gc_bigint_radix_string(
         &mut self,
         bigint: &GcLocal<BigIntValue>,
@@ -4661,6 +4663,10 @@ impl<'a> FunctionBuilder<'a> {
         let limb = schema.reserve_i64_local(function);
         let remainder = schema.reserve_i64_local(function);
         let unit = schema.reserve_i32_local(function);
+        let chunk = schema.reserve_i64_local(function);
+        let chunk_digits = schema.reserve_i64_local(function);
+        let written = schema.reserve_i64_local(function);
+        let digit = schema.reserve_i64_local(function);
         schema
             .array_type::<BigIntLimbArray>()
             .length(&limbs, schema, function);
@@ -4689,6 +4695,33 @@ impl<'a> FunctionBuilder<'a> {
             function,
         );
         self.emit_copy_bigint_formatting_limbs(&limbs, &work, size, index, limb, function);
+        // chunk = radix^chunk_digits, the largest power of the radix that is
+        // at most 2^32, so one division of the working limbs by `chunk`
+        // yields `chunk_digits` digits: a conversion costs about
+        // digits / chunk_digits passes over the limbs, not one per digit.
+        radix.load(function);
+        chunk.store(function);
+        function.instruction(&Instruction::I64Const(1));
+        chunk_digits.store(function);
+        function.instruction(&Instruction::Block(BlockType::Empty));
+        function.instruction(&Instruction::Loop(BlockType::Empty));
+        chunk.load(function);
+        radix.load(function);
+        function.instruction(&Instruction::I64Mul);
+        function.instruction(&Instruction::I64Const(1 << 32));
+        function.instruction(&Instruction::I64GtU);
+        function.instruction(&Instruction::BrIf(1));
+        chunk.load(function);
+        radix.load(function);
+        function.instruction(&Instruction::I64Mul);
+        chunk.store(function);
+        chunk_digits.load(function);
+        function.instruction(&Instruction::I64Const(1));
+        function.instruction(&Instruction::I64Add);
+        chunk_digits.store(function);
+        function.instruction(&Instruction::Br(0));
+        function.instruction(&Instruction::End);
+        function.instruction(&Instruction::End);
         size.load(function);
         active.store(function);
         function.instruction(&Instruction::I64Const(0));
@@ -4698,11 +4731,33 @@ impl<'a> FunctionBuilder<'a> {
         active.load(function);
         function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::BrIf(1));
-        self.emit_bigint_formatting_division(&work, radix, active, remainder, function);
+        self.emit_bigint_formatting_division(&work, chunk, active, remainder, function);
+        active.load(function);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        // A lower chunk: all of its digits, leading zeros included.
+        digits.load(function);
+        chunk_digits.load(function);
+        function.instruction(&Instruction::I64Add);
+        digits.store(function);
+        function.instruction(&Instruction::Else);
+        // The most significant chunk, non-zero: only its own digits.
+        function.instruction(&Instruction::Block(BlockType::Empty));
+        function.instruction(&Instruction::Loop(BlockType::Empty));
         digits.load(function);
         function.instruction(&Instruction::I64Const(1));
         function.instruction(&Instruction::I64Add);
         digits.store(function);
+        remainder.load(function);
+        radix.load(function);
+        function.instruction(&Instruction::I64DivU);
+        remainder.store(function);
+        remainder.load(function);
+        function.instruction(&Instruction::I64Eqz);
+        function.instruction(&Instruction::BrIf(1));
+        function.instruction(&Instruction::Br(0));
+        function.instruction(&Instruction::End);
+        function.instruction(&Instruction::End);
+        function.instruction(&Instruction::End);
         function.instruction(&Instruction::Br(0));
         function.instruction(&Instruction::End);
         function.instruction(&Instruction::End);
@@ -4711,8 +4766,10 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I64ExtendI32U);
         function.instruction(&Instruction::I64Add);
         digits.store(function);
+        // Unreachable: `MAX_BIGINT_BITS` keeps every radix form, radix 2
+        // with its sign included, within the String limit.
         digits.load(function);
-        function.instruction(&Instruction::I64Const(i64::from(u32::MAX)));
+        function.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
         function.instruction(&Instruction::I64GtU);
         function.instruction(&Instruction::If(BlockType::Empty));
         function.instruction(&Instruction::Unreachable);
@@ -4736,27 +4793,58 @@ impl<'a> FunctionBuilder<'a> {
         active.load(function);
         function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::BrIf(1));
-        self.emit_bigint_formatting_division(&work, radix, active, remainder, function);
+        self.emit_bigint_formatting_division(&work, chunk, active, remainder, function);
+        // A lower chunk writes exactly `chunk_digits` digits; the most
+        // significant one stops after its last non-zero digit.
+        chunk_digits.load(function);
+        written.store(function);
+        function.instruction(&Instruction::Block(BlockType::Empty));
+        function.instruction(&Instruction::Loop(BlockType::Empty));
         index.load(function);
         function.instruction(&Instruction::I32Const(1));
         function.instruction(&Instruction::I32Sub);
         index.store(function);
         remainder.load(function);
+        radix.load(function);
+        function.instruction(&Instruction::I64RemU);
+        digit.store(function);
+        digit.load(function);
         function.instruction(&Instruction::I64Const(10));
         function.instruction(&Instruction::I64LtU);
         function.instruction(&Instruction::If(BlockType::Result(ValType::I32)));
-        remainder.load(function);
+        digit.load(function);
         function.instruction(&Instruction::I32WrapI64);
         function.instruction(&Instruction::I32Const(i32::from(b'0')));
         function.instruction(&Instruction::I32Add);
         function.instruction(&Instruction::Else);
-        remainder.load(function);
+        digit.load(function);
         function.instruction(&Instruction::I32WrapI64);
         function.instruction(&Instruction::I32Const(i32::from(b'a') - 10));
         function.instruction(&Instruction::I32Add);
         function.instruction(&Instruction::End);
         unit.store(function);
         string.write(index, unit, schema, function);
+        remainder.load(function);
+        radix.load(function);
+        function.instruction(&Instruction::I64DivU);
+        remainder.store(function);
+        written.load(function);
+        function.instruction(&Instruction::I64Const(1));
+        function.instruction(&Instruction::I64Sub);
+        written.store(function);
+        active.load(function);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        written.load(function);
+        function.instruction(&Instruction::I64Eqz);
+        function.instruction(&Instruction::BrIf(2));
+        function.instruction(&Instruction::Else);
+        remainder.load(function);
+        function.instruction(&Instruction::I64Eqz);
+        function.instruction(&Instruction::BrIf(2));
+        function.instruction(&Instruction::End);
+        function.instruction(&Instruction::Br(0));
+        function.instruction(&Instruction::End);
+        function.instruction(&Instruction::End);
         function.instruction(&Instruction::Br(0));
         function.instruction(&Instruction::End);
         function.instruction(&Instruction::End);
@@ -4771,6 +4859,10 @@ impl<'a> FunctionBuilder<'a> {
         output.replace(string.publish(schema, function), function);
         work.clear(function);
         function.instruction(&Instruction::End);
+        schema.release_i64_local(digit, function);
+        schema.release_i64_local(written, function);
+        schema.release_i64_local(chunk_digits, function);
+        schema.release_i64_local(chunk, function);
         schema.release_i32_local(unit, function);
         schema.release_i64_local(remainder, function);
         schema.release_i64_local(limb, function);

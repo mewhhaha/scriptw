@@ -13180,9 +13180,19 @@ impl<'a> ScriptLowerer<'a> {
                     );
                 }
                 if let (ExprIr::BigInt(lhs), ExprIr::BigInt(rhs)) = (&lhs.expr, &rhs.expr) {
+                    // Fold only a small power. A large one is left to the
+                    // runtime, which applies the implementation's BigInt size
+                    // limit (a RangeError) instead of the compiler computing,
+                    // or embedding, a result of any size.
+                    const MAX_FOLDED_POWER_BITS: u64 = 1 << 16;
                     let rhs_value = rhs.to_bigint();
+                    let lhs_bits = lhs.to_bigint().bits();
                     if rhs_value.sign() != Sign::Minus {
-                        if let Some(exponent) = rhs_value.to_u32() {
+                        if let Some(exponent) = rhs_value.to_u32().filter(|exponent| {
+                            lhs_bits <= 1
+                                || lhs_bits.saturating_mul(u64::from(*exponent))
+                                    <= MAX_FOLDED_POWER_BITS
+                        }) {
                             return TypedExpr::from_info(
                                 ValueInfo::new(ValueKind::BigInt),
                                 ExprIr::BigInt(lhs.pow_u32(exponent)),

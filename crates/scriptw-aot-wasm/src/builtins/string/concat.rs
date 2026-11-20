@@ -60,15 +60,6 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Add);
         next_length.store(f);
         next_length.load(f);
-        total.load(f);
-        f.instruction(&Instruction::I32LtU);
-        self.open_frame(ControlFrameKind::If, f);
-        // Same unsigned-length overflow boundary as pairwise concatenation,
-        // before a subsequent argument's observable ToString may execute.
-        f.instruction(&Instruction::Unreachable);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        next_length.load(f);
         total.store(f);
         s.array_type::<PooledStringTable>().write(
             &parts,
@@ -79,6 +70,22 @@ impl FunctionBuilder<'_> {
         );
         units.clear(f);
         part.clear(f);
+        // R + nextString past the implementation's maximum String length is
+        // a RangeError (`MAX_STRING_LENGTH`), thrown before a later
+        // argument's observable ToString runs. Both lengths are at most
+        // 2^31 - 1 and the running total at most the limit, so the unsigned
+        // sum cannot wrap.
+        next_length.load(f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
+        f.instruction(&Instruction::I64GtU);
+        self.emit_native_string_error_if(
+            RuntimeErrorMessage::STRING_LENGTH_EXCEEDS_IMPLEMENTATION_LIMIT,
+            NativeErrorKind::RangeError,
+            output,
+            exit,
+            f,
+        )?;
         argument.set_undefined(f);
         index.load(f);
         f.instruction(&Instruction::I32Const(1));

@@ -294,11 +294,11 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I64ShrU);
         count.store(function);
         count.load(function);
-        function.instruction(&Instruction::I64Const(i32::MAX as i64));
+        function.instruction(&Instruction::I64Const(crate::bigint::MAX_BIGINT_BITS / 64));
         function.instruction(&Instruction::I64GtU);
         self.open_frame(ControlFrameKind::If, function);
         self.emit_throw_current_function_realm_range_error(
-            RuntimeErrorMessage::BIGINT_SHIFT_RESULT_EXCEEDS_THE_ENGINE_RESOURCE_LIMIT,
+            RuntimeErrorMessage::BIGINT_SIZE_EXCEEDS_IMPLEMENTATION_LIMIT,
             output,
             function,
         )?;

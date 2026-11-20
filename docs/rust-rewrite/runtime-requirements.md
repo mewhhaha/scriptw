@@ -85,8 +85,28 @@ layouts. ABIs 78 to 82 make the Error family with DOMException, twenty-six
 constructors and the ordinary global functions demand-built, and publish a new
 global object's bindings in one call
 ([contract](contracts/lazy-runtime-values.md)). ABI 83 adds the native
-recursion depth global that bounds helper recursion. `LAYOUT_VERSION` in `crates/scriptw-aot-wasm/src/runtime_artifact.rs`
-records each step.
+recursion depth global that bounds helper recursion (see
+[implementation limits](#implementation-limits)). `LAYOUT_VERSION` in
+`crates/scriptw-aot-wasm/src/runtime_artifact.rs` records each step.
+
+## Implementation limits
+
+ECMA-262 bounds none of these; each limit throws a catchable error where the
+alternative was a Wasm trap that ends the program, and each is derived from a
+real constraint of the product Store (a 1 GiB GC heap whose copying collector
+keeps half idle, so at most 512 MiB is live, and a 32 MiB Wasm stack):
+
+| Limit | Value | Error | Constraint |
+| --- | --- | --- | --- |
+| String length | 2^27 - 6 * 2^20 code units (127,926,272) | RangeError | A concatenation keeps its operands live beside its result, four bytes per result unit, in the 512 MiB live semi-space less 24 MiB for the runtime's own data (measured at about 17 MiB) (`MAX_STRING_LENGTH`). V8's 2^29 - 24 cannot be allocated in this heap. |
+| BigInt size | `MAX_STRING_LENGTH` - 1 bits | RangeError | ToString of a BigInt cannot throw; its radix-2 form, with a sign, must fit the String limit (`MAX_BIGINT_BITS`; V8: 2^30). A power whose lower bound exceeds it throws before computing. |
+| Bound function nesting | 4,096 levels | RangeError | Each level keeps its own `name`, so a chain's names grow quadratically; an unbounded chain trapped on heap exhaustion by 12,000 levels (measured before the limit). |
+| Nested helper recursion | 4,096 executing calls | RangeError | Proxy forwarding, JSON.stringify and helper-to-built-in calls recurse with the program's data; 20,000 such calls ran in the 32 MiB Wasm stack, so 4,096 stay under a quarter of it. |
+| Source nesting | 1,000 levels | SyntaxError | The parser and the compiler phases recurse per level on the 64 MiB compiler stack. |
+
+Source recursion has its own bound (`MAX_ACTIVE_SOURCE_BODIES`). A value
+within these limits can still exhaust a heap that other live values fill;
+that is a Store resource trap.
 
 ## Dynamic source: eval and Function constructors
 

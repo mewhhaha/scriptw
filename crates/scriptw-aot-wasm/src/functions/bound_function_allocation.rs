@@ -5,6 +5,16 @@ use crate::gc_types::{
     StringValue, ValueArray, ValueLocals,
 };
 
+/// The deepest chain of directly nested bound functions `bind` creates.
+/// ECMA-262 has no bound and a bound call walks its chain in a loop, so only
+/// memory constrains it: every level keeps its own `name`, "bound " longer
+/// than its target's, so n levels hold about 3n^2 code units (6n^2 bytes).
+/// Without a bound, a chain trapped on GC heap exhaustion by 12,000 levels
+/// (measured with the product CLI before this limit). 4,096 levels keep a
+/// chain's names under 100 MiB, a fifth of the 512 MiB live semi-space;
+/// binding the head of a longer chain throws a RangeError instead.
+const MAX_BOUND_FUNCTION_NESTING: i32 = 4096;
+
 impl FunctionBuilder<'_> {
     /// The native bind entry captures argument zero without this adaptation.
     /// The BoundFunction is an exotic record with no independent Realm slot.
@@ -32,6 +42,23 @@ impl FunctionBuilder<'_> {
         self.emit_throw_runtime_error(
             NativeErrorKind::TypeError,
             RuntimeErrorMessage::FUNCTION_PROTOTYPE_BIND_RECEIVER_IS_NOT_CALLABLE,
+            result,
+            function,
+        )?;
+        self.emit_branch_to_target(exit, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+
+        // Implementation limit, before any observable step: each bound level
+        // holds its own `name` ("bound " repeated per level, so the chain's
+        // names take quadratic heap) and calls its target one helper frame
+        // deeper. Beyond the bound the chain would exhaust the GC heap or the
+        // stack and trap; a RangeError stays catchable.
+        self.emit_bound_nesting_at_limit_i32(target, function);
+        self.open_frame(ControlFrameKind::If, function);
+        self.emit_throw_runtime_error(
+            NativeErrorKind::RangeError,
+            RuntimeErrorMessage::BOUND_FUNCTION_NESTING_EXCEEDS_IMPLEMENTATION_LIMIT,
             result,
             function,
         )?;
@@ -103,6 +130,64 @@ impl FunctionBuilder<'_> {
         bound_this.clear(function);
         pending.clear(function);
         Ok(())
+    }
+
+    /// Leaves 1 when `target` is the head of `MAX_BOUND_FUNCTION_NESTING`
+    /// directly nested bound functions, so binding it would exceed the
+    /// limit. The walk reads only [[BoundTargetFunction]] slots.
+    fn emit_bound_nesting_at_limit_i32(&self, target: &ValueLocals, function: &mut Function) {
+        let schema = self.runtime_schema();
+        let current = schema.reserve_value_local(function);
+        let depth = schema.reserve_i32_local(function);
+        current.copy_from(target, function);
+        depth.set_constant(0, function);
+        function.instruction(&Instruction::Block(BlockType::Empty));
+        function.instruction(&Instruction::Loop(BlockType::Empty));
+        depth.load(function);
+        function.instruction(&Instruction::I32Const(MAX_BOUND_FUNCTION_NESTING));
+        function.instruction(&Instruction::I32GeU);
+        function.instruction(&Instruction::BrIf(1));
+        current.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Function.tag()));
+        function.instruction(&Instruction::I32Eq);
+        current.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<BoundFunction>(crate::gc_types::GcNullability::NonNullable)
+                .heap_type,
+        ));
+        function.instruction(&Instruction::I32And);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::BrIf(1));
+        let bound = schema.reserve_gc_local(function).initialize(
+            current.cast_reference::<BoundFunction>(schema, function),
+            function,
+        );
+        let stored = schema.reserve_gc_local(function).initialize(
+            schema
+                .struct_type::<BoundFunction>()
+                .field(crate::gc_types::BoundFunctionSchema::TARGET)
+                .read(&bound, schema, function)
+                .reference(),
+            function,
+        );
+        schema
+            .struct_type::<StoredValue>()
+            .read_into(&stored, &current, schema, function);
+        stored.clear(function);
+        bound.clear(function);
+        depth.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Add);
+        depth.store(function);
+        function.instruction(&Instruction::Br(0));
+        function.instruction(&Instruction::End);
+        function.instruction(&Instruction::End);
+        depth.load(function);
+        function.instruction(&Instruction::I32Const(MAX_BOUND_FUNCTION_NESTING));
+        function.instruction(&Instruction::I32GeU);
+        schema.release_i32_local(depth, function);
+        current.clear(function);
     }
 
     /// CopyNameAndLength returns the whole abrupt completion. The caller owns

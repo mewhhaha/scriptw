@@ -19,13 +19,13 @@
 
 use super::*;
 
-/// Simultaneously executing counted calls. One level of the deepest guarded
-/// cycles measured here (a Proxy forwarding to a Proxy, JSON.stringify of a
-/// nested Array, Array.prototype.join converting a nested Array) costs well
-/// under 4 KiB of Wasm stack: 30,000 levels of each ran in the product's
-/// 32 MiB Wasm stack before this bound existed, and one join level is two
-/// counted calls. 4,096 keeps the guarded chain under half that stack,
-/// beside the source bodies' own bound.
+/// Simultaneously executing counted calls. Before this bound existed, the
+/// product's 32 MiB Wasm stack ran 30,000 levels of a Proxy forwarding to a
+/// Proxy and of JSON.stringify of nested Arrays, and 10,000 levels (20,000
+/// counted calls, two per level) of Array.prototype.join converting a nested
+/// Array, so one counted call costs well under 2 KiB of stack. 4,096 keeps
+/// the guarded chain under a quarter of that stack, beside the source
+/// bodies' own bound.
 pub(crate) const MAX_NESTED_NATIVE_RECURSION: i32 = 4096;
 
 #[derive(Debug, PartialEq, Eq)]

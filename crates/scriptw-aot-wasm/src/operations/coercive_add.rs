@@ -221,6 +221,9 @@ impl FunctionBuilder<'_> {
                 self.emit_string_add_pair_or_branch(
                     side, left, right, &first, &second, general, function,
                 )?;
+                // An over-long result is the general kernel's RangeError.
+                self.emit_string_parts_exceed_limit_i32(&[&first, &second], function);
+                self.emit_branch_if_to_target(general, function);
                 let text = schema
                     .reserve_gc_local::<StringValue, crate::gc_types::Nullable>(function)
                     .initialize(
@@ -270,6 +273,10 @@ impl FunctionBuilder<'_> {
                     inner_general,
                     function,
                 )?;
+                // The inner addition throws its RangeError before the third
+                // operand is evaluated: through its own general kernel.
+                self.emit_string_parts_exceed_limit_i32(&[&first, &second], function);
+                self.emit_branch_if_to_target(inner_general, function);
                 self.emit_branch_to_target(inner_done, function);
                 self.pop_control(ControlFrameKind::Block);
                 function.instruction(&Instruction::End);
@@ -346,6 +353,20 @@ impl FunctionBuilder<'_> {
                 self.emit_branch_to_target(general, function);
                 self.pop_control(ControlFrameKind::If);
                 function.instruction(&Instruction::End);
+                self.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
+                // An over-long whole result: every conversion is complete and
+                // effect-free, so throw the general kernel's RangeError here
+                // rather than materialize the inner sum for it.
+                self.emit_string_parts_exceed_limit_i32(&[&first, &second, &third], function);
+                self.open_frame(ControlFrameKind::If, function);
+                self.emit_throw_runtime_error(
+                    scriptw_ir::NativeErrorKind::RangeError,
+                    RuntimeErrorMessage::STRING_LENGTH_EXCEEDS_IMPLEMENTATION_LIMIT,
+                    result,
+                    function,
+                )?;
+                self.emit_branch_to_target(done, function);
                 self.pop_control(ControlFrameKind::If);
                 function.instruction(&Instruction::End);
                 second.load(schema, function).is_null(function);
@@ -462,6 +483,41 @@ impl FunctionBuilder<'_> {
         result.value().set_reference(&string, schema, function);
         string.clear(function);
         result.set_normal(result.value(), function);
+    }
+
+    /// Leaves 1 when `parts` (a null part is absent) hold more than
+    /// `MAX_STRING_LENGTH` code units together.
+    fn emit_string_parts_exceed_limit_i32(
+        &self,
+        parts: &[&GcLocal<StringValue, crate::gc_types::Nullable>],
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        let total = schema.reserve_i64_local(function);
+        let length = schema.reserve_i64_local(function);
+        function.instruction(&Instruction::I64Const(0));
+        total.store(function);
+        for part in parts {
+            part.load(schema, function).is_null(function);
+            function.instruction(&Instruction::I32Eqz);
+            function.instruction(&Instruction::If(BlockType::Empty));
+            let string = schema.reserve_gc_local(function).initialize(
+                part.load(schema, function).require_non_null(function),
+                function,
+            );
+            self.emit_native_gc_string_length(&string, length, function);
+            string.clear(function);
+            total.load(function);
+            length.load(function);
+            function.instruction(&Instruction::I64Add);
+            total.store(function);
+            function.instruction(&Instruction::End);
+        }
+        total.load(function);
+        function.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
+        function.instruction(&Instruction::I64GtU);
+        schema.release_i64_local(length, function);
+        schema.release_i64_local(total, function);
     }
 
     /// One String holding the code units of two or three Strings in order.
@@ -655,6 +711,32 @@ impl FunctionBuilder<'_> {
             right.cast_reference::<StringValue>(schema, function),
             function,
         );
+        // Both conversions are complete; only the result's length is left.
+        let lengths = schema.reserve_i64_local(function);
+        let length = schema.reserve_i64_local(function);
+        self.emit_native_gc_string_length(&left_string, lengths, function);
+        self.emit_native_gc_string_length(&right_string, length, function);
+        lengths.load(function);
+        length.load(function);
+        function.instruction(&Instruction::I64Add);
+        function.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
+        function.instruction(&Instruction::I64GtU);
+        schema.release_i64_local(length, function);
+        schema.release_i64_local(lengths, function);
+        self.open_frame(ControlFrameKind::If, function);
+        self.emit_throw_runtime_error(
+            scriptw_ir::NativeErrorKind::RangeError,
+            RuntimeErrorMessage::STRING_LENGTH_EXCEEDS_IMPLEMENTATION_LIMIT,
+            &pending,
+            function,
+        )?;
+        self.finish_to_primitive_operation(
+            ToPrimitiveAbruptRoute::ActiveHandler,
+            &pending,
+            function,
+        )?;
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         let string = schema.reserve_gc_local(function).initialize(
             self.emit_concat_gc_strings(&left_string, &right_string, function),
             function,

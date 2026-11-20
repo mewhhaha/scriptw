@@ -416,10 +416,10 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I64Add);
         total_length.store(f);
         total_length.load(f);
-        f.instruction(&Instruction::I64Const(u32::MAX as i64));
+        f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
         f.instruction(&Instruction::I64GtU);
         self.emit_native_string_error_if(
-            RuntimeErrorMessage::REPLACEMENT_RESULT_WOULD_EXCEED_MAXIMUM_STRING_LENGTH,
+            RuntimeErrorMessage::STRING_LENGTH_EXCEEDS_IMPLEMENTATION_LIMIT,
             NativeErrorKind::RangeError,
             output,
             exit,

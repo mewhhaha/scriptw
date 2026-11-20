@@ -153,6 +153,12 @@ Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and t
   specialisation saved 1.3% of the RSC request's instructions, short of its go
   threshold, so no benchmark uses it
   ([contract](docs/rust-rewrite/contracts/profile-guided-compilation.md)).
+- **Implementation limits:** Strings of more than 2^27 - 6 * 2^20 code units,
+  BigInts beyond that many bits, bound-function chains deeper than 4,096,
+  helper recursion deeper than 4,096 calls and source nested deeper than 1,000
+  levels throw RangeError (SyntaxError for source), as the 1 GiB Store heap
+  and the stacks require
+  ([limits](docs/rust-rewrite/runtime-requirements.md#implementation-limits)).
 - **Runtime ABI 83:** rebuild Portable bundles and native images built under an
   earlier ABI ([details](docs/rust-rewrite/runtime-requirements.md#runtime-abi)).
 

@@ -194,13 +194,13 @@ impl FunctionBuilder<'_> {
                 f.instruction(&Instruction::End);
                 builder.pop_control(ControlFrameKind::Block);
                 f.instruction(&Instruction::End);
+                // Too long a result is the general join's RangeError, at the
+                // separator or element that crosses the limit; every value
+                // here is a String or nullish, so declining repeats no effect.
                 total.load(f);
-                f.instruction(&Instruction::I64Const(u32::MAX as i64));
+                f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
                 f.instruction(&Instruction::I64GtU);
-                builder.open_frame(ControlFrameKind::If, f);
-                f.instruction(&Instruction::Unreachable);
-                builder.pop_control(ControlFrameKind::If);
-                f.instruction(&Instruction::End);
+                builder.emit_branch_if_to_target(decline, f);
                 total.load(f);
                 f.instruction(&Instruction::I64Eqz);
                 builder.open_frame(ControlFrameKind::If, f);

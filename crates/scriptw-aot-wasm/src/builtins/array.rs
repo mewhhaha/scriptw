@@ -4221,6 +4221,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I64Eqz);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
+        self.emit_join_length_limit(&text, &separator, &pending, f)?;
         text.append(&separator, s, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -4266,6 +4267,7 @@ impl FunctionBuilder<'_> {
                 .cast_reference::<crate::gc_types::StringValue>(s, f),
             f,
         );
+        self.emit_join_length_limit(&text, &part, &pending, f)?;
         text.append(&part, s, f);
         part.clear(f);
         self.pop_control(ControlFrameKind::If);
@@ -4294,6 +4296,27 @@ impl FunctionBuilder<'_> {
         receiver.clear(f);
         Ok(())
     }
+    /// The RangeError of a join result longer than `MAX_STRING_LENGTH`.
+    fn emit_join_length_limit(
+        &mut self,
+        text: &string_buffer::ArrayStringBuffer,
+        part: &GcLocal<crate::gc_types::StringValue>,
+        pending: &CompletionLocals,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        text.append_exceeds_limit_i32(part, self.runtime_schema(), f);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_throw_current_function_realm_range_error(
+            RuntimeErrorMessage::STRING_LENGTH_EXCEEDS_IMPLEMENTATION_LIMIT,
+            pending,
+            f,
+        )?;
+        self.emit_array_native_propagate(pending, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        Ok(())
+    }
+
     /// Array.prototype.toString and %TypedArray%.prototype.toString share this
     /// generic native entry and their same per-Realm callable identity.
     pub(crate) fn compile_typed_array_prototype_to_string_builtin(
