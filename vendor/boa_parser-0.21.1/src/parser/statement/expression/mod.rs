@@ -85,9 +85,12 @@ where
                     }
                 }
             }
+            // The lookahead restriction is `let [`; `let` ending the source
+            // is an ordinary IdentifierReference in sloppy code.
             TokenKind::Keyword((Keyword::Let, false)) => {
-                let next_token = cursor.peek(1, interner).or_abrupt()?;
-                if next_token.kind() == &TokenKind::Punctuator(Punctuator::OpenBracket) {
+                if let Some(next_token) = cursor.peek(1, interner)?
+                    && next_token.kind() == &TokenKind::Punctuator(Punctuator::OpenBracket)
+                {
                     return Err(Error::general(
                         "expected statement",
                         next_token.span().start(),

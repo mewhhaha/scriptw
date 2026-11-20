@@ -696,3 +696,44 @@ fn parser_rejects_labelled_functions_nested_under_if_and_loop() {
             .expect_err("labelled function nested under a control-flow statement should fail");
     }
 }
+
+#[test]
+fn sloppy_let_and_async_identifiers_may_end_the_source() {
+    // ExpressionStatement restricts only the lookaheads `let [` and
+    // `async [no LineTerminator here] function`; end of input is neither,
+    // and ASI supplies the final semicolon (ECMA-262 14.5, 12.10.1).
+    for source in [
+        "var let = 1; let",
+        "var let = 1; let // comment",
+        "var let = 1; let /* comment */",
+        "var let = 1; if (true) let",
+        "var let = 1; label: let",
+        "var async = 1; async",
+        "var async = 1; async /* comment */",
+        "var async = 1; x = async",
+        "var async = 1; if (true) async",
+        "var async = function () {}; async(1)",
+        "var async = function () {}; async()",
+        "var async = function () {}; x = async(1)\n",
+        "var async = function () {}; async(1)\n// trailing",
+    ] {
+        assert!(
+            parse(source, ParseOptions::script()).is_ok(),
+            "{source:?}: {:?}",
+            parse(source, ParseOptions::script()).err()
+        );
+    }
+    for source in [
+        "\"use strict\"; let",
+        "var let = 1; let [",
+        "async function",
+        "var async = 1; async x",
+    ] {
+        assert!(
+            parse(source, ParseOptions::script()).is_err(),
+            "{source:?} stays a SyntaxError"
+        );
+    }
+    // A module is strict: `let` is reserved there.
+    assert!(parse("let", ParseOptions::module()).is_err());
+}

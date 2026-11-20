@@ -15,7 +15,7 @@ mod r#yield;
 
 use crate::{
     Error,
-    lexer::{Error as LexError, InputElement, TokenKind},
+    lexer::{Error as LexError, InputElement, Token, TokenKind},
     parser::{
         AllowAwait, AllowIn, AllowYield, Cursor, OrAbrupt, ParseResult, TokenParser,
         expression::assignment::{
@@ -82,20 +82,27 @@ fn async_starts_arrow_function<R: ReadChar>(
     cursor: &mut Cursor<R>,
     interner: &mut Interner,
 ) -> ParseResult<bool> {
-    let skip_n = if cursor.peek_is_line_terminator(0, interner).or_abrupt()? {
+    // `async` may be the last token of the source, where it can only be an
+    // IdentifierReference (`var async; async`): end of input is not an arrow.
+    let skip_n = if cursor
+        .peek_is_line_terminator(0, interner)?
+        .unwrap_or(false)
+    {
         2
     } else {
         1
     };
 
     if cursor
-        .peek_is_line_terminator(skip_n, interner)
-        .or_abrupt()?
+        .peek_is_line_terminator(skip_n, interner)?
+        .unwrap_or(true)
     {
         return Ok(false);
     }
 
-    let next = cursor.peek(1, interner).or_abrupt()?;
+    let Some(next) = cursor.peek(1, interner)? else {
+        return Ok(false);
+    };
 
     match next.kind() {
         TokenKind::Punctuator(Punctuator::OpenParen) => {
@@ -107,9 +114,10 @@ fn async_starts_arrow_function<R: ReadChar>(
                     TokenKind::Punctuator(Punctuator::CloseParen) => {
                         depth -= 1;
                         if depth == 0 {
+                            // `async(...)` ending the source is a call.
                             return Ok(matches!(
-                                cursor.peek(scan + 1, interner).or_abrupt()?.kind(),
-                                TokenKind::Punctuator(Punctuator::Arrow)
+                                cursor.peek(scan + 1, interner)?.map(Token::kind),
+                                Some(TokenKind::Punctuator(Punctuator::Arrow))
                             ));
                         }
                     }
@@ -119,11 +127,11 @@ fn async_starts_arrow_function<R: ReadChar>(
             }
 
             if matches!(
-                cursor.peek(2, interner).or_abrupt()?.kind(),
-                TokenKind::Punctuator(Punctuator::CloseParen)
+                cursor.peek(2, interner)?.map(Token::kind),
+                Some(TokenKind::Punctuator(Punctuator::CloseParen))
             ) && matches!(
-                cursor.peek(3, interner).or_abrupt()?.kind(),
-                TokenKind::Punctuator(
+                cursor.peek(3, interner)?.map(Token::kind),
+                Some(TokenKind::Punctuator(
                     Punctuator::Assign
                         | Punctuator::AssignAdd
                         | Punctuator::AssignSub
@@ -142,7 +150,7 @@ fn async_starts_arrow_function<R: ReadChar>(
                         | Punctuator::AssignCoalesce
                         | Punctuator::Inc
                         | Punctuator::Dec
-                ) | TokenKind::Keyword((Keyword::In | Keyword::Of, false))
+                ) | TokenKind::Keyword((Keyword::In | Keyword::Of, false)))
             ) {
                 return Ok(false);
             }
@@ -150,8 +158,8 @@ fn async_starts_arrow_function<R: ReadChar>(
         }
         TokenKind::IdentifierName(_)
         | TokenKind::Keyword((Keyword::Yield | Keyword::Await | Keyword::Of, _)) => Ok(matches!(
-            cursor.peek(2, interner).or_abrupt()?.kind(),
-            TokenKind::Punctuator(Punctuator::Arrow)
+            cursor.peek(2, interner)?.map(Token::kind),
+            Some(TokenKind::Punctuator(Punctuator::Arrow))
         )),
         _ => Ok(false),
     }

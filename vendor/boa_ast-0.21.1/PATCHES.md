@@ -27,3 +27,16 @@ environment record of a sloppy function whose parameter list holds an
 expression when the function contains a direct eval. Only the oracle reads
 that scope data; see the
 [Boa Engine notes](../boa_engine-0.21.1/PATCHES.md).
+
+## `let` and `async` ending a sloppy script
+
+`vendor/boa_parser-0.21.1` reported "abrupt end" for a sloppy script whose
+last token is the identifier `let` or `async` (`var let = 1; let`,
+`var async = 1; async`, `async(1)`). ExpressionStatement only forbids the
+lookaheads `let [` and `async [no LineTerminator here] function` (ECMA-262
+14.5), so end of input is an ordinary IdentifierReference followed by
+automatic semicolon insertion. The `let [` check in
+`src/parser/statement/expression/mod.rs` and the async arrow detector in
+`src/parser/expression/assignment/mod.rs` now treat a missing token as "not
+the restricted form" instead of an error. Strict `let` and `async x` stay
+SyntaxErrors. Test: `scriptw-front` `sloppy_let_and_async_identifiers_may_end_the_source`.
