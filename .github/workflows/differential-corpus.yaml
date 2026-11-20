@@ -57,6 +57,13 @@ jobs:
           python3 scripts/limited_verification.py --memory-mib 4096 --
           cargo build --locked -p scriptw-cli -p scriptw-test262
           --features scriptw-cli/spec-exec-oracle,scriptw-test262/spec-exec-oracle --bins
+      - name: Run the Boa oracle crate's own tests
+        # scriptw-spec-exec compiles Boa only under `oracle`, so the default
+        # workspace test runner and ci.yaml build it empty and skip these.
+        if: always() && steps.oracle_build.outcome == 'success'
+        run: >-
+          python3 scripts/limited_verification.py --memory-mib 4096 --
+          cargo test --locked -p scriptw-spec-exec --features oracle
       - name: Run AsyncDisposableStack fixtures through both backends
         if: always() && steps.oracle_build.outcome == 'success'
         run: >-

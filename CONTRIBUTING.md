@@ -112,6 +112,15 @@ exact `scriptw inspect` counts (exact-context clones, resolved intrinsics,
 fixture edit. Recount with `scriptw inspect <fixture>` and record the cause in
 the assertion's comment.
 
+The Boa differential oracle compiles only under `scriptw-spec-exec`'s `oracle`
+feature, so the default workspace runner and `ci.yaml` skip that crate's own
+library and integration tests. The differential workflow runs them; run them
+locally when the oracle or its embedding changes:
+
+```sh
+python3 -B scripts/limited_verification.py -- cargo test --locked -p scriptw-spec-exec --features oracle
+```
+
 Encoded R/P ABI and code-size acceptance checks belong in the external
 `emission` target when the public emission API is sufficient. It links the
 ordinary emitter library that Engine also uses; private unit checks remain in
