@@ -1,110 +1,242 @@
 #!/usr/bin/env bash
-# Builds the shipped and benchmark `scriptw` compiler binary: the `dist` Cargo
-# profile (fat LTO, one codegen unit) with jemalloc, optionally with Rust PGO.
-# CONTRIBUTING (Shipped compiler binary) records its cost and the byte-identity
-# gate; docs/rust-rewrite/benchmarks.md has the measurements.
+# Builds a local dist `scriptw` compiler binary for benchmarks and long local
+# runs: the `dist` Cargo profile (fat LTO, one codegen unit) with jemalloc,
+# optionally with Rust PGO. CI release artifacts and Test262 publication still
+# use `cargo build --release`. CONTRIBUTING (Dist compiler binary) records the
+# cost, the limits and what was compared; docs/rust-rewrite/benchmarks.md has
+# the measurements. A binary that links jemalloc must travel with
+# THIRD-PARTY-NOTICES.md.
 #
-# usage: scripts/build-dist.sh [plain|pgo] [out-dir]
+# usage: scripts/build-dist.sh [--check] [plain|pgo] [out-dir]
 #   plain   one dist build (default)
 #   pgo     instrumented dist build, training (scripts/dist-pgo-train.sh), merge
 #           with llvm-profdata, then the dist build that uses the profile
-#   out-dir default target/dist-out. The binary lands in <out-dir>/scriptw;
-#           the PGO profile in <out-dir>/scriptw-<cksum>.profdata.
+#   --check validate the host, toolchain, environment and directories, take
+#           the locks, print the plan and stop: nothing is built or deleted
+#   out-dir default target/dist-out. The binary lands in <out-dir>/scriptw,
+#           its provenance in <out-dir>/scriptw.build-info and the PGO profile
+#           in <out-dir>/scriptw-<cksum>.profdata. A run first removes the
+#           previous binary, so a failed run leaves none behind.
+#
+# Linux x86_64 with lld only: the script hard-codes the host triple and
+# `-fuse-ld=lld`. A PGO build is not reproducible (the profile depends on the
+# training run), so its binary cannot resume or publish a Test262 sweep that
+# another binary started.
 #
 # Environment:
-#   DIST_FEATURES   cargo feature flags, default "--features jemalloc"
-#   DIST_TARGET_DIR Cargo target directory, default target/dist-build. Each step
-#                   deletes the previous step's target units (about 1.8 GB) and
-#                   keeps the host units (1.4 GB: build scripts, proc macros,
-#                   the runtime-image producer). Its fat-LTO link peaks at 3.8 GB RSS.
-#   LLVM_PROFDATA   default: rustup's llvm-tools copy for this toolchain
-#                   (`rustup component add llvm-tools`); it must match rustc's LLVM.
-#   DIST_JOBS       cargo -j (default 1, the workspace default)
+#   SCRIPTW_DIST_FEATURES   cargo feature flags, default "--features jemalloc"
+#   SCRIPTW_DIST_TARGET_DIR Cargo target directory, default target/dist-build;
+#                   never the shared target/. Each non-plain step deletes the
+#                   previous step's target units (about 1.8 GB) and keeps the
+#                   host units (1.4 GB: build scripts, proc macros, the
+#                   runtime-image producer).
+#   SCRIPTW_DIST_JOBS       cargo -j. Default: SCRIPTW_JOBS, which the resource
+#                   wrapper sets to 1, or to the CPU count it computes with
+#                   --cloud-cpus auto.
+#   SCRIPTW_DIST_LLVM_PROFDATA  default: rustup's llvm-tools copy for this
+#                   toolchain (`rustup component add llvm-tools`); it must
+#                   match rustc's LLVM.
+#   SCRIPTW_DIST_BOLT_PREP  1 links the PGO binary with --emit-relocs and
+#                   -z keep-text-section-prefix for a later llvm-bolt pass.
+#                   Off by default: BOLT is not part of the recipe, and the
+#                   relocations add about 19 MB that every CLI run hashes.
+#   SCRIPTW_DIST_PGO_APPLICATION_FIXTURES, SCRIPTW_DIST_PGO_SUITE_ROOT
+#                   the training inputs; see scripts/dist-pgo-train.sh.
+# The script owns the target rustflags: it refuses a pre-set RUSTFLAGS,
+# CARGO_ENCODED_RUSTFLAGS, CARGO_BUILD_RUSTFLAGS or
+# CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS, which it would otherwise
+# drop or which would drop its own flags.
 #
-# Run it under the resource wrapper, e.g.
+# Run it under the resource wrapper with --cloud. The fat-LTO link alone peaks
+# at 3.8 GB RSS, which does not fit the 4 GiB local default; a local run needs
+# an explicit `--memory-mib 6144` or more, outside the AGENTS.md local default.
 #   python3 -B scripts/limited_verification.py --cloud --cloud-cpus auto -- \
-#     env DIST_JOBS=4 scripts/build-dist.sh pgo
+#     scripts/build-dist.sh pgo
 #
-# All builds pass --target <host>: RUSTFLAGS then reach only the target units,
-# so build scripts are neither instrumented nor profile-optimized. Because
-# RUSTFLAGS replaces the [target] rustflags of .cargo/config.toml, the lld link
-# argument is repeated here.
+# All builds pass --target <host>: the rustflags then reach only the target
+# units, so build scripts are neither instrumented nor profile-optimized.
+# Because they replace the [target] rustflags of .cargo/config.toml, the lld
+# link argument is repeated here.
 set -euo pipefail
 
+die() { echo "error: $*" >&2; exit 1; }
+usage() { sed -n '2,/^set -euo/p' "$0" | sed -e '$d' -e 's/^# \{0,1\}//'; exit 2; }
+
+check_only=0
+if [[ ${1:-} == --check ]]; then check_only=1; shift; fi
 mode="${1:-plain}"
-case "$mode" in plain | pgo) ;; *) sed -n '2,/^set -euo/p' "$0" | sed -e '$d' -e 's/^# \{0,1\}//'; exit 2 ;; esac
-repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$repo"
-out="${2:-$repo/target/dist-out}"
-mkdir -p "$out"
-out="$(cd -- "$out" && pwd)"
-target_dir="${DIST_TARGET_DIR:-$repo/target/dist-build}"
-features="${DIST_FEATURES-"--features jemalloc"}"
-jobs="${DIST_JOBS:-1}"
+case "$mode" in plain | pgo) ;; *) usage ;; esac
+(($# <= 2)) || usage
+
+for var in RUSTFLAGS CARGO_ENCODED_RUSTFLAGS CARGO_BUILD_RUSTFLAGS CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS; do
+  [[ -z ${!var+set} ]] || die "$var is set; build-dist.sh sets the target rustflags itself (always with lld)"
+done
 host="$(rustc -vV | sed -n 's/^host: //p')"
-link_flags="-C link-arg=-fuse-ld=lld"
+[[ $host == x86_64-unknown-linux-gnu ]] || die "build-dist.sh supports only x86_64-unknown-linux-gnu, not '${host}'"
+command -v ld.lld > /dev/null || die "no ld.lld on PATH; build-dist.sh always links with lld"
+command -v flock > /dev/null || die "no flock on PATH (util-linux)"
 
-build() { # build <log-name> <extra rustflags>
-  echo "== dist build $1 (${2:-no profile flags})"
-  # Target units built with other RUSTFLAGS cannot be reused; drop them first
-  # so two flavours never share the disk. A plain build resumes its own units.
-  [[ $1 == plain ]] || rm -rf "$target_dir/$host"
-  # shellcheck disable=SC2086 # features is a list of cargo flags
-  env CARGO_TARGET_DIR="$target_dir" RUSTFLAGS="$link_flags ${2:-}" \
-    cargo build -j "$jobs" --locked --profile dist --target "$host" -p scriptw-cli --bin scriptw $features \
-    > "$out/build-$1.log" 2>&1 || { tail -30 "$out/build-$1.log" >&2; exit 1; }
-}
+repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+cd "$repo"
+mkdir -p "$repo/target"
+shared_target="$(cd -- "$repo/target" && pwd -P)"
+out="${2:-$repo/target/dist-out}"
+target_dir="${SCRIPTW_DIST_TARGET_DIR:-$repo/target/dist-build}"
+mkdir -p "$out" "$target_dir"
+out="$(cd -- "$out" && pwd -P)"
+target_dir="$(cd -- "$target_dir" && pwd -P)"
+case "$target_dir" in "$repo" | "$shared_target" | /) die "SCRIPTW_DIST_TARGET_DIR must be a dedicated directory, not $target_dir" ;; esac
+[[ $out != "$target_dir/$host" && $out != "$target_dir/$host/"* ]] || die "the output directory lies inside the target units that the build deletes"
+read -r -a features <<< "${SCRIPTW_DIST_FEATURES-"--features jemalloc"}"
+jobs="${SCRIPTW_DIST_JOBS:-${SCRIPTW_JOBS:-1}}"
+[[ $jobs =~ ^[1-9][0-9]*$ ]] || die "the cargo job count must be a positive integer, not '$jobs'"
+bolt_prep="${SCRIPTW_DIST_BOLT_PREP:-0}"
+[[ $bolt_prep == 0 || $bolt_prep == 1 ]] || die "SCRIPTW_DIST_BOLT_PREP must be 0 or 1"
+[[ $mode == pgo || $bolt_prep == 0 ]] || die "SCRIPTW_DIST_BOLT_PREP applies only to the pgo mode"
 
-if [[ $mode == plain ]]; then
-  build plain ""
-  cp "$target_dir/$host/dist/scriptw" "$out/scriptw"
-  rm -rf "$target_dir/$host"
-  echo "dist binary: $out/scriptw"
+# One run per target and output directory: the steps below delete target units,
+# profiles and binaries that a concurrent run would still be using. Children
+# (cargo, rustc, the training) inherit the descriptors and keep the locks.
+exec 8> "$target_dir/.build-dist.lock"
+flock -n 8 || die "another build-dist.sh run holds $target_dir"
+if [[ $out != "$target_dir" ]]; then
+  exec 9> "$out/.build-dist.lock"
+  flock -n 9 || die "another build-dist.sh run holds $out"
+fi
+
+if [[ $mode == pgo ]]; then
+  profdata="${SCRIPTW_DIST_LLVM_PROFDATA:-$(rustc --print sysroot)/lib/rustlib/$host/bin/llvm-profdata}"
+  [[ -x $profdata ]] || die "no llvm-profdata at $profdata; run 'rustup component add llvm-tools'"
+  rustc_llvm="$(rustc -vV | sed -n 's/^LLVM version: \([0-9]*\).*/\1/p')"
+  profdata_llvm="$("$profdata" --version | sed -n 's/.*LLVM version \([0-9]*\).*/\1/p' | head -1)"
+  [[ -n $rustc_llvm && -n $profdata_llvm ]] || die "cannot read the LLVM major of rustc ('$rustc_llvm') or llvm-profdata ('$profdata_llvm')"
+  [[ $rustc_llvm == "$profdata_llvm" ]] || die "llvm-profdata is LLVM $profdata_llvm, rustc is LLVM $rustc_llvm"
+  if [[ -n ${SCRIPTW_DIST_PGO_APPLICATION_FIXTURES:-} ]]; then
+    [[ -f $SCRIPTW_DIST_PGO_APPLICATION_FIXTURES/rsc.js ]] || die "SCRIPTW_DIST_PGO_APPLICATION_FIXTURES has no rsc.js"
+  fi
+fi
+
+profiles="$out/profraw"
+cargo_cmd=(cargo build -j "$jobs" --locked --profile dist --target "$host" -p scriptw-cli --bin scriptw "${features[@]}")
+if ((check_only)); then
+  echo "check passed: mode $mode, host $host, jobs $jobs, BOLT prep $bolt_prep"
+  echo "  target dir $target_dir (locked), out dir $out (locked)"
+  echo "  ${cargo_cmd[*]}"
+  [[ $mode == plain ]] || echo "  llvm-profdata $profdata (LLVM $profdata_llvm); training fixtures ${SCRIPTW_DIST_PGO_APPLICATION_FIXTURES:-none}"
   exit 0
 fi
 
-sysroot="$(rustc --print sysroot)"
-profdata="${LLVM_PROFDATA:-$sysroot/lib/rustlib/$host/bin/llvm-profdata}"
-[[ -x $profdata ]] || { echo "error: no llvm-profdata; run 'rustup component add llvm-tools'" >&2; exit 1; }
-rustc_llvm="$(rustc -vV | sed -n 's/^LLVM version: \([0-9]*\).*/\1/p')"
-profdata_llvm="$("$profdata" --version | sed -n 's/.*LLVM version \([0-9]*\).*/\1/p' | head -1)"
-[[ $rustc_llvm == "$profdata_llvm" ]] || { echo "error: llvm-profdata is LLVM $profdata_llvm, rustc is LLVM $rustc_llvm" >&2; exit 1; }
+# A failed or interrupted run removes its partial outputs and, in pgo mode,
+# the flavoured target units. A plain build keeps its units so that a rerun
+# resumes. A SIGKILL skips this; the next run starts by removing the same files.
+cleanup() {
+  local status=$?
+  rm -rf "$out/scriptw-instrumented" "$profiles" "$out/.merged.profdata" \
+    "$out/.scriptw.partial" "$out/.scriptw.build-info.partial"
+  if ((status != 0)); then
+    if [[ $mode == pgo ]]; then rm -rf "${target_dir:?}/${host:?}"; fi
+    echo "build-dist.sh failed; $out holds no binary" >&2
+  fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+cleanup
+rm -f "$out/scriptw" "$out/scriptw.build-info"
 
-profiles="$out/profraw"
-rm -rf "$profiles" "$out"/scriptw-*.profdata
+build() { # build <log-name> [rustflag...]
+  local name=$1
+  shift
+  local flags=(-C link-arg=-fuse-ld=lld "$@")
+  echo "== dist build $name (${*:-no profile flags})"
+  # Target units built with other rustflags cannot be reused; drop them first
+  # so two flavours never share the disk. A plain build resumes its own units.
+  [[ $name == plain ]] || rm -rf "${target_dir:?}/${host:?}"
+  # The encoded form keeps paths with spaces intact.
+  env CARGO_TARGET_DIR="$target_dir" \
+    CARGO_ENCODED_RUSTFLAGS="$(IFS=$'\x1f'; printf '%s' "${flags[*]}")" \
+    "${cargo_cmd[@]}" > "$out/build-$name.log" 2>&1 || { tail -30 "$out/build-$name.log" >&2; exit 1; }
+}
+
+# Moves the last build's binary and its build-info into <out-dir> under their
+# final names only once both are complete, then drops the target units.
+# build_info_lines holds the mode's extra key=value lines.
+publish() { # publish <rustflags description>
+  cp "$target_dir/$host/dist/scriptw" "$out/.scriptw.partial"
+  local tracked=(Cargo.toml Cargo.lock .cargo rust-toolchain.toml crates vendor scripts)
+  {
+    echo "recipe=scripts/build-dist.sh $mode"
+    echo "built_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "source_commit=$(git rev-parse HEAD)"
+    echo "source_changed_tracked_files=$(git status --porcelain --untracked-files=no -- "${tracked[@]}" | wc -l)"
+    echo "rustc=$(rustc -V)"
+    echo "host=$host"
+    echo "cargo_profile=dist"
+    echo "features=${features[*]}"
+    echo "target_rustflags=-C link-arg=-fuse-ld=lld $1"
+    printf '%s\n' "${build_info_lines[@]}"
+    echo "binary_sha256=$(sha256sum < "$out/.scriptw.partial" | cut -d' ' -f1)"
+  } > "$out/.scriptw.build-info.partial"
+  mv "$out/.scriptw.partial" "$out/scriptw"
+  mv "$out/.scriptw.build-info.partial" "$out/scriptw.build-info"
+  rm -rf "${target_dir:?}/${host:?}"
+}
+
+if [[ $mode == plain ]]; then
+  build plain
+  build_info_lines=("pgo_profile=none")
+  publish ""
+  echo "dist binary: $out/scriptw (provenance: $out/scriptw.build-info)"
+  exit 0
+fi
+
 mkdir -p "$profiles"
 
 # 1. Instrumented build.
 build gen "-Cprofile-generate=$profiles"
 cp "$target_dir/$host/dist/scriptw" "$out/scriptw-instrumented"
-rm -rf "$target_dir/$host"
+rm -rf "${target_dir:?}/${host:?}"
 
 # 2. Training. %m merges every process into one .profraw online.
 LLVM_PROFILE_FILE="$profiles/scriptw-%m.profraw" "$repo/scripts/dist-pgo-train.sh" "$out/scriptw-instrumented"
 rm -f "$out/scriptw-instrumented"
 n=$(find "$profiles" -name '*.profraw' | wc -l)
-((n > 0)) || { echo "error: the training wrote no profile" >&2; exit 1; }
+((n > 0)) || die "the training wrote no profile"
 
-# 3. Merge. The name carries the profile checksum: Cargo tracks RUSTFLAGS,
-# not the profile's content.
-"$profdata" merge -o "$out/merged.profdata" "$profiles"
-merged="$out/scriptw-$(cksum < "$out/merged.profdata" | cut -d' ' -f1).profdata"
-mv "$out/merged.profdata" "$merged"
+# 3. Merge. The previous profile stays until this one exists. Each non-plain
+# build starts from empty target units, so Cargo cannot reuse units built with
+# another profile; the checksum in the name keeps the flags of different
+# profiles distinct for external caches such as sccache and names the profile
+# in the build-info.
+"$profdata" merge -o "$out/.merged.profdata" "$profiles"
+merged="$out/scriptw-$(cksum < "$out/.merged.profdata" | cut -d' ' -f1).profdata"
+mv "$out/.merged.profdata" "$merged"
+for old in "$out"/scriptw-*.profdata; do [[ $old == "$merged" ]] || rm -f "$old"; done
 rm -rf "$profiles"
 echo "merged $n profiles -> $merged"
 
 # 4. Optimized build. rustc only warns when it cannot use the profile.
-# --emit-relocs keeps the static relocations (a non-loaded section) so that
-# llvm-bolt can reorder functions; keep-text-section-prefix keeps LLVM's
-# .text.hot/.text.unlikely groups apart. Neither changes an instruction;
-# the relocations add about 19 MB to the file.
-build use "-Cprofile-use=$merged -C link-arg=-Wl,--emit-relocs -C link-arg=-Wl,-z,keep-text-section-prefix"
+# With SCRIPTW_DIST_BOLT_PREP=1, --emit-relocs keeps the static relocations (a
+# non-loaded section) so that llvm-bolt can reorder functions, and
+# keep-text-section-prefix keeps LLVM's .text.hot/.text.unlikely groups apart.
+# Neither changes an instruction.
+use_flags=("-Cprofile-use=$merged")
+if ((bolt_prep)); then
+  use_flags+=(-C link-arg=-Wl,--emit-relocs -C link-arg=-Wl,-z,keep-text-section-prefix)
+fi
+build use "${use_flags[@]}"
 pattern='^(warning|error).*(profile-use|profile format|profdata|profile data|instrumentation profile)'
 if grep -qE "$pattern" "$out/build-use.log"; then
   grep -E "$pattern" "$out/build-use.log" | head -3 >&2
-  echo "error: rustc did not use the profile" >&2
-  exit 1
+  die "rustc did not use the profile"
 fi
-cp "$target_dir/$host/dist/scriptw" "$out/scriptw"
-rm -rf "$target_dir/$host"
-echo "dist PGO binary: $out/scriptw"
+build_info_lines=(
+  "pgo_profile=$merged"
+  "pgo_profile_sha256=$(sha256sum < "$merged" | cut -d' ' -f1)"
+  "pgo_training_script_sha256=$(sha256sum < "$repo/scripts/dist-pgo-train.sh" | cut -d' ' -f1)"
+  "pgo_application_fixtures=${SCRIPTW_DIST_PGO_APPLICATION_FIXTURES:-none}"
+  "pgo_suite_root=${SCRIPTW_DIST_PGO_SUITE_ROOT:-test262/vendor/test262}"
+  "bolt_prep=$bolt_prep"
+)
+publish "${use_flags[*]}"
+echo "dist PGO binary: $out/scriptw (provenance: $out/scriptw.build-info)"
