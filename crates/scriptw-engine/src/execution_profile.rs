@@ -138,23 +138,44 @@ impl ResolvedExecutionProfile {
 #[derive(Clone, Debug)]
 pub(crate) struct ProfileSites(Arc<[u8]>);
 
+/// Finds a P's profile sites section among its custom sections, while the
+/// caller walks P for its own checks.
+#[derive(Default)]
+pub(crate) struct ProfileSitesScan(Option<ProfileSites>);
+
+impl ProfileSitesScan {
+    pub(crate) fn observe(
+        &mut self,
+        section: &wasmparser::CustomSectionReader<'_>,
+    ) -> Result<(), EngineError> {
+        if section.name() != scriptw_aot_wasm::PROFILE_SITES_SECTION {
+            return Ok(());
+        }
+        if self.0.is_some() {
+            return Err(EngineError::new("two execution profile sections"));
+        }
+        self.0 = Some(ProfileSites(Arc::from(section.data())));
+        Ok(())
+    }
+
+    /// The section, or `None` for a P not built to collect.
+    pub(crate) fn finish(self) -> Option<ProfileSites> {
+        self.0
+    }
+}
+
 impl ProfileSites {
-    /// The section of `program`, or `None` for a P not built to collect.
-    pub(crate) fn of(program: &[u8]) -> Result<Option<Self>, EngineError> {
-        let mut found = None;
+    /// Whether `program` was built to collect a profile.
+    pub(crate) fn in_program(program: &[u8]) -> Result<bool, EngineError> {
+        let mut scan = ProfileSitesScan::default();
         for payload in WasmParser::new(0).parse_all(program) {
             if let WasmPayload::CustomSection(section) =
                 payload.map_err(|error| EngineError::new(error.to_string()))?
             {
-                if section.name() == scriptw_aot_wasm::PROFILE_SITES_SECTION {
-                    if found.is_some() {
-                        return Err(EngineError::new("two execution profile sections"));
-                    }
-                    found = Some(Self(Arc::from(section.data())));
-                }
+                scan.observe(&section)?;
             }
         }
-        Ok(found)
+        Ok(scan.finish().is_some())
     }
 
     /// Calls P's profile dump and reads its profile memory, after a
@@ -174,23 +195,28 @@ impl ProfileSites {
         run_on_execution_stack(|| dump.call(&mut *store, ()))
             .map_err(|error| EngineError::new(format!("execution profile dump: {error:#}")))?;
         ExecutionProfile::from_collection(&self.0, memory.data(&*store), training_requests)
-            .map_err(|error| EngineError::new(error.to_string()))
+            .map_err(EngineError::from_execution_profile)
     }
 }
 
+#[cfg(any(test, feature = "profile-experiments"))]
 impl Engine {
-    /// Verification only: a wrong profile of `source` compiled with
-    /// `options`, every read site hot with a kind rotated from `seed`, for
-    /// checking that a wrong profile costs speed only. It emits the
-    /// unprofiled build once to learn its site map.
-    #[doc(hidden)]
+    /// Verification only (feature `profile-experiments`): a wrong profile of
+    /// `source` compiled with `options`, for checking that a wrong profile
+    /// costs speed only. Every read site is hot in one training request,
+    /// its dominant kind rotating through every specialisation from
+    /// `seed`, so nearly every guard proves a kind its receivers never
+    /// have. It emits the unprofiled build once to learn the site map.
+    /// `Ok(None)` means the program itself does not compile or emit, so
+    /// its unprofiled build reports that failure; every other failure is
+    /// an error.
     pub fn adversarial_execution_profile(
         &self,
         source: &str,
         goal: EmbeddedModuleGoal,
         options: &CompileOptions,
         seed: usize,
-    ) -> Result<ExecutionProfile, EngineError> {
+    ) -> Result<Option<ExecutionProfile>, EngineError> {
         run_on_sized_stack(|| {
             let goal = match goal {
                 EmbeddedModuleGoal::Script => ParseGoal::Script,
@@ -200,7 +226,9 @@ impl Engine {
                 execution_profile: ExecutionProfileUse::None,
                 ..options.clone()
             };
-            let prepared = self.prepare_compilation(source, goal, &options)?;
+            let Ok(prepared) = self.prepare_compilation(source, goal, &options) else {
+                return Ok(None);
+            };
             let program = ProgramKey::new(
                 program_key_for_role(
                     source,
@@ -210,14 +238,23 @@ impl Engine {
                     module_loader::EmbeddedSourceRole::Entry,
                     &ExecutionProfileUse::None,
                 )
-                .ok_or_else(|| EngineError::new("no compiler cache identity"))?,
+                .ok_or_else(|| {
+                    EngineError::new(format!(
+                        "an adversarial profile needs the compiler cache identity: {}",
+                        compiler_cache_identity()
+                            .err()
+                            .unwrap_or_else(|| "unavailable".into())
+                    ))
+                })?,
             );
-            let unit = self.compile_prepared_on_current_thread(prepared)?;
+            let Ok(unit) = self.compile_prepared_on_current_thread(prepared) else {
+                return Ok(None);
+            };
             let cache = program_wasm_cache();
             let runtime_cache = cache
                 .as_deref()
                 .map(wasm_runtime_link::RuntimeWasmCache::new);
-            let artifact = scriptw_aot_wasm::emit_with_intl_profile_and_runtime_inputs(
+            let Ok(artifact) = scriptw_aot_wasm::emit_with_intl_profile_and_runtime_inputs(
                 &unit.ir,
                 unit.promise_rejection_policy,
                 &unit.intl_profile,
@@ -228,14 +265,29 @@ impl Engine {
                     scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost,
                 ),
                 ProfileMode::None,
-            )
-            .map_err(|error| EngineError::from_wasm_emit_error(&unit.ir, error))?;
-            Ok(ExecutionProfile::adversarial(
+            ) else {
+                return Ok(None);
+            };
+            let site_map = artifact.site_map();
+            let mut profile = ExecutionProfile::new(
                 program,
-                artifact.site_map(),
+                site_map,
                 "adversarial verification profile",
-                seed,
-            ))
+                std::num::NonZeroU32::MIN,
+            );
+            let kinds = scriptw_aot_wasm::ReadSpecialisation::ALL;
+            for (index, site) in site_map.read_sites().enumerate() {
+                profile
+                    .observe_read(
+                        site,
+                        scriptw_aot_wasm::ReadSiteObservation::dominated(
+                            u64::MAX,
+                            kinds[(index + seed) % kinds.len()],
+                        ),
+                    )
+                    .map_err(EngineError::from_execution_profile)?;
+            }
+            Ok(Some(profile))
         })
     }
 }

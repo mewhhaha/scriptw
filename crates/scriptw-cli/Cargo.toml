@@ -27,6 +27,14 @@ spec-exec-oracle = [
   "scriptw-engine/spec-exec-oracle",
   "scriptw-test262/spec-exec-oracle",
 ]
+# Off by default: verification-only hooks of profile-guided compilation, the
+# Test262 SCRIPTW_TEST262_EXECUTION_PROFILE hook, rsc_baseline's
+# SCRIPTW_RSC_PROFILE_ADVERSARIAL and `scriptw precompile --profile`. Never
+# enable it for a shipped/product build or a published Test262 run.
+profile-experiments = [
+  "scriptw-engine/profile-experiments",
+  "scriptw-test262/profile-experiments",
+]
 
 [[bin]]
 name = "scriptw"

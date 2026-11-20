@@ -31,7 +31,9 @@ mod array_own_indexed_data;
 mod compact_data;
 #[cfg(test)]
 pub(crate) use compact_data::dump_slot_for_test;
-pub(crate) use compact_data::{emit_profile_dump, observe_dump_slot, DUMP_SLOT_BYTES};
+pub(crate) use compact_data::{
+    emit_profile_dump, observe_dump_slot, DUMP_SLOT_BYTES, MAX_OBSERVED_RECORDS,
+};
 mod define_property;
 mod dense_array_index;
 mod fresh_publication;

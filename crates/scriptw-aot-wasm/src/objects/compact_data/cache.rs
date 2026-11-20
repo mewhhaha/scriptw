@@ -26,7 +26,9 @@ mod profile_classify;
 mod profiled_read;
 #[cfg(test)]
 pub(crate) use profile_classify::dump_slot_for_test;
-pub(crate) use profile_classify::{emit_profile_dump, observe_dump_slot, DUMP_SLOT_BYTES};
+pub(crate) use profile_classify::{
+    emit_profile_dump, observe_dump_slot, DUMP_SLOT_BYTES, MAX_OBSERVED_RECORDS,
+};
 #[cfg(test)]
 mod proof_trace;
 mod site;

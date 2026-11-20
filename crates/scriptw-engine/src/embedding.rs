@@ -213,6 +213,8 @@ impl EmbeddedRuntime {
             };
             // P/R must be inert until explicit embedder instantiation. Generated
             // modules have no start function; external bytes cannot add one.
+            // The same walk keeps a Collect-mode P's profile sites section.
+            let mut profile_sites = execution_profile::ProfileSitesScan::default();
             for bytes in [
                 Some(artifact.bytes.as_slice()),
                 artifact.runtime.as_ref().map(LinkedRuntime::bytes),
@@ -220,18 +222,22 @@ impl EmbeddedRuntime {
             .into_iter()
             .flatten()
             {
+                let program = std::ptr::eq(bytes, artifact.bytes.as_slice());
                 for payload in WasmParser::new(0).parse_all(bytes) {
-                    if matches!(
-                        payload.map_err(|error| EngineError::new(error.to_string()))?,
-                        WasmPayload::StartSection { .. }
-                    ) {
-                        return Err(EngineError::new(
-                            "embedding rejects implicit Wasm start functions",
-                        ));
+                    match payload.map_err(|error| EngineError::new(error.to_string()))? {
+                        WasmPayload::StartSection { .. } => {
+                            return Err(EngineError::new(
+                                "embedding rejects implicit Wasm start functions",
+                            ));
+                        }
+                        WasmPayload::CustomSection(section) if program => {
+                            profile_sites.observe(&section)?;
+                        }
+                        _ => {}
                     }
                 }
             }
-            let profile_sites = execution_profile::ProfileSites::of(&artifact.bytes)?;
+            let profile_sites = profile_sites.finish();
             let program = artifact.program();
             let intl = wasm_runtime_link::intl_kernel_for(program)?;
             let modules = wasm_runtime_link::compile_modules(
@@ -616,9 +622,7 @@ impl EmbeddedInstance {
         training_requests: std::num::NonZeroU32,
     ) -> Result<ExecutionProfile, EngineError> {
         let sites = self.profile_sites.as_ref().ok_or_else(|| {
-            EngineError::new(
-                "this program records no execution profile: compile it with ExecutionProfileUse::Collect",
-            )
+            EngineError::from_execution_profile(ProfileError::NotCollecting)
         })?;
         self.check_store(store)?;
         sites.collect(&self.program, store, training_requests)

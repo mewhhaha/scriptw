@@ -24,6 +24,9 @@ libc = "0.2.189"
 # unit tests that exercise the spec-exec fake-suite oracle are gated on it and
 # require `cargo test -p scriptw-test262 --features spec-exec-oracle`.
 spec-exec-oracle = ["scriptw-engine/spec-exec-oracle"]
+# Off by default, never in a publishing build: the verification-only
+# SCRIPTW_TEST262_EXECUTION_PROFILE hook (profile-guided compilation).
+profile-experiments = ["scriptw-engine/profile-experiments"]
 
 [lib]
 path = "src/lib.rs"

@@ -230,10 +230,6 @@ pub enum PlaceHolder {
     Dictionary,
 }
 
-impl PlaceHolder {
-    pub const ALL: [Self; 3] = [Self::Intrinsic, Self::Compact, Self::Dictionary];
-}
-
 /// The sealed object layouts whose ordinary header holds every named own
 /// property a site record can name.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -421,6 +417,9 @@ pub enum ProfileError {
     NotAReadSite,
     /// A write observation names a site of another kind.
     NotAWriteSite,
+    /// The program was not built to collect a profile, so it has none to
+    /// read.
+    NotCollecting,
 }
 
 impl std::fmt::Display for ProfileError {
@@ -439,6 +438,9 @@ impl std::fmt::Display for ProfileError {
             Self::Malformed(what) => write!(f, "malformed execution profile: {what}"),
             Self::NotAReadSite => f.write_str("read observation for a site that is not a read"),
             Self::NotAWriteSite => f.write_str("write observation for a site that is not a write"),
+            Self::NotCollecting => f.write_str(
+                "this program records no execution profile: build it with profile collection",
+            ),
         }
     }
 }
@@ -482,29 +484,6 @@ impl ExecutionProfile {
         training_requests: NonZeroU32,
     ) -> Result<Self, ProfileError> {
         collect::decode(section, memory, training_requests)
-    }
-
-    /// A wrong profile for verification only: every read site of `site_map`
-    /// hot in one training request, its dominant kind rotating through
-    /// every specialisation from `seed`, so nearly every guard proves a kind
-    /// its receivers never have. Applying it must change no behaviour, only
-    /// speed.
-    #[doc(hidden)]
-    pub fn adversarial(
-        program: ProgramKey,
-        site_map: &SiteMap,
-        compiler: impl Into<String>,
-        seed: usize,
-    ) -> Self {
-        let mut profile = Self::new(program, site_map, compiler, NonZeroU32::MIN);
-        let kinds = ReadSpecialisation::ALL;
-        for (index, site) in site_map.read_sites().enumerate() {
-            profile.reads.insert(
-                site.clone(),
-                ReadSiteObservation::dominated(u64::MAX, kinds[(index + seed) % kinds.len()]),
-            );
-        }
-        profile
     }
 
     /// Records how often a body was entered; a later observation of the
@@ -656,6 +635,19 @@ impl ExecutionProfile {
                 1 => true,
                 _ => return Err(ProfileError::Malformed("megamorphic flag is not 0 or 1")),
             };
+            // Only states a collected observation can have: a chain of at
+            // most a chain's records, and a dominant kind only at a site
+            // that still learns and has a record proving it.
+            if records > crate::objects::MAX_OBSERVED_RECORDS {
+                return Err(ProfileError::Malformed(
+                    "a read site names more records than a chain holds",
+                ));
+            }
+            if dominant.is_some() && (records == 0 || megamorphic) {
+                return Err(ProfileError::Malformed(
+                    "a dominant kind at a site without records or that stopped learning",
+                ));
+            }
             if reads
                 .insert(
                     site,
@@ -760,13 +752,13 @@ pub(crate) enum ProfileUse {
 }
 
 impl ProfileUse {
-    pub(crate) fn of(mode: ProfileMode<'_>) -> Result<Self, EmitError> {
+    pub(crate) fn of(mode: ProfileMode<'_>) -> Self {
         match mode {
-            ProfileMode::None => Ok(Self::None),
-            ProfileMode::Collect { program, compiler } => Ok(Self::Collect(
-                collect::CollectionIdentity::new(program, compiler),
-            )),
-            ProfileMode::Apply(profile) => Ok(Self::Apply(profile.clone())),
+            ProfileMode::None => Self::None,
+            ProfileMode::Collect { program, compiler } => {
+                Self::Collect(collect::CollectionIdentity::new(program, compiler))
+            }
+            ProfileMode::Apply(profile) => Self::Apply(profile.clone()),
         }
     }
 }
@@ -1033,11 +1025,11 @@ mod tests {
                 program: ProgramKey::new([1; 32]),
                 compiler: "test",
             }),
-            Ok(ProfileUse::Collect(_))
+            ProfileUse::Collect(_)
         ));
         assert!(matches!(
             ProfileUse::of(ProfileMode::None),
-            Ok(ProfileUse::None)
+            ProfileUse::None
         ));
     }
 
@@ -1072,5 +1064,38 @@ mod tests {
         // An undominated read is never specialised, however hot.
         let admitted = AdmittedProfile::admit(&decoded, &ProgramKey::new([7; 32])).unwrap();
         assert_eq!(admitted.read_specialisation(reads[1]), None);
+    }
+
+    /// A decoded observation holds only what a collected one can.
+    #[test]
+    fn decoding_rejects_observations_collection_cannot_make() {
+        let map = site_map();
+        let read = map.read_sites().next().unwrap();
+        let kind = ReadSpecialisation::OwnCompact(CompactStorageLayout::Inline);
+        for (dominant, records, megamorphic) in [
+            (Some(kind), 0, false),
+            (Some(kind), 2, true),
+            (None, 9, false),
+        ] {
+            let mut profile = profile(&map);
+            profile
+                .observe_read(
+                    read,
+                    ReadSiteObservation {
+                        executions: 64,
+                        dominant,
+                        records,
+                        megamorphic,
+                    },
+                )
+                .unwrap();
+            assert!(
+                matches!(
+                    ExecutionProfile::decode(&profile.encode()),
+                    Err(ProfileError::Malformed(_))
+                ),
+                "{dominant:?} {records} {megamorphic}"
+            );
+        }
     }
 }

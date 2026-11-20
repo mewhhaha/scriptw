@@ -57,9 +57,13 @@ learn are the unprofiled build's.
 
 After a training run of N requests, an embedder reads the profile with
 `EmbeddedInstance::collect_profile(&mut store, N)`, which calls the dump and
-decodes the memory against the section. It fails for a program that was not
-built with `Collect` (and for programs loaded from a precompiled image, which
-keep no raw P).
+decodes the memory against the section. A program that was not built with
+`Collect` is refused with `ProfileError::NotCollecting`, and a malformed or
+foreign memory or section with the decoder's typed `ProfileError`
+(`EngineError::execution_profile_error`). `EmbeddedRuntime::precompile`
+refuses a `Collect` build, because a precompiled image keeps no raw P to read
+the profile against. Counters count module initialization and every export
+call as well as requests.
 
 ## Applying
 
@@ -73,41 +77,64 @@ sites are not specialised.
 Entry points:
 
 - Embedding: set `CompileOptions::execution_profile`, then `Engine::emit_wasm`
-  and `EmbeddedRuntime::compile` as usual.
-- CLI: `scriptw precompile --profile app.swprof app.js -o app.swep`. The
-  profile must come from a training build with the same compilation options;
-  the CLI compiles with `filename` set to the source path, so a profile
-  collected by an embedder that left it unset is refused as another program.
+  and `EmbeddedRuntime::compile` as usual. The profile must come from a
+  training build with the same compilation options.
 - RSC host (excluded diagnostics, refused by `scripts/benchmark-rsc.py` for
   scored campaigns): `SCRIPTW_RSC_PROFILE_COLLECT=<path>` trains on the run's
   requests and writes the profile, `SCRIPTW_RSC_PROFILE_USE=<path>` builds with
-  it, `SCRIPTW_RSC_PROFILE_ADVERSARIAL=<seed>` builds with a wrong profile. The
-  exact Flight output check is unchanged.
-- Test262 verification only: `SCRIPTW_TEST262_EXECUTION_PROFILE=collect` or
-  `adversarial:<seed>` builds every Wasm AOT case collecting or with a wrong
-  profile. Never set it for a published run.
+  it. The exact Flight output check is unchanged.
+
+Verification-only surface, compiled only with the non-default
+`profile-experiments` feature of `scriptw-engine`, `scriptw-test262` and
+`scriptw-cli` (never in a product build or a published Test262 run):
+
+- `Engine::adversarial_execution_profile`: a wrong profile of a source (every
+  read site hot, its kind rotated from a seed), `None` when the program itself
+  does not compile.
+- `SCRIPTW_RSC_PROFILE_ADVERSARIAL=<seed>` in the RSC host.
+- `SCRIPTW_TEST262_EXECUTION_PROFILE=collect|adversarial:<seed>` with
+  `SCRIPTW_TEST262_EXECUTION_PROFILE_LOG=<file>`: every Wasm AOT case is built
+  collecting or with a wrong profile, and appends to the log whether it was
+  built profiled or, because its own unprofiled build fails, unprofiled. Any
+  other failure of the hook fails the case. `$262.agent` worker programs stay
+  unprofiled.
+- `scriptw precompile --profile <swprof>`. The CLI compiles with `filename` set
+  to the source path as typed, and has no way to collect, so only a profile
+  an embedder collected under exactly those options is admitted.
 
 ## Validation
 
-- `scriptw-aot-wasm --lib profile`: codec, admission, collector and classifier.
+- `scriptw-aot-wasm --lib profile`: codec (including observations collection
+  cannot make), admission, collector, classifier and the guards' proof steps.
 - `scriptw-aot-wasm --test emission profile_application`: site maps under every
-  profile, true-kind specialisation, byte-identical empty profiles, Collect-mode
+  profile, specialisation, byte-identical empty profiles, Collect-mode
   instrumentation; `SCRIPTW_PGO_CORPUS=1` over the CLI fixtures.
-- `scriptw-engine --lib embedding::tests::execution_profile`: executed counters
-  (main 1, probe body 64, probe read 64), dump kinds, polymorphic and
-  megamorphic flags, Collect and every applied profile (true and two
-  adversarial seeds) observably identical to the unprofiled build, codec and
-  admission round trip against the unprofiled key, distinct cache keys and
-  refusals; a true profile's guards must spend less Wasm fuel than the
-  unprofiled build, which shows they prove their kind.
-- `scriptw-engine --lib tests::execution_profile`: the exactness fixtures. Each
-  trains one site, then meets a Proxy receiver, a getter added to the
-  prototype, `setPrototypeOf`, `delete`, `defineProperty` (non-writable,
-  accessor, non-enumerable), `freeze`/`seal`/`preventExtensions`, a key or
-  method added to `Object.prototype`, a `String.prototype` edit or a receiver
-  from another Realm; unprofiled, Collect, true-kind and three adversarial
-  builds observe the same completion and output.
-- RSC host and Test262 subtrees with the hooks above against unprofiled runs.
+- `scriptw-engine --lib embedding::tests::execution_profile`, all executed in
+  Wasmtime:
+  - the emission fixtures trained for real: counters (main 1, probe body 64,
+    probe read 64, except an Array receiver, whose probe read reaches the
+    site record once), the kind each decodes to, polymorphic and megamorphic
+    flags, the codec and admission round trip against the unprofiled key,
+    and a true profile's guards spending less Wasm fuel than the unprofiled
+    build;
+  - the exactness fixtures: each trains its probe site under Collect on
+    `train()` alone, the true profile's guard must hit (less fuel for
+    `train()`), and then `mutate()` meets a Proxy receiver, a getter or
+    redefinition on the prototype, `setPrototypeOf` on the receiver and on the
+    prototype, `delete`, `defineProperty` (non-writable, accessor,
+    non-enumerable), `freeze`/`seal`/`preventExtensions`, a key or method on
+    `Object.prototype`, a `String.prototype` edit, or receivers of another
+    Realm. Unprofiled, Collect, true and three adversarial builds answer
+    identically, as Modules through embedding and as Scripts through the
+    engine's run path;
+  - distinct cache keys and typed refusals.
+- Retained RSC requests: Collect (sync), the true profile and adversarial seeds
+  0 and 1 (sync and async) pass the host's exact Flight output check.
+- Test262, wasm-aot, the same 15 subtrees unprofiled and with each hook
+  (property-accessors, assignment, call, delete, compound-assignment and super
+  expressions; class and for-in statements; Object, Proxy, Reflect, WeakMap,
+  Array.prototype.push, Function.prototype.call, String.prototype); results
+  in the verdict section.
 
 ## Measured verdict (2026-11-20)
 
@@ -128,7 +155,39 @@ The guards convert half of the R read-entry calls, but in the hottest body
 (`vn`) they cost about 145 instructions per converted call, nearly the R
 proof they replace, so only the call overhead is saved. The remaining entry
 calls are at hot sites whose records prove more than one kind. A Collect
-build's P is 2.3% larger, an adversarial one's 20%. Native preparation showed
-no measurable change (three alternating runs on a loaded machine: process
-user CPU 8.47–8.67 s unprofiled, 8.51–8.76 s applied). A guard for an own
-array slot is not emitted where the site's own inline hit already proves it.
+build's P is 2.3% larger, an adversarial one's 20%. A guard for an own array
+slot is not emitted where the site's own inline hit already proves it.
+
+Test262 (pinned suite, wasm-aot, `--threads` 2–3, 60 s case timeout):
+
+| run | subtrees | cases | pass |
+|---|---|---:|---:|
+| unprofiled | all 15 | 21,282 | 21,282 |
+| adversarial seed 0 | all 15 | 21,282 | 21,282 |
+| Collect | 12 (all but class, Object, String.prototype) | 3,674 | 3,674 |
+
+Per-case results are identical to the unprofiled run's in every case run.
+The unprofiled run used the build before the own-array guard skip, whose
+unprofiled P is the same; the adversarial and Collect runs used the build
+with it. Collect over the three largest subtrees was still running when this
+was written (the first 6,850 class cases identical).
+
+Not verified:
+
+- Native preparation time: three alternating runs on a machine at load about
+  10 gave process user CPU 8.47–8.67 s unprofiled and 8.51–8.76 s applied;
+  the ranges overlap, so no change was measured reliably.
+- Test262 `Function.prototype.apply` and `bind` and
+  `annexB/built-ins/Object/prototype/__proto__` from the design's list were
+  not run, nor Collect over class, Object and String.prototype in full.
+- The Test262 runs above predate the hook's case log, so how many cases were
+  built profiled is not recorded. Cases whose own unprofiled build fails
+  (parse and early-error negatives) run unprofiled by design; the adversarial
+  build compiles the program twice and its P is about 20% larger, and the
+  adversarial pass ran about twice as long, so the profile was applied. With
+  the log, the property-accessors subtree builds 40 of 42 cases profiled and
+  its 2 parse negatives unprofiled.
+- `scriptw precompile --profile` end to end with a matching profile (only its
+  argument parsing and its refusals of a foreign or malformed profile ran).
+- Collect mode of the graph and rooted-snapshot emission, and `$262.agent`
+  worker programs under any profile.

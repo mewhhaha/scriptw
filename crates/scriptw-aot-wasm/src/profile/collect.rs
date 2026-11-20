@@ -275,8 +275,9 @@ pub(super) fn decode(
         if offset % COUNTER_BYTES != 0 {
             return Err(ProfileError::Malformed("a profile counter is misaligned"));
         }
-        let bytes = memory
-            .get(at..at + COUNTER_BYTES as usize)
+        let bytes = at
+            .checked_add(COUNTER_BYTES as usize)
+            .and_then(|end| memory.get(at..end))
             .ok_or(ProfileError::Malformed(
                 "a profile counter is out of bounds",
             ))?;
@@ -303,9 +304,14 @@ pub(super) fn decode(
         let executions = counter(reader.u32()?)?;
         let observation = match site.kind {
             SiteKind::PropertyRead => {
-                let at = reader.u32()? as usize;
-                let slot = memory
-                    .get(at..at + DUMP_SLOT_BYTES as usize)
+                let offset = reader.u32()?;
+                if offset % COUNTER_BYTES != 0 {
+                    return Err(ProfileError::Malformed("a dump slot is misaligned"));
+                }
+                let at = offset as usize;
+                let slot = at
+                    .checked_add(DUMP_SLOT_BYTES as usize)
+                    .and_then(|end| memory.get(at..end))
                     .ok_or(ProfileError::Malformed("a dump slot is out of bounds"))?;
                 let dumped = observe_dump_slot(slot).map_err(ProfileError::Malformed)?;
                 Some(ReadSiteObservation {

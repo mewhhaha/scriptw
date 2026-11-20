@@ -4435,44 +4435,70 @@ fn language_features_for_case(case: &TestCase) -> scriptw_engine::LanguageFeatur
     policy
 }
 
-/// Verification only, never for a published run: with
-/// `SCRIPTW_TEST262_EXECUTION_PROFILE=collect` every Wasm AOT case is built
-/// instrumented to collect an execution profile, and with
+/// Verification only (feature `profile-experiments`, never in a publishing
+/// build): with `SCRIPTW_TEST262_EXECUTION_PROFILE=collect` every Wasm AOT
+/// case is built instrumented to collect an execution profile, and with
 /// `adversarial:<seed>` it is built with a wrong profile (every read site
 /// hot, its kind rotated from the seed). Both must leave every result
-/// unchanged: a profile costs speed only. A case whose unprofiled build
-/// fails keeps that failure.
-const VERIFICATION_EXECUTION_PROFILE_ENV: &str = "SCRIPTW_TEST262_EXECUTION_PROFILE";
-
+/// unchanged: a profile costs speed only. `$262.agent` worker programs stay
+/// unprofiled. `SCRIPTW_TEST262_EXECUTION_PROFILE_LOG` must name a file;
+/// each case appends whether it was built profiled or, because its own
+/// unprofiled build fails, unprofiled, so a run can count what it covered.
+#[cfg(feature = "profile-experiments")]
 fn verification_execution_profile(
     engine: &Engine,
+    case: &TestCase,
     materialized: &MaterializedTest,
     options: &mut CompileOptions,
 ) -> Result<(), String> {
-    let Some(choice) = std::env::var_os(VERIFICATION_EXECUTION_PROFILE_ENV) else {
+    const CHOICE: &str = "SCRIPTW_TEST262_EXECUTION_PROFILE";
+    const LOG: &str = "SCRIPTW_TEST262_EXECUTION_PROFILE_LOG";
+    let Some(choice) = std::env::var_os(CHOICE) else {
         return Ok(());
     };
+    let log = std::env::var_os(LOG).ok_or_else(|| format!("{CHOICE} requires {LOG}"))?;
     let choice = choice.to_str().unwrap_or_default();
-    if choice == "collect" {
+    let built = if choice == "collect" {
         options.execution_profile = scriptw_engine::ExecutionProfileUse::Collect;
-        return Ok(());
-    }
-    let seed = choice
-        .strip_prefix("adversarial:")
-        .and_then(|seed| seed.parse::<usize>().ok())
-        .ok_or_else(|| {
-            format!("{VERIFICATION_EXECUTION_PROFILE_ENV} must be collect or adversarial:<seed>")
-        })?;
-    let goal = if materialized.execution_mode().is_module() {
-        scriptw_engine::EmbeddedModuleGoal::Module
+        "profiled"
     } else {
-        scriptw_engine::EmbeddedModuleGoal::Script
+        let seed = choice
+            .strip_prefix("adversarial:")
+            .and_then(|seed| seed.parse::<usize>().ok())
+            .ok_or_else(|| format!("{CHOICE} must be collect or adversarial:<seed>"))?;
+        let goal = if materialized.execution_mode().is_module() {
+            scriptw_engine::EmbeddedModuleGoal::Module
+        } else {
+            scriptw_engine::EmbeddedModuleGoal::Script
+        };
+        match engine
+            .adversarial_execution_profile(&materialized.source, goal, options, seed)
+            .map_err(|error| format!("{CHOICE}: {error}"))?
+        {
+            Some(profile) => {
+                options.execution_profile =
+                    scriptw_engine::ExecutionProfileUse::Apply(Arc::new(profile));
+                "profiled"
+            }
+            None => "unprofiled-own-build-fails",
+        }
     };
-    if let Ok(profile) =
-        engine.adversarial_execution_profile(&materialized.source, goal, options, seed)
-    {
-        options.execution_profile = scriptw_engine::ExecutionProfileUse::Apply(Arc::new(profile));
-    }
+    use std::io::Write as _;
+    fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log)
+        .and_then(|mut file| writeln!(file, "{built} {}", case.execution_id))
+        .map_err(|error| format!("{LOG}: {error}"))
+}
+
+#[cfg(not(feature = "profile-experiments"))]
+fn verification_execution_profile(
+    _: &Engine,
+    _: &TestCase,
+    _: &MaterializedTest,
+    _: &mut CompileOptions,
+) -> Result<(), String> {
     Ok(())
 }
 
@@ -5432,11 +5458,10 @@ fn run_one_case_with_execution(
                 compile_options.module_loading_policy =
                     ModuleLoadingPolicy::Embedded(catalog.graph);
             }
-            verification_execution_profile(&engine, &materialized, &mut compile_options).map_err(
-                |detail| {
+            verification_execution_profile(&engine, case, &materialized, &mut compile_options)
+                .map_err(|detail| {
                     classify_failure(case.execution_id.clone(), FailureKind::HostHarness, detail)
-                },
-            )?;
+                })?;
         }
 
         // Parse/early-negative tests use an explicit compile path. Wasm-AOT

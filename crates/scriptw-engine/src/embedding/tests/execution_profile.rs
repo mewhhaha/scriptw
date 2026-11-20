@@ -154,18 +154,7 @@ fn execute(artifact: &Artifact) -> (String, Option<Result<ExecutionProfile, Engi
 /// kind skips the R read entry, so a true profile spends less than the
 /// unprofiled build and a guard that never proves spends more.
 fn fuel(artifact: &Artifact) -> u64 {
-    static ENGINE: std::sync::OnceLock<WasmtimeEngine> = std::sync::OnceLock::new();
-    let engine = ENGINE.get_or_init(|| {
-        let mut config = WasmtimeConfig::new();
-        configure_wasm_runtime(
-            &mut config,
-            NativeCompilationPolicy::Fast,
-            crate::CompilationJobs::current(),
-        );
-        config.consume_fuel(true);
-        WasmtimeEngine::new(&config).unwrap()
-    });
-    let runtime = EmbeddedRuntime::compile(engine, artifact).unwrap();
+    let runtime = EmbeddedRuntime::compile(fuel_engine(), artifact).unwrap();
     let mut store = store(&runtime, 0.0);
     store.set_fuel(u64::MAX / 2).unwrap();
     let mut linker = WasmtimeLinker::new(&runtime.engine);
@@ -314,7 +303,8 @@ fn check_fixture(name: &str, source: &str) -> Trained {
                 &CompileOptions::default(),
                 seed,
             )
-            .unwrap();
+            .unwrap()
+            .expect("the fixture compiles");
         assert_eq!(wrong.program().bytes(), &key, "{name}");
         let applied = compile(source, ExecutionProfileUse::Apply(Arc::new(wrong))).unwrap();
         assert!(applied.bytes.len() > unprofiled.bytes.len(), "{name}");
@@ -426,7 +416,18 @@ fn profiles_are_never_silently_ignored() {
     let error = instance
         .collect_profile(&mut store, NonZeroU32::MIN)
         .unwrap_err();
-    assert!(error.to_string().contains("Collect"), "{error}");
+    assert_eq!(
+        error.execution_profile_error(),
+        Some(&ProfileError::NotCollecting),
+        "{error}"
+    );
+
+    // A precompiled image keeps no raw P, so it never holds a Collect build.
+    let collecting = compile(own, ExecutionProfileUse::Collect).unwrap();
+    let error = EmbeddedRuntime::precompile(&shared_wasm_engine().unwrap(), &collecting)
+        .err()
+        .expect("a Collect build is not precompiled");
+    assert!(error.to_string().contains("profile-collecting"), "{error}");
 
     let (_, trained) = train(own);
     let error = compile(other, ExecutionProfileUse::Apply(Arc::new(trained))).unwrap_err();
@@ -434,5 +435,473 @@ fn profiles_are_never_silently_ignored() {
         error.execution_profile_error(),
         Some(&ProfileError::Mismatch(ProfileMismatch::Program)),
         "a foreign profile: {error}"
+    );
+}
+
+/// Exactness (design section 5): a read site trained on one receiver shape
+/// keeps every answer once the receiver, its prototype chain or a Realm
+/// changes. Each fixture defines `train`, which reads through `probe` 64
+/// times, and `mutate`, which changes what the read must see and reads
+/// again. A Collect build is trained on `train` alone, so its profile is
+/// the one the mutation invalidates; that true profile must prove its kind
+/// (less fuel for `train` than the unprofiled build) and then answer
+/// exactly as the unprofiled, Collect and adversarial builds do. The same
+/// sources also run as Scripts through the engine's own run path.
+const EXACTNESS_FIXTURES: &[(&str, &str)] = &[
+    (
+        "Proxy receiver",
+        r#"
+function probe(o) { return o.x; }
+function train() { var t = 0; for (var i = 0; i < 64; i++) t += probe({ x: i }); return t; }
+function mutate() {
+  var out = [probe({ x: 'own' })];
+  out.push(probe(new Proxy({ x: 1 }, { get: function (t, k) { return 'trap:' + String(k); } })));
+  out.push(probe(new Proxy({ x: 'target' }, {})));
+  return out.join('|');
+}
+"#,
+    ),
+    (
+        "getter added to the prototype",
+        r#"
+function C() {}
+C.prototype.x = 'data';
+function probe(o) { return o.x; }
+function train() { var t = ''; for (var i = 0; i < 64; i++) t = probe(new C()); return t; }
+function mutate() {
+  var out = [probe(new C())];
+  Object.defineProperty(C.prototype, 'x', { get: function () { return 'getter:' + (this instanceof C); }, configurable: true });
+  out.push(probe(new C()));
+  Object.defineProperty(C.prototype, 'x', { value: 'redefined', writable: false });
+  out.push(probe(new C()));
+  return out.join('|');
+}
+"#,
+    ),
+    (
+        "setPrototypeOf",
+        r#"
+function C() {}
+C.prototype.x = 'class';
+function probe(o) { return o.x; }
+function train() { var t = ''; for (var i = 0; i < 64; i++) t = probe(new C()); return t; }
+function mutate() {
+  var o = new C();
+  Object.setPrototypeOf(o, { x: 'other' });
+  var out = [probe(o)];
+  Object.setPrototypeOf(o, null);
+  out.push(String(probe(o)));
+  Object.setPrototypeOf(C.prototype, { x: 'grand' });
+  delete C.prototype.x;
+  out.push(probe(new C()));
+  return out.join('|');
+}
+"#,
+    ),
+    (
+        "delete",
+        r#"
+function probe(o) { return o.x; }
+function train() { var t = 0; for (var i = 0; i < 64; i++) t += probe({ x: i }); return t; }
+function mutate() {
+  var o = { x: 1 };
+  delete o.x;
+  var out = [String(probe(o))];
+  var p = { x: 2, y: 3 };
+  delete p.y;
+  out.push(probe(p));
+  var q = { y: 1, x: 'after' };
+  delete q.y;
+  out.push(probe(q));
+  return out.join('|');
+}
+"#,
+    ),
+    (
+        "defineProperty non-writable, accessor and non-enumerable",
+        r#"
+function probe(o) { return o.x; }
+function train() { var t = 0; for (var i = 0; i < 64; i++) t += probe({ x: i }); return t; }
+function mutate() {
+  var a = { x: 1 };
+  Object.defineProperty(a, 'x', { value: 'read-only', writable: false });
+  var out = [probe(a)];
+  var b = { x: 1 };
+  Object.defineProperty(b, 'x', { get: function () { return 'accessor'; } });
+  out.push(probe(b));
+  var c = { x: 'hidden' };
+  Object.defineProperty(c, 'x', { enumerable: false });
+  out.push(probe(c));
+  return out.join('|');
+}
+"#,
+    ),
+    (
+        "freeze, seal and preventExtensions",
+        r#"
+function probe(o) { return o.x; }
+function train() { var t = 0; for (var i = 0; i < 64; i++) t += probe({ x: i }); return t; }
+function mutate() {
+  var out = [probe(Object.freeze({ x: 'frozen' })), probe(Object.seal({ x: 'sealed' }))];
+  var e = { x: 'non-extensible' };
+  Object.preventExtensions(e);
+  out.push(probe(e));
+  return out.join('|');
+}
+"#,
+    ),
+    (
+        "key added to Object.prototype",
+        r#"
+function probe(o) { return o.x; }
+function train() { var t = 0; for (var i = 0; i < 64; i++) if (probe({ y: i }) === undefined) t++; return t; }
+function mutate() {
+  Object.prototype.x = 'inherited';
+  var out = [probe({ y: 1 })];
+  Object.defineProperty(Object.prototype, 'x', { get: function () { return 'getter'; }, configurable: true });
+  out.push(probe({ y: 2 }));
+  delete Object.prototype.x;
+  out.push(String(probe({ y: 3 })));
+  return out.join('|');
+}
+"#,
+    ),
+    (
+        "Object.prototype method replaced",
+        r#"
+var original = Object.prototype.hasOwnProperty;
+function probe(o) { return o.hasOwnProperty; }
+function train() { var t = 0; for (var i = 0; i < 64; i++) if (probe({ y: i }) === original) t++; return t; }
+function mutate() {
+  Object.prototype.hasOwnProperty = function () { return 'patched'; };
+  var out = [probe({ y: 1 })()];
+  out.push(probe({ y: 1, hasOwnProperty: function () { return 'own'; } })());
+  Object.prototype.hasOwnProperty = original;
+  out.push(String(probe({ y: 1 }) === original));
+  return out.join('|');
+}
+"#,
+    ),
+    (
+        "String.prototype edit",
+        r#"
+var original = String.prototype.slice;
+function probe(s) { return s.slice; }
+function train() { var t = 0; for (var i = 0; i < 64; i++) if (probe('abc') === original) t++; return t; }
+function mutate() {
+  String.prototype.slice = function () { return 'patched:' + this; };
+  var out = [probe('abc').call('abc')];
+  Object.defineProperty(String.prototype, 'slice', { get: function () { return function () { return 'getter'; }; }, configurable: true });
+  out.push(probe('abc')());
+  delete String.prototype.slice;
+  out.push(String(probe('abc')));
+  return out.join('|');
+}
+"#,
+    ),
+];
+
+/// The other-Realm fixtures need the Test262 host's `__scriptwCreateRealm`.
+const OTHER_REALM_FIXTURES: &[(&str, &str)] = &[
+    (
+        "other-Realm ordinary receiver",
+        r#"
+var original = Object.prototype.hasOwnProperty;
+function probe(o) { return o.hasOwnProperty; }
+function train() { var t = 0; for (var i = 0; i < 64; i++) if (probe({ y: i }) === original) t++; return t; }
+function mutate() {
+  var other = __scriptwCreateRealm().global;
+  var foreign = new other.Object();
+  var out = [probe(foreign) === other.Object.prototype.hasOwnProperty, probe(foreign) === original];
+  other.Object.prototype.hasOwnProperty = function () { return 'other realm'; };
+  out.push(probe(foreign)());
+  out.push(probe({ y: 1 }) === original);
+  return out.join('|');
+}
+"#,
+    ),
+    (
+        "other-Realm WeakMap and String.prototype",
+        r#"
+var w = new WeakMap();
+function probe(o) { return o.get; }
+function train() { var t = 0; for (var i = 0; i < 64; i++) if (probe(w) === WeakMap.prototype.get) t++; return t; }
+function mutate() {
+  var other = __scriptwCreateRealm().global;
+  var foreign = new other.WeakMap();
+  var out = [probe(foreign) === other.WeakMap.prototype.get, probe(foreign) === WeakMap.prototype.get];
+  other.String.prototype.slice = function () { return 'other realm'; };
+  out.push('abc'.slice(1));
+  return out.join('|');
+}
+"#,
+    ),
+];
+
+fn exactness_options(
+    surface: HostSurfacePolicy,
+    execution_profile: ExecutionProfileUse,
+) -> CompileOptions {
+    CompileOptions {
+        host_surface_policy: surface,
+        execution_profile,
+        ..CompileOptions::default()
+    }
+}
+
+fn exactness_module(
+    source: &str,
+    surface: HostSurfacePolicy,
+    execution_profile: ExecutionProfileUse,
+) -> Artifact {
+    configure_compilation_jobs(1).unwrap();
+    let compiler = Engine::new(RealmBuilder::new().build());
+    let unit = compiler
+        .compile_module(source, exactness_options(surface, execution_profile))
+        .unwrap_or_else(|error| panic!("{error}"));
+    compiler.emit_wasm(&unit).unwrap()
+}
+
+/// What `train` and `mutate` return and print, the fuel `train` spent, and
+/// the profile a Collect build recorded during `train` alone.
+fn run_exactness(artifact: &Artifact) -> (String, u64, Option<ExecutionProfile>) {
+    let runtime = EmbeddedRuntime::compile(fuel_engine(), artifact).unwrap();
+    let mut store = store(&runtime, 0.0);
+    store.set_fuel(u64::MAX / 2).unwrap();
+    let mut linker = WasmtimeLinker::new(&runtime.engine);
+    runtime.register(&mut store, &mut linker).unwrap();
+    let mut instance = runtime.instantiate(&mut store, &mut linker).unwrap();
+    assert!(matches!(
+        instance.initialize(&mut store).unwrap(),
+        EmbeddedEvaluation::Settled(JsCompletion::Normal(_))
+    ));
+    let call = |store: &mut WasmtimeStore<WasmStoreState>, name: &str| {
+        let function = match instance.get_export(store, name).unwrap() {
+            JsCompletion::Normal(function) => function,
+            JsCompletion::Throw(error) => panic!("export {name} threw {error:?}"),
+        };
+        match instance.call(store, &function, None, &[]).unwrap() {
+            JsCompletion::Normal(value) => format!("{name} {:?}", value.observe(store).unwrap()),
+            JsCompletion::Throw(value) => {
+                format!("{name} threw {:?}", value.observe(store).unwrap())
+            }
+        }
+    };
+    let before = store.get_fuel().unwrap();
+    let trained = call(&mut store, "train");
+    let train_fuel = before - store.get_fuel().unwrap();
+    let profile = runtime.profile_sites.is_some().then(|| {
+        instance
+            .collect_profile(&mut store, NonZeroU32::MIN)
+            .unwrap()
+    });
+    let mutated = call(&mut store, "mutate");
+    let output = instance.take_output(&mut store).unwrap();
+    (
+        format!("{trained} {mutated} {output:?}"),
+        train_fuel,
+        profile,
+    )
+}
+
+fn fuel_engine() -> &'static WasmtimeEngine {
+    static ENGINE: std::sync::OnceLock<WasmtimeEngine> = std::sync::OnceLock::new();
+    ENGINE.get_or_init(|| {
+        let mut config = WasmtimeConfig::new();
+        configure_wasm_runtime(
+            &mut config,
+            NativeCompilationPolicy::Fast,
+            crate::CompilationJobs::current(),
+        );
+        config.consume_fuel(true);
+        WasmtimeEngine::new(&config).unwrap()
+    })
+}
+
+fn module_probe_bodies(source: &str, surface: HostSurfacePolicy) -> Vec<SiteBody> {
+    let compiler = Engine::new(RealmBuilder::new().build());
+    let unit = compiler
+        .compile_module(
+            source,
+            exactness_options(surface, ExecutionProfileUse::None),
+        )
+        .unwrap();
+    let artifact = run_on_sized_stack(|| {
+        scriptw_aot_wasm::emit_with_intl_profile_and_runtime_inputs(
+            &unit.ir,
+            unit.promise_rejection_policy,
+            &unit.intl_profile,
+            scriptw_aot_wasm::RuntimeArtifactInputs::new(None),
+            scriptw_aot_wasm::ProfileMode::None,
+        )
+        .unwrap()
+    });
+    artifact
+        .function_sizes
+        .iter()
+        .filter_map(|body| body.name.strip_prefix("js::probe#"))
+        .map(|id| SiteBody::Source(id.to_owned()))
+        .collect()
+}
+
+/// Checks one exactness fixture and returns what went wrong.
+fn check_exactness(name: &str, body: &str, surface: HostSurfacePolicy) -> Vec<String> {
+    let mut problems = Vec::new();
+    let module = format!("{body}\nexport {{ train, mutate }};\n");
+    let (expected, unprofiled_fuel, _) = run_exactness(&exactness_module(
+        &module,
+        surface,
+        ExecutionProfileUse::None,
+    ));
+    if expected.contains("threw") {
+        problems.push(format!("{name}: the unprofiled build throws: {expected}"));
+    }
+    let (collected, _, profile) = run_exactness(&exactness_module(
+        &module,
+        surface,
+        ExecutionProfileUse::Collect,
+    ));
+    if collected != expected {
+        problems.push(format!("{name}: Collect {collected} against {expected}"));
+    }
+    let profile = profile.expect("a Collect build records");
+    let probe = module_probe_bodies(&module, surface);
+    let trained = profile
+        .reads()
+        .filter(|(site, read)| probe.contains(site.body()) && read.executions > 0)
+        .map(|(_, read)| *read)
+        .collect::<Vec<_>>();
+    let kind = match trained.as_slice() {
+        [read] if read.executions == 64 && read.dominant.is_some() => read.dominant,
+        _ => {
+            problems.push(format!(
+                "{name}: probe site not trained to one kind: {trained:?}"
+            ));
+            None
+        }
+    };
+    let (applied, applied_fuel, _) = run_exactness(&exactness_module(
+        &module,
+        surface,
+        ExecutionProfileUse::Apply(Arc::new(profile)),
+    ));
+    if applied != expected {
+        problems.push(format!(
+            "{name}: true profile ({kind:?}) {applied} against {expected}"
+        ));
+    }
+    if applied_fuel >= unprofiled_fuel {
+        problems.push(format!(
+            "{name}: the trained {kind:?} guard does not hit before the mutation ({applied_fuel} fuel against {unprofiled_fuel})"
+        ));
+    }
+    for seed in 0..3 {
+        let wrong = Engine::new(RealmBuilder::new().build())
+            .adversarial_execution_profile(
+                &module,
+                EmbeddedModuleGoal::Module,
+                &exactness_options(surface, ExecutionProfileUse::None),
+                seed,
+            )
+            .unwrap()
+            .expect("the fixture compiles");
+        let (wrongly, _, _) = run_exactness(&exactness_module(
+            &module,
+            surface,
+            ExecutionProfileUse::Apply(Arc::new(wrong)),
+        ));
+        if wrongly != expected {
+            problems.push(format!(
+                "{name}: adversarial {seed} {wrongly} against {expected}"
+            ));
+        }
+    }
+
+    // The engine's own run path, as a Script.
+    let script =
+        format!("{body}\nvar trained = train();\nvar mutated = mutate();\nprint(trained + ' ' + mutated);\nmutated;\n");
+    let observe = |execution_profile| {
+        let outcome = Engine::new(RealmBuilder::new().build())
+            .observe_script(
+                &script,
+                exactness_options(surface, execution_profile),
+                RunOptions::default(),
+            )
+            .unwrap_or_else(|error| panic!("{name}: {error}"));
+        format!("{:?} {:?}", outcome.completion, outcome.output_events)
+    };
+    let expected = observe(ExecutionProfileUse::None);
+    let mut profiles = vec![("Collect".to_owned(), ExecutionProfileUse::Collect)];
+    for seed in 0..3 {
+        let wrong = Engine::new(RealmBuilder::new().build())
+            .adversarial_execution_profile(
+                &script,
+                EmbeddedModuleGoal::Script,
+                &exactness_options(surface, ExecutionProfileUse::None),
+                seed,
+            )
+            .unwrap()
+            .expect("the fixture compiles");
+        profiles.push((
+            format!("adversarial {seed}"),
+            ExecutionProfileUse::Apply(Arc::new(wrong)),
+        ));
+    }
+    for (what, profile) in profiles {
+        let observed = observe(profile);
+        if observed != expected {
+            problems.push(format!(
+                "{name}: run path {what} {observed} against {expected}"
+            ));
+        }
+    }
+    problems
+}
+
+#[test]
+fn trained_sites_keep_every_answer_after_the_receiver_or_its_chain_changes() {
+    let problems = EXACTNESS_FIXTURES
+        .iter()
+        .flat_map(|(name, body)| check_exactness(name, body, HostSurfacePolicy::Product))
+        .collect::<Vec<_>>();
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+#[test]
+fn trained_sites_keep_every_answer_for_receivers_of_another_realm() {
+    let problems = OTHER_REALM_FIXTURES
+        .iter()
+        .flat_map(|(name, body)| check_exactness(name, body, HostSurfacePolicy::Test262))
+        .collect::<Vec<_>>();
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+#[test]
+fn a_profile_of_another_program_is_a_typed_refusal_on_the_run_path() {
+    let (own, other) = (EXACTNESS_FIXTURES[3].1, EXACTNESS_FIXTURES[5].1);
+    let own = format!("{own}\ntrain();\n");
+    let wrong = Engine::new(RealmBuilder::new().build())
+        .adversarial_execution_profile(
+            &own,
+            EmbeddedModuleGoal::Script,
+            &CompileOptions::default(),
+            0,
+        )
+        .unwrap()
+        .expect("the fixture compiles");
+    let error = Engine::new(RealmBuilder::new().build())
+        .observe_script(
+            &format!("{other}\ntrain();\n"),
+            CompileOptions {
+                execution_profile: ExecutionProfileUse::Apply(Arc::new(wrong)),
+                ..CompileOptions::default()
+            },
+            RunOptions::default(),
+        )
+        .unwrap_err();
+    assert_eq!(
+        error.execution_profile_error(),
+        Some(&ProfileError::Mismatch(ProfileMismatch::Program)),
+        "{error}"
     );
 }

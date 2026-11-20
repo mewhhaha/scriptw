@@ -21,6 +21,10 @@ wasmtime = { version = "=47.0.0", default-features = false, features = ["cache",
 wasmtime-fiber = { package = "wasmtime-internal-fiber", version = "=47.0.0", features = ["std"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
+rustix = { version = "=1.1.4", features = ["fs", "time"] }
+
+# The pooled-store tests page memory out and read /proc/self/pagemap.
+[target.'cfg(target_os = "linux")'.dev-dependencies]
 rustix = { version = "=1.1.4", features = ["fs", "mm", "param", "time"] }
 
 [build-dependencies]
@@ -33,6 +37,9 @@ default = ["native-source-compiler"]
 native-source-compiler = []
 # Off by default; address-only hooks for excluded precompiled phase diagnostics.
 benchmark-module-images = []
+# Off by default: verification-only hooks of profile-guided compilation
+# (wrong-profile builders). Never enable it for a shipped/product build.
+profile-experiments = []
 # Off by default: keeps the Boa interpreter (scriptw-spec-exec / boa_engine)
 # out of product and release builds. Only enable for developer-only
 # differential-oracle testing (see AGENTS.md and conformance area T25). Never enable this

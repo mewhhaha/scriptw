@@ -1538,8 +1538,6 @@ mod cache;
 mod control_flow;
 #[path = "tests/execution.rs"]
 mod execution;
-#[path = "tests/execution_profile.rs"]
-mod execution_profile;
 #[path = "tests/foreign_capabilities.rs"]
 mod foreign_capabilities;
 #[path = "tests/functions.rs"]

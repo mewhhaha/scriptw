@@ -4,9 +4,9 @@
 use scriptw_engine::{
     configure_compilation_jobs, configure_precompiled_wasm_runtime, configure_wasm_runtime,
     CompilationJobs, CompileOptions, CompilerIdentity, CompilerSourceRevision, EmbeddedEvaluation,
-    EmbeddedInstance, EmbeddedModuleGoal, EmbeddedRuntime, Engine, ExecutionProfile,
-    ExecutionProfileUse, ForeignValue, JsCompletion, JsPromiseState, JsValue,
-    NativeCompilationPolicy, PrecompiledEmbeddedProgram, RealmBuilder, WasmStoreState,
+    EmbeddedInstance, EmbeddedRuntime, Engine, ExecutionProfile, ExecutionProfileUse, ForeignValue,
+    JsCompletion, JsPromiseState, JsValue, NativeCompilationPolicy, PrecompiledEmbeddedProgram,
+    RealmBuilder, WasmStoreState,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -153,11 +153,13 @@ impl ProfileBarrier {
 /// program, trains it on this run's requests and writes their profile to a
 /// new file; `SCRIPTW_RSC_PROFILE_USE=<path>` builds with a profile of this
 /// same bundle and compiler; `SCRIPTW_RSC_PROFILE_ADVERSARIAL=<seed>` builds
-/// with a wrong one (every read site hot, its kind rotated from the seed).
-/// The exact Flight output check is unchanged in all three.
+/// with a wrong one (every read site hot, its kind rotated from the seed;
+/// only with the `profile-experiments` feature). The exact Flight output
+/// check is unchanged in all three.
 enum ExecutionProfileHook {
     Collect(PathBuf),
     Use(PathBuf),
+    #[cfg(feature = "profile-experiments")]
     Adversarial(usize),
 }
 
@@ -170,10 +172,17 @@ impl ExecutionProfileHook {
             (None, None, None) => None,
             (Some(path), None, None) => Some(Self::Collect(path)),
             (None, Some(path), None) => Some(Self::Use(path)),
+            #[cfg(feature = "profile-experiments")]
             (None, None, Some(seed)) => {
                 Some(Self::Adversarial(seed.parse().map_err(|_| {
                     "SCRIPTW_RSC_PROFILE_ADVERSARIAL must be a seed"
                 })?))
+            }
+            #[cfg(not(feature = "profile-experiments"))]
+            (None, None, Some(_)) => {
+                return Err(
+                    "SCRIPTW_RSC_PROFILE_ADVERSARIAL needs the profile-experiments feature".into(),
+                )
             }
             _ => return Err("choose at most one execution profile diagnostic".into()),
         })
@@ -183,6 +192,7 @@ impl ExecutionProfileHook {
         match self {
             Self::Collect(_) => "collect",
             Self::Use(_) => "apply",
+            #[cfg(feature = "profile-experiments")]
             Self::Adversarial(_) => "adversarial",
         }
     }
@@ -434,13 +444,16 @@ fn run() -> Result<Value> {
                 }));
                 ExecutionProfileUse::Apply(std::sync::Arc::new(applied))
             }
+            #[cfg(feature = "profile-experiments")]
             Some(ExecutionProfileHook::Adversarial(seed)) => {
-                let wrong = compiler.adversarial_execution_profile(
-                    &source,
-                    EmbeddedModuleGoal::Module,
-                    &CompileOptions::default(),
-                    *seed,
-                )?;
+                let wrong = compiler
+                    .adversarial_execution_profile(
+                        &source,
+                        scriptw_engine::EmbeddedModuleGoal::Module,
+                        &CompileOptions::default(),
+                        *seed,
+                    )?
+                    .ok_or("the bundle does not compile unprofiled")?;
                 execution_profile_report = Some(json!({
                     "seed":seed,"hot_read_sites":wrong.hot_reads().count(),
                 }));
@@ -666,6 +679,8 @@ fn run() -> Result<Value> {
             "exact_node_output_checked":true,"expected_json_sha256":hash(expected.as_bytes()),
             "expected_json_bytes":expected.len()}));
     }
+    // The counters also count module initialization and the encode() calls
+    // after each request, so executions per request read slightly high.
     let training_requests = cases.len() * calls;
     if let Some(ExecutionProfileHook::Collect(path)) = &execution_profile_hook {
         let requests = u32::try_from(training_requests)

@@ -15,7 +15,8 @@ struct PrecompileArgs {
     source: String,
     module: bool,
     output: PathBuf,
-    /// An execution profile of this same program and compiler to build with.
+    /// An execution profile of this same program and compiler to build
+    /// with (feature `profile-experiments` only).
     profile: Option<PathBuf>,
 }
 
@@ -24,6 +25,7 @@ fn parse(args: &[String]) -> Result<PrecompileArgs, String> {
     let mut source = None;
     let mut force_module = false;
     let mut output = None;
+    #[cfg_attr(not(feature = "profile-experiments"), allow(unused_mut))]
     let mut profile = None;
     let mut args = args.iter();
     while let Some(argument) = args.next() {
@@ -47,6 +49,7 @@ fn parse(args: &[String]) -> Result<PrecompileArgs, String> {
                     .ok_or_else(|| format!("{argument} needs an image path"))?;
                 output = Some(PathBuf::from(path));
             }
+            #[cfg(feature = "profile-experiments")]
             "--profile" if profile.is_none() => {
                 let path = args
                     .next()
@@ -55,7 +58,11 @@ fn parse(args: &[String]) -> Result<PrecompileArgs, String> {
                 profile = Some(PathBuf::from(path));
             }
             "--module" if !force_module => force_module = true,
-            "--policy" | "-o" | "--output" | "--module" | "--profile" => {
+            "--policy" | "-o" | "--output" | "--module" => {
+                return Err(format!("{argument} may only be specified once"));
+            }
+            #[cfg(feature = "profile-experiments")]
+            "--profile" => {
                 return Err(format!("{argument} may only be specified once"));
             }
             value if !value.starts_with('-') && source.is_none() => source = Some(value.to_owned()),
@@ -244,11 +251,14 @@ mod tests {
                 profile: None,
             }
         );
+        #[cfg(feature = "profile-experiments")]
         assert_eq!(
             parse(&strings(&["app.js", "--profile", "p.swprof", "-o", "a"]))
                 .map(|args| args.profile),
             Ok(Some("p.swprof".into()))
         );
+        #[cfg(not(feature = "profile-experiments"))]
+        assert!(parse(&strings(&["app.js", "--profile", "p.swprof", "-o", "a"])).is_err());
         let parsed = parse(&strings(&[
             "--policy", "fast", "--module", "app.js", "--output", "a",
         ]));

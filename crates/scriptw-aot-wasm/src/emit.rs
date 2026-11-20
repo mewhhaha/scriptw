@@ -596,7 +596,7 @@ fn emit_with_observation_mode(
     inputs: crate::RuntimeArtifactInputs<'_>,
     profile: crate::ProfileMode<'_>,
 ) -> Result<WasmArtifact, EmitError> {
-    let profile = crate::profile::ProfileUse::of(profile)?;
+    let profile = crate::profile::ProfileUse::of(profile);
     // Diagnostics are scanned *before* `program.script`: a stage that reports a
     // reason for failing also declines to produce a script, so checking the
     // script first replaces every honest diagnostic with the generic "no

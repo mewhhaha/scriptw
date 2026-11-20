@@ -28,6 +28,9 @@ use crate::profile::{CompactStorageLayout, PlaceHolder, ReadSpecialisation, Rece
 /// `[records u8][flags u8][hint u8][0]`, then a little-endian u16 facts
 /// word per record of the chain, in chain order, then zero padding.
 pub(crate) const DUMP_SLOT_BYTES: u32 = 24;
+
+/// The most records a read site's chain, and so its observation, holds.
+pub(crate) const MAX_OBSERVED_RECORDS: u8 = MAX_SITE_RECORDS as u8;
 const FACTS_AT: u32 = 4;
 /// Slot flag: the site's learning budget is spent.
 const FLAG_MEGAMORPHIC: u8 = 1;
