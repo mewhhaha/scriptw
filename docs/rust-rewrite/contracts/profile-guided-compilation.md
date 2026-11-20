@@ -172,10 +172,18 @@ Test262 (pinned suite, wasm-aot, `--threads` 2–3, 60 s case timeout):
 | adversarial seed 0 | all 15 | 21,282 | 21,282 |
 | Collect | all 15 | 21,282 | 21,282 |
 
-Per-case results are identical to the unprofiled run's in every case run.
-The unprofiled run used the build before the own-array guard skip, whose
-unprofiled P is the same; the adversarial and Collect runs used the build
-with it.
+Per-case results are identical to the unprofiled run's in every case run
+(`target/pgo-t262-compare.py`: 21,282 common execution ids, none differing,
+none in one run only, for both comparisons).
+
+These runs did not use the committed code. Every snapshot records source
+revision `d63eac23f` with uncommitted profile edits: the unprofiled run used
+executable `af022d5f…` (before the own-array guard skip), the adversarial
+and Collect runs executable `11d48a60…` (with it). That hook still fell back
+to an unprofiled build on any error and had no case log. Later commits
+changed the hook (b3fcee87f, 658d90ec4) and, independently, arguments
+resolution, `import.meta` source text and the code sink; the table has not
+been rerun on them.
 
 Not verified:
 
@@ -193,8 +201,17 @@ Not verified:
   the log, the property-accessors subtree builds 40 of 42 cases profiled and
   its 2 parse negatives unprofiled.
 - `scriptw precompile --profile` end to end: only its argument parsing ran
-  as a test. Refusals of a foreign or malformed profile were tried by hand
-  with the CLI and are tested through the engine API.
+  as a test. Refusals of a foreign or malformed profile are tested only
+  through the engine API.
+- The hook's case log, the label for build-failing cases and the
+  feature-build `publish-status` refusal have not run in a Test262 pass;
+  snapshots and checkpoints do not record a hook mode, so a feature build's
+  profiled checkpoints could be resumed and published once the variable is
+  unset. Owner: the profile-guided compilation stream; rerun the adversarial
+  pass on a committed `profile-experiments` build, with the case log kept,
+  before S2–S5 build on this.
+- Spec-exec runs ignore the hook variables; the loud refusal covers only
+  wasm-aot cases.
 - A true profile on the Script goal through the engine's run path.
 - Collect mode of the graph and rooted-snapshot emission, and `$262.agent`
   worker programs under any profile.
