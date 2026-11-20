@@ -764,21 +764,14 @@ impl FunctionBuilder<'_> {
                     self.emit_branch_to_target(stop, f);
                     self.pop_control(ControlFrameKind::If);
                     f.instruction(&Instruction::End);
+                    // The inner record is used only inside the block that
+                    // acquires it: every early exit from that block is a
+                    // Throw in `output`, reached before the record's holder
+                    // is written.
                     let acquired = self.open_frame(ControlFrameKind::Block, f);
                     let inner = self
                         .emit_helper_flattenable_record(pending.value(), &output, acquired, f)?
                         .into_record();
-                    self.pop_control(ControlFrameKind::Block);
-                    f.instruction(&Instruction::End);
-                    output.kind().load(f);
-                    f.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
-                    f.instruction(&Instruction::I32Eq);
-                    self.open_frame(ControlFrameKind::If, f);
-                    self.emit_helper_close_record(&record, &output, &pending, f)?;
-                    output.copy_from(&pending, f);
-                    self.emit_branch_to_target(stop, f);
-                    self.pop_control(ControlFrameKind::If);
-                    f.instruction(&Instruction::End);
                     schema.field(IteratorFlatMapHelperSchema::INNER).write(
                         &object,
                         GcOperand::nullable_reference(&inner, schema),
@@ -800,6 +793,11 @@ impl FunctionBuilder<'_> {
                         f,
                     );
                     self.emit_branch_to_target(again, f);
+                    self.pop_control(ControlFrameKind::Block);
+                    f.instruction(&Instruction::End);
+                    self.emit_helper_close_record(&record, &output, &pending, f)?;
+                    output.copy_from(&pending, f);
+                    self.emit_branch_to_target(stop, f);
                     self.pop_control(ControlFrameKind::Loop);
                     f.instruction(&Instruction::End);
                 }

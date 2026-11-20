@@ -114,7 +114,8 @@ impl NativeSharedBufferResult {
     /// of the same type, without a store. A released local is never read
     /// again by this holder, and a GC root is an SSA value live across a
     /// safepoint (Cranelift's stack maps), so a store of null here retained
-    /// nothing less. A next holder writes the local before reading it.
+    /// nothing less. A next holder writes the local before reading it, which
+    /// the code sink checks in test and debug builds (`gc_local_writes`).
     pub(crate) fn clear(self, function: &mut Function) {
         function.release_typed_local(self.index);
     }
@@ -257,7 +258,10 @@ enum LocalDeclaration {
     Nullable,
     /// `(ref T)`: validation proves every read non-null, so Wasmtime emits
     /// no null check for it. Validation also confines each read to the
-    /// block that wrote the local, or to a block nested in it.
+    /// block that wrote the local, or to a block nested in it, but it
+    /// accepts a write by any earlier holder of the pooled local; that this
+    /// holder wrote it is the code sink's GC local write check
+    /// (`code_sink/gc_local_writes.rs`), as for nullable locals.
     NonNull,
 }
 
@@ -284,7 +288,8 @@ impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
     /// of the same type, without a store. A released local is never read
     /// again by this holder, and a GC root is an SSA value live across a
     /// safepoint (Cranelift's stack maps), so a store of null here retained
-    /// nothing less. A next holder writes the local before reading it.
+    /// nothing less. A next holder writes the local before reading it, which
+    /// the code sink checks in test and debug builds (`gc_local_writes`).
     pub(crate) fn clear(self, function: &mut Function) {
         function.release_typed_local(self.index);
     }
@@ -437,6 +442,31 @@ impl<T: GcHeapType, N: GcFieldNullability> GcLocalSlot<T, N> {
             declaration: self.declaration,
             shape: PhantomData,
         }
+    }
+}
+impl<T: GcHeapType, N: GcFieldNullability> GcLocalSlot<T, N> {
+    /// Writes null into a slot that only one path initializes, so that every
+    /// path to a read the program reaches only after that initialization
+    /// (one a flag local guards) has written it. A pooled local is not
+    /// cleared on release; without this such a read would be structurally
+    /// reachable with a previous holder's reference. The slot is still
+    /// initialized as before; it must be a nullable declaration.
+    pub(crate) fn hold_null_until_initialized(
+        &self,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) {
+        assert_eq!(
+            self.declaration,
+            LocalDeclaration::Nullable,
+            "a (ref T) local cannot hold null"
+        );
+        function.instruction(&Instruction::RefNull(
+            schema
+                .reference_type::<T>(GcNullability::Nullable)
+                .heap_type,
+        ));
+        function.instruction(&Instruction::LocalSet(self.index));
     }
 }
 impl<T: GcHeapType> GcLocalSlot<T, Nullable> {
@@ -861,7 +891,8 @@ impl<R: GcFunctionRole, N: GcFieldNullability> FunctionLocal<R, N> {
     /// of the same type, without a store. A released local is never read
     /// again by this holder, and a GC root is an SSA value live across a
     /// safepoint (Cranelift's stack maps), so a store of null here retained
-    /// nothing less. A next holder writes the local before reading it.
+    /// nothing less. A next holder writes the local before reading it, which
+    /// the code sink checks in test and debug builds (`gc_local_writes`).
     pub(crate) fn clear(self, function: &mut Function) {
         function.release_typed_local(self.index);
     }
@@ -2397,6 +2428,7 @@ impl RuntimeSchema {
         value.load(self, function);
         emit_root_set(function, self.throw_diagnostic_root(role));
     }
+    #[track_caller]
     pub(crate) fn reserve_function_local<R: GcFunctionRole, N: GcFieldNullability>(
         &self,
         function: &mut Function,
@@ -2573,6 +2605,7 @@ impl RuntimeSchema {
             target: self.reserve_i32_local(function),
         }
     }
+    #[track_caller]
     pub(crate) fn reserve_gc_local<T: GcHeapType, N: GcFieldNullability>(
         &self,
         function: &mut Function,
@@ -2590,6 +2623,7 @@ impl RuntimeSchema {
     /// only inside the block whose `local.set` initialized it (or a block
     /// nested in that one), so the holder must be initialized in the
     /// outermost block that reads it.
+    #[track_caller]
     pub(crate) fn reserve_non_null_gc_local<T: GcHeapType>(
         &self,
         function: &mut Function,

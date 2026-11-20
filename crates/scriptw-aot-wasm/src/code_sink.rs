@@ -13,6 +13,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use wasm_encoder::{Catch, Instruction, ValType};
 
+#[cfg(any(test, debug_assertions))]
+mod gc_local_writes;
+
 /// A live label's position and identity, not a relative branch immediate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct LabelDepth {
@@ -464,6 +467,9 @@ pub(crate) struct Function {
     /// The branch that decides whether the next instruction runs, if one
     /// branch does.
     anchor: Option<Anchor>,
+    /// What the typed GC local write check needs of the body.
+    #[cfg(any(test, debug_assertions))]
+    gc_local_trace: gc_local_writes::Trace,
 }
 
 impl Clone for Function {
@@ -489,6 +495,8 @@ impl Clone for Function {
             index_operands: self.index_operands.clone(),
             two_way_branches: self.two_way_branches.clone(),
             anchor: self.anchor,
+            #[cfg(any(test, debug_assertions))]
+            gc_local_trace: self.gc_local_trace.clone(),
         }
     }
 }
@@ -523,6 +531,8 @@ impl Function {
             index_operands: Vec::new(),
             two_way_branches: Vec::new(),
             anchor: None,
+            #[cfg(any(test, debug_assertions))]
+            gc_local_trace: Default::default(),
         }
     }
 
@@ -536,6 +546,9 @@ impl Function {
         self.locals.count()
     }
 
+    /// Reports the caller's location to the GC local write check, which
+    /// names the holder a failing read belongs to by it.
+    #[track_caller]
     pub(crate) fn reserve_typed_local(&mut self, ty: ValType) -> u32 {
         assert!(
             !self.frames.is_empty(),
@@ -543,12 +556,16 @@ impl Function {
         );
         if let Some(index) = self.free_locals.take(ty) {
             self.forget_i32_local(index);
+            #[cfg(any(test, debug_assertions))]
+            self.gc_local_trace
+                .reserve(index, ty, std::panic::Location::caller());
             return index;
         }
         self.reserve_fresh_typed_local(ty)
     }
 
     /// Append a fresh local declaration when no released slot can be reused.
+    #[track_caller]
     pub(crate) fn reserve_fresh_typed_local(&mut self, ty: ValType) -> u32 {
         assert!(
             !self.frames.is_empty(),
@@ -559,6 +576,9 @@ impl Function {
             .checked_add(self.locals.count())
             .expect("local index overflow");
         self.locals.push(ty);
+        #[cfg(any(test, debug_assertions))]
+        self.gc_local_trace
+            .reserve(index, ty, std::panic::Location::caller());
         index
     }
 
@@ -570,6 +590,8 @@ impl Function {
         );
         assert!(!self.free_locals.contains(index), "local released twice");
         self.forget_i32_local(index);
+        #[cfg(any(test, debug_assertions))]
+        self.gc_local_trace.release(index);
         let ty = self
             .locals
             .type_at(index - base)
@@ -1011,6 +1033,8 @@ impl Function {
             _ => {}
         }
         self.flow_i32_facts(instruction, enclosing_depth, closing);
+        #[cfg(any(test, debug_assertions))]
+        self.gc_local_trace.instruction(instruction);
         self.last_instruction_escapes = matches!(
             instruction,
             Instruction::Br(_)
@@ -1311,6 +1335,8 @@ impl Function {
             "function body for {context} has an unclosed control frame: {} label(s) still open",
             self.frames.len()
         );
+        #[cfg(any(test, debug_assertions))]
+        self.gc_local_trace.verify(context);
         let raw = self.body.into_raw_body();
         let mut body = self.locals.encode_body();
         // Locals declared after construction lengthen the declaration prefix.

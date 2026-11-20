@@ -16,6 +16,7 @@ mod demand_constructors;
 mod dense_switch;
 mod direct_eval_dispatch;
 mod error_demand_initialization;
+mod gc_local_writes;
 mod guarded_number_add;
 mod guarded_number_relational;
 mod immutable_global_read;

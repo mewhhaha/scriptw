@@ -265,6 +265,10 @@ impl FunctionBuilder<'_> {
         json_i32(count, 0, f);
         json_i32(index, 0, f);
         json_i32(filtering, 0, f);
+        // Allocated at the first rejected key, and read only once
+        // `filtering` says it was: null on every other path.
+        let construction_slot = s.reserve_gc_local::<PropertyKeyTable, NonNullable>(f);
+        construction_slot.hold_null_until_initialized(s, f);
         let done = self.open_frame(ControlFrameKind::Block, f);
         let next = self.open_frame(ControlFrameKind::Loop, f);
         index.load(f);
@@ -291,7 +295,7 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, f);
         // The first rejected key. Every earlier key was accepted, so the
         // accepted prefix is exactly the table prefix.
-        let construction = PropertyKeyConstruction::allocate(s, s.reserve_gc_local(f), total, f);
+        let construction = PropertyKeyConstruction::allocate(s, construction_slot, total, f);
         json_i32(copied, 0, f);
         let prefix_done = self.open_frame(ControlFrameKind::Block, f);
         let prefix = self.open_frame(ControlFrameKind::Loop, f);
