@@ -1236,7 +1236,16 @@ fn initial_module_cache_candidate_does_not_name_a_prepared_source_closure() {
             role,
         )
         .unwrap();
-        let prepared = Engine::lower_parsed_compilation(parsed, &options).unwrap();
+        let prepared = Engine::lower_parsed_compilation(
+            parsed,
+            &options,
+            ProgramEntry {
+                source,
+                goal: ParseGoal::Module,
+                role,
+            },
+        )
+        .unwrap();
         let closed = program_cache_key_for_role(
             source,
             ParseGoal::Module,

@@ -2,7 +2,8 @@
 //! deployment through the same `EmbeddedRuntime::precompile` an embedder calls.
 use scriptw_engine::{
     configure_wasm_runtime, CompilationJobs, CompileOptions, EmbeddedRuntime, Engine,
-    HostSurfacePolicy, NativeCompilationPolicy, RealmBuilder,
+    ExecutionProfile, ExecutionProfileUse, HostSurfacePolicy, NativeCompilationPolicy,
+    RealmBuilder,
 };
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -14,6 +15,8 @@ struct PrecompileArgs {
     source: String,
     module: bool,
     output: PathBuf,
+    /// An execution profile of this same program and compiler to build with.
+    profile: Option<PathBuf>,
 }
 
 fn parse(args: &[String]) -> Result<PrecompileArgs, String> {
@@ -21,6 +24,7 @@ fn parse(args: &[String]) -> Result<PrecompileArgs, String> {
     let mut source = None;
     let mut force_module = false;
     let mut output = None;
+    let mut profile = None;
     let mut args = args.iter();
     while let Some(argument) = args.next() {
         match argument.as_str() {
@@ -43,8 +47,15 @@ fn parse(args: &[String]) -> Result<PrecompileArgs, String> {
                     .ok_or_else(|| format!("{argument} needs an image path"))?;
                 output = Some(PathBuf::from(path));
             }
+            "--profile" if profile.is_none() => {
+                let path = args
+                    .next()
+                    .filter(|path| !path.is_empty())
+                    .ok_or_else(|| "--profile needs an execution profile path".to_owned())?;
+                profile = Some(PathBuf::from(path));
+            }
             "--module" if !force_module => force_module = true,
-            "--policy" | "-o" | "--output" | "--module" => {
+            "--policy" | "-o" | "--output" | "--module" | "--profile" => {
                 return Err(format!("{argument} may only be specified once"));
             }
             value if !value.starts_with('-') && source.is_none() => source = Some(value.to_owned()),
@@ -57,21 +68,38 @@ fn parse(args: &[String]) -> Result<PrecompileArgs, String> {
         module: force_module || super::is_module_path(&source),
         source,
         output: output.ok_or_else(|| "precompile needs -o IMAGE".to_string())?,
+        profile,
     })
 }
 
-pub(super) fn command(args: Vec<String>, host_surface_policy: HostSurfacePolicy) -> Result<(), String> {
+pub(super) fn command(
+    args: Vec<String>,
+    host_surface_policy: HostSurfacePolicy,
+) -> Result<(), String> {
     let PrecompileArgs {
         policy,
         source: path,
         module,
         output,
+        profile,
     } = parse(&args)?;
     let source = super::read_source(&path)?;
+    let execution_profile = match &profile {
+        None => ExecutionProfileUse::None,
+        Some(profile) => {
+            let bytes = fs::read(profile)
+                .map_err(|error| format!("cannot read {}: {error}", profile.display()))?;
+            ExecutionProfileUse::Apply(std::sync::Arc::new(
+                ExecutionProfile::decode(&bytes)
+                    .map_err(|error| format!("{}: {error}", profile.display()))?,
+            ))
+        }
+    };
     let compiler = Engine::new(RealmBuilder::new().build());
     let options = CompileOptions {
         filename: Some(path.clone()),
         host_surface_policy,
+        execution_profile,
         ..CompileOptions::default()
     };
     let unit = if module {
@@ -80,7 +108,9 @@ pub(super) fn command(args: Vec<String>, host_surface_policy: HostSurfacePolicy)
         compiler.compile_script(&source, options)
     }
     .map_err(|error| error.to_string())?;
-    let artifact = compiler.emit_wasm(&unit).map_err(|error| error.to_string())?;
+    let artifact = compiler
+        .emit_wasm(&unit)
+        .map_err(|error| error.to_string())?;
     drop(unit);
     drop(compiler);
     let jobs = CompilationJobs::current();
@@ -88,7 +118,8 @@ pub(super) fn command(args: Vec<String>, host_surface_policy: HostSurfacePolicy)
     configure_wasm_runtime(&mut config, policy, jobs);
     let engine = wasmtime::Engine::new(&config)
         .map_err(|error| format!("cannot create the Wasmtime Engine: {error:#}"))?;
-    let image = EmbeddedRuntime::precompile(&engine, &artifact).map_err(|error| error.to_string())?;
+    let image =
+        EmbeddedRuntime::precompile(&engine, &artifact).map_err(|error| error.to_string())?;
     publish(&output, image.as_bytes())?;
     println!(
         "precompiled image: {} ({} bytes, {} policy, {} compilation job(s))",
@@ -142,8 +173,12 @@ fn publish(path: &Path, bytes: &[u8]) -> Result<(), String> {
         file.set_permissions(permissions)
             .map_err(|error| format!("cannot make {} read-only: {error}", temporary.display()))?;
         drop(file);
-        fs::rename(&temporary, path)
-            .map_err(|error| format!("cannot publish precompiled image {}: {error}", path.display()))
+        fs::rename(&temporary, path).map_err(|error| {
+            format!(
+                "cannot publish precompiled image {}: {error}",
+                path.display()
+            )
+        })
     })();
     if result.is_err() {
         let _ = fs::remove_file(&temporary);
@@ -175,10 +210,21 @@ mod tests {
                 source: "app.js".into(),
                 module: false,
                 output: "app.swep".into(),
+                profile: None,
             }
         );
-        let parsed = parse(&strings(&["--policy", "fast", "--module", "app.js", "--output", "a"]));
-        assert_eq!(parsed.as_ref().map(|args| args.policy), Ok(NativeCompilationPolicy::Fast));
+        assert_eq!(
+            parse(&strings(&["app.js", "--profile", "p.swprof", "-o", "a"]))
+                .map(|args| args.profile),
+            Ok(Some("p.swprof".into()))
+        );
+        let parsed = parse(&strings(&[
+            "--policy", "fast", "--module", "app.js", "--output", "a",
+        ]));
+        assert_eq!(
+            parsed.as_ref().map(|args| args.policy),
+            Ok(NativeCompilationPolicy::Fast)
+        );
         assert_eq!(parsed.map(|args| args.module), Ok(true));
         assert!(parse(&strings(&["app.mjs", "-o", "a"])).unwrap().module);
         for invalid in [
@@ -192,6 +238,9 @@ mod tests {
             &["--policy", "fast", "--policy", "fast", "app.js", "-o", "a"],
             &["--module", "--module", "app.js", "-o", "a"],
             &["--jobs", "2", "app.js", "-o", "a"],
+            &["app.js", "-o", "a", "--profile"],
+            &["app.js", "-o", "a", "--profile", ""],
+            &["app.js", "-o", "a", "--profile", "p", "--profile", "q"],
         ] {
             assert!(parse(&strings(invalid)).is_err(), "{invalid:?}");
         }
@@ -199,10 +248,8 @@ mod tests {
 
     #[test]
     fn publication_replaces_the_image_read_only_and_leaves_no_transaction() {
-        let directory = std::env::temp_dir().join(format!(
-            "scriptw-precompile-publish-{}",
-            std::process::id()
-        ));
+        let directory =
+            std::env::temp_dir().join(format!("scriptw-precompile-publish-{}", std::process::id()));
         let _ = fs::remove_dir_all(&directory);
         fs::create_dir(&directory).unwrap();
         let image = directory.join("app.swep");

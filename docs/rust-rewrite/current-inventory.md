@@ -35,6 +35,16 @@ accepts `--case <file.js>`.
   ([results](benchmarks.md#single-reference-value-experiment-2026-11-10)):
   measure conversion, classification and transport together before another
   representation change. Owner: RSC compiler/runtime.
+- Profile-guided compilation: collection, the `.swprof` codec, admission and
+  application are in and off by default
+  ([contract](contracts/profile-guided-compilation.md)). Its first
+  specialisation, inline read proofs at hot single-kind sites (S1), measured
+  no-go on 2026-11-20: 37.7K of 2.79M sync and 38.5K of 3.02M async Callgrind
+  instructions saved, against a threshold of 80K. Each inline guard costs
+  nearly as much as the R entry proof it skips, and the 583 entry calls left
+  are at mixed-kind sites. Computed appends (S2), profiled call targets (S3),
+  arm hints (S4) and computed reads (S5) are unbuilt; cut the guard's own cost
+  before building on S1. Owner: RSC compiler.
 - Native preparation dominates a cold start (6.9 s for the RSC program under
   Speed on a busy machine; the backtracking allocator and the e-graph pass are
   the largest parts). The embedding API compiles serially although two jobs

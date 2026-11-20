@@ -171,6 +171,9 @@ pub struct EmbeddedRuntime {
     foreign: ForeignModuleRegistry,
     intl: intl_data_images::WasmIntlKernel,
     authority: Arc<()>,
+    /// Where a Collect-mode P keeps its execution profile; `None` for any
+    /// other P.
+    profile_sites: Option<execution_profile::ProfileSites>,
 }
 
 impl EmbeddedRuntime {
@@ -228,6 +231,7 @@ impl EmbeddedRuntime {
                     }
                 }
             }
+            let profile_sites = execution_profile::ProfileSites::of(&artifact.bytes)?;
             let program = artifact.program();
             let intl = wasm_runtime_link::intl_kernel_for(program)?;
             let modules = wasm_runtime_link::compile_modules(
@@ -238,7 +242,9 @@ impl EmbeddedRuntime {
                 mode,
                 WasmRuntimeImagePolicy::EmbeddedBuild,
             )?;
-            Ok(Self::from_admitted_modules(engine, modules, foreign, intl))
+            let mut runtime = Self::from_admitted_modules(engine, modules, foreign, intl);
+            runtime.profile_sites = profile_sites;
+            Ok(runtime)
         })
     }
 
@@ -254,6 +260,7 @@ impl EmbeddedRuntime {
             foreign,
             intl,
             authority: Arc::new(()),
+            profile_sites: None,
         }
     }
 
@@ -486,6 +493,7 @@ impl EmbeddedRuntime {
             roots,
             store: Arc::clone(&state.store),
             bridges,
+            profile_sites: self.profile_sites.clone(),
         })
     }
 }
@@ -499,6 +507,7 @@ pub struct EmbeddedInstance {
     store: Arc<()>,
     /// Bridge handles fixed for the instance's lifetime, looked up once.
     bridges: operations::Bridges,
+    profile_sites: Option<execution_profile::ProfileSites>,
 }
 
 impl EmbeddedInstance {
@@ -607,6 +616,25 @@ impl EmbeddedInstance {
         let (evaluation, cpu) = self.initialize_profiled(store)?;
         let outcome = Self::finish_evaluation(evaluation, store)?;
         Ok((outcome, cpu))
+    }
+
+    /// The execution profile this instance recorded since instantiation,
+    /// as a training run of `training_requests` requests: the program must
+    /// have been compiled with [`ExecutionProfileUse::Collect`] and
+    /// initialized. Call it once the training run has ended; the profile's
+    /// read-site kinds are what the site records learned until then.
+    pub fn collect_profile(
+        &self,
+        store: &mut WasmtimeStore<WasmStoreState>,
+        training_requests: std::num::NonZeroU32,
+    ) -> Result<ExecutionProfile, EngineError> {
+        let sites = self.profile_sites.as_ref().ok_or_else(|| {
+            EngineError::new(
+                "this program records no execution profile: compile it with ExecutionProfileUse::Collect",
+            )
+        })?;
+        self.check_store(store)?;
+        sites.collect(&self.program, store, training_requests)
     }
 
     fn finish_evaluation(

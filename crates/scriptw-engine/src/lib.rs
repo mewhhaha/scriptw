@@ -66,6 +66,9 @@ pub use embedding::{
 };
 mod execution_deadline;
 mod execution_failure;
+mod execution_profile;
+use execution_profile::ResolvedExecutionProfile;
+pub use execution_profile::{ExecutionProfile, ExecutionProfileUse, ProfileError, ProfileMismatch};
 mod pooled_stores;
 pub use embedding::{
     configure_precompiled_wasm_runtime, configure_wasm_runtime, throw_foreign_error,
@@ -654,6 +657,26 @@ fn program_wasm_cache_key_with_compiler_fingerprint(
     graph_digest: Option<&[u8; 32]>,
     compiler_fingerprint: &[u8; 32],
 ) -> [u8; 32] {
+    program_key_with_profile(
+        source,
+        goal,
+        options,
+        graph_digest,
+        compiler_fingerprint,
+        &options.execution_profile,
+    )
+}
+
+/// The key of `options` compiled with the execution-profile choice
+/// `profile`: the unprofiled key, extended by a profiled build's choice.
+fn program_key_with_profile(
+    source: &str,
+    goal: ParseGoal,
+    options: &CompileOptions,
+    graph_digest: Option<&[u8; 32]>,
+    compiler_fingerprint: &[u8; 32],
+    profile: &ExecutionProfileUse,
+) -> [u8; 32] {
     let mut hash = Sha256::new();
     hash.update(PROGRAM_WASM_CACHE_KEY_DOMAIN);
     if !options.foreign_modules.is_empty() {
@@ -789,6 +812,7 @@ fn program_wasm_cache_key_with_compiler_fingerprint(
         }
         None => hash.update([0]),
     }
+    profile.hash_cache_key_field(&mut hash);
     hash.finalize().into()
 }
 
@@ -998,13 +1022,24 @@ fn program_cache_key(
     options: &CompileOptions,
     graph: Option<&scriptw_ir::ModuleGraphSources>,
 ) -> Option<[u8; 32]> {
+    program_graph_key(source, goal, options, graph, &options.execution_profile)
+}
+
+fn program_graph_key(
+    source: &str,
+    goal: ParseGoal,
+    options: &CompileOptions,
+    graph: Option<&scriptw_ir::ModuleGraphSources>,
+    profile: &ExecutionProfileUse,
+) -> Option<[u8; 32]> {
     let digest = graph.map(module_graph_digest);
-    Some(program_wasm_cache_key_with_compiler_fingerprint(
+    Some(program_key_with_profile(
         source,
         goal,
         options,
         digest.as_ref(),
         compiler_fingerprint()?,
+        profile,
     ))
 }
 
@@ -1015,7 +1050,29 @@ fn program_cache_key_for_role(
     graph: Option<&scriptw_ir::ModuleGraphSources>,
     role: module_loader::EmbeddedSourceRole,
 ) -> Option<[u8; 32]> {
-    let key = program_cache_key(source, goal, options, graph)?;
+    program_key_for_role(
+        source,
+        goal,
+        options,
+        graph,
+        role,
+        &options.execution_profile,
+    )
+}
+
+/// The program cache key of a compilation in `role` under the
+/// execution-profile choice `profile`. With [`ExecutionProfileUse::None`] it
+/// is the [`scriptw_aot_wasm::ProgramKey`] that names the program in its
+/// profiles.
+fn program_key_for_role(
+    source: &str,
+    goal: ParseGoal,
+    options: &CompileOptions,
+    graph: Option<&scriptw_ir::ModuleGraphSources>,
+    role: module_loader::EmbeddedSourceRole,
+    profile: &ExecutionProfileUse,
+) -> Option<[u8; 32]> {
+    let key = program_graph_key(source, goal, options, graph, profile)?;
     Some(match (&options.module_loading_policy, role) {
         (ModuleLoadingPolicy::Embedded(_), module_loader::EmbeddedSourceRole::UnlocatedScript) => {
             let mut hash = Sha256::new();
@@ -1082,6 +1139,16 @@ struct PreparedCompilation {
     promise_rejection_policy: PromiseRejectionPolicy,
     intl_profile: IntlCompilationProfile,
     host_surface_policy: HostSurfacePolicy,
+    execution_profile: ResolvedExecutionProfile,
+}
+
+/// The entry a compilation lowers, which with its options and final module
+/// graph names the program a profile belongs to.
+#[derive(Clone, Copy)]
+struct ProgramEntry<'a> {
+    source: &'a str,
+    goal: ParseGoal,
+    role: module_loader::EmbeddedSourceRole,
 }
 
 fn wasm_aot_program_is_cached(source: &str, goal: ParseGoal, options: &CompileOptions) -> bool {
@@ -1908,6 +1975,10 @@ pub struct CompileOptions {
     /// Complete pinned Intl image selection retained by Wasm emission and execution.
     /// Named Custom profiles select the same pinned domains under their validated identity.
     pub intl_profile: IntlCompilationProfile,
+    /// Profile-guided compilation of the Wasm AOT program: none, an
+    /// instrumented training build, or a build specialised by an admitted
+    /// profile of this same program. Part of the program cache key.
+    pub execution_profile: ExecutionProfileUse,
 }
 
 impl Default for CompileOptions {
@@ -1923,6 +1994,7 @@ impl Default for CompileOptions {
             language_features: LanguageFeaturePolicy::default(),
             promise_rejection_policy: PromiseRejectionPolicy::default(),
             intl_profile: IntlCompilationProfile::default(),
+            execution_profile: ExecutionProfileUse::None,
         }
     }
 }
@@ -1962,6 +2034,7 @@ pub struct CompilationUnit {
     promise_rejection_policy: PromiseRejectionPolicy,
     intl_profile: IntlCompilationProfile,
     host_surface_policy: HostSurfacePolicy,
+    execution_profile: ResolvedExecutionProfile,
 }
 
 fn require_default_intl_profile(
@@ -2060,6 +2133,7 @@ pub struct EngineError {
     wasmtime_policy: Option<WasmtimeRuntimePolicy>,
     execution_failure: Option<EngineExecutionFailure>,
     store_pool_exhausted: bool,
+    execution_profile_error: Option<ProfileError>,
 }
 
 /// Closed pre-instantiation failures for the Wasm Intl artifact/provider
@@ -2120,6 +2194,7 @@ impl EngineError {
             wasmtime_policy: None,
             execution_failure: None,
             store_pool_exhausted: false,
+            execution_profile_error: None,
         }
     }
 
@@ -2135,6 +2210,7 @@ impl EngineError {
             wasmtime_policy: None,
             execution_failure: None,
             store_pool_exhausted: false,
+            execution_profile_error: None,
         }
     }
 
@@ -2150,10 +2226,27 @@ impl EngineError {
             wasmtime_policy: None,
             execution_failure: None,
             store_pool_exhausted: false,
+            execution_profile_error: None,
         }
     }
 
-    fn from_wasm_emit_error(program: &ProgramIr, err: impl core::fmt::Display) -> Self {
+    fn from_execution_profile(error: ProfileError) -> Self {
+        let mut engine_error = Self::new(error.to_string());
+        engine_error.execution_profile_error = Some(error);
+        engine_error
+    }
+
+    /// Why the compilation's execution profile was refused: decoding,
+    /// admission against the program, or the emitted site map. A profile
+    /// is never ignored, so the compilation fails instead.
+    pub fn execution_profile_error(&self) -> Option<&ProfileError> {
+        self.execution_profile_error.as_ref()
+    }
+
+    fn from_wasm_emit_error(program: &ProgramIr, err: scriptw_aot_wasm::EmitError) -> Self {
+        if let Some(error) = err.profile_error() {
+            return Self::from_execution_profile(error.clone());
+        }
         if let Some(diagnostic) = program.wasm_blocking_diagnostic() {
             return Self::from_ir_diagnostic(diagnostic.clone());
         }
@@ -2175,6 +2268,7 @@ impl EngineError {
             wasmtime_policy: Some(err.policy),
             execution_failure: None,
             store_pool_exhausted: false,
+            execution_profile_error: None,
         }
     }
 
@@ -2190,6 +2284,7 @@ impl EngineError {
             wasmtime_policy: None,
             execution_failure: None,
             store_pool_exhausted: false,
+            execution_profile_error: None,
         }
     }
 
@@ -3190,7 +3285,8 @@ impl Engine {
             }
         }
 
-        let prepared = Self::lower_parsed_compilation(parsed, &options)?;
+        let prepared =
+            Self::lower_parsed_compilation(parsed, &options, ProgramEntry { source, goal, role })?;
         let key = cache.as_ref().and_then(|_| {
             program_cache_key_for_role(source, goal, &options, prepared.modules.graph(), role)
         });
@@ -3344,7 +3440,7 @@ impl Engine {
                     .map(|cache| cache as &dyn scriptw_aot_wasm::RuntimeArtifactCache),
                 source_compilation_profile,
             ),
-            scriptw_aot_wasm::ProfileMode::None,
+            unit.execution_profile.mode(),
         ) {
             Ok(wasm) => {
                 // `scriptw build wasm` and the Test262 wasm-aot backend both reach
@@ -3443,7 +3539,15 @@ impl Engine {
         role: module_loader::EmbeddedSourceRole,
     ) -> Result<PreparedCompilation, EngineError> {
         let parsed = self.parse_compilation_for_role(source_text, goal, options, role)?;
-        Self::lower_parsed_compilation(parsed, options)
+        Self::lower_parsed_compilation(
+            parsed,
+            options,
+            ProgramEntry {
+                source: source_text,
+                goal,
+                role,
+            },
+        )
     }
 
     fn parse_compilation_for_role(
@@ -3521,6 +3625,7 @@ impl Engine {
     fn lower_parsed_compilation(
         parsed: ParsedCompilation,
         options: &CompileOptions,
+        entry: ProgramEntry<'_>,
     ) -> Result<PreparedCompilation, EngineError> {
         #[cfg(test)]
         LOWERING_ATTEMPTS.with(|attempts| attempts.set(attempts.get() + 1));
@@ -3539,6 +3644,19 @@ impl Engine {
         if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
             eprintln!("scriptw wasm trace: lower: {:?}", lower_started.elapsed());
         }
+        // The final graph names the program: finite-source discovery may have
+        // extended the one parsing admitted.
+        let execution_profile =
+            ResolvedExecutionProfile::resolve(&options.execution_profile, || {
+                program_key_for_role(
+                    entry.source,
+                    entry.goal,
+                    options,
+                    modules.graph(),
+                    entry.role,
+                    &ExecutionProfileUse::None,
+                )
+            })?;
         Ok(PreparedCompilation {
             source,
             module_prelude,
@@ -3547,6 +3665,7 @@ impl Engine {
             promise_rejection_policy: options.promise_rejection_policy,
             intl_profile: options.intl_profile.clone(),
             host_surface_policy: options.host_surface_policy,
+            execution_profile,
         })
     }
 
@@ -3562,6 +3681,7 @@ impl Engine {
             promise_rejection_policy,
             intl_profile,
             host_surface_policy,
+            execution_profile,
         } = prepared;
         let module_loading_policy = match modules {
             PreparedModuleCompilation::Embedded { owner, .. } => {
@@ -3596,6 +3716,7 @@ impl Engine {
             promise_rejection_policy,
             intl_profile,
             host_surface_policy,
+            execution_profile,
         })
     }
 
@@ -3794,7 +3915,7 @@ impl Engine {
                     .map(|cache| cache as &dyn scriptw_aot_wasm::RuntimeArtifactCache),
                 scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost,
             ),
-            scriptw_aot_wasm::ProfileMode::None,
+            unit.execution_profile.mode(),
         )
         .map_err(|err| EngineError::from_wasm_emit_error(&unit.ir, err))?;
         if std::env::var_os("SCRIPTW_WASM_TRACE_DUMP").is_some() {

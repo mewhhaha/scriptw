@@ -12,7 +12,7 @@ observation into a current acceptance result.
 Keep current invariants with their owning domain. Git retains superseded
 designs; dated checkpoints retain their own source and verification scope.
 
-850 contracts. Refresh with `python3 scripts/generate-contract-index.py`.
+851 contracts. Refresh with `python3 scripts/generate-contract-index.py`.
 
 ## A
 
@@ -621,6 +621,7 @@ designs; dated checkpoints retain their own source and verification scope.
 - [private-environment-heap-slot-authority](<private-environment-heap-slot-authority.md>)
 - [private-get-value-effects](<private-get-value-effects.md>)
 - [private-optional-call-suspension](<private-optional-call-suspension.md>)
+- [profile-guided-compilation](<profile-guided-compilation.md>)
 - [program-hook-owner-dispatch](<program-hook-owner-dispatch.md>)
 - [program-instance-code-ownership](<program-instance-code-ownership.md>)
 - [program-instance-entry-ownership](<program-instance-entry-ownership.md>)

@@ -4,7 +4,8 @@
 use scriptw_engine::{
     configure_compilation_jobs, configure_precompiled_wasm_runtime, configure_wasm_runtime,
     CompilationJobs, CompileOptions, CompilerIdentity, CompilerSourceRevision, EmbeddedEvaluation,
-    EmbeddedInstance, EmbeddedRuntime, Engine, ForeignValue, JsCompletion, JsPromiseState, JsValue,
+    EmbeddedInstance, EmbeddedModuleGoal, EmbeddedRuntime, Engine, ExecutionProfile,
+    ExecutionProfileUse, ForeignValue, JsCompletion, JsPromiseState, JsValue,
     NativeCompilationPolicy, PrecompiledEmbeddedProgram, RealmBuilder, WasmStoreState,
 };
 use serde_json::{json, Value};
@@ -143,6 +144,46 @@ impl ProfileBarrier {
                 return Err("incorrect RSC profiling acknowledgment".into());
             }
             Ok(())
+        }
+    }
+}
+
+/// Excluded diagnostics of profile-guided compilation, never a scored
+/// cohort. `SCRIPTW_RSC_PROFILE_COLLECT=<path>` builds the instrumented
+/// program, trains it on this run's requests and writes their profile to a
+/// new file; `SCRIPTW_RSC_PROFILE_USE=<path>` builds with a profile of this
+/// same bundle and compiler; `SCRIPTW_RSC_PROFILE_ADVERSARIAL=<seed>` builds
+/// with a wrong one (every read site hot, its kind rotated from the seed).
+/// The exact Flight output check is unchanged in all three.
+enum ExecutionProfileHook {
+    Collect(PathBuf),
+    Use(PathBuf),
+    Adversarial(usize),
+}
+
+impl ExecutionProfileHook {
+    fn from_environment() -> Result<Option<Self>> {
+        let collect = std::env::var_os("SCRIPTW_RSC_PROFILE_COLLECT").map(PathBuf::from);
+        let apply = std::env::var_os("SCRIPTW_RSC_PROFILE_USE").map(PathBuf::from);
+        let adversarial = std::env::var("SCRIPTW_RSC_PROFILE_ADVERSARIAL").ok();
+        Ok(match (collect, apply, adversarial) {
+            (None, None, None) => None,
+            (Some(path), None, None) => Some(Self::Collect(path)),
+            (None, Some(path), None) => Some(Self::Use(path)),
+            (None, None, Some(seed)) => {
+                Some(Self::Adversarial(seed.parse().map_err(|_| {
+                    "SCRIPTW_RSC_PROFILE_ADVERSARIAL must be a seed"
+                })?))
+            }
+            _ => return Err("choose at most one execution profile diagnostic".into()),
+        })
+    }
+
+    fn mode(&self) -> &'static str {
+        match self {
+            Self::Collect(_) => "collect",
+            Self::Use(_) => "apply",
+            Self::Adversarial(_) => "adversarial",
         }
     }
 }
@@ -302,11 +343,17 @@ fn run() -> Result<Value> {
     // Excluded diagnostic: load an image from `scriptw precompile` (of rsc.js
     // plus WRAPPER) on a compiler-disabled Engine instead of compiling.
     let precompiled_image = std::env::var_os("SCRIPTW_RSC_PRECOMPILED_IMAGE").map(PathBuf::from);
+    let execution_profile_hook = ExecutionProfileHook::from_environment()?;
     if precompiled_image.is_some()
-        && (profile.is_some() || std::env::var_os("SCRIPTW_RSC_ARTIFACT_DIR").is_some())
+        && (profile.is_some()
+            || std::env::var_os("SCRIPTW_RSC_ARTIFACT_DIR").is_some()
+            || execution_profile_hook.is_some())
     {
-        return Err("a precompiled image excludes profiling and artifact dumps".into());
+        return Err(
+            "a precompiled image excludes profiling, artifact dumps and execution profiles".into(),
+        );
     }
+    let mut execution_profile_report = None;
     let load_started;
     let mut phases = serde_json::Map::new();
     // A precompiled image runs no front end or emitter: that stage stays null.
@@ -374,7 +421,39 @@ fn run() -> Result<Value> {
             })?;
         let compiler = Engine::new(RealmBuilder::new().build());
         let started = Instant::now();
-        let unit = compiler.compile_module(&source, CompileOptions::default())?;
+        let execution_profile = match &execution_profile_hook {
+            None => ExecutionProfileUse::None,
+            Some(ExecutionProfileHook::Collect(_)) => ExecutionProfileUse::Collect,
+            Some(ExecutionProfileHook::Use(path)) => {
+                let bytes = fs::read(path)?;
+                let applied = ExecutionProfile::decode(&bytes)?;
+                execution_profile_report = Some(json!({
+                    "profile":path,"profile_sha256":hash(&bytes),
+                    "training_requests":applied.training_requests().get(),
+                    "hot_read_sites":applied.hot_reads().count(),
+                }));
+                ExecutionProfileUse::Apply(std::sync::Arc::new(applied))
+            }
+            Some(ExecutionProfileHook::Adversarial(seed)) => {
+                let wrong = compiler.adversarial_execution_profile(
+                    &source,
+                    EmbeddedModuleGoal::Module,
+                    &CompileOptions::default(),
+                    *seed,
+                )?;
+                execution_profile_report = Some(json!({
+                    "seed":seed,"hot_read_sites":wrong.hot_reads().count(),
+                }));
+                ExecutionProfileUse::Apply(std::sync::Arc::new(wrong))
+            }
+        };
+        let unit = compiler.compile_module(
+            &source,
+            CompileOptions {
+                execution_profile,
+                ..CompileOptions::default()
+            },
+        )?;
         let front_and_lower_ns = started.elapsed().as_nanos();
         let started = Instant::now();
         let artifact = compiler.emit_wasm(&unit)?;
@@ -587,6 +666,27 @@ fn run() -> Result<Value> {
             "exact_node_output_checked":true,"expected_json_sha256":hash(expected.as_bytes()),
             "expected_json_bytes":expected.len()}));
     }
+    let training_requests = cases.len() * calls;
+    if let Some(ExecutionProfileHook::Collect(path)) = &execution_profile_hook {
+        let requests = u32::try_from(training_requests)
+            .ok()
+            .and_then(std::num::NonZeroU32::new)
+            .ok_or("a training run needs at least one request")?;
+        let bytes = instance.collect_profile(&mut store, requests)?.encode();
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)?
+            .write_all(&bytes)?;
+        let collected = ExecutionProfile::decode(&bytes)?;
+        execution_profile_report = Some(json!({
+            "profile":path,"profile_sha256":hash(&bytes),"profile_bytes":bytes.len(),
+            "training_requests":training_requests,
+            "read_sites":collected.reads().count(),
+            "hot_read_sites":collected.hot_reads().count(),
+            "megamorphic_read_sites":collected.reads().filter(|(_, read)| read.megamorphic).count(),
+        }));
+    }
     let mut report = json!({
         "schema":"scriptw-react-retained-baseline-v1","status":"complete",
         "scope":"one process and one retained Realm/module; diagnostic, not a statistical comparison",
@@ -626,6 +726,11 @@ fn run() -> Result<Value> {
             "windows":samples,"warmups_excluded":warmups,
             "scope":"flight() only; setup, warmups and output validation outside every window",
         });
+    }
+    if let (Some(hook), Some(mut details)) = (&execution_profile_hook, execution_profile_report) {
+        details["mode"] = json!(hook.mode());
+        details["excluded_from_scored_cohorts"] = json!(true);
+        report["execution_profile"] = details;
     }
     if let Some(path) = precompiled_image {
         report["precompiled_image"] = json!({

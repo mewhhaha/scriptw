@@ -251,6 +251,10 @@ def run(args):
     require(not environment.get('NODE_OPTIONS'), 'unset NODE_OPTIONS')
     require(not environment.get('LD_PRELOAD') and not environment.get('LD_AUDIT'),
             'unset dynamic-loader instrumentation')
+    require(not any(environment.get(key) for key in (
+                'SCRIPTW_RSC_PROFILE_COLLECT', 'SCRIPTW_RSC_PROFILE_USE',
+                'SCRIPTW_RSC_PROFILE_ADVERSARIAL')),
+            'profile-guided RSC builds are excluded diagnostics, never a scored cohort')
     require(not any(value and key.startswith(('SCRIPTW_RSC_', 'SCRIPTW_WASM_TRACE',
                 'SCRIPTW_PERF_MAP', 'SCRIPTW_EMIT_SIZE_REPORT', 'SCRIPTW_SPILL_HOME_CENSUS'))
                 for key, value in environment.items()),

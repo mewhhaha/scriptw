@@ -4435,6 +4435,47 @@ fn language_features_for_case(case: &TestCase) -> scriptw_engine::LanguageFeatur
     policy
 }
 
+/// Verification only, never for a published run: with
+/// `SCRIPTW_TEST262_EXECUTION_PROFILE=collect` every Wasm AOT case is built
+/// instrumented to collect an execution profile, and with
+/// `adversarial:<seed>` it is built with a wrong profile (every read site
+/// hot, its kind rotated from the seed). Both must leave every result
+/// unchanged: a profile costs speed only. A case whose unprofiled build
+/// fails keeps that failure.
+const VERIFICATION_EXECUTION_PROFILE_ENV: &str = "SCRIPTW_TEST262_EXECUTION_PROFILE";
+
+fn verification_execution_profile(
+    engine: &Engine,
+    materialized: &MaterializedTest,
+    options: &mut CompileOptions,
+) -> Result<(), String> {
+    let Some(choice) = std::env::var_os(VERIFICATION_EXECUTION_PROFILE_ENV) else {
+        return Ok(());
+    };
+    let choice = choice.to_str().unwrap_or_default();
+    if choice == "collect" {
+        options.execution_profile = scriptw_engine::ExecutionProfileUse::Collect;
+        return Ok(());
+    }
+    let seed = choice
+        .strip_prefix("adversarial:")
+        .and_then(|seed| seed.parse::<usize>().ok())
+        .ok_or_else(|| {
+            format!("{VERIFICATION_EXECUTION_PROFILE_ENV} must be collect or adversarial:<seed>")
+        })?;
+    let goal = if materialized.execution_mode().is_module() {
+        scriptw_engine::EmbeddedModuleGoal::Module
+    } else {
+        scriptw_engine::EmbeddedModuleGoal::Script
+    };
+    if let Ok(profile) =
+        engine.adversarial_execution_profile(&materialized.source, goal, options, seed)
+    {
+        options.execution_profile = scriptw_engine::ExecutionProfileUse::Apply(Arc::new(profile));
+    }
+    Ok(())
+}
+
 fn compile_options_for_case(case: &TestCase) -> CompileOptions {
     CompileOptions {
         filename: Some(case.source_path.display().to_string()),
@@ -5391,6 +5432,11 @@ fn run_one_case_with_execution(
                 compile_options.module_loading_policy =
                     ModuleLoadingPolicy::Embedded(catalog.graph);
             }
+            verification_execution_profile(&engine, &materialized, &mut compile_options).map_err(
+                |detail| {
+                    classify_failure(case.execution_id.clone(), FailureKind::HostHarness, detail)
+                },
+            )?;
         }
 
         // Parse/early-negative tests use an explicit compile path. Wasm-AOT

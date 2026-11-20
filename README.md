@@ -146,6 +146,12 @@ Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and t
   mapped fresh Store memory for both
   ([measurements](docs/rust-rewrite/benchmarks.md#pooled-gc-heaps-2026-11-19)).
   Embedders opt in with `configure_pooled_stores`.
+- **Profile-guided builds (experimental, off by default):** a build can collect
+  an execution profile and a later build of the same program can apply it
+  (`CompileOptions::execution_profile`, `scriptw precompile --profile`). Its first
+  specialisation saved 1.3% of the RSC request's instructions, short of its go
+  threshold, so no benchmark uses it
+  ([contract](docs/rust-rewrite/contracts/profile-guided-compilation.md)).
 - **Runtime ABI 82:** rebuild Portable bundles and native images built under an
   earlier ABI ([details](docs/rust-rewrite/runtime-requirements.md#runtime-abi)).
 
