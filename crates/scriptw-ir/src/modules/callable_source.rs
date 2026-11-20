@@ -56,6 +56,32 @@ impl OriginalUnitSource {
         self
     }
 
+    /// `text` is this source after [`super::record::rewrite_import_meta`]:
+    /// each `import.meta` site's bytes now hold the `name_len`-byte cell name
+    /// and then padding. A callable whose source ends with the
+    /// meta-property ends, in `text`, after the name, inside the site; its
+    /// original text ends at the site's end. So every position from the end
+    /// of the name to the end of the site maps there, and the positions
+    /// inside the name map to no original position.
+    pub(super) fn rewrite_import_meta(
+        self,
+        text: String,
+        sites: &[scriptw_front::SourceSpan],
+        name_len: usize,
+    ) -> Self {
+        let mut source = self.stable_rewrite(text);
+        for site in sites {
+            let name_end = site.start + name_len;
+            assert!(
+                site.start < name_end && name_end <= site.end,
+                "the import.meta cell name fits its site"
+            );
+            source.boundaries[site.start + 1..name_end].fill(None);
+            source.boundaries[name_end..site.end].fill(Some(site.end));
+        }
+        source
+    }
+
     pub(super) fn replace(&mut self, start: usize, end: usize, replacement: &str) {
         assert!(
             !replacement.is_empty(),

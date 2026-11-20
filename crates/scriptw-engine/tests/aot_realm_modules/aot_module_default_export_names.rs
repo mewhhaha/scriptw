@@ -514,6 +514,28 @@ fn an_import_meta_module_cannot_reach_its_meta_cell() {
     );
 }
 
+// The `import.meta` cell name is shorter than the meta-property it replaces
+// and is padded after it, so a callable whose source ends with the
+// meta-property ends, in the rewritten unit, inside that site. Its original
+// text must still run to the end of `meta`, however the property is spelled.
+#[test]
+fn a_callable_ending_in_import_meta_keeps_its_whole_source_text() {
+    assert_modules(
+        &[
+            (
+                "a.mjs",
+                "import {b, c} from './e.mjs';\nconst a = () => import.meta;\nconst d = () => import\n  .  meta;\nprint(JSON.stringify([a, b, c, d].map(String)));",
+            ),
+            (
+                "e.mjs",
+                "export const b = async () => import.meta;\nexport const c = x => typeof import . meta;",
+            ),
+        ],
+        EntryGoal::Module,
+        &[r#"["() => import.meta","async () => import.meta","x => typeof import . meta","() => import\n  .  meta"]"#],
+    );
+}
+
 #[test]
 fn a_top_level_binding_spelled_like_the_default_cell_is_legal() {
     assert_modules(

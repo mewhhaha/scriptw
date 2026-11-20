@@ -179,7 +179,11 @@ pub(super) fn linked_module_execution_source(
                     .map_err(|error| error.reason)
                     .and_then(|body| {
                         super::default_export_definition::rewrite_source(
-                            original.stable_rewrite(body),
+                            original.rewrite_import_meta(
+                                body,
+                                &unit.record.import_meta_sites,
+                                unit.linker_spelling.import_meta().as_str().len(),
+                            ),
                             unit.record.source_syntax(),
                             rewrite,
                         )
