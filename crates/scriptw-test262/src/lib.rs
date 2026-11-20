@@ -4434,6 +4434,11 @@ fn case_has_compile_only_negative(case: &TestCase) -> bool {
 /// unprofiled. `SCRIPTW_TEST262_EXECUTION_PROFILE_LOG` must name a file;
 /// each case appends whether it was built profiled or, because its own
 /// unprofiled build fails, unprofiled, so a run can count what it covered.
+/// A build without the feature fails every case while either variable is
+/// set, and `publish-status` refuses to publish while it is set.
+pub const VERIFICATION_EXECUTION_PROFILE_ENV: &str = "SCRIPTW_TEST262_EXECUTION_PROFILE";
+const VERIFICATION_EXECUTION_PROFILE_LOG_ENV: &str = "SCRIPTW_TEST262_EXECUTION_PROFILE_LOG";
+
 #[cfg(feature = "profile-experiments")]
 fn verification_execution_profile(
     engine: &Engine,
@@ -4441,14 +4446,17 @@ fn verification_execution_profile(
     materialized: &MaterializedTest,
     options: &mut CompileOptions,
 ) -> Result<(), String> {
-    const CHOICE: &str = "SCRIPTW_TEST262_EXECUTION_PROFILE";
-    const LOG: &str = "SCRIPTW_TEST262_EXECUTION_PROFILE_LOG";
+    const CHOICE: &str = VERIFICATION_EXECUTION_PROFILE_ENV;
+    const LOG: &str = VERIFICATION_EXECUTION_PROFILE_LOG_ENV;
     let Some(choice) = std::env::var_os(CHOICE) else {
         return Ok(());
     };
     let log = std::env::var_os(LOG).ok_or_else(|| format!("{CHOICE} requires {LOG}"))?;
     let choice = choice.to_str().unwrap_or_default();
-    let built = if choice == "collect" {
+    let built = if case_has_compile_only_negative(case) {
+        // Its build is expected to fail before any profile could apply.
+        "unprofiled-compile-negative"
+    } else if choice == "collect" {
         options.execution_profile = scriptw_engine::ExecutionProfileUse::Collect;
         "profiled"
     } else {
@@ -4489,6 +4497,16 @@ fn verification_execution_profile(
     _: &MaterializedTest,
     _: &mut CompileOptions,
 ) -> Result<(), String> {
+    for variable in [
+        VERIFICATION_EXECUTION_PROFILE_ENV,
+        VERIFICATION_EXECUTION_PROFILE_LOG_ENV,
+    ] {
+        if std::env::var_os(variable).is_some() {
+            return Err(format!(
+                "{variable} is set, but this build lacks the profile-experiments feature"
+            ));
+        }
+    }
     Ok(())
 }
 

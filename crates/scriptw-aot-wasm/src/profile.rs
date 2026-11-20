@@ -371,6 +371,23 @@ pub struct ReadSiteObservation {
 }
 
 impl ReadSiteObservation {
+    /// Only states a collected observation can have: a chain of at most a
+    /// chain's records, and a dominant kind only at a site that still
+    /// learns and has a record proving it. A profile holds no other.
+    fn check(&self) -> Result<(), ProfileError> {
+        if self.records > crate::objects::MAX_OBSERVED_RECORDS {
+            return Err(ProfileError::Malformed(
+                "a read site names more records than a chain holds",
+            ));
+        }
+        if self.dominant.is_some() && (self.records == 0 || self.megamorphic) {
+            return Err(ProfileError::Malformed(
+                "a dominant kind at a site without records or that stopped learning",
+            ));
+        }
+        Ok(())
+    }
+
     /// A site of `executions` whose one record proves `dominant`.
     pub fn dominated(executions: u64, dominant: ReadSpecialisation) -> Self {
         Self {
@@ -420,6 +437,9 @@ pub enum ProfileError {
     /// The program was not built to collect a profile, so it has none to
     /// read.
     NotCollecting,
+    /// A profile-collecting build was offered for precompilation; a
+    /// precompiled image keeps no raw P to read its profile against.
+    CollectingNotPrecompilable,
 }
 
 impl std::fmt::Display for ProfileError {
@@ -440,6 +460,9 @@ impl std::fmt::Display for ProfileError {
             Self::NotAWriteSite => f.write_str("write observation for a site that is not a write"),
             Self::NotCollecting => f.write_str(
                 "this program records no execution profile: build it with profile collection",
+            ),
+            Self::CollectingNotPrecompilable => f.write_str(
+                "a profile-collecting build cannot be precompiled: its profile is read against the raw program",
             ),
         }
     }
@@ -512,6 +535,7 @@ impl ExecutionProfile {
         if site.kind != SiteKind::PropertyRead {
             return Err(ProfileError::NotAReadSite);
         }
+        observation.check()?;
         self.reads.insert(site.clone(), observation);
         Ok(())
     }
@@ -635,31 +659,14 @@ impl ExecutionProfile {
                 1 => true,
                 _ => return Err(ProfileError::Malformed("megamorphic flag is not 0 or 1")),
             };
-            // Only states a collected observation can have: a chain of at
-            // most a chain's records, and a dominant kind only at a site
-            // that still learns and has a record proving it.
-            if records > crate::objects::MAX_OBSERVED_RECORDS {
-                return Err(ProfileError::Malformed(
-                    "a read site names more records than a chain holds",
-                ));
-            }
-            if dominant.is_some() && (records == 0 || megamorphic) {
-                return Err(ProfileError::Malformed(
-                    "a dominant kind at a site without records or that stopped learning",
-                ));
-            }
-            if reads
-                .insert(
-                    site,
-                    ReadSiteObservation {
-                        executions,
-                        dominant,
-                        records,
-                        megamorphic,
-                    },
-                )
-                .is_some()
-            {
+            let observation = ReadSiteObservation {
+                executions,
+                dominant,
+                records,
+                megamorphic,
+            };
+            observation.check()?;
+            if reads.insert(site, observation).is_some() {
                 return Err(ProfileError::Malformed("a read site is recorded twice"));
             }
         }
@@ -1066,35 +1073,54 @@ mod tests {
         assert_eq!(admitted.read_specialisation(reads[1]), None);
     }
 
-    /// A decoded observation holds only what a collected one can.
+    /// A profile holds only observations a collection can make, whether
+    /// observed in memory or decoded.
     #[test]
-    fn decoding_rejects_observations_collection_cannot_make() {
+    fn profiles_reject_observations_collection_cannot_make() {
         let map = site_map();
         let read = map.read_sites().next().unwrap();
         let kind = ReadSpecialisation::OwnCompact(CompactStorageLayout::Inline);
+        let mut valid =
+            ExecutionProfile::new(ProgramKey::new([7; 32]), &map, "test", NonZeroU32::MIN);
+        valid
+            .observe_read(read, ReadSiteObservation::dominated(64, kind))
+            .unwrap();
+        let encoded = valid.encode();
+        // The read table's last observation, then an empty write table.
+        let at = encoded.len() - 4 - 3;
+        assert_eq!(encoded[at..at + 3], [kind.code(), 1, 0]);
         for (dominant, records, megamorphic) in [
             (Some(kind), 0, false),
             (Some(kind), 2, true),
             (None, 9, false),
         ] {
-            let mut profile = profile(&map);
-            profile
-                .observe_read(
-                    read,
-                    ReadSiteObservation {
-                        executions: 64,
-                        dominant,
-                        records,
-                        megamorphic,
-                    },
-                )
-                .unwrap();
+            let mut profile =
+                ExecutionProfile::new(ProgramKey::new([7; 32]), &map, "test", NonZeroU32::MIN);
+            let observation = ReadSiteObservation {
+                executions: 64,
+                dominant,
+                records,
+                megamorphic,
+            };
             assert!(
                 matches!(
-                    ExecutionProfile::decode(&profile.encode()),
+                    profile.observe_read(read, observation),
                     Err(ProfileError::Malformed(_))
                 ),
-                "{dominant:?} {records} {megamorphic}"
+                "{observation:?}"
+            );
+            let mut bytes = encoded.clone();
+            bytes[at..at + 3].copy_from_slice(&[
+                dominant.map_or(NO_DOMINANT_KIND, ReadSpecialisation::code),
+                records,
+                u8::from(megamorphic),
+            ]);
+            assert!(
+                matches!(
+                    ExecutionProfile::decode(&bytes),
+                    Err(ProfileError::Malformed(_))
+                ),
+                "{observation:?}"
             );
         }
     }

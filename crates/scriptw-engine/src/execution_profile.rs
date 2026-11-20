@@ -207,9 +207,9 @@ impl Engine {
     /// its dominant kind rotating through every specialisation from
     /// `seed`, so nearly every guard proves a kind its receivers never
     /// have. It emits the unprofiled build once to learn the site map.
-    /// `Ok(None)` means the program itself does not compile or emit, so
-    /// its unprofiled build reports that failure; every other failure is
-    /// an error.
+    /// `Ok(None)` means the program itself is rejected with a source
+    /// diagnostic (parse, early, link or lowering), which its unprofiled
+    /// build reports too; every other failure is an error.
     pub fn adversarial_execution_profile(
         &self,
         source: &str,
@@ -226,8 +226,16 @@ impl Engine {
                 execution_profile: ExecutionProfileUse::None,
                 ..options.clone()
             };
-            let Ok(prepared) = self.prepare_compilation(source, goal, &options) else {
-                return Ok(None);
+            let own = |error: EngineError| {
+                if error.parse_diagnostic.is_some() || error.ir_diagnostic.is_some() {
+                    Ok(None)
+                } else {
+                    Err(error)
+                }
+            };
+            let prepared = match self.prepare_compilation(source, goal, &options) {
+                Ok(prepared) => prepared,
+                Err(error) => return own(error),
             };
             let program = ProgramKey::new(
                 program_key_for_role(
@@ -247,14 +255,15 @@ impl Engine {
                     ))
                 })?,
             );
-            let Ok(unit) = self.compile_prepared_on_current_thread(prepared) else {
-                return Ok(None);
+            let unit = match self.compile_prepared_on_current_thread(prepared) {
+                Ok(unit) => unit,
+                Err(error) => return own(error),
             };
             let cache = program_wasm_cache();
             let runtime_cache = cache
                 .as_deref()
                 .map(wasm_runtime_link::RuntimeWasmCache::new);
-            let Ok(artifact) = scriptw_aot_wasm::emit_with_intl_profile_and_runtime_inputs(
+            let artifact = match scriptw_aot_wasm::emit_with_intl_profile_and_runtime_inputs(
                 &unit.ir,
                 unit.promise_rejection_policy,
                 &unit.intl_profile,
@@ -265,8 +274,9 @@ impl Engine {
                     scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost,
                 ),
                 ProfileMode::None,
-            ) else {
-                return Ok(None);
+            ) {
+                Ok(artifact) => artifact,
+                Err(error) => return own(EngineError::from_wasm_emit_error(&unit.ir, error)),
             };
             let site_map = artifact.site_map();
             let mut profile = ExecutionProfile::new(

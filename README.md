@@ -148,7 +148,8 @@ Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and t
   Embedders opt in with `PooledStores::engine`.
 - **Profile-guided builds (experimental, off by default):** a build can collect
   an execution profile and a later build of the same program can apply it
-  (`CompileOptions::execution_profile`, `scriptw precompile --profile`). Its first
+  through `CompileOptions::execution_profile` (the CLI's `scriptw precompile
+  --profile` needs the non-default `profile-experiments` feature). Its first
   specialisation saved 1.3% of the RSC request's instructions, short of its go
   threshold, so no benchmark uses it
   ([contract](docs/rust-rewrite/contracts/profile-guided-compilation.md)).

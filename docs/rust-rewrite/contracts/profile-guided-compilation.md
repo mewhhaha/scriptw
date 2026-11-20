@@ -61,8 +61,8 @@ decodes the memory against the section. A program that was not built with
 `Collect` is refused with `ProfileError::NotCollecting`, and a malformed or
 foreign memory or section with the decoder's typed `ProfileError`
 (`EngineError::execution_profile_error`). `EmbeddedRuntime::precompile`
-refuses a `Collect` build, because a precompiled image keeps no raw P to read
-the profile against. Counters count module initialization and every export
+refuses a `Collect` build with `ProfileError::CollectingNotPrecompilable`,
+because a precompiled image keeps no raw P to read the profile against. Counters count module initialization and every export
 call as well as requests.
 
 ## Applying
@@ -89,15 +89,18 @@ Verification-only surface, compiled only with the non-default
 `scriptw-cli` (never in a product build or a published Test262 run):
 
 - `Engine::adversarial_execution_profile`: a wrong profile of a source (every
-  read site hot, its kind rotated from a seed), `None` when the program itself
-  does not compile.
+  read site hot, its kind rotated from a seed), `None` only when the program
+  itself is rejected with a source diagnostic (parse, early, link or
+  lowering); any other failure is an error.
 - `SCRIPTW_RSC_PROFILE_ADVERSARIAL=<seed>` in the RSC host.
 - `SCRIPTW_TEST262_EXECUTION_PROFILE=collect|adversarial:<seed>` with
   `SCRIPTW_TEST262_EXECUTION_PROFILE_LOG=<file>`: every Wasm AOT case is built
-  collecting or with a wrong profile, and appends to the log whether it was
-  built profiled or, because its own unprofiled build fails, unprofiled. Any
-  other failure of the hook fails the case. `$262.agent` worker programs stay
-  unprofiled.
+  collecting or with a wrong profile, and appends to the log `profiled`,
+  `unprofiled-compile-negative` (a parse or early negative, whose build fails
+  first) or `unprofiled-own-build-fails`. Any other failure of the hook fails
+  the case. `$262.agent` worker programs stay unprofiled. A build without the
+  feature fails every case while either variable is set, and `test262
+  publish-status` refuses to run while the hook variable is set.
 - `scriptw precompile --profile <swprof>`. The CLI compiles with `filename` set
   to the source path as typed, and has no way to collect, so only a profile
   an embedder collected under exactly those options is admitted.
@@ -112,8 +115,9 @@ Verification-only surface, compiled only with the non-default
 - `scriptw-engine --lib embedding::tests::execution_profile`, all executed in
   Wasmtime:
   - the emission fixtures trained for real: counters (main 1, probe body 64,
-    probe read 64, except an Array receiver, whose probe read reaches the
-    site record once), the kind each decodes to, polymorphic and megamorphic
+    probe read 64, except an Array receiver, whose read takes the general
+    path its Array heap shape plans and never reaches the site record), the
+    kind each decodes to, polymorphic and megamorphic
     flags, the codec and admission round trip against the unprofiled key,
     and a true profile's guards spending less Wasm fuel than the unprofiled
     build;
@@ -125,8 +129,10 @@ Verification-only surface, compiled only with the non-default
     non-enumerable), `freeze`/`seal`/`preventExtensions`, a key or method on
     `Object.prototype`, a `String.prototype` edit, or receivers of another
     Realm. Unprofiled, Collect, true and three adversarial builds answer
-    identically, as Modules through embedding and as Scripts through the
-    engine's run path;
+    identically as Modules through embedding; the same sources as Scripts
+    through the engine's run path are checked unprofiled, Collect and with
+    three adversarial profiles, but with no true profile (a Module-trained
+    profile names another program);
   - distinct cache keys and typed refusals.
 - Retained RSC requests: Collect (sync), the true profile and adversarial seeds
   0 and 1 (sync and async) pass the host's exact Flight output check.
@@ -164,13 +170,12 @@ Test262 (pinned suite, wasm-aot, `--threads` 2–3, 60 s case timeout):
 |---|---|---:|---:|
 | unprofiled | all 15 | 21,282 | 21,282 |
 | adversarial seed 0 | all 15 | 21,282 | 21,282 |
-| Collect | 12 (all but class, Object, String.prototype) | 3,674 | 3,674 |
+| Collect | all 15 | 21,282 | 21,282 |
 
 Per-case results are identical to the unprofiled run's in every case run.
 The unprofiled run used the build before the own-array guard skip, whose
 unprofiled P is the same; the adversarial and Collect runs used the build
-with it. Collect over the three largest subtrees was still running when this
-was written (the first 6,850 class cases identical).
+with it.
 
 Not verified:
 
@@ -179,7 +184,7 @@ Not verified:
   the ranges overlap, so no change was measured reliably.
 - Test262 `Function.prototype.apply` and `bind` and
   `annexB/built-ins/Object/prototype/__proto__` from the design's list were
-  not run, nor Collect over class, Object and String.prototype in full.
+  not run.
 - The Test262 runs above predate the hook's case log, so how many cases were
   built profiled is not recorded. Cases whose own unprofiled build fails
   (parse and early-error negatives) run unprofiled by design; the adversarial
@@ -187,7 +192,9 @@ Not verified:
   adversarial pass ran about twice as long, so the profile was applied. With
   the log, the property-accessors subtree builds 40 of 42 cases profiled and
   its 2 parse negatives unprofiled.
-- `scriptw precompile --profile` end to end with a matching profile (only its
-  argument parsing and its refusals of a foreign or malformed profile ran).
+- `scriptw precompile --profile` end to end: only its argument parsing ran
+  as a test. Refusals of a foreign or malformed profile were tried by hand
+  with the CLI and are tested through the engine API.
+- A true profile on the Script goal through the engine's run path.
 - Collect mode of the graph and rooted-snapshot emission, and `$262.agent`
   worker programs under any profile.

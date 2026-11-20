@@ -2,8 +2,7 @@
 //! deployment through the same `EmbeddedRuntime::precompile` an embedder calls.
 use scriptw_engine::{
     configure_wasm_runtime, CompilationJobs, CompileOptions, EmbeddedRuntime, Engine,
-    ExecutionProfile, ExecutionProfileUse, HostSurfacePolicy, NativeCompilationPolicy,
-    RealmBuilder,
+    ExecutionProfileUse, HostSurfacePolicy, NativeCompilationPolicy, RealmBuilder,
 };
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -17,6 +16,7 @@ struct PrecompileArgs {
     output: PathBuf,
     /// An execution profile of this same program and compiler to build
     /// with (feature `profile-experiments` only).
+    #[cfg(feature = "profile-experiments")]
     profile: Option<PathBuf>,
 }
 
@@ -25,7 +25,7 @@ fn parse(args: &[String]) -> Result<PrecompileArgs, String> {
     let mut source = None;
     let mut force_module = false;
     let mut output = None;
-    #[cfg_attr(not(feature = "profile-experiments"), allow(unused_mut))]
+    #[cfg(feature = "profile-experiments")]
     let mut profile = None;
     let mut args = args.iter();
     while let Some(argument) = args.next() {
@@ -75,33 +75,44 @@ fn parse(args: &[String]) -> Result<PrecompileArgs, String> {
         module: force_module || super::is_module_path(&source),
         source,
         output: output.ok_or_else(|| "precompile needs -o IMAGE".to_string())?,
+        #[cfg(feature = "profile-experiments")]
         profile,
     })
+}
+
+/// The execution profile `--profile` names, decoded.
+#[cfg(feature = "profile-experiments")]
+fn execution_profile(arguments: &PrecompileArgs) -> Result<ExecutionProfileUse, String> {
+    let Some(profile) = &arguments.profile else {
+        return Ok(ExecutionProfileUse::None);
+    };
+    let bytes =
+        fs::read(profile).map_err(|error| format!("cannot read {}: {error}", profile.display()))?;
+    scriptw_engine::ExecutionProfile::decode(&bytes)
+        .map(|profile| ExecutionProfileUse::Apply(std::sync::Arc::new(profile)))
+        .map_err(|error| format!("{}: {error}", profile.display()))
+}
+
+/// Without the feature a precompiled image is never profiled.
+#[cfg(not(feature = "profile-experiments"))]
+fn execution_profile(_: &PrecompileArgs) -> Result<ExecutionProfileUse, String> {
+    Ok(ExecutionProfileUse::None)
 }
 
 pub(super) fn command(
     args: Vec<String>,
     host_surface_policy: HostSurfacePolicy,
 ) -> Result<(), String> {
+    let arguments = parse(&args)?;
+    let execution_profile = execution_profile(&arguments)?;
     let PrecompileArgs {
         policy,
         source: path,
         module,
         output,
-        profile,
-    } = parse(&args)?;
+        ..
+    } = arguments;
     let source = super::read_source(&path)?;
-    let execution_profile = match &profile {
-        None => ExecutionProfileUse::None,
-        Some(profile) => {
-            let bytes = fs::read(profile)
-                .map_err(|error| format!("cannot read {}: {error}", profile.display()))?;
-            ExecutionProfileUse::Apply(std::sync::Arc::new(
-                ExecutionProfile::decode(&bytes)
-                    .map_err(|error| format!("{}: {error}", profile.display()))?,
-            ))
-        }
-    };
     let compiler = Engine::new(RealmBuilder::new().build());
     let options = CompileOptions {
         filename: Some(path.clone()),
@@ -248,6 +259,7 @@ mod tests {
                 source: "app.js".into(),
                 module: false,
                 output: "app.swep".into(),
+                #[cfg(feature = "profile-experiments")]
                 profile: None,
             }
         );

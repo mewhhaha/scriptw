@@ -98,6 +98,9 @@ jobs:
           fi
           exit "$status"
 
+      - name: Check the profile-experiments verification hooks
+        run: cargo check --locked -p scriptw-cli --features profile-experiments --lib --bins --examples --tests
+
       - name: Test AOT compiler library and discovered test targets
         run: python3 scripts/run-ci-target.py aot-complete --release
 

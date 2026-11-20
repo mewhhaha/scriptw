@@ -14,7 +14,8 @@ use std::num::NonZeroU32;
 /// run's records prove, which is not always the emission fixture's label:
 /// `new C()` has array-layout storage and its prototype a dictionary, and a
 /// function receiver's compact own storage is no S1 kind. A read of an
-/// Array receiver reaches the probe's site record once, not 64 times.
+/// Array receiver never reaches the probe's site record: it takes the
+/// general read its Array heap shape plans.
 const TRUE_KIND_FIXTURES: &[(&str, &str, Option<ReadSpecialisation>, u64)] = &[
     (
         "own inline",
@@ -55,7 +56,7 @@ const TRUE_KIND_FIXTURES: &[(&str, &str, Option<ReadSpecialisation>, u64)] = &[
     ),
     (
         "object prototype",
-        "function probe(o) { return o.hasOwnProperty; } var t = 0; for (var i = 0; i < 64; i++) if (probe({ y: i }) === Object.prototype.hasOwnProperty) t++; t;",
+        "var m = Object.prototype.hasOwnProperty; function probe(o) { return o.hasOwnProperty; } var t = 0; for (var i = 0; i < 64; i++) if (probe({ y: i }) === m) t++; t;",
         Some(ReadSpecialisation::ProtoPlaceCompact(
             CompactStorageLayout::Inline,
             PlaceHolder::Intrinsic,
@@ -64,13 +65,13 @@ const TRUE_KIND_FIXTURES: &[(&str, &str, Option<ReadSpecialisation>, u64)] = &[
     ),
     (
         "function prototype",
-        "function g() {} function probe(o) { return o.call; } var t = 0; for (var i = 0; i < 64; i++) if (probe(g) === Function.prototype.call) t++; t;",
+        "var m = Function.prototype.call; function g() {} function probe(o) { return o.call; } var t = 0; for (var i = 0; i < 64; i++) if (probe(g) === m) t++; t;",
         None,
         64,
     ),
     (
         "weak map prototype",
-        "var w = new WeakMap(); function probe(o) { return o.get; } var t = 0; for (var i = 0; i < 64; i++) if (probe(w) === WeakMap.prototype.get) t++; t;",
+        "var m = WeakMap.prototype.get; var w = new WeakMap(); function probe(o) { return o.get; } var t = 0; for (var i = 0; i < 64; i++) if (probe(w) === m) t++; t;",
         Some(ReadSpecialisation::ProtoPlaceIntrinsic(
             ReceiverHeader::WeakMap,
         )),
@@ -78,15 +79,13 @@ const TRUE_KIND_FIXTURES: &[(&str, &str, Option<ReadSpecialisation>, u64)] = &[
     ),
     (
         "array prototype",
-        "var a = [1, 2]; function probe(o) { return o.push; } var t = 0; for (var i = 0; i < 64; i++) if (probe(a) === Array.prototype.push) t++; t;",
-        Some(ReadSpecialisation::ProtoPlaceIntrinsic(
-            ReceiverHeader::Array,
-        )),
-        1,
+        "var m = Array.prototype.push; var a = [1, 2]; function probe(o) { return o.push; } var t = 0; for (var i = 0; i < 64; i++) if (probe(a) === m) t++; t;",
+        None,
+        0,
     ),
     (
         "string prototype",
-        "function probe(o) { return o.slice; } var t = 0; for (var i = 0; i < 64; i++) if (probe('abc') === String.prototype.slice) t++; t;",
+        "var m = String.prototype.slice; function probe(o) { return o.slice; } var t = 0; for (var i = 0; i < 64; i++) if (probe('abc') === m) t++; t;",
         Some(ReadSpecialisation::StringPrototypePlace),
         64,
     ),
@@ -348,7 +347,7 @@ fn trained_fixtures_count_decode_their_kind_and_behave_identically_under_every_p
             .iter()
             .filter(|read| read.executions > 0)
             .collect::<Vec<_>>();
-        assert!(!executed.is_empty(), "{name}");
+        assert_eq!(executed.is_empty(), *probe_reads == 0, "{name}");
         for read in executed {
             if read.dominant != *kind || read.megamorphic || read.records != 1 {
                 mismatches.push(format!(
@@ -441,7 +440,11 @@ fn profiles_are_never_silently_ignored() {
     let error = EmbeddedRuntime::precompile(&shared_wasm_engine().unwrap(), &collecting)
         .err()
         .expect("a Collect build is not precompiled");
-    assert!(error.to_string().contains("profile-collecting"), "{error}");
+    assert_eq!(
+        error.execution_profile_error(),
+        Some(&ProfileError::CollectingNotPrecompilable),
+        "{error}"
+    );
 
     let (_, trained) = train(own);
     let error = compile(other, ExecutionProfileUse::Apply(Arc::new(trained))).unwrap_err();
@@ -635,17 +638,34 @@ function mutate() {
 "#,
     ),
     (
-        "other-Realm WeakMap and String.prototype",
+        "other-Realm WeakMap",
         r#"
 var w = new WeakMap();
+var original = WeakMap.prototype.get;
 function probe(o) { return o.get; }
-function train() { var t = 0; for (var i = 0; i < 64; i++) if (probe(w) === WeakMap.prototype.get) t++; return t; }
+function train() { var t = 0; for (var i = 0; i < 64; i++) if (probe(w) === original) t++; return t; }
 function mutate() {
   var other = __scriptwCreateRealm().global;
   var foreign = new other.WeakMap();
-  var out = [probe(foreign) === other.WeakMap.prototype.get, probe(foreign) === WeakMap.prototype.get];
+  var out = [probe(foreign) === other.WeakMap.prototype.get, probe(foreign) === original];
+  other.WeakMap.prototype.get = function () { return 'other realm'; };
+  out.push(probe(foreign)());
+  out.push(probe(w) === original);
+  return out.join('|');
+}
+"#,
+    ),
+    (
+        "String.prototype of another Realm",
+        r#"
+var original = String.prototype.slice;
+function probe(s) { return s.slice; }
+function train() { var t = 0; for (var i = 0; i < 64; i++) if (probe('abc') === original) t++; return t; }
+function mutate() {
+  var other = __scriptwCreateRealm().global;
   other.String.prototype.slice = function () { return 'other realm'; };
-  out.push('abc'.slice(1));
+  var out = [probe('abc') === original, probe('abc').call('abc', 1)];
+  out.push(probe(new other.String('xyz')).call('xyz', 1));
   return out.join('|');
 }
 "#,

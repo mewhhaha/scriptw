@@ -3019,6 +3019,13 @@ fn execute_test262_command(input: AdmittedTest262Command) -> Result<(), String> 
             Ok(())
         }
         Test262Command::PublishStatus => {
+            // A verification hook's run never becomes published status.
+            if std::env::var_os(scriptw_test262::VERIFICATION_EXECUTION_PROFILE_ENV).is_some() {
+                return Err(format!(
+                    "publish-status refuses to run while {} is set",
+                    scriptw_test262::VERIFICATION_EXECUTION_PROFILE_ENV
+                ));
+            }
             let publication_backend = PublicationBackend::try_from(execution_backend)?;
             let verified = match runner.load_publishable_aggregate_summary(
                 &parsed.run_config.snapshot_name,

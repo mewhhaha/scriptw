@@ -130,8 +130,8 @@ impl EmbeddedRuntime {
             // A precompiled image keeps no raw P, so a Collect build's
             // profile could never be read from it.
             if execution_profile::ProfileSites::in_program(&artifact.bytes)? {
-                return Err(EngineError::new(
-                    "a profile-collecting build cannot be precompiled: its profile is read from the compiled program",
+                return Err(EngineError::from_execution_profile(
+                    ProfileError::CollectingNotPrecompilable,
                 ));
             }
             if artifact
