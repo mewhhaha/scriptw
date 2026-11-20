@@ -33,6 +33,7 @@ intl_source_identities() {
 step 'Check conformance ownership registry' ./scripts/conformance_owners.py
 step 'Test README status artifact guard' ./scripts/tests/check-readme-status-artifacts.sh
 step 'Test Test262 shortcut scanner' ./scripts/tests/audit-test262-shortcut-scanner.sh
+step 'Test module-boundary guard harness' ./scripts/tests/check-module-boundaries-harness.sh
 step 'Check module boundaries' ./scripts/check-module-boundaries.sh
 step 'Audit Test262 shortcuts' ./scripts/audit-test262-shortcuts.sh --check
 step 'Check Test262 host ABI' ./scripts/check-test262-host-abi.sh
