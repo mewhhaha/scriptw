@@ -13,11 +13,6 @@
 # Abandoned run families that nothing reads.
 /test262/snapshots/codex-debug-phase3j*
 /test262/snapshots/codex-published-wasm-aot-next*
-# `test262 backlog` writes test262/backlog/<test262 revision>/<backend>.json
-# and its rendered `.txt` summary together. Both halves of a generated pair
-# are tracked, like the publication pairs above; this negation only records
-# that no `.txt` rule may hide them.
-!/test262/backlog/*/*.txt
 __pycache__/
 *.py[cod]
 *.exe
