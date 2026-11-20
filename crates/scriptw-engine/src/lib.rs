@@ -1106,13 +1106,71 @@ pub fn wasm_aot_module_is_cached(source: &str, options: &CompileOptions) -> bool
     wasm_aot_program_is_cached(source, ParseGoal::Module, options)
 }
 
-static COMPILATION_JOBS: OnceLock<usize> = OnceLock::new();
+static COMPILATION_JOBS: OnceLock<std::num::NonZeroUsize> = OnceLock::new();
 static EXPLICIT_COMPILATION_JOBS: OnceLock<usize> = OnceLock::new();
 static COMPILATION_POOL: OnceLock<Result<rayon::ThreadPool, String>> = OnceLock::new();
 
-/// Default Cranelift parallelism: a positive `SCRIPTW_JOBS` when the process
-/// environment sets one, otherwise half the logical CPUs, with a minimum of
-/// one. Test262's `--threads` remains a separate case-execution setting.
+/// The process-wide native compilation job count: the size of the one bounded
+/// Rayon pool that runs Cranelift. Only [`configure_compilation_jobs`] and
+/// [`CompilationJobs::current`] construct it, so a value always names the count
+/// the pool has (or will be created with); the first choice in a process wins.
+///
+/// Each job beyond the first compiles another function concurrently and keeps
+/// its own Cranelift working set. On the React Flight (RSC) bundle a second job
+/// raised the compiling process's peak resident set by about 110–160 MiB (250
+/// to 361 MiB under Fast, 257 to 415 MiB under Speed) while halving native
+/// preparation. Scriptw offers no byte-valued compilation memory cap because
+/// Cranelift cannot enforce one: bound memory with the job count and the
+/// embedder's cgroup or resource limit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CompilationJobs(std::num::NonZeroUsize);
+
+impl CompilationJobs {
+    /// The configured count, or the [default](default_compilation_jobs), which
+    /// this call then fixes for the rest of the process.
+    pub fn current() -> Self {
+        Self(*COMPILATION_JOBS.get_or_init(|| {
+            std::num::NonZeroUsize::new(default_compilation_jobs())
+                .expect("the default compilation job count is positive")
+        }))
+    }
+
+    pub const fn get(self) -> std::num::NonZeroUsize {
+        self.0
+    }
+
+    /// Whether Wasmtime must split a module's functions across the pool.
+    /// With one job Wasmtime compiles serially on the calling thread; a
+    /// parallel Engine outside the pool would use Rayon's global pool instead.
+    pub(crate) const fn parallel(self) -> bool {
+        self.0.get() > 1
+    }
+
+    /// Refuse an Engine whose parallel-compilation flag disagrees with the
+    /// process job count; configure it with `configure_wasm_runtime`.
+    pub(crate) fn verify_engine(engine: &WasmtimeEngine) -> Result<(), EngineError> {
+        let jobs = Self::current();
+        if engine.get_parallel_compilation() == jobs.parallel() {
+            Ok(())
+        } else {
+            Err(EngineError::new(format!(
+                "Wasmtime Engine parallel compilation is {} but the process compiles with {} job(s); \
+                 configure the Engine with configure_wasm_runtime(config, policy, CompilationJobs::current())",
+                if engine.get_parallel_compilation() { "on" } else { "off" },
+                jobs.get()
+            )))
+        }
+    }
+}
+
+/// Default Cranelift parallelism for a process that never configures one: a
+/// positive `SCRIPTW_JOBS` when the process environment sets one, otherwise
+/// two jobs, or one on a single-CPU machine. The CPU count respects affinity
+/// and cgroup CPU quotas. Two jobs nearly halve a large program's compilation
+/// for a bounded memory cost (see [`CompilationJobs`]); embedders that want
+/// more call [`configure_compilation_jobs`] first. The CLI keeps its own
+/// documented default. Test262's `--threads` remains a separate case-execution
+/// setting.
 ///
 /// The CLI and the differential worker reject a malformed `SCRIPTW_JOBS`
 /// before they configure the pool; this embedder default ignores one rather
@@ -1137,22 +1195,23 @@ pub fn default_compilation_jobs() -> usize {
     }
     std::thread::available_parallelism()
         .map(usize::from)
-        .unwrap_or(2)
-        .div_ceil(2)
-        .max(1)
+        .unwrap_or(1)
+        .clamp(1, 2)
 }
 
 /// Selects the shared Cranelift compilation-pool size before the first Wasm
 /// module is compiled. A process has one pool so concurrent Test262 workers
-/// cannot each create an unbounded set of compiler threads.
-pub fn configure_compilation_jobs(jobs: usize) -> Result<(), String> {
-    if jobs == 0 {
+/// cannot each create an unbounded set of compiler threads. The first choice
+/// wins: a later different request, or one after the default was fixed by a
+/// compilation or [`CompilationJobs::current`], is refused.
+pub fn configure_compilation_jobs(jobs: usize) -> Result<CompilationJobs, String> {
+    let Some(jobs) = std::num::NonZeroUsize::new(jobs) else {
         return Err("--jobs must be a positive integer".to_string());
-    }
-    let configured = COMPILATION_JOBS.get_or_init(|| jobs);
-    if *configured == jobs {
-        let _ = EXPLICIT_COMPILATION_JOBS.set(jobs);
-        Ok(())
+    };
+    let configured = *COMPILATION_JOBS.get_or_init(|| jobs);
+    if configured == jobs {
+        let _ = EXPLICIT_COMPILATION_JOBS.set(jobs.get());
+        Ok(CompilationJobs(jobs))
     } else {
         Err(format!(
             "Wasm compilation pool already configured for {configured} jobs"
@@ -1160,8 +1219,17 @@ pub fn configure_compilation_jobs(jobs: usize) -> Result<(), String> {
     }
 }
 
+/// Fix a tool's own default unless the process already chose a count, without
+/// recording an explicit request: [`configured_compilation_jobs`] stays `None`
+/// so isolated workers keep their serial default. The CLI uses this for its
+/// half-the-CPUs default.
+#[doc(hidden)]
+pub fn prefer_default_compilation_jobs(jobs: std::num::NonZeroUsize) -> CompilationJobs {
+    CompilationJobs(*COMPILATION_JOBS.get_or_init(|| jobs))
+}
+
 pub fn compilation_jobs() -> usize {
-    *COMPILATION_JOBS.get_or_init(default_compilation_jobs)
+    CompilationJobs::current().get().get()
 }
 
 /// Returns explicit configuration without choosing the CPU-derived default.
@@ -1579,7 +1647,7 @@ fn product_wasmtime_config(
 ) -> Result<WasmtimeConfig, WasmtimeEngineSetupError> {
     let mut config =
         wasmtime_config::base_config(mode, wasmtime::WasmBacktraceDetails::Environment);
-    config.parallel_compilation(compilation_jobs() > 1);
+    config.parallel_compilation(CompilationJobs::current().parallel());
     config.cache(wasmtime_module_cache());
     if let Some(function_cache) = cranelift_function_cache() {
         config

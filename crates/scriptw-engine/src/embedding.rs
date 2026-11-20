@@ -128,15 +128,29 @@ impl NativeCompilationPolicy {
 
 /// Initialize Scriptw's required Wasmtime configuration with a native
 /// compilation `policy` (pass `NativeCompilationPolicy::default()`, Speed,
-/// unless compilation cost dominates). Apply any fuel settings after this
-/// call. This sets the copying-GC baseline without epoch checks: compiled code
-/// is stopped through `wasmtime::Store::interrupt_handle`, and callers own that
-/// handle and any deadline. Evaluation neither requests nor cancels an interrupt.
-pub fn configure_wasm_runtime(config: &mut wasmtime::Config, policy: NativeCompilationPolicy) {
+/// unless compilation cost dominates) and the process job count `jobs` (pass
+/// [`CompilationJobs::current()`], or the value [`configure_compilation_jobs`]
+/// returned). With more than one job, Wasmtime compiles a module's functions in
+/// parallel on Scriptw's bounded pool of exactly that many threads; see
+/// [`CompilationJobs`] for the memory each job costs. Apply any fuel settings
+/// after this call. This sets the copying-GC baseline without epoch checks:
+/// compiled code is stopped through `wasmtime::Store::interrupt_handle`, and
+/// callers own that handle and any deadline. Evaluation neither requests nor
+/// cancels an interrupt.
+pub fn configure_wasm_runtime(
+    config: &mut wasmtime::Config,
+    policy: NativeCompilationPolicy,
+    jobs: CompilationJobs,
+) {
+    configure_runtime_capabilities(config, policy);
+    config.parallel_compilation(jobs.parallel());
+}
+
+/// The required capabilities and native policy, without a compiler job count.
+fn configure_runtime_capabilities(config: &mut wasmtime::Config, policy: NativeCompilationPolicy) {
     let (mode, allocator) = policy.settings();
     *config = wasmtime_config::base_config(mode, wasmtime::WasmBacktraceDetails::Environment);
     config.cranelift_regalloc_algorithm(allocator);
-    config.parallel_compilation(false);
 }
 
 /// Immutable, admitted program and its matching runtime for one actual Engine.
@@ -168,6 +182,9 @@ impl EmbeddedRuntime {
             PRODUCT_WASMTIME_POLICY
                 .verify_engine(engine)
                 .map_err(EngineError::new)?;
+            // A parallel Engine compiling outside the bounded pool would use
+            // Rayon's global pool, one thread per CPU.
+            CompilationJobs::verify_engine(engine)?;
             if scriptw_aot_wasm::RuntimeSourceCompilationProfile::from_module(&artifact.bytes)
                 .map_err(|error| EngineError::new(error.to_string()))?
                 != scriptw_aot_wasm::RuntimeSourceCompilationProfile::Portable

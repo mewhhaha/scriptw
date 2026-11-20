@@ -15,8 +15,10 @@ mod tests;
 /// this call is unsupported by Wasmtime. Loading never enables a compiler, so
 /// the image's own recorded policy, not this Engine's, determines its code.
 pub fn configure_precompiled_wasm_runtime(config: &mut wasmtime::Config) {
-    // No compiler runs here; the policy argument is inert once it is disabled.
-    configure_wasm_runtime(config, NativeCompilationPolicy::Fast);
+    // No compiler runs here; the policy argument is inert once it is disabled,
+    // and no compilation job count is chosen for the process.
+    configure_runtime_capabilities(config, NativeCompilationPolicy::Fast);
+    config.parallel_compilation(false);
     config.enable_compiler(false);
 }
 
@@ -144,6 +146,7 @@ impl EmbeddedRuntime {
                     ))
                 }
             };
+            CompilationJobs::verify_engine(engine)?;
             let key = artifact.runtime.as_ref().map(|r| r.key());
             admission::program(&artifact.bytes, key.is_some())?;
             if let Some(key) = &key {

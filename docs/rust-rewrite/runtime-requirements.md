@@ -26,7 +26,10 @@ or Node's worker APIs. SIMD is not an additional requirement of this policy.
 
 The embedding API's `configure_wasm_runtime` takes a `NativeCompilationPolicy`:
 `Speed` (the default; Cranelift `OptLevel::Speed` with the backtracking
-register allocator) or `Fast` (`OptLevel::None`, single-pass). Scriptw's own
+register allocator) or `Fast` (`OptLevel::None`, single-pass), and the
+process's `CompilationJobs` (by default two, or one on a single-CPU machine),
+which decides whether Wasmtime compiles functions in parallel on Scriptw's
+bounded pool. Scriptw's own
 CLI and Test262 execution choose their native mode internally, as before
 (`Fast` for one-shot runs), and do not use this default. The precompiled runtime image R keeps its own fixed policy
 and loads under either.

@@ -386,6 +386,7 @@ fn portable_retained_host_get_keeps_unread_foreign_intl_separate_from_mutated_en
     scriptw_engine::configure_wasm_runtime(
         &mut config,
         scriptw_engine::NativeCompilationPolicy::Fast,
+        scriptw_engine::CompilationJobs::current(),
     );
     let engine = wasmtime::Engine::new(&config).unwrap();
     let runtime = EmbeddedRuntime::compile(&engine, &artifact).unwrap();

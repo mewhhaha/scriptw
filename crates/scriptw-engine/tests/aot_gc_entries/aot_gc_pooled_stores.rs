@@ -16,7 +16,11 @@ use wasmtime::{
 
 fn pooled_engine() -> Engine {
     let mut config = Config::new();
-    configure_wasm_runtime(&mut config, NativeCompilationPolicy::Fast);
+    configure_wasm_runtime(
+        &mut config,
+        NativeCompilationPolicy::Fast,
+        scriptw_engine::CompilationJobs::current(),
+    );
     let reset = configure_pooled_stores(&mut config, &PooledStores::sequential());
     if wasmtime::PoolingAllocationConfig::is_pagemap_scan_available() {
         assert_eq!(

@@ -17,6 +17,8 @@ SCRIPTW_WASM_DUMP=hello.wasm ./target/release/scriptw build wasm hello.js
 
 Rust applications can [embed Scriptw](docs/rust-rewrite/contracts/foreign-modules.md)
 in their own Wasmtime Engine, Store and Linker, with synchronous and async host functions.
+They compile on a bounded pool of `CompilationJobs`, two by default, which nearly
+halves native preparation for about 110–160 MiB more peak memory on the RSC bundle.
 
 ## Benchmarks
 

@@ -38,6 +38,7 @@ fn run() -> Result<(), String> {
     scriptw_engine::configure_wasm_runtime(
         &mut config,
         scriptw_engine::NativeCompilationPolicy::Fast,
+        scriptw_engine::CompilationJobs::current(),
     );
     let engine = Engine::new(&config).map_err(|e| e.to_string())?;
     let begin = Instant::now();

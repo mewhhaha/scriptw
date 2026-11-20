@@ -326,14 +326,30 @@ types options:
 "
 }
 
+/// Half the logical CPUs (respecting affinity and CPU quotas), at least one.
+fn cli_default_compilation_jobs() -> std::num::NonZeroUsize {
+    std::thread::available_parallelism()
+        .map_or(std::num::NonZeroUsize::MIN, |cpus| {
+            std::num::NonZeroUsize::new(cpus.get().div_ceil(2)).unwrap_or(cpus)
+        })
+}
+
 fn command_main(mut args: Vec<String>, stdout: OutputBuffer) -> Result<(), String> {
     let GlobalOptions {
         jobs,
         host_surface_policy,
         intl_profile,
     } = take_global_options(&mut args)?;
-    if let Some(jobs) = jobs {
-        configure_compilation_jobs(jobs)?;
+    match jobs {
+        Some(jobs) => {
+            configure_compilation_jobs(jobs)?;
+        }
+        // The CLI's own default, chosen without recording an explicit request
+        // so isolated differential workers keep their serial default. Embedders
+        // that never configure get the engine's smaller default instead.
+        None => {
+            scriptw_engine::prefer_default_compilation_jobs(cli_default_compilation_jobs());
+        }
     }
     let mut args = args.into_iter();
     let Some(command) = args.next() else {

@@ -212,7 +212,11 @@ mod tests {
             (false, PooledStoreReset::ReleaseAll),
         ] {
             let mut config = wasmtime::Config::new();
-            crate::configure_wasm_runtime(&mut config, crate::NativeCompilationPolicy::Fast);
+            crate::configure_wasm_runtime(
+                &mut config,
+                crate::NativeCompilationPolicy::Fast,
+                crate::CompilationJobs::current(),
+            );
             let reset = configure_with_pagemap(&mut config, &PooledStores::sequential(), available);
             assert_eq!(reset, expected);
             if available && !wasmtime::PoolingAllocationConfig::is_pagemap_scan_available() {

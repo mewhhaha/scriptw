@@ -8,4 +8,5 @@
 
 mod aot_date_cached_realm_choice;
 mod compilation_jobs_environment;
+mod parallel_precompilation;
 mod runtime_artifact_cache;

@@ -254,7 +254,11 @@ export function bump(amount) { return counter(amount); }
         .unwrap();
     let artifact = compiler.emit_wasm(&unit).unwrap();
     let mut config = wasmtime::Config::new();
-    configure_wasm_runtime(&mut config, NativeCompilationPolicy::Fast);
+    configure_wasm_runtime(
+        &mut config,
+        NativeCompilationPolicy::Fast,
+        scriptw_engine::CompilationJobs::current(),
+    );
     let native = wasmtime::Engine::new(&config).unwrap();
     // EmbeddedRuntime admission requires the real Portable compilation profile.
     let runtime = EmbeddedRuntime::compile(&native, &artifact).unwrap();
@@ -407,7 +411,11 @@ export function boundaries() {
         .unwrap();
     let artifact = compiler.emit_wasm(&unit).unwrap();
     let mut config = wasmtime::Config::new();
-    configure_wasm_runtime(&mut config, NativeCompilationPolicy::Fast);
+    configure_wasm_runtime(
+        &mut config,
+        NativeCompilationPolicy::Fast,
+        scriptw_engine::CompilationJobs::current(),
+    );
     let native = wasmtime::Engine::new(&config).unwrap();
     let runtime = EmbeddedRuntime::compile(&native, &artifact).unwrap();
     for _ in 0..2 {

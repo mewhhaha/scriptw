@@ -2,10 +2,10 @@
 //! Run under scripts/limited_verification.py. Inputs are the unmodified rsc.js
 //! bundle and Node-generated support.json from the existing React fixture driver.
 use scriptw_engine::{
-    configure_compilation_jobs, configure_wasm_runtime, CompileOptions, CompilerIdentity,
-    CompilerSourceRevision, EmbeddedEvaluation, EmbeddedInstance, EmbeddedRuntime, Engine,
-    ForeignValue, JsCompletion, JsPromiseState, JsValue, NativeCompilationPolicy, RealmBuilder,
-    WasmStoreState,
+    configure_compilation_jobs, configure_wasm_runtime, CompilationJobs, CompileOptions,
+    CompilerIdentity, CompilerSourceRevision, EmbeddedEvaluation, EmbeddedInstance,
+    EmbeddedRuntime, Engine, ForeignValue, JsCompletion, JsPromiseState, JsValue,
+    NativeCompilationPolicy, RealmBuilder, WasmStoreState,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -54,16 +54,16 @@ impl NativeMode {
 
     /// `fast` and `speed` are the public embedding policies. The excluded
     /// diagnostics cross the two settings that a policy keeps together.
-    fn configure(self, config: &mut wasmtime::Config) {
+    fn configure(self, config: &mut wasmtime::Config, jobs: CompilationJobs) {
         match self {
-            Self::Fast => configure_wasm_runtime(config, NativeCompilationPolicy::Fast),
-            Self::Speed => configure_wasm_runtime(config, NativeCompilationPolicy::Speed),
+            Self::Fast => configure_wasm_runtime(config, NativeCompilationPolicy::Fast, jobs),
+            Self::Speed => configure_wasm_runtime(config, NativeCompilationPolicy::Speed, jobs),
             Self::FastBacktracking => {
-                configure_wasm_runtime(config, NativeCompilationPolicy::Fast);
+                configure_wasm_runtime(config, NativeCompilationPolicy::Fast, jobs);
                 config.cranelift_regalloc_algorithm(wasmtime::RegallocAlgorithm::Backtracking);
             }
             Self::SpeedSinglePass => {
-                configure_wasm_runtime(config, NativeCompilationPolicy::Speed);
+                configure_wasm_runtime(config, NativeCompilationPolicy::Speed, jobs);
                 config.cranelift_regalloc_algorithm(wasmtime::RegallocAlgorithm::SinglePass);
             }
         }
@@ -259,7 +259,16 @@ fn run() -> Result<Value> {
         CompilerSourceRevision::GitCommit(commit) => Some(commit.as_str()),
         CompilerSourceRevision::UnversionedArchive => None,
     };
-    configure_compilation_jobs(1)?;
+    // Scored cohorts compile serially. SCRIPTW_RSC_COMPILATION_JOBS selects an
+    // excluded parallel-compilation diagnostic, which benchmark-rsc.py refuses.
+    let jobs = configure_compilation_jobs(match std::env::var("SCRIPTW_RSC_COMPILATION_JOBS") {
+        Ok(value) => value
+            .parse::<std::num::NonZeroUsize>()
+            .map_err(|_| "SCRIPTW_RSC_COMPILATION_JOBS must be a positive integer")?
+            .get(),
+        Err(std::env::VarError::NotPresent) => 1,
+        Err(error) => return Err(error.into()),
+    })?;
     let compiler = Engine::new(RealmBuilder::new().build());
     let started = Instant::now();
     let unit = compiler.compile_module(&source, CompileOptions::default())?;
@@ -283,7 +292,7 @@ fn run() -> Result<Value> {
     drop(compiler);
     let started = Instant::now();
     let mut config = wasmtime::Config::new();
-    native_mode.configure(&mut config);
+    native_mode.configure(&mut config, jobs);
     config.target(env!("SCRIPTW_PERF_TARGET"))?;
     if profile.is_some() {
         config.profiler(wasmtime::ProfilingStrategy::PerfMap);

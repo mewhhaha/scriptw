@@ -17,12 +17,12 @@ fn libtest_path(test: &str) -> String {
     }
 }
 
+// The embedding default: two jobs, or one on a single-CPU machine.
 fn cpu_default() -> usize {
     std::thread::available_parallelism()
         .map(usize::from)
-        .unwrap_or(2)
-        .div_ceil(2)
-        .max(1)
+        .unwrap_or(1)
+        .clamp(1, 2)
 }
 
 #[test]
@@ -33,7 +33,12 @@ fn unconfigured_compilation_pool_honours_scriptw_jobs() {
         assert_eq!(scriptw_engine::configured_compilation_jobs(), None);
         assert_eq!(scriptw_engine::default_compilation_jobs(), expected);
         assert_eq!(scriptw_engine::compilation_jobs(), expected);
-        assert_eq!(scriptw_engine::configure_compilation_jobs(expected), Ok(()));
+        let current = scriptw_engine::CompilationJobs::current();
+        assert_eq!(current.get().get(), expected);
+        assert_eq!(
+            scriptw_engine::configure_compilation_jobs(expected),
+            Ok(current)
+        );
         assert!(scriptw_engine::configure_compilation_jobs(expected + 1).is_err());
         return;
     }

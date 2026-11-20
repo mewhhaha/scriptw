@@ -2193,11 +2193,16 @@ Per policy, with one host on a busy machine (medians of three):
 | `Speed` / single-pass | 675 µs | 5.58 s |
 | `Speed` / backtracking (Speed) | 286 µs | 6.85 s |
 
-The embedding API compiles a program's functions on one thread
+The embedding API then compiled a program's functions on one thread
 (`parallel_compilation(false)` since the first commit, with no recorded
 reason). With two compilation jobs the CLI's native compilation of the
 same bundle took 3.29 s instead of 5.54 s, for 358 MB peak memory instead
-of 244 MB.
+of 244 MB. Since 2026-11-20 embedders compile with the process's bounded
+`CompilationJobs`, by default two; on two CPUs (`rsc_baseline`,
+`SCRIPTW_RSC_COMPILATION_JOBS`, medians of three) native preparation took
+4.07 s instead of 7.61 s under Speed and 2.42 s instead of 4.77 s under Fast,
+for 415 instead of 257 MiB and 361 instead of 250 MiB peak. The scored RSC
+panel still compiles serially.
 
 Verified on the combined tree `2957071d1`: the engine suite (4,266 tests
 and the doctest pass; the cloud-only runtime cache test fails as before),

@@ -143,8 +143,8 @@ workspace pins version 47.0.0 and supplies its checked dependency patches in
 patch set with paths pointing to this checkout; dependency patches are owned
 by the top-level Cargo workspace. The runnable example uses that pinned setup.
 
-`configure_wasm_runtime(&mut Config, NativeCompilationPolicy)` replaces the
-supplied configuration with Scriptw's required capabilities and the chosen
+`configure_wasm_runtime(&mut Config, NativeCompilationPolicy, CompilationJobs)`
+replaces the supplied configuration with Scriptw's required capabilities and the chosen
 native policy, which always sets Cranelift's optimization level and register
 allocator together. `NativeCompilationPolicy::default()` is `Speed`
 (`OptLevel::Speed`, backtracking allocator): a program compiled once and run
@@ -156,6 +156,25 @@ settings **after** this call. The embedder then creates its
 Wasmtime `Engine` and calls
 `EmbeddedRuntime::compile(&engine, &artifact)` to admit Portable P and R plus
 their persisted foreign requirements.
+
+Native compilation runs on one bounded, process-wide pool of `CompilationJobs`
+threads. `configure_compilation_jobs(n)` chooses the count before the first
+compilation and returns the validated `CompilationJobs`; the first choice in a
+process wins, and a later different request is refused. Without it,
+`CompilationJobs::current()` fixes the default: a positive `SCRIPTW_JOBS`,
+otherwise two jobs (one on a single-CPU machine, counting affinity and CPU
+quotas). The Scriptw CLI keeps its own default of half the CPUs.
+`configure_wasm_runtime` turns Wasmtime's parallel compilation on exactly when
+the count exceeds one, and `EmbeddedRuntime::compile` and `precompile` refuse an
+Engine whose flag disagrees: a parallel Engine compiling outside the pool would
+use Rayon's global pool, one thread per CPU. Each extra job costs memory, and
+there is no byte-valued cap because Cranelift cannot enforce one. On the RSC
+bundle with two CPUs (medians of three), a second job cut native preparation
+from 7.61 to 4.07 s under `Speed` and from 4.77 to 2.42 s under `Fast`, and
+raised the compiling process's peak from 257 to 415 MiB and from 250 to 361
+MiB. Bound memory with the job count and the process's cgroup or resource
+limit. Serial and parallel compilation produce byte-identical precompiled
+images.
 
 `EmbeddedRuntime::new_state(realm, user_data)` creates opaque Scriptw state with
 typed embedder data. The caller owns the `Store`, `Linker`, resource limiter,

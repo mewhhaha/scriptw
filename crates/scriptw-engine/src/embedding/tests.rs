@@ -151,11 +151,12 @@ fn each_native_policy_sets_its_optimization_and_allocator_and_runs_a_linked_prog
         ),
     ] {
         let mut config = WasmtimeConfig::new();
-        configure_wasm_runtime(&mut config, policy);
+        let jobs = crate::CompilationJobs::current();
+        configure_wasm_runtime(&mut config, policy, jobs);
         let engine = WasmtimeEngine::new(&config).unwrap();
         assert_eq!(engine.get_cranelift_opt_level(), Some(optimization));
         assert_eq!(engine.get_cranelift_regalloc_algorithm(), Some(allocator));
-        assert!(!engine.get_parallel_compilation());
+        assert_eq!(engine.get_parallel_compilation(), jobs.get().get() > 1);
         let runtime = EmbeddedRuntime::compile(&engine, &artifact).unwrap();
         let mut store = store(&runtime, 0.0);
         let mut linker = linker(&runtime);
@@ -166,13 +167,55 @@ fn each_native_policy_sets_its_optimization_and_allocator_and_runs_a_linked_prog
 }
 
 #[test]
+fn the_engine_compiles_in_parallel_exactly_when_the_process_has_several_jobs() {
+    for jobs in [1, 2, 7] {
+        let jobs = crate::CompilationJobs(std::num::NonZeroUsize::new(jobs).unwrap());
+        let mut config = WasmtimeConfig::new();
+        configure_wasm_runtime(&mut config, NativeCompilationPolicy::Fast, jobs);
+        let engine = WasmtimeEngine::new(&config).unwrap();
+        assert_eq!(engine.get_parallel_compilation(), jobs.get().get() > 1);
+    }
+}
+
+#[test]
+fn an_engine_whose_parallel_flag_disagrees_with_the_job_count_is_refused() {
+    let artifact = artifact(
+        "import {add} from 'dd:host'; print(add(20,22));",
+        registry(false),
+    );
+    // This process compiles with one job; a parallel Engine would send
+    // Wasmtime to Rayon's unbounded global pool.
+    assert_eq!(crate::CompilationJobs::current().get().get(), 1);
+    let mut config = WasmtimeConfig::new();
+    configure_wasm_runtime(
+        &mut config,
+        NativeCompilationPolicy::Fast,
+        crate::CompilationJobs::current(),
+    );
+    config.parallel_compilation(true);
+    let engine = WasmtimeEngine::new(&config).unwrap();
+    for error in [
+        EmbeddedRuntime::compile(&engine, &artifact).err(),
+        EmbeddedRuntime::precompile(&engine, &artifact).err(),
+    ] {
+        let error = error.expect("a disagreeing Engine is refused").to_string();
+        assert!(error.contains("parallel compilation is on"), "{error}");
+        assert!(error.contains("1 job(s)"), "{error}");
+    }
+}
+
+#[test]
 fn a_full_store_pool_is_a_typed_error_and_a_dropped_store_frees_its_slot() {
     let artifact = artifact(
         "import {add} from 'dd:host'; print(add(20,22));",
         registry(false),
     );
     let mut config = WasmtimeConfig::new();
-    configure_wasm_runtime(&mut config, NativeCompilationPolicy::Fast);
+    configure_wasm_runtime(
+        &mut config,
+        NativeCompilationPolicy::Fast,
+        crate::CompilationJobs::current(),
+    );
     crate::configure_pooled_stores(&mut config, &crate::PooledStores::sequential());
     let engine = WasmtimeEngine::new(&config).unwrap();
     let runtime = EmbeddedRuntime::compile(&engine, &artifact).unwrap();
@@ -507,7 +550,11 @@ fn undeclared_error_tags_and_foreign_store_engine_lifecycles_are_not_authority()
         .to_string()
         .contains("different Store"));
     let mut config = WasmtimeConfig::new();
-    configure_wasm_runtime(&mut config, crate::NativeCompilationPolicy::Fast);
+    configure_wasm_runtime(
+        &mut config,
+        crate::NativeCompilationPolicy::Fast,
+        crate::CompilationJobs::current(),
+    );
     let foreign_engine = WasmtimeEngine::new(&config).unwrap();
     let mut wrong_store = WasmtimeStore::new(
         &foreign_engine,
@@ -571,7 +618,11 @@ fn embedder_fuel_limit_is_not_reset_and_different_foreign_programs_share_unchang
     let scalar = compiler.emit_wasm(&scalar).unwrap();
     assert!(scalar.runtime.is_none());
     let mut config = WasmtimeConfig::new();
-    configure_wasm_runtime(&mut config, crate::NativeCompilationPolicy::Fast);
+    configure_wasm_runtime(
+        &mut config,
+        crate::NativeCompilationPolicy::Fast,
+        crate::CompilationJobs::current(),
+    );
     config.consume_fuel(true);
     let engine = WasmtimeEngine::new(&config).unwrap();
     let runtime = EmbeddedRuntime::compile(&engine, &scalar).unwrap();

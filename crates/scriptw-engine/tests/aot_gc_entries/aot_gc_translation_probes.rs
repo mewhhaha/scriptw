@@ -405,7 +405,11 @@ struct Probe {
 impl Probe {
     fn new() -> Self {
         let mut config = Config::new();
-        configure_wasm_runtime(&mut config, NativeCompilationPolicy::Fast);
+        configure_wasm_runtime(
+            &mut config,
+            NativeCompilationPolicy::Fast,
+            scriptw_engine::CompilationJobs::current(),
+        );
         let engine = wasmtime::Engine::new(&config).unwrap();
         let module = Module::new(&engine, probe_bytes()).unwrap();
         let mut store = Store::new(&engine, Watch::default());
@@ -643,7 +647,11 @@ fn bottom_field_bytes() -> Vec<u8> {
 #[test]
 fn a_read_of_an_uninhabited_field_still_checks_its_reference() {
     let mut config = Config::new();
-    configure_wasm_runtime(&mut config, NativeCompilationPolicy::Fast);
+    configure_wasm_runtime(
+        &mut config,
+        NativeCompilationPolicy::Fast,
+        scriptw_engine::CompilationJobs::current(),
+    );
     let engine = wasmtime::Engine::new(&config).unwrap();
     let module = Module::new(&engine, bottom_field_bytes()).unwrap();
     let mut store = Store::new(&engine, ());
@@ -876,7 +884,11 @@ fn hinted_bytes(likely: bool) -> Vec<u8> {
 fn a_hinted_branch_lays_its_rare_side_out_behind_the_other() {
     for speed in [false, true] {
         let mut config = Config::new();
-        configure_wasm_runtime(&mut config, NativeCompilationPolicy::Fast);
+        configure_wasm_runtime(
+            &mut config,
+            NativeCompilationPolicy::Fast,
+            scriptw_engine::CompilationJobs::current(),
+        );
         if speed {
             config.cranelift_opt_level(wasmtime::OptLevel::Speed);
             config.cranelift_regalloc_algorithm(wasmtime::RegallocAlgorithm::Backtracking);
@@ -1032,7 +1044,11 @@ fn funcref_probe_bytes() -> Vec<u8> {
 #[test]
 fn a_stored_funcref_is_the_function_that_was_stored() {
     let mut config = Config::new();
-    configure_wasm_runtime(&mut config, NativeCompilationPolicy::Fast);
+    configure_wasm_runtime(
+        &mut config,
+        NativeCompilationPolicy::Fast,
+        scriptw_engine::CompilationJobs::current(),
+    );
     let engine = wasmtime::Engine::new(&config).unwrap();
     let module = Module::new(&engine, funcref_probe_bytes()).unwrap();
     let count = FUNCREF_PROBE_FUNCTIONS as i32;

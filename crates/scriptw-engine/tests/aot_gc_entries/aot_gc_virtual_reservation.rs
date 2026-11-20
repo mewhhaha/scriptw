@@ -9,7 +9,11 @@ use wasmtime::{
 
 fn engine() -> wasmtime::Engine {
     let mut config = Config::new();
-    configure_wasm_runtime(&mut config, scriptw_engine::NativeCompilationPolicy::Fast);
+    configure_wasm_runtime(
+        &mut config,
+        scriptw_engine::NativeCompilationPolicy::Fast,
+        scriptw_engine::CompilationJobs::current(),
+    );
     wasmtime::Engine::new(&config).unwrap()
 }
 
@@ -174,6 +178,7 @@ fn precompiled_admission_rejects_old_gc_policy_in_both_directions() {
     configure_wasm_runtime(
         &mut old_config,
         scriptw_engine::NativeCompilationPolicy::Fast,
+        scriptw_engine::CompilationJobs::current(),
     );
     old_config
         .gc_heap_reservation(1_u64 << 30)

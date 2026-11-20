@@ -7,6 +7,7 @@ pub(super) fn run(fixtures: &Path, output: &Path) -> Result<Value, String> {
         scriptw_engine::configure_wasm_runtime(
             config,
             scriptw_engine::NativeCompilationPolicy::Fast,
+            scriptw_engine::CompilationJobs::current(),
         );
         Ok(())
     })

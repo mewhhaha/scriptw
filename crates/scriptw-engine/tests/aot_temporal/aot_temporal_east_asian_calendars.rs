@@ -177,6 +177,7 @@ export function properties() {
     scriptw_engine::configure_wasm_runtime(
         &mut config,
         scriptw_engine::NativeCompilationPolicy::Fast,
+        scriptw_engine::CompilationJobs::current(),
     );
     let engine = wasmtime::Engine::new(&config).expect("required experimental Wasmtime features");
     let runtime =

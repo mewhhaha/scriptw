@@ -39,7 +39,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let artifact = Engine::new(RealmBuilder::new().build()).load_portable_bundle(&bytes)?;
     let mut configuration = wasmtime::Config::new();
     // The default policy optimizes native code for a program that runs many times.
-    configure_wasm_runtime(&mut configuration, NativeCompilationPolicy::default());
+    configure_wasm_runtime(
+        &mut configuration,
+        NativeCompilationPolicy::default(),
+        scriptw_engine::CompilationJobs::current(),
+    );
     let engine = wasmtime::Engine::new(&configuration)?;
     let runtime = EmbeddedRuntime::compile(&engine, &artifact)?;
     let state = runtime.new_state(RealmBuilder::new().build(), ())?;
