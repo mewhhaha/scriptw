@@ -261,6 +261,11 @@ fn compile_site(
             .get(&source.function.id)?
             .entry
             .source_id();
+        // Every source must be called with exactly its arity, not only one
+        // whose `arguments` the proof projects (`positional` answers
+        // `arguments.length` with the call's count). This also refuses an
+        // extra argument to a source without a projection, which this proof
+        // inlined before; such a call takes the ordinary call path.
         if source.function.params.len() != arguments.len() {
             return None;
         }

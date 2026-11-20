@@ -296,6 +296,14 @@ accepts `--case <file.js>`.
   it needs an active swap device, and the cloud machine has none and the
   verification wrapper requires `memory.swap.max = 0`. Owner: pooled-store
   runtime (run it with `--ignored` on a host with swap before each release).
+- The function completion kind is Normal at every normal program point, which
+  is what licensed dropping the `set_completion_kind(Normal)` writes in
+  `a9c732611`; it is still unchecked. A debug-only trap at `project` and at
+  ExpressionStatement would change the bytes every debug build emits (and the
+  exact emission fixtures CI runs in debug), and a static check needs a
+  value-set analysis through completion copies. Owner: emitter completion
+  protocol.
+
 ## Conformance boundaries
 
 Keep the four original upstream disagreements counted as failures. Their exact

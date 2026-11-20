@@ -173,7 +173,7 @@ fn loop_heads_and_handler_entries_start_without_facts() {
 }
 
 #[test]
-fn unreachable_code_adds_no_edge_and_stack_switching_forgets() {
+fn unreachable_code_adds_no_edge() {
     let empty = BlockType::Empty;
     let mut function = body();
     guard(&mut function, 0, 1);
@@ -183,12 +183,27 @@ fn unreachable_code_adds_no_edge_and_stack_switching_forgets() {
     function.instruction(&Instruction::LocalSet(0));
     function.instruction(&Instruction::End);
     assert!(function.excludes_i32_value(0, 1));
+}
 
+/// A resume table's handlers would need the facts at every suspension; no
+/// emitter produces stack switching, so the sink refuses it.
+#[test]
+#[should_panic(expected = "does not model stack switching")]
+fn stack_switching_is_refused() {
     let mut function = body();
     function.instruction(&Instruction::I32Const(0));
     function.instruction(&Instruction::LocalSet(0));
-    assert!(function.excludes_i32_value(0, 1));
     function.instruction(&Instruction::Suspend(0));
+}
+
+/// A program literal's immediate is relocated at link time: a store of it
+/// makes no fact.
+#[test]
+fn a_relocated_literal_immediate_makes_no_fact() {
+    let mut function = body();
+    function.program_literal_count(crate::gc_types::ProgramLiteralCount::for_test(1));
+    function.instruction(&Instruction::LocalSet(0));
+    assert!(!function.excludes_i32_value(0, 0));
     assert!(!function.excludes_i32_value(0, 1));
 }
 

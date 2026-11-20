@@ -72,6 +72,12 @@ impl ProgramLiteralCount {
     pub(crate) const fn value(self) -> u32 {
         self.0
     }
+
+    /// A count for code-sink tests, never an emission operand.
+    #[cfg(test)]
+    pub(crate) const fn for_test(value: u32) -> Self {
+        Self(value)
+    }
 }
 
 /// A P-local ordinal. Runtime/compiler literals use their separate R pool.

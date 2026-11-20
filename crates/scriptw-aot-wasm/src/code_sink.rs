@@ -737,11 +737,16 @@ impl Function {
             | Instruction::ResumeThrow { .. }
             | Instruction::ResumeThrowRef { .. }
             | Instruction::Switch { .. } => {
-                if self.i32_facts.is_some() {
-                    self.i32_facts = Some(I32Facts::default());
-                }
+                // A resume table's handler labels would need the facts that
+                // hold at every suspension, as `try_table` handlers get; no
+                // emitter produces stack switching, so it is refused rather
+                // than modelled.
+                panic!("the i32 fact flow does not model stack switching")
             }
-            _ => {}
+            _ => debug_assert!(
+                !is_two_way_branch(instruction),
+                "a two-way branch must join its facts into its label"
+            ),
         }
     }
 
@@ -1180,6 +1185,9 @@ impl Function {
                 value,
             ));
         self.instruction(&Instruction::I32Const(value.value() as i32));
+        // The immediate is relocated when the program is linked, so it is no
+        // constant a following store could make a fact of.
+        self.pushed_i32_constant = None;
     }
 
     pub(crate) fn program_literal_index(&mut self, value: crate::gc_types::ProgramLiteralIndex) {
@@ -1189,6 +1197,8 @@ impl Function {
                 value,
             ));
         self.instruction(&Instruction::I32Const(value.ordinal() as i32));
+        // Relocated at link time, like the count above.
+        self.pushed_i32_constant = None;
     }
 
     pub(crate) fn literal_operands(&self) -> &[crate::program_literal_operands::FunctionSite] {
