@@ -128,7 +128,7 @@ def check(root, overrides=None):
     require('match(kind,validated_runtime)' in assembly and
             'std::sync::Arc::ptr_eq(runtime,validated.runtime())' in assembly and
             'StringPool::collect_with_validated_runtime(' in assembly and
-            '(_,None)=>StringPool::collect(' in assembly,
+            '(_,None)=>{owned_pool=StringPool::collect(' in assembly,
             'native proof binds exact R while ordinary checked collection remains')
     for kind in ('function','global_script','direct_eval'):
         source = c[A + 'runtime_' + kind + '.rs']

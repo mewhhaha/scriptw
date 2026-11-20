@@ -19,9 +19,11 @@ def check(root: Path, overrides=None):
     def compact(relative):
         return re.sub(r"\s+", "", re.sub(r"//[^\n]*", "", source(relative)))
     slots = compact(A + "functions.rs")
+    # The table grew past 159 entries (40ff4b4ba); slot 158 must stay inside it.
+    table_length = re.search(r"constTABLE_LENGTH:u32=(\d+);", slots)
     need("AbstractModuleSourcePrototype,ModuleSourcePrototype," in slots and
          "Self::ModuleSourcePrototype=>158," in slots and
-         "constTABLE_LENGTH:u32=159;" in slots,
+         table_length is not None and int(table_length.group(1)) > 158,
          "closed host prototype slot has its own allocated entry")
     indexes = re.findall(r"Self::\w+=>158,", slots)
     need(indexes == ["Self::ModuleSourcePrototype=>158,"], "host prototype slot has no intrinsic alias")
@@ -29,8 +31,11 @@ def check(root: Path, overrides=None):
          "NonArrayRealmIntrinsicSlot::TABLE_LENGTH" in compact(A + "functions/intl_fallback_symbol.rs"),
          "private Intl symbol remains after the enlarged object intrinsic table")
     init = compact(A + "intrinsics/abstract_module_source.rs")
-    steps = ["NonArrayRealmIntrinsicSlot::AbstractModuleSourcePrototype,",
-             "self.init_builtin_constructor_object(", "self.emit_install_intrinsic_accessor(",
+    # e03f584d0 builds the abstract constructor on first read; its prototype is
+    # one complete eager layout whose accessor rows replace the explicit install.
+    steps = ["self.emit_alloc_intrinsic_layout_header(",
+             "IntrinsicPropertyLayoutId::AbstractModuleSourcePrototype,",
+             "NonArrayRealmIntrinsicSlot::AbstractModuleSourcePrototype,",
              "letsource_prototype=",
              "self.emit_alloc_plain_object_with_prototype(Some(&prototype),function)?",
              "prototype.set_reference(&source_prototype,schema,function);",

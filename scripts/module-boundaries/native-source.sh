@@ -100,8 +100,14 @@ require_fixed_string_count "$native_global_compiler" \
   '.gc_host_import(GcHostImport::CompileGlobalScript)' 1 'actual global-only native compiler consumer'
 require_fixed_string_count "$native_global_script" \
   'let unit = require_root_source_row(program, first)?;' 1 'exact source/kind/root witness admission'
-require_fixed_string_count crates/scriptw-aot-wasm/src/runtime_artifact.rs \
-  'const LAYOUT_VERSION: u32 = 21;' 1 'current typed native global-source runtime contract'
+# Layout 21 introduced the typed native global-source contract; every later
+# layout keeps it. Pinning 21 itself went stale with the next ABI bump.
+require_regex_count crates/scriptw-aot-wasm/src/runtime_artifact.rs \
+  '^const LAYOUT_VERSION: u32 = [0-9]+;$' 1 'current runtime layout version'
+native_global_layout_version="$(sed -nE 's/^const LAYOUT_VERSION: u32 = ([0-9]+);$/\1/p' crates/scriptw-aot-wasm/src/runtime_artifact.rs | head -n 1)"
+if [ -z "$native_global_layout_version" ] || [ "$native_global_layout_version" -lt 21 ]; then
+  fail "crates/scriptw-aot-wasm/src/runtime_artifact.rs must keep a layout version of at least 21 (the typed native global-source runtime contract)"
+fi
 for native_global_raw_test in \
   crates/scriptw-aot-wasm/src/runtime_artifact/cache/tests.rs \
   crates/scriptw-aot-wasm/src/runtime_artifact/build_package/tests.rs; do
@@ -298,7 +304,8 @@ require_file "$wasm_module_source"
 require_file "$wasm_module_source_tests"
 require_module_decl 'crates/scriptw-aot-wasm/src/modules.rs' source
 require_module_decl 'crates/scriptw-aot-wasm/src/gc_types.rs' module_source_tests
-require_fixed_string_count 'crates/scriptw-aot-wasm/src/gc_types/layouts.rs' 'struct ModuleSourceObject => ModuleSourceObjectSchema {' 1 'real native module-source GC brand'
+# 7e02a8707 gave every object layout its declared JavaScriptObject parent.
+require_fixed_string_count 'crates/scriptw-aot-wasm/src/gc_types/layouts.rs' 'struct ModuleSourceObject: JavaScriptObject => ModuleSourceObjectSchema {' 1 'real native module-source GC brand'
 require_fixed_string_count 'crates/scriptw-aot-wasm/src/gc_types/layouts.rs' 'SOURCE_CELL: GcRef<BindingCell>, Immutable, NonNullable;' 1 'canonical strong source cell on actual ModuleRecord'
 require_fixed_string_count 'crates/scriptw-aot-wasm/src/gc_types/layouts.rs' 'SOURCE_TAG: GcRef<StringValue>, Immutable, NonNullable;' 1 'host tag retained as actual GC String'
 require_fixed_string_count "$wasm_module_source" '.field(ModuleRecordSchema::SOURCE_CELL)' 1 'canonical source-cell selection'
@@ -424,8 +431,7 @@ check_raw_line_budget crates/scriptw-aot-wasm/src/runtime_artifact/validated_pro
 require_file scripts/check-immutable-compiler-pool.py
 check_raw_line_budget scripts/check-immutable-compiler-pool.py 200
 if ! python3 -B scripts/check-immutable-compiler-pool.py .; then
-  echo "immutable compiler-pool ownership controls failed" >&2
-  failures=$((failures + 1))
+  fail "immutable compiler-pool ownership controls failed"
 fi
 
 # Realm-owned host ModuleSource prototype is distinct from its abstract parent.

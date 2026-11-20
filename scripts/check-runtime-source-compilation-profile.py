@@ -87,7 +87,7 @@ def check(root, overrides=None):
                 "all three compiler roles have closed distinct admission: " + name)
     runtime = c[A + "runtime_artifact.rs"]
     require("Self::Program(runtime)=>runtime.source_compilation_profile()" in runtime and
-            "Self::Standalone=>RuntimeSourceCompilationProfile::Portable" in runtime and
+            "Self::Standalone(_)=>RuntimeSourceCompilationProfile::Portable" in runtime and
             "letidentity=inputs.admit_identity(selection)?;" in runtime and
             "emit_runtime_artifact(selection,inputs.source_compilation_profile())" in runtime,
             "P inherits its actual R and residency resolves the complete selected profile")
@@ -215,15 +215,17 @@ def check(root, overrides=None):
     from_cargo = function(source[E + "embedded_runtime/native_backing.rs"], "from_cargo")
     require(re.search(r"RuntimeSourceCompilationProfile::NativeHost=>\{?scriptw_runtime_image::write_native\(&mutfile\)", from_cargo) is not None and
             re.search(r"RuntimeSourceCompilationProfile::Portable=>\{?scriptw_runtime_image::write_portable_native\(&mutfile\)", from_cargo) is not None and
-            "written.digest()!=expected" in from_cargo and
-            "file.metadata().ok()?.len()!=written.decoded_bytes()asu64" in from_cargo and
-            from_cargo.index("written.digest()!=expected") < from_cargo.index("Self::publish(file)"),
+            "letbytes=file.metadata().ok()?.len();" in from_cargo and
+            "written.digest()!=expected||bytes!=written.decoded_bytes()asu64" in from_cargo and
+            from_cargo.index("written.digest()!=expected") < from_cargo.find("returnSome(Self{file,bytes});"),
             "bounded Cargo output matches independent digest and file length before backing publication")
-    require("structNativeBacking(File);" in backing and "OFlags::TMPFILE|OFlags::EXCL|OFlags::CLOEXEC" in backing and
-            "file.write_all(bytes).ok()?" in backing and "file.sync_data().ok()?" in backing and
+    require("structNativeBacking{file:File,bytes:u64,}" in backing and "OFlags::TMPFILE|OFlags::EXCL|OFlags::CLOEXEC" in backing and
+            "file.write_all(bytes).ok()?" in backing and
             "0x0102_1994|0x8584_58f6" in backing and
-            "Module::deserialize_open_file(engine,self.0.try_clone()?)" in backing,
-            "native file backing remains private, unlinked, synced, non-tmpfs and owned by Wasmtime")
+            "Module::deserialize_open_file(engine,self.file.try_clone()?)" in backing,
+            "native file backing remains private, unlinked, non-tmpfs and owned by Wasmtime")
+    require("file.sync_data().ok()?" in backing,
+            "native file backing is synced before publication")
     image = "crates/scriptw-runtime-image/src/"
     require("modmetadata;pubusemetadata::{metadata,portable_metadata};" in c[image + "lib.rs"] and
             c[image + "lib.rs"].count("#[inline(never)]") == 9 and

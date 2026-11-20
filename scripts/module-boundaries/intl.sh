@@ -405,8 +405,12 @@ require_module_decl crates/scriptw-engine/src/lib.rs wasm_agent_host
 require_file crates/scriptw-engine/src/wasm_agent_host.rs
 check_raw_line_budget crates/scriptw-engine/src/wasm_agent_host.rs 200
 check_no_inline_legacy_includes crates/scriptw-engine/src/wasm_agent_host.rs
-require_fixed_string_count crates/scriptw-engine/src/lib.rs \
+# c26e64ed6 moved the product linker setup into host_imports.rs.
+require_module_decl crates/scriptw-engine/src/lib.rs host_imports
+require_fixed_string_count crates/scriptw-engine/src/host_imports.rs \
   'wasm_agent_host::agent_call,' 1 'shared native agent operation handler production owner'
+require_fixed_string_count crates/scriptw-engine/src/lib.rs \
+  'wasm_agent_host::agent_call,' 0 'second production agent operation handler'
 require_fixed_string_count crates/scriptw-engine/src/tests.rs \
   'wasm_agent_host::agent_call,' 1 'shared native agent operation handler test control'
 require_fixed_string_count crates/scriptw-engine/src/wasm_agent_host.rs \

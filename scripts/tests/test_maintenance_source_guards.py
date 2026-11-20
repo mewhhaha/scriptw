@@ -175,7 +175,7 @@ class EmbeddedProfileGuards(unittest.TestCase):
 
         path = profile.E + "embedded_runtime/native_backing.rs"
         source = (ROOT / path).read_text()
-        for before in ("OFlags::EXCL", "file.sync_data().ok()?", "struct NativeBacking(File);"):
+        for before in ("OFlags::EXCL", "file.sync_data().ok()?", "struct NativeBacking {"):
             with self.subTest(before=before):
                 self.assertEqual(source.count(before), 1)
                 self.assertTrue(profile.check(ROOT, {path: source.replace(before, "missing_immutable_backing_proof")}))
@@ -202,7 +202,7 @@ class TransientNativeImageGuards(unittest.TestCase):
         self.assertEqual(profile.check(ROOT), [])
         for path, before in [
             (profile.E + "embedded_runtime/native_backing.rs", "written.digest() != expected"),
-            (profile.E + "embedded_runtime/native_backing.rs", "file.metadata().ok()?.len() != written.decoded_bytes() as u64"),
+            (profile.E + "embedded_runtime/native_backing.rs", "bytes != written.decoded_bytes() as u64"),
             ("crates/scriptw-runtime-image/src/native_input.rs", "inode != self.inode"),
             ("crates/scriptw-runtime-image/src/native_input.rs", "major != expected_major || minor != expected_minor"),
             ("crates/scriptw-runtime-image/src/native_input.rs", "address.checked_add(length)? > end"),

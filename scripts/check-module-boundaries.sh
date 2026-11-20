@@ -1,17 +1,37 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# One run reports every finding. `errexit` is deliberately off: a rule that hits
+# a missing file or a failing helper must not end the run before the thousands of
+# rule lines after it execute. Instead the ERR trap below records every command
+# failure that `set -e` would have aborted on (same condition rules: `if`,
+# `while`, `!`, `&&`/`||` heads and non-final pipeline stages stay exempt) as a
+# finding, so nothing that used to fail the guard can pass it now.
+set -uo pipefail
+set -E
 
-failures=0
+# Findings are appended to a log, so a `fail` from any subshell still counts.
+failure_log="$(mktemp)"
+trap 'rm -f "$failure_log"' EXIT
 
 fail() {
   printf 'check-module-boundaries: %s\n' "$*" >&2
-  failures=$((failures + 1))
+  printf 'finding\n' >> "$failure_log"
 }
 
+# Only the main shell's failures are findings, matching errexit, which command
+# substitutions do not inherit: `$(a; b)` tolerates a failing `a` and the
+# assignment that consumes it fails (and is recorded) when `b` fails.
+command_failed() {
+  if [ "$BASHPID" = "$$" ]; then
+    fail "command failed with status $1 at $2:$3: $4"
+  fi
+}
+trap 'command_failed "$?" "${BASH_SOURCE[0]:-$0}" "$LINENO" "$BASH_COMMAND"' ERR
+
+# Records the finding and returns 0: later rules still run. A caller that must
+# skip work for a missing file tests `[ -f ]` itself.
 require_file() {
   if [ ! -f "$1" ]; then
     fail "missing file: $1"
-    return 1
   fi
 }
 
@@ -260,7 +280,9 @@ source "$module_guard_dir/regexp-objects.sh"
 source "$module_guard_dir/intl.sh"
 source "$module_guard_dir/native-source.sh"
 
+failures="$(wc -l < "$failure_log" | tr -d '[:space:]')"
 if [ "$failures" -ne 0 ]; then
+  printf 'check-module-boundaries: %s findings\n' "$failures" >&2
   exit 1
 fi
 

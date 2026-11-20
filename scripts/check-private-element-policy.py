@@ -82,7 +82,7 @@ def check(root,overrides=None):
     need('pub language_features: LanguageFeaturePolicy' in engine and 'language_features: LanguageFeaturePolicy::default()' in engine and
          'hash.update(options.language_features.wire_code().to_le_bytes())' in engine,'CompileOptions default and framed cache policy witness')
     need('language_features: options.language_features' in engine and 'language_features: self.language_features' in engine,'agent root/worker options inherit exact policy')
-    need('#[cfg(test)]\nmod native_language_feature_policy_tests;' in engine and
+    need('#[cfg(all(test, feature = "native-source-compiler"))]\nmod native_language_feature_policy_tests;' in engine and
          'mod aot_private_element_extensibility;' in read('crates/scriptw-engine/tests/aot_language/main.rs'),'native observer and integration controls remain statically attached')
     retained=read('crates/scriptw-engine/src/wasm_compilation_policy.rs')
     need('language_features: options.language_features' in retained and 'language_features: unit.ir.language_features()' in retained,'retained execution policy derives exact IR authority')

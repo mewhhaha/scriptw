@@ -122,7 +122,12 @@ for regexp_tree_reader in with_template_snapshots compare_template_tree; do
   require_tree_regex_count crates/scriptw-aot-wasm/src/builtins/regexp/matcher_workspace "^[[:space:]]*pub\\(in crate::builtins::regexp\\) fn ${regexp_tree_reader}\\(" 1 'sole bounded same-workspace tree reader'
   require_fixed_string_present "$wasm_regexp_required_run" ".${regexp_tree_reader}(" 'proof consumes the actual physical tree'
 done
-require_fixed_string_present "$wasm_regexp_builtins" 'entry.restore_required_run(' 'native failure resumes the selected virtual continuation'
+# 97ffdc83d moved the shared backtrack recovery into its private child.
+wasm_regexp_backtracking="crates/scriptw-aot-wasm/src/builtins/regexp/backtracking.rs"
+require_file "$wasm_regexp_backtracking"
+require_exact_line_count "$wasm_regexp_builtins" 'mod backtracking;' 1 'private shared backtrack recovery owner'
+require_fixed_string_count "$wasm_regexp_backtracking" 'entry.restore_required_run(' 1 'native failure resumes the selected virtual continuation'
+require_fixed_string_count "$wasm_regexp_builtins" 'entry.restore_required_run(' 0 'parent copies of the shared Run recovery'
 require_fixed_string_present "$wasm_regexp_builtins" 'entry.restore_repeats(builder, function);' 'logical assertion rollback restores the complete counter slab'
 for regexp_choice_owner in "$wasm_regexp_choices" "$wasm_regexp_run_playback"; do
   check_no_inline_legacy_includes "$regexp_choice_owner"
@@ -610,8 +615,11 @@ own_descriptor_predicate_body="$(braced_rust_item_source "$own_descriptor_predic
 if grep -Eq '^[[:space:]]*_ =>|unreachable!\(' <<<"$own_descriptor_predicate_body"; then
   fail 'own-descriptor predicate compiler must keep its closed source/order/projection decisions exhaustive'
 fi
-require_text_regex_count "$own_descriptor_predicate_body" 'self\.emit_proxy_target_own_descriptor[(]' 1 'sole completed GetOwnProperty descriptor consumer'
-require_text_regex_count "$own_descriptor_predicate_body" 'descriptor\.emit_enumerable_i32[(]' 1 'non-observing completed enumerable projection'
+# b8c732543 replaced the descriptor snapshot with the found/enumerable
+# observation of the same completed [[GetOwnProperty]] (ordinary, Array and
+# trap paths), so no descriptor object or getter is materialized here.
+require_text_regex_count "$own_descriptor_predicate_body" 'self\.emit_own_property_enumerability[(]' 1 'sole completed GetOwnProperty found/enumerable consumer'
+require_text_regex_count "$own_descriptor_predicate_body" 'emit_proxy_target_own_descriptor|emit_object_get_own_property|own_descriptor_reference|emit_enumerable_i32' 0 'second descriptor lookup or projection'
 # The live two source arms fuse the prototype forms while preserving each
 # required coercion order. No canonical public-property relookup is involved.
 if ! awk '
@@ -1027,8 +1035,11 @@ check_raw_line_budget "$wasm_expressions" 1980
 wasm_regexp_expressions="crates/scriptw-aot-wasm/src/expressions/regexp_program.rs"
 require_file "$wasm_regexp_expressions"
 require_exact_line_count "$wasm_expressions" 'mod regexp_program;' 1 'private RegExp expression compiler owner'
-for regexp_expression_entry in emit_collected_regexp_program emit_regexp_program_slots emit_runtime_regexp_program_slots emit_regexp_compiler_failures emit_gc_string_contains_ascii_byte_i32 emit_regexp_program_with_compatible_flags compile_regexp_literal_to_value; do
+for regexp_expression_entry in emit_collected_regexp_program emit_regexp_program_slots compile_regexp_literal_to_value; do
   require_fixed_string_count "$wasm_regexp_expressions" "fn ${regexp_expression_entry}(" 1 'RegExp expression algorithm owner'
+done
+# fbc281cac deleted four of these entries as dead code; none may return in the parent.
+for regexp_expression_entry in emit_collected_regexp_program emit_regexp_program_slots emit_runtime_regexp_program_slots emit_regexp_compiler_failures emit_gc_string_contains_ascii_byte_i32 emit_regexp_program_with_compatible_flags compile_regexp_literal_to_value; do
   require_fixed_string_count "$wasm_expressions" "fn ${regexp_expression_entry}(" 0 'no parent RegExp expression algorithm copy'
 done
 require_fixed_string_count "$wasm_regexp_expressions" 'pub(super) fn compile_regexp_literal_to_value(' 1 'RegExp literal entry stays inside expressions'
@@ -1143,8 +1154,12 @@ require_fixed_string_count \
 
 # Reserved storage cannot be used as the completed Array prototype. The GC
 # slot/value witnesses and consuming transition are private to this child.
-for created_array_transition in reserve_realm_array_prototype_local emit_initialize_realm_array_prototype emit_define_realm_array_prototype_data_with_flags emit_bind_realm_array_constructor_prototype release_realm_array_prototype_local; do
+# 0bc2e0883 moved the prototype's data rows and constructor binding into the
+# shared eager intrinsic layouts, leaving reserve/initialize/release here.
+for created_array_transition in reserve_realm_array_prototype_local emit_initialize_realm_array_prototype release_realm_array_prototype_local; do
   require_fixed_string_count "$wasm_created_realm_array_prototype" "fn ${created_array_transition}(" 1 'actual created-Realm Array lifecycle owner'
+done
+for created_array_transition in reserve_realm_array_prototype_local emit_initialize_realm_array_prototype emit_define_realm_array_prototype_data_with_flags emit_bind_realm_array_constructor_prototype release_realm_array_prototype_local; do
   require_fixed_string_count "$wasm_functions" "fn ${created_array_transition}(" 0 'no parent Array prototype lifecycle copy'
 done
 
@@ -1188,8 +1203,11 @@ require_regex_count \
 # separately typed Array root. No fixed variant count or byte offset is needed.
 require_fixed_string_count "$wasm_required_resolved_realm_ordinary_prototype" 'pub(super) struct ResolvedRealmOrdinaryPrototypeLocal(ValueLocals);' 1 'completed whole prototype witness'
 require_fixed_string_count "$wasm_required_resolved_realm_ordinary_prototype" 'const fn slot(self) -> Option<NonArrayRealmIntrinsicSlot>' 1 'closed intrinsic selector owner'
-for required_prototype_entry in emit_get_prototype_from_constructor emit_required_function_realm_ordinary_prototype_completion emit_required_new_target_realm_ordinary_prototype; do
+for required_prototype_entry in emit_get_prototype_from_constructor emit_required_function_realm_ordinary_prototype_completion; do
   require_fixed_string_count "$wasm_required_resolved_realm_ordinary_prototype" "fn ${required_prototype_entry}(" 1 'actual constructor/prototype completion owner'
+done
+# fbc281cac deleted the uncalled NewTarget entry; it may not return in the parent.
+for required_prototype_entry in emit_get_prototype_from_constructor emit_required_function_realm_ordinary_prototype_completion emit_required_new_target_realm_ordinary_prototype; do
   require_fixed_string_count "$wasm_functions" "fn ${required_prototype_entry}(" 0 'no parent prototype algorithm copy'
 done
 

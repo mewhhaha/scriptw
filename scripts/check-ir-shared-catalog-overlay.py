@@ -52,7 +52,7 @@ def check(root: Path, overrides: dict | None = None) -> list[str]:
     unconstrained = overlay.split("impl<V: Clone + 'static>", 1)[0]
     need(insertion is not None
          and compact(insertion.group()) ==
-         'pub(super)fninsert(&mutself,key:String,value:V){self.changes.insert(key,Some(Arc::new(value)));}'
+         'pub(super)fninsert(&mutself,key:String,value:V){self.touch(&key);self.changes.insert(key,Some(Arc::new(value)));}'
          and insertion.group() in unconstrained,
          'replacement must retain shared previous rows without cloning a discarded value or requiring Clone')
     need('impl<V:PartialEq' in compact(overlay)

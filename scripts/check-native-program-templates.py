@@ -57,7 +57,7 @@ CAPS = {
     'crates/scriptw-engine/tests/aot_native_program_templates/catalog_overlays.rs': 60,
 }
 KINDS = ('function', 'global_script', 'direct_eval')
-FILES = tuple(CAPS) + (A + 'lib.rs', E + 'lib.rs', E + 'wasm_native_source_compiler.rs',
+FILES = tuple(CAPS) + (A + 'lib.rs', E + 'lib.rs', E + 'embedding.rs', E + 'wasm_native_source_compiler.rs',
     E + 'memory_module_cache.rs', 'crates/scriptw-ir/src/runtime_direct_eval.rs') + tuple(E + 'wasm_native_' + k + '_compiler/factory.rs' for k in KINDS)
 def compact(text):
     return re.sub(r'\s+', '', re.sub(r'//[^\n]*', '', text))
@@ -113,7 +113,8 @@ def check(sources):
     need('!WasmtimeEngine::same(engine,context.linker.engine())' in binder and
          '!Arc::ptr_eq(template.runtime(),context.runtime())' in binder and
          'Instance::new(&mut*store,&module,&imports)?' in binder and
-         '.get(&mut*store,import.module(),import.name())' in binder and
+         '.resolve_import(&mut*store,import.module(),import.name())' in binder and
+         '!WasmtimeEngine::same(store.as_context().engine(),self.linker.engine())' in c[E + 'wasm_native_source_compiler.rs'] and
          binder.count('context.check_budget()?') >= 4, 'same_store_engine_runtime_and_budget')
     data = c[N + '/bindings.rs'] + c[N + '/bindings/types.rs']
     allocation = (c[N + '/bindings/allocation.rs'] + c[N + '/bindings/allocation/payload.rs'] +
@@ -204,7 +205,7 @@ def check(sources):
          '.native_template_instances.get(&key,template.bytes(),engine,&context.instance_authority)' in binder and
          'template.permits_instance_reuse()' in binder and
          '.is_some_and(|p|p.permits_instance_reuse())' in c[T + '/empty_direct_eval.rs'] and
-         'native_template_instances:memory_module_cache::MemoryNativeInstanceCache' in c[E + 'lib.rs'],
+         'native_template_instances:memory_module_cache::MemoryNativeInstanceCache' in c[E + 'embedding.rs'],
          'instance_reuse_is_store_engine_code_authority_and_original_budget_bound')
     need('fnfresh_from_payload<T>(' in allocation and 'directory.image_row(ordinal)' in allocation and
          'directory.image_span(&row)' in allocation and 'NativeProgramPayloadDirectory::from_footer' in allocation and
