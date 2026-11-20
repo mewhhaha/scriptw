@@ -1501,7 +1501,7 @@ fn a_source_phase_import_rejects_a_source_text_module() {
         }]
     );
     assert_eq!(
-        namespace_target_reference(&graph.units[0].resolved_imports[0]),
+        namespace_target_reference(&graph, &graph.units[0].resolved_imports[0]),
         Some(MergedName::minted(target, UnitCellRole::ModuleSource))
     );
 }
@@ -2008,11 +2008,11 @@ fn an_indirect_export_chain_resolves_to_the_module_that_declares_it() {
     // exporter spells it — no `$m{unit}$` prefix — which is what makes an
     // importer's read a read of the exporter's own cell.
     assert_eq!(
-        namespace_target_reference(&resolved),
-        Some(LocalName::from_bound_name("x").merged_in(c))
+        namespace_target_reference(&graph, &resolved),
+        Some(graph.unit(c).merged(&LocalName::from_bound_name("x")))
     );
     assert_eq!(
-        namespace_target_reference(&resolved).map(|name| name.as_str().to_string()),
+        namespace_target_reference(&graph, &resolved).map(|name| name.as_str().to_string()),
         Some("x".to_string())
     );
 }
@@ -2135,7 +2135,7 @@ fn a_namespace_import_resolves_to_the_namespace_cell() {
     };
     assert_eq!(graph.units[0].resolved_imports, vec![binding.clone()]);
     assert_eq!(
-        namespace_target_reference(&binding),
+        namespace_target_reference(&graph, &binding),
         Some(MergedName::minted(a, UnitCellRole::Namespace))
     );
 }

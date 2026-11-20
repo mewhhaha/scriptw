@@ -435,7 +435,7 @@ fn rewrite_default_keywords(
 mod tests {
     use super::*;
 
-    use crate::{LocalName, MAX_LINKABLE_MODULE_UNIT_ID};
+    use crate::{UnitLinkerSpelling, MAX_LINKABLE_MODULE_UNIT_ID};
 
     fn strip_parsed(source: &str, rewrite: DefaultExportRewrite<'_>) -> Result<String, StripError> {
         let parsed = scriptw_front::parse(source, scriptw_front::ParseOptions::module())
@@ -580,7 +580,7 @@ mod tests {
         let stripped = strip_parsed(
             source,
             DefaultExportRewrite::Bind {
-                name: &LocalName::AnonymousDefault.merged_in(0),
+                name: &UnitLinkerSpelling::unreserved(0).anonymous_default(),
                 hoisted: false,
             },
         )
@@ -594,7 +594,7 @@ mod tests {
     /// including CRLF as one sequence and the two Unicode forms.
     #[test]
     fn split_anonymous_defaults_preserve_bytes_and_ordered_line_sequences_at_the_cap() {
-        let name = LocalName::AnonymousDefault.merged_in(MAX_LINKABLE_MODULE_UNIT_ID);
+        let name = UnitLinkerSpelling::unreserved(MAX_LINKABLE_MODULE_UNIT_ID).anonymous_default();
         assert_eq!(name.as_str(), "$d9999$");
 
         let forms = [
@@ -653,7 +653,7 @@ mod tests {
         let stripped = strip_parsed(
             source,
             DefaultExportRewrite::Bind {
-                name: &LocalName::AnonymousDefault.merged_in(0),
+                name: &UnitLinkerSpelling::unreserved(0).anonymous_default(),
                 hoisted: false,
             },
         )
@@ -681,7 +681,8 @@ mod tests {
         let stripped = strip_parsed(
             source,
             DefaultExportRewrite::Bind {
-                name: &LocalName::AnonymousDefault.merged_in(MAX_LINKABLE_MODULE_UNIT_ID),
+                name: &UnitLinkerSpelling::unreserved(MAX_LINKABLE_MODULE_UNIT_ID)
+                    .anonymous_default(),
                 hoisted: false,
             },
         )
@@ -717,7 +718,7 @@ mod tests {
             let stripped = strip_parsed(
                 &source,
                 DefaultExportRewrite::Bind {
-                    name: &LocalName::AnonymousDefault.merged_in(0),
+                    name: &UnitLinkerSpelling::unreserved(0).anonymous_default(),
                     hoisted: false,
                 },
             )
@@ -742,7 +743,7 @@ mod tests {
         let stripped_default = strip_parsed(
             default_source,
             DefaultExportRewrite::Bind {
-                name: &LocalName::AnonymousDefault.merged_in(0),
+                name: &UnitLinkerSpelling::unreserved(0).anonymous_default(),
                 hoisted: false,
             },
         )
@@ -789,7 +790,7 @@ mod tests {
         let stripped_leading = strip_parsed(
             leading_source,
             DefaultExportRewrite::Bind {
-                name: &LocalName::AnonymousDefault.merged_in(0),
+                name: &UnitLinkerSpelling::unreserved(0).anonymous_default(),
                 hoisted: false,
             },
         )
@@ -805,7 +806,7 @@ mod tests {
         let stripped_word = strip_parsed(
             word_source,
             DefaultExportRewrite::Bind {
-                name: &LocalName::AnonymousDefault.merged_in(0),
+                name: &UnitLinkerSpelling::unreserved(0).anonymous_default(),
                 hoisted: false,
             },
         )
@@ -833,7 +834,7 @@ mod tests {
         let stripped = strip_parsed(
             "export default function () {}",
             DefaultExportRewrite::Bind {
-                name: &LocalName::AnonymousDefault.merged_in(3),
+                name: &UnitLinkerSpelling::unreserved(3).anonymous_default(),
                 hoisted: true,
             },
         )
@@ -850,30 +851,6 @@ mod tests {
             .expect("source should strip");
         assert_eq!(stripped.len(), source.len());
         assert_eq!(stripped, "               function f() {}\n");
-    }
-
-    /// A name too long for the keywords it replaces is reported rather than
-    /// emitted at the wrong length.
-    ///
-    /// Reaching this needs a unit id past
-    /// [`MAX_LINKABLE_MODULE_UNIT_ID`](crate::MAX_LINKABLE_MODULE_UNIT_ID),
-    /// which `build_graph` refuses to mint (ledger R3) and which const
-    /// assertion V2 pins the format side of. The check stays because the *span*
-    /// is data — `export  default` with two spaces is wider than the minimum,
-    /// and a hypothetical narrower one would be caught here rather than
-    /// silently emitted at the wrong length.
-    #[test]
-    fn a_default_binding_that_does_not_fit_is_reported() {
-        let over_cap = LocalName::AnonymousDefault.merged_in(1_234_567_890);
-        let error = strip_parsed(
-            "export default 1;",
-            DefaultExportRewrite::Bind {
-                name: &over_cap,
-                hoisted: false,
-            },
-        )
-        .expect_err("must be reported");
-        assert!(error.reason.contains("does not fit"), "{}", error.reason);
     }
 
     #[test]

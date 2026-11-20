@@ -141,5 +141,5 @@ fn resolution_algorithms_and_existing_consumers_keep_their_owners() {
     assert_eq!(DYNAMIC_SOURCE.matches("ModuleBindingNameIr").count(), 1);
     assert_eq!(DYNAMIC_SOURCE.matches("ResolvedBindingIr").count(), 4);
     assert!(!RECORD_SOURCE.contains("ModuleBindingNameIr"));
-    assert_eq!(RECORD_SOURCE.matches("ResolvedBindingIr").count(), 1);
+    assert!(!RECORD_SOURCE.contains("ResolvedBindingIr"));
 }

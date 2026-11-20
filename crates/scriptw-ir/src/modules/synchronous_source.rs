@@ -140,7 +140,7 @@ pub(super) fn linked_module_execution_source(
                 )
             })
             .collect();
-        let default_name = MergedName::anonymous_default(module);
+        let default_name = unit.linker_spelling.anonymous_default();
         let rewrite = match unit.record.default_export_form() {
             DefaultExportFormIr::Absent => DefaultExportRewrite::None,
             DefaultExportFormIr::Named => DefaultExportRewrite::DeleteKeywords,
@@ -175,7 +175,7 @@ pub(super) fn linked_module_execution_source(
                 &super::record::embeddable_unit_source(&unit.source_text),
             );
             Some(
-                rewrite_import_meta(original.text(), &unit.record)
+                rewrite_import_meta(original.text(), &unit.record, &unit.linker_spelling)
                     .map_err(|error| error.reason)
                     .and_then(|body| {
                         super::default_export_definition::rewrite_source(
@@ -200,7 +200,7 @@ pub(super) fn linked_module_execution_source(
             text.push_str(" = 0;\n");
         }
         if unit.record.import_meta_uses() > 0 {
-            text.push_str(&import_meta_binding(module, &unit.meta_url).declaration);
+            text.push_str(&import_meta_binding(&unit.linker_spelling, &unit.meta_url).declaration);
             text.push('\n');
         }
         for namespace in unit.namespaces.values() {
@@ -246,6 +246,7 @@ pub(super) fn linked_module_execution_source(
                 .as_ref()
                 .map(|source| source.registry.modules()[0].clone()),
             module,
+            linker_spelling: unit.linker_spelling.clone(),
             imports,
             namespaces,
             has_import_meta: unit.record.import_meta_uses() > 0,

@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
-use crate::{BlockIr, FunctionIr, ModuleNamespaceModeIr, OwnedEnvBindingIr};
+use crate::{
+    BlockIr, FunctionIr, LocalName, MergedName, ModuleNamespaceModeIr, OwnedEnvBindingIr,
+    UnitLinkerSpelling,
+};
 
 use super::namespace::ModuleNamespaceIr;
 use super::record::ModuleRecordIr;
@@ -13,6 +16,9 @@ pub struct ModuleUnitIr {
     pub(super) foreign: Option<crate::foreign::ForeignModuleSource>,
     /// Static entry tables for this module.
     pub record: ModuleRecordIr,
+    /// Spelling of the anonymous-default and `import.meta` cells inside this
+    /// unit's activation, chosen away from the unit's own identifiers.
+    pub(super) linker_spelling: UnitLinkerSpelling,
     /// The module source text, kept so the lowerer can slice spans from it.
     pub source_text: String,
     /// Value `import.meta.url` reports.
@@ -41,6 +47,17 @@ pub struct ModuleUnitIr {
 }
 
 impl ModuleUnitIr {
+    /// The merged spelling of one of *this* unit's `[[LocalName]]`s.
+    ///
+    /// [`LocalName::merged_in`] takes the owner's spelling, so "which unit does
+    /// this name belong to" — the coordinate commit `e27c01b1e` got wrong — is
+    /// fixed here by holding the unit: an importer's spelling cannot be
+    /// supplied for an exporter's name.
+    #[must_use]
+    pub fn merged(&self, name: &LocalName) -> MergedName {
+        name.merged_in(&self.linker_spelling)
+    }
+
     pub(super) fn payload_bytes(&self) -> &[u8] {
         if let Some(foreign) = &self.foreign {
             return &foreign.canonical_bytes;

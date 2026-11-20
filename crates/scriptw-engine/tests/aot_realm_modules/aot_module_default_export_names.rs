@@ -444,3 +444,135 @@ fn module_wrappers_initialize_default_declarations_in_their_owning_activation() 
         &["script:33", "entry:default:33"],
     );
 }
+
+// The linker's anonymous-default (`$d<tag>$`) and `import.meta` (`$m<tag>$meta`)
+// cells live in the module's own activation. Their per-unit spelling avoids
+// every identifier of that module, and direct eval cannot name them, so source
+// spelled like one is an ordinary global reference. Expected outputs were
+// checked against Node 24.
+
+#[test]
+fn source_spelled_like_the_default_cell_cannot_read_or_write_it() {
+    assert_modules(
+        &[
+            (
+                "f.mjs",
+                "import d, {read, write} from './e.mjs'; print([read(), write(), d, read()].join(' '));",
+            ),
+            (
+                "e.mjs",
+                "export default 41;\nexport function read(){ try { return $d1$ } catch(e){ return e.name } }\nexport function write(){ try { $d1$ = 99; return \"assigned\" } catch(e){ return e.name } }",
+            ),
+        ],
+        EntryGoal::Module,
+        &["ReferenceError ReferenceError 41 ReferenceError"],
+    );
+}
+
+#[test]
+fn typeof_the_entry_default_cell_spelling_is_undefined() {
+    assert_modules(
+        &[("a.mjs", "export default 1; print(typeof $d0$);")],
+        EntryGoal::Module,
+        &["undefined"],
+    );
+}
+
+#[test]
+fn a_default_cell_spelling_resolves_to_the_global_property() {
+    assert_modules(
+        &[
+            (
+                "a.mjs",
+                "import d, {g} from './e.mjs'; print(g() + ':' + d);",
+            ),
+            (
+                "e.mjs",
+                "export default 41;\nexport function g(){ globalThis.$d1$ = 7; return $d1$; }",
+            ),
+        ],
+        EntryGoal::Module,
+        &["7:41"],
+    );
+}
+
+#[test]
+fn an_import_meta_module_cannot_reach_its_meta_cell() {
+    assert_modules(
+        &[
+            (
+                "a.mjs",
+                "import {u, m, t} from './e.mjs'; print(u + ':' + m() + ':' + t());",
+            ),
+            (
+                "e.mjs",
+                "export const u = typeof import.meta.url;\nexport function m(){ try { return $m1$meta } catch(e){ return e.name } }\nexport function t(){ return typeof $m1$meta }",
+            ),
+        ],
+        EntryGoal::Module,
+        &["string:ReferenceError:undefined"],
+    );
+}
+
+#[test]
+fn a_top_level_binding_spelled_like_the_default_cell_is_legal() {
+    assert_modules(
+        &[
+            ("a.mjs", "import d, {v} from './e.mjs'; print(d + ':' + v);"),
+            (
+                "e.mjs",
+                "let $d1$ = 5;\nexport default 41;\nexport const v = $d1$;",
+            ),
+        ],
+        EntryGoal::Module,
+        &["41:5"],
+    );
+}
+
+#[test]
+fn a_cyclic_class_default_stays_in_tdz_until_its_declaration() {
+    assert_modules(
+        &[
+            (
+                "a.mjs",
+                "import { probe, later } from './b.mjs';\nexport default class { static tag = 'A'; };\nprint(probe + ':' + later());",
+            ),
+            (
+                "b.mjs",
+                "import A from './a.mjs';\nlet r;\ntry { A; r = 'init'; } catch (e) { r = e.name; }\nexport const probe = r;\nexport function later() { return typeof A + ':' + A.tag; }",
+            ),
+        ],
+        EntryGoal::Module,
+        &["ReferenceError:function:A"],
+    );
+}
+
+#[test]
+fn namespace_and_dynamic_import_read_a_respelled_default_cell() {
+    assert_modules(
+        &[
+            (
+                "a.mjs",
+                "import * as ns from './e.mjs'; import('./e.mjs').then(m => print(m.default + ':' + ns.default + ':' + (m === ns) + ':' + m.read()));",
+            ),
+            (
+                "e.mjs",
+                "export default 41;\nexport function read(){ try { return $d1$ } catch(e){ return e.name } }",
+            ),
+        ],
+        EntryGoal::Module,
+        &["41:41:true:ReferenceError"],
+    );
+}
+
+#[test]
+fn direct_eval_cannot_name_the_activation_cells() {
+    assert_modules(
+        &[(
+            "a.mjs",
+            "export default 5;\nconst u = import.meta.url;\nfunction g() { return eval('typeof $d0$') + ',' + eval('typeof $m0$meta'); }\nprint(eval('typeof $d0$') + ':' + eval('typeof $m0$meta') + ':' + g());",
+        )],
+        EntryGoal::Module,
+        &["undefined:undefined:undefined,undefined"],
+    );
+}

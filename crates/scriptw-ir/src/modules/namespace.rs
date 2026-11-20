@@ -183,7 +183,10 @@ fn is_binding_identifier(name: &MergedName) -> bool {
 /// missing export (which 16.2.1.10 already excludes from the namespace), or a
 /// local name no `IdentifierReference` can spell.
 #[must_use]
-pub fn namespace_target_reference(target: &ResolvedBindingIr) -> Option<MergedName> {
+pub fn namespace_target_reference(
+    graph: &ModuleGraphIr,
+    target: &ResolvedBindingIr,
+) -> Option<MergedName> {
     match target {
         ResolvedBindingIr::Resolved {
             module,
@@ -198,15 +201,10 @@ pub fn namespace_target_reference(target: &ResolvedBindingIr) -> Option<MergedNa
             binding: ModuleBindingNameIr::Name(name),
         } => {
             // `*default*` is the one `[[LocalName]]` no source text can spell,
-            // and `merged_in` is where the merged script's minted name for it
-            // comes from. Applied exactly once, here.
-            //
-            // The one site that keeps `merged_in` rather than
-            // `ModuleRecordIr::merged`: `module` and `name` are
-            // destructured from the *same* `ResolvedBindingIr::Resolved`, so the
-            // "which unit owns this name" pairing is already structural and
-            // there is no id to supply independently.
-            let reference = name.merged_in(*module);
+            // and the owning unit's spelling is where the merged script's name
+            // for it comes from. `module` and `name` are destructured from the
+            // *same* `ResolvedBindingIr::Resolved`, so the owner is structural.
+            let reference = graph.unit(*module).merged(name);
             is_binding_identifier(&reference).then_some(reference)
         }
         ResolvedBindingIr::Ambiguous | ResolvedBindingIr::NotFound => None,
@@ -214,7 +212,10 @@ pub fn namespace_target_reference(target: &ResolvedBindingIr) -> Option<MergedNa
 }
 
 /// Private closure table recognized only through linker-owned source spans.
-fn namespace_object_source(namespace: &ModuleNamespaceIr) -> Result<String, String> {
+fn namespace_object_source(
+    graph: &ModuleGraphIr,
+    namespace: &ModuleNamespaceIr,
+) -> Result<String, String> {
     let defer_evaluate = MergedName::minted(namespace.module, UnitCellRole::DeferEvaluate);
     let mut text = format!("const {} = [", namespace.cell.as_str());
     match namespace.mode {
@@ -231,7 +232,7 @@ fn namespace_object_source(namespace: &ModuleNamespaceIr) -> Result<String, Stri
         }
     }
     for export in &namespace.exports {
-        let reference = namespace_target_reference(&export.target).ok_or_else(|| {
+        let reference = namespace_target_reference(graph, &export.target).ok_or_else(|| {
             format!(
                 "export `{}` resolves to a binding the merged script cannot name",
                 export.export_name.as_str()
@@ -341,8 +342,8 @@ fn namespace_prelude_uses_global(graph: &ModuleGraphIr, name: &str) -> bool {
                             ..
                         }
                     )
-                    && namespace_target_reference(resolved)
-                        .is_some_and(|reference| reference != unit.record.merged(&entry.local_name))
+                    && namespace_target_reference(graph, resolved)
+                        .is_some_and(|reference| reference != unit.merged(&entry.local_name))
             })
     });
     match name {
@@ -369,7 +370,7 @@ fn report_shadowed_namespace_globals(graph: &ModuleGraphIr, diagnostics: &mut Ve
         {
             // The merged spelling, because that is the name the prelude's own
             // `Object.` / `Symbol.` reads would resolve against.
-            let merged = unit.record.merged(&shadowed.name);
+            let merged = unit.merged(&shadowed.name);
             if !namespace_prelude_uses_global(graph, merged.as_str()) {
                 continue;
             }
@@ -410,7 +411,7 @@ fn collect_namespace_aliases(
         }
         for binding in &unit.record.environment {
             if binding.kind != ModuleBindingKindIr::Import {
-                declared.insert(unit.record.merged(&binding.name), unit.record.key.as_str());
+                declared.insert(unit.merged(&binding.name), unit.record.key.as_str());
             }
         }
     }
@@ -423,7 +424,7 @@ fn collect_namespace_aliases(
             // The alias is emitted as a real `const` in the merged scope, so
             // the name that matters here is the merged one — the same domain
             // as the `declared` map it is checked against below.
-            let merged = unit.record.merged(&entry.local_name);
+            let merged = unit.merged(&entry.local_name);
             let local = merged.as_str();
             let Some(ResolvedBindingIr::Resolved {
                 module,
@@ -545,7 +546,7 @@ fn deferred_body_original_source(
         errored = DeferredEvaluationState::Errored.word(),
     );
     for export in exports {
-        let reference = namespace_target_reference(&export.target).ok_or_else(|| {
+        let reference = namespace_target_reference(graph, &export.target).ok_or_else(|| {
             format!(
                 "deferred export `{}` resolves to a binding the merged script cannot name",
                 export.export_name.as_str()
@@ -656,7 +657,7 @@ pub(crate) fn ensure_namespace(
         materialization,
         source: Ok(String::new()),
     };
-    namespace.source = namespace_object_source(&namespace);
+    namespace.source = namespace_object_source(graph, &namespace);
     graph.units[index].namespaces.insert(mode, namespace);
     Some(cell)
 }
@@ -849,11 +850,12 @@ mod tests {
             .find(|export| export.export_name.as_str() == "value")
             .expect("`value` is an own key of the namespace");
         assert_eq!(
-            namespace_target_reference(&export.target),
-            Some(LocalName::from_bound_name("value").merged_in(0))
+            namespace_target_reference(&graph, &export.target),
+            Some(graph.units[0].merged(&LocalName::from_bound_name("value")))
         );
         assert_eq!(
-            namespace_target_reference(&export.target).map(|name| name.as_str().to_string()),
+            namespace_target_reference(&graph, &export.target)
+                .map(|name| name.as_str().to_string()),
             Some("value".to_string())
         );
     }
@@ -1063,12 +1065,14 @@ mod tests {
     /// declares in its place instead.
     #[test]
     fn the_anonymous_default_local_is_read_through_its_minted_name() {
+        let graph = graph_of(&[("a", ""), ("b", ""), ("c", "export default 1;")]);
         let namespace = namespace_of_one_local(2, MODULE_ANONYMOUS_DEFAULT_LOCAL_NAME);
-        let source = namespace_object_source(&namespace).expect("`*default*` has a merged name");
+        let source =
+            namespace_object_source(&graph, &namespace).expect("`*default*` has a merged name");
         assert!(
             source.contains(&format!(
                 "() => {}",
-                LocalName::AnonymousDefault.merged_in(2).as_str()
+                graph.units[2].merged(&LocalName::AnonymousDefault).as_str()
             )),
             "got {source}"
         );
@@ -1078,8 +1082,10 @@ mod tests {
     /// write is reported rather than emitted as broken source.
     #[test]
     fn an_unspellable_local_name_is_reported_rather_than_emitted() {
+        let graph = graph_of(&[("m", "")]);
         let namespace = namespace_of_one_local(0, "*not a binding*");
-        let error = namespace_object_source(&namespace).expect_err("the name is unspellable");
+        let error =
+            namespace_object_source(&graph, &namespace).expect_err("the name is unspellable");
         assert!(error.contains("default"), "got {error}");
     }
 
@@ -1104,7 +1110,7 @@ mod tests {
                 .get(&ModuleNamespaceModeIr::Eager)
                 .expect("namespace exists");
             assert_eq!(namespace.exports[0].export_name.as_str(), decoded);
-            let reference = namespace_target_reference(&namespace.exports[0].target)
+            let reference = namespace_target_reference(&graph, &namespace.exports[0].target)
                 .expect("the lexer and namespace accept the same spelling");
             assert_eq!(reference.as_str(), decoded);
             let source = source_of(&graph, 0);
@@ -1140,9 +1146,13 @@ mod tests {
 
     #[test]
     fn invalid_synthetic_names_are_not_admitted_by_alphabetic_approximations() {
+        let graph = graph_of(&[("m", "")]);
         for local in ["", "\u{0345}a", "a\u{00b2}", "\u{200c}a", "a😀"] {
             let namespace = namespace_of_one_local(0, local);
-            assert!(namespace_object_source(&namespace).is_err(), "{local:?}");
+            assert!(
+                namespace_object_source(&graph, &namespace).is_err(),
+                "{local:?}"
+            );
         }
     }
 
@@ -1465,7 +1475,7 @@ mod tests {
         // ModuleSourceUnavailable rejection checked above.
         assert!(graph.units.iter().all(|unit| unit.namespaces.is_empty()));
         assert_eq!(
-            namespace_target_reference(&graph.units[1].resolved_imports[0]),
+            namespace_target_reference(&graph, &graph.units[1].resolved_imports[0]),
             Some(MergedName::minted(0, UnitCellRole::ModuleSource))
         );
     }

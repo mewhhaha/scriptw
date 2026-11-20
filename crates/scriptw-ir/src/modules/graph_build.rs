@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{IrDiagnostic, MAX_LINKABLE_MODULE_UNIT_ID};
+use crate::{IrDiagnostic, UnitLinkerSpelling, MAX_LINKABLE_MODULE_UNIT_ID};
 
 use super::graph::ModuleGraphIr;
 use super::link_error::ModuleLinkErrorIr;
@@ -134,14 +134,20 @@ fn assemble_sources(
                 Err(vec![super::early::module_parse_failure_diagnostic(error)])
             }
         };
-        let record = record.map(|mut record| {
+        let record = record.and_then(|mut record| {
             record
                 .dynamic_import_sites
                 .extend(source.prepared_script_import_sites.iter().cloned());
-            record
+            // A first spelling against the unit's own identifiers, so the unit
+            // can be constructed and an exhausted unit is reported in its own
+            // module; it is re-chosen against the whole graph below.
+            match UnitLinkerSpelling::choose(id, record.linker_reserved_names()) {
+                Ok(linker_spelling) => Ok((record, linker_spelling)),
+                Err(exhausted) => Err(vec![exhausted.to_diagnostic(record.key.as_str())]),
+            }
         });
         match record {
-            Ok(record) => {
+            Ok((record, linker_spelling)) => {
                 let resolved_imports =
                     vec![ResolvedBindingIr::NotFound; record.import_entries.len()];
                 let resolved_indirect_exports =
@@ -152,6 +158,7 @@ fn assemble_sources(
                 graph.units.push(ModuleUnitIr {
                     foreign: source.foreign.clone(),
                     record,
+                    linker_spelling,
                     source_text: source.source_text().to_string(),
                     meta_url: source.meta_url().to_string(),
                     hoist: None,
@@ -174,6 +181,24 @@ fn assemble_sources(
                     }
                 }));
             }
+        }
+    }
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
+    // Lowering recognizes the activation cells by name in every unit (they
+    // never take a runtime named lookup, and no eval table names them), so no
+    // identifier of *any* unit may spell any unit's cell. Cells are still
+    // addressed by `(unit, name)`; the decimal tag stays first.
+    let graph_reserved: BTreeSet<String> = graph
+        .units
+        .iter()
+        .flat_map(|unit| unit.record.linker_reserved_names().iter().cloned())
+        .collect();
+    for unit in &mut graph.units {
+        match UnitLinkerSpelling::choose(unit.record.id, &graph_reserved) {
+            Ok(spelling) => unit.linker_spelling = spelling,
+            Err(exhausted) => diagnostics.push(exhausted.to_diagnostic(unit.record.key.as_str())),
         }
     }
     if !diagnostics.is_empty() {

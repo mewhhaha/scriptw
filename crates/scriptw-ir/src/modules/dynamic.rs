@@ -367,14 +367,18 @@ pub const LINKER_NAME_PREFIX: &str = "$scriptw$module$";
 /// Validate parsed identifiers before any linker-private names enter the source.
 /// Properties and string literals remain ordinary user data; identifier
 /// references and bindings cannot expose or shadow the private dispatcher names.
+///
+/// On success, returns the identifiers that could spell a
+/// [`UnitLinkerSpelling`] name, which that spelling is then chosen away from.
 pub(super) fn validate_linker_identifiers(
     node: boa_ast::visitor::NodeRef<'_>,
     interner: &Interner,
     key: &ModuleKey,
-) -> Result<(), Vec<IrDiagnostic>> {
+) -> Result<BTreeSet<String>, Vec<IrDiagnostic>> {
     struct IdentifierScan<'a> {
         interner: &'a Interner,
         collisions: BTreeSet<String>,
+        reserved: BTreeSet<String>,
     }
     impl<'ast> Visitor<'ast> for IdentifierScan<'_> {
         type BreakTy = core::convert::Infallible;
@@ -386,6 +390,8 @@ pub(super) fn validate_linker_identifiers(
             let name = self.interner.resolve_expect(node.sym()).to_string();
             if name.starts_with(LINKER_NAME_PREFIX) {
                 self.collisions.insert(name);
+            } else if UnitLinkerSpelling::could_collide(&name) {
+                self.reserved.insert(name);
             }
             ControlFlow::Continue(())
         }
@@ -393,10 +399,11 @@ pub(super) fn validate_linker_identifiers(
     let mut scan = IdentifierScan {
         interner,
         collisions: BTreeSet::new(),
+        reserved: BTreeSet::new(),
     };
     let _ = scan.visit(node);
     if scan.collisions.is_empty() {
-        Ok(())
+        Ok(scan.reserved)
     } else {
         Err(scan
             .collisions
@@ -740,41 +747,6 @@ impl ModuleGraphIr {
     pub fn check_dynamic_import_linkable(&self) -> Vec<IrDiagnostic> {
         let mut diagnostics = Vec::new();
 
-        for (_, _, unit) in self.materialized_units() {
-            let key = unit.record.key.as_str();
-            for binding in &unit.record.environment {
-                let merged = unit.record.merged(&binding.name);
-                // The `$m<unit>$…` / `$d<unit>$` range is minted by
-                // `MergedName::minted` and `MergedName::anonymous_default`, and
-                // `merged_in` is the identity on a source name — so a module
-                // that declares `$m0$namespace` lands in the same merged cell as
-                // the prelude's `const $m0$namespace = Object.create(null);`.
-                // Left unchecked that is a duplicate-declaration SyntaxError
-                // from the merged script for a legal module. Pathological, but
-                // it is the same merged-name hazard invariant M3 governs, and
-                // parsed linker-prefix admission covers a different family.
-                //
-                // Asked of the *source* spelling, not of `merged`. `merged_in`
-                // is the identity on a `LocalName::Source`, so for that variant
-                // the two spellings are the same string and the question is
-                // unchanged — but `LocalName::AnonymousDefault` is mapped *into*
-                // the minted range on purpose, and asking `merged` there reports
-                // every module with an anonymous `export default` as colliding
-                // with the very cell the linker minted for it. `spec_name` is
-                // `*default*` for that variant, which no `BindingIdentifier` can
-                // spell and which is therefore never minted-shaped, so the two
-                // generators stay distinguishable here by construction rather
-                // than by a second predicate that could drift.
-                if MergedName::is_minted_shaped(binding.name.spec_name()) {
-                    diagnostics.push(IrDiagnostic::unsupported(format!(
-                        "unsupported in scriptw wasm-aot: module {key}: top-level `{}` collides \
-                         with a linker-minted per-unit cell name",
-                        merged.as_str()
-                    )));
-                }
-            }
-        }
-
         // A Script entry owns root statements rather than a module activation,
         // so no request can evaluate it as a module or expose a module namespace.
         if self.entry_is_script
@@ -813,7 +785,7 @@ impl ModuleGraphIr {
                 // The same spellability rule `modules::namespace` applies when
                 // it emits the getter, asked through the same function, so the
                 // two cannot disagree about which exports are expressible.
-                if super::namespace::namespace_target_reference(&export.target).is_none() {
+                if super::namespace::namespace_target_reference(self, &export.target).is_none() {
                     diagnostics.push(IrDiagnostic::unsupported(format!(
                         "unsupported in scriptw wasm-aot: module {key}: `import()` cannot expose \
                          export `{}`, whose binding has no name in the merged scope",
@@ -1909,39 +1881,67 @@ mod tests {
         );
     }
 
-    /// The minted-cell half of the same hazard, and the positive control for
-    /// the `spec_name` narrowing beside it: source text *can* spell `$m0$…` and
-    /// `$d0$`, and a top-level declaration of one lands in the merged cell the
-    /// prelude declares, so it is reported.
-    ///
-    /// Paired deliberately with
-    /// [`an_anonymous_default_export_is_exposed_under_its_minted_name`], which
-    /// is the same predicate's negative control: that module's `*default*`
-    /// binding is spelled `$d0$` in the merged scope too, and must *not* be
-    /// reported. A predicate asked of the merged spelling passes this test and
-    /// fails that one, which is how the two together pin the right question.
+    /// Source text *can* spell `$m0$namespace`, `$d0$` and `$m0$meta`. The
+    /// dispatcher cells are resolved as trusted cells outside every module
+    /// activation, and the two activation cells are spelled per unit away from
+    /// the unit's identifiers, so a top-level declaration of any of them is an
+    /// ordinary binding of a legal module and is not reported.
     #[test]
-    fn a_user_binding_shaped_like_a_minted_cell_is_reported() {
-        for spelling in [
-            MergedName::minted(0, UnitCellRole::Namespace)
-                .as_str()
-                .to_string(),
-            LocalName::AnonymousDefault
-                .merged_in(0)
-                .as_str()
-                .to_string(),
-        ] {
-            let source = format!("const {spelling} = 1;\nimport(x);");
+    fn a_user_binding_shaped_like_a_minted_cell_is_accepted() {
+        for spelling in ["$m0$namespace", "$d0$", "$m0$meta"] {
+            let source =
+                format!("const {spelling} = 1;\nexport default 2;\nimport.meta;\nimport(x);");
             let sources = sources_of(&[("d", source.as_str())], 0, Vec::new());
             let graph = graph_of(&sources);
-            let diagnostics = graph.check_dynamic_import_linkable();
-            assert!(
-                diagnostics.iter().any(|diagnostic| diagnostic
-                    .message
-                    .contains("linker-minted per-unit cell name")),
-                "{spelling}: got {diagnostics:?}"
+            assert_eq!(
+                graph.check_dynamic_import_linkable(),
+                Vec::new(),
+                "{spelling}"
             );
+            let unit = &graph.units[0];
+            let default = unit.merged(&LocalName::AnonymousDefault);
+            let meta = unit.linker_spelling.import_meta();
+            assert_ne!(default.as_str(), spelling);
+            assert_ne!(meta.as_str(), spelling);
         }
+    }
+
+    /// Lowering recognizes activation cells by name in every unit, so a cell
+    /// spelling avoids the identifiers of the *whole* graph: the importer's
+    /// free `$d1$` and `$m1$meta` move the exporter off its decimal tag, while
+    /// an unrelated unit keeps its own.
+    #[test]
+    fn cell_spellings_avoid_every_unit_of_the_graph() {
+        let sources = sources_of(
+            &[
+                ("a", "export default 1;\nimport.meta;"),
+                ("c", "export default 3;"),
+                (
+                    "d",
+                    "import x from \"./a.mjs\";\nimport y from \"./c.mjs\";\ntypeof $d1$;\ntypeof $m2$meta;",
+                ),
+            ],
+            2,
+            vec![(2, request_key("./a.mjs"), 0), (2, request_key("./c.mjs"), 1)],
+        );
+        let graph = graph_of(&sources);
+        let names = |unit: usize| {
+            let unit = &graph.units[unit];
+            (
+                unit.merged(&LocalName::AnonymousDefault)
+                    .as_str()
+                    .to_owned(),
+                unit.linker_spelling.import_meta().as_str().to_owned(),
+            )
+        };
+        let spellings: Vec<_> = (0..3).map(names).collect();
+        assert!(
+            spellings
+                .iter()
+                .all(|(default, meta)| default != "$d1$" && meta != "$m2$meta"),
+            "{spellings:?}"
+        );
+        assert_eq!(names(0), ("$d0$".to_owned(), "$m0$meta".to_owned()));
     }
 
     /// An anonymous `export default` binds `*default*`, which no source text
@@ -1967,7 +1967,7 @@ mod tests {
         assert!(
             source.contains(&format!(
                 ", () => {}",
-                LocalName::AnonymousDefault.merged_in(0).as_str()
+                graph.units[0].merged(&LocalName::AnonymousDefault).as_str()
             )),
             "got {source}"
         );

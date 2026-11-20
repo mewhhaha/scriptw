@@ -9,6 +9,10 @@ pub(crate) struct ModuleExecutionAnalysis {
     pub(crate) foreign_modules: crate::foreign::ForeignModuleRegistry,
     pub(crate) foreign_calls: BTreeMap<usize, crate::foreign::ForeignFunctionId>,
     private_dispatchers: BTreeMap<FunctionId, String>,
+    /// Every unit's anonymous-default and `import.meta` cell spelling. No
+    /// identifier of any unit spells one (`build_graph` chooses them away
+    /// from the whole graph), so each reference to one is linker-generated.
+    private_activation_cells: BTreeSet<String>,
     original_callable_sources: BTreeMap<(usize, usize), String>,
     pub(crate) graphs: BTreeMap<usize, ModuleExecutionGraphIr>,
     pub(crate) initializers: BTreeMap<usize, ModuleExecutionGraphIr>,
@@ -44,6 +48,12 @@ impl ModuleExecutionAnalysis {
             .any(|private| private == name)
     }
 
+    /// A linker-generated read or write of a unit's activation cell: resolved
+    /// statically, never through the runtime name table it is absent from.
+    pub(crate) fn is_private_activation_cell(&self, name: &str) -> bool {
+        self.private_activation_cells.contains(name)
+    }
+
     pub(crate) fn is_private_dispatcher_function(&self, function: &FunctionId) -> bool {
         self.private_dispatchers.contains_key(function)
     }
@@ -53,6 +63,8 @@ impl ModuleExecutionAnalysis {
 pub(super) struct ModuleUnitDefinition {
     pub(super) foreign: Option<crate::foreign::ForeignModuleDeclaration>,
     pub(super) module: u32,
+    /// The unit's activation-cell spelling, as the source builder emitted it.
+    pub(super) linker_spelling: UnitLinkerSpelling,
     pub(super) imports: Vec<ResolvedBindingIr>,
     pub(super) namespaces: Vec<(ModuleNamespaceModeIr, Vec<ResolvedBindingIr>)>,
     pub(super) has_import_meta: bool,
@@ -86,6 +98,17 @@ impl ModuleExecutionDefinitions {
         interner: &Interner,
     ) {
         analysis.module_execution.foreign_modules = self.foreign_modules.clone();
+        analysis.module_execution.private_activation_cells = self
+            .units
+            .iter()
+            .flat_map(|unit| {
+                [
+                    unit.linker_spelling.anonymous_default(),
+                    unit.linker_spelling.import_meta(),
+                ]
+            })
+            .map(|name| name.as_str().to_owned())
+            .collect();
         let root_statements = script.statements().statements();
         let (initializer_index, initializer_expression, initializer, graph_index, graph) =
             root_statements
@@ -319,12 +342,45 @@ impl ModuleExecutionDefinitions {
                 }
             }
         }
+        // The two activation cells are spelled away from every identifier of
+        // their unit, so no source reference resolves to them; a direct eval
+        // in the unit must not either. Remove only their named exposure from
+        // that unit's own activation, keeping the slots for the linker's cells.
+        for (unit, function) in self.units.iter().zip(&functions) {
+            let activation = analysis.owner_plans[function].activation_environment_id;
+            let private = [
+                unit.linker_spelling.anonymous_default(),
+                unit.linker_spelling.import_meta(),
+            ];
+            if let Some(EvalEnvironmentRoleIr::Declarative { bindings, .. }) = &mut analysis
+                .environment_plans
+                .get_mut(&activation)
+                .expect("module activation environment was analyzed")
+                .eval_environment
+            {
+                bindings.retain(|binding| {
+                    !private
+                        .iter()
+                        .any(|name| name.as_str() == binding.source_name)
+                });
+            }
+        }
+        let spellings = self
+            .units
+            .iter()
+            .map(|unit| {
+                assert_eq!(unit.linker_spelling.unit(), unit.module);
+                (unit.module, &unit.linker_spelling)
+            })
+            .collect::<BTreeMap<_, _>>();
         let resolve = |target: &ResolvedBindingIr| match target {
             ResolvedBindingIr::Resolved {
                 module,
                 binding: ModuleBindingNameIr::Name(name),
             } => {
-                let name = name.merged_in(*module);
+                let name = name.merged_in(spellings.get(module).unwrap_or_else(|| {
+                    panic!("module {module} binding {name:?} has an activation owner")
+                }));
                 ModuleCellIr::Binding {
                     module: *module,
                     slot: *cells
@@ -446,7 +502,7 @@ impl ModuleExecutionDefinitions {
             }
             super::default_export_definition::apply_synchronous_default(
                 owner.body(),
-                unit.module,
+                &unit.linker_spelling,
                 unit.default_export,
                 analysis,
                 interner,

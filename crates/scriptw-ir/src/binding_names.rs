@@ -9,18 +9,19 @@
 //! production that makes them differ, and `ResolveExport` (16.2.1.6.2) matches
 //! on one and returns the other.
 //!
-//! This compiler adds a third domain the specification does not have. `modules::link`
-//! merges every unit's *source text* into one Script and lowers it once, so all
-//! units' top-level bindings share one activation environment (the three reasons
-//! are stated in that module, and the load-bearing one — a cross-module read
-//! becoming an ordinary read of the exporter's own cell — is what makes an
-//! imported binding live without runtime indirection). The name a binding is
-//! spelled by in that one merged scope is the **merged name**.
+//! This compiler adds a third domain the specification does not have. The
+//! linker assembles every unit's *source text* into one generated Script, in
+//! which each module body is its own private activation owner (an async arrow
+//! of the module graph table); cross-module reads go through trusted cells the
+//! linker resolves, not through shared names. The name a binding is spelled by
+//! in that generated text — inside its own unit's activation — is the
+//! **merged name**. Two units may therefore use the same merged spelling for
+//! different cells: cells are addressed by `(unit, merged name)`.
 //!
 //! ```text
 //! D1  [[LocalName]]   LocalName    a name in one module's own environment
 //! D2  [[ExportName]]  ExportName   a name in a module's export table
-//! D3  merged name     MergedName   a name in the single merged Script scope
+//! D3  merged name     MergedName   a name in the generated Script text
 //! ```
 //!
 //! `[[ImportName]]` is **not** a fourth domain: 16.2.1.4 defines it as "the name
@@ -30,14 +31,24 @@
 //! So [`ImportNameIr::Name`](crate::ImportNameIr::Name) carries an
 //! [`ExportName`].
 //!
-//! D3 has exactly two generators and no others:
+//! D3 has exactly three generators and no others:
 //!
-//! * [`LocalName::merged_in`] for a source binding. It applies **no** prefix —
-//!   the merge shares cells by name on purpose — so it is the identity except
-//!   for `*default*`, which becomes `$d{unit}$`.
+//! * [`LocalName::merged_in`] for a source binding. It applies **no** prefix,
+//!   so it is the identity except for `*default*`, which becomes the unit's
+//!   [`UnitLinkerSpelling::anonymous_default`].
+//! * [`UnitLinkerSpelling`] for the two cells generated *inside* a unit's
+//!   activation — the anonymous default (`$d<tag>$`) and the `import.meta`
+//!   object (`$m<tag>$meta`). Source code of that unit can name anything in
+//!   its activation, so these spellings are chosen per unit to occur nowhere
+//!   among the graph's identifiers, and the linker removes both from the
+//!   eval-visible name table of the unit's activation. User code can then
+//!   neither read, assign, `typeof`, shadow nor `eval` its way to them, and a
+//!   free reference spelled like one falls through to the global object, as
+//!   it must for the unspellable 8.2.2 `*default*` binding.
 //! * [`MergedName::minted`] for a compiler-owned per-unit cell, whose role
 //!   ranges over the closed set [`UnitCellRole`] rather than over any source
-//!   name.
+//!   name. Those cells are read only by linker-generated dispatcher text and
+//!   are resolved to trusted cells, never through a unit's activation.
 //!
 //! There is deliberately **no** `MergedName::prefixed(unit, &LocalName)`: no
 //! function anywhere takes a `[[LocalName]]` and returns a `$m{unit}$`-prefixed
@@ -53,7 +64,11 @@
 //!
 //! See `docs/rust-rewrite/contracts/module-binding-names.md`.
 
-use crate::{ModuleUnitId, MODULE_ANONYMOUS_DEFAULT_LOCAL_NAME, MODULE_DEFAULT_EXPORT_NAME};
+use std::collections::BTreeSet;
+
+use crate::{
+    IrDiagnostic, ModuleUnitId, MODULE_ANONYMOUS_DEFAULT_LOCAL_NAME, MODULE_DEFAULT_EXPORT_NAME,
+};
 
 // -- const helpers --------------------------------------------------------
 //
@@ -145,18 +160,26 @@ const fn ends_with(text: &str, tail: &str) -> bool {
 
 // -- spellings ------------------------------------------------------------
 
-/// Prefix of every compiler-owned per-unit cell name.
+/// Prefix of every compiler-owned per-unit cell name, and of the `import.meta`
+/// cell's [`UnitLinkerSpelling`].
 ///
-/// `$` is not a byte this compiler mints at the start of a source-spelled
-/// binding — but it *is* a legal `IdentifierStart`, so source text can spell a
-/// name in this range and the two ranges are **not** disjoint by construction.
-/// [`MergedName::is_minted_shaped`] is the predicate that closes the gap, and
-/// `check_dynamic_import_linkable` is where it is enforced.
+/// `$` is a legal `IdentifierStart`, so source text can spell a name in this
+/// range: the ranges are **not** disjoint from source names by construction.
+/// The two cells generated inside a unit's activation are therefore spelled per
+/// unit by [`UnitLinkerSpelling::choose`], away from that unit's identifiers.
 const MINTED_PREFIX: &str = "$m";
 /// Prefix of the merged spelling of an anonymous `export default`.
 const ANONYMOUS_DEFAULT_PREFIX: &str = "$d";
-/// Separator between a unit id and whatever follows it in a minted name.
+/// Separator between a unit id (or spelling tag) and whatever follows it.
 const UNIT_ID_TERMINATOR: &str = "$";
+/// Suffix of the `import.meta` cell, after `$m<tag>$`.
+const IMPORT_META_SUFFIX: &str = "meta";
+/// Characters a spelling tag is drawn from, in ascending ASCII order so that
+/// enumerating tags by length and then by these indices is shortlex order.
+const TAG_ALPHABET: &str = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz";
+/// Longest spelling tag. Derived from budgets B1 and B2, see
+/// [`MAX_LINKABLE_MODULE_UNIT_ID`] and assertions V2/V4.
+const MAX_TAG_LEN: usize = 4;
 
 /// Width of the parsed `export` keyword, reserved for generated binding heads.
 pub(crate) const EXPORT_KEYWORD: &str = "export";
@@ -188,21 +211,25 @@ const EXPORT_DEFAULT_MIN_CODE_WIDTH: usize = EXPORT_KEYWORD.len() + DEFAULT_KEYW
 /// Largest module unit id the source-text linker can name.
 ///
 /// Derived, not chosen. Two in-place rewrites must not change a unit's byte
-/// length, and each caps the decimal width of a unit id:
+/// length, and each caps the width of a [`UnitLinkerSpelling`] tag:
 ///
 /// * **B1** — `modules::source` rewrites `export default` into
 ///   `keyword ++ name ++ padding ++ "="` while preserving every line
 ///   terminator in the erased span. The two keywords guarantee 13 non-terminator
 ///   bytes even in `export\ndefault`, so
-///   `len(MergedName::anonymous_default(u)) <= 13 - 4 - 1 = 8`, i.e.
-///   `len(dec(u)) <= 5`.
+///   `len(UnitLinkerSpelling::anonymous_default()) <= 13 - 4 - 1 = 8`, i.e.
+///   `len(tag) <= 5`.
 /// * **B2** — `modules::record::rewrite_import_meta` replaces `import.meta` in
 ///   place, and its narrowest span is 11 bytes, so
-///   `len(MergedName::minted(u, ImportMeta)) <= 11`, i.e. `len(dec(u)) <= 4`.
+///   `len(UnitLinkerSpelling::import_meta()) <= 11`, i.e. `len(tag) <= 4`.
 ///
-/// B2 is strictly tighter. At exactly this cap the `import.meta` replacement is
-/// 11 bytes with *zero* padding, which is what makes assertion V4 below worth
-/// writing: it is tight rather than slack.
+/// B2 is strictly tighter, so tags are at most four bytes, and this cap is the
+/// largest id whose decimal spelling is itself a tag: that decimal tag is
+/// always the first candidate, which keeps `$d<unit>$` and `$m<unit>$meta` the
+/// spellings of every unit whose source does not already use them. At a
+/// four-byte tag the `import.meta` replacement is 11 bytes with *zero* padding,
+/// which is what makes assertion V4 below worth writing: it is tight rather
+/// than slack.
 pub const MAX_LINKABLE_MODULE_UNIT_ID: ModuleUnitId = 9_999;
 
 // -- D1: `[[LocalName]]` --------------------------------------------------
@@ -291,11 +318,15 @@ impl LocalName {
     ///
     /// The two-arm `match` has no catch-all, so adding a third `[[LocalName]]`
     /// shape is `E0004` at the one place the mapping lives.
+    ///
+    /// `spelling` must be the owning unit's: the anonymous default is spelled
+    /// by it, and source names cannot collide with it because it was chosen
+    /// away from them.
     #[must_use]
-    pub fn merged_in(&self, unit: ModuleUnitId) -> MergedName {
+    pub fn merged_in(&self, spelling: &UnitLinkerSpelling) -> MergedName {
         match self {
             Self::Source(name) => MergedName(name.as_str().to_string()),
-            Self::AnonymousDefault => MergedName::anonymous_default(unit),
+            Self::AnonymousDefault => spelling.anonymous_default(),
         }
     }
 }
@@ -422,14 +453,13 @@ unit_cell_roles! {
     DeferCaughtError => "defer$caught$error";
     /// Separate declaration scope inside the evaluator's exception boundary.
     DeferExecute => "defer$execute";
-    /// `import.meta` object (13.3.12, 16.2.1.9).
-    ImportMeta => "meta";
 }
 
-/// A name in the single merged Script top-level scope.
+/// A name in the generated Script text.
 ///
-/// Two disjoint generators and no other constructor: [`LocalName::merged_in`]
-/// for a source binding and [`MergedName::minted`] for a compiler-owned cell.
+/// Three generators and no other constructor: [`LocalName::merged_in`] for a
+/// source binding, [`UnitLinkerSpelling`] for the two cells inside a unit's
+/// activation, and [`MergedName::minted`] for a compiler-owned dispatcher cell.
 /// There is no `From<String>`, so a bare `String` cannot become one, and no
 /// constructor takes a `MergedName`, so the map cannot be applied twice.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -447,66 +477,187 @@ impl MergedName {
         ))
     }
 
-    /// `$d{unit}$` — the merged spelling of an anonymous `export default`.
-    ///
-    /// `pub(crate)`, and reached from exactly two places: the
-    /// [`LocalName::AnonymousDefault`] arm of [`LocalName::merged_in`], and
-    /// `modules::link` building the `DefaultExportRewrite::Bind` the source
-    /// rewriter needs. Those two must agree, and they do by construction.
-    ///
-    /// Its byte length is capped by B1; assertion V2 checks that.
-    pub(crate) fn anonymous_default(unit: ModuleUnitId) -> Self {
-        Self(format!(
-            "{ANONYMOUS_DEFAULT_PREFIX}{unit}{UNIT_ID_TERMINATOR}"
-        ))
-    }
-
     /// The name as the merged script spells it.
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
+}
 
-    /// Whether this merged name lies in the *minted* range — `$m<digits>$…` or
-    /// `$d<digits>$`.
-    ///
-    /// The two generators' ranges are **not** disjoint from the source range by
-    /// construction, contrary to what `MINTED_PREFIX`'s doc used to say. That
-    /// quantifier ranges over what the compiler mints, not over what source text
-    /// may spell, and `$m0$namespace`, `$m1$meta` and `$d0$` are all legal
-    /// `BindingIdentifier`s. `merged_in` is the identity on a source name, so a
-    /// module that declares one collides with the prelude's own cell, and a
-    /// module that merely *reads* one has the read captured by it.
-    ///
-    /// Derived from `MINTED_PREFIX`/`ANONYMOUS_DEFAULT_PREFIX`/
-    /// `UNIT_ID_TERMINATOR` rather than from a literal, so this predicate and
-    /// the generators cannot drift apart.
+// -- per-unit spellings of the activation cells -----------------------------
+
+/// The per-unit spelling of the two cells the linker declares *inside* a
+/// unit's activation: the anonymous `export default` binding and the
+/// `import.meta` object.
+///
+/// Invariant: neither [`Self::anonymous_default`] nor [`Self::import_meta`] is
+/// any identifier in `reserved` — for a linked unit, every identifier of every
+/// unit of the graph (references, bindings at any depth, top-level bound names
+/// and import locals). [`Self::choose`] is the only constructor and
+/// establishes it; the tag is 1–4 bytes of [`TAG_ALPHABET`], so budgets B1/B2
+/// hold for every value of the type. Graph-wide, so that lowering may
+/// recognize a cell reference by name in any unit.
+///
+/// Strict module code reaches its activation only through its own source text
+/// or a direct eval with that environment; the linker removes both spellings
+/// from that activation's eval-visible name table, so no user reference can
+/// read, write, `typeof` or shadow either cell.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct UnitLinkerSpelling {
+    unit: ModuleUnitId,
+    tag: String,
+}
+
+/// Every candidate tag was taken by one of the unit's identifiers.
+///
+/// Needs millions of distinct `$d…$`/`$m…$meta` identifiers in one module;
+/// reported, never silently resolved by sharing a name with user code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LinkerSpellingExhausted {
+    /// The unit that could not be spelled.
+    pub unit: ModuleUnitId,
+}
+
+impl LinkerSpellingExhausted {
+    /// The `unsupported` diagnostic for module `key`.
     #[must_use]
-    pub fn is_minted_shaped(name: &str) -> bool {
-        let rest = match name
-            .strip_prefix(MINTED_PREFIX)
-            .or_else(|| name.strip_prefix(ANONYMOUS_DEFAULT_PREFIX))
-        {
-            Some(rest) => rest,
-            None => return false,
-        };
-        let digits_end = rest
-            .find(|byte: char| !byte.is_ascii_digit())
-            .unwrap_or(rest.len());
-        digits_end > 0 && rest[digits_end..].starts_with(UNIT_ID_TERMINATOR)
+    pub fn to_diagnostic(self, key: &str) -> IrDiagnostic {
+        IrDiagnostic::unsupported(format!(
+            "unsupported in scriptw wasm-aot: module {key}: every linker spelling for its \
+             anonymous default and `import.meta` cells (`{ANONYMOUS_DEFAULT_PREFIX}<tag>$`, \
+             `{MINTED_PREFIX}<tag>${IMPORT_META_SUFFIX}` with tags of up to {MAX_TAG_LEN} \
+             characters) is already an identifier of the module"
+        ))
     }
+}
+
+impl UnitLinkerSpelling {
+    /// Chooses `unit`'s spelling away from `reserved`, the graph's identifiers.
+    ///
+    /// Candidates are the decimal spelling of `unit` first — so a unit whose
+    /// source does not use `$d<unit>$` or `$m<unit>$meta` keeps exactly those
+    /// names — and then every other tag in shortlex order. A candidate is taken
+    /// when either of its two names is in `reserved`.
+    ///
+    /// # Errors
+    /// [`LinkerSpellingExhausted`] when every candidate is taken.
+    pub fn choose(
+        unit: ModuleUnitId,
+        reserved: &BTreeSet<String>,
+    ) -> Result<Self, LinkerSpellingExhausted> {
+        candidate_tags(unit)
+            .map(|tag| Self { unit, tag })
+            .find(|spelling| {
+                !reserved.contains(spelling.anonymous_default().as_str())
+                    && !reserved.contains(spelling.import_meta().as_str())
+            })
+            .ok_or(LinkerSpellingExhausted { unit })
+    }
+
+    /// `choose` with nothing reserved: the decimal spelling of an admitted unit.
+    #[cfg(test)]
+    pub(crate) fn unreserved(unit: ModuleUnitId) -> Self {
+        Self::choose(unit, &BTreeSet::new()).expect("an empty reservation leaves every tag free")
+    }
+
+    /// The unit this spelling belongs to.
+    #[must_use]
+    pub(crate) const fn unit(&self) -> ModuleUnitId {
+        self.unit
+    }
+
+    /// `$d<tag>$` — the merged spelling of this unit's anonymous `export default`.
+    ///
+    /// Its byte length is capped by B1; assertion V2 checks that.
+    #[must_use]
+    pub fn anonymous_default(&self) -> MergedName {
+        MergedName(format!(
+            "{ANONYMOUS_DEFAULT_PREFIX}{}{UNIT_ID_TERMINATOR}",
+            self.tag
+        ))
+    }
+
+    /// `$m<tag>$meta` — this unit's `import.meta` object (13.3.12, 16.2.1.9).
+    ///
+    /// Its byte length is capped by B2; assertion V4 checks that.
+    #[must_use]
+    pub fn import_meta(&self) -> MergedName {
+        MergedName(format!(
+            "{MINTED_PREFIX}{}{UNIT_ID_TERMINATOR}{IMPORT_META_SUFFIX}",
+            self.tag
+        ))
+    }
+
+    /// Whether `name` could equal either spelling of *some* unit, so a
+    /// reservation scan need keep only these identifiers.
+    #[must_use]
+    pub(crate) fn could_collide(name: &str) -> bool {
+        name.starts_with(ANONYMOUS_DEFAULT_PREFIX) || name.starts_with(MINTED_PREFIX)
+    }
+}
+
+/// `true` for a 1–4 byte string of [`TAG_ALPHABET`].
+fn is_tag(text: &str) -> bool {
+    (1..=MAX_TAG_LEN).contains(&text.len())
+        && text
+            .bytes()
+            .all(|byte| TAG_ALPHABET.as_bytes().contains(&byte))
+}
+
+/// Every tag, decimal spelling of `unit` first, each exactly once.
+fn candidate_tags(unit: ModuleUnitId) -> impl Iterator<Item = String> {
+    let decimal = Some(unit.to_string()).filter(|tag| is_tag(tag));
+    let skip = decimal.clone();
+    decimal.into_iter().chain(
+        (1..=MAX_TAG_LEN)
+            .flat_map(|len| {
+                let count = TAG_ALPHABET
+                    .len()
+                    .pow(u32::try_from(len).expect("tag length"));
+                (0..count).map(move |mut index| {
+                    let mut tag = vec![0u8; len];
+                    for slot in tag.iter_mut().rev() {
+                        *slot = TAG_ALPHABET.as_bytes()[index % TAG_ALPHABET.len()];
+                        index /= TAG_ALPHABET.len();
+                    }
+                    String::from_utf8(tag).expect("the tag alphabet is ASCII")
+                })
+            })
+            .filter(move |tag| skip.as_ref() != Some(tag)),
+    )
 }
 
 // -- const assertions -----------------------------------------------------
 
-/// Byte length of `MergedName::anonymous_default(unit)`.
-const fn anonymous_default_len(unit: ModuleUnitId) -> usize {
-    ANONYMOUS_DEFAULT_PREFIX.len() + decimal_len(unit) + UNIT_ID_TERMINATOR.len()
+/// Byte length of the widest `UnitLinkerSpelling::anonymous_default()`.
+const ANONYMOUS_DEFAULT_MAX_LEN: usize =
+    ANONYMOUS_DEFAULT_PREFIX.len() + MAX_TAG_LEN + UNIT_ID_TERMINATOR.len();
+
+/// Byte length of the widest `UnitLinkerSpelling::import_meta()`.
+const IMPORT_META_MAX_LEN: usize =
+    MINTED_PREFIX.len() + MAX_TAG_LEN + UNIT_ID_TERMINATOR.len() + IMPORT_META_SUFFIX.len();
+
+const fn no_suffix_is_the_import_meta_suffix() -> bool {
+    let mut index = 0;
+    while index < UnitCellRole::ALL.len() {
+        if str_eq(UnitCellRole::ALL[index].suffix(), IMPORT_META_SUFFIX) {
+            return false;
+        }
+        index += 1;
+    }
+    true
 }
 
-/// Byte length of `MergedName::minted(unit, role)`.
-const fn minted_len(unit: ModuleUnitId, role: UnitCellRole) -> usize {
-    MINTED_PREFIX.len() + decimal_len(unit) + UNIT_ID_TERMINATOR.len() + role.suffix().len()
+const fn tag_alphabet_is_ascending_identifier_parts() -> bool {
+    let bytes = TAG_ALPHABET.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'$' || (index > 0 && bytes[index - 1] >= bytes[index]) {
+            return false;
+        }
+        index += 1;
+    }
+    is_identifier_body_ascii(TAG_ALPHABET)
 }
 
 const fn every_suffix_is_an_identifier_body() -> bool {
@@ -549,9 +700,7 @@ const _: () = assert!(
 // code budget left by the narrowest split `export default` span after its line
 // terminator is reserved.
 const _: () = assert!(
-    DEFAULT_BINDING_LET.len()
-        + anonymous_default_len(MAX_LINKABLE_MODULE_UNIT_ID)
-        + DEFAULT_BINDING_ASSIGN.len()
+    DEFAULT_BINDING_LET.len() + ANONYMOUS_DEFAULT_MAX_LEN + DEFAULT_BINDING_ASSIGN.len()
         <= EXPORT_DEFAULT_MIN_CODE_WIDTH,
     "the anonymous `export default` binding no longer fits the keywords it replaces"
 );
@@ -565,20 +714,34 @@ const _: () = assert!(
     "a unit-cell suffix is not an ASCII IdentifierPart sequence"
 );
 
-// **V4 (budget B2).** Named for [`UnitCellRole::ImportMeta`] alone and
-// deliberately *not* quantified over all roles: `DeferEvaluate`'s suffix is 14
-// bytes and would fail, correctly, because only the `import.meta` cell is
-// written into a fixed-width span. A second span-constrained role means
-// editing this assertion, which is the point.
+// **V4 (budget B2).** Only the `import.meta` cell is written into a
+// fixed-width span; it is spelled by `UnitLinkerSpelling`, not by a
+// `UnitCellRole`, and its widest tag must still fit.
 const _: () = assert!(
-    minted_len(MAX_LINKABLE_MODULE_UNIT_ID, UnitCellRole::ImportMeta) <= IMPORT_META_TEXT.len(),
+    IMPORT_META_MAX_LEN <= IMPORT_META_TEXT.len(),
     "the `import.meta` cell name no longer fits the meta-property it replaces"
 );
 
-// **V5.** Two roles sharing a suffix would share a cell.
+// **V5.** Two roles sharing a suffix would share a cell, and a role suffixed
+// like the `import.meta` cell would share that one with a unit whose tag is its
+// decimal id.
 const _: () = assert!(
-    every_suffix_is_distinct(),
-    "two unit-cell roles share a suffix"
+    every_suffix_is_distinct() && no_suffix_is_the_import_meta_suffix(),
+    "two unit-cell names share a suffix"
+);
+
+// **V8.** Every admitted unit's decimal spelling is a candidate tag, so units
+// whose source does not use them keep `$d<unit>$` and `$m<unit>$meta`.
+const _: () = assert!(
+    decimal_len(MAX_LINKABLE_MODULE_UNIT_ID) <= MAX_TAG_LEN,
+    "an admitted unit id no longer spells as a linker tag"
+);
+
+// **V9.** Tags are identifier parts without `$` (so `$d<tag>$` ends at its
+// terminator) and the alphabet is ascending, so candidate order is shortlex.
+const _: () = assert!(
+    tag_alphabet_is_ascending_identifier_parts(),
+    "the linker tag alphabet is not ascending `$`-free identifier parts"
 );
 
 // **V6.** Deleted. `ALL` is generated from the same macro rows as the enum, so
@@ -631,16 +794,29 @@ mod tests {
     /// imported binding live.
     #[test]
     fn merging_a_source_name_is_the_identity() {
-        assert_eq!(LocalName::from_bound_name("x").merged_in(3).as_str(), "x");
-        assert_eq!(LocalName::from_bound_name("x").merged_in(0).as_str(), "x");
+        for unit in [0, 3] {
+            let spelling = UnitLinkerSpelling::unreserved(unit);
+            assert_eq!(
+                LocalName::from_bound_name("x")
+                    .merged_in(&spelling)
+                    .as_str(),
+                "x"
+            );
+        }
     }
 
     /// The one name 8.2.2 makes unspellable gets a per-unit merged spelling, so
     /// two units with an anonymous `export default` do not collide.
     #[test]
     fn the_anonymous_default_gets_a_per_unit_merged_name() {
-        assert_eq!(LocalName::AnonymousDefault.merged_in(0).as_str(), "$d0$");
-        assert_eq!(LocalName::AnonymousDefault.merged_in(1).as_str(), "$d1$");
+        let zero = UnitLinkerSpelling::unreserved(0);
+        let one = UnitLinkerSpelling::unreserved(1);
+        assert_eq!(
+            LocalName::AnonymousDefault.merged_in(&zero).as_str(),
+            "$d0$"
+        );
+        assert_eq!(LocalName::AnonymousDefault.merged_in(&one).as_str(), "$d1$");
+        assert_eq!(one.import_meta().as_str(), "$m1$meta");
         assert_eq!(
             LocalName::AnonymousDefault.spec_name(),
             MODULE_ANONYMOUS_DEFAULT_LOCAL_NAME
@@ -655,10 +831,6 @@ mod tests {
             MergedName::minted(0, UnitCellRole::Namespace).as_str(),
             "$m0$namespace"
         );
-        assert_eq!(
-            MergedName::minted(7, UnitCellRole::ImportMeta).as_str(),
-            "$m7$meta"
-        );
         assert_ne!(
             MergedName::minted(0, UnitCellRole::Namespace),
             MergedName::minted(1, UnitCellRole::Namespace)
@@ -667,11 +839,13 @@ mod tests {
             MergedName::minted(0, UnitCellRole::DeferCells),
             MergedName::minted(0, UnitCellRole::DeferEvaluate)
         );
+        let spelling = UnitLinkerSpelling::unreserved(0);
         for role in UnitCellRole::ALL.iter().copied() {
             assert_ne!(
                 MergedName::minted(0, role),
-                LocalName::AnonymousDefault.merged_in(0)
+                LocalName::AnonymousDefault.merged_in(&spelling)
             );
+            assert_ne!(MergedName::minted(0, role), spelling.import_meta());
         }
     }
 
@@ -688,19 +862,89 @@ mod tests {
 
     /// The budgets V2 and V4 assert at compile time, checked here against the
     /// values the two rewriters actually measure so a change to either side is
-    /// visible in one place. B2 is tight at the cap; B1 has one byte of slack.
+    /// visible in one place. B2 is tight at a four-byte tag — the cap's decimal
+    /// tag and the widest fallback alike; B1 has one byte of slack.
     #[test]
-    fn the_byte_budgets_hold_at_the_cap() {
-        let meta = MergedName::minted(MAX_LINKABLE_MODULE_UNIT_ID, UnitCellRole::ImportMeta);
-        assert_eq!(meta.as_str().len(), IMPORT_META_TEXT.len());
-        let default = LocalName::AnonymousDefault.merged_in(MAX_LINKABLE_MODULE_UNIT_ID);
-        assert_eq!(
-            DEFAULT_BINDING_LET.len() + default.as_str().len() + DEFAULT_BINDING_ASSIGN.len(),
-            12
-        );
+    fn the_byte_budgets_hold_at_the_widest_tag() {
+        let decimal = UnitLinkerSpelling::unreserved(MAX_LINKABLE_MODULE_UNIT_ID);
+        let fallback = UnitLinkerSpelling {
+            unit: 0,
+            tag: "zzzz".into(),
+        };
+        assert!(is_tag(&fallback.tag));
+        for spelling in [decimal, fallback] {
+            assert_eq!(
+                spelling.import_meta().as_str().len(),
+                IMPORT_META_TEXT.len()
+            );
+            let default = LocalName::AnonymousDefault.merged_in(&spelling);
+            assert_eq!(
+                DEFAULT_BINDING_LET.len() + default.as_str().len() + DEFAULT_BINDING_ASSIGN.len(),
+                12
+            );
+            assert!(
+                DEFAULT_BINDING_LET.len() + default.as_str().len() + DEFAULT_BINDING_ASSIGN.len()
+                    <= EXPORT_DEFAULT_MIN_CODE_WIDTH
+            );
+        }
+    }
+
+    fn reserved(names: &[&str]) -> BTreeSet<String> {
+        names.iter().map(|name| (*name).to_string()).collect()
+    }
+
+    /// The decimal tag comes first, so every existing spelling is unchanged
+    /// while the unit's source does not use it.
+    #[test]
+    fn a_unit_keeps_its_decimal_spelling_when_its_source_does_not_use_it() {
+        let spelling = UnitLinkerSpelling::choose(7, &reserved(&["$d0$", "$m1$meta", "x"]))
+            .expect("tag is free");
+        assert_eq!(spelling.anonymous_default().as_str(), "$d7$");
+        assert_eq!(spelling.import_meta().as_str(), "$m7$meta");
+        assert_eq!(spelling.unit, 7);
+    }
+
+    /// Either name of a candidate takes the whole candidate; fallbacks run in
+    /// shortlex order and never repeat the skipped decimal tag.
+    #[test]
+    fn a_taken_spelling_falls_back_in_shortlex_order() {
+        let default_taken = UnitLinkerSpelling::choose(1, &reserved(&["$d1$"])).unwrap();
+        assert_eq!(default_taken.anonymous_default().as_str(), "$d0$");
+        assert_eq!(default_taken.import_meta().as_str(), "$m0$meta");
+
+        let meta_taken = UnitLinkerSpelling::choose(1, &reserved(&["$m1$meta", "$d0$"])).unwrap();
+        assert_eq!(meta_taken.anonymous_default().as_str(), "$d2$");
+
+        let mut taken = vec!["$d5$".to_string()];
+        taken.extend(TAG_ALPHABET.chars().map(|tag| format!("$m{tag}$meta")));
+        let wide = UnitLinkerSpelling::choose(5, &taken.into_iter().collect()).unwrap();
+        assert_eq!(wide.anonymous_default().as_str(), "$d00$");
+
+        let mut tags = candidate_tags(5);
+        assert_eq!(tags.next().as_deref(), Some("5"));
+        let rest: Vec<String> = tags.take(TAG_ALPHABET.len() + 1).collect();
+        assert!(!rest.contains(&"5".to_string()));
+        assert_eq!(rest[0], "0");
+        assert_eq!(rest[TAG_ALPHABET.len() - 2], "z");
+        assert_eq!(rest[TAG_ALPHABET.len() - 1], "00");
+        assert!(rest.iter().all(|tag| is_tag(tag)));
+    }
+
+    /// A unit past the decimal-tag cap has no decimal candidate but is still
+    /// spelled inside the budgets.
+    #[test]
+    fn a_unit_without_a_decimal_tag_still_has_a_spelling() {
+        let spelling = UnitLinkerSpelling::unreserved(MAX_LINKABLE_MODULE_UNIT_ID + 1);
+        assert_eq!(spelling.anonymous_default().as_str(), "$d0$");
+    }
+
+    #[test]
+    fn exhaustion_is_an_unsupported_diagnostic_naming_the_module() {
+        let diagnostic = LinkerSpellingExhausted { unit: 3 }.to_diagnostic("m.mjs");
         assert!(
-            DEFAULT_BINDING_LET.len() + default.as_str().len() + DEFAULT_BINDING_ASSIGN.len()
-                <= EXPORT_DEFAULT_MIN_CODE_WIDTH
+            diagnostic.message.contains("module m.mjs"),
+            "{diagnostic:?}"
         );
+        assert!(diagnostic.message.contains("unsupported"), "{diagnostic:?}");
     }
 }

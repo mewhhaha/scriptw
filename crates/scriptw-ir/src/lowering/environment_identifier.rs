@@ -213,6 +213,16 @@ impl ScriptLowerer<'_> {
         if !self.uses_runtime_identifier_environment() {
             return false;
         }
+        // The linker's activation cells are absent from the runtime name
+        // table so that eval cannot name them; their generated references
+        // resolve to the cell itself.
+        if self
+            .analysis
+            .module_execution
+            .is_private_activation_cell(name)
+        {
+            return false;
+        }
         let Some(locals) = self
             .analysis
             .module_local_candidates

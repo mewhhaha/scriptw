@@ -13,8 +13,9 @@ separation remains authoritative; only this source-width premise changes.
 The one-artifact module linker concatenates source units and reparses the result
 with the Script goal. Before that reparse it must erase static `import` and
 `export` syntax and must turn an anonymous `export default` into a declaration
-of the merged `$d<unit>$` binding. Later rewrites and lowering still rely on
-byte offsets captured from the original unit.
+of the unit's `$d<tag>$` binding (see
+[module binding names](module-binding-names.md)). Later rewrites and lowering
+still rely on byte offsets captured from the original unit.
 
 Two source shapes expose the same missing invariant:
 

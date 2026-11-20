@@ -587,6 +587,11 @@ pub struct ModuleRecordIr {
     // Only the AST factory can mint these denied keys. Display collisions do
     // not become host identities, including when diagnostic attrs are empty.
     catalog_unrepresentable_requests: BTreeSet<ModuleRequestKeyIr>,
+    /// Every identifier of this unit's source that could spell a
+    /// [`UnitLinkerSpelling`](crate::UnitLinkerSpelling) name: references and
+    /// bindings at any depth, top-level bound names and import locals.
+    /// Synthetic records have no source identifiers and keep it empty.
+    linker_reserved_names: BTreeSet<String>,
 }
 
 /// Shape of a module's `export default`, from the merged script's point of
@@ -756,29 +761,17 @@ impl ModuleRecordIr {
             dynamic_import_sites: Vec::new(),
             dynamic_import_heads: Vec::new(),
             catalog_unrepresentable_requests: BTreeSet::new(),
+            linker_reserved_names: BTreeSet::new(),
         }
     }
     pub(super) fn catalog_key_is_eligible(&self, key: &ModuleRequestKeyIr) -> bool {
         !self.catalog_unrepresentable_requests.contains(key)
     }
 
-    /// The merged spelling of one of *this* record's `[[LocalName]]`s.
-    ///
-    /// [`LocalName::merged_in`] takes a bare `ModuleUnitId`, so "which unit does
-    /// this name belong to" — the exact coordinate commit `e27c01b1e` got wrong
-    /// — was carried by loop structure rather than by types: passing the
-    /// importer's id where the exporter's is required compiled, was silent for
-    /// [`LocalName::Source`] (`merged_in` ignores the unit there) and produced
-    /// the wrong `$d<unit>$` cell for [`LocalName::AnonymousDefault`].
-    ///
-    /// Every call site that already holds the record goes through here instead,
-    /// so the id cannot be supplied independently of the name's owner. The one
-    /// site that legitimately keeps `merged_in` destructures both from the same
-    /// `ResolvedBindingIr::Resolved { module, binding }`, where the pairing is
-    /// structural already.
-    #[must_use]
-    pub fn merged(&self, name: &LocalName) -> MergedName {
-        name.merged_in(self.id)
+    /// The identifiers [`UnitLinkerSpelling::choose`](crate::UnitLinkerSpelling::choose)
+    /// must avoid for this unit.
+    pub(super) const fn linker_reserved_names(&self) -> &BTreeSet<String> {
+        &self.linker_reserved_names
     }
 
     /// Number of `import.meta` references in the module body.
@@ -900,11 +893,10 @@ pub struct ImportMetaBindingIr {
     /// Binding that holds the object, and that every rewritten `import.meta`
     /// in this unit reads.
     ///
-    /// A [`MergedName`] minted for [`UnitCellRole::ImportMeta`], so it cannot
-    /// collide with another unit's meta object, with a namespace cell, or with
-    /// an ordinary top-level binding of the merged scope — and so its byte
-    /// length is bounded by const assertion V4, which is what
-    /// [`rewrite_import_meta`] depends on.
+    /// The unit's [`UnitLinkerSpelling::import_meta`], so it cannot collide
+    /// with any identifier of the unit's own source — and so its byte length is
+    /// bounded by const assertion V4, which is what [`rewrite_import_meta`]
+    /// depends on.
     pub name: MergedName,
     /// The declaration that creates it, terminated by `;`.
     ///
@@ -912,15 +904,15 @@ pub struct ImportMetaBindingIr {
     pub declaration: String,
 }
 
-/// Module `unit`'s `import.meta` object, with the host properties 16.2.1.9
-/// defines for it.
+/// The `import.meta` object of the unit `spelling` belongs to, with the host
+/// properties 16.2.1.9 defines for it.
 ///
 /// `meta_url` is [`ModuleUnitIr::meta_url`](crate::ModuleUnitIr::meta_url): the
 /// host resolved and normalized it while loading, and nothing here re-derives
 /// it.
 #[must_use]
-pub fn import_meta_binding(unit: ModuleUnitId, meta_url: &str) -> ImportMetaBindingIr {
-    let name = MergedName::minted(unit, UnitCellRole::ImportMeta);
+pub fn import_meta_binding(spelling: &UnitLinkerSpelling, meta_url: &str) -> ImportMetaBindingIr {
+    let name = spelling.import_meta();
     // `__proto__:` in an object literal is the prototype setter (13.2.5.5), and
     // the lowerer recognises a `null` value as "no prototype"
     // (`lowering::lower_object_literal`), so this is `OrdinaryObjectCreate(null)`
@@ -949,8 +941,8 @@ impl ImportMetaRewriteError {
     }
 }
 
-/// Replaces every `import.meta` in `source` with a read of module `record.id`'s
-/// [`UnitCellRole::ImportMeta`] cell.
+/// Replaces every `import.meta` in `source` with a read of the module's
+/// [`UnitLinkerSpelling::import_meta`] cell; `spelling` is that module's.
 ///
 /// Script text cannot spell `import.meta` at all — boa rejects it outright
 /// outside a module — so a linker that merges units into one Script *must*
@@ -972,11 +964,10 @@ impl ImportMetaRewriteError {
 /// is supposed to (which would mean `source` is not this unit's), or when the
 /// binding name does not fit in the span it replaces.
 ///
-/// The second failure is unreachable for any unit the graph will admit: the
-/// narrowest `import.meta` span is 11 bytes, const
-/// assertion V4 holds `MergedName::minted(u, ImportMeta)` to that width for
-/// every `u <= MAX_LINKABLE_MODULE_UNIT_ID`, and `build_graph` mints no larger
-/// id. It stays checked because the *span* is data from boa, not a constant.
+/// The second failure is unreachable: the narrowest `import.meta` span is 11
+/// bytes and const assertion V4 holds every `UnitLinkerSpelling::import_meta`
+/// to that width. It stays checked because the *span* is data from boa, not a
+/// constant.
 /// A HashbangComment (12.5) is legal only at the very start of a Script or
 /// Module. Linked units are embedded inside one synthesized Script, so the
 /// comment is rewritten to a SingleLineComment of the same length: every
@@ -991,12 +982,13 @@ pub(crate) fn embeddable_unit_source(source: &str) -> std::borrow::Cow<'_, str> 
 pub fn rewrite_import_meta(
     source: &str,
     record: &ModuleRecordIr,
+    spelling: &UnitLinkerSpelling,
 ) -> Result<String, ImportMetaRewriteError> {
     if record.import_meta_sites.is_empty() {
         return Ok(source.to_string());
     }
 
-    let cell = MergedName::minted(record.id, UnitCellRole::ImportMeta);
+    let cell = spelling.import_meta();
     let name = cell.as_str();
     let mut rewritten = String::with_capacity(source.len());
     let mut cursor = 0usize;
@@ -1316,9 +1308,28 @@ fn parse_record_with_admission(
     if !early_errors.is_empty() {
         return Err(early_errors);
     }
-    source.with_compiler_session(|module, interner| {
+    let mut record = record;
+    let mut reserved = source.with_compiler_session(|module, interner| {
         super::dynamic::validate_linker_identifiers(module.into(), interner, &record.key)
     })?;
+    // The scan already sees every BindingIdentifier; the bound and import
+    // names are added from the record too, so the reservation never depends on
+    // which AST positions the visitor happens to reach.
+    reserved.extend(
+        record
+            .environment
+            .iter()
+            .map(|binding| binding.name.spec_name())
+            .chain(
+                record
+                    .import_entries
+                    .iter()
+                    .map(|entry| entry.local_name.spec_name()),
+            )
+            .filter(|name| crate::UnitLinkerSpelling::could_collide(name))
+            .map(str::to_owned),
+    );
+    record.linker_reserved_names = reserved;
 
     // `[[HasTLA]]` is a property of the record, never a failure of ParseModule:
     // 16.2.1.6.1 step 12 simply stores it. What it costs is decided later, by
@@ -1362,6 +1373,7 @@ fn build_module_record(
         dynamic_import_sites: Vec::new(),
         dynamic_import_heads: Vec::new(),
         catalog_unrepresentable_requests: BTreeSet::new(),
+        linker_reserved_names: BTreeSet::new(),
     };
 
     // 16.2.2.2 ModuleRequests, over *all* module items in source order. The
@@ -2218,10 +2230,11 @@ fn script_record_with_admission(
     key: ModuleKey,
     admission: super::admission::GraphAdmission,
 ) -> Result<ModuleRecordIr, Vec<IrDiagnostic>> {
-    let script_entry_strict =
+    let (script_entry_strict, linker_reserved_names) =
         source.with_compiler_session(|script, interner| -> Result<_, Vec<IrDiagnostic>> {
-            super::dynamic::validate_linker_identifiers(script.into(), interner, &key)?;
-            Ok(script.strict())
+            let reserved =
+                super::dynamic::validate_linker_identifiers(script.into(), interner, &key)?;
+            Ok((script.strict(), reserved))
         })?;
     let (dynamic_import_sites, dynamic_import_heads) =
         script_sites_with_admission(source, admission);
@@ -2243,6 +2256,7 @@ fn script_record_with_admission(
         dynamic_import_sites,
         dynamic_import_heads,
         catalog_unrepresentable_requests: BTreeSet::new(),
+        linker_reserved_names,
     })
 }
 
@@ -3062,6 +3076,85 @@ mod tests {
             .expect("module record should build")
     }
 
+    /// The spelling `build_graph` chooses for `record`.
+    fn spelling_of(record: &ModuleRecordIr) -> UnitLinkerSpelling {
+        UnitLinkerSpelling::choose(record.id, record.linker_reserved_names())
+            .expect("a free spelling exists")
+    }
+
+    /// Every way module source can spell an identifier reserves it, so the
+    /// unit's activation cells are never spelled like one: top-level and nested
+    /// declarations of every form, parameters, catch and loop bindings,
+    /// destructuring, import locals, plain/`typeof`/assignment references and
+    /// shorthand properties.
+    #[test]
+    fn every_identifier_form_reserves_its_spelling() {
+        for (template, name) in [
+            ("var NAME = 1;", "$d0$"),
+            ("let NAME = 1;", "$d0$"),
+            ("const NAME = 1;", "$m0$meta"),
+            ("function NAME() {}", "$d0$"),
+            ("function* NAME() {}", "$d0$"),
+            ("async function NAME() {}", "$m0$meta"),
+            ("class NAME {}", "$d0$"),
+            ("export let NAME = 1;", "$d0$"),
+            ("export function NAME() {}", "$m0$meta"),
+            ("export default function NAME() {}", "$d0$"),
+            ("export default class NAME {}", "$d0$"),
+            ("import NAME from './a.mjs';", "$d0$"),
+            ("import { x as NAME } from './a.mjs';", "$m0$meta"),
+            ("import * as NAME from './a.mjs';", "$d0$"),
+            ("function f(NAME) {}", "$d0$"),
+            ("function f(a = NAME) {}", "$d0$"),
+            ("(NAME) => 0;", "$m0$meta"),
+            ("try {} catch (NAME) {}", "$d0$"),
+            ("for (const NAME of []) {}", "$d0$"),
+            ("const { a: [NAME] } = {};", "$d0$"),
+            ("const { NAME } = {};", "$m0$meta"),
+            ("({ NAME } = {});", "$d0$"),
+            ("(class { m() { return NAME; } });", "$d0$"),
+            ("{ let NAME = 1; }", "$d0$"),
+            ("export function f() { return NAME; }", "$d0$"),
+            ("typeof NAME;", "$m0$meta"),
+            ("NAME = 1;", "$d0$"),
+            ("({ NAME });", "$d0$"),
+        ] {
+            let declaration = template.replace("NAME", name);
+            let default = if template.contains("export default") {
+                ""
+            } else {
+                "export default 0;"
+            };
+            let source = format!("{declaration}\n{default}\nimport.meta;");
+            let record = record_with_id(&source, 0);
+            assert!(
+                record.linker_reserved_names().contains(name),
+                "{source}: {:?}",
+                record.linker_reserved_names()
+            );
+            let spelling = spelling_of(&record);
+            assert_ne!(spelling.anonymous_default().as_str(), name, "{source}");
+            assert_ne!(spelling.import_meta().as_str(), name, "{source}");
+            assert_eq!(spelling.anonymous_default().as_str(), "$d1$", "{source}");
+        }
+    }
+
+    /// Property names, strings and other prefixes are user data, not
+    /// identifiers, and leave the decimal spelling in place.
+    #[test]
+    fn non_identifier_spellings_reserve_nothing() {
+        let record = record_with_id(
+            "const o = { $d0$: 1 }; o.$d0$; '$m0$meta'; $d0$: ;\nexport default 0;",
+            0,
+        );
+        assert!(
+            record.linker_reserved_names().is_empty(),
+            "{:?}",
+            record.linker_reserved_names()
+        );
+        assert_eq!(spelling_of(&record).anonymous_default().as_str(), "$d0$");
+    }
+
     /// Every slice a site addresses, so a test can say what was found without
     /// hard-coding byte offsets.
     fn site_slices<'a>(source: &'a str, record: &ModuleRecordIr) -> Vec<&'a str> {
@@ -3101,16 +3194,21 @@ mod tests {
         assert_eq!(record.import_meta_uses(), 0);
         // Nothing to rewrite, and the text comes back untouched rather than
         // merely equivalent.
-        assert_eq!(rewrite_import_meta(source, &record).as_deref(), Ok(source));
+        assert_eq!(
+            rewrite_import_meta(source, &record, &spelling_of(&record)).as_deref(),
+            Ok(source)
+        );
     }
 
     #[test]
     fn rewriting_replaces_every_site_with_this_units_binding() {
         let source = "print(import.meta.url);\nconst m = import.meta;\n";
         let record = record_with_id(source, 7);
-        let rewritten = rewrite_import_meta(source, &record).expect("rewrite should succeed");
+        let spelling = spelling_of(&record);
+        let rewritten =
+            rewrite_import_meta(source, &record, &spelling).expect("rewrite should succeed");
 
-        let name = MergedName::minted(7, UnitCellRole::ImportMeta);
+        let name = spelling.import_meta();
         assert_eq!(name.as_str(), "$m7$meta");
         assert!(
             !rewritten.contains("import"),
@@ -3123,13 +3221,12 @@ mod tests {
 
     #[test]
     fn two_units_get_two_distinct_import_meta_objects() {
+        let zero = UnitLinkerSpelling::unreserved(0);
+        let one = UnitLinkerSpelling::unreserved(1);
+        assert_ne!(zero.import_meta(), one.import_meta());
         assert_ne!(
-            MergedName::minted(0, UnitCellRole::ImportMeta),
-            MergedName::minted(1, UnitCellRole::ImportMeta)
-        );
-        assert_ne!(
-            import_meta_binding(0, "file:///a.mjs").declaration,
-            import_meta_binding(1, "file:///a.mjs").declaration
+            import_meta_binding(&zero, "file:///a.mjs").declaration,
+            import_meta_binding(&one, "file:///a.mjs").declaration
         );
     }
 
@@ -3141,7 +3238,8 @@ mod tests {
             "function f() { return import.meta; }\nf();\n",
         ] {
             let record = record_of(source);
-            let rewritten = rewrite_import_meta(source, &record).expect("rewrite should succeed");
+            let rewritten = rewrite_import_meta(source, &record, &spelling_of(&record))
+                .expect("rewrite should succeed");
             assert_eq!(rewritten.len(), source.len(), "{source}");
             assert_eq!(
                 rewritten.matches('\n').count(),
@@ -3153,20 +3251,20 @@ mod tests {
 
     #[test]
     fn the_declaration_is_a_null_prototype_object_carrying_url() {
-        let binding = import_meta_binding(0, "file:///root/a.mjs");
+        let binding = import_meta_binding(&UnitLinkerSpelling::unreserved(0), "file:///root/a.mjs");
         assert_eq!(
             binding.declaration,
             "const $m0$meta = { __proto__: null, url: \"file:///root/a.mjs\" };"
         );
-        assert_eq!(
-            binding.name,
-            MergedName::minted(0, UnitCellRole::ImportMeta)
-        );
+        assert_eq!(binding.name.as_str(), "$m0$meta");
     }
 
     #[test]
     fn a_url_that_needs_escaping_stays_one_string_literal() {
-        let binding = import_meta_binding(0, "file:///a\"b\\c\u{2028}d\n");
+        let binding = import_meta_binding(
+            &UnitLinkerSpelling::unreserved(0),
+            "file:///a\"b\\c\u{2028}d\n",
+        );
         assert_eq!(
             binding.declaration,
             "const $m0$meta = { __proto__: null, url: \"file:///a\\\"b\\\\c\\u2028d\\n\" };"
@@ -3180,8 +3278,8 @@ mod tests {
         let source = "print(import.meta.url);\n";
         let mut record = record_of(source);
         record.import_meta_sites = vec![SourceSpan { start: 0, end: 11 }];
-        let error =
-            rewrite_import_meta(source, &record).expect_err("a bogus span must be reported");
+        let error = rewrite_import_meta(source, &record, &spelling_of(&record))
+            .expect_err("a bogus span must be reported");
         assert!(error.reason.contains("covers"), "{}", error.reason);
     }
 

@@ -376,7 +376,7 @@ mod tests {
             .unwrap();
         assert_eq!(entry.imports.len(), 1);
         assert_eq!(
-            namespace_target_reference(&entry.imports[0])
+            namespace_target_reference(&graph, &entry.imports[0])
                 .unwrap()
                 .as_str(),
             "value"
@@ -417,7 +417,7 @@ mod tests {
             .find(|unit| unit.module == 2)
             .unwrap();
         assert_eq!(
-            namespace_target_reference(&entry.imports[0])
+            namespace_target_reference(&graph, &entry.imports[0])
                 .unwrap()
                 .as_str(),
             "value"
@@ -458,11 +458,15 @@ mod tests {
                 .imports
         };
         assert_eq!(
-            namespace_target_reference(&imports(1)[0]).unwrap().as_str(),
+            namespace_target_reference(&graph, &imports(1)[0])
+                .unwrap()
+                .as_str(),
             "first"
         );
         assert_eq!(
-            namespace_target_reference(&imports(2)[0]).unwrap().as_str(),
+            namespace_target_reference(&graph, &imports(2)[0])
+                .unwrap()
+                .as_str(),
             "second"
         );
         assert!(!linked
@@ -530,7 +534,7 @@ mod tests {
         let mut graph = graph_of(&sources);
         let linked = linked_script_source(&sources, &mut graph).expect("default export links");
 
-        let binding = MergedName::anonymous_default(0);
+        let binding = graph.units[0].merged(&LocalName::AnonymousDefault);
         let binding = binding.as_str();
         assert!(
             linked
@@ -550,7 +554,7 @@ mod tests {
             .find(|unit| unit.module == 1)
             .unwrap();
         assert_eq!(
-            namespace_target_reference(&importer.imports[0])
+            namespace_target_reference(&graph, &importer.imports[0])
                 .unwrap()
                 .as_str(),
             binding
@@ -573,7 +577,7 @@ mod tests {
         let mut graph = graph_of(&sources);
         let linked = linked_script_source(&sources, &mut graph).expect("split default links");
 
-        let binding = MergedName::anonymous_default(0);
+        let binding = graph.units[0].merged(&LocalName::AnonymousDefault);
         assert!(
             linked
                 .source
@@ -592,7 +596,7 @@ mod tests {
             .find(|unit| unit.module == 1)
             .unwrap();
         assert_eq!(
-            namespace_target_reference(&importer.imports[0])
+            namespace_target_reference(&graph, &importer.imports[0])
                 .unwrap()
                 .as_str(),
             binding.as_str()
@@ -626,7 +630,7 @@ mod tests {
         assert!(
             linked.source.source_text.contains(&format!(
                 "let {}     = 1;",
-                MergedName::anonymous_default(0).as_str()
+                graph.units[0].merged(&LocalName::AnonymousDefault).as_str()
             )),
             "got {}",
             linked.source.source_text
@@ -634,7 +638,7 @@ mod tests {
         assert!(
             linked.source.source_text.contains(&format!(
                 "let {}     = 2;",
-                MergedName::anonymous_default(1).as_str()
+                graph.units[1].merged(&LocalName::AnonymousDefault).as_str()
             )),
             "got {}",
             linked.source.source_text
@@ -901,7 +905,7 @@ mod tests {
         for absent in [
             MergedName::minted(1, UnitCellRole::Namespace),
             MergedName::minted(3, UnitCellRole::Namespace),
-            MergedName::minted(0, UnitCellRole::ImportMeta),
+            graph.units[0].linker_spelling.import_meta(),
         ] {
             assert!(
                 !text.contains(absent.as_str()),

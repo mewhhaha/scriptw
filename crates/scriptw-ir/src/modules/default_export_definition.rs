@@ -30,7 +30,7 @@ pub(super) fn rewrite_source(
 /// rather than reparsing a source-function wrapper with different lexical rules.
 pub(super) fn apply_synchronous_default<'a>(
     body: &'a FunctionBody,
-    module: ModuleUnitId,
+    spelling: &UnitLinkerSpelling,
     form: DefaultExportFormIr,
     analysis: &mut Analysis<'a>,
     interner: &Interner,
@@ -38,7 +38,7 @@ pub(super) fn apply_synchronous_default<'a>(
     let DefaultExportFormIr::Anonymous { hoisted } = form else {
         return;
     };
-    let binding_name = MergedName::anonymous_default(module);
+    let binding_name = spelling.anonymous_default();
     let (binding, expression) = body
         .statements()
         .iter()
