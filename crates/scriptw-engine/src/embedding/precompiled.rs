@@ -215,13 +215,13 @@ impl EmbeddedRuntime {
                         ))
                     })?;
             loading.program = started.elapsed();
-            let modules = wasm_runtime_link::WasmModules {
+            let modules = wasm_runtime_link::WasmModules::new(
                 program,
                 runtime,
-                memory_cache_outcome: WasmModuleMemoryCacheOutcome::Bypassed,
-                matched_runtime_image_cache: WasmRuntimeMatchedImageCacheOutcome::NotAccessed,
+                WasmModuleMemoryCacheOutcome::Bypassed,
+                WasmRuntimeMatchedImageCacheOutcome::NotAccessed,
                 loading,
-            };
+            )?;
             Ok(Self::from_admitted_modules(engine, modules, foreign, intl))
         })
     }

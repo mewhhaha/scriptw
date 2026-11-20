@@ -283,15 +283,45 @@ pub(super) fn intl_kernel_for(
 pub(super) struct WasmModules {
     pub(super) program: WasmtimeModule,
     pub(super) runtime: Option<WasmtimeModule>,
+    /// The memories the host module imports, admitted within the Store cap.
+    /// Private, so every `WasmModules` comes from [`WasmModules::new`].
+    memories: crate::host_memory_imports::HostMemoryImports,
     pub(super) memory_cache_outcome: WasmModuleMemoryCacheOutcome,
     pub(super) matched_runtime_image_cache: WasmRuntimeMatchedImageCacheOutcome,
     pub(super) loading: WasmRuntimeModuleLoading,
 }
 
 impl WasmModules {
+    /// Admits the host module's memory imports once, for every Store the
+    /// modules will serve.
+    pub(super) fn new(
+        program: WasmtimeModule,
+        runtime: Option<WasmtimeModule>,
+        memory_cache_outcome: WasmModuleMemoryCacheOutcome,
+        matched_runtime_image_cache: WasmRuntimeMatchedImageCacheOutcome,
+        loading: WasmRuntimeModuleLoading,
+    ) -> Result<Self, EngineError> {
+        let memories = crate::host_memory_imports::HostMemoryImports::admit(
+            runtime.as_ref().unwrap_or(&program),
+        )?;
+        Ok(Self {
+            program,
+            runtime,
+            memories,
+            memory_cache_outcome,
+            matched_runtime_image_cache,
+            loading,
+        })
+    }
+
     /// The module that owns the host imports and memory imports.
     pub(super) fn host(&self) -> &WasmtimeModule {
         self.runtime.as_ref().unwrap_or(&self.program)
+    }
+
+    /// The memory types to create for the host module's memory imports.
+    pub(super) fn memories(&self) -> &crate::host_memory_imports::HostMemoryImports {
+        &self.memories
     }
 }
 
@@ -398,13 +428,13 @@ pub(super) fn compile_modules(
         .transpose()?;
     let (module, memory_cache_outcome) =
         module_for_execution("program", WasmModuleSource::Program(program.bytes))?;
-    let modules = WasmModules {
-        program: module,
+    let modules = WasmModules::new(
+        module,
         runtime,
         memory_cache_outcome,
         matched_runtime_image_cache,
         loading,
-    };
+    )?;
     perf_map::record(&modules, program);
     Ok(modules)
 }

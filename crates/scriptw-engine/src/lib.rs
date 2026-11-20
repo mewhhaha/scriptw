@@ -69,6 +69,7 @@ mod execution_failure;
 mod execution_profile;
 use execution_profile::ResolvedExecutionProfile;
 pub use execution_profile::{ExecutionProfile, ExecutionProfileUse, ProfileError, ProfileMismatch};
+mod host_memory_imports;
 mod pooled_stores;
 pub use embedding::{
     configure_precompiled_wasm_runtime, configure_wasm_runtime, throw_foreign_error,
@@ -4228,15 +4229,7 @@ impl Engine {
         let store_started = std::time::Instant::now();
         // Memory imports and the GC host imports live in the module that owns
         // the runtime: `R` when linked, the standalone module otherwise.
-        let shared_memory_type = modules.host().imports().find_map(|import| {
-            (import.module() == WASM_HOST_IMPORT_NAMESPACE
-                && import.name() == WASM_HOST_IMPORT_SHARED_MEMORY)
-                .then(|| match import.ty() {
-                    WasmtimeExternType::Memory(memory_type) => Some(memory_type),
-                    _ => None,
-                })
-                .flatten()
-        });
+        let shared_memory_type = modules.memories().shared().cloned();
         let shared_memory_backing = if let Some(agent_execution) = &agent_execution {
             Some(Arc::clone(&agent_execution.group.shared_memory_backing))
         } else {
@@ -4331,15 +4324,7 @@ impl Engine {
             "host import registration (within store + linker)",
             host_imports_started,
         );
-        if let Some(private_memory_type) = modules.host().imports().find_map(|import| {
-            (import.module() == WASM_HOST_IMPORT_NAMESPACE
-                && import.name() == WASM_HOST_IMPORT_PRIVATE_MEMORY)
-                .then(|| match import.ty() {
-                    WasmtimeExternType::Memory(memory_type) => Some(memory_type),
-                    _ => None,
-                })
-                .flatten()
-        }) {
+        if let Some(private_memory_type) = modules.memories().private().cloned() {
             let private_memory =
                 WasmtimeMemory::new(&mut store, private_memory_type).map_err(|err| {
                     EngineError::new(format!("wasmtime private-memory setup failed: {err}"))

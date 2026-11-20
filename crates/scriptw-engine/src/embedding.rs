@@ -282,19 +282,10 @@ impl EmbeddedRuntime {
         }
         let shared = self
             .modules
-            .host()
-            .imports()
-            .find_map(|import| {
-                (import.module() == WASM_HOST_IMPORT_NAMESPACE
-                    && import.name() == WASM_HOST_IMPORT_SHARED_MEMORY)
-                    .then(|| import.ty())
-                    .and_then(|ty| match ty {
-                        WasmtimeExternType::Memory(ty) => Some(ty),
-                        _ => None,
-                    })
-            })
+            .memories()
+            .shared()
             .map(|ty| {
-                WasmtimeSharedMemory::new(&self.engine, ty)
+                WasmtimeSharedMemory::new(&self.engine, ty.clone())
                     .map(WasmSharedMemoryBacking::new)
                     .map_err(|error| {
                         EngineError::new(format!("embedding shared memory: {error:#}"))
@@ -368,22 +359,18 @@ impl EmbeddedRuntime {
         self.check(store, linker, StorePhase::Fresh)?;
         store.data_mut().embedding.as_mut().unwrap().phase = StorePhase::Failed;
         host_imports::register(linker, self.modules.host())?;
-        for import in self.modules.host().imports() {
-            if import.module() == WASM_HOST_IMPORT_NAMESPACE
-                && import.name() == WASM_HOST_IMPORT_PRIVATE_MEMORY
-            {
-                let WasmtimeExternType::Memory(ty) = import.ty() else {
-                    return Err(EngineError::new(
-                        "Scriptw private memory import is not a memory",
-                    ));
-                };
-                let memory = WasmtimeMemory::new(&mut *store, ty).map_err(|error| {
-                    EngineError::new(format!("embedding private memory: {error:#}"))
-                })?;
-                linker
-                    .define(&*store, import.module(), import.name(), memory)
-                    .map_err(|error| EngineError::new(error.to_string()))?;
-            }
+        if let Some(ty) = self.modules.memories().private() {
+            let memory = WasmtimeMemory::new(&mut *store, ty.clone()).map_err(|error| {
+                EngineError::new(format!("embedding private memory: {error:#}"))
+            })?;
+            linker
+                .define(
+                    &*store,
+                    WASM_HOST_IMPORT_NAMESPACE,
+                    WASM_HOST_IMPORT_PRIVATE_MEMORY,
+                    memory,
+                )
+                .map_err(|error| EngineError::new(error.to_string()))?;
         }
         if let Some(memory) = store
             .data()

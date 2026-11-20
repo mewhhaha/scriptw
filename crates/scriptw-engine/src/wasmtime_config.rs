@@ -65,7 +65,8 @@ pub(crate) fn base_config(
     config.async_stack_size(ENGINE_WORKER_STACK_SIZE);
     // Equal to the GC heap's in every Engine (`pooled_stores`), so one native
     // image serves pooled and on-demand Engines. Shared memories ignore
-    // StoreLimits; Scriptw's import declares the 1 GiB maximum.
+    // StoreLimits: admission (`host_memory_imports`) refuses a shared import
+    // above the 1 GiB cap and gives the private memory that maximum.
     config.memory_reservation(WASM_HEAP_RESERVATION_BYTES);
     config.memory_reservation_for_growth(0);
     // Growth never relocates; saying so lets a deadline publish the range.

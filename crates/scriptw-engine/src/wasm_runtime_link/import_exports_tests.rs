@@ -101,13 +101,14 @@ fn engine() -> WasmtimeEngine {
     WasmtimeEngine::new(&config).unwrap()
 }
 fn modules(engine: &WasmtimeEngine, program: &[u8]) -> WasmModules {
-    WasmModules {
-        program: WasmtimeModule::new(engine, program).unwrap(),
-        runtime: Some(WasmtimeModule::new(engine, runtime()).unwrap()),
-        memory_cache_outcome: WasmModuleMemoryCacheOutcome::Bypassed,
-        matched_runtime_image_cache: WasmRuntimeMatchedImageCacheOutcome::NotAccessed,
-        loading: Default::default(),
-    }
+    WasmModules::new(
+        WasmtimeModule::new(engine, program).unwrap(),
+        Some(WasmtimeModule::new(engine, runtime()).unwrap()),
+        WasmModuleMemoryCacheOutcome::Bypassed,
+        WasmRuntimeMatchedImageCacheOutcome::NotAccessed,
+        Default::default(),
+    )
+    .unwrap()
 }
 
 fn assert_unpublished(
