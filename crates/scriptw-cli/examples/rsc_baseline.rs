@@ -198,6 +198,34 @@ impl ExecutionProfileHook {
     }
 }
 
+/// Excluded diagnostic of emitter headroom, never a scored cohort:
+/// `SCRIPTW_RSC_PORTABLE_BUNDLE=<path>` runs a portable bundle in place of the
+/// artifact this run emitted, after the unchanged front end and emission. The
+/// bundle is this build's P and R for rsc.js as `SCRIPTW_RSC_ARTIFACT_DIR`
+/// dumps them, with either module rewritten by an external Wasm optimiser and
+/// its checksums and runtime key recomputed. `Engine::load_portable_bundle`
+/// admits it as it admits any portable bundle (Wasm validation, R layout and
+/// Intl identity), and the exact Flight output check is unchanged. A rewritten
+/// R misses the embedded native R image, so native preparation then includes
+/// compiling R. Only with the `module-replacement` feature.
+#[cfg(feature = "module-replacement")]
+fn replace_artifact(
+    compiler: &Engine,
+    emitted: &scriptw_engine::Artifact,
+    path: &std::path::Path,
+) -> Result<(scriptw_engine::Artifact, Value)> {
+    let bytes = fs::read(path)?;
+    let replaced = compiler.load_portable_bundle(&bytes)?;
+    let report = json!({
+        "bundle":path,"bundle_sha256":hash(&bytes),
+        "emitted_program_wasm_sha256":hash(&emitted.bytes),
+        "program_replaced":replaced.bytes != emitted.bytes,
+        "runtime_replaced":replaced.runtime != emitted.runtime,
+        "excluded_from_scored_cohorts":true,
+    });
+    Ok((replaced, report))
+}
+
 // rsc_baseline uses only the smaps_rollup endpoint snapshot.
 #[cfg(target_os = "linux")]
 #[allow(dead_code)]
@@ -363,6 +391,23 @@ fn run() -> Result<Value> {
             "a precompiled image excludes profiling, artifact dumps and execution profiles".into(),
         );
     }
+    let replacement_bundle = std::env::var_os("SCRIPTW_RSC_PORTABLE_BUNDLE").map(PathBuf::from);
+    #[cfg(not(feature = "module-replacement"))]
+    if replacement_bundle.is_some() {
+        return Err("SCRIPTW_RSC_PORTABLE_BUNDLE needs the module-replacement feature".into());
+    }
+    if replacement_bundle.is_some()
+        && (precompiled_image.is_some()
+            || std::env::var_os("SCRIPTW_RSC_ARTIFACT_DIR").is_some()
+            || execution_profile_hook.is_some())
+    {
+        return Err(
+            "a replacement bundle excludes precompiled images, artifact dumps and execution profiles"
+                .into(),
+        );
+    }
+    #[cfg_attr(not(feature = "module-replacement"), allow(unused_mut))]
+    let mut replacement_report: Option<Value> = None;
     let mut execution_profile_report = None;
     let load_started;
     let mut phases = serde_json::Map::new();
@@ -484,6 +529,15 @@ fn run() -> Result<Value> {
                     .encode_portable_bundle(&scriptw_engine::IntlCompilationProfile::Minimal)?,
             )?;
         }
+        #[cfg(feature = "module-replacement")]
+        let artifact = match &replacement_bundle {
+            Some(path) => {
+                let (replaced, report) = replace_artifact(&compiler, &artifact, path)?;
+                replacement_report = Some(report);
+                replaced
+            }
+            None => artifact,
+        };
         drop(unit);
         drop(compiler);
         front_and_emit_high_water = memory("after Wasm emission, source compiler dropped")?;
@@ -756,6 +810,9 @@ fn run() -> Result<Value> {
         report["artifact_dump"] = json!({
             "directory":directory,"excluded_from_scored_cohorts":true,
         });
+    }
+    if let Some(details) = replacement_report {
+        report["portable_bundle"] = details;
     }
     let bytes = serde_json::to_vec_pretty(&report)?;
     let mut file = fs::OpenOptions::new()

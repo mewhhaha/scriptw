@@ -530,6 +530,16 @@ per request; `symbols --event I1mr` attributes one of those events instead
 of instructions. A `rep stos` fill counts once per byte in Callgrind, so
 `memset` looks many times its hardware cost.
 
+To measure what an external Wasm optimiser would gain over the emitter, build
+the host with `--features module-replacement` and set
+`SCRIPTW_RSC_PORTABLE_BUNDLE` to a portable bundle that holds a rewritten P or
+R: start from the `portable.bundle` that `SCRIPTW_RSC_ARTIFACT_DIR` writes,
+replace a module and recompute its checksums and runtime key. The host admits
+it through `Engine::load_portable_bundle` and checks the exact Flight output
+as usual. A rewritten R must keep its `f<index>`/`g<index>` exports, imports
+and data segments, and it compiles from bytes instead of loading the embedded
+native R image. Such runs are diagnostics, never a scored cohort.
+
 Instructions and simulated misses judge a change; only time on a quiet
 machine compares with Node. `scripts/rsc_wall_clock_compare.py` interleaves
 fresh processes of the host and of Node `--jitless` on one CPU and reports

@@ -31,6 +31,10 @@ spec-exec-oracle = [
 # Test262 SCRIPTW_TEST262_EXECUTION_PROFILE hook, rsc_baseline's
 # SCRIPTW_RSC_PROFILE_ADVERSARIAL and `scriptw precompile --profile`. Never
 # enable it for a shipped/product build or a published Test262 run.
+# Off by default: rsc_baseline's SCRIPTW_RSC_PORTABLE_BUNDLE diagnostic, which
+# runs a P/R pair rewritten outside the compiler (an external Wasm optimiser)
+# to measure emitter headroom. Never enable it for a shipped/product build.
+module-replacement = []
 profile-experiments = [
   "scriptw-engine/profile-experiments",
   "scriptw-test262/profile-experiments",
