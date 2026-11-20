@@ -5,9 +5,9 @@ use scriptw_engine::{
     configure_wasm_runtime, NativeCompilationPolicy, PooledStoreReset, PooledStores,
 };
 use std::num::NonZeroU32;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Barrier};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use wasmtime::{
     ArrayRef, ArrayRefPre, ArrayType, Config, Engine, FieldType, Func, Instance, InterruptHandle,
     Module, Mutability, PoolConcurrencyLimitError, StorageType, Store, StoreLimits,
@@ -560,5 +560,77 @@ fn a_swapped_out_dirty_page_reads_zero_in_the_next_store() {
             "no page of the dirty memory was swapped out: this host has no usable swap \
              device, so the swapped-page reset cannot be exercised here"
         );
+    }
+}
+
+/// More Stores interrupted at once than a table of 64 published ranges holds
+/// (each GC heap is one range): every one of them stops while all the others
+/// still hold their ranges.
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[test]
+fn every_one_of_many_concurrently_interrupted_stores_stops() {
+    const STORES: usize = 80;
+    let engine = Engine::new(&runtime_config()).unwrap();
+    let module = heap_module(&engine);
+    let ready = Arc::new(Barrier::new(STORES + 1));
+    let release = Arc::new(Barrier::new(STORES + 1));
+    let stopped = Arc::new(AtomicUsize::new(0));
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let threads = (0..STORES)
+        .map(|_| {
+            let (engine, module, ready, release, stopped, sender) = (
+                engine.clone(),
+                module.clone(),
+                ready.clone(),
+                release.clone(),
+                stopped.clone(),
+                sender.clone(),
+            );
+            std::thread::spawn(move || {
+                let mut heap = HeapStore::new(&engine, &module, STORE_LIMIT).unwrap();
+                let cell = heap.cell(0);
+                sender.send(heap.store.interrupt_handle()).unwrap();
+                ready.wait();
+                let error = heap
+                    .spin
+                    .call(
+                        &mut heap.store,
+                        &[Val::AnyRef(Some(cell.to_anyref()))],
+                        &mut [],
+                    )
+                    .unwrap_err();
+                assert_eq!(
+                    error.downcast_ref::<Trap>(),
+                    Some(&Trap::Interrupt),
+                    "{error:?}"
+                );
+                stopped.fetch_add(1, Ordering::SeqCst);
+                // Keep the Store, and so its published range, until every
+                // Store has stopped.
+                release.wait();
+            })
+        })
+        .collect::<Vec<_>>();
+    let handles = receiver.iter().take(STORES).collect::<Vec<_>>();
+    ready.wait();
+    std::thread::sleep(Duration::from_millis(100));
+    let started = Instant::now();
+    while stopped.load(Ordering::SeqCst) < STORES {
+        assert!(
+            started.elapsed() < Duration::from_secs(60),
+            "{} of {STORES} interrupted Stores were still running",
+            STORES - stopped.load(Ordering::SeqCst)
+        );
+        for handle in &handles {
+            handle.interrupt();
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    release.wait();
+    for thread in threads {
+        thread.join().unwrap();
+    }
+    for handle in handles {
+        handle.cancel();
     }
 }

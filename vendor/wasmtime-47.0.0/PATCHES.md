@@ -54,15 +54,23 @@ request removes access to the store's GC heap and to linear memories given to
 `Store::interrupt_on_memory`. The fault handler restores access and, for a
 faulting instruction in compiled code with a request pending, unwinds with
 `Trap::Interrupt` whether or not that instruction is a registered trap site;
-host code retries its access. Ranges are published in a fixed table of atomics
-before access is removed and cleared before the store frees the memory. Only
+host code retries its access. Ranges are published in a list of fixed chunks
+of 64 atomic slots before access is removed and cleared before the store frees
+the memory. A requester that finds every slot taken appends a chunk; chunks
+are never freed, so the fault handler walks the list without a lock, and no
+watched memory is ever left unpublished (one table of 64 slots used to leave
+the 33rd concurrently interrupted store, with its two ranges, running until
+another one was dropped; a pool serves up to 1,024 stores). Only
 memory that cannot relocate is watched. A request still pending at the next
 entry into compiled code is delivered there. A fault may interrupt an object's
 initialisation; this relies on the copying collector reaching objects from
 roots only and keeping its allocation pointer outside the heap. Nothing in the compiled-code or
 VMContext ABI changes. `tests/interrupt_handle.rs` covers GC-heap and
 linear-memory loops, host code reaching protected memory, idle requests,
-cancellation, store drop and concurrent stores. See the
+cancellation, store drop and concurrent stores; `interrupt::tests` claims
+three chunks' worth of slots, and the engine's
+`every_one_of_many_concurrently_interrupted_stores_stops` stops 80 spinning
+stores at once. See the
 [deadline contract](../../docs/rust-rewrite/contracts/execution-deadlines.md).
 
 ## Per-operation host costs

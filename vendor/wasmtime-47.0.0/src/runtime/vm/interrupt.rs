@@ -12,15 +12,23 @@
 //! unbounded.
 
 use crate::runtime::vm::{SendSyncPtr, VMMemoryDefinition};
-use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use core::ptr;
+use core::sync::atomic::{AtomicBool, AtomicPtr, AtomicU64, AtomicUsize, Ordering};
+use std::boxed::Box;
 use std::sync::Mutex;
 use std::vec::Vec;
 
 /// The ranges a requester may have made inaccessible.
 ///
-/// The fault handler reads this, so it is a fixed table of atomics rather
-/// than a locked map. A slot packs its page-aligned base and length into one
-/// word, which makes every read a consistent pair.
+/// The fault handler reads this, so it is a list of fixed chunks of atomics
+/// rather than a locked map. A slot packs its page-aligned base and length
+/// into one word, which makes every read a consistent pair. A requester that
+/// finds every slot taken appends a chunk (outside the fault handler); chunks
+/// are never freed or unlinked, so the handler can walk the list at any time.
+/// The list therefore never refuses a range: every watched memory of every
+/// interrupted store, pooled or not, is published (Scriptw patch; upstream had
+/// one table of 64 slots, so a store requested while 32 others held two
+/// ranges each kept running until one of them was dropped).
 const SLOTS: usize = 64;
 const PAGE_BITS: u32 = 12;
 const LENGTH_PAGE_BITS: u32 = 21;
@@ -32,12 +40,68 @@ struct Slot {
     range: AtomicU64,
 }
 
-static ARMED: [Slot; SLOTS] = [const {
-    Slot {
+impl Slot {
+    const EMPTY: Self = Self {
         owner: AtomicUsize::new(0),
         range: AtomicU64::new(0),
+    };
+}
+
+struct Chunk {
+    slots: [Slot; SLOTS],
+    /// The next chunk, appended once and never changed again.
+    next: AtomicPtr<Chunk>,
+}
+
+static ARMED: Chunk = Chunk {
+    slots: [Slot::EMPTY; SLOTS],
+    next: AtomicPtr::new(ptr::null_mut()),
+};
+
+impl Chunk {
+    fn next(&self) -> Option<&'static Chunk> {
+        // SAFETY: a non-null `next` is a leaked chunk, never freed.
+        unsafe { self.next.load(Ordering::Acquire).as_ref() }
     }
-}; SLOTS];
+}
+
+/// Every slot of every chunk, in list order.
+fn slots() -> impl Iterator<Item = &'static Slot> {
+    core::iter::successors(Some(&ARMED), |chunk| chunk.next()).flat_map(|chunk| &chunk.slots)
+}
+
+/// Claims a free slot for `owner`, appending a chunk when none is free.
+fn claim(owner: usize) -> &'static Slot {
+    loop {
+        let free = slots().find(|slot| {
+            slot.owner
+                .compare_exchange(0, owner, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+        });
+        if let Some(slot) = free {
+            return slot;
+        }
+        // Every slot was taken: append a chunk at the tail. A racing append
+        // wins the tail, and this one tries the next tail; either way the
+        // next pass finds the new slots.
+        let mut tail = &ARMED;
+        while let Some(next) = tail.next() {
+            tail = next;
+        }
+        let chunk = Box::into_raw(Box::new(Chunk {
+            slots: [Slot::EMPTY; SLOTS],
+            next: AtomicPtr::new(ptr::null_mut()),
+        }));
+        if tail
+            .next
+            .compare_exchange(ptr::null_mut(), chunk, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            // SAFETY: `chunk` was never published.
+            drop(unsafe { Box::from_raw(chunk) });
+        }
+    }
+}
 
 fn pack(base: usize, len: usize) -> Option<u64> {
     let page = 1usize << PAGE_BITS;
@@ -82,7 +146,11 @@ struct Heap {
     /// each with the slot that publishes its range and the length of the
     /// prefix that stays inaccessible regardless. Empty once the store is
     /// gone.
-    memories: Vec<(SendSyncPtr<VMMemoryDefinition>, Option<usize>, usize)>,
+    memories: Vec<(
+        SendSyncPtr<VMMemoryDefinition>,
+        Option<&'static Slot>,
+        usize,
+    )>,
 }
 
 impl StoreInterrupt {
@@ -145,18 +213,9 @@ impl StoreInterrupt {
                 let Some(range) = pack(base, len) else {
                     continue;
                 };
-                if slot.is_none() {
-                    *slot = ARMED.iter().position(|slot| {
-                        slot.owner
-                            .compare_exchange(0, owner, Ordering::SeqCst, Ordering::SeqCst)
-                            .is_ok()
-                    });
-                }
-                let Some(slot) = *slot else {
-                    continue;
-                };
+                let slot = *slot.get_or_insert_with(|| claim(owner));
                 // Publish before removing access: a fault must find its range.
-                ARMED[slot].range.store(range, Ordering::SeqCst);
+                slot.range.store(range, Ordering::SeqCst);
                 unsafe { set_access(base, len, false) };
             }
         }
@@ -187,14 +246,14 @@ impl StoreInterrupt {
             let Some(slot) = slot.take() else {
                 continue;
             };
-            let range = ARMED[slot].range.swap(0, Ordering::SeqCst);
+            let range = slot.range.swap(0, Ordering::SeqCst);
             #[cfg(unix)]
             if range != 0 {
                 let (base, len) = unpack(range);
                 unsafe { set_access(base, len, true) };
             }
             let _ = range;
-            ARMED[slot].owner.store(0, Ordering::SeqCst);
+            slot.owner.store(0, Ordering::SeqCst);
         }
     }
 
@@ -207,7 +266,8 @@ impl StoreInterrupt {
 /// Restores access when `addr` lies in a range an interrupt request made
 /// inaccessible, and returns the owning store's state.
 ///
-/// Runs in the fault handler: it reads atomics and makes one `mprotect` call.
+/// Runs in the fault handler: it reads atomics, follows chunk links that are
+/// never freed, and makes one `mprotect` call.
 ///
 /// # Safety
 ///
@@ -216,7 +276,7 @@ impl StoreInterrupt {
 /// thread or one that is not running the store.
 #[cfg(unix)]
 pub(crate) unsafe fn restore_access<'a>(addr: usize) -> Option<&'a StoreInterrupt> {
-    for slot in &ARMED {
+    for slot in slots() {
         let range = slot.range.load(Ordering::SeqCst);
         if range == 0 {
             continue;
@@ -254,6 +314,20 @@ mod tests {
             (page, 1usize << 33),
         ] {
             assert!(pack(base, len).is_none());
+        }
+    }
+
+    #[test]
+    fn more_owners_than_one_chunk_holds_each_get_a_slot() {
+        let owners: Vec<usize> = (1..=3 * SLOTS).map(|owner| owner * 8).collect();
+        let claimed: Vec<&'static Slot> = owners.iter().map(|owner| claim(*owner)).collect();
+        for (slot, owner) in claimed.iter().zip(&owners) {
+            assert_eq!(slot.owner.load(Ordering::SeqCst), *owner);
+        }
+        for (index, slot) in claimed.iter().enumerate() {
+            assert!(claimed[..index].iter().all(|other| !ptr::eq(*other, *slot)));
+            assert!(slots().any(|listed| ptr::eq(listed, *slot)));
+            slot.owner.store(0, Ordering::SeqCst);
         }
     }
 }
