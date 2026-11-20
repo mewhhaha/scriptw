@@ -150,7 +150,7 @@ impl EmbeddedRuntime {
                 _ => {
                     return Err(EngineError::new(
                         "precompilation requires a supported Wasmtime compiler",
-                    ))
+                    ));
                 }
             };
             CompilationJobs::verify_engine(engine)?;

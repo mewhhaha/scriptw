@@ -1,6 +1,6 @@
 use super::*;
 use scriptw_aot_wasm::{
-    RuntimeArtifact, RuntimeSourceCompilationProfile, RUNTIME_IMPORT_NAMESPACE,
+    RUNTIME_IMPORT_NAMESPACE, RuntimeArtifact, RuntimeSourceCompilationProfile,
 };
 
 pub(super) fn program(bytes: &[u8], linked: bool) -> Result<ForeignModuleRegistry, EngineError> {
@@ -22,7 +22,7 @@ pub(super) fn program(bytes: &[u8], linked: bool) -> Result<ForeignModuleRegistr
             WasmPayload::StartSection { .. } => {
                 return Err(EngineError::new(
                     "embedding rejects implicit Wasm start functions",
-                ))
+                ));
             }
             WasmPayload::CustomSection(section) => {
                 has_intl |= section.name().starts_with("scriptw.intl")

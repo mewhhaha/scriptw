@@ -23,7 +23,7 @@ fn declarations() -> ForeignModuleRegistry {
     })
     .collect();
     ForeignModuleRegistry::new(vec![
-        ForeignModuleDeclaration::new("io:host", functions).unwrap()
+        ForeignModuleDeclaration::new("io:host", functions).unwrap(),
     ])
     .unwrap()
 }
@@ -381,18 +381,22 @@ fn top_level_await_keeps_each_stores_queued_settlement_and_initializes_exactly_o
 
 #[test]
 fn synchronous_async_host_completion_stays_queued_and_declared_startup_errors_reject() {
-    let registry = ForeignModuleRegistry::new(vec![ForeignModuleDeclaration::new(
-        "io:host",
-        vec![ForeignFunctionDeclaration::new_async(
-            "number",
-            "io",
-            "number",
-            vec![ForeignValueType::Number],
-            ForeignResultType::Number,
+    let registry = ForeignModuleRegistry::new(vec![
+        ForeignModuleDeclaration::new(
+            "io:host",
+            vec![
+                ForeignFunctionDeclaration::new_async(
+                    "number",
+                    "io",
+                    "number",
+                    vec![ForeignValueType::Number],
+                    ForeignResultType::Number,
+                )
+                .unwrap(),
+            ],
         )
-        .unwrap()],
-    )
-    .unwrap()])
+        .unwrap(),
+    ])
     .unwrap()
     .with_error_tag(ForeignErrorTag::code_v1());
     let artifact = artifact(

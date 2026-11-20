@@ -55,18 +55,22 @@ export function read() { return state; }
         }],
     )
     .unwrap();
-    let foreign_modules = ForeignModuleRegistry::new(vec![ForeignModuleDeclaration::new(
-        "io:host",
-        vec![ForeignFunctionDeclaration::new_async(
-            "bytes",
-            "io",
-            "bytes",
-            vec![ForeignValueType::Bytes],
-            ForeignResultType::Bytes,
+    let foreign_modules = ForeignModuleRegistry::new(vec![
+        ForeignModuleDeclaration::new(
+            "io:host",
+            vec![
+                ForeignFunctionDeclaration::new_async(
+                    "bytes",
+                    "io",
+                    "bytes",
+                    vec![ForeignValueType::Bytes],
+                    ForeignResultType::Bytes,
+                )
+                .unwrap(),
+            ],
         )
-        .unwrap()],
-    )
-    .unwrap()])
+        .unwrap(),
+    ])
     .unwrap();
     let compiler = Engine::new(RealmBuilder::new().build());
     let unit = compiler

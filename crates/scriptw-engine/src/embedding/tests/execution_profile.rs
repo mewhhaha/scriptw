@@ -31,25 +31,35 @@ const TRUE_KIND_FIXTURES: &[(&str, &str, Option<ReadSpecialisation>, u64)] = &[
     (
         "absent inline",
         "function probe(o) { return o.x; } var t = 0; for (var i = 0; i < 64; i++) if (probe({ y: i }) === undefined) t++; t;",
-        Some(ReadSpecialisation::AbsentClosedTail(CompactStorageLayout::Inline)),
+        Some(ReadSpecialisation::AbsentClosedTail(
+            CompactStorageLayout::Inline,
+        )),
         64,
     ),
     (
         "absent array",
         "function probe(o) { return o.x; } var t = 0; for (var i = 0; i < 64; i++) if (probe({ a: 1, b: 2, c: i }) === undefined) t++; t;",
-        Some(ReadSpecialisation::AbsentClosedTail(CompactStorageLayout::Array)),
+        Some(ReadSpecialisation::AbsentClosedTail(
+            CompactStorageLayout::Array,
+        )),
         64,
     ),
     (
         "prototype place",
         "function C() {} C.prototype.x = 3; function probe(o) { return o.x; } var t = 0; for (var i = 0; i < 64; i++) t += probe(new C()); t;",
-        Some(ReadSpecialisation::ProtoPlaceCompact(CompactStorageLayout::Array, PlaceHolder::Dictionary)),
+        Some(ReadSpecialisation::ProtoPlaceCompact(
+            CompactStorageLayout::Array,
+            PlaceHolder::Dictionary,
+        )),
         64,
     ),
     (
         "object prototype",
         "function probe(o) { return o.hasOwnProperty; } var t = 0; for (var i = 0; i < 64; i++) if (probe({ y: i }) === Object.prototype.hasOwnProperty) t++; t;",
-        Some(ReadSpecialisation::ProtoPlaceCompact(CompactStorageLayout::Inline, PlaceHolder::Intrinsic)),
+        Some(ReadSpecialisation::ProtoPlaceCompact(
+            CompactStorageLayout::Inline,
+            PlaceHolder::Intrinsic,
+        )),
         64,
     ),
     (
@@ -61,13 +71,17 @@ const TRUE_KIND_FIXTURES: &[(&str, &str, Option<ReadSpecialisation>, u64)] = &[
     (
         "weak map prototype",
         "var w = new WeakMap(); function probe(o) { return o.get; } var t = 0; for (var i = 0; i < 64; i++) if (probe(w) === WeakMap.prototype.get) t++; t;",
-        Some(ReadSpecialisation::ProtoPlaceIntrinsic(ReceiverHeader::WeakMap)),
+        Some(ReadSpecialisation::ProtoPlaceIntrinsic(
+            ReceiverHeader::WeakMap,
+        )),
         64,
     ),
     (
         "array prototype",
         "var a = [1, 2]; function probe(o) { return o.push; } var t = 0; for (var i = 0; i < 64; i++) if (probe(a) === Array.prototype.push) t++; t;",
-        Some(ReadSpecialisation::ProtoPlaceIntrinsic(ReceiverHeader::Array)),
+        Some(ReadSpecialisation::ProtoPlaceIntrinsic(
+            ReceiverHeader::Array,
+        )),
         1,
     ),
     (
@@ -818,8 +832,9 @@ fn check_exactness(name: &str, body: &str, surface: HostSurfacePolicy) -> Vec<St
     }
 
     // The engine's own run path, as a Script.
-    let script =
-        format!("{body}\nvar trained = train();\nvar mutated = mutate();\nprint(trained + ' ' + mutated);\nmutated;\n");
+    let script = format!(
+        "{body}\nvar trained = train();\nvar mutated = mutate();\nprint(trained + ' ' + mutated);\nmutated;\n"
+    );
     let observe = |execution_profile| {
         let outcome = Engine::new(RealmBuilder::new().build())
             .observe_script(

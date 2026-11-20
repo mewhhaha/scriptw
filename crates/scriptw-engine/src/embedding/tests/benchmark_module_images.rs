@@ -32,13 +32,15 @@ fn assert_actual(observed: &BenchmarkModuleImage, actual: &wasmtime::Module) {
         &serialized[text_section.offset()..text_section.offset() + text_section.bytes()],
         actual.text()
     );
-    assert!(sections
-        .file_sections()
-        .iter()
-        .all(|section| !section.name().is_empty()
-            && section.bytes() > 0
-            && section.section_type() != 0
-            && section.section_type() != 8));
+    assert!(
+        sections
+            .file_sections()
+            .iter()
+            .all(|section| !section.name().is_empty()
+                && section.bytes() > 0
+                && section.section_type() != 0
+                && section.section_type() != 8)
+    );
 }
 
 #[test]

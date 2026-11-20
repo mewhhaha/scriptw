@@ -9,36 +9,38 @@ fn normal(completion: JsCompletion) -> JsValue {
 
 #[test]
 fn owned_utf16_and_uint8array_transfer_are_lossless_strict_and_source_free() {
-    let declarations = ForeignModuleRegistry::new(vec![ForeignModuleDeclaration::new(
-        "dd:transfer",
-        vec![
-            ForeignFunctionDeclaration::new(
-                "text",
-                "transfer",
-                "text",
-                vec![ForeignValueType::StringUtf16],
-                ForeignResultType::StringUtf16,
-            )
-            .unwrap(),
-            ForeignFunctionDeclaration::new(
-                "bytes",
-                "transfer",
-                "bytes",
-                vec![ForeignValueType::Bytes],
-                ForeignResultType::Bytes,
-            )
-            .unwrap(),
-            ForeignFunctionDeclaration::new(
-                "both",
-                "transfer",
-                "both",
-                vec![ForeignValueType::StringUtf16, ForeignValueType::Bytes],
-                ForeignResultType::Void,
-            )
-            .unwrap(),
-        ],
-    )
-    .unwrap()])
+    let declarations = ForeignModuleRegistry::new(vec![
+        ForeignModuleDeclaration::new(
+            "dd:transfer",
+            vec![
+                ForeignFunctionDeclaration::new(
+                    "text",
+                    "transfer",
+                    "text",
+                    vec![ForeignValueType::StringUtf16],
+                    ForeignResultType::StringUtf16,
+                )
+                .unwrap(),
+                ForeignFunctionDeclaration::new(
+                    "bytes",
+                    "transfer",
+                    "bytes",
+                    vec![ForeignValueType::Bytes],
+                    ForeignResultType::Bytes,
+                )
+                .unwrap(),
+                ForeignFunctionDeclaration::new(
+                    "both",
+                    "transfer",
+                    "both",
+                    vec![ForeignValueType::StringUtf16, ForeignValueType::Bytes],
+                    ForeignResultType::Void,
+                )
+                .unwrap(),
+            ],
+        )
+        .unwrap(),
+    ])
     .unwrap();
     let compiled = artifact(
         r#"
@@ -130,11 +132,13 @@ print('initialized');
         instance.initialize(&mut store).unwrap(),
         EmbeddedEvaluation::Settled(JsCompletion::Normal(_))
     ));
-    assert!(instance
-        .initialize(&mut store)
-        .unwrap_err()
-        .to_string()
-        .contains("already evaluated"));
+    assert!(
+        instance
+            .initialize(&mut store)
+            .unwrap_err()
+            .to_string()
+            .contains("already evaluated")
+    );
     let next = normal(instance.get_export(&mut store, "next").unwrap());
     store.gc(None).unwrap();
     let three = instance
@@ -241,16 +245,20 @@ print('initialized');
     );
     assert!(instance.to_bytes(&mut store, &next).is_err());
     let mut wrong_store = super::store(&runtime, 0.0);
-    assert!(instance
-        .call(&mut wrong_store, &next, None, &[])
-        .unwrap_err()
-        .to_string()
-        .contains("different Store"));
-    assert!(echoed
-        .observe(&mut wrong_store)
-        .unwrap_err()
-        .to_string()
-        .contains("different Store"));
+    assert!(
+        instance
+            .call(&mut wrong_store, &next, None, &[])
+            .unwrap_err()
+            .to_string()
+            .contains("different Store")
+    );
+    assert!(
+        echoed
+            .observe(&mut wrong_store)
+            .unwrap_err()
+            .to_string()
+            .contains("different Store")
+    );
     assert_eq!(
         instance.take_output(&mut store).unwrap(),
         [HostOutputEvent::PrintLine("initialized".into())]

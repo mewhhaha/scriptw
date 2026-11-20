@@ -1,6 +1,6 @@
 //! Store-bound roots for exact JavaScript values.
 use super::*;
-use scriptw_aot_wasm::{check_gc_main_completion, GcHostValue};
+use scriptw_aot_wasm::{GcHostValue, check_gc_main_completion};
 use wasmtime::{EqRef, OwnedRooted, Rooted, Val};
 
 pub use scriptw_aot_wasm::WasmRuntimeValueTag as JsValueKind;
@@ -187,8 +187,13 @@ pub(super) fn dynamic_completion(
     store: &mut impl AsContextMut<Data = WasmStoreState>,
     results: &[Val],
 ) -> Result<JsCompletion, EngineError> {
-    let [Val::I32(tag), Val::I64(scalar), Val::AnyRef(reference), Val::I32(kind), Val::I32(target)] =
-        results
+    let [
+        Val::I32(tag),
+        Val::I64(scalar),
+        Val::AnyRef(reference),
+        Val::I32(kind),
+        Val::I32(target),
+    ] = results
     else {
         return Err(EngineError::new(
             "embedding bridge completion has invalid Wasm storage",

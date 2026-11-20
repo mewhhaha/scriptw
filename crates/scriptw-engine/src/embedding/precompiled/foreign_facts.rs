@@ -1,8 +1,8 @@
 //! Private binary execution facts; declarations grant no native-code provenance.
 //! The enclosing precompiled-image magic owns this codec's version.
 use scriptw_ir::foreign::{
-    ForeignErrorTag, ForeignFunctionDeclaration, ForeignFunctionMode, ForeignModuleDeclaration,
-    ForeignModuleRegistry, ForeignResultType, ForeignValueType, FOREIGN_ABI_VERSION,
+    FOREIGN_ABI_VERSION, ForeignErrorTag, ForeignFunctionDeclaration, ForeignFunctionMode,
+    ForeignModuleDeclaration, ForeignModuleRegistry, ForeignResultType, ForeignValueType,
 };
 
 pub(super) const MAX_BYTES: usize = 1024 * 1024;
@@ -338,18 +338,20 @@ mod tests {
     fn exact_binary_schema_preserves_unicode_order_ids_and_owned_lifetimes() {
         let expected = registry(vec![(
             "α",
-            vec![ForeignFunctionDeclaration::new_async(
-                "f",
-                "host",
-                "go",
-                vec![
-                    ForeignValueType::Number,
-                    ForeignValueType::StringUtf16,
-                    ForeignValueType::Bytes,
-                ],
-                ForeignResultType::Void,
-            )
-            .unwrap()],
+            vec![
+                ForeignFunctionDeclaration::new_async(
+                    "f",
+                    "host",
+                    "go",
+                    vec![
+                        ForeignValueType::Number,
+                        ForeignValueType::StringUtf16,
+                        ForeignValueType::Bytes,
+                    ],
+                    ForeignResultType::Void,
+                )
+                .unwrap(),
+            ],
         )])
         .with_error_tag(ForeignErrorTag::code_v1());
         assert_eq!(encode(&expected).unwrap(), b"\x02\0\0\0\x01\x01\0\0\0\x02\0\0\0\xce\xb1\x01\0\0\0\x01\0\0\0f\x04\0\0\0host\x02\0\0\0go\x01\x03\0\0\0\x00\x01\x02\x03");
