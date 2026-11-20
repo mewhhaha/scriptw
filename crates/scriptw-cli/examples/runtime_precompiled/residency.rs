@@ -1,5 +1,7 @@
 use super::*;
 use std::io::Read;
+// rsc_baseline includes this module and aliases `Result` at its root.
+use std::result::Result;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 

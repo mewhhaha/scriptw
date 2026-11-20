@@ -147,6 +147,46 @@ impl ProfileBarrier {
     }
 }
 
+// rsc_baseline uses only the smaps_rollup endpoint snapshot.
+#[cfg(target_os = "linux")]
+#[allow(dead_code)]
+#[path = "runtime_precompiled/residency.rs"]
+mod residency;
+
+/// Process memory at one stage, outside every request clock. VmHWM is the
+/// kernel's high-water mark since the process started. It is never reset:
+/// writing 5 to /proc/self/clear_refs would also lower ru_maxrss, and GNU
+/// time's whole-child peak would then be silently understated.
+fn memory(stage: &str) -> Result<Value> {
+    #[cfg(target_os = "linux")]
+    {
+        use std::io::Read;
+        let mut status = String::new();
+        fs::File::open("/proc/self/status")?
+            .take(64 * 1024)
+            .read_to_string(&mut status)?;
+        let field = |name: &str| -> Result<u64> {
+            let mut matches = status.lines().filter_map(|line| line.strip_prefix(name));
+            let mut words = matches
+                .next()
+                .ok_or_else(|| format!("missing {name}"))?
+                .split_whitespace();
+            let kib: u64 = words.next().ok_or("missing memory count")?.parse()?;
+            if words.next() != Some("kB") || words.next().is_some() || matches.next().is_some() {
+                return Err(format!("ambiguous {name}").into());
+            }
+            Ok(kib.checked_mul(1024).ok_or("memory count overflow")?)
+        };
+        Ok(json!({"stage":stage,"vm_hwm_bytes":field("VmHWM:")?,
+            "vm_rss_bytes":field("VmRSS:")?,"smaps_rollup":residency::snapshot()?}))
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = stage;
+        Ok(Value::Null)
+    }
+}
+
 fn hash(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
@@ -269,6 +309,8 @@ fn run() -> Result<Value> {
     }
     let load_started;
     let mut phases = serde_json::Map::new();
+    // A precompiled image runs no front end or emitter: that stage stays null.
+    let mut front_and_emit_high_water = Value::Null;
     let mut artifact_directory = None;
     let (native, runtime, configuration, program_wasm, runtime_identity) = if let Some(path) =
         &precompiled_image
@@ -352,6 +394,7 @@ fn run() -> Result<Value> {
         }
         drop(unit);
         drop(compiler);
+        front_and_emit_high_water = memory("after Wasm emission, source compiler dropped")?;
         // An embedder that compiles at boot starts here, with the artifact.
         load_started = Instant::now();
         let started = load_started;
@@ -437,6 +480,11 @@ fn run() -> Result<Value> {
             "excluded crossed compiler-policy diagnostic; keep separate from scored Fast/Speed cohorts"
         }
     };
+    let compile_high_water = memory(if precompiled_image.is_some() {
+        "after precompiled image admission and from_precompiled"
+    } else {
+        "after native preparation"
+    })?;
     let started = Instant::now();
     let state = runtime.new_state(RealmBuilder::new().build(), ())?;
     let mut store = wasmtime::Store::new(&native, state);
@@ -466,6 +514,7 @@ fn run() -> Result<Value> {
     // Load (an image, or an emitted artifact to compile) through the end of
     // the first checked request, warm-up or not.
     let mut load_to_first_request_ns = None;
+    let mut post_compile = None;
     for mode in ["sync", "async"] {
         if profile.as_ref().is_some_and(|profile| profile.mode != mode) {
             continue;
@@ -485,6 +534,9 @@ fn run() -> Result<Value> {
         let mut observations = Vec::new();
         let mut measured = Vec::new();
         for index in 0..calls {
+            if index == warmups && post_compile.is_none() {
+                post_compile = Some(memory("after the first selected case's warm-up requests")?);
+            }
             if index >= warmups {
                 if let Some(profile) = &mut profile {
                     profile.exchange("ready", index)?;
@@ -558,6 +610,13 @@ fn run() -> Result<Value> {
         "runtime":runtime_identity,
         "phases_ns":phases,
         "load_to_first_request_ns":load_to_first_request_ns,
+        "memory":{
+            "front_and_emit_high_water":front_and_emit_high_water,
+            "compile_high_water":compile_high_water,
+            "post_compile":post_compile,
+            "steady":memory("after the last request")?,
+            "scope":"Linux /proc/self/status VmHWM (high water since process start, never reset) and VmRSS, plus smaps_rollup endpoints; compile_high_water bounds front end, emission and native preparation; post_compile and steady RSS in a compiling process include compiler memory the allocator retains",
+        },
         "cases":cases,
     });
     if let Some(profile) = profile {

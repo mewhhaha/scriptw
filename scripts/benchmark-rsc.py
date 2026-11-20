@@ -132,6 +132,47 @@ def check_report(raw, plan, inputs, support, samples, warmups, host_sha, native_
                 phases_ns=phases, request_clock=raw['request_clock'], gc_policy=raw['gc_policy'])
 
 
+MEMORY_STAGES = ('front_and_emit_high_water', 'compile_high_water', 'post_compile', 'steady')
+# Published numbers: the two high-water marks, then resident memory after compilation and warmups,
+# and after the last request.
+MEMORY_FIELDS = dict(front_and_emit_high_water='vm_hwm_bytes', compile_high_water='vm_hwm_bytes',
+                     post_compile='vm_rss_bytes', steady='vm_rss_bytes')
+
+
+def check_memory(raw, peak_rss_bytes):
+    """Validate a Scriptw host's stage memory against the child's whole-process peak.
+
+    Hosts built before the memory split report none; that is not an error, so an older
+    baseline host stays admissible. VmHWM never decreases, so the stages are ordered. Only
+    compile_high_water is bounded by GNU time's peak: VmHWM and ru_maxrss read the kernel's
+    counters through different paths, and the final stages can exceed it by tens of KiB.
+    """
+    memory = raw.get('memory')
+    if memory is None:
+        return None
+    require(isinstance(memory, dict) and set(memory) == {*MEMORY_STAGES, 'scope'} and memory['scope'],
+            'memory requires exactly the four stages and a scope')
+    previous = 0
+    for stage in MEMORY_STAGES:
+        snapshot = memory[stage]
+        require(isinstance(snapshot, dict) and snapshot.get('stage'), 'missing memory stage: ' + stage)
+        hwm, rss = snapshot.get('vm_hwm_bytes'), snapshot.get('vm_rss_bytes')
+        require(type(hwm) is int and type(rss) is int and 0 < rss <= hwm, 'invalid VmHWM/VmRSS: ' + stage)
+        require(hwm >= previous, 'VmHWM decreased at ' + stage)
+        previous = hwm
+    require(type(peak_rss_bytes) is int and memory['compile_high_water']['vm_hwm_bytes'] <= peak_rss_bytes,
+            'compile high water exceeds the whole-process peak')
+    return memory
+
+
+def memory_summary(rows):
+    """Per-stage statistics when every selected process reported its memory."""
+    if not rows or any(row.get('memory') is None for row in rows):
+        return None
+    return {stage + '_bytes': stats([row['memory'][stage][field] for row in rows])
+            for stage, field in MEMORY_FIELDS.items()}
+
+
 def aggregate(rows, actors, cases):
     result = {}
     for case in cases:
@@ -146,7 +187,8 @@ def aggregate(rows, actors, cases):
                     block_medians_ns={str(block): statistics.median([row['request_ns']['median']
                         for row in selected if row['block'] == block]) for block in (0, 1)
                         if any(row['block'] == block for row in selected)},
-                    whole_process_peak_rss_bytes=stats([row['accounting']['peak_rss_bytes'] for row in selected]))
+                    whole_process_peak_rss_bytes=stats([row['accounting']['peak_rss_bytes'] for row in selected]),
+                    memory=memory_summary(selected))
     return result
 
 
@@ -270,7 +312,10 @@ def run(args):
             reduction='mean/median/p95 per process; campaign scores summarize fresh-process medians, never pooled calls',
             tail='p95 is a descriptive nearest-rank order statistic, not a confidence bound',
             warmup='all checked warmup times retained; count does not establish optimized steady state',
-            memory='whole-child high-water RSS includes source compilation/setup/warmup; no request-only RSS claim',
+            memory='whole-child high-water RSS includes source compilation/setup/warmup; no request-only RSS claim. '
+                   'Scriptw hosts also report VmHWM after emission and after native preparation, and VmRSS after '
+                   'warmups and after the last request; steady RSS in a compiling process includes compiler memory '
+                   'the allocator retains',
             cold='first process of each selected case/actor is cold in that process; filesystem and OS caches remain',
             integrity='full SHA256 at admission and termination; per-use dev/inode/size/mode/mtime_ns/ctime_ns witnesses; no OS-enforced immutability',
             stages='render/consume/validation stage decomposition unavailable; no clock injection into scored bundle'))
@@ -331,7 +376,8 @@ def run(args):
                 identity = {key: raw.get(key) for key in ('source_commit', 'source_fingerprint', 'compiler_identity_scheme', 'toolchain', 'configuration', 'program_wasm_sha256', 'runtime')}
             require(identity is not None, 'missing runtime identity')
             require(identities.setdefault(item['actor'], identity) == identity, 'actor source/runtime identity changed')
-            report['processes'].append(dict(item, **checked, accounting=event['accounting'],
+            memory = None if item['actor'] == 'v8' else check_memory(raw, event['accounting']['peak_rss_bytes'])
+            report['processes'].append(dict(item, **checked, accounting=event['accounting'], memory=memory,
                 report=str(result_path.relative_to(output)), node=raw.get('node'),
                 source_identity={key: raw.get(key) for key in ('source_commit', 'source_fingerprint', 'compiler_identity_scheme', 'toolchain', 'configuration', 'program_wasm_sha256', 'runtime')}))
             save()

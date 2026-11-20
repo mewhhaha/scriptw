@@ -16,6 +16,20 @@ m = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(m)
 
 
+PUBLISH_SPEC = importlib.util.spec_from_file_location('publish_rsc_current', SCRIPTS / 'publish-rsc-current.py')
+publish = importlib.util.module_from_spec(PUBLISH_SPEC)
+PUBLISH_SPEC.loader.exec_module(publish)
+
+
+def stage_memory(front=100, compile_=300, post=(250, 320), steady=(260, 330)):
+    def snapshot(stage, hwm, rss):
+        return dict(stage=stage, vm_hwm_bytes=hwm, vm_rss_bytes=rss, smaps_rollup={'rss_bytes': rss})
+    return dict(front_and_emit_high_water=snapshot('emission', front, 60),
+                compile_high_water=snapshot('native preparation', compile_, 200),
+                post_compile=snapshot('warmups', post[1], post[0]),
+                steady=snapshot('last request', steady[1], steady[0]), scope='fixture')
+
+
 def observations(values=(100, 1000, 4, 8), warmups=2):
     return [dict(index=index, warmup=index < warmups, elapsed_ns=value,
                  exact_node_output_checked=True, output_json_sha256=m.sha(b'"flight"'),
@@ -109,6 +123,46 @@ class Calls(unittest.TestCase):
             altered['configuration'][field] = value
             with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'inlining policy'):
                 check(altered)
+
+    def test_stage_memory_is_ordered_and_bounded_by_the_whole_process_peak(self):
+        memory = stage_memory()
+        self.assertEqual(m.check_memory(dict(memory=memory), 400), memory)
+        self.assertEqual(m.check_memory(dict(memory=memory), 300), memory)
+        self.assertIsNone(m.check_memory({}, 400), 'an older host reports no memory')
+        for altered, peak in ((stage_memory(compile_=500, post=(250, 500), steady=(260, 500)), 400),
+                              (stage_memory(front=400), 1000),
+                              (stage_memory(post=(400, 320)), 1000),
+                              (memory, None)):
+            with self.subTest(altered=altered, peak=peak), self.assertRaises(ValueError):
+                m.check_memory(dict(memory=altered), peak)
+        for stage in m.MEMORY_STAGES:
+            altered = copy.deepcopy(memory)
+            del altered[stage]
+            with self.subTest(stage=stage), self.assertRaises(ValueError):
+                m.check_memory(dict(memory=altered), 400)
+        altered = copy.deepcopy(memory)
+        altered['front_and_emit_high_water'] = None
+        with self.assertRaises(ValueError):
+            m.check_memory(dict(memory=altered), 400)
+
+    def test_memory_is_summarized_and_published_per_stage(self):
+        rows = [dict(case='rsc-sync', actor='scriptw', block=block, request_ns=m.stats([5]),
+                     accounting=dict(peak_rss_bytes=400), memory=stage_memory(compile_=value,
+                     post=(250, value), steady=(260 + block, value)))
+                for block, value in ((0, 300), (1, 310))]
+        summary = m.aggregate(rows, ['scriptw'], ['rsc-sync'])['rsc-sync']['scriptw']['memory']
+        self.assertEqual(summary['compile_high_water_bytes']['samples'], [300, 310])
+        self.assertEqual(summary['front_and_emit_high_water_bytes']['median'], 100)
+        self.assertEqual(summary['post_compile_bytes']['samples'], [250, 250])
+        self.assertEqual(summary['steady_bytes']['samples'], [260, 261])
+        published = publish.memory(rows)
+        self.assertEqual(published['compile_high_water_bytes']['median'], 305)
+        self.assertEqual(published['steady_bytes']['maximum'], 261)
+        self.assertIsNone(m.memory_summary([dict(rows[0], memory=None), rows[1]]))
+        self.assertIsNone(publish.memory([dict(rows[0], memory=None), rows[1]]))
+        rows[0]['accounting']['peak_rss_bytes'] = 299
+        with self.assertRaises(ValueError):
+            publish.memory(rows)
 
     def test_missing_case_or_mismatched_source_is_rejected(self):
         raw = dict(inputs=dict(source_sha256='wrong'))

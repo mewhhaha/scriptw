@@ -30,6 +30,8 @@ On 2026-11-16, with V8's JIT off (`node --jitless`), `scripts/rsc_wall_clock_com
 
 Cold setup per process, as medians of sixteen processes: source to Wasm takes 0.83 s (2.9 s for the 2026-11-16 source), and native preparation takes 4.2 s under Fast and 6.7 s under Speed (6.2 s Fast for the 2026-11-16 source). Whole-process peak RSS, which includes that compilation, is 247 to 263 MiB for Scriptw and 85 MiB for Node.
 
+From 2026-11-20 the host also splits its memory (`memory` in each process report; `memory_bytes` per engine and case in the published report). It reads `/proc/self/status` and `smaps_rollup` at four points outside every request clock: VmHWM after emission with the source compiler dropped (`front_and_emit_high_water`), VmHWM after native preparation (`compile_high_water`), VmRSS after the first case's warmups (`post_compile`) and VmRSS after the last request (`steady`). The high-water mark is never reset: writing `5` to `/proc/self/clear_refs` would also lower `ru_maxrss`, and GNU time's whole-child peak would then be understated. `benchmark-rsc.py` requires `compile_high_water` to be at most that peak; later stages are not bounded by it, because VmHWM and `ru_maxrss` read the kernel's counters through different paths and can differ by tens of KiB. Resident memory in a compiling process includes compiler memory the allocator keeps. One unscored Fast process on 2026-11-20 read 83, 247, 258 and 258 MiB for a 258 MiB peak; the same program loaded from a `scriptw precompile` image peaked at 74 MiB and held 56 MiB after its last request. The panel above predates the split and has no such numbers.
+
 ![RSC cold compilation phases](assets/rsc-current/compilation.svg)
 
 #### Previous campaign (2026-11-09)

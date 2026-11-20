@@ -18,6 +18,9 @@ import statistics
 ACTORS = ('baseline', 'candidate', 'candidate-speed', 'v8')
 CASES = ('rsc-sync', 'rsc-async')
 POLICIES = {'baseline': 'fast', 'candidate': 'fast', 'candidate-speed': 'speed'}
+# As benchmark-rsc.py: the two high-water marks, then resident memory after warmups and at the end.
+MEMORY_FIELDS = dict(front_and_emit_high_water='vm_hwm_bytes', compile_high_water='vm_hwm_bytes',
+                     post_compile='vm_rss_bytes', steady='vm_rss_bytes')
 
 
 def require(condition, message):
@@ -50,7 +53,7 @@ def engine(report, root, actor, label):
     result = dict(label=label, cases={}, warmup_curves_ns={}, identity=identity, case_statistics={},
                   phase_processes=[dict(case=row['case'], block=row['block'], repetition=row['repetition'],
                                         ordinal=row['ordinal'], **row['phases_ns']) for row in rows],
-                  whole_process_peak_rss_bytes={})
+                  whole_process_peak_rss_bytes={}, memory_bytes={})
     for case in CASES:
         selected = [row for row in rows if row['case'] == case]
         require(len(selected) == 8, 'eight processes per case required: ' + actor + '/' + case)
@@ -67,7 +70,19 @@ def engine(report, root, actor, label):
                                                             if row['block'] == block) for block in (0, 1)})
         result['whole_process_peak_rss_bytes'][case] = summary(
             [row['accounting']['peak_rss_bytes'] for row in selected])
+        result['memory_bytes'][case] = memory(selected)
     return result
+
+
+def memory(rows):
+    """Scriptw stage memory, or None for V8 and hosts built before the memory split."""
+    if any(row.get('memory') is None for row in rows):
+        return None
+    for row in rows:
+        require(row['memory']['compile_high_water']['vm_hwm_bytes'] <= row['accounting']['peak_rss_bytes'],
+                'compile high water exceeds the whole-process peak')
+    return {stage + '_bytes': summary([row['memory'][stage][field] for row in rows])
+            for stage, field in MEMORY_FIELDS.items()}
 
 
 def main():
@@ -116,7 +131,10 @@ def main():
         limitations=dict(
             all_timed_calls_ns='dependent serial calls within fresh processes; process medians are the independent units',
             profiling='no profiling or artifact dumps admitted; phase timings are cold/setup phases',
-            memory='Child high-water RSS includes compilation, setup and warmup; neither request-only RSS nor live Wasm heap.',
+            memory='Child high-water RSS includes compilation, setup and warmup; neither request-only RSS nor live Wasm heap. '
+                   'memory_bytes splits Scriptw processes: VmHWM after front end and emission, VmHWM after native '
+                   'preparation, VmRSS after warmups (post_compile) and after the last request (steady); resident '
+                   'memory in a compiling process includes compiler memory the allocator retains.',
             producers='Cargo producer logs are retained by the campaign; feature graphs are not compared.'),
         status='complete')
     args.output.write_text(json.dumps(current, indent=1) + '\n')
