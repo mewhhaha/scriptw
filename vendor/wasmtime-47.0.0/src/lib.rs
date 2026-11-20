@@ -558,7 +558,7 @@ pub mod _internal {
         target_os = "linux",
         target_pointer_width = "64",
         feature = "std",
-        feature = "pooling-allocator"
+        feature = "scriptw-pagemap-model"
     ))]
     pub use crate::runtime::vm::{DirtyPageReset, model_dirty_page_reset};
 }

@@ -129,7 +129,7 @@ pub use crate::runtime::vm::sys::mmap::open_file_for_mmap;
     target_os = "linux",
     target_pointer_width = "64",
     feature = "std",
-    feature = "pooling-allocator"
+    feature = "scriptw-pagemap-model"
 ))]
 pub use crate::runtime::vm::sys::vm::{DirtyPageReset, model_dirty_page_reset};
 #[cfg(has_host_compiler_backend)]

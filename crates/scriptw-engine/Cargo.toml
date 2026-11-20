@@ -26,6 +26,10 @@ rustix = { version = "=1.1.4", features = ["fs", "time"] }
 # The pooled-store tests page memory out and read /proc/self/pagemap.
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 rustix = { version = "=1.1.4", features = ["fs", "mm", "param", "time"] }
+# Test-only seam: the pooled reset's page classification model
+# (`wasmtime::_internal::model_dirty_page_reset`). Resolver 2 keeps this
+# dev-dependency feature out of every product build.
+wasmtime = { version = "=47.0.0", default-features = false, features = ["scriptw-pagemap-model"] }
 
 [build-dependencies]
 sha2 = "0.10.9"

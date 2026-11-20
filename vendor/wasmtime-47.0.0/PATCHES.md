@@ -320,7 +320,10 @@ guard above must hold on such a slot too.
   upstream `pagemap::tests` that expect holes to be unwritten fail here. The
   scan's filter and its region handling are `DirtyPageScan` and
   `reset_regions`; `wasmtime::_internal::model_dirty_page_reset` runs that
-  handling on given page categories, with the kernel's selection modelled, and
+  handling on given page categories, with the kernel's selection modelled. The
+  model and its export exist only under the vendored `scriptw-pagemap-model`
+  feature, which only scriptw-engine's Linux dev-dependencies enable, so
+  product builds do not contain it, and
   the engine's `the_reset_releases_swapped_dirty_pages_and_zeroes_present_ones`
   drives it with swapped, migrating, present, zero-page, file and
   never-populated pages. The engine's

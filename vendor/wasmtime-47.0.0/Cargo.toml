@@ -166,6 +166,11 @@ pooling-allocator = [
     "runtime",
     "std",
 ]
+# Scriptw: exports `_internal::model_dirty_page_reset`, the pooled reset's
+# page classification, for scriptw-engine's tests on hosts that cannot swap
+# pages out. Only that crate's dev-dependencies enable it; product builds
+# never compile the model.
+scriptw-pagemap-model = ["pooling-allocator"]
 profile-pulley = [
     "anyhow",
     "profiling",

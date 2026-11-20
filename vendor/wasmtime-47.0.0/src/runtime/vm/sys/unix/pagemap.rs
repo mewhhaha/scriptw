@@ -410,7 +410,7 @@ unsafe fn reset_regions(
 }
 
 /// How the reset leaves one page of a slot.
-#[cfg(feature = "pooling-allocator")]
+#[cfg(feature = "scriptw-pagemap-model")]
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DirtyPageReset {
@@ -429,7 +429,7 @@ pub enum DirtyPageReset {
 /// must contain the whole mask and meet the any-of set; matching neighbours
 /// with equal returned categories form one region). This is the classification
 /// a host without a swap device cannot exercise with real swapped pages.
-#[cfg(feature = "pooling-allocator")]
+#[cfg(feature = "scriptw-pagemap-model")]
 #[doc(hidden)]
 pub fn model_dirty_page_reset(pages: &[u64]) -> Vec<DirtyPageReset> {
     const PAGE: usize = 4096;
