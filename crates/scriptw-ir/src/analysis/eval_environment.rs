@@ -492,7 +492,7 @@ impl AnalysisBuilder<'_> {
                             .function_plans
                             .get(&environment.owner_id)
                             .is_some_and(|plan| {
-                                plan.self_binding_name.as_deref() == Some(source_name.as_str())
+                                plan.activation_self_binding_name() == Some(source_name.as_str())
                                     && (self.owner_plans[&environment.owner_id]
                                         .body_environment_id
                                         .is_some()

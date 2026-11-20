@@ -370,16 +370,16 @@ impl<'a> ScriptLowerer<'a> {
                 captured_bindings: Vec::new(),
             });
         };
-        if let Some(self_binding_name) = function.self_binding_name.as_ref() {
+        if let Some(self_binding_name) = function.activation_self_binding_name() {
             let function_info = lowerer.function_value_info(&function.id);
             lowerer
                 .sloppy_immutable_binding_storage_names
-                .insert(self_binding_name.clone());
+                .insert(self_binding_name.to_owned());
             lowerer.declare_binding(
-                self_binding_name.clone(),
+                self_binding_name.to_owned(),
                 BindingInfo {
                     mode: BindingMode::Const,
-                    storage_name: self_binding_name.clone(),
+                    storage_name: self_binding_name.to_owned(),
                     kind: function_info.kind,
                     possible_kinds: function_info.possible_kinds,
                     heap_shape: function_info.heap_shape,
@@ -476,7 +476,7 @@ impl<'a> ScriptLowerer<'a> {
                     .analysis
                     .function_plans
                     .get(&capture.owner_id)
-                    .and_then(|owner| owner.self_binding_name.as_deref())
+                    .and_then(|owner| owner.activation_self_binding_name())
                     == Some(source_name)
             {
                 lowerer

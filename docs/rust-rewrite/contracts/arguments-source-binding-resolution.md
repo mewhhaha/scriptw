@@ -42,6 +42,18 @@ with the protocol's initialized ArgumentsObject value rather than undefined;
 all source accesses then share that published cell. Real parameters, root
 function declarations and separate body records retain their existing ordering.
 
+A function expression named `arguments` keeps that name only in the outer
+record that holds its own name (`named_expression_binds_self_in_activation`
+in `names.rs`). Scriptw binds other self names in the activation too, but the
+function's own `arguments` binding shadows this one everywhere in its
+parameters and body, so the activation holds the implicit binding and every
+reference, arrow, nested eval and write resolves to it; strict code cannot
+use the name. (Until the fix this resolved to the function itself:
+`(function arguments(){ return typeof arguments })()` gave `function`.)
+`arguments_named_function_expression.js` covers plain, generator, async,
+method-valued and parameter-default forms, arrows, eval, `var` and parameter
+shadows, writes, `callee`, strict inner functions and the strict early errors.
+
 Controls cover own/global collision, var-without-initializer, reassignment and
 escaping arrows, destructuring in async functions/generators, parameter and
 lexical shadows, and with precedence. The original executions and every prior

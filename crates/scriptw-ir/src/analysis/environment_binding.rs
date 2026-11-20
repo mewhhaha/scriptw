@@ -40,7 +40,7 @@ impl Analysis<'_> {
                     .function_plans
                     .get(&environment.owner_id)
                     .is_some_and(|function| {
-                        function.self_binding_name.as_deref() == Some(name)
+                        function.activation_self_binding_name() == Some(name)
                             && (self.owner_plans[&environment.owner_id]
                                 .body_environment_id
                                 .is_some()

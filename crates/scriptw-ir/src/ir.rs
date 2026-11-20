@@ -3572,6 +3572,17 @@ pub struct FunctionIr {
     pub captured_bindings: Vec<CapturedBindingIr>,
 }
 
+impl FunctionIr {
+    /// The name this named function expression binds to itself inside its
+    /// own activation ([`crate::named_expression_binds_self_in_activation`]);
+    /// the outer name record holds it either way.
+    pub fn activation_self_binding_name(&self) -> Option<&str> {
+        self.is_named_expression
+            .then_some(self.name.as_str())
+            .filter(|name| crate::named_expression_binds_self_in_activation(name))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StatementIr {
     Empty,

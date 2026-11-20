@@ -7155,7 +7155,7 @@ impl<'a> ScriptLowerer<'a> {
                     .analysis
                     .function_plans
                     .get(capture_owner_id)
-                    .and_then(|owner| owner.self_binding_name.as_deref())
+                    .and_then(|owner| owner.activation_self_binding_name())
                     == Some(binding.source_name.as_str())
             {
                 lowerer

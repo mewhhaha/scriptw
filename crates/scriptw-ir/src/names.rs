@@ -55,6 +55,23 @@ pub const LEXICAL_ARGUMENTS_NAME: &str = "$.arguments";
 pub const LEXICAL_NEW_TARGET_NAME: &str = "$new.target";
 /// Compiler-private lexical `[[HomeObject]]` binding for arrows using `super`.
 pub const LEXICAL_HOME_OBJECT_NAME: &str = "$.homeObject";
+
+/// Whether a named function expression's own name is also bound inside its
+/// own activation.
+///
+/// The specification binds the name in a separate declarative record outside
+/// the function (the funcEnv of InstantiateOrdinaryFunctionExpression and its
+/// generator and async forms), which Scriptw also creates. Scriptw binds the
+/// name in the activation too, so references to it need no capture. That is
+/// exact for every name but `arguments`: FunctionDeclarationInstantiation
+/// gives every non-arrow function (and only those have such names) an own
+/// `arguments` binding, the arguments object or the parameter or declaration
+/// that suppresses it, and that binding shadows the outer name everywhere in
+/// the function's parameters and body. A self name `arguments` therefore
+/// lives only in the outer record.
+pub fn named_expression_binds_self_in_activation(name: &str) -> bool {
+    name != "arguments"
+}
 /// Compiler-private environment bindings for lexical `super()` in arrows.
 pub const DERIVED_ACTIVATION_THIS_NAME: &str = "$derived.this";
 pub const DERIVED_ACTIVATION_THIS_STATUS_NAME: &str = "$derived.thisStatus";

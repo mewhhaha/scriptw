@@ -1810,7 +1810,7 @@ impl<'a> FunctionBuilder<'a> {
             arguments_protocol,
             function.lexical_derived_activation.as_ref(),
             function.strict,
-            function.is_named_expression.then(|| function.name.clone()),
+            function.activation_self_binding_name().map(str::to_owned),
             Some(global_bindings),
             uses_heap,
             FunctionModuleState::Internal(

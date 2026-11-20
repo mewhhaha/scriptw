@@ -167,6 +167,16 @@ pub(crate) struct OwnerPlan {
     pub(crate) private_environment_id: Option<PrivateEnvironmentId>,
 }
 
+impl FunctionPlan<'_> {
+    /// The self name bound inside the activation; see
+    /// [`named_expression_binds_self_in_activation`].
+    pub(crate) fn activation_self_binding_name(&self) -> Option<&str> {
+        self.self_binding_name
+            .as_deref()
+            .filter(|name| named_expression_binds_self_in_activation(name))
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct FunctionPlan<'a> {
     pub(crate) id: FunctionId,
@@ -1690,10 +1700,16 @@ impl<'a> AnalysisBuilder<'a> {
                 Vec::new()
             };
         let lexical_super_owner_role = function.protocol.lexical_super_owner_role();
+        // The self name lives in the outer record above in every case; the
+        // activation holds it only where nothing of the function shadows it.
+        let activation_self_name = function
+            .self_binding_name
+            .as_deref()
+            .filter(|name| named_expression_binds_self_in_activation(name));
         let parameter_environment_bindings = self.collect_parameter_environment_bindings(
             interner,
             function.parameters.as_ref(),
-            function.self_binding_name.as_deref(),
+            activation_self_name,
             function.protocol.flavor() == FunctionFlavor::Ordinary,
             lexical_super_owner_role,
         );
@@ -1707,7 +1723,7 @@ impl<'a> AnalysisBuilder<'a> {
             let mut bindings = self.collect_owner_bindings(
                 interner,
                 function.parameters.as_ref(),
-                function.self_binding_name.as_deref(),
+                activation_self_name,
                 function.protocol.flavor() == FunctionFlavor::Ordinary,
                 function.protocol.flavor() == FunctionFlavor::Ordinary,
                 function.protocol.flavor() == FunctionFlavor::Ordinary,
@@ -1738,7 +1754,7 @@ impl<'a> AnalysisBuilder<'a> {
         let mut activation_binding_modes = self.activation_binding_modes(
             interner,
             function.parameters.as_ref(),
-            function.self_binding_name.as_deref(),
+            activation_self_name,
             function.body.statements(),
             &root_bindings,
         );

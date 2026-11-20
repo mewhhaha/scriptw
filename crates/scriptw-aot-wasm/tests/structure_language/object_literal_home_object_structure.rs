@@ -236,7 +236,7 @@ fn super_references_carry_receiver_and_parameter_initializers_gain_context_first
     let function_lowering = bounded(
         FUNCTION_LOWERING_SOURCE,
         "        let lexical_derived_activation =",
-        "        if let Some(self_binding_name) = function.self_binding_name.as_ref() {",
+        "        if let Some(self_binding_name) = function.activation_self_binding_name() {",
     );
     assert_before(
         function_lowering,

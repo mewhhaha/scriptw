@@ -298,7 +298,7 @@ impl AnalysisBuilder<'_> {
                     ((*mode == BindingMode::Var || owner.parameter_names.contains(name))
                         && self.source_identifiers.contains(name)
                         && !owner.function_bindings.contains_key(name)
-                        && function.self_binding_name.as_ref() != Some(name))
+                        && function.activation_self_binding_name() != Some(name.as_str()))
                     .then(|| name.clone())
                 })
                 .collect();

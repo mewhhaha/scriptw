@@ -43,3 +43,11 @@ fn script_global_arguments_never_precedes_an_implicit_binding() {
         "global arguments ok",
     );
 }
+
+#[test]
+fn a_function_expression_named_arguments_still_sees_its_own_arguments_binding() {
+    run_script(
+        include_str!("../fixtures/arguments_named_function_expression.js"),
+        "named arguments ok",
+    );
+}
