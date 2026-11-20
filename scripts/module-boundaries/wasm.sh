@@ -432,9 +432,22 @@ if [[ "$source_body_compiler_code" != *'ifself.is_main(){letindex=initializer.ex
 fi
 require_fixed_string_count "$wasm_module_assembly" 'compile_pooled_strings_initialize_helper' 1 'runtime assembly consumes the canonical pooled-string helper'
 module_assembly_code="$(tr -d '[:space:]' < "$wasm_module_assembly")"
-# register_runtime_helper! takes several `Id, compiler;` pairs per invocation.
-if [[ "$module_assembly_code" != *'PooledStringsInitialize,compile_pooled_strings_initialize_helper);'* ]]; then
-  fail 'the pooled-string body owner must compile the registered PooledStringsInitialize helper'
+# register_runtime_helper! takes several `Id, compiler;` pairs per invocation;
+# the pair must be one whole pair inside exactly one such invocation.
+pooled_strings_registrations="$(printf '%s\n' "$module_assembly_code" | awk '
+  {
+    count = split($0, invocations, /register_runtime_helper!\(/)
+    for (invocation = 2; invocation <= count; invocation++) {
+      end = index(invocations[invocation], ");")
+      if (end && index(";" substr(invocations[invocation], 1, end - 1) ";", ";PooledStringsInitialize,compile_pooled_strings_initialize_helper;")) {
+        registrations++
+      }
+    }
+  }
+  END { print registrations + 0 }
+')"
+if [ "$pooled_strings_registrations" -ne 1 ]; then
+  fail "the pooled-string body owner must compile the registered PooledStringsInitialize helper inside one register_runtime_helper! invocation (found $pooled_strings_registrations)"
 fi
 check_no_inline_legacy_includes "$wasm_literal_roots"
 check_raw_line_budget "$wasm_literal_roots" 180
@@ -709,6 +722,84 @@ require_module_decl "$wasm_gc_types" type_registration_tests
 if [[ "$(head -n 1 "$gc_type_registration_fixture_source")" != '#![cfg(test)]' ]]; then
   fail 'GC declaration fixtures must be compiled only for tests'
 fi
+# The section scans below skip every `tests.rs` and `tests/` source by path.
+# That is sound only while each of them compiles solely under cfg(test), so
+# prove it: a source is test-only when its first line is `#![cfg(test)]`, or
+# when every `mod` declaration that attaches it (the default parent's plain
+# `mod name;` and any `#[path = ...]` attachment) carries a cfg(test) gate or
+# sits in a source that is itself test-only. A source nothing attaches is not
+# proven either.
+normalize_relative_path() {
+  local part
+  local -a parts=()
+  local IFS=/
+  for part in $1; do
+    case "$part" in
+      ''|.) ;;
+      ..) if [ "${#parts[@]}" -gt 0 ]; then unset 'parts[${#parts[@]}-1]'; fi ;;
+      *) parts+=("$part") ;;
+    esac
+  done
+  printf '%s\n' "${parts[*]}"
+}
+# One row per `#[path]` attachment: target, declaring source, gated (1/0).
+wasm_path_attachments="$(
+  while IFS=$'\t' read -r declaring_source attached_path gated; do
+    printf '%s\t%s\t%s\n' "$(normalize_relative_path "$(dirname "$declaring_source")/$attached_path")" "$declaring_source" "$gated"
+  done < <(find crates/scriptw-aot-wasm/src -type f -name '*.rs' -print0 | sort -z | xargs -0 awk '
+    FNR == 1 { attrs = "" }
+    /^[[:space:]]*#\[/ { attrs = attrs $0 "\n"; next }
+    /^[[:space:]]*(pub(\([^)]*\))?[[:space:]]+)?mod[[:space:]]+[A-Za-z0-9_]+;/ && match(attrs, /#\[path = "[^"]+"\]/) {
+      print FILENAME "\t" substr(attrs, RSTART + 10, RLENGTH - 12) "\t" (attrs ~ /#\[cfg\((all\()?test[,)]/ ? 1 : 0)
+    }
+    { attrs = "" }
+  ')
+)"
+# Prints "gated" or "ungated" for each plain (path-less) `mod name;` in a file.
+rust_plain_module_declarations() {
+  awk -v module="$2" '
+    /^[[:space:]]*#\[/ { attrs = attrs $0 "\n"; next }
+    $0 ~ ("^[[:space:]]*(pub(\\([^)]*\\))?[[:space:]]+)?mod[[:space:]]+" module ";") && attrs !~ /#\[path/ {
+      print (attrs ~ /#\[cfg\((all\()?test[,)]/ ? "gated" : "ungated")
+    }
+    { attrs = "" }
+  ' "$1"
+}
+rust_source_is_test_only() {
+  local source="$1" depth="${2:-0}" directory stem parent declaration attached declaring_source gated
+  [ "$depth" -le 16 ] || return 1
+  [ "$(head -n 1 "$source")" = '#![cfg(test)]' ] && return 0
+  attached=0
+  directory="$(dirname "$source")"
+  stem="$(basename "$source" .rs)"
+  if [ "$directory" = crates/scriptw-aot-wasm/src ]; then
+    parent=crates/scriptw-aot-wasm/src/lib.rs
+  elif [ -f "$directory.rs" ]; then
+    parent="$directory.rs"
+  else
+    parent="$directory/mod.rs"
+  fi
+  if [ -f "$parent" ] && [ "$stem" != mod ]; then
+    while read -r declaration; do
+      attached=1
+      if [ "$declaration" != gated ] && ! rust_source_is_test_only "$parent" "$((depth + 1))"; then
+        return 1
+      fi
+    done < <(rust_plain_module_declarations "$parent" "$stem")
+  fi
+  while IFS=$'\t' read -r declaring_source gated; do
+    attached=1
+    if [ "$gated" != 1 ] && ! rust_source_is_test_only "$declaring_source" "$((depth + 1))"; then
+      return 1
+    fi
+  done < <(printf '%s\n' "$wasm_path_attachments" | awk -F '\t' -v target="$source" '$1 == target { print $2 "\t" $3 }')
+  [ "$attached" -eq 1 ]
+}
+while IFS= read -r -d '' path_excluded_test_source; do
+  if ! rust_source_is_test_only "$path_excluded_test_source"; then
+    fail "$path_excluded_test_source is skipped by the tests.rs/tests/ section-scan exclusion but is not proven cfg(test)-only"
+  fi
+done < <(find crates/scriptw-aot-wasm/src -type f -name '*.rs' \( -path '*/tests.rs' -o -path '*/tests/*' \) -print0 | sort -z)
 for sealed_section in types globals code; do
   source_profile_fixture_exclusions=()
   if [ "$sealed_section" = types ]; then
@@ -731,8 +822,8 @@ for sealed_section in types globals code; do
       ! -path 'crates/scriptw-aot-wasm/src/branch_hints.rs' -print0 \
       | xargs -0 grep -Fn "module.section(&${sealed_section})" || true
   )"
-  # Test-only sources (`tests.rs`, `tests/`, declared under #[cfg(test)]) and
-  # inline #[cfg(test)] modules build fixture modules directly.
+  # Test-only sources (`tests.rs`, `tests/`, each proven cfg(test)-only above)
+  # and inline #[cfg(test)] modules build fixture modules directly.
   for inline_test_owner in crates/scriptw-aot-wasm/src/branch_hints.rs; do
     inline_escape="$(sed '/^#\[cfg(test)\]/,$d' "$inline_test_owner" | grep -Fn "module.section(&${sealed_section})" || true)"
     if [ -n "$inline_escape" ]; then
@@ -916,6 +1007,8 @@ require_fixed_string_count "$wasm_atomics_builtins" 'pub(crate) const ATOMICS_PU
 # Realm Atomics publication moved into the declarative intrinsic property layouts.
 require_fixed_string_count "$wasm_builtin_bootstrap" 'ATOMICS_PUBLICATION_ORDER' 0 'no second Atomics publication loop in bootstrap'
 require_fixed_string_count crates/scriptw-aot-wasm/src/intrinsics/property_layouts.rs 'for builtin in crate::builtins::ATOMICS_PUBLICATION_ORDER' 1 'sole shared Realm Atomics publication loop'
+# The order is pub(crate) and re-exported, so no other source may loop over it.
+require_tree_regex_count crates/scriptw-aot-wasm/src 'for builtin in .*ATOMICS_PUBLICATION_ORDER' 1 'Realm Atomics publication loop'
 for atomics_wait_hook in emit_drain_atomics_wait_async_timeouts emit_poll_atomics_wait_async_timeouts; do
   require_regex_count "$wasm_atomics_wait_async" "^[[:space:]]*pub\(crate\)[[:space:]]+fn[[:space:]]+${atomics_wait_hook}[[:space:]]*\(" 1 'consumed async-wait checkpoint owner'
   require_regex_count "$wasm_atomics_builtins" "^[[:space:]]*(pub(\([^)]*\))?[[:space:]]+)?fn[[:space:]]+${atomics_wait_hook}[[:space:]]*\(" 0 'no parent async-wait checkpoint copy'
