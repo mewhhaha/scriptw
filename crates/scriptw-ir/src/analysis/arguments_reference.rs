@@ -1,8 +1,11 @@
 //! Static resolution of a source `arguments` reference.
 //!
-//! Without direct eval, `with` or an Annex B `function arguments` (which keep
-//! the whole Script eval-visible), ResolveBinding of `arguments` is decided by
-//! the lexical chain alone. FunctionDeclarationInstantiation creates the
+//! Unless the whole Script is eval-visible (direct eval, an Annex B `function
+//! arguments`, a prepared eval or ShadowRealm Script, or Realm-reusable module
+//! environments; see `AnalysisBuilder::finish`), ResolveBinding of `arguments`
+//! is decided by the lexical chain alone. `with` does not make the Script
+//! eval-visible: inside its body lowering tests the Object Environment Records
+//! first at run time and uses this static result only as the fallback. FunctionDeclarationInstantiation creates the
 //! implicit binding in the nearest non-arrow function's own record, so a
 //! reference names that one owner's arguments object, a source declaration
 //! between the reference and that record, or, with no enclosing function, the

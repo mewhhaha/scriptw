@@ -21,10 +21,14 @@ binding, or, outside any function, an ordinary global reference. Reads,
 writes, destructuring and update targets, for-in/of heads, shorthand
 properties and arrow captures all use that one result, so a Script global can
 no longer precede a function's own `arguments`. A reference no longer makes
-any environment eval-visible. The whole Script stays eval-visible only for
-direct eval and the Annex B `function arguments` form
-(`AnalysisBuilder::eval_visible` in `analysis.rs`). Inside a `with` body the
-static result is the fallback only: lowering tests the Object Environment
+any environment eval-visible. `AnalysisBuilder::finish` in `analysis.rs` makes
+the whole Script eval-visible in exactly these cases: the source contains a
+direct eval call; it contains an Annex B `function arguments` candidate; the
+Script is itself a prepared direct-eval Script; it is a strict Script prepared
+for indirect eval or `ShadowRealm.prototype.evaluate`; or the compilation
+enables Realm-reusable module environments, which sets the flag after the
+static module-binding decision has read it. `with` is not one of them. Inside
+a `with` body the static result is the fallback only: lowering tests the Object Environment
 Record first at run time, and the stable implicit-arguments cell is not used
 there. (Before `c294028e7` a whole-Script scan made every activation
 eval-visible, which sent every identifier in a classic Script through runtime
