@@ -371,24 +371,28 @@ fn inspect_reports_phase_fourteen_param_ir_shape() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    // This Script references `arguments`, so its identifiers use the named
-    // runtime environment. Calls retain ResolveBinding/GetValue and do not
-    // prove an exact target for a specialization clone. Count the two source
-    // defaults and single rest parameter in the four emitted functions.
-    assert!(stdout.contains("functions=4"), "{stdout}");
-    assert!(stdout.contains("default_params=2"), "{stdout}");
-    assert!(stdout.contains("rest_params=1"), "{stdout}");
-    // The arrow reads the captured arguments binding through a runtime
-    // Reference, not an ExprIr::Arguments object expression. The read/call
-    // census and capture count keep that execution visible in inspection.
+    // Since c294028e7 `arguments` resolves statically, so the Script keeps
+    // static identifiers and exact call targets. The four source functions
+    // gain three exact-context specialization clones: `outer` from
+    // `outer(3, 4, 5)` and `pick` once per argument context (`{}` and
+    // `{ value: 5 }`). The source defaults are `outer`'s `x = 1` and `f`'s
+    // `y = this.x` (`pick`'s `{ value = 2 }` is a binding-pattern default, not
+    // a parameter default) and the only rest parameter is `outer`'s `...xs`;
+    // the `outer` clone repeats both. `f` has no clone: calling `outer` is
+    // unknown user code, which erases `o`'s shape before `o.f()`.
+    assert!(stdout.contains("functions=7"), "{stdout}");
+    assert!(stdout.contains("default_params=3"), "{stdout}");
+    assert!(stdout.contains("rest_params=2"), "{stdout}");
+    // The arrow reads `outer`'s implicit arguments cell through its capture,
+    // not an ExprIr::Arguments object expression and not a runtime Reference.
     assert!(stdout.contains("arguments_uses=0"), "{stdout}");
     assert!(stdout.contains("lexical_arguments_captures=1"), "{stdout}");
     assert!(
-        stdout.contains("environment_identifier_reads=4"),
+        stdout.contains("environment_identifier_reads=0"),
         "{stdout}"
     );
     assert!(
-        stdout.contains("environment_identifier_calls=3"),
+        stdout.contains("environment_identifier_calls=0"),
         "{stdout}"
     );
     // The parameter default `y = this.x` is executable IR as well.
@@ -422,9 +426,12 @@ fn inspect_reports_phase_eighteen_global_ir_shape() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    // Include the mutable public `globalThis` data property in the
-    // fixture's global environment.
-    assert!(stdout.contains("global_bindings=69"), "{stdout}");
+    // The canonical global environment plus the fixture's `x`, `f` and `g`,
+    // including the mutable public `globalThis` data property. 40ff4b4ba
+    // (Runtime ABI 47) added thirteen Web host globals to every Script, which
+    // moved 69 -> 82; `inspect_reports_phase_twenty_five_builtin_ir_shape`
+    // lists them.
+    assert!(stdout.contains("global_bindings=82"), "{stdout}");
     // The three comparisons and `globalThis.x` retain their actual receiver.
     // This fixture proves the builtin property intact at all four uses.
     assert!(stdout.contains("global_this_uses=4"), "{stdout}");

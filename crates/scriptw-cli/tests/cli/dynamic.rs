@@ -46,7 +46,11 @@ fn inspect_reports_phase_fifteen_dynamic_primitive_ir_shape() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("string_concats=1"));
+    // `"a" + "b"` is the fixture's only `+` of two strings. Both operands are
+    // string literals, so since d67cbfbf0 `combine_arithmetic` folds it to the
+    // constant "ab" (ApplyStringOrNumericBinaryOperator has no observable
+    // step for two primitive strings); no runtime StringConcat remains.
+    assert!(stdout.contains("string_concats=0"), "{stdout}");
     assert!(stdout.contains("typeof_uses=1"));
     assert!(stdout.contains("nullish_ops=1"));
 }

@@ -101,8 +101,16 @@ Then run a focused target and the batch's broader checks under the same wrapper:
 ```sh
 python3 -B scripts/limited_verification.py -- cargo check --locked --workspace --all-targets
 python3 -B scripts/limited_verification.py -- cargo test --locked -p scriptw-aot-wasm --test structure_language -- --test-threads=1
+python3 -B scripts/limited_verification.py -- cargo test --release --locked -p scriptw-cli --test cli -- --test-threads=1
 python3 -B scripts/limited_verification.py -- ./scripts/check-no-interpreter-in-product-graph.sh
 ```
+
+Include `-p scriptw-cli --test cli` whenever lowering, analysis, the builtin
+catalog or the global environment changes: its `inspect_reports_*` tests assert
+exact `scriptw inspect` counts (exact-context clones, resolved intrinsics,
+`global_bindings`, `builtin_globals`), so such a change moves them without any
+fixture edit. Recount with `scriptw inspect <fixture>` and record the cause in
+the assertion's comment.
 
 Encoded R/P ABI and code-size acceptance checks belong in the external
 `emission` target when the public emission API is sufficient. It links the

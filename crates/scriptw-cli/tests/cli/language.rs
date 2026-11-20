@@ -225,12 +225,17 @@ fn inspect_reports_phase_twenty_five_builtin_ir_shape() {
     // Batch 8: 51 -> 52 for `AsyncDisposableStack`; the constructor-only
     // `%DisposableStack%` shell then moves 52 -> 53. `%Float16Array%`
     // (ES2025, catalog `GlobalOrdinal(53)`, 7a7610705) moves 53 -> 54.
-    // `ShadowRealm` at `GlobalOrdinal(54)` moves 54 -> 55. Recount
+    // `ShadowRealm` at `GlobalOrdinal(54)` moves 54 -> 55. Runtime ABI 47
+    // (40ff4b4ba) adds the Web host globals `TextEncoder`, `TextDecoder`,
+    // `AbortController`, `AbortSignal`, `EventTarget`, `Event`,
+    // `DOMException`, `ReadableStream`, `ReadableStreamDefaultReader`,
+    // `ReadableByteStreamController`, `queueMicrotask`, `setTimeout` and
+    // `clearTimeout` at `GlobalOrdinal(55..=67)`, moving 55 -> 68. Recount
     // with `scriptw inspect crates/scriptw-cli/tests/fixtures/wasm_builtin_globals.js`
     // rather than guessing the delta; do not weaken this to a prefix match,
     // because the exact number is the only thing that makes an accidental
     // global-environment change visible at rung 1b.
-    assert!(stdout.contains(" builtin_globals=55 "), "{stdout}");
+    assert!(stdout.contains(" builtin_globals=68 "), "{stdout}");
     assert!(stdout.contains("builtin_ctor_calls="));
     assert!(stdout.contains("builtin_static_calls="));
     assert!(stdout.contains("error_builtin_calls="));
