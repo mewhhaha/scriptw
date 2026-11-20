@@ -3436,6 +3436,16 @@ where
         owner.access(function);
         function.instruction(&Instruction::ArrayLen);
     }
+    /// The length of the array reference on top of the stack, which no
+    /// local needs to hold.
+    pub(crate) fn length_top<R: GcFieldNullability>(
+        &self,
+        owner: GcStackReference<T, R>,
+        function: &mut Function,
+    ) {
+        let GcStackReference { .. } = owner;
+        function.instruction(&Instruction::ArrayLen);
+    }
     pub(crate) fn read<R: GcFieldNullability>(
         &self,
         owner: &GcLocal<T, R>,

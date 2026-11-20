@@ -6213,12 +6213,14 @@ impl<'a> FunctionBuilder<'a> {
                 function.instruction(&Instruction::If(BlockType::Empty));
                 if self.compares_string_lengths_inline {
                     for string in [left, right] {
-                        let _ = schema
+                        let units = schema
                             .struct_type::<StringValue>()
                             .field(StringValueSchema::CODE_UNITS)
                             .read(string, schema, function)
                             .reference();
-                        function.instruction(&Instruction::ArrayLen);
+                        schema
+                            .array_type::<CodeUnitArray>()
+                            .length_top(units, function);
                     }
                     function.instruction(&Instruction::I32Eq);
                     function.instruction(&Instruction::If(BlockType::Empty));
