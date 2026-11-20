@@ -88,7 +88,7 @@ mod generator_reference;
 mod heap;
 mod intrinsics;
 mod module;
-pub use module::WasmArtifact;
+pub use module::{EmitError, WasmArtifact};
 mod module_entry_completion;
 pub use module_entry_completion::{WasmModuleEvaluationStatus, MODULE_EVALUATION_STATUS_EXPORT};
 mod modules;

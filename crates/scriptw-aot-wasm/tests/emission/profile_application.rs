@@ -210,7 +210,10 @@ const TRUE_KIND_FIXTURES: &[(&str, &str, ReadSpecialisation)] = &[
     (
         "prototype place",
         "function C() {} C.prototype.x = 3; function probe(o) { return o.x; } var t = 0; for (var i = 0; i < 64; i++) t += probe(new C()); t;",
-        ReadSpecialisation::ProtoPlaceCompact(CompactStorageLayout::Inline, PlaceHolder::Compact),
+        // A trained run proves this kind (the engine's execution_profile
+        // tests): `new C()` has array-layout storage and C.prototype is a
+        // dictionary.
+        ReadSpecialisation::ProtoPlaceCompact(CompactStorageLayout::Array, PlaceHolder::Dictionary),
     ),
     (
         "object prototype",
@@ -281,7 +284,12 @@ fn true_kind_fixtures_specialise_their_probe_site() {
         validate(&specialised, name);
         assert_eq!(specialised.site_map(), site_map, "{name}");
         assert_eq!(specialised.site_map().digest(), site_map.digest(), "{name}");
-        assert!(specialised.bytes.len() > unprofiled.bytes.len(), "{name}");
+        if *kind == ReadSpecialisation::OwnCompact(CompactStorageLayout::Array) {
+            // The probe's own inline hit already proves that kind.
+            assert_eq!(specialised.bytes, unprofiled.bytes, "{name}");
+        } else {
+            assert!(specialised.bytes.len() > unprofiled.bytes.len(), "{name}");
+        }
 
         for seed in 0..2 {
             let wrong =
@@ -309,8 +317,21 @@ fn mismatched_profiles_are_rejected() {
         trained.site_map(),
         emit_with(&second, ProfileMode::None).unwrap().site_map()
     );
-    let error = emit_with(&second, ProfileMode::Apply(&empty(trained.site_map()))).unwrap_err();
-    assert!(error.contains("site map"), "{error}");
+    let error = scriptw_aot_wasm::emit_with_intl_profile_and_runtime_inputs(
+        &second,
+        PromiseRejectionPolicy::default(),
+        &scriptw_intl::IntlCompilationProfile::default(),
+        RuntimeArtifactInputs::new(None),
+        ProfileMode::Apply(&empty(trained.site_map())),
+    )
+    .unwrap_err();
+    assert_eq!(
+        error.profile_error(),
+        Some(&scriptw_aot_wasm::ProfileError::Mismatch(
+            scriptw_aot_wasm::ProfileMismatch::SiteMap
+        )),
+        "{error}"
+    );
     let foreign = ExecutionProfile::new(
         ProgramKey::new([1; 32]),
         trained.site_map(),

@@ -15,6 +15,10 @@ use super::*;
 use crate::emit::ControlTarget;
 use crate::gc_types::SiteRecordGlobal;
 
+/// The kind of read the site's own inline hit proves.
+const ARRAY_OWN_SLOT: crate::profile::ReadSpecialisation =
+    crate::profile::ReadSpecialisation::OwnCompact(crate::profile::CompactStorageLayout::Array);
+
 /// The key a site's record is made for.
 enum SiteKey<'a> {
     /// The site's static key, materialized only when R makes the record.
@@ -80,7 +84,13 @@ impl FunctionBuilder<'_> {
         let s = self.runtime_schema();
         let (global, site) =
             self.next_profiled_site_record(crate::profile::SiteKind::PropertyRead)?;
-        let specialisation = self.functions.read_specialisation(&site);
+        // A site whose base may be ordinary already proves an own slot of
+        // the array layout inline, right after the guard: guarding that kind
+        // too would only repeat the proof.
+        let specialisation = self
+            .functions
+            .read_specialisation(&site)
+            .filter(|kind| !(may_be_ordinary && *kind == ARRAY_OWN_SLOT));
         let record = self.emit_site_record(global, SiteKey::Literal(name), f)?;
         let done = (may_be_ordinary || specialisation.is_some())
             .then(|| self.open_frame(ControlFrameKind::Block, f));

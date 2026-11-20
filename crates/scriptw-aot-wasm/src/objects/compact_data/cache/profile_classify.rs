@@ -129,11 +129,20 @@ fn hinted(hint: u8) -> (Option<ReceiverLayout>, Option<ReceiverStorage>) {
     )
 }
 
+/// The inverse of `receiver_layout`: a layout without a profile header
+/// fails to compile here.
 fn header_of(layout: ReceiverLayout) -> ReceiverHeader {
-    ReceiverHeader::ALL
-        .into_iter()
-        .find(|header| receiver_layout(*header) == layout)
-        .expect("every receiver layout is a profile receiver header")
+    match layout {
+        ReceiverLayout::Ordinary => ReceiverHeader::Ordinary,
+        ReceiverLayout::Function => ReceiverHeader::Function,
+        ReceiverLayout::Array => ReceiverHeader::Array,
+        ReceiverLayout::PrimitiveBox => ReceiverHeader::PrimitiveBox,
+        ReceiverLayout::Map => ReceiverHeader::Map,
+        ReceiverLayout::WeakMap => ReceiverHeader::WeakMap,
+        ReceiverLayout::Set => ReceiverHeader::Set,
+        ReceiverLayout::WeakSet => ReceiverHeader::WeakSet,
+        ReceiverLayout::Promise => ReceiverHeader::Promise,
+    }
 }
 
 /// What a record whose facts word is `facts` proves, at a site whose hint

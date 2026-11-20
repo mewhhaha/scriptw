@@ -221,7 +221,10 @@ fn malformed_sections_and_memories_are_rejected() {
     ));
     let mut version = layout.section.clone();
     version[0] ^= 1;
-    assert!(decode(&version, &memory).is_err());
+    assert_eq!(
+        decode(&version, &memory).unwrap_err(),
+        ProfileError::Mismatch(super::ProfileMismatch::Version)
+    );
     let mut digest = layout.section.clone();
     digest[40] ^= 1;
     assert_eq!(

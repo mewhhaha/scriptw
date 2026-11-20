@@ -23,9 +23,9 @@
 //! import compaction leaves it unchanged. [`decode`] reads it with the
 //! memory after a run, so the host needs nothing of the emitter but the two.
 use super::{
-    encode_body, encode_bytes, encode_site, encode_u32, ExecutionProfile, ProfileError, ProgramKey,
-    ReadSiteObservation, Reader, SiteBody, SiteKind, SiteMap, SiteMapBuilder, SiteMapDigest,
-    SiteRef,
+    encode_body, encode_bytes, encode_site, encode_u32, ExecutionProfile, ProfileError,
+    ProfileMismatch, ProgramKey, ReadSiteObservation, Reader, SiteBody, SiteKind, SiteMap,
+    SiteMapBuilder, SiteMapDigest, SiteRef,
 };
 use crate::code_sink::Function;
 use crate::gc_types::SiteRecordGlobal;
@@ -260,9 +260,7 @@ pub(super) fn decode(
 ) -> Result<ExecutionProfile, ProfileError> {
     let mut reader = Reader { bytes: section };
     if u16::from_le_bytes(reader.array()?) != PROFILE_SITES_SECTION_VERSION {
-        return Err(ProfileError::Malformed(
-            "profile sites section of another version",
-        ));
+        return Err(ProfileError::Mismatch(ProfileMismatch::Version));
     }
     let program = ProgramKey(reader.array()?);
     let digest = SiteMapDigest(reader.array()?);

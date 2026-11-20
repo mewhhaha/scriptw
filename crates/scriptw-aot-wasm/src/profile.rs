@@ -443,9 +443,11 @@ impl std::fmt::Display for ProfileError {
     }
 }
 
+impl std::error::Error for ProfileError {}
+
 impl ProfileError {
     pub(crate) fn into_emit_error(self) -> EmitError {
-        EmitError::unsupported(self.to_string())
+        EmitError::profile(self)
     }
 }
 
@@ -482,6 +484,29 @@ impl ExecutionProfile {
         collect::decode(section, memory, training_requests)
     }
 
+    /// A wrong profile for verification only: every read site of `site_map`
+    /// hot in one training request, its dominant kind rotating through
+    /// every specialisation from `seed`, so nearly every guard proves a kind
+    /// its receivers never have. Applying it must change no behaviour, only
+    /// speed.
+    #[doc(hidden)]
+    pub fn adversarial(
+        program: ProgramKey,
+        site_map: &SiteMap,
+        compiler: impl Into<String>,
+        seed: usize,
+    ) -> Self {
+        let mut profile = Self::new(program, site_map, compiler, NonZeroU32::MIN);
+        let kinds = ReadSpecialisation::ALL;
+        for (index, site) in site_map.read_sites().enumerate() {
+            profile.reads.insert(
+                site.clone(),
+                ReadSiteObservation::dominated(u64::MAX, kinds[(index + seed) % kinds.len()]),
+            );
+        }
+        profile
+    }
+
     /// Records how often a body was entered; a later observation of the
     /// same body replaces it.
     pub fn observe_body(&mut self, body: &SiteBody, entries: u64) {
@@ -510,6 +535,18 @@ impl ExecutionProfile {
         }
         self.reads.insert(site.clone(), observation);
         Ok(())
+    }
+
+    /// The read sites admission specialises, with their dominant kinds:
+    /// those with a dominant kind that ran at least
+    /// [`HOT_READ_EXECUTIONS_PER_REQUEST`] times per training request.
+    pub fn hot_reads(&self) -> impl Iterator<Item = (&SiteRef, ReadSpecialisation)> {
+        let threshold =
+            HOT_READ_EXECUTIONS_PER_REQUEST.saturating_mul(u64::from(self.training_requests.get()));
+        self.reads
+            .iter()
+            .filter(move |(_, observation)| observation.executions >= threshold)
+            .filter_map(|(site, observation)| Some((site, observation.dominant?)))
     }
 
     pub fn program(&self) -> &ProgramKey {
@@ -679,13 +716,9 @@ impl AdmittedProfile {
         if profile.program != *program {
             return Err(ProfileError::Mismatch(ProfileMismatch::Program));
         }
-        let threshold = HOT_READ_EXECUTIONS_PER_REQUEST
-            .saturating_mul(u64::from(profile.training_requests.get()));
         let reads = profile
-            .reads
-            .iter()
-            .filter(|(_, observation)| observation.executions >= threshold)
-            .filter_map(|(site, observation)| Some((site.clone(), observation.dominant?)))
+            .hot_reads()
+            .map(|(site, dominant)| (site.clone(), dominant))
             .collect();
         Ok(Self(Arc::new(Admitted {
             site_map: profile.site_map,

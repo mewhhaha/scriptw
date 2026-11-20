@@ -1329,13 +1329,29 @@ impl WasmArtifact {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EmitError {
     message: String,
+    /// The execution profile this emission was given cannot be used for it.
+    profile: Option<crate::profile::ProfileError>,
 }
 
 impl EmitError {
     pub fn unsupported(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
+            profile: None,
         }
+    }
+
+    pub(crate) fn profile(error: crate::profile::ProfileError) -> Self {
+        Self {
+            message: error.to_string(),
+            profile: Some(error),
+        }
+    }
+
+    /// Why the emission's execution profile was refused, when it was: a
+    /// profile is never ignored, so emission fails instead.
+    pub fn profile_error(&self) -> Option<&crate::profile::ProfileError> {
+        self.profile.as_ref()
     }
 
     /// A function body exceeded the configured per-function budget.
@@ -1359,6 +1375,7 @@ impl EmitError {
                 body_bytes,
                 budget
             ),
+            profile: None,
         }
     }
 }

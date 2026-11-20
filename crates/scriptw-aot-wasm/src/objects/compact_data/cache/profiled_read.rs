@@ -491,6 +491,9 @@ mod tests {
         }
     }
 
+    const ARRAY_OWN_SLOT: ReadSpecialisation =
+        ReadSpecialisation::OwnCompact(crate::profile::CompactStorageLayout::Array);
+
     /// Each kind's guard is made of the R read entry's own proof emitters,
     /// called as the entry calls them, and of nothing else.
     #[test]
@@ -519,7 +522,10 @@ mod tests {
             let (profiled, steps) = capture(|| emit(ProfileMode::Apply(&profile)));
             assert_eq!(profiled.site_map(), unprofiled.site_map());
             let guards = guards(&steps);
-            assert_eq!(guards.len(), reads, "{kind:?}");
+            // `probe`'s base may be ordinary, so its own inline hit already
+            // proves an own array slot and that kind takes no guard.
+            let guarded = if kind == ARRAY_OWN_SLOT { 0 } else { reads };
+            assert_eq!(guards.len(), guarded, "{kind:?}");
             for guard in guards {
                 assert_eq!(guard, expected(kind), "{kind:?}");
                 for step in &guard {
@@ -557,7 +563,11 @@ mod tests {
             wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all())
                 .validate_all(&profiled.bytes)
                 .unwrap_or_else(|error| panic!("{kind:?}: {error}"));
-            assert!(size(&profiled, "js::probe#") > size(&unprofiled, "js::probe#"));
+            if kind == ARRAY_OWN_SLOT {
+                assert_eq!(profiled.bytes, unprofiled.bytes, "{kind:?}");
+            } else {
+                assert!(size(&profiled, "js::probe#") > size(&unprofiled, "js::probe#"));
+            }
             assert_eq!(
                 size(&profiled, "scriptw::main"),
                 size(&unprofiled, "scriptw::main")
