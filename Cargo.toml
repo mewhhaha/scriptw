@@ -71,6 +71,21 @@ strip = "debuginfo"
 [profile.release.package.scriptw-precompiled-consumer]
 strip = "debuginfo"
 
+# Shipped and benchmark compiler binaries only (`scripts/build-dist.sh`, which
+# also enables jemalloc and optionally Rust PGO). Fat LTO and one codegen unit
+# let LLVM inline across the Wasmtime/Cranelift and Scriptw crates, which
+# release deliberately skips (see above). Measured on the same allocator, that
+# saves about 7% of RSC compile time and 10% of Test262 wall time, for a cold
+# build of about 25 minutes (see CONTRIBUTING). It inherits release, including
+# its package and build-script overrides; development and test rebuilds are
+# unchanged. No DWARF: the CLI strips it anyway, and line tables only enlarge
+# the intermediate LTO objects.
+[profile.dist]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+debug = false
+
 # The runtime-image producer emits/adopts R in Rust before native compilation.
 # Its separate host graph previously defaulted to opt0 even in release builds.
 # Same-source opt1 preserves exact package/native/manifest bytes and cuts warm
