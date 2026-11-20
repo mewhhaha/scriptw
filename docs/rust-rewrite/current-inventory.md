@@ -251,7 +251,10 @@ accepts `--case <file.js>`.
   `docs/rust-rewrite/*.json` (9,524), the `aa55200d1` backlog JSON (651) and
   `test262/replays/*.verification.json` (364). Self-hosted jobs are cancelled
   for want of a runner. Preserve original evidence and compiler invariants;
-  focused native verification does not clear these gates. Owner: unassigned.
+  focused native verification does not clear these gates. Owner: coordinator
+  (this maintenance stream). The red steps span many crates and their evidence
+  rather than one subsystem, so the stream that maintains the guards keeps them
+  sound and takes each finding to the owner of the code it names.
 - Repair pinned Wasmtime's owned-reference downcast: `AnyRef::as_struct` can
   construct a LIFO `Rooted` from an `OwnedRooted` index. Collector tests use a
   scoped view after collection; that preserves their coverage without repairing

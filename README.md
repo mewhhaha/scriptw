@@ -120,7 +120,7 @@ retain the full denominator, including every failure.
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 <!-- scriptw-test-graph:end -->
 
-Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and the doctest pass; one runtime cache test failed on the cloud machine only (fixed in `c0fc65034`). The published Test262 run above measured `41983e248`; later changes ran their affected suites and Test262 subtrees; [current work](docs/rust-rewrite/current-inventory.md) lists what is open.
+Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and the doctest pass; one runtime cache test failed on the cloud machine only. The published Test262 run above measured `41983e248`; later changes ran their affected suites and Test262 subtrees; [current work](docs/rust-rewrite/current-inventory.md) lists what is open.
 
 ## Caveats
 
