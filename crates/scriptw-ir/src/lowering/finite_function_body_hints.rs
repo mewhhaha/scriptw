@@ -65,6 +65,9 @@ impl<'ast> Visitor<'ast> for BodyReferences<'_> {
 
 impl ScriptLowerer<'_> {
     fn parameter_conversion_needs_body_hints(&self, expression: &Expression) -> bool {
+        if super::binary_chain_longer_than(expression, super::MAX_SOURCE_CANDIDATE_CHAIN) {
+            return false;
+        }
         match Self::unwrap_parenthesized_expr(expression) {
             Expression::Binary(binary)
                 if binary.op() == BinaryOp::Arithmetic(ArithmeticOp::Add) =>
@@ -90,6 +93,9 @@ impl ScriptLowerer<'_> {
         references: &[FiniteSourceValue],
     ) -> Vec<FiniteSourceValue> {
         let existing = self.function_source_value_candidates(expression);
+        if super::binary_chain_longer_than(expression, super::MAX_SOURCE_CANDIDATE_CHAIN) {
+            return existing;
+        }
         let hints = match Self::unwrap_parenthesized_expr(expression) {
             Expression::Binary(binary)
                 if binary.op() == BinaryOp::Arithmetic(ArithmeticOp::Add) =>

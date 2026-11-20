@@ -613,6 +613,77 @@ enum IdentifierUpdateReachability {
     WithEnvironmentFallback,
 }
 
+/// Whether `expression` is a binary chain with more than `limit` operators
+/// on its left spine. Analyses that recurse per operator and only look for
+/// small finite facts (dynamic `Function` source candidates) give up on longer
+/// chains instead of recursing through them.
+pub(crate) fn binary_chain_longer_than(expression: &Expression, limit: usize) -> bool {
+    let mut operand = expression;
+    let mut operators = 0;
+    while let Expression::Binary(binary) = ScriptLowerer::unwrap_parenthesized_expr(operand) {
+        operators += 1;
+        if operators > limit {
+            return true;
+        }
+        operand = binary.lhs();
+    }
+    false
+}
+
+/// The longest binary chain whose dynamic `Function` source candidates are
+/// enumerated (see [`binary_chain_longer_than`]).
+pub(crate) const MAX_SOURCE_CANDIDATE_CHAIN: usize = 64;
+
+/// The most operators of a left-deep chain nested in one IR expression, and
+/// the most chain temporaries bound in one group (see [`ChainSegments`]).
+const CHAIN_SEGMENT_LINKS: usize = 256;
+
+/// The temporaries of a long left-deep chain, in source order. Each holds the
+/// value of the chain up to a segment boundary, read by the next segment.
+///
+/// Binding them one inside the other would nest a chain of n operators n/256
+/// deep; binding each run of [`CHAIN_SEGMENT_LINKS`] temporaries inside the
+/// value of the run's last one keeps the nesting at most
+/// 256 + 256 + n/65,536 for any n.
+#[derive(Default)]
+struct ChainSegments {
+    group: Vec<(String, TypedExpr)>,
+    groups: Vec<(String, TypedExpr)>,
+}
+
+impl ChainSegments {
+    fn bind(&mut self, name: String, value: TypedExpr) {
+        self.group.push((name, value));
+        if self.group.len() == CHAIN_SEGMENT_LINKS {
+            let (name, last) = self.group.pop().expect("a full group");
+            let value = Self::materialize(std::mem::take(&mut self.group), last);
+            self.groups.push((name, value));
+        }
+    }
+
+    fn finish(mut self, value: TypedExpr) -> TypedExpr {
+        let value = Self::materialize(std::mem::take(&mut self.group), value);
+        Self::materialize(self.groups, value)
+    }
+
+    /// `let name1 = value1 in (let name2 = value2 in ... body)`.
+    fn materialize(bindings: Vec<(String, TypedExpr)>, body: TypedExpr) -> TypedExpr {
+        bindings
+            .into_iter()
+            .rev()
+            .fold(body, |body, (name, value)| {
+                TypedExpr::from_info(
+                    body.value_info(),
+                    ExprIr::MaterializeBinding {
+                        name,
+                        value: Box::new(value),
+                        body: Box::new(body),
+                    },
+                )
+            })
+    }
+}
+
 fn unknown_runtime_value_info() -> ValueInfo {
     ValueInfo {
         kind: ValueKind::Dynamic,
@@ -12661,6 +12732,93 @@ impl<'a> ScriptLowerer<'a> {
     }
 
     fn lower_binary(&mut self, op: BinaryOp, lhs: &Expression, rhs: &Expression) -> TypedExpr {
+        // A left operand that is itself a binary expression starts a
+        // left-deep chain (`a + b + c`, `a || b || c`, `a, b, c`), which
+        // minified code builds with tens of thousands of operators. Outside
+        // async expression lowering, whose operand pinning needs each operand's
+        // syntax, the chain is lowered by a loop rather than by one recursion
+        // per operator.
+        if self.async_expression_prefix.is_none() && matches!(lhs, Expression::Binary(_)) {
+            return self.lower_binary_chain(op, lhs, rhs);
+        }
+        self.lower_binary_operator(op, lhs, rhs)
+    }
+
+    /// Lowers the left-deep chain whose last operator is `op`: the first
+    /// operand, then each operator with its right operand in source order,
+    /// exactly as the recursive lowering of each `Binary` node would. The
+    /// result keeps at most [`CHAIN_SEGMENT_LINKS`] operators nested in one
+    /// IR expression: every that many, the value so far is bound to a
+    /// temporary that the rest of the chain reads (an `ExprIr::MaterializeBinding`,
+    /// which evaluates its value, propagating an abrupt completion, before its
+    /// body), so IR passes and the emitter recurse through bounded depth.
+    fn lower_binary_chain(
+        &mut self,
+        op: BinaryOp,
+        lhs: &Expression,
+        rhs: &Expression,
+    ) -> TypedExpr {
+        let mut links = vec![(op, rhs)];
+        let mut first = lhs;
+        while let Expression::Binary(binary) = first {
+            links.push((binary.op(), binary.rhs()));
+            first = binary.lhs();
+        }
+        let mut chain = ChainSegments::default();
+        let mut value = self.lower_expression(first);
+        let mut segment_links = 0;
+        let link_count = links.len();
+        for (index, (op, rhs)) in links.into_iter().rev().enumerate() {
+            value = self.lower_binary_link(op, value, rhs);
+            segment_links += 1;
+            if segment_links == CHAIN_SEGMENT_LINKS && index + 1 < link_count {
+                let name = self.alloc_temp_binding_name("binary.chain.");
+                let read =
+                    TypedExpr::from_info(value.value_info(), ExprIr::Identifier(name.clone()));
+                chain.bind(name, std::mem::replace(&mut value, read));
+                segment_links = 0;
+            }
+        }
+        chain.finish(value)
+    }
+
+    /// One operator of a chain whose left operand is already lowered; the
+    /// same operand order and combination as [`Self::lower_binary_operator`]
+    /// outside async expression lowering.
+    fn lower_binary_link(&mut self, op: BinaryOp, lhs: TypedExpr, rhs: &Expression) -> TypedExpr {
+        match op {
+            BinaryOp::Arithmetic(arithmetic) => {
+                let rhs = self.lower_expression(rhs);
+                self.combine_arithmetic(arithmetic, lhs, rhs)
+            }
+            BinaryOp::Relational(relational) => {
+                let rhs = self.lower_expression(rhs);
+                self.combine_relational(relational, lhs, rhs)
+            }
+            BinaryOp::Logical(logical) => self.lower_logical_rhs(logical, lhs, rhs),
+            BinaryOp::Bitwise(bitwise) => {
+                let rhs = self.lower_expression(rhs);
+                self.combine_bitwise(Self::bitwise_binary_op(bitwise), lhs, rhs)
+            }
+            BinaryOp::Comma => {
+                let rhs = self.lower_expression(rhs);
+                TypedExpr::from_info(
+                    rhs.value_info(),
+                    ExprIr::Comma {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                    },
+                )
+            }
+        }
+    }
+
+    fn lower_binary_operator(
+        &mut self,
+        op: BinaryOp,
+        lhs: &Expression,
+        rhs: &Expression,
+    ) -> TypedExpr {
         match op {
             BinaryOp::Arithmetic(arithmetic) => self.lower_arithmetic(arithmetic, lhs, rhs),
             BinaryOp::Relational(relational) => self.lower_relational(relational, lhs, rhs),
@@ -12693,15 +12851,18 @@ impl<'a> ScriptLowerer<'a> {
         let lhs = self.lower_expression(lhs);
         let lhs = self.pin_async_operand_before_suspension(lhs, rhs_suspends, "async.bitwise.lhs.");
         let rhs = self.lower_expression(rhs);
-        let op = match bitwise {
+        self.combine_bitwise(Self::bitwise_binary_op(bitwise), lhs, rhs)
+    }
+
+    const fn bitwise_binary_op(bitwise: BitwiseOp) -> BitwiseBinaryOp {
+        match bitwise {
             BitwiseOp::And => BitwiseBinaryOp::And,
             BitwiseOp::Or => BitwiseBinaryOp::Or,
             BitwiseOp::Xor => BitwiseBinaryOp::Xor,
             BitwiseOp::Shl => BitwiseBinaryOp::Shl,
             BitwiseOp::Shr => BitwiseBinaryOp::Shr,
             BitwiseOp::UShr => BitwiseBinaryOp::UShr,
-        };
-        self.combine_bitwise(op, lhs, rhs)
+        }
     }
 
     /// Applies a bitwise operator to two already-lowered operands.
@@ -13317,8 +13478,7 @@ impl<'a> ScriptLowerer<'a> {
         let lhs = self.lower_expression(lhs);
         let lhs =
             self.pin_async_operand_before_suspension(lhs, rhs_suspends, "async.relational.lhs.");
-        let rhs = self.lower_expression(rhs);
-        self.combine_relational(relational, lhs, rhs)
+        self.lower_binary_link(BinaryOp::Relational(relational), lhs, rhs)
     }
 
     fn lower_logical(
@@ -13334,6 +13494,17 @@ impl<'a> ScriptLowerer<'a> {
             return self.lower_logical_await_value(logical, lhs, rhs);
         }
         let lhs = self.lower_expression(lhs);
+        self.lower_logical_rhs(logical, lhs, rhs)
+    }
+
+    /// The rest of a logical operator once its left operand is lowered: the
+    /// right operand is lowered only where it can be evaluated.
+    fn lower_logical_rhs(
+        &mut self,
+        logical: LogicalOp,
+        lhs: TypedExpr,
+        rhs: &Expression,
+    ) -> TypedExpr {
         if let Some(lhs_bool) = Self::static_bool_expr(&lhs) {
             match (logical, lhs_bool) {
                 (LogicalOp::And, false) | (LogicalOp::Or, true) => return lhs,
@@ -14644,17 +14815,27 @@ impl<'a> ScriptLowerer<'a> {
                 }
             }
             Expression::Binary(binary) => {
-                let lhs = self.static_number_expr(binary.lhs())?;
-                let rhs = self.static_number_expr(binary.rhs())?;
-                match binary.op() {
-                    BinaryOp::Arithmetic(ArithmeticOp::Add) => Some(lhs + rhs),
-                    BinaryOp::Arithmetic(ArithmeticOp::Sub) => Some(lhs - rhs),
-                    BinaryOp::Arithmetic(ArithmeticOp::Mul) => Some(lhs * rhs),
-                    BinaryOp::Arithmetic(ArithmeticOp::Div) => Some(lhs / rhs),
-                    BinaryOp::Arithmetic(ArithmeticOp::Mod) => Some(lhs % rhs),
-                    BinaryOp::Arithmetic(ArithmeticOp::Exp) => Some(Self::static_pow(lhs, rhs)),
-                    _ => None,
+                // A left-deep chain folds from its first operand in a loop.
+                let mut links = vec![(binary.op(), binary.rhs())];
+                let mut first = binary.lhs();
+                while let Expression::Binary(binary) = first {
+                    links.push((binary.op(), binary.rhs()));
+                    first = binary.lhs();
                 }
+                let mut value = self.static_number_expr(first)?;
+                for (op, rhs) in links.into_iter().rev() {
+                    let rhs = self.static_number_expr(rhs)?;
+                    value = match op {
+                        BinaryOp::Arithmetic(ArithmeticOp::Add) => value + rhs,
+                        BinaryOp::Arithmetic(ArithmeticOp::Sub) => value - rhs,
+                        BinaryOp::Arithmetic(ArithmeticOp::Mul) => value * rhs,
+                        BinaryOp::Arithmetic(ArithmeticOp::Div) => value / rhs,
+                        BinaryOp::Arithmetic(ArithmeticOp::Mod) => value % rhs,
+                        BinaryOp::Arithmetic(ArithmeticOp::Exp) => Self::static_pow(value, rhs),
+                        _ => return None,
+                    };
+                }
+                Some(value)
             }
             _ => None,
         }

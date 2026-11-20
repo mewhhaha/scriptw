@@ -232,78 +232,119 @@ where
         let defer_sym = interner.get_or_intern("defer");
         let source_sym = interner.get_or_intern("source");
 
-        let mut lhs = if let Some(start) = is_keyword_call(Keyword::Super, cursor, interner)? {
-            cursor.advance(interner);
-            let (args, args_span) =
-                Arguments::new(self.allow_yield, self.allow_await).parse(cursor, interner)?;
-            SuperCall::new(args, Span::new(start, args_span.end())).into()
-        } else if let Some(start) =
-            is_import_phase_call(cursor, interner, defer_sym, "import.defer")?
-        {
-            CallExpressionTail::new(
-                self.allow_yield,
-                self.allow_await,
-                parse_import_call(
-                    cursor,
-                    interner,
-                    self.allow_yield,
-                    self.allow_await,
-                    start,
-                    boa_ast::declaration::ImportPhase::Defer,
-                    "import.defer call",
-                )?,
+        // Scriptw: an optional chain is one more tree level over its target.
+        let (mut lhs, mut height) = cursor.measured(interner, |cursor, interner| {
+            Ok(
+                if let Some(start) = is_keyword_call(Keyword::Super, cursor, interner)? {
+                    cursor.advance(interner);
+                    let (args, args_span) = Arguments::new(self.allow_yield, self.allow_await)
+                        .parse(cursor, interner)?;
+                    SuperCall::new(args, Span::new(start, args_span.end())).into()
+                } else if let Some(start) =
+                    is_import_phase_call(cursor, interner, defer_sym, "import.defer")?
+                {
+                    {
+                        let (call, call_height) =
+                            cursor.measured(interner, |cursor, interner| {
+                                parse_import_call(
+                                    cursor,
+                                    interner,
+                                    self.allow_yield,
+                                    self.allow_await,
+                                    start,
+                                    boa_ast::declaration::ImportPhase::Defer,
+                                    "import.defer call",
+                                )
+                            })?;
+                        CallExpressionTail::new(
+                            self.allow_yield,
+                            self.allow_await,
+                            call,
+                            call_height,
+                        )
+                        .parse(cursor, interner)?
+                    }
+                } else if let Some(start) =
+                    is_import_phase_call(cursor, interner, source_sym, "import.source")?
+                {
+                    {
+                        let (call, call_height) =
+                            cursor.measured(interner, |cursor, interner| {
+                                parse_import_call(
+                                    cursor,
+                                    interner,
+                                    self.allow_yield,
+                                    self.allow_await,
+                                    start,
+                                    boa_ast::declaration::ImportPhase::Source,
+                                    "import.source call",
+                                )
+                            })?;
+                        CallExpressionTail::new(
+                            self.allow_yield,
+                            self.allow_await,
+                            call,
+                            call_height,
+                        )
+                        .parse(cursor, interner)?
+                    }
+                } else if let Some(start) = is_keyword_call(Keyword::Import, cursor, interner)? {
+                    {
+                        let (call, call_height) =
+                            cursor.measured(interner, |cursor, interner| {
+                                parse_import_call(
+                                    cursor,
+                                    interner,
+                                    self.allow_yield,
+                                    self.allow_await,
+                                    start,
+                                    boa_ast::declaration::ImportPhase::Evaluation,
+                                    "import call",
+                                )
+                            })?;
+                        CallExpressionTail::new(
+                            self.allow_yield,
+                            self.allow_await,
+                            call,
+                            call_height,
+                        )
+                        .parse(cursor, interner)?
+                    }
+                } else {
+                    let (mut member, member_height) =
+                        cursor.measured(interner, |cursor, interner| {
+                            MemberExpression::new(self.allow_yield, self.allow_await)
+                                .parse(cursor, interner)
+                        })?;
+                    if let Some(tok) = cursor.peek(0, interner)?
+                        && tok.kind() == &TokenKind::Punctuator(Punctuator::OpenParen)
+                    {
+                        member = CallExpression::new(
+                            self.allow_yield,
+                            self.allow_await,
+                            member,
+                            member_height,
+                        )
+                        .parse(cursor, interner)?;
+                    }
+                    member
+                },
             )
-            .parse(cursor, interner)?
-        } else if let Some(start) =
-            is_import_phase_call(cursor, interner, source_sym, "import.source")?
-        {
-            CallExpressionTail::new(
-                self.allow_yield,
-                self.allow_await,
-                parse_import_call(
-                    cursor,
-                    interner,
-                    self.allow_yield,
-                    self.allow_await,
-                    start,
-                    boa_ast::declaration::ImportPhase::Source,
-                    "import.source call",
-                )?,
-            )
-            .parse(cursor, interner)?
-        } else if let Some(start) = is_keyword_call(Keyword::Import, cursor, interner)? {
-            CallExpressionTail::new(
-                self.allow_yield,
-                self.allow_await,
-                parse_import_call(
-                    cursor,
-                    interner,
-                    self.allow_yield,
-                    self.allow_await,
-                    start,
-                    boa_ast::declaration::ImportPhase::Evaluation,
-                    "import call",
-                )?,
-            )
-            .parse(cursor, interner)?
-        } else {
-            let mut member = MemberExpression::new(self.allow_yield, self.allow_await)
-                .parse(cursor, interner)?;
-            if let Some(tok) = cursor.peek(0, interner)?
-                && tok.kind() == &TokenKind::Punctuator(Punctuator::OpenParen)
-            {
-                member = CallExpression::new(self.allow_yield, self.allow_await, member)
-                    .parse(cursor, interner)?;
-            }
-            member
-        };
+        })?;
 
         if let Some(tok) = cursor.peek(0, interner)?
             && tok.kind() == &TokenKind::Punctuator(Punctuator::Optional)
         {
-            lhs = OptionalExpression::new(self.allow_yield, self.allow_await, lhs)
-                .parse(cursor, interner)?
-                .into();
+            let (optional, chain_height) = cursor.measured(interner, |cursor, interner| {
+                OptionalExpression::new(self.allow_yield, self.allow_await, lhs)
+                    .parse(cursor, interner)
+            })?;
+            height = cursor.chain_height(
+                height.max(chain_height) + crate::parser::MEMBER_LINK_UNITS,
+                interner,
+            )?;
+            cursor.record_height(height);
+            lhs = optional.into();
         }
 
         Ok(lhs)

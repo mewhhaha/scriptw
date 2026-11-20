@@ -389,9 +389,8 @@ where
                         .peek(0, interner)?
                         .is_some_and(|tok| tok.kind() == &TokenKind::Punctuator(Punctuator::Assign))
                     {
-                        let mut init =
-                            Initializer::new(true, self.allow_yield, self.allow_await)
-                                .parse(cursor, interner)?;
+                        let mut init = Initializer::new(true, self.allow_yield, self.allow_await)
+                            .parse(cursor, interner)?;
                         init.set_anonymous_function_definition_name(&ident);
                         Some(init)
                     } else {
@@ -472,65 +471,68 @@ where
     type Output = AstFunctionBody;
 
     fn parse(self, cursor: &mut Cursor<R>, interner: &mut Interner) -> ParseResult<Self::Output> {
-        cursor.nested(interner, move |cursor, interner| {
-            let start = if self.parse_full_input {
-                cursor
-                    .peek(0, interner)?
-                    .map_or_else(|| Position::new(1, 1), |token| token.span().start())
-            } else {
-                cursor
-                    .expect(Punctuator::OpenBlock, self.context, interner)?
-                    .span()
-                    .start()
-            };
+        let resumable = self.allow_yield.0 || self.allow_await.0;
+        cursor.function_body(resumable, interner, move |cursor, interner| {
+            cursor.nested(interner, move |cursor, interner| {
+                let start = if self.parse_full_input {
+                    cursor
+                        .peek(0, interner)?
+                        .map_or_else(|| Position::new(1, 1), |token| token.span().start())
+                } else {
+                    cursor
+                        .expect(Punctuator::OpenBlock, self.context, interner)?
+                        .span()
+                        .start()
+                };
 
-            let break_tokens: &[TokenKind] = if self.parse_full_input {
-                &[]
-            } else {
-                &FUNCTION_BREAK_TOKENS
-            };
+                let break_tokens: &[TokenKind] = if self.parse_full_input {
+                    &[]
+                } else {
+                    &FUNCTION_BREAK_TOKENS
+                };
 
-            let (body, end) = StatementList::new(
-                self.allow_yield,
-                self.allow_await,
-                true,
-                break_tokens,
-                true,
-                false,
-            )
-            .parse(cursor, interner)?;
+                let (body, end) = StatementList::new(
+                    self.allow_yield,
+                    self.allow_await,
+                    true,
+                    break_tokens,
+                    true,
+                    false,
+                )
+                .parse(cursor, interner)?;
 
-            if let Err(error) = check_labels(&body) {
-                return Err(Error::lex(LexError::Syntax(
-                    error.message(interner).into(),
-                    Position::new(1, 1),
-                )));
-            }
-
-            if contains_invalid_object_literal(&body) {
-                return Err(Error::lex(LexError::Syntax(
-                    "invalid object literal in function statement list".into(),
-                    Position::new(1, 1),
-                )));
-            }
-
-            let end = if self.parse_full_input {
-                if let Some(token) = cursor.peek(0, interner)? {
-                    return Err(Error::unexpected(
-                        token.to_string(interner),
-                        token.span(),
-                        "function statement list",
-                    ));
+                if let Err(error) = check_labels(&body) {
+                    return Err(Error::lex(LexError::Syntax(
+                        error.message(interner).into(),
+                        Position::new(1, 1),
+                    )));
                 }
-                end.unwrap_or(start)
-            } else {
-                cursor
-                    .expect(Punctuator::CloseBlock, self.context, interner)?
-                    .span()
-                    .end()
-            };
 
-            Ok(AstFunctionBody::new(body, Span::new(start, end)))
+                if contains_invalid_object_literal(&body) {
+                    return Err(Error::lex(LexError::Syntax(
+                        "invalid object literal in function statement list".into(),
+                        Position::new(1, 1),
+                    )));
+                }
+
+                let end = if self.parse_full_input {
+                    if let Some(token) = cursor.peek(0, interner)? {
+                        return Err(Error::unexpected(
+                            token.to_string(interner),
+                            token.span(),
+                            "function statement list",
+                        ));
+                    }
+                    end.unwrap_or(start)
+                } else {
+                    cursor
+                        .expect(Punctuator::CloseBlock, self.context, interner)?
+                        .span()
+                        .end()
+                };
+
+                Ok(AstFunctionBody::new(body, Span::new(start, end)))
+            })
         })
     }
 }

@@ -60,183 +60,194 @@ where
     type Output = ast::Expression;
 
     fn parse(self, cursor: &mut Cursor<R>, interner: &mut Interner) -> ParseResult<Self::Output> {
+        // Scriptw: the first operand of a left-deep chain, one tree level per
+        // property access or tagged template.
         cursor.set_goal(InputElement::RegExp);
 
-        let token = cursor.peek(0, interner).or_abrupt()?;
-        let position = token.span().start();
-        let mut lhs = match token.kind() {
-            TokenKind::Keyword((Keyword::New | Keyword::Super | Keyword::Import, true)) => {
-                return Err(Error::general(
-                    "keyword must not contain escaped characters",
-                    token.span().start(),
-                ));
-            }
-            TokenKind::Keyword((Keyword::Import, false)) => {
-                let import_span = token.span();
-                cursor.advance(interner);
-
-                cursor.expect(
-                    TokenKind::Punctuator(Punctuator::Dot),
-                    "import.meta",
-                    interner,
-                )?;
-
-                let token = cursor.next(interner).or_abrupt()?;
-
-                match token.kind() {
-                    TokenKind::IdentifierName((Sym::META, ContainsEscapeSequence(ces))) => {
-                        if *ces {
-                            return Err(Error::general(
-                                "`import.meta` cannot contain escaped characters",
-                                token.span().start(),
-                            ));
-                        }
-                    }
-                    _ => {
-                        return Err(Error::expected(
-                            ["property `meta`".into()],
-                            token.to_string(interner),
-                            token.span(),
-                            "import.meta",
-                        ));
-                    }
-                }
-
-                if !cursor.module() {
+        let (mut lhs, mut height) = cursor.measured(interner, |cursor, interner| {
+            let token = cursor.peek(0, interner).or_abrupt()?;
+            let position = token.span().start();
+            Ok(match token.kind() {
+                TokenKind::Keyword((Keyword::New | Keyword::Super | Keyword::Import, true)) => {
                     return Err(Error::general(
-                        "invalid `import.meta` expression outside a module",
-                        position,
+                        "keyword must not contain escaped characters",
+                        token.span().start(),
                     ));
                 }
+                TokenKind::Keyword((Keyword::Import, false)) => {
+                    let import_span = token.span();
+                    cursor.advance(interner);
 
-                ImportMeta::new(Span::new(import_span.start(), token.span().end())).into()
-            }
-            TokenKind::Keyword((Keyword::New, false)) => {
-                let new_token_span = token.span();
-                cursor.advance(interner);
+                    cursor.expect(
+                        TokenKind::Punctuator(Punctuator::Dot),
+                        "import.meta",
+                        interner,
+                    )?;
 
-                if cursor.next_if(Punctuator::Dot, interner)?.is_some() {
                     let token = cursor.next(interner).or_abrupt()?;
+
                     match token.kind() {
-                        TokenKind::IdentifierName((Sym::TARGET, ContainsEscapeSequence(true))) => {
-                            return Err(Error::general(
-                                "'new.target' must not contain escaped characters",
-                                token.span().start(),
-                            ));
-                        }
-                        TokenKind::IdentifierName((Sym::TARGET, ContainsEscapeSequence(false))) => {
-                            NewTarget::new(Span::new(new_token_span.start(), token.span().end()))
-                                .into()
+                        TokenKind::IdentifierName((Sym::META, ContainsEscapeSequence(ces))) => {
+                            if *ces {
+                                return Err(Error::general(
+                                    "`import.meta` cannot contain escaped characters",
+                                    token.span().start(),
+                                ));
+                            }
                         }
                         _ => {
-                            return Err(Error::general(
-                                "unexpected private identifier",
-                                token.span().start(),
+                            return Err(Error::expected(
+                                ["property `meta`".into()],
+                                token.to_string(interner),
+                                token.span(),
+                                "import.meta",
                             ));
                         }
                     }
-                } else {
-                    // `new new … F`: the callee recursion passes no other
-                    // counted production.
-                    let lhs_inner =
-                        cursor.nested(interner, |cursor, interner| self.parse(cursor, interner))?;
-                    if let Some(next) = cursor.peek(0, interner)?
-                        && next.kind() == &TokenKind::Punctuator(Punctuator::Optional)
-                    {
+
+                    if !cursor.module() {
                         return Err(Error::general(
-                            "optional chain is not a constructor target",
-                            next.span().start(),
+                            "invalid `import.meta` expression outside a module",
+                            position,
                         ));
                     }
-                    let (args, args_span) = match cursor.peek(0, interner)? {
-                        Some(next)
-                            if next.kind() == &TokenKind::Punctuator(Punctuator::OpenParen) =>
-                        {
-                            Arguments::new(self.allow_yield, self.allow_await)
-                                .parse(cursor, interner)?
-                        }
-                        _ => (Box::default(), lhs_inner.span()),
-                    };
-                    let call_node = Call::new(
-                        lhs_inner,
-                        args,
-                        Span::new(new_token_span.start(), args_span.end()),
-                    );
 
-                    New::from(call_node).into()
+                    ImportMeta::new(Span::new(import_span.start(), token.span().end())).into()
                 }
-            }
-            TokenKind::Keyword((Keyword::Super, _)) => {
-                let super_token_span = token.span();
-                cursor.advance(interner);
-                let token = cursor.next(interner).or_abrupt()?;
-                match token.kind() {
-                    TokenKind::Punctuator(Punctuator::Dot) => {
+                TokenKind::Keyword((Keyword::New, false)) => {
+                    let new_token_span = token.span();
+                    cursor.advance(interner);
+
+                    if cursor.next_if(Punctuator::Dot, interner)?.is_some() {
                         let token = cursor.next(interner).or_abrupt()?;
-                        let field = match token.kind() {
-                            TokenKind::IdentifierName((name, _)) => SuperPropertyAccess::new(
-                                Identifier::new(*name, token.span()).into(),
-                                Span::new(super_token_span.start(), token.span().end()),
-                            ),
-                            TokenKind::Keyword((kw, _)) => SuperPropertyAccess::new(
-                                Identifier::new(kw.to_sym(), token.span()).into(),
-                                Span::new(super_token_span.start(), token.span().end()),
-                            ),
-                            TokenKind::BooleanLiteral((true, _)) => SuperPropertyAccess::new(
-                                Identifier::new(Sym::TRUE, token.span()).into(),
-                                Span::new(super_token_span.start(), token.span().end()),
-                            ),
-                            TokenKind::BooleanLiteral((false, _)) => SuperPropertyAccess::new(
-                                Identifier::new(Sym::FALSE, token.span()).into(),
-                                Span::new(super_token_span.start(), token.span().end()),
-                            ),
-                            TokenKind::NullLiteral(_) => SuperPropertyAccess::new(
-                                Identifier::new(Sym::NULL, token.span()).into(),
-                                Span::new(super_token_span.start(), token.span().end()),
-                            ),
-                            TokenKind::PrivateIdentifier(_) => {
+                        match token.kind() {
+                            TokenKind::IdentifierName((
+                                Sym::TARGET,
+                                ContainsEscapeSequence(true),
+                            )) => {
+                                return Err(Error::general(
+                                    "'new.target' must not contain escaped characters",
+                                    token.span().start(),
+                                ));
+                            }
+                            TokenKind::IdentifierName((
+                                Sym::TARGET,
+                                ContainsEscapeSequence(false),
+                            )) => NewTarget::new(Span::new(
+                                new_token_span.start(),
+                                token.span().end(),
+                            ))
+                            .into(),
+                            _ => {
                                 return Err(Error::general(
                                     "unexpected private identifier",
                                     token.span().start(),
                                 ));
                             }
-                            _ => {
-                                return Err(Error::unexpected(
-                                    token.to_string(interner),
-                                    token.span(),
-                                    "expected super property",
-                                ));
+                        }
+                    } else {
+                        // `new new … F`: the callee recursion passes no other
+                        // counted production.
+                        let lhs_inner = cursor
+                            .nested(interner, |cursor, interner| self.parse(cursor, interner))?;
+                        if let Some(next) = cursor.peek(0, interner)?
+                            && next.kind() == &TokenKind::Punctuator(Punctuator::Optional)
+                        {
+                            return Err(Error::general(
+                                "optional chain is not a constructor target",
+                                next.span().start(),
+                            ));
+                        }
+                        let (args, args_span) = match cursor.peek(0, interner)? {
+                            Some(next)
+                                if next.kind() == &TokenKind::Punctuator(Punctuator::OpenParen) =>
+                            {
+                                Arguments::new(self.allow_yield, self.allow_await)
+                                    .parse(cursor, interner)?
                             }
+                            _ => (Box::default(), lhs_inner.span()),
                         };
-                        ast::Expression::PropertyAccess(field.into())
-                    }
-                    TokenKind::Punctuator(Punctuator::OpenBracket) => {
-                        let expr = Expression::new(true, self.allow_yield, self.allow_await)
-                            .parse(cursor, interner)?;
-                        let token_span = cursor
-                            .expect(Punctuator::CloseBracket, "super property", interner)?
-                            .span();
+                        let call_node = Call::new(
+                            lhs_inner,
+                            args,
+                            Span::new(new_token_span.start(), args_span.end()),
+                        );
 
-                        ast::Expression::PropertyAccess(
-                            SuperPropertyAccess::new(
-                                expr.into(),
-                                Span::new(super_token_span.start(), token_span.end()),
-                            )
-                            .into(),
-                        )
-                    }
-                    _ => {
-                        return Err(Error::unexpected(
-                            token.to_string(interner),
-                            token.span(),
-                            "expected super property",
-                        ));
+                        New::from(call_node).into()
                     }
                 }
-            }
-            _ => PrimaryExpression::new(self.allow_yield, self.allow_await)
-                .parse(cursor, interner)?,
-        };
+                TokenKind::Keyword((Keyword::Super, _)) => {
+                    let super_token_span = token.span();
+                    cursor.advance(interner);
+                    let token = cursor.next(interner).or_abrupt()?;
+                    match token.kind() {
+                        TokenKind::Punctuator(Punctuator::Dot) => {
+                            let token = cursor.next(interner).or_abrupt()?;
+                            let field = match token.kind() {
+                                TokenKind::IdentifierName((name, _)) => SuperPropertyAccess::new(
+                                    Identifier::new(*name, token.span()).into(),
+                                    Span::new(super_token_span.start(), token.span().end()),
+                                ),
+                                TokenKind::Keyword((kw, _)) => SuperPropertyAccess::new(
+                                    Identifier::new(kw.to_sym(), token.span()).into(),
+                                    Span::new(super_token_span.start(), token.span().end()),
+                                ),
+                                TokenKind::BooleanLiteral((true, _)) => SuperPropertyAccess::new(
+                                    Identifier::new(Sym::TRUE, token.span()).into(),
+                                    Span::new(super_token_span.start(), token.span().end()),
+                                ),
+                                TokenKind::BooleanLiteral((false, _)) => SuperPropertyAccess::new(
+                                    Identifier::new(Sym::FALSE, token.span()).into(),
+                                    Span::new(super_token_span.start(), token.span().end()),
+                                ),
+                                TokenKind::NullLiteral(_) => SuperPropertyAccess::new(
+                                    Identifier::new(Sym::NULL, token.span()).into(),
+                                    Span::new(super_token_span.start(), token.span().end()),
+                                ),
+                                TokenKind::PrivateIdentifier(_) => {
+                                    return Err(Error::general(
+                                        "unexpected private identifier",
+                                        token.span().start(),
+                                    ));
+                                }
+                                _ => {
+                                    return Err(Error::unexpected(
+                                        token.to_string(interner),
+                                        token.span(),
+                                        "expected super property",
+                                    ));
+                                }
+                            };
+                            ast::Expression::PropertyAccess(field.into())
+                        }
+                        TokenKind::Punctuator(Punctuator::OpenBracket) => {
+                            let expr = Expression::new(true, self.allow_yield, self.allow_await)
+                                .parse(cursor, interner)?;
+                            let token_span = cursor
+                                .expect(Punctuator::CloseBracket, "super property", interner)?
+                                .span();
+
+                            ast::Expression::PropertyAccess(
+                                SuperPropertyAccess::new(
+                                    expr.into(),
+                                    Span::new(super_token_span.start(), token_span.end()),
+                                )
+                                .into(),
+                            )
+                        }
+                        _ => {
+                            return Err(Error::unexpected(
+                                token.to_string(interner),
+                                token.span(),
+                                "expected super property",
+                            ));
+                        }
+                    }
+                }
+                _ => PrimaryExpression::new(self.allow_yield, self.allow_await)
+                    .parse(cursor, interner)?,
+            })
+        })?;
 
         cursor.set_goal(InputElement::TemplateTail);
 
@@ -246,6 +257,8 @@ where
                     cursor
                         .next(interner)?
                         .expect("dot punctuator token disappeared"); // We move the parser forward.
+                    height =
+                        cursor.chain_height(height + crate::parser::MEMBER_LINK_UNITS, interner)?;
 
                     let token = cursor.next(interner).or_abrupt()?;
 
@@ -295,25 +308,40 @@ where
                     cursor
                         .next(interner)?
                         .expect("open bracket punctuator token disappeared"); // We move the parser forward.
-                    let idx = Expression::new(true, self.allow_yield, self.allow_await)
-                        .parse(cursor, interner)?;
+                    let (idx, idx_height) = cursor.measured(interner, |cursor, interner| {
+                        Expression::new(true, self.allow_yield, self.allow_await)
+                            .parse(cursor, interner)
+                    })?;
+                    height = cursor.chain_height(
+                        height.max(idx_height) + crate::parser::MEMBER_LINK_UNITS,
+                        interner,
+                    )?;
                     cursor.expect(Punctuator::CloseBracket, "member expression", interner)?;
                     lhs =
                         ast::Expression::PropertyAccess(SimplePropertyAccess::new(lhs, idx).into());
                 }
                 TokenKind::TemplateNoSubstitution { .. } | TokenKind::TemplateMiddle { .. } => {
-                    lhs = TaggedTemplateLiteral::new(
-                        self.allow_yield,
-                        self.allow_await,
-                        tok.start_group(),
-                        lhs,
-                    )
-                    .parse(cursor, interner)?
-                    .into();
+                    let start_group = tok.start_group();
+                    let (tagged, template_height) =
+                        cursor.measured(interner, |cursor, interner| {
+                            TaggedTemplateLiteral::new(
+                                self.allow_yield,
+                                self.allow_await,
+                                start_group,
+                                lhs,
+                            )
+                            .parse(cursor, interner)
+                        })?;
+                    height = cursor.chain_height(
+                        height.max(template_height) + crate::parser::MEMBER_LINK_UNITS,
+                        interner,
+                    )?;
+                    lhs = tagged.into();
                 }
                 _ => break,
             }
         }
+        cursor.record_height(height);
 
         Ok(lhs)
     }

@@ -511,9 +511,11 @@ where
                     "multiple expressions in parenthesized expression",
                 ));
             }
-            if let InnerExpression::Expression(expression) = &expressions[0] {
+            // Scriptw: move the expression rather than clone it; cloning
+            // recursed through its whole tree, once per enclosing parenthesis.
+            if let Some(InnerExpression::Expression(expression)) = expressions.pop() {
                 return Ok(ast::Expression::Parenthesized(Parenthesized::new(
-                    expression.clone(),
+                    expression,
                     Span::new(span_start.start(), span.end()),
                 )));
             }

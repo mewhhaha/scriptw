@@ -20,8 +20,7 @@ use crate::{
     source::ReadChar,
 };
 use boa_ast::{
-    Position, StatementList,
-    Declaration, StatementListItem,
+    Declaration, Position, Spanned, StatementList, StatementListItem,
     declaration::LexicalDeclaration,
     function::{FormalParameterList, FunctionBody},
     operations::{
@@ -29,7 +28,6 @@ use boa_ast::{
         contains_invalid_object_literal, lexically_declared_names, var_declared_names,
     },
     scope::Scope,
-    Spanned,
 };
 use boa_interner::{Interner, Sym};
 use rustc_hash::FxHashSet;
@@ -41,12 +39,54 @@ use self::statement::ModuleItemList;
 /// have; deeper source is a SyntaxError. Each level is one enclosing
 /// AssignmentExpression, Statement, function body, unary or prefix update
 /// operand, `await` operand, right-associative `**` operand, `new` callee,
-/// class heritage or binding pattern. The recursive-descent
-/// parser, and the compiler phases that recurse over the tree, need native
-/// stack in proportion to this depth; at this bound they stay well inside the
-/// 64 MiB stack Scriptw compiles on. V8 reports a RangeError for comparable
+/// class heritage or binding pattern. V8 reports a RangeError for comparable
 /// depths (about 2,000 to 4,000 nested parentheses or blocks).
+///
+/// The parser recurses once per level, but loops build some trees deeper than
+/// the parser recursed: binary, logical, `??` and comma chains, and member,
+/// call, tagged template and optional chains add one tree level per operator.
+/// So the bound is on the height of the tree, in units: a counted production
+/// costs [`NESTING_UNITS_PER_LEVEL`], an `else if` [`ELSE_IF_UNITS`], a member
+/// or call link [`MEMBER_LINK_UNITS`] and a binary, logical, `??` or comma
+/// link [`BINARY_LINK_UNITS`] ([`RESUMABLE_BINARY_LINK_UNITS`] in generator
+/// and async function bodies), and no path from the root may exceed
+/// [`MAX_NESTING_UNITS`]. Every phase after the parser recurses once per
+/// level except through binary, logical, `??` and comma chains, which Boa's
+/// visitors, the tree's `Drop` and Scriptw's lowering walk iteratively, and
+/// which lowering splits into bounded IR. So at this bound the compiler stays
+/// well inside the 64 MiB stack it runs on, and those chains may have about
+/// two million operators (V8 handles chains of a million terms).
 pub const MAX_NESTING_DEPTH: u32 = 1000;
+
+/// Scriptw: tree-height units of one counted production.
+pub const NESTING_UNITS_PER_LEVEL: u32 = 2048;
+
+/// Scriptw: tree-height units of one `else if`, which the parser recurses
+/// through directly rather than as a whole Statement: two thirds of a level,
+/// so up to 1,500 `else if` branches compile (V8: about 3,000 run; 10,000
+/// throw a RangeError). Native compilation of the nested branches still grows
+/// faster than their number (2,000 took 2.2 GB with backtracking allocation).
+pub const ELSE_IF_UNITS: u32 = NESTING_UNITS_PER_LEVEL * 2 / 3;
+
+/// Scriptw: tree-height units of one link of a member, call, tagged template
+/// or optional chain (`a.b`, `a[b]`, `a(b)`, ``a`b` ``, `a?.b`): two levels,
+/// so a chain has at most about 500 links. Later phases recurse through each
+/// link, and native compilation of the chain grows faster than its length
+/// (1,000 links took 1.5 GB).
+pub const MEMBER_LINK_UNITS: u32 = 2 * NESTING_UNITS_PER_LEVEL;
+
+/// Scriptw: tree-height units of one binary, logical, `??` or comma operator;
+/// the compiler walks these chains without recursing per operator. Inside a
+/// generator or async function body the compiler's resumable lowering still
+/// recurses per operator, so there one costs [`RESUMABLE_BINARY_LINK_UNITS`].
+pub const BINARY_LINK_UNITS: u32 = 1;
+
+/// Scriptw: tree-height units of one binary operator in a generator or async
+/// function body: half a level, so about 2,000 fit.
+pub const RESUMABLE_BINARY_LINK_UNITS: u32 = NESTING_UNITS_PER_LEVEL / 2;
+
+/// Scriptw: the greatest tree height, in units, a source may have.
+pub const MAX_NESTING_UNITS: u32 = MAX_NESTING_DEPTH * NESTING_UNITS_PER_LEVEL;
 
 type ScriptParseOutput = (boa_ast::Script, boa_ast::SourceText);
 type ModuleParseOutput = (boa_ast::Module, boa_ast::SourceText);

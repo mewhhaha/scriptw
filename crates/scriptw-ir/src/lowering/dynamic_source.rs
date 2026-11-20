@@ -218,7 +218,21 @@ fn has_aot_source_text_proof(expression: &Expression) -> bool {
             true
         }
         Expression::Binary(binary) if binary.op() == BinaryOp::Arithmetic(ArithmeticOp::Add) => {
-            has_aot_source_text_proof(binary.lhs()) && has_aot_source_text_proof(binary.rhs())
+            // A left-deep `+` chain is checked operand by operand in a loop.
+            let mut operand = expression;
+            loop {
+                match ScriptLowerer::unwrap_parenthesized_expr(operand) {
+                    Expression::Binary(binary)
+                        if binary.op() == BinaryOp::Arithmetic(ArithmeticOp::Add) =>
+                    {
+                        if !has_aot_source_text_proof(binary.rhs()) {
+                            return false;
+                        }
+                        operand = binary.lhs();
+                    }
+                    first => return has_aot_source_text_proof(first),
+                }
+            }
         }
         _ => false,
     }
@@ -690,8 +704,20 @@ impl ScriptLowerer<'_> {
             Expression::Binary(binary)
                 if binary.op() == BinaryOp::Arithmetic(ArithmeticOp::Add) =>
             {
-                let mut units = decode_js_string_utf16(&self.aot_source_text(binary.lhs())?);
-                units.extend(decode_js_string_utf16(&self.aot_source_text(binary.rhs())?));
+                // A left-deep `+` chain concatenates its operands in a loop.
+                let mut right_operands = vec![binary.rhs()];
+                let mut first = binary.lhs();
+                while let Expression::Binary(binary) = first {
+                    if binary.op() != BinaryOp::Arithmetic(ArithmeticOp::Add) {
+                        break;
+                    }
+                    right_operands.push(binary.rhs());
+                    first = binary.lhs();
+                }
+                let mut units = decode_js_string_utf16(&self.aot_source_text(first)?);
+                for operand in right_operands.into_iter().rev() {
+                    units.extend(decode_js_string_utf16(&self.aot_source_text(operand)?));
+                }
                 Some(Self::utf16_units_to_runtime_string(&units))
             }
             _ => None,

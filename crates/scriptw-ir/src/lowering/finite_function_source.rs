@@ -373,6 +373,9 @@ impl ScriptLowerer<'_> {
     ) -> Vec<FiniteSourceValue> {
         #[cfg(test)]
         let _discovery_work = super::finite_regexp_source::enter_source_candidate_discovery();
+        if super::binary_chain_longer_than(expression, super::MAX_SOURCE_CANDIDATE_CHAIN) {
+            return Vec::new();
+        }
         let expression = Self::unwrap_parenthesized_expr(expression);
         let prototype_source = match expression {
             Expression::Call(call) => match Self::unwrap_parenthesized_expr(call.function()) {

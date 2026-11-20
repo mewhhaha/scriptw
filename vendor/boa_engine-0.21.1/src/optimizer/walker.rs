@@ -40,6 +40,8 @@ where
     F: FnMut(&mut Expression) -> PassAction<Expression>,
 {
     type BreakTy = Infallible;
+    // Scriptw: the passes rewrite every expression, inner chain nodes included.
+    const VISITS_BINARY_CHAINS_ITERATIVELY: bool = false;
 
     /// Visits the tree in postorder.
     fn visit_expression_mut(&mut self, expr: &'ast mut Expression) -> ControlFlow<Self::BreakTy> {

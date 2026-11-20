@@ -5831,24 +5831,24 @@ impl<'a> AnalysisBuilder<'a> {
                 );
             }
             Expression::Binary(binary) => {
-                self.scan_expression(
-                    owner_id,
-                    binary.lhs(),
-                    interner,
-                    source_text,
-                    self_name,
-                    capture_aliases,
-                    refs,
-                );
-                self.scan_expression(
-                    owner_id,
-                    binary.rhs(),
-                    interner,
-                    source_text,
-                    self_name,
-                    capture_aliases,
-                    refs,
-                );
+                // A left-deep chain is scanned in source order by a loop.
+                let mut right_operands = vec![binary.rhs()];
+                let mut first = binary.lhs();
+                while let Expression::Binary(binary) = first {
+                    right_operands.push(binary.rhs());
+                    first = binary.lhs();
+                }
+                for operand in std::iter::once(first).chain(right_operands.into_iter().rev()) {
+                    self.scan_expression(
+                        owner_id,
+                        operand,
+                        interner,
+                        source_text,
+                        self_name,
+                        capture_aliases,
+                        refs,
+                    );
+                }
             }
             Expression::Assign(assign) => {
                 match assign.lhs() {

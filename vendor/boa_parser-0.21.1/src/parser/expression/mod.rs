@@ -81,20 +81,31 @@ macro_rules! expression {
                     cursor.set_goal($goal.unwrap());
                 }
 
-                let mut lhs = $lower::new($( self.$low_param ),*).parse(cursor, interner)?;
+                // Scriptw: a left-deep chain, one tree level per operator.
+                let (mut lhs, mut height) = cursor.measured(interner, |cursor, interner| {
+                    $lower::new($( self.$low_param ),*).parse(cursor, interner)
+                })?;
                 while let Some(tok) = cursor.peek(0, interner)? {
                     match *tok.kind() {
                         TokenKind::Punctuator(op) if $( op == $op )||* => {
                             cursor.advance(interner);
+                            let (rhs, rhs_height) = cursor.measured(interner, |cursor, interner| {
+                                $lower::new($( self.$low_param ),*).parse(cursor, interner)
+                            })?;
+                            height = cursor.chain_height(
+                                height.max(rhs_height) + cursor.binary_link_units(),
+                                interner,
+                            )?;
                             lhs = Binary::new(
                                 op.as_binary_op().expect("Could not get binary operation."),
                                 lhs,
-                                $lower::new($( self.$low_param ),*).parse(cursor, interner)?
+                                rhs
                             ).into();
                         }
                         _ => break
                     }
                 }
+                cursor.record_height(height);
 
                 Ok(lhs)
             }
@@ -140,42 +151,49 @@ where
     type Output = ast::Expression;
 
     fn parse(self, cursor: &mut Cursor<R>, interner: &mut Interner) -> ParseResult<Self::Output> {
-        let mut lhs = AssignmentExpression::new(self.allow_in, self.allow_yield, self.allow_await)
-            .parse(cursor, interner)?;
+        // Scriptw: a left-deep chain, one tree level per comma.
+        let (mut lhs, mut height) = cursor.measured(interner, |cursor, interner| {
+            AssignmentExpression::new(self.allow_in, self.allow_yield, self.allow_await)
+                .parse(cursor, interner)
+        })?;
         while let Some(tok) = cursor.peek(0, interner)? {
             match *tok.kind() {
                 TokenKind::Punctuator(Punctuator::Comma) => {
                     if cursor.peek(1, interner).or_abrupt()?.kind()
                         == &TokenKind::Punctuator(Punctuator::CloseParen)
                     {
-                        return Ok(lhs);
+                        break;
                     }
 
                     if cursor.peek(1, interner).or_abrupt()?.kind()
                         == &TokenKind::Punctuator(Punctuator::Spread)
                     {
-                        return Ok(lhs);
+                        break;
                     }
 
                     cursor.advance(interner);
 
+                    let (rhs, rhs_height) = cursor.measured(interner, |cursor, interner| {
+                        AssignmentExpression::new(self.allow_in, self.allow_yield, self.allow_await)
+                            .parse(cursor, interner)
+                    })?;
+                    height = cursor.chain_height(
+                        height.max(rhs_height) + cursor.binary_link_units(),
+                        interner,
+                    )?;
                     lhs = Binary::new(
                         Punctuator::Comma
                             .as_binary_op()
                             .expect("Could not get binary operation."),
                         lhs,
-                        AssignmentExpression::new(
-                            self.allow_in,
-                            self.allow_yield,
-                            self.allow_await,
-                        )
-                        .parse(cursor, interner)?,
+                        rhs,
                     )
                     .into();
                 }
                 _ => break,
             }
         }
+        cursor.record_height(height);
 
         Ok(lhs)
     }
@@ -219,25 +237,6 @@ impl ShortCircuitExpression {
             previous: PreviousExpr::None,
         }
     }
-
-    fn with_previous<I, Y, A>(
-        allow_in: I,
-        allow_yield: Y,
-        allow_await: A,
-        previous: PreviousExpr,
-    ) -> Self
-    where
-        I: Into<AllowIn>,
-        Y: Into<AllowYield>,
-        A: Into<AllowAwait>,
-    {
-        Self {
-            allow_in: allow_in.into(),
-            allow_yield: allow_yield.into(),
-            allow_await: allow_await.into(),
-            previous,
-        }
-    }
 }
 
 impl<R> TokenParser<R> for ShortCircuitExpression
@@ -247,9 +246,31 @@ where
     type Output = ast::Expression;
 
     fn parse(self, cursor: &mut Cursor<R>, interner: &mut Interner) -> ParseResult<Self::Output> {
-        let mut current_node =
-            BitwiseORExpression::new(self.allow_in, self.allow_yield, self.allow_await)
-                .parse(cursor, interner)?;
+        // Scriptw: `a || b && c || d` is parsed in one loop into left-deep
+        // `||` and `&&` chains (LogicalORExpression is left-recursive in
+        // ECMA-262 13.13), instead of recursing once per `||`, which neither
+        // bounded the parser's recursion nor the tree's height.
+        let operand = |cursor: &mut Cursor<R>, interner: &mut Interner| {
+            cursor.measured(interner, |cursor, interner| {
+                BitwiseORExpression::new(self.allow_in, self.allow_yield, self.allow_await)
+                    .parse(cursor, interner)
+            })
+        };
+        let link = |cursor: &mut Cursor<R>,
+                    interner: &mut Interner,
+                    op: LogicalOp,
+                    (lhs, lhs_height): (ast::Expression, u32),
+                    (rhs, rhs_height): (ast::Expression, u32)| {
+            let height = cursor.chain_height(
+                lhs_height.max(rhs_height) + cursor.binary_link_units(),
+                interner,
+            )?;
+            Ok::<_, Error>((Binary::new(BinaryOp::Logical(op), lhs, rhs).into(), height))
+        };
+        // The `||` operands before the current one, and the current `&&` (or
+        // `??`) chain.
+        let mut disjunction: Option<(ast::Expression, u32)> = None;
+        let mut current = operand(cursor, interner)?;
         let mut previous = self.previous;
 
         while let Some(tok) = cursor.peek(0, interner)? {
@@ -268,12 +289,8 @@ where
                     }
                     cursor.advance(interner);
                     previous = PreviousExpr::Logical;
-                    let rhs =
-                        BitwiseORExpression::new(self.allow_in, self.allow_yield, self.allow_await)
-                            .parse(cursor, interner)?;
-
-                    current_node =
-                        Binary::new(BinaryOp::Logical(LogicalOp::And), current_node, rhs).into();
+                    let rhs = operand(cursor, interner)?;
+                    current = link(cursor, interner, LogicalOp::And, current, rhs)?;
                 }
                 TokenKind::Punctuator(Punctuator::BoolOr) => {
                     match previous {
@@ -289,15 +306,15 @@ where
                     }
                     cursor.advance(interner);
                     previous = PreviousExpr::Logical;
-                    let rhs = Self::with_previous(
-                        self.allow_in,
-                        self.allow_yield,
-                        self.allow_await,
-                        PreviousExpr::Logical,
-                    )
-                    .parse(cursor, interner)?;
-                    current_node =
-                        Binary::new(BinaryOp::Logical(LogicalOp::Or), current_node, rhs).into();
+                    let rhs = operand(cursor, interner)?;
+                    let lhs = match disjunction.take() {
+                        Some(disjunction) => {
+                            link(cursor, interner, LogicalOp::Or, disjunction, current)?
+                        }
+                        None => current,
+                    };
+                    disjunction = Some(lhs);
+                    current = rhs;
                 }
                 TokenKind::Punctuator(Punctuator::Coalesce) => {
                     match previous {
@@ -313,17 +330,18 @@ where
                     }
                     cursor.advance(interner);
                     previous = PreviousExpr::Coalesce;
-                    let rhs =
-                        BitwiseORExpression::new(self.allow_in, self.allow_yield, self.allow_await)
-                            .parse(cursor, interner)?;
-                    current_node =
-                        Binary::new(BinaryOp::Logical(LogicalOp::Coalesce), current_node, rhs)
-                            .into();
+                    let rhs = operand(cursor, interner)?;
+                    current = link(cursor, interner, LogicalOp::Coalesce, current, rhs)?;
                 }
                 _ => break,
             }
         }
-        Ok(current_node)
+        let (expression, height) = match disjunction {
+            Some(disjunction) => link(cursor, interner, LogicalOp::Or, disjunction, current)?,
+            None => current,
+        };
+        cursor.record_height(height);
+        Ok(expression)
     }
 }
 

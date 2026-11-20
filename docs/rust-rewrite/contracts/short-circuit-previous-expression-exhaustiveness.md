@@ -22,7 +22,7 @@ new state silently followed the accepting path.
 
 The Rust-lexical guard removes comments and all Rust string, byte-string,
 C-string, raw-string, character and byte-character literals before checking the
-exact private declaration, capability absence, 17-identifier census, three
+exact private declaration, capability absence, 15-identifier census, three
 exhaustive matches and wildcard absence. Its semantic witness rejects all four
 logical/coalesce orderings under Script and Module goals while accepting
 parenthesized mixtures and same-family chains.

@@ -38,9 +38,18 @@ pub(super) struct Cursor<R> {
     /// Tracks the number of tagged templates that are currently being parsed.
     tagged_templates_count: u32,
 
-    /// Scriptw: how many recursive grammar productions enclose the current
-    /// token (see [`crate::parser::MAX_NESTING_DEPTH`]).
+    /// Scriptw: the tree height, in units, of the recursive grammar
+    /// productions that enclose the current token (see
+    /// [`crate::parser::MAX_NESTING_UNITS`]).
     nesting: u32,
+
+    /// Scriptw: the greatest tree height, in units, of any node parsed since
+    /// the innermost [`Self::measured`] began.
+    reach: u32,
+
+    /// Scriptw: whether the current token is in a generator or async function
+    /// body (see [`crate::parser::BINARY_LINK_UNITS`]).
+    resumable_body: bool,
 }
 
 impl<R> Cursor<R>
@@ -56,37 +65,116 @@ where
             identifier: 0,
             tagged_templates_count: 0,
             nesting: 0,
+            reach: 0,
+            resumable_body: false,
         }
     }
 
     /// Scriptw: parses one recursive production one nesting level deeper.
     ///
     /// Every grammar cycle of the recursive-descent parser passes through a
-    /// production that calls this, so source nested more deeply than
-    /// [`crate::parser::MAX_NESTING_DEPTH`] is a SyntaxError instead of a
-    /// native stack overflow in the parser or in the compiler phases that
-    /// recurse over the tree it builds.
+    /// production that calls this, so the parser's own recursion is bounded.
+    /// Trees that loops build deeper than the parser recursed are bounded by
+    /// [`Self::measured`] and [`Self::chain_height`].
     pub(super) fn nested<T>(
         &mut self,
         interner: &mut Interner,
         parse: impl FnOnce(&mut Self, &mut Interner) -> ParseResult<T>,
     ) -> ParseResult<T> {
-        if self.nesting >= crate::parser::MAX_NESTING_DEPTH {
-            let position = self
-                .peek(0, interner)?
-                .map_or(boa_ast::Position::new(1, 1), |token| token.span().start());
-            return Err(Error::general(
-                format!(
-                    "source nesting exceeds the implementation limit of {} levels",
-                    crate::parser::MAX_NESTING_DEPTH
-                ),
-                position,
-            ));
+        self.nested_units(crate::parser::NESTING_UNITS_PER_LEVEL, interner, parse)
+    }
+
+    /// Scriptw: [`Self::nested`] for a production that costs `units`.
+    pub(super) fn nested_units<T>(
+        &mut self,
+        units: u32,
+        interner: &mut Interner,
+        parse: impl FnOnce(&mut Self, &mut Interner) -> ParseResult<T>,
+    ) -> ParseResult<T> {
+        if self.nesting + units > crate::parser::MAX_NESTING_UNITS {
+            return Err(self.nesting_limit_error(interner));
         }
-        self.nesting += 1;
+        self.nesting += units;
+        self.reach = self.reach.max(self.nesting);
         let parsed = parse(self, interner);
-        self.nesting -= 1;
+        self.nesting -= units;
         parsed
+    }
+
+    /// Scriptw: parses one operand of a loop-built node and returns it with
+    /// the height, in units above the current nesting, of the tree parsed.
+    ///
+    /// A loop that wraps earlier operands in a new node (a left-deep chain) or
+    /// nests later ones (an `else if` chain) makes the tree deeper than the
+    /// nesting its operands were parsed at; it adds its own links to these
+    /// heights with [`Self::chain_height`] and records the total with
+    /// [`Self::record_height`].
+    pub(super) fn measured<T>(
+        &mut self,
+        interner: &mut Interner,
+        parse: impl FnOnce(&mut Self, &mut Interner) -> ParseResult<T>,
+    ) -> ParseResult<(T, u32)> {
+        let enclosing = core::mem::replace(&mut self.reach, self.nesting);
+        let parsed = parse(self, interner);
+        let height = self.reach - self.nesting;
+        self.reach = enclosing.max(self.reach);
+        parsed.map(|parsed| (parsed, height))
+    }
+
+    /// Scriptw: checks that a loop-built tree `height` units above the current
+    /// nesting stays within [`crate::parser::MAX_NESTING_UNITS`], and returns it.
+    pub(super) fn chain_height(
+        &mut self,
+        height: u32,
+        interner: &mut Interner,
+    ) -> ParseResult<u32> {
+        if self.nesting.saturating_add(height) > crate::parser::MAX_NESTING_UNITS {
+            return Err(self.nesting_limit_error(interner));
+        }
+        Ok(height)
+    }
+
+    /// Scriptw: records a loop-built tree of a height that [`Self::chain_height`]
+    /// accepted, for the enclosing [`Self::measured`].
+    pub(super) fn record_height(&mut self, height: u32) {
+        self.reach = self.reach.max(self.nesting + height);
+    }
+
+    /// Scriptw: the units of one binary, logical, `??` or comma operator here.
+    pub(super) const fn binary_link_units(&self) -> u32 {
+        if self.resumable_body {
+            crate::parser::RESUMABLE_BINARY_LINK_UNITS
+        } else {
+            crate::parser::BINARY_LINK_UNITS
+        }
+    }
+
+    /// Scriptw: parses a function body, `resumable` when it is a generator or
+    /// async function's.
+    pub(super) fn function_body<T>(
+        &mut self,
+        resumable: bool,
+        interner: &mut Interner,
+        parse: impl FnOnce(&mut Self, &mut Interner) -> ParseResult<T>,
+    ) -> ParseResult<T> {
+        let enclosing = core::mem::replace(&mut self.resumable_body, resumable);
+        let parsed = parse(self, interner);
+        self.resumable_body = enclosing;
+        parsed
+    }
+
+    fn nesting_limit_error(&mut self, interner: &mut Interner) -> Error {
+        let position = match self.peek(0, interner) {
+            Ok(Some(token)) => token.span().start(),
+            _ => boa_ast::Position::new(1, 1),
+        };
+        Error::general(
+            format!(
+                "source nesting exceeds the implementation limit of {} levels",
+                crate::parser::MAX_NESTING_DEPTH
+            ),
+            position,
+        )
     }
 
     /// Sets the goal symbol of the cursor to `Module`.

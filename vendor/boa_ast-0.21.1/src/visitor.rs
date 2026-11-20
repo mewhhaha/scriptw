@@ -225,6 +225,14 @@ pub trait Visitor<'ast>: Sized {
     /// Type which will be propagated from the visitor if completing early.
     type BreakTy;
 
+    /// Scriptw: whether a [`Binary`] whose left operand is again a `Binary`
+    /// visits the operands of the whole left-deep chain in source order
+    /// without calling [`Self::visit_expression`] or [`Self::visit_binary`] on
+    /// the inner `Binary` nodes. That keeps the walk of a chain of any length
+    /// from recursing once per operator. A visitor that must see each inner
+    /// node sets this to `false` and recurses as upstream Boa does.
+    const VISITS_BINARY_CHAINS_ITERATIVELY: bool = true;
+
     define_visit!(visit_script, Script);
     define_visit!(visit_module, Module);
     define_visit!(visit_function_body, FunctionBody);
@@ -447,6 +455,9 @@ pub trait Visitor<'ast>: Sized {
 pub trait VisitorMut<'ast>: Sized {
     /// Type which will be propagated from the visitor if completing early.
     type BreakTy;
+
+    /// Scriptw: see [`Visitor::VISITS_BINARY_CHAINS_ITERATIVELY`].
+    const VISITS_BINARY_CHAINS_ITERATIVELY: bool = true;
 
     define_visit_mut!(visit_script_mut, Script);
     define_visit_mut!(visit_module_mut, Module);

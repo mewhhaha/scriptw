@@ -219,6 +219,10 @@ impl ExpressionStates<'_> {
 }
 impl<'ast> Visitor<'ast> for ExpressionStates<'_> {
     type BreakTy = AsyncGeneratorSourceError;
+    // Logical operators that own suspensions are branch regions; each inner
+    // node of a chain must be seen. (Chains in generator and async bodies are
+    // bounded by the parser's nesting limit.)
+    const VISITS_BINARY_CHAINS_ITERATIVELY: bool = false;
     fn visit_expression(&mut self, source: &'ast Expression) -> ControlFlow<Self::BreakTy> {
         if !has_suspension(source) {
             return ControlFlow::Continue(());

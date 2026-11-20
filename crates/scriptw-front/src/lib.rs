@@ -553,10 +553,20 @@ impl core::fmt::Display for ParseError {
 impl std::error::Error for ParseError {}
 
 /// The deepest nesting of recursive grammar productions a source may have;
-/// deeper source is a SyntaxError. Parsing at this depth, and compiling the
-/// tree, needs native stack in proportion to it: callers parse on the engine's
-/// 64 MiB compiler stack, not on a small default thread stack.
+/// deeper source is a SyntaxError. The parser bounds the height of the tree,
+/// not only its own recursion: an `else if` counts two thirds of a level, a
+/// member or call link two levels, and a binary, logical, `??` or comma
+/// operator, which the compiler walks without recursing per operator, a
+/// two-thousandth of a level outside generator and async function bodies and
+/// half a level inside them (see `boa_parser::parser::MAX_NESTING_UNITS`). Parsing and
+/// compiling a tree at the limit needs native stack in proportion to it:
+/// callers parse on the engine's 64 MiB compiler stack, not on a small
+/// default thread stack.
 pub const MAX_SOURCE_NESTING_DEPTH: u32 = boa_parser::parser::MAX_NESTING_DEPTH;
+
+/// The deepest nesting of groups (and, with the `v` flag, classes) a regular
+/// expression literal may have; deeper is a SyntaxError.
+pub const MAX_REGEXP_NESTING_DEPTH: usize = boa_parser::lexer::regex::MAX_PATTERN_NESTING_DEPTH;
 
 pub fn parse(
     source_text: impl Into<String>,
@@ -1111,16 +1121,17 @@ mod tests {
         const INITIAL_TOKEN_CAPTURE: &str = r#"
             cursor.set_goal(InputElement::RegExp);
 
-            let token = cursor.peek(0, interner).or_abrupt()?;
-            let position = token.span().start();
-            let mut lhs = match token.kind() {
+            let (mut lhs, mut height) = cursor.measured(interner, |cursor, interner| {
+                let token = cursor.peek(0, interner).or_abrupt()?;
+                let position = token.span().start();
+                Ok(match token.kind() {
         "#;
         const GOAL_BRANCH: &str = r#"if !cursor.module() {
-                    return Err(Error::general(
-                        "invalid `import.meta` expression outside a module",
-                        position,
-                    ));
-                }"#;
+                        return Err(Error::general(
+                            "invalid `import.meta` expression outside a module",
+                            position,
+                        ));
+                    }"#;
         const MODULE_ENTRY: &str = r#"
             #[derive(Debug, Clone, Copy)]
             struct ModuleParser;

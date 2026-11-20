@@ -764,3 +764,117 @@ fn source_nesting_past_the_parser_limit_is_a_syntax_error() {
         .join()
         .unwrap();
 }
+
+#[test]
+fn export_default_async_is_a_declaration_only_before_function_on_the_same_line() {
+    use boa_ast::declaration::ExportDeclaration;
+    use boa_ast::ModuleItem;
+
+    // ECMA-262 16.2.3: `export default` takes a declaration only for the
+    // lookaheads `function`, `async [no LineTerminator here] function` and
+    // `class`; any other `async` begins an AssignmentExpression.
+    let default_export_kinds = |source: &str| {
+        let parsed = parse(source, ParseOptions::module())
+            .unwrap_or_else(|err| panic!("{source:?}: {err:?}"));
+        parsed
+            .as_module()
+            .expect("module goal")
+            .with_compiler_session(|module, _| {
+                module
+                    .items()
+                    .items()
+                    .iter()
+                    .filter_map(|item| match item {
+                        ModuleItem::ExportDeclaration(export) => Some(match export.as_ref() {
+                            ExportDeclaration::DefaultAssignmentExpression(_) => "expression",
+                            ExportDeclaration::DefaultAsyncFunctionDeclaration(_) => {
+                                "async function"
+                            }
+                            ExportDeclaration::DefaultAsyncGeneratorDeclaration(_) => {
+                                "async generator"
+                            }
+                            _ => "other",
+                        }),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+            })
+    };
+    for (source, kind) in [
+        ("export default async () => 1", "expression"),
+        ("export default async x => x", "expression"),
+        ("export default async\nx => x", "expression"),
+        ("var async = 1; export default async", "expression"),
+        ("var async = 1; export default async;", "expression"),
+        (
+            "var async = function () {}; export default async(1)",
+            "expression",
+        ),
+        (
+            "var async = 1; export default async\nfunction f() {}",
+            "expression",
+        ),
+        ("export default async function f() {}", "async function"),
+        ("export default async function () {}", "async function"),
+        ("export default\nasync function f() {}", "async function"),
+        ("export default async function* g() {}", "async generator"),
+    ] {
+        assert_eq!(default_export_kinds(source), [kind], "{source:?}");
+    }
+    assert!(parse("export default async x", ParseOptions::module()).is_err());
+}
+
+#[test]
+fn source_nesting_limit_is_exact() {
+    use boa_parser::parser::{MAX_NESTING_UNITS, NESTING_UNITS_PER_LEVEL};
+    let limit = MAX_SOURCE_NESTING_DEPTH as usize;
+    std::thread::Builder::new()
+        .stack_size(64 << 20)
+        .spawn(move || {
+            let rejected = |source: &str| {
+                parse(source, ParseOptions::script())
+                    .err()
+                    .is_some_and(|err| {
+                        err.message()
+                            .contains("nesting exceeds the implementation limit")
+                    })
+            };
+            // The statement and its initializer are two levels, each
+            // parenthesis one more.
+            let parentheses =
+                |depth: usize| format!("var x = {}1{};", "(".repeat(depth), ")".repeat(depth));
+            assert!(!rejected(&parentheses(limit - 2)));
+            assert!(rejected(&parentheses(limit - 1)));
+            // With one level of room left, a `+` chain inside may have exactly
+            // one level's worth of operators.
+            let room = (MAX_NESTING_UNITS / MAX_SOURCE_NESTING_DEPTH) as usize;
+            assert_eq!(room, NESTING_UNITS_PER_LEVEL as usize);
+            let chain = |operators: usize| {
+                format!(
+                    "var x = {}1{}{};",
+                    "(".repeat(limit - 3),
+                    "+1".repeat(operators),
+                    ")".repeat(limit - 3)
+                )
+            };
+            assert!(!rejected(&chain(room)));
+            assert!(rejected(&chain(room + 1)));
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn long_operator_chains_parse_without_recursing_per_operator() {
+    // A million operators (Node's measured scale): the parser builds them in
+    // loops, the visitors that check early errors and the tree's Drop walk
+    // them without recursion, on this test's default thread stack. About two
+    // million fit the limit.
+    for operator in ["+", "||", "&&", "??", ","] {
+        let source = format!("x{};", format!(" {operator} x").repeat(1_000_000));
+        assert!(parse(&source, ParseOptions::script()).is_ok(), "{operator}");
+    }
+    let source = format!("x{};", " + x".repeat(2_100_000));
+    assert!(parse(&source, ParseOptions::script()).is_err());
+}

@@ -1174,6 +1174,19 @@ impl PatternParser<'_> {
         &mut self,
         opening: Option<usize>,
     ) -> Result<Vec<Vec<ParsedTerm>>, RegExpCompileError> {
+        // The parser recurses once per group. A literal deeper than the
+        // front end's pattern limit is already a SyntaxError; a pattern string
+        // reaching here another way is refused rather than overflowing the
+        // native stack.
+        if self.choice_path.len() > scriptw_front::MAX_REGEXP_NESTING_DEPTH {
+            return Err(RegExpCompileError::unsupported_feature(
+                opening.unwrap_or(self.offset),
+                format!(
+                    "groups nest more than the implementation limit of {} levels",
+                    scriptw_front::MAX_REGEXP_NESTING_DEPTH
+                ),
+            ));
+        }
         let choice_id = self.choice_count;
         self.choice_count += 1;
         self.choice_path.push((choice_id, 0));

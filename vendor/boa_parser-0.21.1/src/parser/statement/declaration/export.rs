@@ -10,7 +10,7 @@
 //! [mdn]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/export
 
 use crate::{
-    lexer::{TokenKind, token::ContainsEscapeSequence},
+    lexer::{Token, TokenKind, token::ContainsEscapeSequence},
     parser::{
         Error, OrAbrupt, ParseResult, TokenParser,
         cursor::Cursor,
@@ -161,6 +161,29 @@ where
             TokenKind::Keyword((Keyword::Default, false)) => {
                 cursor.advance(interner);
 
+                // Scriptw: only `async [no LineTerminator here] function` starts a
+                // declaration here (ECMA-262 16.2.3); any other `async` begins the
+                // AssignmentExpression (`async () => 1`, `async(1)`, the identifier).
+                let async_function_declaration = if cursor.peek(0, interner).or_abrupt()?.kind()
+                    == &TokenKind::Keyword((Keyword::Async, false))
+                {
+                    let skip_n = if cursor.peek_is_line_terminator(0, interner).or_abrupt()? {
+                        2
+                    } else {
+                        1
+                    };
+                    let line_terminator = cursor
+                        .peek_is_line_terminator(skip_n, interner)?
+                        .unwrap_or(true);
+                    !line_terminator
+                        && matches!(
+                            cursor.peek(1, interner)?.map(Token::kind),
+                            Some(TokenKind::Keyword((Keyword::Function, _)))
+                        )
+                } else {
+                    false
+                };
+
                 let tok = cursor.peek(0, interner).or_abrupt()?;
 
                 match tok.kind() {
@@ -178,7 +201,7 @@ where
                             )
                         }
                     }
-                    TokenKind::Keyword((Keyword::Async, false)) => {
+                    TokenKind::Keyword((Keyword::Async, false)) if async_function_declaration => {
                         let next_token = cursor.peek(2, interner).or_abrupt()?;
                         if next_token.kind() == &TokenKind::Punctuator(Punctuator::Mul) {
                             AstExportDeclaration::DefaultAsyncGeneratorDeclaration(

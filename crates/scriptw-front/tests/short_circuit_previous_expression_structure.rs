@@ -168,7 +168,9 @@ fn previous_expression_is_the_exact_private_non_equality_domain() {
     assert!(!expression.contains("==PreviousExpr::"));
     assert!(!expression.contains("!=PreviousExpr::"));
     assert!(!expression.contains("matches!(previous"));
-    assert_eq!(expression.matches("PreviousExpr").count(), 17);
+    // 15 since `||` joined the `&&` loop: the `with_previous` constructor
+    // and its recursive `PreviousExpr::Logical` call are gone.
+    assert_eq!(expression.matches("PreviousExpr").count(), 15);
 }
 
 #[test]

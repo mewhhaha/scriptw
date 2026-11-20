@@ -188,6 +188,9 @@ where
     type Output = Expression;
 
     fn parse(self, cursor: &mut Cursor<R>, interner: &mut Interner) -> ParseResult<Self::Output> {
-        AssignmentExpression::new(self.allow_in, false, self.allow_await).parse(cursor, interner)
+        cursor.function_body(self.allow_await.0, interner, |cursor, interner| {
+            AssignmentExpression::new(self.allow_in, false, self.allow_await)
+                .parse(cursor, interner)
+        })
     }
 }

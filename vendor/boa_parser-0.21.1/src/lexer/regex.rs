@@ -152,6 +152,22 @@ impl<R> Tokenizer<R> for RegexLiteral {
         if flags.intersects(RegExpFlags::UNICODE | RegExpFlags::UNICODE_SETS)
             || !is_simple_non_unicode_pattern(&body)
         {
+            // Scriptw: the pattern parser (here and in the compiler) recurses
+            // once per group and, with the `v` flag, per nested class; deeper
+            // patterns are a SyntaxError rather than a native stack overflow.
+            if pattern_nesting_exceeds(
+                &body,
+                flags.contains(RegExpFlags::UNICODE_SETS),
+                MAX_PATTERN_NESTING_DEPTH,
+            ) {
+                return Err(Error::syntax(
+                    format!(
+                        "Invalid regular expression literal: groups and classes nest more than \
+                         the implementation limit of {MAX_PATTERN_NESTING_DEPTH} levels"
+                    ),
+                    start_pos,
+                ));
+            }
             // Legacy ClassAtoms are UTF-16 units, including each half of a raw
             // astral character. Unicode modes parse those characters as scalars.
             // Keep the interned source unchanged and validate the selected grammar.
@@ -180,6 +196,43 @@ impl<R> Tokenizer<R> for RegexLiteral {
             cursor.pos_group(),
         ))
     }
+}
+
+/// Scriptw: the deepest nesting of groups (and, with the `v` flag, of class
+/// set operands) a regular expression literal may have. V8 compiles about
+/// 10,000 nested groups and reports a SyntaxError for 20,000.
+pub const MAX_PATTERN_NESTING_DEPTH: usize = 1000;
+
+/// Scriptw: whether `body` nests groups (or `v`-mode classes) more than `limit`
+/// deep, scanning escapes and classes the way the pattern grammar does. It only
+/// over-counts parentheses inside a class in `v` mode, where a nested class
+/// starts with `[` and a parenthesis is a syntax error anyway.
+fn pattern_nesting_exceeds(body: &[u32], unicode_sets: bool, limit: usize) -> bool {
+    let mut depth = 0usize;
+    let mut classes = 0usize;
+    let mut code_points = body.iter().copied();
+    while let Some(cp) = code_points.next() {
+        match char::from_u32(cp) {
+            Some('\\') => {
+                code_points.next();
+            }
+            Some('[') if classes == 0 || unicode_sets => {
+                classes += 1;
+                depth += 1;
+            }
+            Some(']') if classes > 0 => {
+                classes -= 1;
+                depth = depth.saturating_sub(1);
+            }
+            Some('(') if classes == 0 => depth += 1,
+            Some(')') if classes == 0 => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+        if depth > limit {
+            return true;
+        }
+    }
+    false
 }
 
 fn is_simple_non_unicode_pattern(body: &[u32]) -> bool {

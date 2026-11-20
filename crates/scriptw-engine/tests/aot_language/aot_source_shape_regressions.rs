@@ -1,6 +1,6 @@
-//! Valid programs that the front end or lowering used to reject, and source
-//! nested beyond the implementation's limit, which must be a SyntaxError
-//! instead of a native stack overflow (target/review/correctness.md 4 and 8).
+//! Valid programs that the front end or lowering used to reject, long operator
+//! chains that must compile, and source nested beyond the implementation's
+//! limit, which must be a SyntaxError instead of a native stack overflow.
 //! Expected output is Node 24's.
 use scriptw_engine::{
     CompileOptions, Engine, ExecutionBackend, HostOutputEvent, HostSurfacePolicy,
@@ -77,8 +77,9 @@ fn a_sloppy_script_may_end_with_let_or_async() {
     }
 }
 
-// Each construct nests one grammar level per repetition; at the limit the
-// whole pipeline compiles and runs, one level beyond is a SyntaxError.
+// Each construct nests one grammar level per repetition; near the limit the
+// whole pipeline compiles and runs, and far beyond it is a SyntaxError (the
+// exact boundary is the front end's `source_nesting_limit_is_exact`).
 #[test]
 fn source_nesting_beyond_the_limit_is_a_syntax_error_not_a_stack_overflow() {
     const LIMIT: usize = 1000;
@@ -113,4 +114,129 @@ fn source_nesting_beyond_the_limit_is_a_syntax_error_not_a_stack_overflow() {
             "{name}: {error:?}"
         );
     }
+}
+
+fn nesting_error(source: &str) -> String {
+    scriptw_engine::configure_compilation_jobs(1).unwrap();
+    let (compile, run) = options();
+    let error = Engine::new(RealmBuilder::new().build())
+        .run_script(source, compile, run)
+        .expect_err("past the implementation limit");
+    format!("{error:?}")
+}
+
+// Minifiers emit `+`, `||`, `&&`, `??` and comma chains with tens of
+// thousands of operators (Node runs chains of a million terms). The parser
+// builds them in loops, and Boa's visitors, the tree's Drop and lowering walk
+// them without recursing per operator, so they cost nothing against the
+// native stack; lowering splits them into bounded IR.
+#[test]
+fn hundred_thousand_term_chains_compile_and_run() {
+    const TERMS: usize = 100_000;
+    prints(
+        &format!(
+            "print((function () {{ var x = 1; return x{}; }})());",
+            "+x".repeat(TERMS)
+        ),
+        "100001",
+    );
+    prints(&format!("print(({}1));", "0, ".repeat(TERMS)), "1");
+    // Logical chains lower in the same loop; each right operand is lowered
+    // as conditionally reached, which snapshots the flow facts, so they are
+    // tested shorter (see the inventory's chain item).
+    const LOGICAL_TERMS: usize = 500;
+    prints(
+        &format!(
+            "print((function (t) {{ return t{} || 'end'; }})(0));",
+            " || t".repeat(LOGICAL_TERMS)
+        ),
+        "end",
+    );
+    prints(
+        &format!(
+            "print((function (t) {{ return t{} && 'end'; }})(1));",
+            " && t".repeat(LOGICAL_TERMS)
+        ),
+        "end",
+    );
+    prints(
+        &format!(
+            "print((function (t) {{ return t{} ?? 'end'; }})(null));",
+            " ?? t".repeat(LOGICAL_TERMS)
+        ),
+        "end",
+    );
+    // Mixed precedence keeps `&&` inside `||`, left to right.
+    prints(
+        &format!(
+            "var log = ''; function f(v) {{ log += v; return v; }} \
+             var r = f(0){} || f(1) && f(2); print(log + ':' + r);",
+            " || f(0) && f(9)".repeat(300)
+        ),
+        &format!("{}12:2", "0".repeat(301)),
+    );
+}
+
+// Generator and async function bodies are lowered by resumable passes that
+// still recurse per operator, so there an operator costs half a nesting level.
+#[test]
+fn operator_chains_in_resumable_bodies_stay_within_the_nesting_limit() {
+    prints(
+        &format!(
+            "var g = (function* () {{ var x = 1; yield x{}; }})(); print(g.next().value);",
+            "+x".repeat(1_900)
+        ),
+        "1901",
+    );
+    let error = nesting_error(&format!(
+        "function* g() {{ var x = 1; yield x{}; }}",
+        "+x".repeat(4_000)
+    ));
+    assert!(
+        error.contains("nesting exceeds the implementation limit"),
+        "{error}"
+    );
+}
+
+// An `else if` costs two thirds of a nesting level, so more than 1,000 branches
+// compile (about 1,500 fit; V8 runs about 3,000 and throws a RangeError at
+// 10,000). A member or call link costs two levels, so about 500 fit: native
+// compilation of both grows faster than their length.
+#[test]
+fn else_if_and_member_chains_are_bounded_by_their_compile_cost() {
+    let else_ifs = |n: usize| {
+        let mut source = String::from("var x = -1; if (x === 0) { print(0); }");
+        for i in 1..n {
+            source.push_str(&format!(" else if (x === {i}) {{ print({i}); }}"));
+        }
+        source.push_str(" else { print('end'); }");
+        source
+    };
+    prints(&else_ifs(1_050), "end");
+    let error = nesting_error(&else_ifs(1_600));
+    assert!(
+        error.contains("nesting exceeds the implementation limit"),
+        "{error}"
+    );
+
+    let members = |n: usize| format!("var a = {{}}; a.b = a; print(a{} === a);", ".b".repeat(n));
+    prints(&members(490), "true");
+    let error = nesting_error(&members(600));
+    assert!(
+        error.contains("nesting exceeds the implementation limit"),
+        "{error}"
+    );
+}
+
+// A regular expression literal nests groups at most 1,000 deep; deeper is a
+// SyntaxError (V8 compiles about 10,000 and rejects 20,000 with one).
+#[test]
+fn regular_expression_nesting_is_bounded() {
+    let pattern = |n: usize| format!("{}a{}", "(".repeat(n), ")".repeat(n));
+    prints(&format!("print(/{}/.test('a'));", pattern(990)), "true");
+    let error = nesting_error(&format!("/{}/;", pattern(100_000)));
+    assert!(
+        error.contains("nest more than the implementation limit"),
+        "{error}"
+    );
 }

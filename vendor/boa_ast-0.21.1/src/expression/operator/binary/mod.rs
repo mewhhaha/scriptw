@@ -18,7 +18,7 @@ mod op;
 
 use crate::{
     Span, Spanned,
-    expression::Expression,
+    expression::{Expression, This},
     function::PrivateName,
     visitor::{VisitWith, Visitor, VisitorMut},
 };
@@ -32,7 +32,7 @@ pub use op::*;
 /// See the [module level documentation][self] for more information.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Binary {
     op: BinaryOp,
     lhs: Box<Expression>,
@@ -90,7 +90,67 @@ impl Binary {
 impl Spanned for Binary {
     #[inline]
     fn span(&self) -> Span {
-        Span::new(self.lhs.span().start(), self.rhs.span().end())
+        // Scriptw: walk a left-deep chain down to its first operand instead
+        // of recursing once per operator.
+        let mut first = &self.lhs;
+        while let Expression::Binary(binary) = &**first {
+            first = &binary.lhs;
+        }
+        Span::new(first.span().start(), self.rhs.span().end())
+    }
+}
+
+/// Scriptw: clones a left-deep chain from its first operator outwards, so
+/// cloning a chain of any length does not recurse once per operator.
+impl Clone for Binary {
+    fn clone(&self) -> Self {
+        let mut outer = Vec::new();
+        let mut node = self;
+        while let Expression::Binary(lhs) = &*node.lhs {
+            outer.push(node);
+            node = lhs;
+        }
+        let mut copy = Self {
+            op: node.op,
+            lhs: node.lhs.clone(),
+            rhs: node.rhs.clone(),
+        };
+        for node in outer.into_iter().rev() {
+            copy = Self {
+                op: node.op,
+                lhs: Box::new(Expression::Binary(copy)),
+                rhs: node.rhs.clone(),
+            };
+        }
+        copy
+    }
+}
+
+/// Scriptw: drops binary operands that are themselves binary expressions
+/// from an explicit stack, so dropping a chain of any length (left-deep from
+/// `a + b + c`, or right-deep) does not recurse once per operator.
+impl Drop for Binary {
+    fn drop(&mut self) {
+        fn detach(operand: &mut Expression, pending: &mut Vec<Binary>) {
+            if matches!(operand, Expression::Binary(_)) {
+                let placeholder = Expression::This(This::new(Span::EMPTY));
+                if let Expression::Binary(binary) = core::mem::replace(operand, placeholder) {
+                    pending.push(binary);
+                }
+            }
+        }
+        if !matches!(*self.lhs, Expression::Binary(_))
+            && !matches!(*self.rhs, Expression::Binary(_))
+        {
+            return;
+        }
+        let mut pending = Vec::new();
+        detach(&mut self.lhs, &mut pending);
+        detach(&mut self.rhs, &mut pending);
+        while let Some(mut binary) = pending.pop() {
+            detach(&mut binary.lhs, &mut pending);
+            detach(&mut binary.rhs, &mut pending);
+        }
     }
 }
 
@@ -118,16 +178,51 @@ impl VisitWith for Binary {
     where
         V: Visitor<'a>,
     {
-        visitor.visit_expression(&self.lhs)?;
-        visitor.visit_expression(&self.rhs)
+        if !V::VISITS_BINARY_CHAINS_ITERATIVELY {
+            visitor.visit_expression(&self.lhs)?;
+            return visitor.visit_expression(&self.rhs);
+        }
+        // Scriptw: visits the operands of a left-deep chain in source order
+        // without recursing once per operator (see the trait constant).
+        let mut right_operands = Vec::new();
+        let mut node = self;
+        let first = loop {
+            right_operands.push(&*node.rhs);
+            match &*node.lhs {
+                Expression::Binary(lhs) => node = lhs,
+                first => break first,
+            }
+        };
+        visitor.visit_expression(first)?;
+        for operand in right_operands.into_iter().rev() {
+            visitor.visit_expression(operand)?;
+        }
+        ControlFlow::Continue(())
     }
 
     fn visit_with_mut<'a, V>(&'a mut self, visitor: &mut V) -> ControlFlow<V::BreakTy>
     where
         V: VisitorMut<'a>,
     {
-        visitor.visit_expression_mut(&mut self.lhs)?;
-        visitor.visit_expression_mut(&mut self.rhs)
+        if !V::VISITS_BINARY_CHAINS_ITERATIVELY {
+            visitor.visit_expression_mut(&mut self.lhs)?;
+            return visitor.visit_expression_mut(&mut self.rhs);
+        }
+        let mut right_operands = Vec::new();
+        let mut node = self;
+        let first = loop {
+            let Self { lhs, rhs, .. } = node;
+            right_operands.push(&mut **rhs);
+            match &mut **lhs {
+                Expression::Binary(lhs) => node = lhs,
+                first => break first,
+            }
+        };
+        visitor.visit_expression_mut(first)?;
+        for operand in right_operands.into_iter().rev() {
+            visitor.visit_expression_mut(operand)?;
+        }
+        ControlFlow::Continue(())
     }
 }
 
