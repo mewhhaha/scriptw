@@ -2102,8 +2102,17 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    /// Leaves 1 when |base| >= 2 and |base|^exponent has more than
-    /// `MAX_BIGINT_BITS` bits by the lower bound 2^max(e, (b - 1) e).
+    /// Leaves 1 when |base| >= 2 and |base|^exponent provably has more than
+    /// `MAX_BIGINT_BITS` bits.
+    ///
+    /// The result has floor(e log2|base|) + 1 bits. With b the base's bit
+    /// length and t its top 32 bits, |base| >= t 2^(b - 32), so
+    /// e log2|base| >= (b - 1) e + e log2(t / 2^31). The fractional logarithm
+    /// is computed to 20 bits by repeated squaring of t / 2^31 in 31-bit fixed
+    /// point; every truncation rounds down, so the bits found are a lower
+    /// bound and the check never throws for a result that fits. The bound is
+    /// within e / 2^19 bits of the true size, so `3n ** 100000000n`
+    /// (1.58e8 bits) throws before multiplying.
     fn emit_bigint_power_exceeds_limit_i32(
         &mut self,
         lhs_ptr: &BigIntConstruction,
@@ -2112,11 +2121,15 @@ impl FunctionBuilder<'_> {
         rhs_len: I64Local,
         function: &mut Function,
     ) {
+        const FRACTION_BITS: i64 = 20;
         let schema = self.runtime_schema();
         let index = schema.reserve_i64_local(function);
         let digit = schema.reserve_i64_local(function);
         let factor = schema.reserve_i64_local(function);
         let exponent = schema.reserve_i64_local(function);
+        let top = schema.reserve_i64_local(function);
+        let fraction = schema.reserve_i64_local(function);
+        let remaining = schema.reserve_i64_local(function);
         let exceeds = schema.reserve_i32_local(function);
         function.instruction(&Instruction::I32Const(0));
         exceeds.store(function);
@@ -2131,7 +2144,7 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I64GtU);
         function.instruction(&Instruction::I32Or);
         function.instruction(&Instruction::If(BlockType::Empty));
-        // factor = max(1, b - 1) for the base's bit length b.
+        // factor = b - 1 >= 1 for the base's bit length b >= 2.
         lhs_len.load(function);
         function.instruction(&Instruction::I64Const(1));
         function.instruction(&Instruction::I64Sub);
@@ -2146,11 +2159,63 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I64Sub);
         function.instruction(&Instruction::I64Add);
         factor.store(function);
-        factor.load(function);
-        function.instruction(&Instruction::I64Eqz);
-        function.instruction(&Instruction::If(BlockType::Empty));
+        // top = the base's highest 32 bits, normalized into [2^31, 2^32). The
+        // next lower digit is zero for a one-digit base (the index wraps).
+        digit.load(function);
+        function.instruction(&Instruction::I64Const(32));
+        function.instruction(&Instruction::I64Shl);
+        top.store(function);
+        index.load(function);
         function.instruction(&Instruction::I64Const(1));
-        factor.store(function);
+        function.instruction(&Instruction::I64Sub);
+        index.store(function);
+        self.emit_bigint_digit_load_or_zero(lhs_ptr, lhs_len, index, digit, function);
+        top.load(function);
+        digit.load(function);
+        function.instruction(&Instruction::I64Or);
+        top.load(function);
+        function.instruction(&Instruction::I64Clz);
+        function.instruction(&Instruction::I64Shl);
+        function.instruction(&Instruction::I64Const(32));
+        function.instruction(&Instruction::I64ShrU);
+        top.store(function);
+        // fraction = the first 20 bits of log2(top / 2^31), rounded down.
+        function.instruction(&Instruction::I64Const(0));
+        fraction.store(function);
+        function.instruction(&Instruction::I64Const(FRACTION_BITS));
+        remaining.store(function);
+        function.instruction(&Instruction::Loop(BlockType::Empty));
+        top.load(function);
+        top.load(function);
+        function.instruction(&Instruction::I64Mul);
+        function.instruction(&Instruction::I64Const(31));
+        function.instruction(&Instruction::I64ShrU);
+        top.store(function);
+        fraction.load(function);
+        function.instruction(&Instruction::I64Const(1));
+        function.instruction(&Instruction::I64Shl);
+        fraction.store(function);
+        top.load(function);
+        function.instruction(&Instruction::I64Const(1 << 32));
+        function.instruction(&Instruction::I64GeU);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        fraction.load(function);
+        function.instruction(&Instruction::I64Const(1));
+        function.instruction(&Instruction::I64Or);
+        fraction.store(function);
+        top.load(function);
+        function.instruction(&Instruction::I64Const(1));
+        function.instruction(&Instruction::I64ShrU);
+        top.store(function);
+        function.instruction(&Instruction::End);
+        remaining.load(function);
+        function.instruction(&Instruction::I64Const(1));
+        function.instruction(&Instruction::I64Sub);
+        remaining.store(function);
+        remaining.load(function);
+        function.instruction(&Instruction::I64Const(0));
+        function.instruction(&Instruction::I64Ne);
+        function.instruction(&Instruction::BrIf(0));
         function.instruction(&Instruction::End);
         // An exponent of more than one digit is at least 2^32.
         function.instruction(&Instruction::I64Const(MAX_BIGINT_BITS));
@@ -2163,16 +2228,26 @@ impl FunctionBuilder<'_> {
         index.store(function);
         self.emit_bigint_digit_load_or_zero(rhs_ptr, rhs_len, index, exponent, function);
         function.instruction(&Instruction::End);
-        // factor <= 2^26 and exponent < 2^32: the product fits.
+        // factor < 2^27, exponent < 2^32 and fraction < 2^20: the sum of
+        // factor * exponent and (fraction * exponent) >> 20 fits.
         factor.load(function);
         exponent.load(function);
         function.instruction(&Instruction::I64Mul);
+        fraction.load(function);
+        exponent.load(function);
+        function.instruction(&Instruction::I64Mul);
+        function.instruction(&Instruction::I64Const(FRACTION_BITS));
+        function.instruction(&Instruction::I64ShrU);
+        function.instruction(&Instruction::I64Add);
         function.instruction(&Instruction::I64Const(MAX_BIGINT_BITS));
         function.instruction(&Instruction::I64GeU);
         exceeds.store(function);
         function.instruction(&Instruction::End);
         exceeds.load(function);
         schema.release_i32_local(exceeds, function);
+        schema.release_i64_local(remaining, function);
+        schema.release_i64_local(fraction, function);
+        schema.release_i64_local(top, function);
         schema.release_i64_local(exponent, function);
         schema.release_i64_local(factor, function);
         schema.release_i64_local(digit, function);

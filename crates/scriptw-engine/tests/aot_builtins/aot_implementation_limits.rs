@@ -1,11 +1,20 @@
 //! Implementation limits end in the spec's answer or a catchable RangeError,
-//! never in a Wasm trap that ends the program (target/review/correctness.md
-//! findings 5 to 7). Expected values were checked against ECMA-262 and, where
-//! V8 follows it, against Node 24.
+//! never in a Wasm trap that ends the program. Expected values were checked
+//! against ECMA-262 and, where V8 follows it, against Node 24.
 
 use scriptw_engine::{
     CompileOptions, Engine, ExecutionBackend, HostSurfacePolicy, RealmBuilder, RunOptions,
 };
+
+/// Tests that drive a Store's heap toward its 1 GiB cap hold this, so at most
+/// one of them runs at a time beside the target's other tests.
+static HEAP_FILLING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn heap_filling() -> std::sync::MutexGuard<'static, ()> {
+    HEAP_FILLING
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
 
 fn completion(source: &str) -> String {
     scriptw_engine::configure_compilation_jobs(1).expect("one bounded compilation worker");
@@ -99,6 +108,7 @@ const MAX_STRING_LENGTH: u64 = (1 << 27) - 6 * (1 << 20);
 // spec's own RangeErrors and empty results are unchanged.
 #[test]
 fn strings_longer_than_the_maximum_throw_range_errors() {
+    let _heap = heap_filling();
     let source = r#"
 function attempt(f) { try { var r = f(); return 'ok:' + (typeof r === 'string' ? r.length : r); } catch (e) { return e instanceof RangeError ? 'RangeError' : 'other:' + e; } }
 var results = [
@@ -144,6 +154,7 @@ results.join();
 // String limit's documentation.)
 #[test]
 fn a_string_of_the_maximum_length_is_built_and_one_unit_more_is_a_range_error() {
+    let _heap = heap_filling();
     let source = r#"
 var x = 'y'.repeat(MAX / 2), y = 'z'.repeat(MAX / 2), results = [];
 function rangeError(f) { try { f(); return 'no error'; } catch (e) { return e instanceof RangeError; } }
@@ -173,9 +184,26 @@ try { for (var i = 0; i < 100000; i++) { f = f.bind(null, i); made++; } } catch 
     );
 }
 
-// BigInt magnitudes are limited to MAX_STRING_LENGTH - 1 bits. A power whose lower bound already
-// exceeds it throws before any squaring; 0, 1 and -1 stay exact for every
-// exponent, and conversion to a String is exact in every radix.
+// A callable Proxy forwards its target's name, so a Proxy between two binds
+// counts as a level: interleaving them cannot restart the count while the
+// names keep growing.
+#[test]
+fn bind_chains_through_proxies_are_bounded_too() {
+    assert_completion(
+        r#"
+var f = function g() { return 1; }, made = 0, error;
+try { for (var i = 0; i < 20000; i++) { f = new Proxy(f, {}).bind(null); made++; } } catch (e) { error = e; }
+[made, error instanceof RangeError, f(), f.name.length].join();
+"#,
+        "2048,true,1,12289",
+    );
+}
+
+// BigInt magnitudes are limited to MAX_STRING_LENGTH - 1 bits. A power whose
+// size provably exceeds it throws before any squaring, also for small bases
+// whose results the bound 2^((b - 1) e) once let through to hours of
+// multiplication (3n ** 100000000n has 1.58e8 bits); 0, 1 and -1 stay exact
+// for every exponent, and conversion to a String is exact in every radix.
 #[test]
 fn bigint_size_limit_and_chunked_conversion() {
     assert_completion(
@@ -185,6 +213,9 @@ var s = (2n ** 100000n).toString(), t = (3n ** 5000n).toString(36), u = (-(7n **
 [
   attempt(function () { return 2n ** (2n ** 31n); }),
   attempt(function () { return 3n ** (2n ** 27n); }),
+  attempt(function () { return 3n ** 100000000n; }),
+  attempt(function () { return (-3n) ** 100000001n; }),
+  attempt(function () { return 5n ** 60000000n; }),
   attempt(function () { return 1n ** (2n ** 100n); }),
   attempt(function () { return (-1n) ** (2n ** 64n + 1n); }),
   attempt(function () { return 0n ** (2n ** 64n); }),
@@ -199,6 +230,6 @@ var s = (2n ** 100000n).toString(), t = (3n ** 5000n).toString(36), u = (-(7n **
   (12345678901234567890n).toString(7), (0n).toString(), (-5n).toString(2),
 ].join();
 "#,
-        "RangeError,RangeError,1,-1,0,RangeError,100001,RangeError,5,30103,999002093014,389883109376,1533,mfi5rk0rse9w,a8l6vjx20529,8424,-10000101111,001101000001,1001,999999999999999999,10000000000000000,31050262160105055621201,0,-101",
+        "RangeError,RangeError,RangeError,RangeError,RangeError,1,-1,0,RangeError,100001,RangeError,5,30103,999002093014,389883109376,1533,mfi5rk0rse9w,a8l6vjx20529,8424,-10000101111,001101000001,1001,999999999999999999,10000000000000000,31050262160105055621201,0,-101",
     );
 }

@@ -66,8 +66,10 @@ impl RuntimeSchema {
         body: impl FnOnce(&mut Function) -> Result<(), E>,
     ) -> Result<(), E> {
         let scope = function.open_counted_calls(self.native_recursion_depth.index);
-        body(function)?;
+        // Close the scope on an emission error too: a later emission into the
+        // same function must not wrap its calls in this scope's counting.
+        let emitted = body(function);
         function.close_counted_calls(scope);
-        Ok(())
+        emitted
     }
 }

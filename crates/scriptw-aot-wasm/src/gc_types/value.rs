@@ -3604,7 +3604,16 @@ where
 /// allocating, where the allocation itself would trap; V8's length cannot be
 /// allocated in this heap at all. A String within the limit can still
 /// exhaust a heap that other live values fill (or that earlier growth
-/// fragmented), which traps as a Store resource limit.
+/// fragmented), which traps as a Store resource limit. Builders that keep
+/// more than the two operands live, such as `join` beside its element
+/// Strings (about six bytes per unit), can trap below the limit for the same
+/// reason.
+///
+/// The 1 GiB premise holds for the CLI, pooled Engines and an embedder that
+/// attaches the Store's own limiter (`limits_mut`, holding the cap). An
+/// embedder chooses its limiter: with a smaller cap a String within the limit
+/// traps instead of throwing; with none, an on-demand Store's heap is bounded
+/// only by its 4 GiB reservation and the limit is merely conservative.
 pub(crate) const MAX_STRING_LENGTH: i64 = STRING_LIVE_HEAP_BYTES / 4;
 /// The live semi-space of the 1 GiB Store heap, less the runtime's reserve.
 const STRING_LIVE_HEAP_BYTES: i64 = (512 << 20) - (24 << 20);

@@ -1,11 +1,12 @@
 use super::*;
 use crate::emit::AccessorThrowRouting;
 use crate::gc_types::{
-    BoundFunction, CompletionLocals, GcLocal, GcOperand, I32Local, Nullable, StoredValue,
-    StringValue, ValueArray, ValueLocals,
+    BoundFunction, CompletionLocals, GcLocal, GcOperand, I32Local, Nullable, ProxyObject,
+    StoredValue, StringValue, ValueArray, ValueLocals,
 };
 
-/// The deepest chain of directly nested bound functions `bind` creates.
+/// The deepest chain of nested bound functions `bind` creates, counting the
+/// callable Proxies between them, which forward the name.
 /// ECMA-262 has no bound and a bound call walks its chain in a loop, so only
 /// memory constrains it: every level keeps its own `name`, "bound " longer
 /// than its target's, so n levels hold about 3n^2 code units (6n^2 bytes).
@@ -133,8 +134,12 @@ impl FunctionBuilder<'_> {
     }
 
     /// Leaves 1 when `target` is the head of `MAX_BOUND_FUNCTION_NESTING`
-    /// directly nested bound functions, so binding it would exceed the
-    /// limit. The walk reads only [[BoundTargetFunction]] slots.
+    /// nested bound functions and callable Proxies, so binding it would
+    /// exceed the limit. Each level's name is "bound " plus its target's name,
+    /// which a Proxy forwards, so Proxies count as levels too: interleaving
+    /// them cannot restart the count. The walk reads only
+    /// [[BoundTargetFunction]] and [[ProxyTarget]] slots and stops at a revoked
+    /// Proxy.
     fn emit_bound_nesting_at_limit_i32(&self, target: &ValueLocals, function: &mut Function) {
         let schema = self.runtime_schema();
         let current = schema.reserve_value_local(function);
@@ -147,18 +152,23 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I32Const(MAX_BOUND_FUNCTION_NESTING));
         function.instruction(&Instruction::I32GeU);
         function.instruction(&Instruction::BrIf(1));
+        // A callable Proxy carries the Object tag; a bound function the
+        // Function tag.
         current.tag().load(function);
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Function.tag()));
-        function.instruction(&Instruction::I32Eq);
+        function.instruction(&Instruction::I32Ne);
+        current.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Object.tag()));
+        function.instruction(&Instruction::I32Ne);
+        function.instruction(&Instruction::I32And);
+        function.instruction(&Instruction::BrIf(1));
         current.reference().load(function);
         function.instruction(&Instruction::RefTestNonNull(
             schema
                 .reference_type::<BoundFunction>(crate::gc_types::GcNullability::NonNullable)
                 .heap_type,
         ));
-        function.instruction(&Instruction::I32And);
-        function.instruction(&Instruction::I32Eqz);
-        function.instruction(&Instruction::BrIf(1));
+        function.instruction(&Instruction::If(BlockType::Empty));
         let bound = schema.reserve_gc_local(function).initialize(
             current.cast_reference::<BoundFunction>(schema, function),
             function,
@@ -176,6 +186,33 @@ impl FunctionBuilder<'_> {
             .read_into(&stored, &current, schema, function);
         stored.clear(function);
         bound.clear(function);
+        function.instruction(&Instruction::Else);
+        current.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<ProxyObject>(crate::gc_types::GcNullability::NonNullable)
+                .heap_type,
+        ));
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::BrIf(2));
+        let proxy = schema.reserve_gc_local(function).initialize(
+            current.cast_reference::<ProxyObject>(schema, function),
+            function,
+        );
+        let stored = schema.reserve_gc_local(function).initialize(
+            schema
+                .struct_type::<ProxyObject>()
+                .field(crate::gc_types::ProxyObjectSchema::TARGET)
+                .read(&proxy, schema, function)
+                .reference(),
+            function,
+        );
+        schema
+            .struct_type::<StoredValue>()
+            .read_into(&stored, &current, schema, function);
+        stored.clear(function);
+        proxy.clear(function);
+        function.instruction(&Instruction::End);
         depth.load(function);
         function.instruction(&Instruction::I32Const(1));
         function.instruction(&Instruction::I32Add);
