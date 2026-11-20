@@ -142,11 +142,10 @@ impl ForeignAsyncState {
             .next_request
             .ok_or_else(|| EngineError::new("asynchronous foreign request identity exhausted"))?;
         self.next_request = request.0.checked_add(1).map(ForeignRequestId);
-        assert!(
-            self.pending
-                .insert(request, PendingResolvers { resolve, reject })
-                .is_none()
-        );
+        assert!(self
+            .pending
+            .insert(request, PendingResolvers { resolve, reject })
+            .is_none());
         Ok(ForeignCompleter {
             request,
             sender: Some(self.sender.clone()),
@@ -251,12 +250,10 @@ mod tests {
     fn settlement_after_store_retirement_reports_closed_authority() {
         let (completion, receiver) = completer(ForeignResultType::Void);
         drop(receiver);
-        assert!(
-            completion
-                .resolve(ForeignValue::Void)
-                .unwrap_err()
-                .to_string()
-                .contains("Store was dropped")
-        );
+        assert!(completion
+            .resolve(ForeignValue::Void)
+            .unwrap_err()
+            .to_string()
+            .contains("Store was dropped"));
     }
 }

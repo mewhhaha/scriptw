@@ -1,6 +1,6 @@
 use super::*;
 use scriptw_aot_wasm::{
-    RUNTIME_IMPORT_NAMESPACE, RuntimeArtifact, RuntimeSourceCompilationProfile,
+    RuntimeArtifact, RuntimeSourceCompilationProfile, RUNTIME_IMPORT_NAMESPACE,
 };
 
 pub(super) fn program(bytes: &[u8], linked: bool) -> Result<ForeignModuleRegistry, EngineError> {

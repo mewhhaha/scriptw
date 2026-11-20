@@ -17,30 +17,28 @@ mod reentrant_execution;
 mod timers;
 
 fn registry(error_tag: bool) -> ForeignModuleRegistry {
-    let mut registry = ForeignModuleRegistry::new(vec![
-        ForeignModuleDeclaration::new(
-            "dd:host",
-            vec![
-                ForeignFunctionDeclaration::new(
-                    "add",
-                    "dd",
-                    "add",
-                    vec![ForeignValueType::Number; 2],
-                    ForeignResultType::Number,
-                )
-                .unwrap(),
-                ForeignFunctionDeclaration::new(
-                    "record",
-                    "dd",
-                    "record",
-                    vec![ForeignValueType::Number],
-                    ForeignResultType::Void,
-                )
-                .unwrap(),
-            ],
-        )
-        .unwrap(),
-    ])
+    let mut registry = ForeignModuleRegistry::new(vec![ForeignModuleDeclaration::new(
+        "dd:host",
+        vec![
+            ForeignFunctionDeclaration::new(
+                "add",
+                "dd",
+                "add",
+                vec![ForeignValueType::Number; 2],
+                ForeignResultType::Number,
+            )
+            .unwrap(),
+            ForeignFunctionDeclaration::new(
+                "record",
+                "dd",
+                "record",
+                vec![ForeignValueType::Number],
+                ForeignResultType::Void,
+            )
+            .unwrap(),
+        ],
+    )
+    .unwrap()])
     .unwrap();
     if error_tag {
         registry = registry.with_error_tag(ForeignErrorTag::code_v1());
@@ -352,14 +350,12 @@ fn missing_foreign_module_function_and_wrong_signature_fail_before_runtime_insta
         .func_wrap("dd", "another_name", |a: f64, b: f64| a + b)
         .unwrap();
     runtime.register(&mut store, &mut linker).unwrap();
-    assert!(
-        runtime
-            .instantiate(&mut store, &mut linker)
-            .err()
-            .unwrap()
-            .to_string()
-            .contains("dd.add")
-    );
+    assert!(runtime
+        .instantiate(&mut store, &mut linker)
+        .err()
+        .unwrap()
+        .to_string()
+        .contains("dd.add"));
 }
 
 #[test]
@@ -438,14 +434,12 @@ fn declared_operation_error_is_a_js_error_and_unrelated_host_failure_stays_fatal
             different_tag,
         )
         .unwrap();
-    assert!(
-        runtime
-            .instantiate(&mut replaced_store, &mut replaced_linker)
-            .err()
-            .unwrap()
-            .to_string()
-            .contains("differs from the registered Store tag")
-    );
+    assert!(runtime
+        .instantiate(&mut replaced_store, &mut replaced_linker)
+        .err()
+        .unwrap()
+        .to_string()
+        .contains("differs from the registered Store tag"));
 }
 
 #[test]
@@ -538,13 +532,11 @@ fn undeclared_error_tags_and_foreign_store_engine_lifecycles_are_not_authority()
         "registration is one-shot"
     );
     let instance = runtime.instantiate(&mut first, &mut linker).unwrap();
-    assert!(
-        instance
-            .evaluate(&mut first)
-            .unwrap_err()
-            .to_string()
-            .contains("not explicitly declared")
-    );
+    assert!(instance
+        .evaluate(&mut first)
+        .unwrap_err()
+        .to_string()
+        .contains("not explicitly declared"));
     let mut second = store(&runtime, 0.0);
     let mut second_linker = super::tests::linker(&runtime);
     runtime.register(&mut second, &mut second_linker).unwrap();
@@ -552,13 +544,11 @@ fn undeclared_error_tags_and_foreign_store_engine_lifecycles_are_not_authority()
         .instantiate(&mut second, &mut second_linker)
         .unwrap();
     let mut other = store(&runtime, 0.0);
-    assert!(
-        instance
-            .evaluate(&mut other)
-            .unwrap_err()
-            .to_string()
-            .contains("different Store")
-    );
+    assert!(instance
+        .evaluate(&mut other)
+        .unwrap_err()
+        .to_string()
+        .contains("different Store"));
     let mut config = WasmtimeConfig::new();
     configure_wasm_runtime(
         &mut config,
@@ -571,11 +561,9 @@ fn undeclared_error_tags_and_foreign_store_engine_lifecycles_are_not_authority()
         runtime.new_state(RealmBuilder::new().build(), ()).unwrap(),
     );
     let mut wrong_linker = WasmtimeLinker::new(&foreign_engine);
-    assert!(
-        runtime
-            .register(&mut wrong_store, &mut wrong_linker)
-            .is_err()
-    );
+    assert!(runtime
+        .register(&mut wrong_store, &mut wrong_linker)
+        .is_err());
 }
 
 #[test]
@@ -584,22 +572,18 @@ fn embedder_fuel_limit_is_not_reset_and_different_foreign_programs_share_unchang
         "import {add} from 'dd:host'; print(add(20,22));",
         registry(false),
     );
-    let other_declarations = ForeignModuleRegistry::new(vec![
-        ForeignModuleDeclaration::new(
-            "tools:native",
-            vec![
-                ForeignFunctionDeclaration::new(
-                    "multiply",
-                    "tools",
-                    "multiply",
-                    vec![ForeignValueType::Number; 2],
-                    ForeignResultType::Number,
-                )
-                .unwrap(),
-            ],
+    let other_declarations = ForeignModuleRegistry::new(vec![ForeignModuleDeclaration::new(
+        "tools:native",
+        vec![ForeignFunctionDeclaration::new(
+            "multiply",
+            "tools",
+            "multiply",
+            vec![ForeignValueType::Number; 2],
+            ForeignResultType::Number,
         )
-        .unwrap(),
-    ])
+        .unwrap()],
+    )
+    .unwrap()])
     .unwrap();
     let second = artifact(
         "import {multiply} from 'tools:native'; print(multiply(6,7));",
@@ -649,14 +633,12 @@ fn embedder_fuel_limit_is_not_reset_and_different_foreign_programs_share_unchang
         .register(&mut exhausted, &mut exhausted_linker)
         .unwrap();
     assert_eq!(exhausted.get_fuel().unwrap(), 0);
-    assert!(
-        runtime
-            .instantiate(&mut exhausted, &mut exhausted_linker)
-            .err()
-            .unwrap()
-            .to_string()
-            .contains("fuel")
-    );
+    assert!(runtime
+        .instantiate(&mut exhausted, &mut exhausted_linker)
+        .err()
+        .unwrap()
+        .to_string()
+        .contains("fuel"));
     assert_eq!(exhausted.get_fuel().unwrap(), 0);
     let mut store = store(&runtime, 0.0);
     store.set_fuel(1_000_000).unwrap();

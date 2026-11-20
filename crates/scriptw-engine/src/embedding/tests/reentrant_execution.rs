@@ -1,5 +1,5 @@
 use super::*;
-use std::sync::{Mutex, mpsc};
+use std::sync::{mpsc, Mutex};
 use std::thread;
 use std::time::Duration;
 

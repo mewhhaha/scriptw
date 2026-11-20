@@ -23,9 +23,9 @@ mod values;
 use async_host::ForeignAsyncState;
 pub use async_host::ForeignCompleter;
 pub use foreign_host::ForeignValue;
-pub use precompiled::{PrecompiledEmbeddedProgram, configure_precompiled_wasm_runtime};
-pub use values::{EmbeddedEvaluation, JsCompletion, JsPromiseState, JsValue, JsValueKind};
+pub use precompiled::{configure_precompiled_wasm_runtime, PrecompiledEmbeddedProgram};
 use values::{embedded_error, retained_completion};
+pub use values::{EmbeddedEvaluation, JsCompletion, JsPromiseState, JsValue, JsValueKind};
 
 #[cfg(test)]
 mod decimal_helper_tests;

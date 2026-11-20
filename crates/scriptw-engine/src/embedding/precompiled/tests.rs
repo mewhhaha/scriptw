@@ -39,12 +39,10 @@ fn precompiled_standalone_executes_on_an_engine_that_cannot_compile_wasm() {
     let image = EmbeddedRuntime::precompile(&shared_wasm_engine().unwrap(), &artifact).unwrap();
     let engine = compiler_disabled();
     assert_eq!(engine.get_cranelift_opt_level(), None);
-    assert!(
-        WasmtimeModule::new(&engine, b"\0asm\x01\0\0\0")
-            .unwrap_err()
-            .to_string()
-            .contains("compiler")
-    );
+    assert!(WasmtimeModule::new(&engine, b"\0asm\x01\0\0\0")
+        .unwrap_err()
+        .to_string()
+        .contains("compiler"));
     let runtime = EmbeddedRuntime::from_precompiled(&engine, &image).unwrap();
     let mut store = state(&runtime);
     #[cfg(feature = "native-source-compiler")]
@@ -62,23 +60,20 @@ fn linked_image() -> &'static PrecompiledEmbeddedProgram {
     static IMAGE: OnceLock<PrecompiledEmbeddedProgram> = OnceLock::new();
     IMAGE.get_or_init(|| {
         let compiler = Engine::new(RealmBuilder::new().build());
-        let declarations = ForeignModuleRegistry::new(vec![
-            scriptw_ir::foreign::ForeignModuleDeclaration::new(
+        let declarations =
+            ForeignModuleRegistry::new(vec![scriptw_ir::foreign::ForeignModuleDeclaration::new(
                 "fixture:host",
-                vec![
-                    scriptw_ir::foreign::ForeignFunctionDeclaration::new(
-                        "add",
-                        "fixture",
-                        "add",
-                        vec![scriptw_ir::foreign::ForeignValueType::Number; 2],
-                        scriptw_ir::foreign::ForeignResultType::Number,
-                    )
-                    .unwrap(),
-                ],
+                vec![scriptw_ir::foreign::ForeignFunctionDeclaration::new(
+                    "add",
+                    "fixture",
+                    "add",
+                    vec![scriptw_ir::foreign::ForeignValueType::Number; 2],
+                    scriptw_ir::foreign::ForeignResultType::Number,
+                )
+                .unwrap()],
             )
-            .unwrap(),
-        ])
-        .unwrap();
+            .unwrap()])
+            .unwrap();
         let unit = compiler
             .compile_module(
                 r#"
@@ -116,14 +111,12 @@ fn precompiled_linked_images_keep_foreign_metadata_retained_calls_throws_and_gc_
     runtime
         .register(&mut missing_store, &mut missing_linker)
         .unwrap();
-    assert!(
-        runtime
-            .instantiate(&mut missing_store, &mut missing_linker)
-            .err()
-            .unwrap()
-            .to_string()
-            .contains("missing declared foreign import")
-    );
+    assert!(runtime
+        .instantiate(&mut missing_store, &mut missing_linker)
+        .err()
+        .unwrap()
+        .to_string()
+        .contains("missing declared foreign import"));
     let mut wrong_store = state(&runtime);
     let mut wrong_linker = WasmtimeLinker::new(&engine);
     wrong_linker
@@ -132,14 +125,12 @@ fn precompiled_linked_images_keep_foreign_metadata_retained_calls_throws_and_gc_
     runtime
         .register(&mut wrong_store, &mut wrong_linker)
         .unwrap();
-    assert!(
-        runtime
-            .instantiate(&mut wrong_store, &mut wrong_linker)
-            .err()
-            .unwrap()
-            .to_string()
-            .contains("foreign import type mismatch")
-    );
+    assert!(runtime
+        .instantiate(&mut wrong_store, &mut wrong_linker)
+        .err()
+        .unwrap()
+        .to_string()
+        .contains("foreign import type mismatch"));
     let mut store = state(&runtime);
     let mut linker = WasmtimeLinker::new(&engine);
     linker
@@ -195,13 +186,11 @@ fn precompiled_rejects_wrong_runtime_missing_link_and_incompatible_native_engine
     wrong.facts.runtime = ProgramRuntimeRequirement::CargoMinimalPortable {
         key: RuntimeArtifactKey::from_bytes(wrong_key),
     };
-    assert!(
-        EmbeddedRuntime::from_precompiled(&engine, &wrong)
-            .err()
-            .unwrap()
-            .to_string()
-            .contains("runtime key")
-    );
+    assert!(EmbeddedRuntime::from_precompiled(&engine, &wrong)
+        .err()
+        .unwrap()
+        .to_string()
+        .contains("runtime key"));
     // Inert linkage is a producer-established fact. A public raw artifact
     // cannot mint Standalone facts for a P that imports Cargo R.
     let mut missing_link = script("var answer = 42; answer;");
@@ -302,8 +291,8 @@ fn precompiled_rejects_implicit_start_native_host_and_nonminimal_policy() {
 }
 
 #[test]
-fn precompiled_framing_rejects_corruption_truncation_overflow_and_trailing_data_before_native_admission()
- {
+fn precompiled_framing_rejects_corruption_truncation_overflow_and_trailing_data_before_native_admission(
+) {
     // These inert frames never acquire the unsafe native-origin capability.
     let bytes = envelope::encode(
         b"raw-program",
@@ -421,22 +410,18 @@ fn precompiled_facts_roundtrip_async_foreign_declarations_and_explicit_error_tag
         ForeignErrorTag, ForeignFunctionDeclaration, ForeignModuleDeclaration, ForeignResultType,
         ForeignValueType,
     };
-    let registry = ForeignModuleRegistry::new(vec![
-        ForeignModuleDeclaration::new(
-            "fixture:async",
-            vec![
-                ForeignFunctionDeclaration::new_async(
-                    "read",
-                    "fixture",
-                    "read",
-                    vec![ForeignValueType::Bytes],
-                    ForeignResultType::StringUtf16,
-                )
-                .unwrap(),
-            ],
+    let registry = ForeignModuleRegistry::new(vec![ForeignModuleDeclaration::new(
+        "fixture:async",
+        vec![ForeignFunctionDeclaration::new_async(
+            "read",
+            "fixture",
+            "read",
+            vec![ForeignValueType::Bytes],
+            ForeignResultType::StringUtf16,
         )
-        .unwrap(),
-    ])
+        .unwrap()],
+    )
+    .unwrap()])
     .unwrap()
     .with_error_tag(ForeignErrorTag::code_v1());
     let facts = ProgramExecutionFacts {
