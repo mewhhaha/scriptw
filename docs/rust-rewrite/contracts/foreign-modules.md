@@ -204,8 +204,9 @@ the count exceeds one, and `EmbeddedRuntime::compile` and `precompile` refuse an
 Engine whose flag disagrees: a parallel Engine compiling outside the pool would
 use Rayon's global pool, one thread per CPU. The embedder's own
 `wasmtime::Module::new` on such an Engine (a WASI adapter, a foreign Wasm
-module) does compile on that global pool; Scriptw cannot route it. Each extra job costs memory, and
-there is no byte-valued cap because Cranelift cannot enforce one. On the RSC
+module) does compile on that global pool; Scriptw cannot route it. Each extra
+job costs memory, and there is no byte-valued cap because Cranelift cannot
+enforce one. On the RSC
 bundle with two CPUs (medians of three), a second job cut native preparation
 from 7.61 to 4.07 s under `Speed` and from 4.77 to 2.42 s under `Fast`, and
 raised the compiling process's peak from 257 to 415 MiB and from 250 to 361
@@ -217,11 +218,12 @@ images.
 typed embedder data. The caller owns the `Store`, `Linker`, resource limiter,
 fuel policy and any [execution deadline](execution-deadlines.md). The state
 carries `StoreLimits` at the 1 GiB Store cap; attach them with
-`store.limiter(|state| state.limits_mut())` or install another limiter. Scriptw's
-private and shared memories carry the cap in their types, but on an on-demand
-Engine without a limiter the Store's GC heap is bounded only by its 4 GiB
-reservation (a pooled Engine caps it at 1 GiB). `register` installs the checked Scriptw host
-functions/resources and any explicitly declared error tag. The embedder adds
+`store.limiter(|state| state.limits_mut())` or install another limiter.
+Scriptw's private and shared memories carry the cap in their types, but on an
+on-demand Engine without a limiter the Store's GC heap is bounded only by its
+4 GiB reservation (a pooled Engine caps it at 1 GiB). `register` installs the
+checked Scriptw host functions/resources and any explicitly declared error
+tag. The embedder adds
 its own ordinary `linker.func_wrap("dd", "add", ...)` implementation.
 `instantiate` checks required native function types before R/P initialization.
 `EmbeddedInstance::initialize(&mut self, store)` executes entry once and retains

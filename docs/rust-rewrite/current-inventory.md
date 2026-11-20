@@ -338,11 +338,23 @@ accepts `--case <file.js>`.
 - Smaller runtime review items left open, each with its reason: an
   embedder's own `Module::new` on a parallel Engine still compiles on Rayon's
   global pool (Scriptw cannot route it; foreign-modules.md says so);
-  `configure_compilation_jobs` caches a failed pool build for the process;
+  `compilation_pool` caches a failed Rayon pool build for the process (the
+  failure is a thread spawn refused by the OS, which a retry in the same
+  process would most likely meet again, while retrying would let two callers
+  race to build two pools; the cached error names the cause on every use);
   `EngineError` keeps `store_pool_limit_reached: bool` beside mutually
   exclusive `Option` fields (part of the typed error kinds decision);
-  `default_compilation_jobs` keeps a `cfg!(test)` branch; no test drops a
-  pooled Store while a panic or trap unwinds out of a host call; a killed `scriptw precompile`
+  `default_compilation_jobs` keeps a `cfg!(test)` branch (the library's unit
+  tests share one process and most configure one job explicitly; without it
+  an unconfigured test would fix a CPU-derived count first and every later
+  one-job request would be refused; integration tests use `SCRIPTW_JOBS`
+  instead, and removing the branch waits on the B4 test-harness change in
+  target/review/PLAN.md); no test drops a pooled Store while a panic or trap
+  unwinds out of a host call (the drop path is the same `Drop` that ordinary
+  Store teardown runs and the pooled-store tests cover, and the trap case is
+  covered by the interrupted-Store test; a panic through a host call needs a
+  panicking host import that the product does not define, so the test needs
+  a test-only import first); a killed `scriptw precompile`
   leaves its transaction file (removing files by a dead PID is not safe across
   PID namespaces). Owner: embedding API.
 - Compiler review refactors not taken, each because it prevents no current

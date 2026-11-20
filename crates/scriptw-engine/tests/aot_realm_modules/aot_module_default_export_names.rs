@@ -524,7 +524,9 @@ fn a_callable_ending_in_import_meta_keeps_its_whole_source_text() {
         &[
             (
                 "a.mjs",
-                "import {b, c} from './e.mjs';\nconst a = () => import.meta;\nconst d = () => import\n  .  meta;\nconst f = () => import /* c */ . meta;\nprint(JSON.stringify([a, b, c, d, f].map(String)));",
+                // `g` separates the meta-property's tokens with U+2028, a
+                // LineTerminator that is one UTF-16 unit but three UTF-8 bytes.
+                "import {b, c} from './e.mjs';\nconst a = () => import.meta;\nconst d = () => import\n  .  meta;\nconst f = () => import /* c */ . meta;\nconst g = () => import\u{2028}.\u{2028}meta;\nprint(JSON.stringify([a, b, c, d, f, g].map(String)));",
             ),
             (
                 "e.mjs",
@@ -533,7 +535,10 @@ fn a_callable_ending_in_import_meta_keeps_its_whole_source_text() {
         ],
         EntryGoal::Module,
         &[
-            r#"["() => import.meta","async () => import.meta","x => typeof import . meta","() => import\n  .  meta","() => import /* c */ . meta"]"#,
+            concat!(
+                r#"["() => import.meta","async () => import.meta","x => typeof import . meta","() => import\n  .  meta","() => import /* c */ . meta","#,
+                "\"() => import\u{2028}.\u{2028}meta\"]"
+            ),
         ],
     );
 }
