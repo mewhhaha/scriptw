@@ -15,6 +15,11 @@ fn scripts(directory: &std::path::Path, found: &mut Vec<std::path::PathBuf>) {
     entries.sort();
     for path in entries {
         if path.is_dir() {
+            // Entry scripts of module graphs: emitted with their graph by
+            // the engine's module suites, which run with this check in debug.
+            if path.ends_with("script_import_jobs") {
+                continue;
+            }
             scripts(&path, found);
         } else if path.extension().is_some_and(|extension| extension == "js") {
             found.push(path);
@@ -34,26 +39,28 @@ fn r_and_the_engine_fixtures_write_each_typed_gc_local_before_reading_it() {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../scriptw-engine/tests/fixtures");
     let mut found = Vec::new();
     scripts(&fixtures, &mut found);
+    let mut refused = Vec::new();
     let mut emitted = 0;
     for path in &found {
         let source = std::fs::read_to_string(path).unwrap();
-        // Module-goal files do not parse as Scripts; every emitted body,
-        // whatever the outcome of the rest of the program, was checked.
+        // Module-goal files do not parse as Scripts; the engine's debug
+        // suites check their bodies.
         let Ok(parsed) = parse(&source, ParseOptions::script()) else {
             continue;
         };
-        if emit(&lower_with_host_surface_policy(
+        match emit(&lower_with_host_surface_policy(
             &parsed,
             HostSurfacePolicy::Test262,
-        ))
-        .is_ok()
-        {
-            emitted += 1;
+        )) {
+            Ok(_) => emitted += 1,
+            Err(error) => refused.push(format!("{}: {error}", path.display())),
         }
     }
+    // Every Script fixture the engine runs through Wasm emits here too, so
+    // each body of each one was checked.
     assert!(
-        emitted >= found.len() / 2,
-        "only {emitted} of {} fixture scripts emitted",
-        found.len()
+        refused.is_empty() && emitted > 0,
+        "{emitted} fixture scripts emitted; refused:\n{}",
+        refused.join("\n")
     );
 }

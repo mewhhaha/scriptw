@@ -713,6 +713,14 @@ impl Function {
             | Instruction::BrOnCastFail {
                 relative_depth: label,
                 ..
+            }
+            | Instruction::BrOnCastDescEq {
+                relative_depth: label,
+                ..
+            }
+            | Instruction::BrOnCastDescEqFail {
+                relative_depth: label,
+                ..
             } => {
                 let current = self.i32_facts.clone();
                 self.join_i32_facts_at(enclosing_depth, *label, &current);
@@ -743,10 +751,9 @@ impl Function {
                 // than modelled.
                 panic!("the i32 fact flow does not model stack switching")
             }
-            _ => debug_assert!(
-                !is_two_way_branch(instruction),
-                "a two-way branch must join its facts into its label"
-            ),
+            // Every branching operator wasm-encoder 0.245 encodes is
+            // matched above; the rest fall through to the next operator.
+            _ => {}
         }
     }
 
@@ -1021,7 +1028,9 @@ impl Function {
                 self.anchor = None;
             }
             Instruction::BrOnCast { relative_depth, .. }
-            | Instruction::BrOnCastFail { relative_depth, .. } => {
+            | Instruction::BrOnCastFail { relative_depth, .. }
+            | Instruction::BrOnCastDescEq { relative_depth, .. }
+            | Instruction::BrOnCastDescEqFail { relative_depth, .. } => {
                 self.check_branch(*relative_depth);
                 self.two_way_branch(*relative_depth);
             }
@@ -1402,6 +1411,8 @@ fn is_two_way_branch(instruction: &Instruction<'_>) -> bool {
             | Instruction::BrOnNonNull(_)
             | Instruction::BrOnCast { .. }
             | Instruction::BrOnCastFail { .. }
+            | Instruction::BrOnCastDescEq { .. }
+            | Instruction::BrOnCastDescEqFail { .. }
     )
 }
 

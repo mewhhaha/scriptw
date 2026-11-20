@@ -48,11 +48,11 @@ in `names.rs`). Scriptw binds other self names in the activation too, but the
 function's own `arguments` binding shadows this one everywhere in its
 parameters and body, so the activation holds the implicit binding and every
 reference, arrow, nested eval and write resolves to it; strict code cannot
-use the name. (Until the fix this resolved to the function itself:
-`(function arguments(){ return typeof arguments })()` gave `function`.)
-`arguments_named_function_expression.js` covers plain, generator, async,
-method-valued and parameter-default forms, arrows, eval, `var` and parameter
-shadows, writes, `callee`, strict inner functions and the strict early errors.
+use the name. `arguments_named_function_expression.js` covers plain,
+generator, async and async generator, method-valued and parameter-default
+forms, mapped aliasing, parameter expressions with a separate body, arrows
+(escaping too), eval, `with`, `var` and parameter shadows, writes, `callee`,
+strict inner functions and the strict early errors.
 
 Controls cover own/global collision, var-without-initializer, reassignment and
 escaping arrows, destructuring in async functions/generators, parameter and

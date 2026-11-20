@@ -326,9 +326,16 @@ accepts `--case <file.js>`.
   is what licensed dropping the `set_completion_kind(Normal)` writes in
   `a9c732611`; it is still unchecked. A debug-only trap at `project` and at
   ExpressionStatement would change the bytes every debug build emits (and the
-  exact emission fixtures CI runs in debug), and a static check needs a
-  value-set analysis through completion copies. Owner: emitter completion
-  protocol.
+  exact emission fixtures CI runs in debug). An opt-in emission mode would
+  change no default bytes, but it must reach the compiler as a compile option
+  that the program cache key, the runtime-image build (R is emitted at build
+  time) and the CLI cache all see, or a cached artifact silently drops or
+  carries the checks; an environment switch read by the emitter does not.
+  The better path is static: the code sink's GC local check shows a
+  trace-based dataflow over a finished body is cheap, and the i32 fact flow
+  already proves `Is(const)` for `i32.const; local.set`, so a completion-kind
+  variant needs value sets through completion copies. Revisit when the next
+  change removes completion writes. Owner: emitter completion protocol.
 
 ## Conformance boundaries
 

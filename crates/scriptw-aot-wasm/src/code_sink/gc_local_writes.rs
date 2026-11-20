@@ -12,8 +12,11 @@
 //! enclosing block, whichever holder made it.
 //!
 //! The sink records the control structure, the reservations, releases, reads
-//! and writes of every local declared with a concrete reference type, and the
-//! operations that can throw into a handler. [`Trace::verify`] then runs a
+//! and writes of every pooled reference local except the `eqref` value pool
+//! (whose release does store null), and the operations that can throw into a
+//! handler. Every control-transfer operator of wasm-encoder 0.245's
+//! `Instruction` is listed below; an upgrade must list new ones, since an
+//! unlisted operator is taken as straight-line code. [`Trace::verify`] then runs a
 //! must-be-written dataflow over that record when the body is finished:
 //! joins intersect, and each `try_table` handler label receives the state at
 //! every call and throw inside its body. A loop head holds what its entry
@@ -24,9 +27,14 @@
 //! that is not written on every path from its reservation panics with the
 //! function and the operator.
 //!
+//! "Its holder" is the most recent reservation of that Wasm local on the
+//! path: the check cannot tell a stale Rust copy of a released holder from
+//! the new one. The emitter's types prevent that copy instead, since a
+//! holder's `clear` consumes it.
+//!
 //! The record exists in test and debug builds only.
 
-use wasm_encoder::{Catch, HeapType, Instruction, ValType};
+use wasm_encoder::{Catch, Instruction, ValType};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Op {
@@ -56,17 +64,11 @@ enum Op {
     Unmodelled(&'static str),
 }
 
-/// Whether locals of `ty` are checked: references to a concrete type, the
-/// typed GC locals whose release does not clear them. Abstract references
-/// (the value pool's `eqref`, which keeps its clear) are not.
+/// Whether locals of `ty` are checked: every reference type whose release
+/// does not clear the local, which is all of them except the value pool's
+/// `eqref` (it stores null on release, and its holders may read that null).
 pub(super) fn is_checked_type(ty: ValType) -> bool {
-    matches!(
-        ty,
-        ValType::Ref(wasm_encoder::RefType {
-            heap_type: HeapType::Concrete(_),
-            ..
-        })
-    )
+    matches!(ty, ValType::Ref(reference) if reference != wasm_encoder::RefType::EQREF)
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -128,6 +130,14 @@ impl Trace {
             | Instruction::BrOnCastFail {
                 relative_depth: label,
                 ..
+            }
+            | Instruction::BrOnCastDescEq {
+                relative_depth: label,
+                ..
+            }
+            | Instruction::BrOnCastDescEqFail {
+                relative_depth: label,
+                ..
             } => Op::BrIf(*label),
             Instruction::BrTable(labels, default) => Op::BrTable(labels.to_vec(), *default),
             Instruction::Return
@@ -161,6 +171,7 @@ impl Trace {
             | Instruction::ResumeThrow { .. }
             | Instruction::ResumeThrowRef { .. }
             | Instruction::Switch { .. } => Op::Unmodelled("stack switching"),
+            // Not a control transfer and not a checked local.
             _ => return,
         };
         self.ops.push(op);
@@ -169,7 +180,9 @@ impl Trace {
     /// Panics, naming `context`, at the first read some path reaches
     /// without a write by the local's current holder.
     pub(super) fn verify(&self, context: &dyn core::fmt::Display) {
-        if self.checked.is_empty() {
+        // With no read of a checked local there is nothing to check (a
+        // code-sink test may then use operators the emitter never emits).
+        if !self.ops.iter().any(|op| matches!(op, Op::Read(_))) {
             return;
         }
         if let Some(Op::Unmodelled(what)) =
@@ -451,7 +464,7 @@ impl<'a> Flow<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wasm_encoder::{BlockType, RefType};
+    use wasm_encoder::{BlockType, HeapType, RefType};
 
     const TYPED: ValType = ValType::Ref(RefType {
         nullable: true,
@@ -572,5 +585,39 @@ mod tests {
             trace.instruction(&Instruction::LocalGet(9));
         })
         .is_empty());
+    }
+
+    /// The check is wired into the sink: a body built through `Function`
+    /// whose second holder of a pooled local reads it after a join with an
+    /// arm that did not write it is refused when it is finished.
+    #[test]
+    #[should_panic(expected = "a typed GC local is read on a path where its current holder")]
+    fn finish_named_refuses_a_read_of_a_previous_holders_reference() {
+        let mut function = super::super::Function::new(
+            super::super::LocalDeclarations::from_types(std::iter::empty::<ValType>()),
+        );
+        let first = function.reserve_typed_local(TYPED);
+        function.instruction(&Instruction::RefNull(HeapType::Concrete(0)));
+        function.instruction(&Instruction::LocalSet(first));
+        function.release_typed_local(first);
+        let second = function.reserve_typed_local(TYPED);
+        assert_eq!(second, first, "the pool hands the local to the next holder");
+        function.instruction(&Instruction::I32Const(0));
+        function.instruction(&Instruction::If(BlockType::Empty));
+        function.instruction(&Instruction::RefNull(HeapType::Concrete(0)));
+        function.instruction(&Instruction::LocalSet(second));
+        function.instruction(&Instruction::End);
+        function.instruction(&Instruction::LocalGet(second));
+        function.instruction(&Instruction::Drop);
+        function.instruction(&Instruction::End);
+        let _ = function.finish_named(&"a violating test body");
+    }
+
+    #[test]
+    fn a_pooled_externref_local_is_checked_and_the_eqref_pool_is_not() {
+        assert!(is_checked_type(ValType::Ref(RefType::EXTERNREF)));
+        assert!(is_checked_type(TYPED));
+        assert!(!is_checked_type(ValType::Ref(RefType::EQREF)));
+        assert!(!is_checked_type(ValType::I32));
     }
 }

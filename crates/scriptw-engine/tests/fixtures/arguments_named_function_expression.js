@@ -27,6 +27,19 @@ log((function arguments(a) {
 })(9));
 log((function arguments(a = typeof arguments) { return a; })());
 log(f28.name + ',' + typeof f28);
+// The arguments object now exists where the name used to hide it: mapped
+// aliasing, parameter expressions and their separate body, `with`, escape.
+log((function arguments(a) { arguments[0] = 2; return a; })(1));
+log((function arguments(a) { a = 3; return arguments[0]; })(1));
+log((function arguments(a = eval('arguments')) { return typeof a + a.length; })());
+log((function arguments(b, a = () => arguments) { return a()[0]; })(7));
+log((function arguments(a = 1) { function arguments() {} return typeof arguments; })());
+log((function arguments() { with ({}) return typeof arguments; })());
+var escaped = (function arguments() { return () => arguments; })(5);
+log(escaped()[0]);
+var asyncGeneratorResult = 'pending';
+(async function* arguments() { yield typeof arguments + arguments.length; })(1, 2)
+  .next().then(function (result) { asyncGeneratorResult = result.value; });
 var asyncResult = 'pending';
 (async function arguments() { return typeof arguments + arguments.length; })(1)
   .then(function (value) { asyncResult = value; });
@@ -39,10 +52,13 @@ for (var source of ['"use strict"; (function arguments() {});',
 }
 var expected = [
   'object', '2', 'object', 'object', '3', 'object', '7', 'object', '5', '4', 'true', 'object',
-  '3:9', 'object', 'arguments,function',
+  '3:9', 'object', 'arguments,function', '2', '3', 'object0', '7', 'function', 'object', '5',
 ].join('|');
 Promise.resolve().then(function () {}).then(function () {
-  var actual = out.join('|') + ';' + asyncResult + ';' + strictErrors.join();
-  if (actual !== expected + ';object1;SyntaxError,SyntaxError,SyntaxError') throw new Error(actual);
+  var actual = out.join('|') + ';' + asyncResult + ';' + asyncGeneratorResult + ';' +
+    strictErrors.join();
+  if (actual !== expected + ';object1;object2;SyntaxError,SyntaxError,SyntaxError') {
+    throw new Error(actual);
+  }
   print('named arguments ok');
 });

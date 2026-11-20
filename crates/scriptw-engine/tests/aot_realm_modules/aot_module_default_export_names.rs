@@ -524,7 +524,7 @@ fn a_callable_ending_in_import_meta_keeps_its_whole_source_text() {
         &[
             (
                 "a.mjs",
-                "import {b, c} from './e.mjs';\nconst a = () => import.meta;\nconst d = () => import\n  .  meta;\nprint(JSON.stringify([a, b, c, d].map(String)));",
+                "import {b, c} from './e.mjs';\nconst a = () => import.meta;\nconst d = () => import\n  .  meta;\nconst f = () => import /* c */ . meta;\nprint(JSON.stringify([a, b, c, d, f].map(String)));",
             ),
             (
                 "e.mjs",
@@ -532,7 +532,9 @@ fn a_callable_ending_in_import_meta_keeps_its_whole_source_text() {
             ),
         ],
         EntryGoal::Module,
-        &[r#"["() => import.meta","async () => import.meta","x => typeof import . meta","() => import\n  .  meta"]"#],
+        &[
+            r#"["() => import.meta","async () => import.meta","x => typeof import . meta","() => import\n  .  meta","() => import /* c */ . meta"]"#,
+        ],
     );
 }
 
