@@ -2694,3 +2694,75 @@ sidecar; Scriptc standalone WASI. Application caches are fresh; OS and Zig toolc
 caches remain. Runtime production, Wasm-to-native compilation and execution are
 excluded. [Data and tool identities](compilation-current.json) ·
 [Reproduce](../../CONTRIBUTING.md#benchmark-charts).
+
+### Compiler binary build (2026-11-20)
+
+The panel above, the RSC compile and Test262 runs all time the `scriptw` binary
+itself, so how that binary is built matters too. [CONTRIBUTING](../../CONTRIBUTING.md#shipped-compiler-binary)
+has the recipe: `scripts/build-dist.sh` (fat LTO, one codegen unit, jemalloc) and its
+`pgo` mode (Rust PGO). All four binaries below were built from one source state,
+`a49682ada` plus the dist profile and allocator manifests (fingerprint `e18762413c39`).
+They were measured in interleaved rounds: five for compilation, three for Test262.
+Every child ran pinned to CPUs 0 and 1 with `SCRIPTW_JOBS=1` and a fresh disk-backed
+`SCRIPTW_CACHE_DIR`. Another worker ran Callgrind or builds on CPUs 2 and 3 for part of the
+time, so walls carry that contention; user CPU is steadier. Values are medians
+[min–max].
+
+| Binary | RSC precompile (Speed) | Panel `build wasm`, 17 kernels | Panel precompile, 17 kernels | `client.js` precompile (held out) | Test262 `built-ins/Array/prototype/find` | Peak RSS: RSC / build / Test262 | Size |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| release, glibc malloc | 9.70 s [9.36–10.69], user 9.30 s | 2.59 s [2.48–2.66], user 1.76 s | 7.66 s | 64.97 s [63.42–67.88] | 74.8 s [68.8–75.9], user 56.1 s | 292 / 85 / 157 MiB | 218.2 MB |
+| release + jemalloc | 9.09 s [8.95–9.63], user 8.60 s | 2.42 s [2.31–2.53], user 1.58 s | 7.42 s | 58.15 s [55.65–58.91] | 72.8 s [65.3–75.8], user 53.7 s | 240 / 75 / 169 MiB | 218.7 MB |
+| dist (fat LTO) + jemalloc | 8.42 s [8.27–8.72], user 7.99 s | 2.30 s [2.28–2.45], user 1.49 s | 7.15 s | 53.00 s [51.97–56.52] | 65.2 s [63.1–66.4], user 48.3 s | 230 / 69 / 158 MiB | 180.5 MB |
+| dist + jemalloc + PGO | **7.26 s** [6.95–7.78], user 6.72 s | **2.15 s** [2.08–2.24], user 1.34 s | **6.58 s** | **50.74 s** [48.02–51.63] | **63.5 s** [63.1–63.6], user 45.3 s | 227 / 63 / 149 MiB | 197.8 MB (178.4 MB without BOLT relocations) |
+
+Against release, the PGO dist binary takes 25% less wall time on the RSC
+compile (28% less user CPU), 17% less on the panel's builds and 15% less on the
+Test262 directory. The panel's per-kernel `build wasm` median falls from 0.145
+to 0.123 s. Most of that is CLI startup on a 200 MB binary: 17 builds take 1.76 s
+of user CPU against 2.59 s of wall time.
+
+Every artifact was byte-identical across all four binaries and all rounds:
+P and R of the 17 kernels, their `scriptw precompile` images, the RSC and
+`client.js` images, the `scriptw run` output of the 17 kernels (each matches its
+manifest) and the 44 Test262 outcomes (all pass). Wasmtime's native output
+therefore does not depend on how the compiler binary was built. The images carry
+the source fingerprint, which covers `Cargo.toml` and `Cargo.lock`, so only
+binaries from one source state can be compared byte for byte.
+
+PGO trained on nine of the kernels, the RSC program, the six edge programs and
+`built-ins/JSON/stringify`. It generalizes: on the eight held-out kernels,
+`build wasm` user CPU falls 24% (0.85 to 0.65 s) against 23% on the trained ones,
+and precompile falls 19% against 17%. `client.js` (325 KB React client) and the
+Test262 directory are also outside the training set.
+
+Allocators: mimalloc 0.1.52 matched jemalloc's CPU savings in a separate
+three-way A/B: RSC user 8.70 s against 8.71 s (glibc 9.08 s), and Test262 user
+54.4 s against 55.1 s (58.4 s). It raised peak RSS, though, to 305 MiB on the RSC
+compile and 249 MiB on Test262, against 241 and 171 MiB for jemalloc and 291 and
+160 MiB for glibc. jemalloc was kept.
+
+Build cost: a cold dist build takes about 25 minutes on four contended vCPUs, and
+its fat-LTO link peaks at 3.8 GB RSS. PGO adds an instrumented build, about four
+minutes of training and a second dist build. The instrumented target units
+take 1.8 GB and the profile-use ones about 1.7 GB, plus 1.4 GB of host units. Release and
+development builds are unchanged.
+
+Not done:
+
+- BOLT. LLVM 18 BOLT is installable here (`bolt-18`), but this VM has no PMU, so
+  no perf LBR profile. Its instrumentation mode grew to 8.3 GB RSS on the 198 MB
+  PGO binary (38,722 functions, relocation mode) before it wrote anything. It
+  was stopped so that it would not crowd out concurrent builds on a 16 GB
+  machine. The PGO build already links with `--emit-relocs` and
+  `-z keep-text-section-prefix`, so a machine with about 12 GB of free RAM can
+  retry with `llvm-bolt -instrument`, the same training and
+  `-reorder-blocks=ext-tsp -reorder-functions=hfsort+ -split-functions`.
+- Linker identical-code folding (`--icf`) and a static or non-PIE link. Each needs
+  another full fat-LTO build with different link flags. Neither was measured.
+- The benchmark examples (`rsc_baseline`, `compiler_precompiled_baseline`) get
+  the allocator through `--features jemalloc` but have no dist/PGO recipe of
+  their own. Their native-preparation phase above comes from `scriptw precompile`.
+- The published compilation panel above still uses its frozen release CLI; a
+  new campaign should freeze a dist binary.
+- Two diagnostics are outside the set: RSC Fast policy and `scriptw build wasm`
+  of the whole RSC bundle. The latter grew past 12 GB RSS in a trial and was stopped.

@@ -52,6 +52,54 @@ Prefer persistent Cargo output directories. If filesystem pressure requires
 temporary tmpfs outputs, restore verified persistent copies before runtime tests.
 Tmpfs pages consume the producing cgroup's memory budget after compilation ends.
 
+### Shipped compiler binary
+
+Shipped and benchmark `scriptw` binaries (compilation panels, frozen cohorts,
+long Test262 sweeps) come from `scripts/build-dist.sh`: the `dist` Cargo profile
+(release plus fat LTO, one codegen unit and no DWARF) with jemalloc as the global
+allocator (`--features jemalloc`). Development and test builds keep the release
+profile and glibc malloc.
+
+```sh
+python3 -B scripts/limited_verification.py --cloud --cloud-cpus auto -- \
+  env DIST_JOBS=4 scripts/build-dist.sh plain target/dist-out
+```
+
+The binary lands in `target/dist-out/scriptw`. A cold build takes about 25
+minutes on four shared vCPUs, and its fat-LTO link peaks at 3.8 GB RSS. The
+dedicated target directory `target/dist-build` (`DIST_TARGET_DIR`) peaks at about
+3.2 GB. The script deletes the target units after copying the binary, but keeps
+the host units (build scripts and the runtime-image producer). It always passes
+`--target <host>`, so `RUSTFLAGS` reach only the target units, and it repeats
+the lld link argument, which `RUSTFLAGS` would otherwise replace.
+Artifacts must match the release binary byte for byte: P, R, `scriptw precompile`
+images, program output and Test262 outcomes. Images embed the source fingerprint,
+which covers `Cargo.toml` and `Cargo.lock`, so compare binaries built from one
+source state.
+
+`scripts/build-dist.sh pgo` adds Rust PGO. It needs rustup's `llvm-tools`
+component (`rustup component add llvm-tools`), whose `llvm-profdata` matches
+rustc's LLVM; the system `llvm-profdata` is older and cannot read the profiles.
+It builds an instrumented dist binary, runs `scripts/dist-pgo-train.sh`, merges
+the single online-merged `.profraw` and rebuilds with the profile. Set
+`DIST_PGO_APPLICATION_FIXTURES` to a generated application fixture directory
+(`benchmark-react.py prepare`) to include the RSC and edge programs; without it
+the training uses only the in-repository kernels and Test262. The script header
+lists the held-out inputs. PGO costs two dist builds plus about four minutes of
+training, and the instrumented build's target units take 1.8 GB. Against release,
+the PGO dist binary cuts the RSC compile's wall time by 25%, the compilation
+panel's builds by 17% and a Test262 directory by 15%. It also helps inputs
+outside the training set; see the
+[measurements](docs/rust-rewrite/benchmarks.md#compiler-binary-build-2026-11-20).
+Retrain after changing the allocator or hot compiler code. A stale profile
+only costs speed, but rustc does not warn when the profile no longer matches the
+code. The use build links with `--emit-relocs`, for a later BOLT pass. BOLT is
+not part of the recipe: LLVM 18's instrumentation pass needed more than 8 GB of
+RAM on this binary.
+
+Freeze a dist binary, not a release one, for a new compilation, RSC or Test262
+wall-time campaign, and record which recipe produced it.
+
 ## Development workflow
 
 1. Start from a reproducible failure or missing invariant and choose one coherent

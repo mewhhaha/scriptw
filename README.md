@@ -23,6 +23,11 @@ For production, precompile first: `scriptw precompile app.mjs -o app.swep` write
 native image once, and servers load it without a compiler; it needs the same Scriptw
 build and CPU features ([flow](docs/rust-rewrite/contracts/foreign-modules.md#precompiled-execution)).
 
+For a shipped or benchmark compiler, `scripts/build-dist.sh pgo` builds `scriptw`
+with fat LTO, jemalloc and Rust PGO. It compiles the RSC bundle about 25% faster
+than a release build, with byte-identical output
+([recipe](CONTRIBUTING.md#shipped-compiler-binary)).
+
 ## Benchmarks
 
 All panels were measured on **2026-11-17** at source `d2948d619` (compiler fingerprint `697c47c22eb0`), on a
