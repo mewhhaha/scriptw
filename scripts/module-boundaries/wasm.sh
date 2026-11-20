@@ -723,90 +723,244 @@ if [[ "$(head -n 1 "$gc_type_registration_fixture_source")" != '#![cfg(test)]' ]
   fail 'GC declaration fixtures must be compiled only for tests'
 fi
 # The section scans below skip every `tests.rs` and `tests/` source by path.
-# That is sound only while each of them compiles solely under cfg(test), so
-# prove it: a source is test-only when its first line is `#![cfg(test)]`, or
-# when every `mod` declaration that attaches it (the default parent's plain
-# `mod name;` and any `#[path = ...]` attachment) carries a cfg(test) gate or
-# sits in a source that is itself test-only. A source nothing attaches is not
-# proven either.
-normalize_relative_path() {
-  local part
-  local -a parts=()
-  local IFS=/
-  for part in $1; do
-    case "$part" in
-      ''|.) ;;
-      ..) if [ "${#parts[@]}" -gt 0 ]; then unset 'parts[${#parts[@]}-1]'; fi ;;
-      *) parts+=("$part") ;;
-    esac
-  done
-  printf '%s\n' "${parts[*]}"
+# That is sound only while each such source compiles solely under cfg(test), so
+# prove it for everything the crate compiles: every source under src/ plus every
+# file a `#[path = ...]` attribute or an `include!("...")` pulls in, wherever it
+# lives (tests/unit/*.rs, tests/fixtures/, the runtime image's execution.rs) and
+# whatever those attach in turn. A source is test-only when its first line is
+# `#![cfg(test)]`, or when something attaches it and every declaration that does
+# (a plain `mod name;` in its parent, a `#[path]` attachment, an `include!`)
+# carries a cfg(test) gate or sits in a source that is itself test-only.
+# `include!` carries no gate the proof can see, so only a test-only source may
+# include a tests path. Attributes are read wherever they sit: on their own lines,
+# split over several lines, or on the declaration's own line. Anything the proof
+# cannot follow is a finding: a non-literal `include!`, a declaration inside an
+# inline `mod name { ... }` block, a `#[path]` that is not an outer attribute of
+# a `mod` declaration, or an attachment whose target does not exist.
+#
+# One awk pass prints the table:
+#   attach <target> <declaring source> <gated 1/0> <plain|path|include> <line>
+#   source <compiled source>
+#   unresolved <source> <line> <reason>
+# Plain children resolve as rustc does: next to lib.rs, main.rs, mod.rs and every
+# `#[path]`-loaded file, and under `<stem>/` for any other file.
+wasm_attachment_program='
+function dir_of(path,   count, parts, index_, result) {
+  count = split(path, parts, "/")
+  result = parts[1]
+  for (index_ = 2; index_ < count; index_++) result = result "/" parts[index_]
+  return count > 1 ? result : "."
 }
-# One row per `#[path]` attachment: target, declaring source, gated (1/0).
-wasm_path_attachments="$(
-  while IFS=$'\t' read -r declaring_source attached_path gated; do
-    printf '%s\t%s\t%s\n' "$(normalize_relative_path "$(dirname "$declaring_source")/$attached_path")" "$declaring_source" "$gated"
-  done < <(find crates/scriptw-aot-wasm/src -type f -name '*.rs' -print0 | sort -z | xargs -0 awk '
-    FNR == 1 { attrs = "" }
-    /^[[:space:]]*#\[/ { attrs = attrs $0 "\n"; next }
-    /^[[:space:]]*(pub(\([^)]*\))?[[:space:]]+)?mod[[:space:]]+[A-Za-z0-9_]+;/ && match(attrs, /#\[path = "[^"]+"\]/) {
-      print FILENAME "\t" substr(attrs, RSTART + 10, RLENGTH - 12) "\t" (attrs ~ /#\[cfg\((all\()?test[,)]/ ? 1 : 0)
+function base_of(path,   count, parts) {
+  count = split(path, parts, "/")
+  return parts[count]
+}
+function normalize(path,   count, parts, index_, depth, stack, result) {
+  count = split(path, parts, "/")
+  depth = 0
+  for (index_ = 1; index_ <= count; index_++) {
+    if (parts[index_] == "" || parts[index_] == ".") continue
+    if (parts[index_] == ".." && depth > 0 && stack[depth] != "..") { depth--; continue }
+    stack[++depth] = parts[index_]
+  }
+  result = ""
+  for (index_ = 1; index_ <= depth; index_++) result = result (index_ > 1 ? "/" : "") stack[index_]
+  return result
+}
+function exists(path,   probe, status) {
+  status = (getline probe < path)
+  if (status >= 0) close(path)
+  return status >= 0
+}
+# Index of the `]` closing the attribute that opens `text` with `#[`, or 0.
+function attribute_end(text,   index_, character, depth, quoted) {
+  depth = 0
+  quoted = 0
+  for (index_ = 2; index_ <= length(text); index_++) {
+    character = substr(text, index_, 1)
+    if (quoted) {
+      if (character == "\\") index_++
+      else if (character == "\"") quoted = 0
+      continue
     }
-    { attrs = "" }
-  ')
-)"
-# Prints "gated" or "ungated" for each plain (path-less) `mod name;` in a file.
-rust_plain_module_declarations() {
-  awk -v module="$2" '
-    /^[[:space:]]*#\[/ { attrs = attrs $0 "\n"; next }
-    $0 ~ ("^[[:space:]]*(pub(\\([^)]*\\))?[[:space:]]+)?mod[[:space:]]+" module ";") && attrs !~ /#\[path/ {
-      print (attrs ~ /#\[cfg\((all\()?test[,)]/ ? "gated" : "ungated")
+    if (character == "\"") quoted = 1
+    else if (character == "[") depth++
+    else if (character == "]" && --depth == 0) return index_
+  }
+  return 0
+}
+function literal_path(text,   result) {
+  result = text
+  sub(/^[^"]*"/, "", result)
+  sub(/".*$/, "", result)
+  return result
+}
+function enqueue(path) {
+  if (!(path in seen)) {
+    seen[path] = 1
+    queue[++queued] = path
+  }
+}
+function unresolved(source, line, reason) {
+  printf "unresolved\t%s\t%s\t%s\n", source, line, reason
+}
+function attach(target, source, gated, kind, line) {
+  if (kind != "plain") path_loaded[target] = 1
+  if (!exists(target)) {
+    unresolved(source, line, kind " attachment target does not exist: " target)
+    return
+  }
+  printf "attach\t%s\t%s\t%s\t%s\t%s\n", target, source, gated, kind, line
+  enqueue(target)
+}
+function parse(source,   line, number, rest, attributes, pending, pending_indented, indented, end_, remaining, at, after, name) {
+  attributes = ""
+  pending = ""
+  number = 0
+  while ((getline line < source) > 0) {
+    number++
+    if (pending != "") {
+      pending = pending " " line
+      if (attribute_end(pending) == 0) continue
+      rest = pending
+      indented = pending_indented
+      pending = ""
+    } else {
+      indented = line ~ /^[[:space:]]/
+      rest = line
+      sub(/^[[:space:]]+/, "", rest)
     }
-    { attrs = "" }
-  ' "$1"
+    # Comments (doc comments included) may sit between attributes and their item.
+    if (rest ~ /^\/\//) continue
+    while (substr(rest, 1, 2) == "#[" && (end_ = attribute_end(rest)) > 0) {
+      attributes = attributes substr(rest, 1, end_) "\n"
+      rest = substr(rest, end_ + 1)
+      sub(/^[[:space:]]+/, "", rest)
+    }
+    if (substr(rest, 1, 2) == "#[") {
+      pending = rest
+      pending_indented = indented
+      continue
+    }
+    if (rest == "") continue
+    remaining = rest
+    while ((at = index(remaining, "include!")) > 0) {
+      after = substr(remaining, at + 8)
+      if (match(after, /^[[:space:]]*\([[:space:]]*"[^"]*"[[:space:]]*\)/)) {
+        attach(normalize(dir_of(source) "/" literal_path(substr(after, RSTART, RLENGTH))), source, 0, "include", number)
+      } else {
+        unresolved(source, number, "include! without a literal path")
+      }
+      remaining = after
+    }
+    if (rest ~ /\{.*(^|[^A-Za-z0-9_])mod[[:space:]]+[A-Za-z0-9_]+[[:space:]]*;/) {
+      unresolved(source, number, "mod declaration inside an inline module block")
+    }
+    if (index(rest, "#[path") > 0) {
+      unresolved(source, number, "#[path] that is not an outer attribute of a mod declaration")
+    }
+    if (rest ~ /^(pub(\([^)]*\))?[[:space:]]+)?mod[[:space:]]+[A-Za-z0-9_]+[[:space:]]*;/) {
+      name = rest
+      sub(/^(pub(\([^)]*\))?[[:space:]]+)?mod[[:space:]]+/, "", name)
+      sub(/[^A-Za-z0-9_].*$/, "", name)
+      if (indented) {
+        unresolved(source, number, "mod " name " is declared inside an inline module block")
+      } else if (match(attributes, /#\[path[[:space:]]*=[[:space:]]*"[^"]*"\]/)) {
+        attach(normalize(dir_of(source) "/" literal_path(substr(attributes, RSTART, RLENGTH))), source, attributes ~ test_gate, "path", number)
+      } else if (attributes ~ /#\[path/) {
+        unresolved(source, number, "#[path] attribute without a literal path")
+      } else {
+        plain_source[++plains] = source
+        plain_name[plains] = name
+        plain_gated[plains] = attributes ~ test_gate
+        plain_line[plains] = number
+      }
+    } else if (attributes ~ /#\[path/) {
+      unresolved(source, number, "#[path] attribute on something other than a mod declaration")
+    }
+    attributes = ""
+  }
+  close(source)
+  if (pending ~ /#\[path/) unresolved(source, number, "unterminated #[path] attribute")
+}
+function resolve_plain(index_,   source, stem, children, child) {
+  source = plain_source[index_]
+  stem = base_of(source)
+  if (stem ~ /^(lib|main|mod)\.rs$/ || source in path_loaded) {
+    children = dir_of(source)
+  } else {
+    children = dir_of(source) "/" substr(stem, 1, length(stem) - 3)
+  }
+  child = children "/" plain_name[index_] ".rs"
+  if (!exists(child)) child = children "/" plain_name[index_] "/mod.rs"
+  # A plain mod whose file is absent fails to compile; there is nothing to attach.
+  if (exists(child)) attach(child, source, plain_gated[index_], "plain", plain_line[index_])
+}
+BEGIN { test_gate = "#\\[cfg\\([[:space:]]*(all\\([[:space:]]*)?test[[:space:]]*[,)]" }
+{ enqueue($0) }
+END {
+  parsed = 0
+  resolved = 0
+  while (parsed < queued) {
+    while (parsed < queued) parse(queue[++parsed])
+    while (resolved < plains) resolve_plain(++resolved)
+  }
+  for (index_ = 1; index_ <= queued; index_++) printf "source\t%s\n", queue[index_]
+}
+'
+wasm_attachment_table="$(find crates/scriptw-aot-wasm/src -type f -name '*.rs' | LC_ALL=C sort | awk "$wasm_attachment_program")"
+wasm_attachments="$(printf '%s\n' "$wasm_attachment_table" | awk -F '\t' '$1 == "attach" { print $2 "\t" $3 "\t" $4 }')"
+wasm_compiled_sources=()
+wasm_external_scan_sources=()
+while IFS= read -r wasm_compiled_source; do
+  wasm_compiled_sources+=("$wasm_compiled_source")
+  case "$wasm_compiled_source" in
+    crates/scriptw-aot-wasm/src/*|*/tests.rs|*/tests/*) ;;
+    *) wasm_external_scan_sources+=("$wasm_compiled_source") ;;
+  esac
+done < <(printf '%s\n' "$wasm_attachment_table" | awk -F '\t' '$1 == "source" { print $2 }')
+if [[ $'\n'"$wasm_attachment_table"$'\n' != *$'\nsource\tcrates/scriptw-aot-wasm/src/lib.rs\n'* ]]; then
+  fail 'the cfg(test) proof read no crate sources; its attachment table is incomplete'
+fi
+while IFS=$'\t' read -r _ unresolved_source unresolved_line unresolved_reason; do
+  fail "$unresolved_source:$unresolved_line: $unresolved_reason; the cfg(test) proof cannot follow it"
+done < <(printf '%s\n' "$wasm_attachment_table" | awk -F '\t' '$1 == "unresolved"')
+# Sources outside src/ that the section scans read like any src/ source.
+print_wasm_external_scan_sources() {
+  local external_source
+  for external_source in ${wasm_external_scan_sources[@]+"${wasm_external_scan_sources[@]}"}; do
+    printf '%s\0' "$external_source"
+  done
 }
 rust_source_is_test_only() {
-  local source="$1" depth="${2:-0}" directory stem parent declaration attached declaring_source gated
+  local source="$1" depth="${2:-0}" attached declaring_source gated
   [ "$depth" -le 16 ] || return 1
   [ "$(head -n 1 "$source")" = '#![cfg(test)]' ] && return 0
   attached=0
-  directory="$(dirname "$source")"
-  stem="$(basename "$source" .rs)"
-  if [ "$directory" = crates/scriptw-aot-wasm/src ]; then
-    parent=crates/scriptw-aot-wasm/src/lib.rs
-  elif [ -f "$directory.rs" ]; then
-    parent="$directory.rs"
-  else
-    parent="$directory/mod.rs"
-  fi
-  if [ -f "$parent" ] && [ "$stem" != mod ]; then
-    while read -r declaration; do
-      attached=1
-      if [ "$declaration" != gated ] && ! rust_source_is_test_only "$parent" "$((depth + 1))"; then
-        return 1
-      fi
-    done < <(rust_plain_module_declarations "$parent" "$stem")
-  fi
   while IFS=$'\t' read -r declaring_source gated; do
     attached=1
     if [ "$gated" != 1 ] && ! rust_source_is_test_only "$declaring_source" "$((depth + 1))"; then
       return 1
     fi
-  done < <(printf '%s\n' "$wasm_path_attachments" | awk -F '\t' -v target="$source" '$1 == target { print $2 "\t" $3 }')
+  done < <(printf '%s\n' "$wasm_attachments" | awk -F '\t' -v target="$source" '$1 == target { print $2 "\t" $3 }')
   [ "$attached" -eq 1 ]
 }
-while IFS= read -r -d '' path_excluded_test_source; do
+for path_excluded_test_source in ${wasm_compiled_sources[@]+"${wasm_compiled_sources[@]}"}; do
+  case "$path_excluded_test_source" in
+    */tests.rs|*/tests/*) ;;
+    *) continue ;;
+  esac
   if ! rust_source_is_test_only "$path_excluded_test_source"; then
     fail "$path_excluded_test_source is skipped by the tests.rs/tests/ section-scan exclusion but is not proven cfg(test)-only"
   fi
-done < <(find crates/scriptw-aot-wasm/src -type f -name '*.rs' \( -path '*/tests.rs' -o -path '*/tests/*' \) -print0 | sort -z)
+done
 for sealed_section in types globals code; do
   source_profile_fixture_exclusions=()
   if [ "$sealed_section" = types ]; then
     source_profile_fixture_exclusions=(-not -path "$runtime_source_profile_fixture_source")
   fi
   sealed_section_escapes="$(
-    find crates/scriptw-aot-wasm/src -type f -name '*.rs' \
+    { find crates/scriptw-aot-wasm/src -type f -name '*.rs' \
       ! -path "$compiled_module_package" \
       ! -path "$runtime_cache_fixture_source" \
       ! -path "$runtime_validation_fixture_source" \
@@ -819,11 +973,13 @@ for sealed_section in types globals code; do
       ! -path '*/tests.rs' ! -path '*/tests/*' \
       "${source_profile_fixture_exclusions[@]}" \
       ! -path 'crates/scriptw-aot-wasm/src/module.rs' \
-      ! -path 'crates/scriptw-aot-wasm/src/branch_hints.rs' -print0 \
+      ! -path 'crates/scriptw-aot-wasm/src/branch_hints.rs' -print0
+      print_wasm_external_scan_sources; } \
       | xargs -0 grep -Fn "module.section(&${sealed_section})" || true
   )"
   # Test-only sources (`tests.rs`, `tests/`, each proven cfg(test)-only above)
-  # and inline #[cfg(test)] modules build fixture modules directly.
+  # and inline #[cfg(test)] modules build fixture modules directly. Sources
+  # outside src/ that the crate compiles are scanned like src/ sources.
   for inline_test_owner in crates/scriptw-aot-wasm/src/branch_hints.rs; do
     inline_escape="$(sed '/^#\[cfg(test)\]/,$d' "$inline_test_owner" | grep -Fn "module.section(&${sealed_section})" || true)"
     if [ -n "$inline_escape" ]; then
@@ -839,7 +995,7 @@ for sealed_section in types globals code; do
   fi
 done
 global_section_constructor_escapes="$(
-  find crates/scriptw-aot-wasm/src -type f -name '*.rs' \
+  { find crates/scriptw-aot-wasm/src -type f -name '*.rs' \
     ! -path "$compiled_module_package" \
     ! -path "$runtime_cache_fixture_source" \
     ! -path "$native_template_fixture_source" \
@@ -847,7 +1003,8 @@ global_section_constructor_escapes="$(
       ! -path "$native_template_shared_body_fixture_source" \
       ! -path 'crates/scriptw-aot-wasm/src/native_program_template/tests/program_owned_payload.rs' \
       ! -path '*/tests.rs' ! -path '*/tests/*' \
-    ! -path "$wasm_gc_types" -print0 \
+    ! -path "$wasm_gc_types" -print0
+    print_wasm_external_scan_sources; } \
     | xargs -0 grep -Fn 'GlobalSection::new()' || true
 )"
 if [ -n "$global_section_constructor_escapes" ] \
