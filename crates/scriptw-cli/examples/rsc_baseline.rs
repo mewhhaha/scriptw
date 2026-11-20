@@ -1,6 +1,12 @@
 //! Retained production React Flight requests; setup and output checks are separate.
 //! Run under scripts/limited_verification.py. Inputs are the unmodified rsc.js
 //! bundle and Node-generated support.json from the existing React fixture driver.
+// Rustc links an unused `--extern` crate only when the code names it; this
+// makes `--features jemalloc` install the lib's global allocator here too.
+// The whole process then runs on jemalloc, its execution phases included,
+// unlike scriptw-precompiled-consumer and the runtime examples.
+#[cfg(feature = "jemalloc")]
+use scriptw_cli as _;
 use scriptw_engine::{
     configure_compilation_jobs, configure_precompiled_wasm_runtime, configure_wasm_runtime,
     CompilationJobs, CompileOptions, CompilerIdentity, CompilerSourceRevision, EmbeddedEvaluation,

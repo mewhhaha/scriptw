@@ -1,4 +1,10 @@
 //! Shared benchmark-only host. External native images require trusted producers.
+// Rustc links an unused `--extern` crate only when the code names it; this
+// makes `--features jemalloc` install the lib's global allocator here too.
+// The whole process then runs on jemalloc, its execution phases included,
+// unlike scriptw-precompiled-consumer and the runtime examples.
+#[cfg(feature = "jemalloc")]
+use scriptw_cli as _;
 #[path = "benchmark_common/thread_cpu.rs"]
 mod benchmark_thread_cpu;
 #[path = "runtime_precompiled/callable.rs"]

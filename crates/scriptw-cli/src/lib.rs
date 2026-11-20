@@ -1,4 +1,8 @@
-// The binary and examples link this library, so they share its allocator.
+// With `--features jemalloc` this is the global allocator of every crate that
+// links this library: the `scriptw` binary, the integration tests that call
+// `run_cli_capture`, and the examples that name `scriptw_cli` (rsc_baseline,
+// compiler_precompiled_baseline). Rustc drops an `--extern` crate that the code
+// never names, so the other examples keep the system allocator.
 #[cfg(feature = "jemalloc")]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
