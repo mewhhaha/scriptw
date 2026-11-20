@@ -232,6 +232,25 @@ kept-resident pool by default, or on-demand mappings for both under
 `store_allocation`; the runtime-comparison preflight and both panels' publishers
 refuse a campaign whose Scriptw and Scriptc processes differ.
 
+`scripts/benchmark-store-allocation.py` reproduces the pooled against on-demand
+A/B of the benchmark details. `prepare` builds one host's images: Scriptw sources
+through `prepare-scriptw`, Scriptc 0.4.5 WASI programs through the same print
+adapter, `scriptc build` and `prepare-wasi` commands as the application panel.
+`run` alternates the two modes in fresh processes pinned to one CPU and counts
+minor faults inside the reported entry through the host's phase barriers;
+`summarize` gives per-block medians. It is an unscored diagnostic:
+
+```sh
+python3 -B scripts/limited_verification.py --cloud -- python3 -B scripts/benchmark-store-allocation.py prepare \
+  --host target/release/examples/compiler_precompiled_baseline --output target/store-ab \
+  --actor scriptw --actor scriptc --scriptc /path/to/scriptc --runtime-pack /path/to/runtime-wasm32-wasi \
+  --zig /path/to/zig-0.16.0/zig crates/scriptw-cli/tests/fixtures/edge_rendering/edge-router.js \
+  crates/scriptw-cli/tests/fixtures/v8_execution_hotpaths/integer.js
+python3 -B scripts/limited_verification.py --cloud -- python3 -B scripts/benchmark-store-allocation.py run \
+  --prepared target/store-ab --output target/store-ab/ab.jsonl --cpu 3
+python3 -B scripts/benchmark-store-allocation.py summarize target/store-ab/ab.jsonl
+```
+
 `scriptw-precompiled-consumer` only consumes images. Produce them with
 `compiler_precompiled_baseline prepare-scriptw`/`prepare-wasi` built from the same
 source; admission refuses another source fingerprint and names both. Its end-to-end

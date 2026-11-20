@@ -62,6 +62,15 @@ def process_environment(work, runtime_pack, zig_global_cache):
                 SCRIPTC_CACHE_DIR=str(work / 'cache'), ZIG_LOCAL_CACHE_DIR=str(work / 'zig-local'))
 
 
+def scriptc_wasi_preparation(scriptc, host, source, wasm, image):
+    """Scriptc source to portable WASI, then the precompiled host's native image.
+
+    Every Scriptc actor of the precompiled panels is prepared by these two
+    child commands, in this order; the first runs in a work directory whose
+    environment comes from `process_environment`."""
+    return [scriptc, 'build', source, '-o', wasm], [host, 'prepare-wasi', wasm, image]
+
+
 def is_digest(value):
     return isinstance(value, str) and len(value) == 64 and set(value) <= set('0123456789abcdef')
 

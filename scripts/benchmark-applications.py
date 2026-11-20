@@ -11,7 +11,7 @@ import subprocess
 from application_benchmarks import (ACTORS, SAMPLES, WARMUPS, SCHEMA, checked_identity, checked_observations,
     machine_identity, process_plan, require, successful_process, summarize, validate_manifest)
 from benchmark_metrics import digest, measure_process
-from compilation_comparison import ADAPTER, process_environment, scriptc_companions
+from compilation_comparison import ADAPTER, process_environment, scriptc_companions, scriptc_wasi_preparation
 from limited_verification import kernel_group, limited_environment, require_cloud_budget, require_kernel_budget
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -255,15 +255,16 @@ def main():
                     source = work / name
                     shutil.copyfile(output / 'adapted' / name, source)
                     wasm_path = work / 'program.wasm'
+                    image_path = output / 'prepared' / (stem + '.swpc')
+                    emit_argv, native_argv = scriptc_wasi_preparation(scriptc, host, source, wasm_path, image_path)
                     child_env = dict(env, **process_environment(work, runtime_pack,
                         Path(os.environ.get('ZIG_GLOBAL_CACHE_DIR', str(Path.home() / '.cache/zig'))).resolve()))
-                    command = invoke(stem + '-emit', preparation['stage'], [scriptc, 'build', source, '-o', wasm_path], child_env, work)
+                    command = invoke(stem + '-emit', preparation['stage'], emit_argv, child_env, work)
                     preparation['commands'].append(command)
                     require(command['status'] == 'succeeded', command.get('reason', 'source compilation failed'))
                     require(wasm_path.read_bytes()[:8] == b'\0asm\1\0\0\0', 'Scriptc did not emit portable Wasm')
                     preparation['stage'] = 'wasm-to-native'
-                    image_path = output / 'prepared' / (stem + '.swpc')
-                    command = invoke(stem + '-native', preparation['stage'], [host, 'prepare-wasi', wasm_path, image_path])
+                    command = invoke(stem + '-native', preparation['stage'], native_argv)
                     preparation['commands'].append(command)
                     receipt = checked_json(command)
                     checked_identity(receipt, identity)
