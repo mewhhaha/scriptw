@@ -25,7 +25,7 @@ build and CPU features ([flow](docs/rust-rewrite/contracts/foreign-modules.md#pr
 
 ## Benchmarks
 
-All panels were measured on **2026-11-17** from source `697c47c22eb0`, on a
+All panels were measured on **2026-11-17** at source `d2948d619` (compiler fingerprint `697c47c22eb0`), on a
 shared four-vCPU cloud machine (Intel Xeon, 2.30 GHz) with Node 24.22.1. Every
 engine gets the same two CPUs, so V8's compiler and collector threads do not
 preempt its main thread. They are not requalified on every commit.
@@ -34,7 +34,7 @@ methods and limits.
 
 ### React Server Components
 
-**React 19.3.1 RSC · 2026-11-17**, source `697c47c22eb0`; exact Flight output on every call.
+**React 19.3.1 RSC · 2026-11-17**, compiler fingerprint `697c47c22eb0`; exact Flight output on every call.
 
 | Retained request | Scriptw Fast | Scriptw Speed | Node 24 / V8 |
 | --- | ---: | ---: | ---: |
@@ -92,7 +92,7 @@ Each timed entry is a whole batch of requests in a fresh Realm, after three warm
 3 to 15% of its batch times. Against V8, Scriptw takes 2.2 to 2.5× on the six kernels. It completes the React
 SSR render at 7.3 ms against V8's 0.63 ms; Scriptc fails to build it.
 
-**Focused performance situations · 2026-11-17**, source `697c47c22eb0`: 21 standalone programs compare Fast, Speed and V8
+**Focused performance situations · 2026-11-17**, compiler fingerprint `697c47c22eb0`: 21 standalone programs compare Fast, Speed and V8
 on a retained call after 100 warmups. Speed is ahead of V8 in 9 of them and behind in 12, by up to 29×.
 [Scores and workload bounds](docs/rust-rewrite/benchmarks.md#focused-performance-situations) · [Situation data](docs/rust-rewrite/situations-current.json).
 
@@ -120,7 +120,7 @@ retain the full denominator, including every failure.
 [Scope policy](docs/rust-rewrite/runtime-requirements.md#out-of-scope-tests).
 <!-- scriptw-test-graph:end -->
 
-Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and the doctest pass; one runtime cache test fails on the cloud machine only. The published Test262 run above measured `41983e248`; later changes ran their affected suites and Test262 subtrees; [current work](docs/rust-rewrite/current-inventory.md) lists what is open.
+Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and the doctest pass; one runtime cache test failed on the cloud machine only (fixed in `c0fc65034`). The published Test262 run above measured `41983e248`; later changes ran their affected suites and Test262 subtrees; [current work](docs/rust-rewrite/current-inventory.md) lists what is open.
 
 ## Caveats
 

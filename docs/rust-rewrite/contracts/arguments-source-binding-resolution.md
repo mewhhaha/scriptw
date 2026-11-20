@@ -21,20 +21,24 @@ binding, or, outside any function, an ordinary global reference. Reads,
 writes, destructuring and update targets, for-in/of heads, shorthand
 properties and arrow captures all use that one result, so a Script global can
 no longer precede a function's own `arguments`. A reference no longer makes
-any environment eval-visible; only direct eval and the Annex B
-`function arguments` form still do. (Before `c294028e7` a whole-Script scan
-made every activation eval-visible, which sent every identifier in a classic
-Script through runtime name lookup.)
-The existing hidden arguments slot is exported under its source name when no
-real source declaration masks it. A simple source `var arguments` slot starts
+any environment eval-visible. The whole Script stays eval-visible only for
+direct eval and the Annex B `function arguments` form
+(`AnalysisBuilder::eval_visible` in `analysis.rs`). Inside a `with` body the
+static result is the fallback only: lowering tests the Object Environment
+Record first at run time, and the stable implicit-arguments cell is not used
+there. (Before `c294028e7` a whole-Script scan made every activation
+eval-visible, which sent every identifier in a classic Script through runtime
+name lookup.)
+Where the owner's activation has no source binding named `arguments`, lowering
+declares that source name as an alias of the hidden implicit storage
+(`LEXICAL_ARGUMENTS_NAME`), so reads, writes and closures share one cell.
+Unreassigned reads keep `ExprIr::Arguments`; captured reads keep the
+`StableImplicitArgumentsCell` fact. A simple source `var arguments` slot starts
 with the protocol's initialized ArgumentsObject value rather than undefined;
 all source accesses then share that published cell. Real parameters, root
 function declarations and separate body records retain their existing ordering.
-This deliberately uses the complete named-record path instead of adding a
-partial hidden-slot alias with stale capture/value metadata.
 
 Controls cover own/global collision, var-without-initializer, reassignment and
 escaping arrows, destructuring in async functions/generators, parameter and
 lexical shadows, and with precedence. The original executions and every prior
-passing inventory remain required. This is prepared source; the wider named
-environment transition requires complete affected native verification.
+passing inventory remain required.

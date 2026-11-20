@@ -166,7 +166,8 @@ const fn ends_with(text: &str, tail: &str) -> bool {
 /// `$` is a legal `IdentifierStart`, so source text can spell a name in this
 /// range: the ranges are **not** disjoint from source names by construction.
 /// The two cells generated inside a unit's activation are therefore spelled per
-/// unit by [`UnitLinkerSpelling::choose`], away from that unit's identifiers.
+/// unit by [`UnitLinkerSpelling::choose`], away from the identifiers of every
+/// unit of the graph (lowering recognizes the cells by name in all of them).
 const MINTED_PREFIX: &str = "$m";
 /// Prefix of the merged spelling of an anonymous `export default`.
 const ANONYMOUS_DEFAULT_PREFIX: &str = "$d";

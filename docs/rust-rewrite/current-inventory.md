@@ -236,12 +236,20 @@ accepts `--case <file.js>`.
   DOMException inheritance while repairing that demand boundary and the inventory
   checks. All four remain failures. Owner: AOT runtime bootstrap recipes and
   their encoded-allocation assertions.
-- Make CI green again; every `CI` run since at least 2026-11-16 fails in its
-  cheap guard steps (`scripts/ci-fast.sh` runs them locally): `cargo fmt
-  --check` (130 files), the module-boundary guard (64 source-drift findings,
-  then a stale path), the Intl provenance bound to the pre-vendoring
-  `Cargo.lock` (8 script tests, including the one `ci.yaml` runs), stale
-  shortcut inventory and identity findings. Self-hosted jobs are cancelled
+- Make CI green again. Two of the cheap guard steps that `ci.yaml` runs before
+  it builds (`scripts/ci-fast.sh` runs them locally) are still red; formatting,
+  Intl identities, the shortcut audit and the other guard steps pass. The
+  module-boundary guard now runs every rule and reports 51 findings: 20 line
+  budgets (largest `objects.rs` 4526/4250, `json/stringify.rs` 1320/950,
+  `gc_types/value/program_instance.rs` 646/420, `emit/module_assembly.rs`
+  2184/1950), the removed Date TimeClip, JSON undefined-descriptor, fixed
+  String trim and raw-key read authorities, the eight `intrinsics/<family>.rs`
+  files folded into `property_layouts/eager.rs`, the stale engine-test selector
+  baseline in `check-abi8-native-direct-eval-host.py`, and the native-backing
+  `sync_data` that `59bc04411` removed. `check-scriptw-identity.sh` reports
+  10,539 retired-name lines (paths and commands) in tracked evidence:
+  `docs/rust-rewrite/*.json` (9,524), the `aa55200d1` backlog JSON (651) and
+  `test262/replays/*.verification.json` (364). Self-hosted jobs are cancelled
   for want of a runner. Preserve original evidence and compiler invariants;
   focused native verification does not clear these gates. Owner: unassigned.
 - Repair pinned Wasmtime's owned-reference downcast: `AnyRef::as_struct` can
