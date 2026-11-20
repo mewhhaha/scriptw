@@ -158,7 +158,7 @@ impl ScriptLowerer<'_> {
             if !self.can_specialize_function_body(&callback_id) {
                 continue;
             }
-            for (index, helper_context_id) in helper_contexts.into_iter().enumerate() {
+            for helper_context_id in helper_contexts {
                 let key = (callback_id.clone(), helper_context_id);
                 if self
                     .exact_context_callback_specializations
@@ -166,7 +166,11 @@ impl ScriptLowerer<'_> {
                 {
                     continue;
                 }
-                let synthetic_id = format!("{callback_id}$exact_context${index}");
+                let synthetic_id = fresh_specialization_id(
+                    &self.exact_context_callback_specializations,
+                    &callback_id,
+                    "exact_context",
+                );
                 if let Some(signature) = self.exact_context_callback_observations.get(&key).cloned()
                 {
                     self.function_signatures
@@ -188,7 +192,7 @@ impl ScriptLowerer<'_> {
             if !self.can_specialize_function_body(&function_id) {
                 continue;
             }
-            for (index, helper_context_id) in helper_contexts.into_iter().enumerate() {
+            for helper_context_id in helper_contexts {
                 let key = (function_id.clone(), helper_context_id);
                 if self
                     .exact_context_function_specializations
@@ -196,7 +200,11 @@ impl ScriptLowerer<'_> {
                 {
                     continue;
                 }
-                let synthetic_id = format!("{function_id}$exact_helper_context${index}");
+                let synthetic_id = fresh_specialization_id(
+                    &self.exact_context_function_specializations,
+                    &function_id,
+                    "exact_helper_context",
+                );
                 if let Some(signature) = self.exact_context_function_observations.get(&key).cloned()
                 {
                     self.function_signatures
@@ -985,4 +993,29 @@ impl ScriptLowerer<'_> {
             signature.source_call_flow_effects = merged_source_call_flow_effects;
         }
     }
+}
+
+/// Mints the identity of a new exact-context clone of `function_id`.
+///
+/// Specializations accumulate over several allocation passes, and a later pass
+/// observes contexts that can sort before keys an earlier pass already
+/// specialised. Numbering by a context's position in the current sorted list
+/// therefore reused an earlier clone's suffix (`f$exact_helper_context$1` for
+/// two distinct contexts). The suffix is instead the first one no existing
+/// clone of the same function owns, so every clone keeps a unique identity
+/// however the observations grow.
+fn fresh_specialization_id(
+    specializations: &BTreeMap<ExactCallbackContextKey, FunctionId>,
+    function_id: &FunctionId,
+    infix: &str,
+) -> FunctionId {
+    let used = specializations
+        .iter()
+        .filter(|((owner, _), _)| owner == function_id)
+        .map(|(_, synthetic_id)| synthetic_id.as_str())
+        .collect::<BTreeSet<_>>();
+    (0..)
+        .map(|index| format!("{function_id}${infix}${index}"))
+        .find(|candidate| !used.contains(candidate.as_str()))
+        .expect("an unbounded suffix range always has an unused suffix")
 }

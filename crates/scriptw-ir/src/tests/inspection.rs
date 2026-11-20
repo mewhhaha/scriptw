@@ -314,3 +314,27 @@ fn inspection_parameter_traversal_preserves_scalar_exponentiation_dependency() {
         );
     }
 }
+
+#[test]
+fn exact_context_clones_keep_unique_identities_across_specialization_passes() {
+    // A later specialization pass observes contexts that sort before keys an
+    // earlier pass already cloned; the clones must still get distinct ids
+    // (formerly both were `f$exact_helper_context$1` and emission rejected the
+    // valid program as a duplicate function identity).
+    for source in [
+        "var r; r = (function () { function f(o) { return o } var c = Object.create({}); return [f(c), f(\"s\")] })();",
+        "try { (function () { function f(o) { return o } var c = Object.create({}); return [f(c), f(\"s\")] })() } catch (e) {}",
+    ] {
+        let program = lower_script(source);
+        assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
+        let script = program.script.as_ref().unwrap();
+        let mut seen = BTreeSet::new();
+        for function in &script.functions {
+            assert!(
+                seen.insert(function.id.as_str()),
+                "duplicate function identity `{}` in {source}",
+                function.id
+            );
+        }
+    }
+}
