@@ -9,6 +9,7 @@
 
 use crate::Variable;
 use alloc::{vec, vec::Vec};
+use core::hash::{BuildHasherDefault, Hasher};
 use core::mem;
 use cranelift_codegen::cursor::{Cursor, FuncCursor};
 use cranelift_codegen::entity::{EntityList, EntitySet, ListPool, SecondaryMap};
@@ -32,10 +33,11 @@ use cranelift_codegen::packed_option::PackedOption;
 /// can be declared.
 #[derive(Default)]
 pub struct SSABuilder {
-    // TODO: Consider a sparse representation rather than SecondaryMap-of-SecondaryMap.
     /// Records for every variable and for every relevant block, the last definition of
-    /// the variable in the block.
-    variables: SecondaryMap<Variable, SecondaryMap<Block, PackedOption<Value>>>,
+    /// the variable in the block. Sparse: a dense map per variable, sized by the highest
+    /// block that defines it, costs variables x blocks, which is quadratic in the size of
+    /// a function whose locals are each live in a few late blocks.
+    variables: VariableDefinitions,
 
     /// Variables whose bindings must be tracked for stack maps.
     stack_map_vars: EntitySet<Variable>,
@@ -56,13 +58,171 @@ pub struct SSABuilder {
     side_effects: SideEffects,
 
     /// Reused storage for cycle-detection.
-    visited: EntitySet<Block>,
+    visited: VisitedBlocks,
 
     /// Storage for pending variable definitions.
     variable_pool: ListPool<Variable>,
 
     /// Storage for predecessor definitions.
     inst_pool: ListPool<Inst>,
+}
+
+/// The last definition of each variable in each block that defines it.
+///
+/// Upstream kept a dense map over every block for every variable, which costs
+/// variables x blocks: quadratic in a large function whose many locals are
+/// each defined in a few blocks far from the entry. A variable defined in
+/// most blocks up to its highest one is best served by that dense map, so each
+/// variable keeps whichever form is smaller: dense while its highest defined
+/// block is at most 8 times its number of definitions, and a hash map from
+/// block to value otherwise (switching back once the definitions fill half the
+/// range). Memory is linear in the number of definitions either way.
+/// Lookups and definitions are exactly those of the dense map this replaces,
+/// and nothing iterates either form, so neither reaches the output.
+#[derive(Default)]
+struct VariableDefinitions {
+    variables: SecondaryMap<Variable, VariableBlocks>,
+}
+
+#[derive(Clone, Default)]
+struct VariableBlocks {
+    /// How many blocks hold a definition.
+    defined: u32,
+    /// The highest block that holds a definition, plus one.
+    end: u32,
+    dense: Option<Vec<PackedOption<Value>>>,
+    sparse: hashbrown::HashMap<u32, Value, BuildHasherDefault<BlockKeyHasher>>,
+}
+
+impl VariableBlocks {
+    fn get(&self, block: Block) -> Option<Value> {
+        match &self.dense {
+            Some(dense) => dense.get(block.as_u32() as usize).and_then(|value| value.expand()),
+            None => self.sparse.get(&block.as_u32()).copied(),
+        }
+    }
+
+    fn define(&mut self, block: Block, value: Value) {
+        let index = block.as_u32() as usize;
+        let end = self.end.max(block.as_u32() + 1);
+        match &mut self.dense {
+            Some(dense) if index < dense.len() => {
+                if dense[index].is_none() {
+                    self.defined += 1;
+                }
+                dense[index] = value.into();
+            }
+            Some(_) if end as u64 > 8 * (u64::from(self.defined) + 1) => {
+                let dense = self.dense.take().expect("dense definitions");
+                self.sparse = dense
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, value)| Some((index as u32, value.expand()?)))
+                    .collect();
+                self.sparse.insert(block.as_u32(), value);
+                self.defined += 1;
+            }
+            Some(dense) => {
+                dense.resize(index + 1, PackedOption::default());
+                dense[index] = value.into();
+                self.defined += 1;
+            }
+            None => {
+                if self.sparse.insert(block.as_u32(), value).is_none() {
+                    self.defined += 1;
+                }
+                if end as u64 <= 2 * u64::from(self.defined) {
+                    let mut dense = vec![PackedOption::default(); end as usize];
+                    for (index, value) in self.sparse.drain() {
+                        dense[index as usize] = value.into();
+                    }
+                    self.sparse = Default::default();
+                    self.dense = Some(dense);
+                }
+            }
+        }
+        self.end = end;
+    }
+}
+
+impl VariableDefinitions {
+    fn get(&self, var: Variable, block: Block) -> Option<Value> {
+        self.variables.get(var).and_then(|blocks| blocks.get(block))
+    }
+
+    fn define(&mut self, var: Variable, block: Block, val: Value) {
+        self.variables[var].define(block, val);
+    }
+
+    fn has_any_definition(&self, var: Variable) -> bool {
+        self.variables.get(var).is_some_and(|blocks| blocks.defined > 0)
+    }
+
+    fn clear(&mut self) {
+        self.variables.clear();
+    }
+
+    fn is_empty(&self) -> bool {
+        self.variables.is_empty()
+    }
+}
+
+/// The blocks one `find_var` walk has visited. Each block holds the generation of the
+/// walk that last visited it, so clearing is one increment rather than a rewrite of a
+/// set as large as the highest block index, which once per walk made a large function
+/// quadratic.
+#[derive(Default)]
+struct VisitedBlocks {
+    generation: u32,
+    stamps: SecondaryMap<Block, u32>,
+}
+
+impl VisitedBlocks {
+    fn clear(&mut self) {
+        self.generation = self.generation.wrapping_add(1);
+        if self.generation == 0 {
+            self.stamps.clear();
+            self.generation = 1;
+        }
+    }
+
+    /// Returns whether `block` was not yet visited in this generation.
+    fn insert(&mut self, block: Block) -> bool {
+        // A cleared set starts at generation 1, so the map's default of 0 is never current.
+        if self.generation == 0 {
+            self.generation = 1;
+        }
+        let stamp = &mut self.stamps[block];
+        let fresh = *stamp != self.generation;
+        *stamp = self.generation;
+        fresh
+    }
+}
+
+/// Hashes a block number with one folded multiplication, so that it reaches both
+/// the low bits that select a bucket and the high bits of the tag.
+#[derive(Clone, Default)]
+struct BlockKeyHasher(u64);
+
+impl Hasher for BlockKeyHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for &byte in bytes {
+            self.write_u64(self.0.rotate_left(8) ^ u64::from(byte));
+        }
+    }
+
+    fn write_u32(&mut self, key: u32) {
+        self.write_u64(u64::from(key));
+    }
+
+    fn write_u64(&mut self, key: u64) {
+        let product = u128::from(key ^ self.0) * 0x9e37_79b9_7f4a_7c15_u128;
+        self.0 = (product as u64) ^ ((product >> 64) as u64);
+    }
 }
 
 /// Side effects of a `use_var` or a `seal_block` method call.
@@ -116,6 +276,7 @@ impl SSABuilder {
     /// deallocating memory.
     pub fn clear(&mut self) {
         self.variables.clear();
+        self.visited.clear();
         self.stack_map_vars.clear();
         self.stack_map_values.clear();
         self.ssa_blocks.clear();
@@ -215,14 +376,14 @@ impl SSABuilder {
     /// The SSA value is passed as an argument because it should be created with
     /// `ir::DataFlowGraph::append_result`.
     pub fn def_var(&mut self, var: Variable, val: Value, block: Block) {
-        self.variables[var][block] = PackedOption::from(val);
+        self.variables.define(var, block, val);
         self.record_stack_map_binding(var, val);
     }
 
     /// Mark `var` as needing its bindings tracked for stack maps.
     pub fn mark_var_needs_stack_map(&mut self, var: Variable) {
         debug_assert!(
-            self.variables[var].values().all(|v| v.is_none()),
+            !self.variables.has_any_definition(var),
             "declare_var_needs_stack_map({var:?}) must be called before any \
              definition of the variable; otherwise earlier definitions are \
              silently omitted from stack maps"
@@ -280,7 +441,7 @@ impl SSABuilder {
     fn use_var_nonlocal(&mut self, func: &mut Function, var: Variable, ty: Type, mut block: Block) {
         // First, try Local Value Numbering (Algorithm 1 in the paper).
         // If the variable already has a known Value in this block, use that.
-        if let Some(val) = self.variables[var][block].expand() {
+        if let Some(val) = self.variables.get(var, block) {
             self.results.push(val);
             return;
         }
@@ -309,10 +470,9 @@ impl SSABuilder {
         //
         // So in either case there is no definition in these blocks yet and we can blindly set one.
         debug_assert!(!self.stack_map_vars.contains(var) || self.stack_map_values.contains(val));
-        let var_defs = &mut self.variables[var];
         while block != from {
-            debug_assert!(var_defs[block].is_none());
-            var_defs[block] = PackedOption::from(val);
+            debug_assert!(self.variables.get(var, block).is_none());
+            self.variables.define(var, block, val);
             block = self.ssa_blocks[block].single_predecessor.unwrap();
         }
     }
@@ -349,13 +509,12 @@ impl SSABuilder {
     ) -> (Value, Block) {
         // Try to find an existing definition along single-predecessor edges first.
         self.visited.clear();
-        let var_defs = &mut self.variables[var];
         while let Some(pred) = self.ssa_blocks[block].single_predecessor.expand() {
             if !self.visited.insert(block) {
                 break;
             }
             block = pred;
-            if let Some(val) = var_defs[block].expand() {
+            if let Some(val) = self.variables.get(var, block) {
                 self.results.push(val);
                 return (val, block);
             }
@@ -364,7 +523,7 @@ impl SSABuilder {
         // We've promised to return the most recent block where `var` was defined, but we didn't
         // find a usable definition. So create one.
         let val = func.dfg.append_block_param(block, ty);
-        var_defs[block] = PackedOption::from(val);
+        self.variables.define(var, block, val);
         self.record_stack_map_binding(var, val);
 
         // Now every predecessor needs to pass its definition of this variable to the newly added

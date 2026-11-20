@@ -92,8 +92,9 @@
 //! The stores to stack-map slots and the stack maps are untouched, so the
 //! collector sees what it saw before. A home's store is removed only when
 //! no load of the home is left in the function, reachable or not. If the
-//! equations are not solved within [`MAX_ROUNDS`] rounds the function is
-//! left as it was.
+//! equations are not solved within [`MAX_ROUNDS`] rounds, or their answer
+//! would hold more than [`MAX_KNOWN_PER_BLOCK`] entries per block, the
+//! function is left as it was.
 
 use cranelift_codegen::cursor::{Cursor, FuncCursor};
 use cranelift_codegen::dominator_tree::DominatorTree;
@@ -105,6 +106,13 @@ use cranelift_entity::SecondaryMap;
 /// function without loops needs two (the second confirms the first); each
 /// level of loop nesting can add one.
 const MAX_ROUNDS: usize = 12;
+
+/// Scriptw: the most entries the answer may hold, per block of the function,
+/// before the pass gives up. What is known at a block's end can grow with the
+/// path to it, so deeply nested code (2,000 nested `else if` branches) held
+/// a known set per block proportional to its depth, memory quadratic in the
+/// function's size (half of a 1 GB native compilation of 500 such branches).
+const MAX_KNOWN_PER_BLOCK: usize = 64;
 
 /// What a slot is known to hold.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -446,7 +454,8 @@ impl Reloads {
     /// answer yet does not constrain its successors; the loop ends when a
     /// whole round changes nothing, and by then every reachable block has an
     /// answer that follows from its predecessors' answers. `None` when that
-    /// takes more than [`MAX_ROUNDS`] rounds.
+    /// takes more than [`MAX_ROUNDS`] rounds or the answer outgrows
+    /// [`MAX_KNOWN_PER_BLOCK`] entries per block.
     fn solve(
         &self,
         func: &ir::Function,
@@ -466,6 +475,8 @@ impl Reloads {
         let mut clock: u32 = 0;
         let mut evaluated: SecondaryMap<ir::Block, u32> = SecondaryMap::new();
         let mut changed_at: SecondaryMap<ir::Block, u32> = SecondaryMap::new();
+        let budget = MAX_KNOWN_PER_BLOCK.saturating_mul(blocks.len());
+        let mut entries = 0usize;
         for _ in 0..MAX_ROUNDS {
             let mut changed = false;
             for &block in blocks {
@@ -482,6 +493,10 @@ impl Reloads {
                 let start = self.at_start(cfg, &ends, entry, block);
                 let end = self.at_end(func, block, start);
                 if ends[block].as_ref() != Some(&end) {
+                    entries = entries - ends[block].as_ref().map_or(0, Vec::len) + end.len();
+                    if entries > budget {
+                        return None;
+                    }
                     ends[block] = Some(end);
                     changed_at[block] = clock;
                     changed = true;

@@ -231,7 +231,12 @@ definition dominates the load, and no collection lies between. Stores to
 stack-map slots and the stack maps themselves are untouched. `try_call` is a
 call, so exception handlers start knowing nothing but nulls; a trap leaves the
 function. The equations are iterated at most twelve rounds, after which the
-function is left as it was. A loop head's parameter is the slot's content
+function is left as it was; so is a function whose answer would hold more
+than 64 entries per block (`MAX_KNOWN_PER_BLOCK`). What is known at a block's
+end can grow with the path to it, so deeply nested code kept a known set per
+block proportional to its depth: half of a 1 GB native compilation of 500
+nested `else if` branches, and 3.3 GB for 1,000 (now 216 MB and 392 MB, and
+those functions keep their reloads). A loop head's parameter is the slot's content
 because each edge passes what the slot holds at the end of its predecessor
 (the known value, a zero, or a load placed before a `jump`), and nothing
 writes the slot or calls before the block's first use of it; a load from the
