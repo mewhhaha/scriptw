@@ -2,8 +2,7 @@
 //! The reused slot keeps its null guard, deadlines and Store limits, and
 //! shows the next Store nothing of the previous one.
 use scriptw_engine::{
-    configure_pooled_stores, configure_wasm_runtime, NativeCompilationPolicy, PooledStoreReset,
-    PooledStores,
+    configure_wasm_runtime, NativeCompilationPolicy, PooledStoreReset, PooledStores,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -14,25 +13,35 @@ use wasmtime::{
     StoreLimitsBuilder, StructRef, StructRefPre, Trap, Val,
 };
 
-fn pooled_engine() -> Engine {
+const KEEP_RESIDENT: usize = 16 * 1024 * 1024;
+
+fn runtime_config() -> Config {
     let mut config = Config::new();
     configure_wasm_runtime(
         &mut config,
         NativeCompilationPolicy::Fast,
         scriptw_engine::CompilationJobs::current(),
     );
-    let reset = configure_pooled_stores(&mut config, &PooledStores::sequential());
+    config
+}
+
+fn pooled_engine_for(pool: PooledStores) -> (Engine, PooledStoreReset) {
+    let (engine, reset) = pool.engine(&runtime_config()).unwrap();
     if wasmtime::PoolingAllocationConfig::is_pagemap_scan_available() {
         assert_eq!(
             reset,
             PooledStoreReset::KeepDirtyPagesResident {
-                bytes: 16 * 1024 * 1024
+                bytes: KEEP_RESIDENT
             }
         );
     } else {
         assert_eq!(reset, PooledStoreReset::ReleaseAll);
     }
-    Engine::new(&config).unwrap()
+    (engine, reset)
+}
+
+fn pooled_engine() -> Engine {
+    pooled_engine_for(PooledStores::sequential()).0
 }
 
 fn module(engine: &Engine, sections: &[(u8, &[u8])]) -> Module {

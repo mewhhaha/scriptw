@@ -244,9 +244,11 @@ Without the tag declaration, no expected-error tag is imported or registered.
 ## Pooled stores
 
 An embedder that creates a fresh Store per request can make its Engine take
-GC heaps from a pool: `configure_pooled_stores(&mut config, &pool)` after
-`configure_wasm_runtime` or `configure_precompiled_wasm_runtime`, which replace
-the whole configuration. `PooledStores::new(max_concurrent, keep_resident_bytes)`
+GC heaps from a pool: `pool.engine(&config)` creates the Engine from a
+complete Config (after `configure_wasm_runtime` or
+`configure_precompiled_wasm_runtime`, which replace the whole configuration,
+and any later settings). The pool is applied as the Engine is created, so no
+configuration call can drop it. `PooledStores::new(max_concurrent, keep_resident_bytes)`
 validates the policy once: 1 to 1,024 concurrent Stores, and up to 16 MiB (the
 GC heap's initial size, in 64 KiB units) of each returned heap's dirty pages
 kept resident and zeroed for the next Store; `PooledStores::sequential()` is
@@ -260,8 +262,13 @@ and later) only dirty pages are zeroed (`KeepDirtyPagesResident`). Without it,
 keeping 16 MiB would zero all of it at every drop, so the pool releases every
 page instead (`ReleaseAll`) and only reuses mappings. Creating a Store beyond
 the pool's capacity fails at `instantiate` with an error whose
-`is_store_pool_exhausted()` is true; nothing falls back to on-demand
-allocation, and dropping a Store frees its slot. At most `max_concurrent ×
+`is_store_pool_limit_reached()` is true; nothing falls back to on-demand
+allocation, and dropping a Store frees its slot. The same error reports a
+Store that needs more than its share of the pool (2 core instances, 3
+memories with its GC heap, 2 tables) while the others hold theirs; such a
+Store fails even alone, so a retry after a drop helps only while the embedder
+still holds another Store. Each pooled memory is also capped by the pool's
+`max_memory_size` (the 1 GiB Store cap). At most `max_concurrent ×
 keep_resident_bytes` stay resident, and each concurrent Store reserves about
 12 GiB of address space while the Engine lives. Store limits, the null guard
 and [execution deadlines](execution-deadlines.md) apply unchanged on a reused

@@ -60,33 +60,57 @@ const STORE_ALLOCATION_VARIABLE: &str = "SCRIPTW_PRECOMPILED_STORE_ALLOCATION";
 /// each Store's memory (Scriptw's GC heap, the WASI program's linear memory)
 /// from a one-slot pool that keeps its dirty pages resident
 /// (`PooledStores::sequential`). Both adapters of a host apply this one
-/// policy. Returns the report's description.
-fn configure_store_allocation(config: &mut wasmtime::Config) -> Result<Value, String> {
-    match std::env::var(STORE_ALLOCATION_VARIABLE).as_deref() {
-        Err(std::env::VarError::NotPresent) | Ok("pooled") => {
-            let pool = scriptw_engine::PooledStores::sequential();
-            let reset = match scriptw_engine::configure_pooled_stores(config, &pool) {
-                scriptw_engine::PooledStoreReset::KeepDirtyPagesResident { bytes } => {
-                    json!({"mode": "keep-dirty-pages-resident", "keep_resident_bytes": bytes})
-                }
-                scriptw_engine::PooledStoreReset::ReleaseAll => {
-                    json!({"mode": "release-all", "reason": "PAGEMAP_SCAN unavailable"})
-                }
-            };
-            Ok(json!({"strategy": "pooled", "max_concurrent_stores": pool.max_concurrent().get(),
-                "reset": reset}))
+/// policy.
+#[derive(Clone, Copy)]
+enum StoreAllocation {
+    Pooled(scriptw_engine::PooledStores),
+    OnDemand,
+}
+
+impl StoreAllocation {
+    fn from_environment() -> Result<Self, String> {
+        match std::env::var(STORE_ALLOCATION_VARIABLE).as_deref() {
+            Err(std::env::VarError::NotPresent) | Ok("pooled") => {
+                Ok(Self::Pooled(scriptw_engine::PooledStores::sequential()))
+            }
+            Ok("on-demand") => Ok(Self::OnDemand),
+            Ok(other) => Err(format!(
+                "{STORE_ALLOCATION_VARIABLE} must be pooled or on-demand, not {other:?}"
+            )),
+            Err(error) => Err(format!("{STORE_ALLOCATION_VARIABLE}: {error}")),
         }
-        Ok("on-demand") => Ok(json!({"strategy": "on-demand"})),
-        Ok(other) => Err(format!(
-            "{STORE_ALLOCATION_VARIABLE} must be pooled or on-demand, not {other:?}"
-        )),
-        Err(error) => Err(format!("{STORE_ALLOCATION_VARIABLE}: {error}")),
+    }
+
+    /// The Engine for the complete `config`, and the report's description.
+    /// A pool is applied as the Engine is created, after every setting.
+    fn engine(self, config: &wasmtime::Config) -> Result<(wasmtime::Engine, Value), String> {
+        match self {
+            Self::Pooled(pool) => {
+                let (engine, reset) = pool.engine(config).map_err(|e| e.to_string())?;
+                let reset = match reset {
+                    scriptw_engine::PooledStoreReset::KeepDirtyPagesResident { bytes } => {
+                        json!({"mode": "keep-dirty-pages-resident", "keep_resident_bytes": bytes})
+                    }
+                    scriptw_engine::PooledStoreReset::ReleaseAll => {
+                        json!({"mode": "release-all", "reason": "PAGEMAP_SCAN unavailable"})
+                    }
+                };
+                Ok((engine, json!({"strategy": "pooled",
+                    "max_concurrent_stores": pool.max_concurrent().get(), "reset": reset})))
+            }
+            Self::OnDemand => Ok((
+                wasmtime::Engine::new(config).map_err(|e| e.to_string())?,
+                json!({"strategy": "on-demand"}),
+            )),
+        }
     }
 }
 
-fn configure_fresh_store_consumer(config: &mut wasmtime::Config) -> Result<Value, String> {
+fn configure_fresh_store_consumer(
+    config: &mut wasmtime::Config,
+) -> Result<StoreAllocation, String> {
     configure_consumer(config)?;
-    configure_store_allocation(config)
+    StoreAllocation::from_environment()
 }
 
 fn shared_configuration() -> Value {

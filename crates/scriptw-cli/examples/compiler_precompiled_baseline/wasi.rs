@@ -29,7 +29,7 @@ pub(super) fn execute(
     // differ in compiled code, not in how their Stores are allocated.
     let store_allocation = configure_fresh_store_consumer(&mut config)?;
     let started = Instant::now();
-    let engine = Engine::new(&config).map_err(|e| e.to_string())?;
+    let (engine, store_allocation) = store_allocation.engine(&config)?;
     let engine_ns = started.elapsed().as_nanos();
     if engine.get_cranelift_opt_level().is_some() {
         return Err("WASI execution unexpectedly enabled a native compiler".into());

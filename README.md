@@ -145,7 +145,7 @@ Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and t
   entries), and publication refuses actors that differ. Panels dated earlier
   mapped fresh Store memory for both
   ([measurements](docs/rust-rewrite/benchmarks.md#pooled-gc-heaps-2026-11-19)).
-  Embedders opt in with `configure_pooled_stores`.
+  Embedders opt in with `PooledStores::engine`.
 - **Profile-guided builds (experimental, off by default):** a build can collect
   an execution profile and a later build of the same program can apply it
   (`CompileOptions::execution_profile`, `scriptw precompile --profile`). Its first

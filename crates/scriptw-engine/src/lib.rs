@@ -77,8 +77,7 @@ pub use embedding::{
     PrecompiledEmbeddedProgram, WasmStoreState,
 };
 pub use pooled_stores::{
-    configure_pooled_stores, PooledStoreReset, PooledStores, MAX_POOLED_KEEP_RESIDENT_BYTES,
-    MAX_POOLED_STORES,
+    PooledStoreReset, PooledStores, MAX_POOLED_KEEP_RESIDENT_BYTES, MAX_POOLED_STORES,
 };
 mod global_script_prelude;
 mod graph_observation;
@@ -2132,7 +2131,7 @@ pub struct EngineError {
     intl_artifact_identity_error: Option<IntlArtifactIdentityError>,
     wasmtime_policy: Option<WasmtimeRuntimePolicy>,
     execution_failure: Option<EngineExecutionFailure>,
-    store_pool_exhausted: bool,
+    store_pool_limit_reached: bool,
     execution_profile_error: Option<ProfileError>,
 }
 
@@ -2193,7 +2192,7 @@ impl EngineError {
             intl_artifact_identity_error: None,
             wasmtime_policy: None,
             execution_failure: None,
-            store_pool_exhausted: false,
+            store_pool_limit_reached: false,
             execution_profile_error: None,
         }
     }
@@ -2209,7 +2208,7 @@ impl EngineError {
             intl_artifact_identity_error: None,
             wasmtime_policy: None,
             execution_failure: None,
-            store_pool_exhausted: false,
+            store_pool_limit_reached: false,
             execution_profile_error: None,
         }
     }
@@ -2225,7 +2224,7 @@ impl EngineError {
             intl_artifact_identity_error: None,
             wasmtime_policy: None,
             execution_failure: None,
-            store_pool_exhausted: false,
+            store_pool_limit_reached: false,
             execution_profile_error: None,
         }
     }
@@ -2267,7 +2266,7 @@ impl EngineError {
             intl_artifact_identity_error: None,
             wasmtime_policy: Some(err.policy),
             execution_failure: None,
-            store_pool_exhausted: false,
+            store_pool_limit_reached: false,
             execution_profile_error: None,
         }
     }
@@ -2283,14 +2282,14 @@ impl EngineError {
             intl_artifact_identity_error: Some(error),
             wasmtime_policy: None,
             execution_failure: None,
-            store_pool_exhausted: false,
+            store_pool_limit_reached: false,
             execution_profile_error: None,
         }
     }
 
-    fn from_store_pool_exhaustion(message: impl Into<String>) -> Self {
+    fn from_store_pool_limit(message: impl Into<String>) -> Self {
         let mut error = Self::new(message);
-        error.store_pool_exhausted = true;
+        error.store_pool_limit_reached = true;
         error
     }
 
@@ -2298,12 +2297,18 @@ impl EngineError {
         &self.message
     }
 
-    /// Instantiation needed a GC heap, memory or instance from an Engine's
-    /// Store pool ([`configure_pooled_stores`]) while as many Stores as the
-    /// pool serves were alive. Nothing fell back to on-demand allocation;
-    /// dropping a Store frees its slots.
-    pub const fn is_store_pool_exhausted(&self) -> bool {
-        self.store_pool_exhausted
+    /// Instantiation needed a GC heap, memory, instance or table from an
+    /// Engine's Store pool ([`PooledStores::engine`]) and the pool had none
+    /// left. Nothing fell back to on-demand allocation. Either the pool's
+    /// other live Stores hold the slots, and dropping one frees them, or this
+    /// Store needs more than its share (2 core instances, 3 memories with its
+    /// GC heap, 2 tables): then it can fail even as the only live Store, and
+    /// no drop helps. The embedder, which holds the Stores, can tell the two
+    /// apart. A GC heap that host code allocates before `instantiate` (a
+    /// `StructRef::new` on a fresh Store) reports Wasmtime's own
+    /// `PoolConcurrencyLimitError` instead.
+    pub const fn is_store_pool_limit_reached(&self) -> bool {
+        self.store_pool_limit_reached
     }
 
     /// The optional differential oracle rejected its entry in its native

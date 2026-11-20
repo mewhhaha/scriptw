@@ -34,7 +34,7 @@ const CORE_INSTANCES_PER_STORE: u32 = 2;
 const MAX_CORE_INSTANCE_BYTES: usize = 64 * 1024 * 1024;
 
 /// A validated Store pool policy for an Engine that creates a fresh Store per
-/// entry. Apply it with [`configure_pooled_stores`].
+/// entry. [`PooledStores::engine`] creates such an Engine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PooledStores {
     max_concurrent: NonZeroU32,
@@ -44,7 +44,7 @@ pub struct PooledStores {
 impl PooledStores {
     /// At most `max_concurrent` Stores of the Engine may be alive at once
     /// (`1..=MAX_POOLED_STORES`); creating another fails with
-    /// [`EngineError::is_store_pool_exhausted`], never by falling back to
+    /// [`EngineError::is_store_pool_limit_reached`], never by falling back to
     /// on-demand allocation. Up to `keep_resident_bytes` of each returned GC
     /// heap's dirty pages stay resident for the next Store: a multiple of
     /// 64 KiB, at most [`MAX_POOLED_KEEP_RESIDENT_BYTES`]. Zero keeps nothing
@@ -88,10 +88,58 @@ impl PooledStores {
     pub const fn keep_resident_bytes(&self) -> usize {
         self.keep_resident_bytes
     }
+
+    /// How a pooled Engine on this host resets a GC heap its Store returned.
+    pub fn reset(&self) -> PooledStoreReset {
+        self.reset_with_pagemap(wasmtime::PoolingAllocationConfig::is_pagemap_scan_available())
+    }
+
+    fn reset_with_pagemap(&self, pagemap_scan_available: bool) -> PooledStoreReset {
+        if pagemap_scan_available {
+            PooledStoreReset::KeepDirtyPagesResident {
+                bytes: self.keep_resident_bytes,
+            }
+        } else {
+            PooledStoreReset::ReleaseAll
+        }
+    }
+
+    /// An Engine for `config` that takes GC heaps from a pool of
+    /// `max_concurrent()` slots, and how this host resets them.
+    ///
+    /// `config` is complete: set up by
+    /// [`configure_wasm_runtime`](crate::configure_wasm_runtime) or
+    /// [`configure_precompiled_wasm_runtime`](crate::configure_precompiled_wasm_runtime),
+    /// which replace the whole configuration, and any settings applied after
+    /// them. The pool is applied to a copy as the Engine is created, so no
+    /// later configuration call can replace it and leave a reset policy that
+    /// describes an on-demand Engine.
+    ///
+    /// The pool needs the linear-memory and GC-heap reservations to match, as
+    /// every Scriptw configuration sets them. Store limits still cap each heap
+    /// at 1 GiB, and the heaps never move, so execution deadlines are
+    /// unchanged. Each warm slot keeps up to `keep_resident_bytes` resident
+    /// after its Store is dropped, so at most `max_concurrent ×
+    /// keep_resident_bytes` stay resident; the pool's address space is
+    /// reserved while the Engine lives.
+    pub fn engine(
+        &self,
+        config: &wasmtime::Config,
+    ) -> Result<(wasmtime::Engine, PooledStoreReset), EngineError> {
+        let mut config = config.clone();
+        let reset = configure_with_pagemap(
+            &mut config,
+            self,
+            wasmtime::PoolingAllocationConfig::is_pagemap_scan_available(),
+        );
+        let engine = wasmtime::Engine::new(&config)
+            .map_err(|error| EngineError::new(format!("pooled Wasmtime Engine: {error:#}")))?;
+        Ok((engine, reset))
+    }
 }
 
-/// How a pooled Engine resets a GC heap its Store returned, chosen once by
-/// [`configure_pooled_stores`] for this host.
+/// How a pooled Engine resets a GC heap its Store returned, chosen once for
+/// this host ([`PooledStores::reset`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PooledStoreReset {
     /// Linux's `PAGEMAP_SCAN` (6.7 and later) finds the dirty pages. Up to
@@ -105,42 +153,13 @@ pub enum PooledStoreReset {
     ReleaseAll,
 }
 
-/// Make `config` (already set up by
-/// [`configure_wasm_runtime`](crate::configure_wasm_runtime) or
-/// [`configure_precompiled_wasm_runtime`](crate::configure_precompiled_wasm_runtime),
-/// which replace the whole configuration) take GC heaps from a pool of
-/// `pool.max_concurrent()` slots. Returns how this host resets them.
-///
-/// The pool needs the linear-memory and GC-heap reservations to match, as
-/// every Scriptw configuration sets them. Store limits still cap each heap at
-/// 1 GiB, and the heaps never move, so execution deadlines are unchanged. Each
-/// warm slot keeps up to `keep_resident_bytes` resident after its Store is
-/// dropped, so at most `max_concurrent × keep_resident_bytes` stay resident;
-/// the pool's address space is reserved while the Engine lives.
-pub fn configure_pooled_stores(
-    config: &mut wasmtime::Config,
-    pool: &PooledStores,
-) -> PooledStoreReset {
-    configure_with_pagemap(
-        config,
-        pool,
-        wasmtime::PoolingAllocationConfig::is_pagemap_scan_available(),
-    )
-}
-
 pub(crate) fn configure_with_pagemap(
     config: &mut wasmtime::Config,
     pool: &PooledStores,
     pagemap_scan_available: bool,
 ) -> PooledStoreReset {
     let stores = pool.max_concurrent.get();
-    let reset = if pagemap_scan_available {
-        PooledStoreReset::KeepDirtyPagesResident {
-            bytes: pool.keep_resident_bytes,
-        }
-    } else {
-        PooledStoreReset::ReleaseAll
-    };
+    let reset = pool.reset_with_pagemap(pagemap_scan_available);
     let mut pooling = wasmtime::PoolingAllocationConfig::new();
     pooling
         .total_gc_heaps(stores)
@@ -171,11 +190,23 @@ pub(crate) fn configure_with_pagemap(
     reset
 }
 
-/// Report a Store pool's capacity limit as a typed error.
+/// Report a Store pool limit as a typed error.
+///
+/// Wasmtime reports every pool total the same way, and a total is reached for
+/// one of two reasons that this error cannot tell apart: the pool's other live
+/// Stores hold their slots (dropping one frees them), or this Store needs
+/// more core instances, memories (its GC heap included) or tables than the
+/// per-Store share configured above while the others hold theirs. A Store
+/// that alone needs more than the whole pool fails even with no other Store
+/// alive, and no drop helps it.
 pub(crate) fn classify_allocation_error(error: wasmtime::Error, context: &str) -> EngineError {
     if error.is::<wasmtime::PoolConcurrencyLimitError>() {
-        EngineError::from_store_pool_exhaustion(format!(
-            "{context}: the Store pool's capacity is reached: {error:#}"
+        EngineError::from_store_pool_limit(format!(
+            "{context}: a Store pool limit is reached: {error:#}. Either the pool's other \
+             live Stores hold its slots (dropping one frees them), or this Store needs more \
+             than {CORE_INSTANCES_PER_STORE} core instances, {MEMORY_SLOTS_PER_STORE} memories \
+             (its GC heap included) or {CORE_INSTANCES_PER_STORE} tables, which no drop frees \
+             once it is the only Store"
         ))
     } else {
         EngineError::new(format!("{context}: {error:#}"))
@@ -217,8 +248,10 @@ mod tests {
                 crate::NativeCompilationPolicy::Fast,
                 crate::CompilationJobs::current(),
             );
-            let reset = configure_with_pagemap(&mut config, &PooledStores::sequential(), available);
+            let pool = PooledStores::sequential();
+            let reset = configure_with_pagemap(&mut config, &pool, available);
             assert_eq!(reset, expected);
+            assert_eq!(pool.reset_with_pagemap(available), expected);
             if available && !wasmtime::PoolingAllocationConfig::is_pagemap_scan_available() {
                 continue;
             }
@@ -226,5 +259,24 @@ mod tests {
             // reservations; a mismatch fails here, at Engine creation.
             wasmtime::Engine::new(&config).unwrap();
         }
+    }
+
+    #[test]
+    fn a_pooled_engine_keeps_its_pool_whatever_configuration_came_before() {
+        let mut config = wasmtime::Config::new();
+        crate::configure_wasm_runtime(
+            &mut config,
+            crate::NativeCompilationPolicy::Fast,
+            crate::CompilationJobs::current(),
+        );
+        let pool = PooledStores::sequential();
+        let (engine, reset) = pool.engine(&config).unwrap();
+        assert_eq!(reset, pool.reset());
+        // The Engine was created with the pool: there is no configuration
+        // step after which it could be lost.
+        assert!(engine.pooling_allocator_metrics().is_some());
+        // The caller's Config is untouched and still makes on-demand Engines.
+        let on_demand = wasmtime::Engine::new(&config).unwrap();
+        assert!(on_demand.pooling_allocator_metrics().is_none());
     }
 }

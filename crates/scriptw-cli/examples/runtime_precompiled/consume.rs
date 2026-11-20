@@ -14,17 +14,18 @@ pub(super) fn run(
 ) -> Result<Value, String> {
     run_with_config(path, expected, samples, warmups, |config| {
         scriptw_engine::configure_precompiled_wasm_runtime(config);
-        configure_store_allocation(config)
+        StoreAllocation::from_environment()
     })
 }
 
-/// `configure` sets up the consumer Engine and describes its Store allocation.
+/// `configure` sets up the consumer Engine's Config and chooses its Store
+/// allocation.
 pub(super) fn run_with_config(
     path: &Path,
     expected: &str,
     samples: &str,
     warmups: &str,
-    configure: fn(&mut wasmtime::Config) -> Result<Value, String>,
+    configure: fn(&mut wasmtime::Config) -> Result<StoreAllocation, String>,
 ) -> Result<Value, String> {
     let samples: usize = samples.parse().map_err(|_| "invalid sample count")?;
     let warmups: usize = warmups.parse().map_err(|_| "invalid warmup count")?;
@@ -43,7 +44,7 @@ pub(super) fn run_with_config(
         config.profiler(wasmtime::ProfilingStrategy::PerfMap);
     }
     let started = Instant::now();
-    let engine = wasmtime::Engine::new(&config).map_err(|e| e.to_string())?;
+    let (engine, store_allocation) = store_allocation.engine(&config)?;
     let engine_ns = started.elapsed().as_nanos();
     let compiler_enabled = engine.get_cranelift_opt_level().is_some();
     if compiler_enabled {

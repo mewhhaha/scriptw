@@ -217,8 +217,7 @@ fn a_full_store_pool_is_a_typed_error_and_a_dropped_store_frees_its_slot() {
         NativeCompilationPolicy::Fast,
         crate::CompilationJobs::current(),
     );
-    crate::configure_pooled_stores(&mut config, &crate::PooledStores::sequential());
-    let engine = WasmtimeEngine::new(&config).unwrap();
+    let (engine, _) = crate::PooledStores::sequential().engine(&config).unwrap();
     let runtime = EmbeddedRuntime::compile(&engine, &artifact).unwrap();
     let mut first = store(&runtime, 0.0);
     let mut first_linker = linker(&runtime);
@@ -231,7 +230,7 @@ fn a_full_store_pool_is_a_typed_error_and_a_dropped_store_frees_its_slot() {
         .instantiate(&mut second, &mut second_linker)
         .err()
         .expect("a one-Store pool serves no second Store");
-    assert!(error.is_store_pool_exhausted(), "{error}");
+    assert!(error.is_store_pool_limit_reached(), "{error}");
     drop((second_linker, second));
     assert_output(instance.evaluate(&mut first).unwrap(), "42");
     drop((first_linker, first));
