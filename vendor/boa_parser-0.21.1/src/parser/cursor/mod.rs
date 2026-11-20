@@ -37,6 +37,10 @@ pub(super) struct Cursor<R> {
 
     /// Tracks the number of tagged templates that are currently being parsed.
     tagged_templates_count: u32,
+
+    /// Scriptw: how many recursive grammar productions enclose the current
+    /// token (see [`crate::parser::MAX_NESTING_DEPTH`]).
+    nesting: u32,
 }
 
 impl<R> Cursor<R>
@@ -51,7 +55,38 @@ where
             json_parse: false,
             identifier: 0,
             tagged_templates_count: 0,
+            nesting: 0,
         }
+    }
+
+    /// Scriptw: parses one recursive production one nesting level deeper.
+    ///
+    /// Every grammar cycle of the recursive-descent parser passes through a
+    /// production that calls this, so source nested more deeply than
+    /// [`crate::parser::MAX_NESTING_DEPTH`] is a SyntaxError instead of a
+    /// native stack overflow in the parser or in the compiler phases that
+    /// recurse over the tree it builds.
+    pub(super) fn nested<T>(
+        &mut self,
+        interner: &mut Interner,
+        parse: impl FnOnce(&mut Self, &mut Interner) -> ParseResult<T>,
+    ) -> ParseResult<T> {
+        if self.nesting >= crate::parser::MAX_NESTING_DEPTH {
+            let position = self
+                .peek(0, interner)?
+                .map_or(boa_ast::Position::new(1, 1), |token| token.span().start());
+            return Err(Error::general(
+                format!(
+                    "source nesting exceeds the implementation limit of {} levels",
+                    crate::parser::MAX_NESTING_DEPTH
+                ),
+                position,
+            ));
+        }
+        self.nesting += 1;
+        let parsed = parse(self, interner);
+        self.nesting -= 1;
+        parsed
     }
 
     /// Sets the goal symbol of the cursor to `Module`.

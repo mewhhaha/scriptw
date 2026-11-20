@@ -256,19 +256,21 @@ where
     type Output = Expression;
 
     fn parse(self, cursor: &mut Cursor<R>, interner: &mut Interner) -> ParseResult<Self::Output> {
-        cursor.expect(
-            TokenKind::Keyword((Keyword::Extends, false)),
-            "class heritage",
-            interner,
-        )?;
+        cursor.nested(interner, move |cursor, interner| {
+            cursor.expect(
+                TokenKind::Keyword((Keyword::Extends, false)),
+                "class heritage",
+                interner,
+            )?;
 
-        let strict = cursor.strict();
-        cursor.set_strict(true);
-        let lhs = LeftHandSideExpression::new(self.allow_yield, self.allow_await)
-            .parse(cursor, interner)?;
-        cursor.set_strict(strict);
+            let strict = cursor.strict();
+            cursor.set_strict(true);
+            let lhs = LeftHandSideExpression::new(self.allow_yield, self.allow_await)
+                .parse(cursor, interner)?;
+            cursor.set_strict(strict);
 
-        Ok(lhs)
+            Ok(lhs)
+        })
     }
 }
 

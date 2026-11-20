@@ -307,6 +307,34 @@ accepts `--case <file.js>`.
   and the embedder owns the Store's limiter, so closing it needs either
   Scriptw-owned limiting in the embedding API or a vendored heap maximum.
   Owner: embedding API.
+- Native compilation of one large Wasm function is superlinear in time and
+  memory, so large single bodies and deep nesting stay costly though they no
+  longer overflow a stack (measured 2026-11-20 with the product CLI, one
+  process each). A top-level script body costs about 990 Wasm bytes per
+  global `x++` statement (the global-binding write and its fallbacks; the
+  same statements in a function body cost about 250): 600 of them make one
+  594 KB function that `scriptw run` (Fast policy, single-pass register
+  allocation) compiles in 22.8 s at 400 MB RSS (200: 2.7 s; 400: 8.0 s),
+  and 800 `if (x == i) { x++ }` statements make 1.3 MB that take 97 s and
+  2.0 GB. `precompile --policy speed` (backtracking allocation) compiles the
+  latter in 8.7 s at 2.1 GB, `--policy fast` in 110 s at 1.9 GB, so the time
+  is in the single-pass allocator and the memory in compiling the one
+  function; Wasm emission takes 0.4 s and 51 MB. Source nested just below
+  `MAX_NESTING_DEPTH` (997 levels) compiles and runs everywhere without a
+  stack overflow, but its memory grows superlinearly with depth for some
+  constructs: parentheses 81 MB, arrays 220 MB, blocks 53 MB, nested
+  functions 304 MB, `else if` chains 1.2 GB, conditional chains 558 MB,
+  templates 3.2 GB, chained assignment 4.1 GB, binding patterns 9.2 GB,
+  object literals 9.7 GB (500 levels: 2.7 GB; emission itself 1 GB at 997),
+  and nested `class extends` heritage already 3.5 GB and 62 s at 250 levels
+  (emission 3.6 GB at 500). The parser limit is the stack bound, not a
+  memory bound; lowering it to fit the deepest-cost construct in 4 GiB would
+  reject ordinary 500-branch `else if` chains. Fix: split a large script or
+  function body into several Wasm functions at statement boundaries (the
+  emitter keeps one function per body today), find the single-pass
+  allocator's superlinear step, and remove the per-level duplication behind
+  class heritage and object literal emission. Owner: AOT codegen and native
+  compilation.
 - Smaller runtime review items left open, each with its reason: an
   embedder's own `Module::new` on a parallel Engine still compiles on Rayon's
   global pool (Scriptw cannot route it; foreign-modules.md says so);

@@ -40,3 +40,17 @@ automatic semicolon insertion. The `let [` check in
 `src/parser/expression/assignment/mod.rs` now treat a missing token as "not
 the restricted form" instead of an error. Strict `let` and `async x` stay
 SyntaxErrors. Test: `scriptw-front` `sloppy_let_and_async_identifiers_may_end_the_source`.
+
+## Source nesting limit
+
+The recursive-descent parser recursed once per nesting level with no bound,
+so deeply nested source (about 4,000 parentheses, brackets or blocks on the
+64 MiB compiler stack) aborted the process with a native stack overflow.
+`Cursor::nested` (`src/parser/cursor/mod.rs`) counts the recursive
+productions that enclose the current token and reports a SyntaxError past
+`parser::MAX_NESTING_DEPTH` (1,000). Every grammar cycle passes a counted
+production: AssignmentExpression, Statement and FunctionStatementList are
+wrapped whole; the unary, prefix update, `await` and `**` operands, the `new`
+callee, ClassHeritage and the two binding patterns count only their recursive
+operand, so one source level costs one count. Test: engine
+`source_nesting_beyond_the_limit_is_a_syntax_error_not_a_stack_overflow`.

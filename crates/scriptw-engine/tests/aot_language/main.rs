@@ -75,6 +75,7 @@ mod aot_scalar_execution;
 mod aot_scalar_masked_rows;
 mod aot_set_without_chain;
 mod aot_source_recursion;
+mod aot_source_shape_regressions;
 mod aot_string_addition;
 mod aot_string_index_read;
 mod aot_super_assignment_reference;

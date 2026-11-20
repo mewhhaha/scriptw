@@ -79,7 +79,12 @@ where
         {
             cursor.advance(interner);
             return Ok(
-                Binary::new(ArithmeticOp::Exp.into(), lhs, self.parse(cursor, interner)?).into(),
+                Binary::new(
+                    ArithmeticOp::Exp.into(),
+                    lhs,
+                    cursor.nested(interner, |cursor, interner| self.parse(cursor, interner))?,
+                )
+                .into(),
             );
         }
         Ok(lhs)

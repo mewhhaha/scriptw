@@ -57,7 +57,9 @@ where
             .span()
             .start();
 
-        let expr = UnaryExpression::new(self.allow_yield, true).parse(cursor, interner)?;
+        let expr = cursor.nested(interner, |cursor, interner| {
+            UnaryExpression::new(self.allow_yield, true).parse(cursor, interner)
+        })?;
         let expr_span_end = expr.span().end();
 
         Ok(Await::new(

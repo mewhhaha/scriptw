@@ -136,7 +136,10 @@ where
                         }
                     }
                 } else {
-                    let lhs_inner = self.parse(cursor, interner)?;
+                    // `new new … F`: the callee recursion passes no other
+                    // counted production.
+                    let lhs_inner =
+                        cursor.nested(interner, |cursor, interner| self.parse(cursor, interner))?;
                     if let Some(next) = cursor.peek(0, interner)?
                         && next.kind() == &TokenKind::Punctuator(Punctuator::Optional)
                     {

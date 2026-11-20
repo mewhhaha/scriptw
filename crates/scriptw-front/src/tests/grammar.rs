@@ -737,3 +737,30 @@ fn sloppy_let_and_async_identifiers_may_end_the_source() {
     // A module is strict: `let` is reserved there.
     assert!(parse("let", ParseOptions::module()).is_err());
 }
+
+#[test]
+fn source_nesting_past_the_parser_limit_is_a_syntax_error() {
+    // The parser needs native stack in proportion to the nesting it admits;
+    // product compilation runs on a 64 MiB stack, so this test does too.
+    std::thread::Builder::new()
+        .stack_size(64 << 20)
+        .spawn(|| {
+            for (open, close) in [("(", ")"), ("[", "]"), ("{a:", "}")] {
+                let source = |depth: usize| {
+                    format!("var x = {}1{};", open.repeat(depth), close.repeat(depth))
+                };
+                assert!(parse(&source(990), ParseOptions::script()).is_ok());
+                let err = parse(&source(4000), ParseOptions::script())
+                    .expect_err("nesting past the limit is rejected");
+                assert!(
+                    err.message()
+                        .contains("nesting exceeds the implementation limit"),
+                    "{err:?}"
+                );
+                assert_eq!(err.diagnostic().error_type(), Some("SyntaxError"));
+            }
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}

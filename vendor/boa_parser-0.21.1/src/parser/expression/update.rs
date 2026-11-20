@@ -99,8 +99,9 @@ where
                     .next(interner)?
                     .expect("Punctuator::Inc token disappeared");
 
-                let target = UnaryExpression::new(self.allow_yield, self.allow_await)
-                    .parse(cursor, interner)?;
+                let target = cursor.nested(interner, |cursor, interner| {
+                    UnaryExpression::new(self.allow_yield, self.allow_await).parse(cursor, interner)
+                })?;
                 let target_span_end = target.span().end();
 
                 // https://tc39.es/ecma262/#sec-update-expressions-static-semantics-early-errors
@@ -126,8 +127,9 @@ where
                     .next(interner)?
                     .expect("Punctuator::Dec token disappeared");
 
-                let target = UnaryExpression::new(self.allow_yield, self.allow_await)
-                    .parse(cursor, interner)?;
+                let target = cursor.nested(interner, |cursor, interner| {
+                    UnaryExpression::new(self.allow_yield, self.allow_await).parse(cursor, interner)
+                })?;
                 let target_span_end = target.span().end();
 
                 // https://tc39.es/ecma262/#sec-update-expressions-static-semantics-early-errors

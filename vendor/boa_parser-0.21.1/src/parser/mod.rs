@@ -37,6 +37,17 @@ use std::path::Path;
 
 use self::statement::ModuleItemList;
 
+/// Scriptw: the deepest nesting of recursive grammar productions a source may
+/// have; deeper source is a SyntaxError. Each level is one enclosing
+/// AssignmentExpression, Statement, function body, unary or prefix update
+/// operand, `await` operand, right-associative `**` operand, `new` callee,
+/// class heritage or binding pattern. The recursive-descent
+/// parser, and the compiler phases that recurse over the tree, need native
+/// stack in proportion to this depth; at this bound they stay well inside the
+/// 64 MiB stack Scriptw compiles on. V8 reports a RangeError for comparable
+/// depths (about 2,000 to 4,000 nested parentheses or blocks).
+pub const MAX_NESTING_DEPTH: u32 = 1000;
+
 type ScriptParseOutput = (boa_ast::Script, boa_ast::SourceText);
 type ModuleParseOutput = (boa_ast::Module, boa_ast::SourceText);
 

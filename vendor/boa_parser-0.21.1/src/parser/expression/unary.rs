@@ -87,7 +87,7 @@ where
             TokenKind::Keyword((Keyword::Delete, false)) => {
                 cursor.advance(interner);
                 let position = cursor.peek(0, interner).or_abrupt()?.span().start();
-                let target = self.parse(cursor, interner)?;
+                let target = cursor.nested(interner, |cursor, interner| self.parse(cursor, interner))?;
 
                 if cursor.strict() {
                     match target.flatten() {
@@ -117,7 +117,7 @@ where
             }
             TokenKind::Keyword((Keyword::Void, false)) => {
                 cursor.advance(interner);
-                let target = self.parse(cursor, interner)?;
+                let target = cursor.nested(interner, |cursor, interner| self.parse(cursor, interner))?;
                 let target_span_end = target.span().end();
                 Ok(Unary::new(
                     UnaryOp::Void,
@@ -129,7 +129,7 @@ where
             TokenKind::Keyword((Keyword::TypeOf, false)) => {
                 cursor.advance(interner);
 
-                let target = self.parse(cursor, interner)?;
+                let target = cursor.nested(interner, |cursor, interner| self.parse(cursor, interner))?;
                 let target_span_end = target.span().end();
                 Ok(Unary::new(
                     UnaryOp::TypeOf,
@@ -141,7 +141,7 @@ where
             TokenKind::Punctuator(Punctuator::Add) => {
                 cursor.advance(interner);
 
-                let target = self.parse(cursor, interner)?;
+                let target = cursor.nested(interner, |cursor, interner| self.parse(cursor, interner))?;
                 let target_span_end = target.span().end();
                 Ok(Unary::new(
                     UnaryOp::Plus,
@@ -153,7 +153,7 @@ where
             TokenKind::Punctuator(Punctuator::Sub) => {
                 cursor.advance(interner);
 
-                let target = self.parse(cursor, interner)?;
+                let target = cursor.nested(interner, |cursor, interner| self.parse(cursor, interner))?;
                 let target_span_end = target.span().end();
                 Ok(Unary::new(
                     UnaryOp::Minus,
@@ -165,7 +165,7 @@ where
             TokenKind::Punctuator(Punctuator::Neg) => {
                 cursor.advance(interner);
 
-                let target = self.parse(cursor, interner)?;
+                let target = cursor.nested(interner, |cursor, interner| self.parse(cursor, interner))?;
                 let target_span_end = target.span().end();
                 Ok(Unary::new(
                     UnaryOp::Tilde,
@@ -177,7 +177,7 @@ where
             TokenKind::Punctuator(Punctuator::Not) => {
                 cursor.advance(interner);
 
-                let target = self.parse(cursor, interner)?;
+                let target = cursor.nested(interner, |cursor, interner| self.parse(cursor, interner))?;
                 let target_span_end = target.span().end();
                 Ok(Unary::new(
                     UnaryOp::Not,

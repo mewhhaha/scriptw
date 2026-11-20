@@ -552,6 +552,12 @@ impl core::fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
+/// The deepest nesting of recursive grammar productions a source may have;
+/// deeper source is a SyntaxError. Parsing at this depth, and compiling the
+/// tree, needs native stack in proportion to it: callers parse on the engine's
+/// 64 MiB compiler stack, not on a small default thread stack.
+pub const MAX_SOURCE_NESTING_DEPTH: u32 = boa_parser::parser::MAX_NESTING_DEPTH;
+
 pub fn parse(
     source_text: impl Into<String>,
     options: ParseOptions,
