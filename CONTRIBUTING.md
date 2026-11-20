@@ -52,53 +52,91 @@ Prefer persistent Cargo output directories. If filesystem pressure requires
 temporary tmpfs outputs, restore verified persistent copies before runtime tests.
 Tmpfs pages consume the producing cgroup's memory budget after compilation ends.
 
-### Shipped compiler binary
+### Dist compiler binary
 
-Shipped and benchmark `scriptw` binaries (compilation panels, frozen cohorts,
-long Test262 sweeps) come from `scripts/build-dist.sh`: the `dist` Cargo profile
-(release plus fat LTO, one codegen unit and no DWARF) with jemalloc as the global
-allocator (`--features jemalloc`). Development and test builds keep the release
-profile and glibc malloc.
+`scripts/build-dist.sh` builds a local `scriptw` for compilation panels, frozen
+benchmark cohorts and long local runs: the `dist` Cargo profile (release plus
+fat LTO, one codegen unit and no DWARF) with jemalloc as the global allocator
+(`--features jemalloc`). It is not the shipped binary: CI's native release
+artifacts and Test262 publication still use `cargo build --release` (glibc
+malloc, no LTO). A binary that links jemalloc must travel with
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), which reproduces jemalloc's
+BSD-2-Clause notice; that file does not yet cover every Rust dependency, so
+do not publish dist binaries as release artifacts. Development and test
+builds keep their profiles and glibc malloc. `--all-features` builds now
+compile jemalloc's C code (`make` and `cc`) and run scriptw-cli's integration
+tests on jemalloc. The recipe is Linux x86_64 with lld only, and no CI job
+builds `--features jemalloc` or `--profile dist`.
 
 ```sh
 python3 -B scripts/limited_verification.py --cloud --cloud-cpus auto -- \
-  env DIST_JOBS=4 scripts/build-dist.sh plain target/dist-out
+  scripts/build-dist.sh plain target/dist-out
 ```
 
-The binary lands in `target/dist-out/scriptw`. A cold build takes about 25
-minutes on four shared vCPUs, and its fat-LTO link peaks at 3.8 GB RSS. The
-dedicated target directory `target/dist-build` (`DIST_TARGET_DIR`) peaks at about
-3.2 GB. The script deletes the target units after copying the binary, but keeps
-the host units (build scripts and the runtime-image producer). It always passes
-`--target <host>`, so `RUSTFLAGS` reach only the target units, and it repeats
-the lld link argument, which `RUSTFLAGS` would otherwise replace.
-Artifacts must match the release binary byte for byte: P, R, `scriptw precompile`
-images, program output and Test262 outcomes. Images embed the source fingerprint,
-which covers `Cargo.toml` and `Cargo.lock`, so compare binaries built from one
-source state.
+The recipe needs `--cloud`: its fat-LTO link alone peaks at 3.8 GB RSS, which
+does not fit the 4 GiB local default. A local run needs an explicit
+`--memory-mib 6144` or more, outside the AGENTS.md local default. Cargo's job
+count follows the wrapper's `SCRIPTW_JOBS` (the CPU count with `--cloud-cpus
+auto`); `SCRIPTW_DIST_JOBS` overrides it. `scripts/build-dist.sh --check
+[plain|pgo]` validates the host, toolchain, environment and directories without
+building. A cold build takes about 25 minutes on four shared vCPUs. The binary
+lands in `target/dist-out/scriptw`, next to `scriptw.build-info` (source commit,
+changed tracked files, toolchain, rustflags, profile and training inputs,
+binary SHA-256). The dedicated target directory `target/dist-build`
+(`SCRIPTW_DIST_TARGET_DIR`, never the shared `target/`) peaks at about 3.2 GB.
+The script holds an exclusive `flock` on the target and output directories for
+the whole run, so a concurrent run fails at once instead of deleting the
+other's units or profiles. It deletes the target units after copying the
+binary but keeps the host units (build scripts and the runtime-image
+producer). It always passes `--target <host>`, so its rustflags reach only the
+target units, and it repeats the lld link argument, which they would otherwise
+replace; it refuses a pre-set `RUSTFLAGS` or `CARGO_ENCODED_RUSTFLAGS`.
+
+On the inputs compared so far, dist and release binaries produced the same
+artifacts byte for byte: P and the `scriptw precompile` images of the 17 panel
+kernels, the RSC and `client.js` images, the kernels' `scriptw run` output and
+44 Test262 outcomes of one directory. R comes from the build-time
+runtime-image producer, a host unit that gets neither LTO nor PGO, so its
+identity says nothing about the dist code. No committed command checks this
+yet; compare a new binary against release yourself before trusting its
+output elsewhere. Images embed the source fingerprint, which covers
+`Cargo.toml` and `Cargo.lock` but not Cargo features or
+`crates/scriptw-cli/Cargo.toml`: release builds with and without jemalloc
+share a fingerprint but not an `executable_sha256`, so Test262 evidence from
+one cannot be published by the other.
 
 `scripts/build-dist.sh pgo` adds Rust PGO. It needs rustup's `llvm-tools`
 component (`rustup component add llvm-tools`), whose `llvm-profdata` matches
 rustc's LLVM; the system `llvm-profdata` is older and cannot read the profiles.
 It builds an instrumented dist binary, runs `scripts/dist-pgo-train.sh`, merges
-the single online-merged `.profraw` and rebuilds with the profile. Set
-`DIST_PGO_APPLICATION_FIXTURES` to a generated application fixture directory
-(`benchmark-react.py prepare`) to include the RSC and edge programs; without it
-the training uses only the in-repository kernels and Test262. The script header
-lists the held-out inputs. PGO costs two dist builds plus about four minutes of
-training, and the instrumented build's target units take 1.8 GB. Against release,
-the PGO dist binary cuts the RSC compile's wall time by 25%, the compilation
-panel's builds by 17% and a Test262 directory by 15%. It also helps inputs
-outside the training set; see the
-[measurements](docs/rust-rewrite/benchmarks.md#compiler-binary-build-2026-11-20).
-Retrain after changing the allocator or hot compiler code. A stale profile
-only costs speed, but rustc does not warn when the profile no longer matches the
-code. The use build links with `--emit-relocs`, for a later BOLT pass. BOLT is
-not part of the recipe: LLVM 18's instrumentation pass needed more than 8 GB of
-RAM on this binary.
+the single online-merged `.profraw` and rebuilds with the profile; the previous
+profile stays until the new one is merged. Set
+`SCRIPTW_DIST_PGO_APPLICATION_FIXTURES` to a generated application fixture
+directory (`benchmark-react.py prepare`) to include the RSC and edge programs,
+as the measured binary did; without it the training uses only the
+in-repository kernels and Test262. The script header lists the held-out
+inputs. PGO costs two dist builds plus about four minutes of training, and the
+instrumented build's target units take 1.8 GB. On a held-out input the PGO
+binary precompiled `client.js` 22% faster than release; see the
+[measurements](docs/rust-rewrite/benchmarks.md#compiler-binary-build-2026-11-20)
+and the source state they came from. Retrain after changing the allocator or
+hot compiler code. A stale profile only costs speed, but rustc does not warn
+when the profile no longer matches the code. `SCRIPTW_DIST_BOLT_PREP=1` links
+the PGO binary with `--emit-relocs` and `-z keep-text-section-prefix` for a
+later BOLT pass; it is off by default because BOLT is not part of the recipe
+(LLVM 18's instrumentation pass needed more than 8 GB of RAM on this binary)
+and the relocations add about 19 MB that every CLI run hashes.
 
-Freeze a dist binary, not a release one, for a new compilation, RSC or Test262
-wall-time campaign, and record which recipe produced it.
+Freeze a dist binary, not a release one, for a new compilation or RSC
+wall-time campaign, and keep its `scriptw.build-info`. For a long Test262
+sweep prefer the plain mode: the speed of a PGO binary on a full sweep is
+unmeasured, and compiler paths the training never reaches are optimized as
+cold. A PGO build is not reproducible, because the profile depends on the
+training run, and any rebuild changes `executable_sha256`. Resume and publish
+a dist sweep with the same frozen binary (`SCRIPTW_BIN=target/dist-out/scriptw`
+for `scripts/publish-real-status-low-ram.sh`, or that binary's own
+`test262 publish-status`); `cargo run -p scriptw-cli -- test262 publish-status`
+rejects its evidence.
 
 ## Development workflow
 

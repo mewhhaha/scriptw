@@ -2698,42 +2698,84 @@ excluded. [Data and tool identities](compilation-current.json) ·
 ### Compiler binary build (2026-11-20)
 
 The panel above, the RSC compile and Test262 runs all time the `scriptw` binary
-itself, so how that binary is built matters too. [CONTRIBUTING](../../CONTRIBUTING.md#shipped-compiler-binary)
+itself, so how that binary is built matters too. [CONTRIBUTING](../../CONTRIBUTING.md#dist-compiler-binary)
 has the recipe: `scripts/build-dist.sh` (fat LTO, one codegen unit, jemalloc) and its
-`pgo` mode (Rust PGO). All four binaries below were built from one source state,
-`a49682ada` plus the dist profile and allocator manifests (fingerprint `e18762413c39`).
-They were measured in interleaved rounds: five for compilation, three for Test262.
-Every child ran pinned to CPUs 0 and 1 with `SCRIPTW_JOBS=1` and a fresh disk-backed
-`SCRIPTW_CACHE_DIR`. Another worker ran Callgrind or builds on CPUs 2 and 3 for part of the
-time, so walls carry that contention; user CPU is steadier. Values are medians
-[min–max].
+`pgo` mode (Rust PGO). These are local benchmark binaries; CI and Test262
+publication still use release builds.
+
+Source state. All four binaries below were built from one uncommitted state,
+S1: `a49682ada` plus `[profile.dist]`, the tikv-jemallocator dependency and an
+optional, unused mimalloc 0.1.52 entry in the root `Cargo.toml` and `Cargo.lock`
+(source fingerprint `e18762413c39`). The mimalloc entry was dropped before the
+commit, so no commit reproduces that fingerprint, and binaries built from the
+committed tree embed a different one. The PGO binary did not come from the
+committed `build-dist.sh pgo` either, but from an equivalent hand-resumed
+sequence of uncommitted scripts: a tmpfs target directory, `-j 4`, a final link
+resumed by hand and a looser warning grep. Those runs skipped the committed
+script's LLVM version, profile-count and warning checks, and the committed
+`pgo` mode has not yet completed end to end. The training ran without
+`--snapshot-dir`, so it wrote into the shared `test262/snapshots`, and it set
+the application fixtures variable, so RSC and the edge programs were in the
+training set.
+
+Method. The binaries were measured in interleaved rounds: five for
+compilation, three for Test262. Every child ran pinned to CPUs 0 and 1 with
+`SCRIPTW_JOBS=1` and a fresh disk-backed `SCRIPTW_CACHE_DIR`; the binaries
+themselves ran from tmpfs (`/dev/shm`), which takes page-cache misses out of
+the startup that dominates `build wasm`. Another worker ran Callgrind or builds
+on CPUs 2 and 3 for part of the time, and its unpinned `node` (wasm-opt)
+process could also run on CPUs 0 and 1, so walls carry that contention; user
+CPU is steadier. Values are medians [min–max].
 
 | Binary | RSC precompile (Speed) | Panel `build wasm`, 17 kernels | Panel precompile, 17 kernels | `client.js` precompile (held out) | Test262 `built-ins/Array/prototype/find` | Peak RSS: RSC / build / Test262 | Size |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | release, glibc malloc | 9.70 s [9.36–10.69], user 9.30 s | 2.59 s [2.48–2.66], user 1.76 s | 7.66 s | 64.97 s [63.42–67.88] | 74.8 s [68.8–75.9], user 56.1 s | 292 / 85 / 157 MiB | 218.2 MB |
 | release + jemalloc | 9.09 s [8.95–9.63], user 8.60 s | 2.42 s [2.31–2.53], user 1.58 s | 7.42 s | 58.15 s [55.65–58.91] | 72.8 s [65.3–75.8], user 53.7 s | 240 / 75 / 169 MiB | 218.7 MB |
 | dist (fat LTO) + jemalloc | 8.42 s [8.27–8.72], user 7.99 s | 2.30 s [2.28–2.45], user 1.49 s | 7.15 s | 53.00 s [51.97–56.52] | 65.2 s [63.1–66.4], user 48.3 s | 230 / 69 / 158 MiB | 180.5 MB |
-| dist + jemalloc + PGO | **7.26 s** [6.95–7.78], user 6.72 s | **2.15 s** [2.08–2.24], user 1.34 s | **6.58 s** | **50.74 s** [48.02–51.63] | **63.5 s** [63.1–63.6], user 45.3 s | 227 / 63 / 149 MiB | 197.8 MB (178.4 MB without BOLT relocations) |
+| dist + jemalloc + PGO | **7.26 s** [6.95–7.78], user 6.72 s | **2.15 s** [2.08–2.24], user 1.34 s | **6.58 s** | **50.74 s** [48.02–51.63] | **63.5 s** [63.1–63.6], user 45.3 s | 227 / 63 / 149 MiB | 197.8 MB with BOLT relocations (178.4 MB without, now the default) |
 
 Against release, the PGO dist binary takes 25% less wall time on the RSC
-compile (28% less user CPU), 17% less on the panel's builds and 15% less on the
+compile (28% less user CPU), but RSC was in its training set. On the held-out
+`client.js` it takes 22% less, 17% less on the panel's builds and 15% less on the
 Test262 directory. The panel's per-kernel `build wasm` median falls from 0.145
 to 0.123 s. Most of that is CLI startup on a 200 MB binary: 17 builds take 1.76 s
 of user CPU against 2.59 s of wall time.
 
-Every artifact was byte-identical across all four binaries and all rounds:
-P and R of the 17 kernels, their `scriptw precompile` images, the RSC and
-`client.js` images, the `scriptw run` output of the 17 kernels (each matches its
-manifest) and the 44 Test262 outcomes (all pass). Wasmtime's native output
-therefore does not depend on how the compiler binary was built. The images carry
-the source fingerprint, which covers `Cargo.toml` and `Cargo.lock`, so only
-binaries from one source state can be compared byte for byte.
+Variance between campaigns is as large as several of these effects. An earlier
+campaign on the same S1 binaries (release glibc, release jemalloc, dist
+jemalloc; five compilation and three Test262 rounds) measured the RSC compile at
+9.29, 9.32 and 8.68 s wall (user 8.94, 8.86 and 8.16 s) and the Test262 directory
+at 64.6, 61.7 and 57.6 s wall (user 53.2, 50.5 and 47.4 s). The same release
+binary thus took 64.6 s there and 74.8 s in the final campaign, and the earlier
+dist median beats the final PGO median. A third, allocator-only campaign put
+release at 73.7 s on that directory. Across the three campaigns, jemalloc saved
+1–8% of RSC user CPU, 3–10% of `build wasm` user CPU and 4–6% of Test262 user
+CPU, but its RSC wall change ranged from −6% to +0.4%; read the jemalloc and
+Test262 rows by user CPU. The speed of a PGO binary on a full pinned Test262
+sweep is unmeasured.
+
+On these inputs, every compared artifact was byte-identical across all four
+binaries and all rounds: P of the 17 kernels, their `scriptw precompile`
+images, the RSC and `client.js` images, and the `scriptw run` output of the
+17 kernels (each matches its manifest). R was identical too, but the build-time
+runtime-image producer makes it, a host unit that gets neither LTO nor PGO, so
+it proves nothing about the dist code. The 44 Test262 cases passed in every
+run by each run's stdout summary; the per-case JSON came from the shared
+snapshot directory, which other workers' runs overwrote in three of the twelve
+final rounds. This is a fixed set, not a proof that output never depends on how
+the compiler binary was built. The images carry the source fingerprint, which
+covers `Cargo.toml` and `Cargo.lock`, so only binaries from one source state can
+be compared byte for byte.
 
 PGO trained on nine of the kernels, the RSC program, the six edge programs and
-`built-ins/JSON/stringify`. It generalizes: on the eight held-out kernels,
-`build wasm` user CPU falls 24% (0.85 to 0.65 s) against 23% on the trained ones,
-and precompile falls 19% against 17%. `client.js` (325 KB React client) and the
-Test262 directory are also outside the training set.
+`built-ins/JSON/stringify`. On the eight held-out kernels, `build wasm` user CPU
+falls 24% (0.85 to 0.65 s) against 23% on the trained ones, and precompile falls
+19% against 17%. `client.js` (325 KB React client) and the Test262 directory are
+also outside the training set. All of these exercise mostly the same compiler
+paths as the training. With `-Cprofile-use`, LLVM optimizes functions the
+training never ran as cold, so lowering and codegen of features it never
+compiles (generators, classes and private fields, RegExp, Intl, Temporal,
+BigInt and others) may be slower than in release.
 
 Allocators: mimalloc 0.1.52 matched jemalloc's CPU savings in a separate
 three-way A/B: RSC user 8.70 s against 8.71 s (glibc 9.08 s), and Test262 user
@@ -2742,7 +2784,8 @@ compile and 249 MiB on Test262, against 241 and 171 MiB for jemalloc and 291 and
 160 MiB for glibc. jemalloc was kept.
 
 Build cost: a cold dist build takes about 25 minutes on four contended vCPUs, and
-its fat-LTO link peaks at 3.8 GB RSS. PGO adds an instrumented build, about four
+its fat-LTO link peaks at 3.8 GB RSS, more than the 4 GiB local verification
+cap allows. PGO adds an instrumented build, about four
 minutes of training and a second dist build. The instrumented target units
 take 1.8 GB and the profile-use ones about 1.7 GB, plus 1.4 GB of host units. Release and
 development builds are unchanged.
@@ -2753,15 +2796,21 @@ Not done:
   no perf LBR profile. Its instrumentation mode grew to 8.3 GB RSS on the 198 MB
   PGO binary (38,722 functions, relocation mode) before it wrote anything. It
   was stopped so that it would not crowd out concurrent builds on a 16 GB
-  machine. The PGO build already links with `--emit-relocs` and
-  `-z keep-text-section-prefix`, so a machine with about 12 GB of free RAM can
-  retry with `llvm-bolt -instrument`, the same training and
+  machine. With `SCRIPTW_DIST_BOLT_PREP=1` the PGO build links with
+  `--emit-relocs` and `-z keep-text-section-prefix`, so a machine with about
+  12 GB of free RAM can retry with `llvm-bolt -instrument`, the same training and
   `-reorder-blocks=ext-tsp -reorder-functions=hfsort+ -split-functions`.
 - Linker identical-code folding (`--icf`) and a static or non-PIE link. Each needs
   another full fat-LTO build with different link flags. Neither was measured.
-- The benchmark examples (`rsc_baseline`, `compiler_precompiled_baseline`) get
-  the allocator through `--features jemalloc` but have no dist/PGO recipe of
-  their own. Their native-preparation phase above comes from `scriptw precompile`.
+- The benchmark examples `rsc_baseline` and `compiler_precompiled_baseline` name
+  `scriptw_cli`, so `--features jemalloc` gives their whole process, execution
+  phases included, the allocator; the other examples and
+  `scriptw-precompiled-consumer` keep glibc. The examples have no dist/PGO recipe
+  of their own. Their native-preparation phase above comes from
+  `scriptw precompile`.
+- An identity gate: the comparison above lives in uncommitted tooling, and no
+  committed command compares a dist binary's artifacts with release.
+- A broad held-out Test262 slice with the PGO binary, outside `built-ins`.
 - The published compilation panel above still uses its frozen release CLI; a
   new campaign should freeze a dist binary.
 - Two diagnostics are outside the set: RSC Fast policy and `scriptw build wasm`

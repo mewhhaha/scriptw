@@ -23,10 +23,11 @@ For production, precompile first: `scriptw precompile app.mjs -o app.swep` write
 native image once, and servers load it without a compiler; it needs the same Scriptw
 build and CPU features ([flow](docs/rust-rewrite/contracts/foreign-modules.md#precompiled-execution)).
 
-For a shipped or benchmark compiler, `scripts/build-dist.sh pgo` builds `scriptw`
-with fat LTO, jemalloc and Rust PGO. It compiles the RSC bundle about 25% faster
-than a release build, with byte-identical output
-([recipe](CONTRIBUTING.md#shipped-compiler-binary)).
+Local benchmark compilers come from `scripts/build-dist.sh pgo` (fat LTO, jemalloc, Rust
+PGO; Linux x86_64). On 2026-11-20 its binary precompiled the held-out React client bundle
+22% faster than release, and the RSC bundle it was trained on 25% faster. CI releases and
+Test262 publication still use `--release`
+([recipe and limits](CONTRIBUTING.md#dist-compiler-binary), [notices](THIRD-PARTY-NOTICES.md)).
 
 ## Benchmarks
 
