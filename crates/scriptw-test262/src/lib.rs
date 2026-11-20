@@ -4425,16 +4425,6 @@ fn case_has_compile_only_negative(case: &TestCase) -> bool {
         .is_some_and(|negative| negative.phase.is_compile_only())
 }
 
-fn language_features_for_case(case: &TestCase) -> scriptw_engine::LanguageFeaturePolicy {
-    let mut policy = scriptw_engine::LanguageFeaturePolicy::default();
-    if case.features.contains("nonextensible-applies-to-private") {
-        policy = policy.with_private_element_extensibility(
-            scriptw_engine::PrivateElementExtensibility::NonExtensibleAppliesToPrivate,
-        );
-    }
-    policy
-}
-
 /// Verification only (feature `profile-experiments`, never in a publishing
 /// build): with `SCRIPTW_TEST262_EXECUTION_PROFILE=collect` every Wasm AOT
 /// case is built instrumented to collect an execution profile, and with
@@ -4500,6 +4490,16 @@ fn verification_execution_profile(
     _: &mut CompileOptions,
 ) -> Result<(), String> {
     Ok(())
+}
+
+fn language_features_for_case(case: &TestCase) -> scriptw_engine::LanguageFeaturePolicy {
+    let mut policy = scriptw_engine::LanguageFeaturePolicy::default();
+    if case.features.contains("nonextensible-applies-to-private") {
+        policy = policy.with_private_element_extensibility(
+            scriptw_engine::PrivateElementExtensibility::NonExtensibleAppliesToPrivate,
+        );
+    }
+    policy
 }
 
 fn compile_options_for_case(case: &TestCase) -> CompileOptions {
