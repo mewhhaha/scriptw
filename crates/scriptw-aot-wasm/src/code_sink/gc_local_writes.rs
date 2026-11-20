@@ -16,7 +16,9 @@
 //! (whose release does store null), and the operations that can throw into a
 //! handler. Every control-transfer operator of wasm-encoder 0.245's
 //! `Instruction` is listed below; an upgrade must list new ones, since an
-//! unlisted operator is taken as straight-line code. [`Trace::verify`] then runs a
+//! unlisted operator is taken as straight-line code. The crate pins the exact
+//! wasm-encoder version (Cargo.toml) so no resolver update changes the enum
+//! under this list unnoticed. [`Trace::verify`] then runs a
 //! must-be-written dataflow over that record when the body is finished:
 //! joins intersect, and each `try_table` handler label receives the state at
 //! every call and throw inside its body. A loop head holds what its entry

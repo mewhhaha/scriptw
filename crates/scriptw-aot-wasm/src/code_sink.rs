@@ -752,7 +752,8 @@ impl Function {
                 panic!("the i32 fact flow does not model stack switching")
             }
             // Every branching operator wasm-encoder 0.245 encodes is
-            // matched above; the rest fall through to the next operator.
+            // matched above (the version is pinned exactly in Cargo.toml);
+            // the rest fall through to the next operator.
             _ => {}
         }
     }

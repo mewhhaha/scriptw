@@ -14,7 +14,12 @@ scriptw-intl = { path = "../scriptw-intl" }
 scriptw-runtime = { path = "../scriptw-runtime" }
 scriptw-front = { path = "../scriptw-front" }
 sha2 = "0.10.9"
-wasm-encoder = { version = "0.245.1", features = ["wasmparser"] }
+# Exact: `wasm_encoder::Instruction` is non-exhaustive, and the code sink's
+# i32 fact flow and GC-local write check (src/code_sink.rs,
+# src/code_sink/gc_local_writes.rs) list every control-transfer operator of
+# this version by hand. Any upgrade, even a compatible patch release, must
+# re-list them, since an unlisted operator is treated as straight-line code.
+wasm-encoder = { version = "=0.245.1", features = ["wasmparser"] }
 wasmparser = "0.245.1"
 
 [dev-dependencies]
