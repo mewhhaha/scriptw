@@ -1,3 +1,8 @@
+// The binary and examples link this library, so they share its allocator.
+#[cfg(feature = "jemalloc")]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 use std::cell::RefCell;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
