@@ -104,7 +104,8 @@ def check_report(raw, plan, inputs, support, samples, warmups, host_sha, native_
                                            'module_link_and_initialization_ns')}
     else:
         require(raw.get('schema') == 'scriptw-react-retained-baseline-v1'
-                and raw.get('status') == 'complete' and 'profiling' not in raw and 'artifact_dump' not in raw
+                and raw.get('status') == 'complete'
+                and not {'profiling', 'artifact_dump', 'precompiled_image'} & raw.keys()
                 and raw.get('case_selection') == case, 'incomplete, profiled or wrong Scriptw case')
         require(raw.get('executable_sha256') == host_sha and raw.get('native_mode') == native_mode,
                 'host identity/policy differs')

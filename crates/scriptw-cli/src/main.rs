@@ -43,6 +43,7 @@ mod fake_suite_publication;
 mod intl_data;
 mod jsonc;
 mod performance;
+mod precompile;
 mod status_publication;
 use fake_suite_publication::VerifiedFakeSuiteCounts;
 
@@ -187,6 +188,13 @@ Commands:
                                         is parsed as an ES module; `--module` forces the
                                         module goal for any other extension
   build wasm <file>                     compile JavaScript directly to Wasm
+  precompile [--policy speed|fast] [--module] <file> -o <image>
+                                        compile JavaScript to the embedding API's
+                                        precompiled native image (default policy:
+                                        speed; global --jobs sets compiler threads);
+                                        writes a read-only file by atomic rename.
+                                        Load it with PrecompiledEmbeddedProgram on
+                                        the same Scriptw build and CPU features
   cache status                          report bounded Scriptw caches and the
                                         legacy global Wasmtime cache
   cache prune [--legacy-wasmtime]       delete Scriptw caches; optionally delete
@@ -400,6 +408,9 @@ fn command_main(mut args: Vec<String>, stdout: OutputBuffer) -> Result<(), Strin
     }
     if command == "intl" {
         return intl_data::command(args.collect(), intl_profile);
+    }
+    if command == "precompile" {
+        return precompile::command(args.collect(), host_surface_policy);
     }
 
     let engine = Engine::new(

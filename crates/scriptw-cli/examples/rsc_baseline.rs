@@ -2,10 +2,10 @@
 //! Run under scripts/limited_verification.py. Inputs are the unmodified rsc.js
 //! bundle and Node-generated support.json from the existing React fixture driver.
 use scriptw_engine::{
-    configure_compilation_jobs, configure_wasm_runtime, CompilationJobs, CompileOptions,
-    CompilerIdentity, CompilerSourceRevision, EmbeddedEvaluation, EmbeddedInstance,
-    EmbeddedRuntime, Engine, ForeignValue, JsCompletion, JsPromiseState, JsValue,
-    NativeCompilationPolicy, RealmBuilder, WasmStoreState,
+    configure_compilation_jobs, configure_precompiled_wasm_runtime, configure_wasm_runtime,
+    CompilationJobs, CompileOptions, CompilerIdentity, CompilerSourceRevision, EmbeddedEvaluation,
+    EmbeddedInstance, EmbeddedRuntime, Engine, ForeignValue, JsCompletion, JsPromiseState, JsValue,
+    NativeCompilationPolicy, PrecompiledEmbeddedProgram, RealmBuilder, WasmStoreState,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -259,84 +259,176 @@ fn run() -> Result<Value> {
         CompilerSourceRevision::GitCommit(commit) => Some(commit.as_str()),
         CompilerSourceRevision::UnversionedArchive => None,
     };
-    // Scored cohorts compile serially. SCRIPTW_RSC_COMPILATION_JOBS selects an
-    // excluded parallel-compilation diagnostic, which benchmark-rsc.py refuses.
-    let jobs = configure_compilation_jobs(match std::env::var("SCRIPTW_RSC_COMPILATION_JOBS") {
-        Ok(value) => value
-            .parse::<std::num::NonZeroUsize>()
-            .map_err(|_| "SCRIPTW_RSC_COMPILATION_JOBS must be a positive integer")?
-            .get(),
-        Err(std::env::VarError::NotPresent) => 1,
-        Err(error) => return Err(error.into()),
-    })?;
-    let compiler = Engine::new(RealmBuilder::new().build());
-    let started = Instant::now();
-    let unit = compiler.compile_module(&source, CompileOptions::default())?;
-    let front_and_lower_ns = started.elapsed().as_nanos();
-    let started = Instant::now();
-    let artifact = compiler.emit_wasm(&unit)?;
-    let wasm_emission_ns = started.elapsed().as_nanos();
-    let artifact_directory = std::env::var_os("SCRIPTW_RSC_ARTIFACT_DIR").map(PathBuf::from);
-    if let Some(directory) = &artifact_directory {
-        fs::create_dir(directory)?;
-        fs::write(directory.join("program.wasm"), &artifact.bytes)?;
-        if let Some(runtime) = &artifact.runtime {
-            fs::write(directory.join("runtime.wasm"), runtime.bytes())?;
-        }
-        fs::write(
-            directory.join("portable.bundle"),
-            artifact.encode_portable_bundle(&scriptw_engine::IntlCompilationProfile::Minimal)?,
-        )?;
+    // Excluded diagnostic: load an image from `scriptw precompile` (of rsc.js
+    // plus WRAPPER) on a compiler-disabled Engine instead of compiling.
+    let precompiled_image = std::env::var_os("SCRIPTW_RSC_PRECOMPILED_IMAGE").map(PathBuf::from);
+    if precompiled_image.is_some()
+        && (profile.is_some() || std::env::var_os("SCRIPTW_RSC_ARTIFACT_DIR").is_some())
+    {
+        return Err("a precompiled image excludes profiling and artifact dumps".into());
     }
-    drop(unit);
-    drop(compiler);
-    let started = Instant::now();
-    let mut config = wasmtime::Config::new();
-    native_mode.configure(&mut config, jobs);
-    config.target(env!("SCRIPTW_PERF_TARGET"))?;
-    if profile.is_some() {
-        config.profiler(wasmtime::ProfilingStrategy::PerfMap);
-    }
-    let native = wasmtime::Engine::new(&config)?;
-    if let Some(directory) = &artifact_directory {
-        // The native images under this policy, for disassembly.
-        fs::write(
-            directory.join("program.cwasm"),
-            native.precompile_module(&artifact.bytes)?,
-        )?;
-        if let Some(runtime) = &artifact.runtime {
+    let load_started;
+    let mut phases = serde_json::Map::new();
+    let mut artifact_directory = None;
+    let (native, runtime, configuration, program_wasm, runtime_identity) = if let Some(path) =
+        &precompiled_image
+    {
+        load_started = Instant::now();
+        let bytes = fs::read(path)?;
+        // SAFETY: this diagnostic's operator supplies an unchanged image that
+        // this build's `scriptw precompile` produced.
+        let image = unsafe { PrecompiledEmbeddedProgram::from_bytes(&bytes) }?;
+        drop(bytes);
+        phases.insert(
+            "image_read_and_admission".into(),
+            json!(load_started.elapsed().as_nanos()),
+        );
+        let started = Instant::now();
+        let mut config = wasmtime::Config::new();
+        configure_precompiled_wasm_runtime(&mut config);
+        let native = wasmtime::Engine::new(&config)?;
+        phases.insert("engine_setup".into(), json!(started.elapsed().as_nanos()));
+        let started = Instant::now();
+        let runtime = EmbeddedRuntime::from_precompiled(&native, &image)?;
+        phases.insert(
+            "native_preparation".into(),
+            json!(started.elapsed().as_nanos()),
+        );
+        let configuration = json!({
+            "wasmtime":"47.0.0","precompiled_image":path,
+            "precompiled_image_sha256":hash(image.as_bytes()),
+            "precompiled_image_bytes":image.as_bytes().len(),
+            "native_policy":"chosen by scriptw precompile; native-mode names it",
+            "compiler_enabled":false,"target":native.get_target(),
+            "target_features_policy":"host-inferred features, as scriptw precompile used",
+            "collector":native.get_collector().map(|value|format!("{value:?}")),
+            "driver_worker_stack_bytes":WORKER_STACK_BYTES,
+            "store_limiter":"EmbeddedRuntime::new_state limits_mut",
+            "pending_deadline_ms":DEADLINE.as_millis(),
+        });
+        let runtime_identity = image.runtime_key().map(|key| {
+            json!({
+                "key":key.iter().map(|byte|format!("{byte:02x}")).collect::<String>(),
+            })
+        });
+        (
+            native,
+            runtime,
+            configuration,
+            image.program_wasm().to_vec(),
+            runtime_identity,
+        )
+    } else {
+        // Scored cohorts compile serially. SCRIPTW_RSC_COMPILATION_JOBS selects an
+        // excluded parallel-compilation diagnostic, which benchmark-rsc.py refuses.
+        let jobs =
+            configure_compilation_jobs(match std::env::var("SCRIPTW_RSC_COMPILATION_JOBS") {
+                Ok(value) => value
+                    .parse::<std::num::NonZeroUsize>()
+                    .map_err(|_| "SCRIPTW_RSC_COMPILATION_JOBS must be a positive integer")?
+                    .get(),
+                Err(std::env::VarError::NotPresent) => 1,
+                Err(error) => return Err(error.into()),
+            })?;
+        let compiler = Engine::new(RealmBuilder::new().build());
+        let started = Instant::now();
+        let unit = compiler.compile_module(&source, CompileOptions::default())?;
+        let front_and_lower_ns = started.elapsed().as_nanos();
+        let started = Instant::now();
+        let artifact = compiler.emit_wasm(&unit)?;
+        let wasm_emission_ns = started.elapsed().as_nanos();
+        artifact_directory = std::env::var_os("SCRIPTW_RSC_ARTIFACT_DIR").map(PathBuf::from);
+        if let Some(directory) = &artifact_directory {
+            fs::create_dir(directory)?;
+            fs::write(directory.join("program.wasm"), &artifact.bytes)?;
+            if let Some(runtime) = &artifact.runtime {
+                fs::write(directory.join("runtime.wasm"), runtime.bytes())?;
+            }
             fs::write(
-                directory.join("runtime.cwasm"),
-                native.precompile_module(runtime.bytes())?,
+                directory.join("portable.bundle"),
+                artifact
+                    .encode_portable_bundle(&scriptw_engine::IntlCompilationProfile::Minimal)?,
             )?;
         }
-    }
-    let engine_setup_ns = started.elapsed().as_nanos();
-    let configuration = json!({
-        "wasmtime":"47.0.0",
-        "compilation_jobs":scriptw_engine::configured_compilation_jobs(),
-        "cranelift_opt_level":native.get_cranelift_opt_level().map(|value|format!("{value:?}")),
-        "native_parallel_compilation":native.get_parallel_compilation(),
-        "register_allocation":native.get_cranelift_regalloc_algorithm().map(|value|format!("{value:?}")),
-        "native_inlining":format!("{:?}", native.get_compiler_inlining()),
-        "native_inlining_requested_flags":native.get_cranelift_flags_set()
-            .filter(|(name, _)| name.starts_with("wasmtime_inlining_"))
-            .collect::<std::collections::BTreeMap<_, _>>(),
-        "target":native.get_target(),
-        "target_features_policy":"explicit Config::target disables host-inferred feature flags",
-        "collector":native.get_collector().map(|value|format!("{value:?}")),
-        "gc_initial_bytes":native.get_gc_heap_initial_size(),
-        "gc_reservation_bytes":native.get_gc_heap_reservation(),
-        "gc_guard_bytes":native.get_gc_heap_guard_size(),
-        "gc_heap_may_move":native.get_gc_heap_may_move(),
-        "max_wasm_stack_bytes":native.get_max_wasm_stack(),
-        "wasmtime_async_stack_bytes":native.get_async_stack_size(),
-        "driver_worker_stack_bytes":WORKER_STACK_BYTES,
-        "store_limiter":"EmbeddedRuntime::new_state limits_mut",
-        "epoch_interruption":native.get_epoch_interruption(),
-        "pending_deadline_ms":DEADLINE.as_millis(),
-    });
+        drop(unit);
+        drop(compiler);
+        // An embedder that compiles at boot starts here, with the artifact.
+        load_started = Instant::now();
+        let started = load_started;
+        let mut config = wasmtime::Config::new();
+        native_mode.configure(&mut config, jobs);
+        config.target(env!("SCRIPTW_PERF_TARGET"))?;
+        if profile.is_some() {
+            config.profiler(wasmtime::ProfilingStrategy::PerfMap);
+        }
+        let native = wasmtime::Engine::new(&config)?;
+        if let Some(directory) = &artifact_directory {
+            // The native images under this policy, for disassembly.
+            fs::write(
+                directory.join("program.cwasm"),
+                native.precompile_module(&artifact.bytes)?,
+            )?;
+            if let Some(runtime) = &artifact.runtime {
+                fs::write(
+                    directory.join("runtime.cwasm"),
+                    native.precompile_module(runtime.bytes())?,
+                )?;
+            }
+        }
+        let engine_setup_ns = started.elapsed().as_nanos();
+        let configuration = json!({
+            "wasmtime":"47.0.0",
+            "compilation_jobs":scriptw_engine::configured_compilation_jobs(),
+            "cranelift_opt_level":native.get_cranelift_opt_level().map(|value|format!("{value:?}")),
+            "native_parallel_compilation":native.get_parallel_compilation(),
+            "register_allocation":native.get_cranelift_regalloc_algorithm().map(|value|format!("{value:?}")),
+            "native_inlining":format!("{:?}", native.get_compiler_inlining()),
+            "native_inlining_requested_flags":native.get_cranelift_flags_set()
+                .filter(|(name, _)| name.starts_with("wasmtime_inlining_"))
+                .collect::<std::collections::BTreeMap<_, _>>(),
+            "target":native.get_target(),
+            "target_features_policy":"explicit Config::target disables host-inferred feature flags",
+            "collector":native.get_collector().map(|value|format!("{value:?}")),
+            "gc_initial_bytes":native.get_gc_heap_initial_size(),
+            "gc_reservation_bytes":native.get_gc_heap_reservation(),
+            "gc_guard_bytes":native.get_gc_heap_guard_size(),
+            "gc_heap_may_move":native.get_gc_heap_may_move(),
+            "max_wasm_stack_bytes":native.get_max_wasm_stack(),
+            "wasmtime_async_stack_bytes":native.get_async_stack_size(),
+            "driver_worker_stack_bytes":WORKER_STACK_BYTES,
+            "store_limiter":"EmbeddedRuntime::new_state limits_mut",
+            "epoch_interruption":native.get_epoch_interruption(),
+            "pending_deadline_ms":DEADLINE.as_millis(),
+        });
+        phases.insert("front_and_lower".into(), json!(front_and_lower_ns));
+        phases.insert("wasm_emission".into(), json!(wasm_emission_ns));
+        phases.insert(
+            "source_to_wasm".into(),
+            json!(front_and_lower_ns + wasm_emission_ns),
+        );
+        phases.insert("engine_setup".into(), json!(engine_setup_ns));
+        let started = Instant::now();
+        let runtime = EmbeddedRuntime::compile(&native, &artifact)?;
+        phases.insert(
+            "native_preparation".into(),
+            json!(started.elapsed().as_nanos()),
+        );
+        let runtime_identity = artifact.runtime.as_ref().map(|runtime| json!({
+            "key":runtime.key().as_bytes().iter().map(|byte|format!("{byte:02x}")).collect::<String>(),
+            "wasm_sha256":hash(runtime.bytes()),"wasm_bytes":runtime.bytes().len(),
+        }));
+        (
+            native,
+            runtime,
+            configuration,
+            artifact.bytes,
+            runtime_identity,
+        )
+    };
     let native_mode_scope = match native_mode {
+        _ if precompiled_image.is_some() => {
+            "excluded precompiled-image diagnostic; keep separate from compiling cohorts"
+        }
         NativeMode::Fast => "matched Fast cohort",
         NativeMode::Speed => {
             "unscored Speed/Backtracking diagnostic; keep separate from Fast cohort"
@@ -346,20 +438,23 @@ fn run() -> Result<Value> {
         }
     };
     let started = Instant::now();
-    let runtime = EmbeddedRuntime::compile(&native, &artifact)?;
-    let native_preparation_ns = started.elapsed().as_nanos();
-    let started = Instant::now();
     let state = runtime.new_state(RealmBuilder::new().build(), ())?;
     let mut store = wasmtime::Store::new(&native, state);
     store.limiter(|state| state.limits_mut());
     let mut linker = wasmtime::Linker::<WasmStoreState>::new(&native);
     runtime.register(&mut store, &mut linker)?;
     let mut instance = runtime.instantiate(&mut store, &mut linker)?;
-    let realm_and_instantiation_ns = started.elapsed().as_nanos();
+    phases.insert(
+        "realm_and_instantiation".into(),
+        json!(started.elapsed().as_nanos()),
+    );
     let started = Instant::now();
     let evaluation = instance.initialize(&mut store)?;
     initialized(&instance, &mut store, evaluation)?;
-    let module_initialization_ns = started.elapsed().as_nanos();
+    phases.insert(
+        "module_initialization".into(),
+        json!(started.elapsed().as_nanos()),
+    );
     if !instance.take_output(&mut store)?.is_empty() {
         return Err(
             "bundle initialization emitted output; use rsc.js without capability autorun".into(),
@@ -368,6 +463,9 @@ fn run() -> Result<Value> {
     let run = normal(instance.get_export(&mut store, "run")?)?;
     let encode = normal(instance.get_export(&mut store, "encode")?)?;
     let mut cases = Vec::new();
+    // Load (an image, or an emitted artifact to compile) through the end of
+    // the first checked request, warm-up or not.
+    let mut load_to_first_request_ns = None;
     for mode in ["sync", "async"] {
         if profile.as_ref().is_some_and(|profile| profile.mode != mode) {
             continue;
@@ -395,6 +493,7 @@ fn run() -> Result<Value> {
             let started = Instant::now();
             let value = flight(&instance, &mut store, &run, &argument)?;
             let elapsed_ns = started.elapsed().as_nanos();
+            load_to_first_request_ns.get_or_insert_with(|| load_started.elapsed().as_nanos());
             if index >= warmups {
                 if let Some(profile) = &mut profile {
                     profile.exchange("done", index)?;
@@ -436,10 +535,6 @@ fn run() -> Result<Value> {
             "exact_node_output_checked":true,"expected_json_sha256":hash(expected.as_bytes()),
             "expected_json_bytes":expected.len()}));
     }
-    let runtime_identity = artifact.runtime.as_ref().map(|runtime| json!({
-        "key":runtime.key().as_bytes().iter().map(|byte|format!("{byte:02x}")).collect::<String>(),
-        "wasm_sha256":hash(runtime.bytes()),"wasm_bytes":runtime.bytes().len(),
-    }));
     let mut report = json!({
         "schema":"scriptw-react-retained-baseline-v1","status":"complete",
         "scope":"one process and one retained Realm/module; diagnostic, not a statistical comparison",
@@ -459,12 +554,10 @@ fn run() -> Result<Value> {
             "source_bytes":original.len(),"wrapper":WRAPPER,"adapted_source_sha256":hash(source.as_bytes()),
             "adapted_source_bytes":source.len(),"support":support_path,"support_sha256":hash(&support_bytes),
             "versions":support["versions"]},
-        "program_wasm_sha256":hash(&artifact.bytes),"program_wasm_bytes":artifact.bytes.len(),
+        "program_wasm_sha256":hash(&program_wasm),"program_wasm_bytes":program_wasm.len(),
         "runtime":runtime_identity,
-        "phases_ns":{"front_and_lower":front_and_lower_ns,"wasm_emission":wasm_emission_ns,
-            "source_to_wasm":front_and_lower_ns+wasm_emission_ns,"engine_setup":engine_setup_ns,
-            "native_preparation":native_preparation_ns,"realm_and_instantiation":realm_and_instantiation_ns,
-            "module_initialization":module_initialization_ns},
+        "phases_ns":phases,
+        "load_to_first_request_ns":load_to_first_request_ns,
         "cases":cases,
     });
     if let Some(profile) = profile {
@@ -473,6 +566,11 @@ fn run() -> Result<Value> {
             "protocol":"SWRSC1","mode":profile.mode,"nonce":profile.nonce,
             "windows":samples,"warmups_excluded":warmups,
             "scope":"flight() only; setup, warmups and output validation outside every window",
+        });
+    }
+    if let Some(path) = precompiled_image {
+        report["precompiled_image"] = json!({
+            "path":path,"excluded_from_scored_cohorts":true,
         });
     }
     if let Some(directory) = artifact_directory {

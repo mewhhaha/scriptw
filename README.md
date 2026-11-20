@@ -19,6 +19,9 @@ Rust applications can [embed Scriptw](docs/rust-rewrite/contracts/foreign-module
 in their own Wasmtime Engine, Store and Linker, with synchronous and async host functions.
 They compile on a bounded pool of `CompilationJobs`, two by default, which nearly
 halves native preparation for about 110–160 MiB more peak memory on the RSC bundle.
+For production, precompile first: `scriptw precompile app.mjs -o app.swep` writes the
+native image once, and servers load it without a compiler; it needs the same Scriptw
+build and CPU features ([flow](docs/rust-rewrite/contracts/foreign-modules.md#precompiled-execution)).
 
 ## Benchmarks
 

@@ -134,3 +134,98 @@ fn execution_gate_rejects_wrong_results_extra_output_and_oracle_fallback() {
     assert!(!execution_matches(false, &valid, expected));
     assert!(!execution_matches(true, WASM_COMPLETION, ""));
 }
+
+/// Precompile-first deployment: `scriptw precompile` writes the image, and the
+/// embedding API's compiler-disabled precompiled path loads and runs it.
+#[test]
+fn a_cli_precompiled_image_runs_through_the_embedding_precompiled_path() {
+    use scriptw_engine::{
+        configure_precompiled_wasm_runtime, EmbeddedEvaluation, EmbeddedRuntime, HostOutputEvent,
+        JsCompletion, PrecompiledEmbeddedProgram, RealmBuilder,
+    };
+    let directory = Directory::new();
+    let source = directory.0.join("app.mjs");
+    fs::write(
+        &source,
+        "const parts = ['precompiled', 'image'];\n\
+         export const label = parts.join(' ');\n\
+         export function area(width, height) { return width * height; }\n\
+         print(`${label}: ${area(6, 7)}`);\n",
+    )
+    .expect("fixture source should be written");
+    let image = directory.0.join("app.swep");
+    let mut published = None;
+    // A second run replaces the first image atomically.
+    for _ in 0..2 {
+        let output = Command::new(env!("CARGO_BIN_EXE_scriptw"))
+            .args(["--jobs", "1", "precompile", "--policy", "fast"])
+            .arg(&source)
+            .arg("-o")
+            .arg(&image)
+            .env("SCRIPTW_CACHE_DIR", directory.0.join("cache"))
+            .stdin(Stdio::null())
+            .output()
+            .expect("the CLI starts");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success() && stdout.contains("precompiled image:"),
+            "status {}\nstdout: {stdout}\nstderr: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let bytes = fs::read(&image).expect("the image is published");
+        assert_eq!(published.get_or_insert_with(|| bytes.clone()), &bytes);
+    }
+    let permissions = fs::metadata(&image).unwrap().permissions();
+    assert!(permissions.readonly());
+    #[cfg(unix)]
+    assert_eq!(
+        std::os::unix::fs::PermissionsExt::mode(&permissions) & 0o777,
+        0o444
+    );
+    let mut names: Vec<_> = fs::read_dir(&directory.0)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort();
+    assert_eq!(
+        names,
+        ["app.mjs", "app.swep", "cache"],
+        "no transaction remains"
+    );
+
+    // SAFETY: this test's own CLI build produced the unchanged image.
+    let program = unsafe { PrecompiledEmbeddedProgram::from_bytes(&published.unwrap()) }
+        .expect("the same build admits its image");
+    let mut config = wasmtime::Config::new();
+    configure_precompiled_wasm_runtime(&mut config);
+    let engine = wasmtime::Engine::new(&config).unwrap();
+    let runtime = EmbeddedRuntime::from_precompiled(&engine, &program).unwrap();
+    let mut store = wasmtime::Store::new(
+        &engine,
+        runtime.new_state(RealmBuilder::new().build(), ()).unwrap(),
+    );
+    store.limiter(|state| state.limits_mut());
+    let mut linker = wasmtime::Linker::new(&engine);
+    runtime.register(&mut store, &mut linker).unwrap();
+    let mut instance = runtime.instantiate(&mut store, &mut linker).unwrap();
+    match instance.initialize(&mut store).unwrap() {
+        EmbeddedEvaluation::Settled(JsCompletion::Normal(_)) => {}
+        EmbeddedEvaluation::Settled(JsCompletion::Throw(value)) => {
+            panic!("entry threw: {value:?}")
+        }
+        EmbeddedEvaluation::Pending => panic!("a synchronous module settles at entry"),
+    }
+    assert_eq!(
+        instance.take_output(&mut store).unwrap(),
+        [HostOutputEvent::PrintLine("precompiled image: 42".into())]
+    );
+    let label = match instance.get_export(&mut store, "label").unwrap() {
+        JsCompletion::Normal(value) => value,
+        JsCompletion::Throw(value) => panic!("label threw: {value:?}"),
+    };
+    assert_eq!(
+        String::from_utf16(&label.to_utf16(&mut store).unwrap()).unwrap(),
+        "precompiled image"
+    );
+}

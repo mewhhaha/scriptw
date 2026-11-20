@@ -81,6 +81,36 @@ detect damage; they do not establish native-code provenance.
 Configure a fresh Wasmtime Engine with `configure_precompiled_wasm_runtime`,
 then attach the admitted image using `EmbeddedRuntime::from_precompiled`.
 
+**Precompile first in production.** Compiling at boot spends seconds of
+Cranelift time and the compiler's peak memory in every server process; a
+precompiled image moves both to deployment. Produce the image once with the
+same Scriptw build the server links:
+
+```sh
+scriptw [--jobs N] precompile [--policy speed|fast] [--module] app.mjs -o app.swep
+```
+
+It compiles the JavaScript to Portable Wasm and calls `EmbeddedRuntime::precompile`
+on an Engine from `configure_wasm_runtime` (default policy `speed`; `.mjs` or
+`--module` selects the module goal, as for `run`). It writes a synced temporary
+sibling with mode 0444 and renames it over the output, so a reader sees the old
+or the complete new image, never a partial one. The server reads the file, calls
+the unsafe `PrecompiledEmbeddedProgram::from_bytes`, configures its Engine with
+`configure_precompiled_wasm_runtime` and calls `EmbeddedRuntime::from_precompiled`;
+it needs no JavaScript or Wasm compiler. An image loads only under the same
+Scriptw build: the Cargo Minimal Portable runtime key, the compiler source
+fingerprint and the Wasmtime configuration must match, and the server's CPU must
+support every CPU feature the producing host enabled (produce on the deployment
+CPU type). Minimal Intl is required. Loading stays `unsafe`: the SHA-256 and
+framing checks detect damage, not tampering, so let only the deployment principal
+write the image and the server principal only read it.
+
+On the RSC bundle (`rsc_baseline`, two CPUs, medians of three), loading a Speed
+image and serving the first request took 0.142 s and peaked at 45 MiB, against
+7.47 s and 259 MiB when the process compiled the emitted Wasm at boot with one
+job; under Fast, 0.189 s and 74 MiB against 4.61 s and 248 MiB. Precompiling
+the Speed image took 4.9 s with two jobs and produced 16.5 MB.
+
 The opaque precompiled owner reuses its actual producer's successful Wasm body
 validation. Recovery from external bytes is unsafe and requires the unchanged
 precompile output with exact raw/native correspondence; checksums alone do not

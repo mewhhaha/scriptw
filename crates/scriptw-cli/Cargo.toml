@@ -11,6 +11,9 @@ scriptw-test262 = { path = "../scriptw-test262" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10.9"
+# The embedder-owned Engine that `scriptw precompile` configures; the engine
+# crate already enables these and further features.
+wasmtime = { version = "=47.0.0", default-features = false, features = ["cranelift", "runtime", "std"] }
 
 [features]
 # Benchmark examples only; absent from default product builds.
@@ -37,7 +40,6 @@ name = "compiler_precompiled_baseline"
 test = true
 
 [dev-dependencies]
-wasmtime = { version = "=47.0.0", default-features = false, features = ["cranelift", "runtime", "std"] }
 wasmtime-wasi = { version = "=47.0.0", default-features = false, features = ["p1"] }
 
 # Contains audited unsafe code, so it cannot inherit the workspace
