@@ -1,31 +1,107 @@
 #!/usr/bin/env bash
 # One run reports every finding. `errexit` is deliberately off: a rule that hits
 # a missing file or a failing helper must not end the run before the thousands of
-# rule lines after it execute. Instead the ERR trap below records every command
-# failure that `set -e` would have aborted on (same condition rules: `if`,
-# `while`, `!`, `&&`/`||` heads and non-final pipeline stages stay exempt) as a
-# finding, so nothing that used to fail the guard can pass it now.
+# rule lines after it execute. Instead the ERR trap below records each command
+# failure that `set -e` would have aborted on as one finding, and the run goes on.
+#
+# - The trap is exempt where errexit is: the conditions of `if`, `while` and
+#   `until`, commands negated by `!`, and every command of an `&&`/`||` list but
+#   the last. Under `pipefail` a pipeline fails when any of its stages fails, so
+#   a failing non-final stage is a finding, as it was under `set -eo pipefail`.
+# - `set -E` (errtrace) carries the trap into functions, `( ... )` groups,
+#   pipeline stages such as a `| while` body, process substitutions and command
+#   substitutions. A failure in any of these subshells is recorded in the shared
+#   log, and the subshell then exits 0, so its parent does not record the same
+#   failure a second time. This is stricter than errexit in one place: errexit
+#   ignores a failure inside `$( ... )` unless it decides the status of a plain
+#   assignment, while the trap records it.
+# - A function or sourced file whose last command fails returns that status to
+#   its call site, where the trap fires again for the same failure; that repeat
+#   is recognised by its call site and not recorded.
+# - The guard fails closed. A finding log that cannot be created or written ends
+#   the run with status 2. A count rule whose file is missing, or whose count is
+#   not a number, is a finding. A run that ends before the last rule (an unbound
+#   variable under `set -u`, a signal) reports how far it got and never prints ok.
+#
+# scripts/tests/check-module-boundaries-harness.sh runs each of these cases.
 set -uo pipefail
 set -E
 
 # Findings are appended to a log, so a `fail` from any subshell still counts.
-failure_log="$(mktemp)"
-trap 'rm -f "$failure_log"' EXIT
+if ! failure_log="$(mktemp)" || [ ! -f "$failure_log" ] || [ ! -w "$failure_log" ]; then
+  printf 'check-module-boundaries: cannot create the finding log; no rule ran\n' >&2
+  exit 2
+fi
+run_complete=0
+finish() {
+  local status=$? recorded
+  trap - ERR
+  if [ "$run_complete" != 1 ]; then
+    recorded="$(wc -l 2>/dev/null < "$failure_log" | tr -d '[:space:]')" || true
+    printf 'check-module-boundaries: run ended early with status %s after %s recorded findings; later rules did not run\n' \
+      "$status" "${recorded:-an unknown number of}" >&2 || true
+    # 1 means "every rule ran and found something"; an unfinished run is 2.
+    if [ "$status" -lt 2 ]; then
+      status=2
+    fi
+  fi
+  rm -f "$failure_log"
+  exit "$status"
+}
+trap finish EXIT
 
 fail() {
-  printf 'check-module-boundaries: %s\n' "$*" >&2
-  printf 'finding\n' >> "$failure_log"
-}
-
-# Only the main shell's failures are findings, matching errexit, which command
-# substitutions do not inherit: `$(a; b)` tolerates a failing `a` and the
-# assignment that consumes it fails (and is recorded) when `b` fails.
-command_failed() {
-  if [ "$BASHPID" = "$$" ]; then
-    fail "command failed with status $1 at $2:$3: $4"
+  printf 'check-module-boundaries: %s\n' "$*" >&2 || true
+  if ! printf 'finding\n' >> "$failure_log"; then
+    printf 'check-module-boundaries: cannot record a finding in %s; aborting\n' "$failure_log" >&2 || true
+    # A subshell cannot end the run by exiting, so it stops the main shell.
+    if [ "$BASHPID" != "$$" ]; then
+      kill -s TERM "$$"
+    fi
+    exit 2
   fi
 }
-trap 'command_failed "$?" "${BASH_SOURCE[0]:-$0}" "$LINENO" "$BASH_COMMAND"' ERR
+
+# Call site of the frame that returned the last recorded failure, as
+# "<frame depth> <status> <source>:<line>". The trap that fires there for the
+# same status is that failure returning, not a new one.
+returning_failure=''
+command_failed() {
+  local status="$1" command="$2" line="$3"
+  # Frames below this handler; the handler runs in the frame that failed.
+  local depth=$((${#FUNCNAME[@]} - 1))
+  local site="${BASH_SOURCE[1]:-$0}:$line"
+  if [ "$BASHPID" != "$$" ]; then
+    fail "command failed with status $status at $site: $command"
+    exit 0
+  fi
+  local repeat=0
+  if [ "$returning_failure" = "$depth $status $site" ]; then
+    repeat=1
+  fi
+  returning_failure="$((depth - 1)) $status ${BASH_SOURCE[2]:-$0}:${BASH_LINENO[1]:-0}"
+  if [ "$repeat" = 0 ]; then
+    fail "command failed with status $status at $site: $command"
+  fi
+}
+trap 'command_failed "$?" "$BASH_COMMAND" "$LINENO"' ERR
+
+# Succeeds only for a decimal count, so an empty or garbled count (a missing
+# file, a failed reader) can never satisfy a rule.
+is_count() {
+  case "$1" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+}
+
+# Records a finding and fails when a rule's input file is missing.
+rule_input_file() {
+  if [ -f "$1" ]; then
+    return 0
+  fi
+  fail "missing file: $1 (needed by: $2)"
+  return 1
+}
 
 # Records the finding and returns 0: later rules still run. A caller that must
 # skip work for a missing file tests `[ -f ]` itself.
@@ -57,9 +133,10 @@ require_fixed_string_count() {
   needle="$2"
   expected="$3"
   description="$4"
-  count="$(grep -Fc "$needle" "$file" || true)"
-  if [ "$count" -ne "$expected" ]; then
-    fail "$file must contain $expected $description sites (found $count)"
+  rule_input_file "$file" "$expected $description sites" || return 0
+  count="$(grep -Fc -e "$needle" "$file" || true)"
+  if ! is_count "$count" || [ "$count" -ne "$expected" ]; then
+    fail "$file must contain $expected $description sites (found ${count:-no count})"
   fi
 }
 
@@ -77,9 +154,10 @@ require_exact_line_count() {
   line="$2"
   expected="$3"
   description="$4"
-  count="$(grep -Fxc "$line" "$file" || true)"
-  if [ "$count" -ne "$expected" ]; then
-    fail "$file must contain $expected exact $description lines (found $count)"
+  rule_input_file "$file" "$expected exact $description lines" || return 0
+  count="$(grep -Fxc -e "$line" "$file" || true)"
+  if ! is_count "$count" || [ "$count" -ne "$expected" ]; then
+    fail "$file must contain $expected exact $description lines (found ${count:-no count})"
   fi
 }
 
@@ -88,9 +166,10 @@ require_regex_count() {
   pattern="$2"
   expected="$3"
   description="$4"
-  count="$(grep -Ec "$pattern" "$file" || true)"
-  if [ "$count" -ne "$expected" ]; then
-    fail "$file must contain $expected $description lines (found $count)"
+  rule_input_file "$file" "$expected $description lines" || return 0
+  count="$(grep -Ec -e "$pattern" "$file" || true)"
+  if ! is_count "$count" || [ "$count" -ne "$expected" ]; then
+    fail "$file must contain $expected $description lines (found ${count:-no count})"
   fi
 }
 
@@ -99,9 +178,10 @@ require_text_regex_count() {
   pattern="$2"
   expected="$3"
   description="$4"
-  count="$(printf '%s\n' "$text" | grep -Ec "$pattern" || true)"
-  if [ "$count" -ne "$expected" ]; then
-    fail "text must contain $expected $description lines (found $count)"
+  # `|| true` covers grep's no-match status; pipefail would fail the pipeline.
+  count="$(printf '%s\n' "$text" | grep -Ec -e "$pattern" || true)"
+  if ! is_count "$count" || [ "$count" -ne "$expected" ]; then
+    fail "text must contain $expected $description lines (found ${count:-no count})"
   fi
 }
 
@@ -110,9 +190,14 @@ require_tree_regex_count() {
   pattern="$2"
   expected="$3"
   description="$4"
-  count="$({ grep -RhE --include='*.rs' "$pattern" "$root" || true; } | wc -l | tr -d '[:space:]')"
-  if [ "$count" -ne "$expected" ]; then
-    fail "$root must contain $expected $description declarations (found $count)"
+  if [ ! -e "$root" ]; then
+    fail "missing tree: $root (needed by: $expected $description declarations)"
+    return 0
+  fi
+  # grep exits 1 for no match and 2 for an error; only no match is a count.
+  count="$({ grep -RhE --include='*.rs' -e "$pattern" "$root" || [ "$?" -eq 1 ]; } | wc -l | tr -d '[:space:]')"
+  if ! is_count "$count" || [ "$count" -ne "$expected" ]; then
+    fail "$root must contain $expected $description declarations (found ${count:-no count})"
   fi
 }
 
@@ -189,8 +274,9 @@ non_test_lines() {
 check_orchestration_surface() {
   file="$1"
   max_lines="$2"
+  rule_input_file "$file" "a budget of $max_lines non-test code lines" || return 0
   lines="$(non_test_lines "$file")"
-  if [ "$lines" -gt "$max_lines" ]; then
+  if ! is_count "$lines" || [ "$lines" -gt "$max_lines" ]; then
     fail "$file has $lines non-test code lines; expected at most $max_lines"
   fi
 }
@@ -241,8 +327,9 @@ check_registered_module_source_test_child() {
 check_raw_line_budget() {
   file="$1"
   max_lines="$2"
-  lines="$(wc -l < "$file")"
-  if [ "$lines" -gt "$max_lines" ]; then
+  rule_input_file "$file" "a budget of $max_lines raw lines" || return 0
+  lines="$(wc -l < "$file" | tr -d '[:space:]')"
+  if ! is_count "$lines" || [ "$lines" -gt "$max_lines" ]; then
     fail "$file has $lines raw lines; expected at most $max_lines"
   fi
 }
@@ -280,8 +367,19 @@ source "$module_guard_dir/regexp-objects.sh"
 source "$module_guard_dir/intl.sh"
 source "$module_guard_dir/native-source.sh"
 
-failures="$(wc -l < "$failure_log" | tr -d '[:space:]')"
-if [ "$failures" -ne 0 ]; then
+# Every rule ran. From here on only a readable, numeric zero count is a pass.
+trap - ERR
+run_complete=1
+if ! failures="$(wc -l < "$failure_log")"; then
+  printf 'check-module-boundaries: cannot read the finding log; failing closed\n' >&2
+  exit 2
+fi
+failures="${failures//[[:space:]]/}"
+if ! is_count "$failures"; then
+  printf 'check-module-boundaries: finding count is not a number (%s); failing closed\n' "$failures" >&2
+  exit 2
+fi
+if [ "$failures" != 0 ]; then
   printf 'check-module-boundaries: %s findings\n' "$failures" >&2
   exit 1
 fi

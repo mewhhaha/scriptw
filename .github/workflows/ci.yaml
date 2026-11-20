@@ -27,6 +27,9 @@ jobs:
       - name: Test Test262 shortcut scanner
         run: ./scripts/tests/audit-test262-shortcut-scanner.sh
 
+      - name: Test module-boundary guard harness
+        run: ./scripts/tests/check-module-boundaries-harness.sh
+
       - name: Check module boundaries
         run: ./scripts/check-module-boundaries.sh
 
