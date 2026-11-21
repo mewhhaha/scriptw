@@ -156,7 +156,7 @@ impl<R> Tokenizer<R> for RegexLiteral {
             // once per group and, with the `v` flag, per nested class; deeper
             // patterns are a SyntaxError rather than a native stack overflow.
             if pattern_nesting_exceeds(
-                &body,
+                body.iter().copied(),
                 flags.contains(RegExpFlags::UNICODE_SETS),
                 MAX_PATTERN_NESTING_DEPTH,
             ) {
@@ -203,14 +203,21 @@ impl<R> Tokenizer<R> for RegexLiteral {
 /// 10,000 nested groups and reports a SyntaxError for 20,000.
 pub const MAX_PATTERN_NESTING_DEPTH: usize = 1000;
 
-/// Scriptw: whether `body` nests groups (or `v`-mode classes) more than `limit`
-/// deep, scanning escapes and classes the way the pattern grammar does. It only
-/// over-counts parentheses inside a class in `v` mode, where a nested class
-/// starts with `[` and a parenthesis is a syntax error anyway.
-fn pattern_nesting_exceeds(body: &[u32], unicode_sets: bool, limit: usize) -> bool {
+/// Scriptw: whether the pattern `body` (its code points, or the bytes of its
+/// UTF-8 or WTF-8 encoding, whose ASCII bytes are its ASCII code points) nests
+/// groups (or `v`-mode classes) more than `limit` deep, scanning escapes and
+/// classes the way the pattern grammar does. It only over-counts parentheses
+/// inside a class in `v` mode, where a nested class starts with `[` and a
+/// parenthesis is a syntax error anyway. Scriptw's own pattern compiler
+/// applies the same scan to every pattern it is given.
+pub fn pattern_nesting_exceeds(
+    body: impl IntoIterator<Item = u32>,
+    unicode_sets: bool,
+    limit: usize,
+) -> bool {
     let mut depth = 0usize;
     let mut classes = 0usize;
-    let mut code_points = body.iter().copied();
+    let mut code_points = body.into_iter();
     while let Some(cp) = code_points.next() {
         match char::from_u32(cp) {
             Some('\\') => {

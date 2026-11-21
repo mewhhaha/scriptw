@@ -568,6 +568,21 @@ pub const MAX_SOURCE_NESTING_DEPTH: u32 = boa_parser::parser::MAX_NESTING_DEPTH;
 /// expression literal may have; deeper is a SyntaxError.
 pub const MAX_REGEXP_NESTING_DEPTH: usize = boa_parser::lexer::regex::MAX_PATTERN_NESTING_DEPTH;
 
+/// Whether a regular expression pattern nests groups (or, with `unicode_sets`,
+/// classes) more than [`MAX_REGEXP_NESTING_DEPTH`] deep; `pattern` is its code
+/// points or the bytes of its UTF-8 or WTF-8 encoding. This is the literal
+/// scan the lexer applies before it validates a literal.
+pub fn regexp_pattern_nesting_exceeds(
+    pattern: impl IntoIterator<Item = u32>,
+    unicode_sets: bool,
+) -> bool {
+    boa_parser::lexer::regex::pattern_nesting_exceeds(
+        pattern,
+        unicode_sets,
+        MAX_REGEXP_NESTING_DEPTH,
+    )
+}
+
 pub fn parse(
     source_text: impl Into<String>,
     options: ParseOptions,

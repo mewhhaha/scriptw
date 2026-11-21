@@ -1101,6 +1101,25 @@ fn parse_pattern(
         });
     }
 
+    // The parser recurses once per group and, in `v` mode, once per nested
+    // class. A literal deeper than the front end's pattern limit is already a
+    // SyntaxError. A pattern reaching here any other way (the string argument
+    // of a statically compiled `RegExp` call, or the runtime candidate table's
+    // string literals) is refused by the same scan instead of overflowing the
+    // native stack, and is left to the runtime compiler, which keeps its
+    // frames on the heap.
+    if scriptw_front::regexp_pattern_nesting_exceeds(
+        pattern.iter().map(|&byte| u32::from(byte)),
+        matches!(unicode_mode, RegExpUnicodeMode::UnicodeSets),
+    ) {
+        return Err(RegExpCompileError::unsupported_feature(
+            0,
+            format!(
+                "groups and classes nest more than the implementation limit of {} levels",
+                scriptw_front::MAX_REGEXP_NESTING_DEPTH
+            ),
+        ));
+    }
     let (total_capture_count, has_named_capture_syntax) = regexp_capture_syntax(pattern);
     let mut parser = PatternParser {
         bytes: pattern,
@@ -1174,19 +1193,6 @@ impl PatternParser<'_> {
         &mut self,
         opening: Option<usize>,
     ) -> Result<Vec<Vec<ParsedTerm>>, RegExpCompileError> {
-        // The parser recurses once per group. A literal deeper than the
-        // front end's pattern limit is already a SyntaxError; a pattern string
-        // reaching here another way is refused rather than overflowing the
-        // native stack.
-        if self.choice_path.len() > scriptw_front::MAX_REGEXP_NESTING_DEPTH {
-            return Err(RegExpCompileError::unsupported_feature(
-                opening.unwrap_or(self.offset),
-                format!(
-                    "groups nest more than the implementation limit of {} levels",
-                    scriptw_front::MAX_REGEXP_NESTING_DEPTH
-                ),
-            ));
-        }
         let choice_id = self.choice_count;
         self.choice_count += 1;
         self.choice_path.push((choice_id, 0));

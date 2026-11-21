@@ -345,3 +345,31 @@ fn does_not_fold_stateful_regexp_literal_exec_or_test() {
     };
     assert_literal_regexp_call(test, "a", "g", "test", "a");
 }
+
+// The pattern parser recurses once per group and, with the `v` flag, once per
+// nested class. Every pattern it is given is scanned first, so one nesting
+// deeper than the literal limit is refused, as unsupported here and left to
+// the runtime compiler, whatever its source: a literal (already a SyntaxError
+// in the front end), a `RegExp` call's string argument or a string literal of
+// the runtime candidate table.
+#[test]
+fn regexp_patterns_nesting_past_the_limit_are_refused_before_parsing() {
+    let nested = |open: &str, close: &str, depth: usize| {
+        format!("{}a{}", open.repeat(depth), close.repeat(depth))
+    };
+    for (pattern, flags) in [
+        (nested("[", "]", 100_000), "v"),
+        (nested("(", ")", 100_000), ""),
+        (nested("(?:", ")", 100_000), "u"),
+        (nested("[(", ")]", 60_000), "v"),
+    ] {
+        let error = RegExpProgram::compile(&pattern, flags).unwrap_err();
+        assert_eq!(error.kind, RegExpCompileErrorKind::UnsupportedFeature, "{flags}");
+        assert!(error.message.contains("nest more than"), "{}", error.message);
+    }
+    RegExpProgram::compile(&nested("[", "]", 200), "v").expect("nested classes within the limit");
+    RegExpProgram::compile(&nested("(", ")", 200), "").expect("nested groups within the limit");
+    // Without the `v` flag a `[` inside a class is an ordinary character.
+    RegExpProgram::compile(&format!("[{}]", "[".repeat(100_000)), "u")
+        .expect("a class of `[` characters");
+}
