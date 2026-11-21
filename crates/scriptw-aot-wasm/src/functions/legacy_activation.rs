@@ -87,13 +87,16 @@ impl FunctionBuilder<'_> {
         // Admission happens before parameter initialization or reflection
         // publication. The rejected body never owns or retires its caller's
         // depth or legacy properties, and its Throw remains catchable in JS.
-        // R-owned bodies (the empty dynamic-function bodies, see
-        // `SourceFunctions::partition`) cannot call a program-owned helper.
-        let runtime_owned = matches!(
-            self.planned_entry().map(|entry| entry.identity()),
-            Some(crate::FunctionIdentity::Script { id, .. })
-                if crate::builtins::is_empty_dynamic_function_id(&id)
-        );
+        // R-owned bodies (the partition's runtime list) cannot call a
+        // program-owned helper.
+        let runtime_owned = match self
+            .planned_entry()
+            .and_then(|entry| entry.source_body_owner())
+            .expect("only a source body owns a source activation")
+        {
+            crate::function_layout::SourceBodyOwner::Runtime => true,
+            crate::function_layout::SourceBodyOwner::Program => false,
+        };
         let depth = schema.enter_source_activation_depth(function, |function| {
             if runtime_owned {
                 let overflow = schema.reserve_completion(function);

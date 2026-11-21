@@ -81,6 +81,15 @@ impl ProfileDumpIndex {
     }
 }
 
+/// Which half of the module pair emits a source body: the
+/// [`SourceFunctions`] list it was partitioned into, which the planner records
+/// in the body's entry. An R-owned body can call no program-owned helper.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SourceBodyOwner {
+    Runtime,
+    Program,
+}
+
 /// The script's source functions split at the runtime/program boundary. Each
 /// list keeps the script's own order.
 pub(crate) struct SourceFunctions<'a> {

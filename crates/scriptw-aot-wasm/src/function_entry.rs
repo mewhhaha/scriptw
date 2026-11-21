@@ -6,6 +6,7 @@
 use super::*;
 use crate::emit::{ControlFrameKind, FunctionBuilder};
 use crate::emitted_function::FunctionIdentity;
+use crate::function_layout::SourceBodyOwner;
 use crate::module::StaticSignature;
 
 mod binary_numeric;
@@ -38,6 +39,8 @@ enum EntryOrigin {
         id: FunctionId,
         name: String,
         protocol: FunctionProtocolIr,
+        /// The partition list the planner took this body from.
+        owner: SourceBodyOwner,
         binary_numeric: Option<PlannedBinaryNumericEntry>,
         local_arguments: Option<PlannedLocalArgumentsEntry>,
     },
@@ -63,6 +66,7 @@ pub(crate) struct PlannedFunctionEntry {
 impl PlannedFunctionEntry {
     pub(crate) fn user(
         source: &FunctionIr,
+        owner: SourceBodyOwner,
         wasm_index: u32,
         binary_numeric: Option<PlannedBinaryNumericEntry>,
         local_arguments: Option<PlannedLocalArgumentsEntry>,
@@ -78,10 +82,22 @@ impl PlannedFunctionEntry {
                 id: source.id.clone(),
                 name: source.name.clone(),
                 protocol: source.protocol,
+                owner,
                 binary_numeric,
                 local_arguments,
             },
             wasm_index,
+        }
+    }
+
+    /// The module half that emits a source body; `None` for every other
+    /// entry.
+    pub(crate) fn source_body_owner(&self) -> Option<SourceBodyOwner> {
+        match &self.origin {
+            EntryOrigin::User { owner, .. } => Some(*owner),
+            EntryOrigin::PreparedScript { .. }
+            | EntryOrigin::StandardBuiltin { .. }
+            | EntryOrigin::HostBuiltin(_) => None,
         }
     }
 

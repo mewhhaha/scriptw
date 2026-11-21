@@ -130,6 +130,7 @@ mod program_ownership_tests {
                 id: "source-owner".into(),
                 name: "sourceOwner".into(),
                 protocol: FunctionProtocolIr::OrdinaryCallOnly,
+                owner: crate::function_layout::SourceBodyOwner::Program,
                 binary_numeric: None,
                 local_arguments: None,
             },

@@ -4306,19 +4306,26 @@ pub(crate) fn build_function_metas<'a>(
             )))
         }
     };
+    use crate::function_layout::SourceBodyOwner;
     let source_functions = source
         .runtime_owned
         .iter()
         .enumerate()
-        .map(|(position, function)| (*function, layout.runtime_owned_index(position)))
+        .map(|(position, function)| {
+            let index = layout.runtime_owned_index(position);
+            (*function, SourceBodyOwner::Runtime, index)
+        })
         .chain(
             source
                 .program
                 .iter()
                 .enumerate()
-                .map(|(position, function)| (*function, layout.program_callable_index(position))),
+                .map(|(position, function)| {
+                    let index = layout.program_callable_index(position);
+                    (*function, SourceBodyOwner::Program, index)
+                }),
         );
-    for (function, wasm_index) in source_functions {
+    for (function, owner, wasm_index) in source_functions {
         insert_meta(
             function.id.clone(),
             WasmFunctionMeta {
@@ -4338,6 +4345,7 @@ pub(crate) fn build_function_metas<'a>(
                 length_name_configurable: true,
                 entry: crate::function_entry::PlannedFunctionEntry::user(
                     function,
+                    owner,
                     wasm_index,
                     source.binary_numeric_entry(function, layout),
                     source.local_arguments_entry(function, layout),
