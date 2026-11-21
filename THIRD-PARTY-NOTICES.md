@@ -7,7 +7,8 @@ any such binary.
 
 It is not yet a complete notice set for every crate a binary links: the Rust
 dependencies under MIT, Apache-2.0 and Unicode-3.0 licenses still need a
-generated notice file (see the dependency review's licence gap). Until then,
+generated notice file (the notices item in
+[current work](docs/rust-rewrite/current-inventory.md)). Until then,
 treat binaries as local build and benchmark outputs, not release artifacts.
 
 ## jemalloc

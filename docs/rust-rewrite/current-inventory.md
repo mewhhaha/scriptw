@@ -506,6 +506,30 @@ accepts `--case <file.js>`.
   already proves `Is(const)` for `i32.const; local.set`, so a completion-kind
   variant needs value sets through completion copies. Revisit when the next
   change removes completion writes. Owner: emitter completion protocol.
+- Third-party notices: `THIRD-PARTY-NOTICES.md` reproduces only jemalloc's
+  notice. The Rust dependencies under MIT, Apache-2.0 and Unicode-3.0 need a
+  generated notice file, and CI uploads `cargo build --release` binaries for
+  three systems as artifacts without any notice file, so neither a dist nor a
+  release binary may be published as a release artifact yet.
+  `scripts/build-dist.sh` copies the file next to its binary. Fix: generate
+  the notices from `Cargo.lock` (cargo-about or cargo-deny's license data)
+  and ship them with every uploaded binary. Owner: release engineering
+  (dependency licences).
+- Dist recipe residuals, each with its reason: no committed command compares a
+  dist binary's outputs with release (the identity gate; until one exists,
+  CONTRIBUTING asks for a manual comparison); the committed `pgo` mode has not
+  completed end to end (the measured binary came from hand-resumed scripts);
+  no CI job builds `--features jemalloc` or `--profile dist` (the recipe is
+  local-only); `SCRIPTW_DIST_TARGET_DIR` refuses only this checkout's paths,
+  not another checkout's target or an inherited `CARGO_TARGET_DIR` (the only
+  deletion there is that directory's `--target` units); the lock descriptors
+  are inherited by daemons a build starts (an sccache server would hold the
+  lock after the run); `--check` creates the directories and lock files it
+  validates and checks none of the pgo training inputs but `rsc.js`;
+  `CARGO_PROFILE_*` overrides are neither refused nor recorded; and the
+  `target/release/examples` RSC and precompiled hosts built at 2026-11-20
+  23:05 link jemalloc (rebuild them with default features before an RSC or
+  situations measurement). Owner: release engineering (dist recipe).
 
 ## Conformance boundaries
 

@@ -24,8 +24,9 @@ native image once, and servers load it without a compiler; it needs the same Scr
 build and CPU features ([flow](docs/rust-rewrite/contracts/foreign-modules.md#precompiled-execution)).
 
 Local benchmark compilers come from `scripts/build-dist.sh pgo` (fat LTO, jemalloc, Rust
-PGO; Linux x86_64). On 2026-11-20 its binary precompiled the held-out React client bundle
-22% faster than release, and the RSC bundle it was trained on 25% faster. CI releases and
+PGO; Linux x86_64). On 2026-11-20 a hand-built equivalent, trained with the RSC and edge
+fixtures (`SCRIPTW_DIST_PGO_APPLICATION_FIXTURES`), precompiled the held-out React client
+bundle 22% faster than release, and the RSC bundle 25% faster. CI releases and
 Test262 publication still use `--release`
 ([recipe and limits](CONTRIBUTING.md#dist-compiler-binary), [notices](THIRD-PARTY-NOTICES.md)).
 

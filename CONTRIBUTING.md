@@ -80,9 +80,14 @@ count follows the wrapper's `SCRIPTW_JOBS` (the CPU count with `--cloud-cpus
 auto`); `SCRIPTW_DIST_JOBS` overrides it. `scripts/build-dist.sh --check
 [plain|pgo]` validates the host, toolchain, environment and directories without
 building. A cold build takes about 25 minutes on four shared vCPUs. The binary
-lands in `target/dist-out/scriptw`, next to `scriptw.build-info` (source commit,
-changed tracked files, toolchain, rustflags, profile and training inputs,
-binary SHA-256). The dedicated target directory `target/dist-build`
+lands in `target/dist-out/scriptw`, next to a copy of `THIRD-PARTY-NOTICES.md`
+and `scriptw.build-info`: the source commit and a digest of the tracked diff
+and untracked files, read before the build starts and checked again before
+publication (`source_unchanged_during_build`), the binary's own
+`scriptw compiler-identity` output, toolchain, rustflags, profile and training
+inputs, and the binary SHA-256. The out-dir must be dedicated: the script
+refuses `target/` itself, its `debug`, `release` and `dist` directories, and
+a directory holding a `scriptw` without a build-info. The dedicated target directory `target/dist-build`
 (`SCRIPTW_DIST_TARGET_DIR`, never the shared `target/`) peaks at about 3.2 GB.
 The script holds an exclusive `flock` on the target and output directories for
 the whole run, so a concurrent run fails at once instead of deleting the
@@ -94,8 +99,9 @@ replace; it refuses a pre-set `RUSTFLAGS` or `CARGO_ENCODED_RUSTFLAGS`.
 
 On the inputs compared so far, dist and release binaries produced the same
 artifacts byte for byte: P and the `scriptw precompile` images of the 17 panel
-kernels, the RSC and `client.js` images, the kernels' `scriptw run` output and
-44 Test262 outcomes of one directory. R comes from the build-time
+kernels, the RSC and `client.js` images and the kernels' `scriptw run` output.
+The 44 cases of one Test262 directory passed under each binary by the stdout
+summary only; their per-case outcomes were not compared. R comes from the build-time
 runtime-image producer, a host unit that gets neither LTO nor PGO, so its
 identity says nothing about the dist code. No committed command checks this
 yet; compare a new binary against release yourself before trusting its
@@ -132,9 +138,13 @@ wall-time campaign, and keep its `scriptw.build-info`. For a long Test262
 sweep prefer the plain mode: the speed of a PGO binary on a full sweep is
 unmeasured, and compiler paths the training never reaches are optimized as
 cold. A PGO build is not reproducible, because the profile depends on the
-training run, and any rebuild changes `executable_sha256`. Resume and publish
-a dist sweep with the same frozen binary (`SCRIPTW_BIN=target/dist-out/scriptw`
-for `scripts/publish-real-status-low-ram.sh`, or that binary's own
+training run, and any rebuild changes `executable_sha256`. Every
+`build-dist.sh` run deletes `target/dist-out/scriptw` first, so freeze a
+binary before a sweep: copy `scriptw`, `scriptw.build-info` and
+`THIRD-PARTY-NOTICES.md` to a directory of their own (for example
+`target/frozen/<binary_sha256>/`) and use only that copy. Resume and publish
+a dist sweep with the same frozen copy (`SCRIPTW_BIN=target/frozen/<sha>/scriptw`
+for `scripts/publish-real-status-low-ram.sh`, or that copy's own
 `test262 publish-status`); `cargo run -p scriptw-cli -- test262 publish-status`
 rejects its evidence.
 
