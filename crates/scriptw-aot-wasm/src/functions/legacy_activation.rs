@@ -8,7 +8,7 @@ use super::*;
 use crate::gc_types::{
     ArgumentsObject, ExecutableCode, ExecutableCodeSchema, FunctionObject, FunctionObjectSchema,
     FunctionProtocolCode, GcI32Constant, GcLocal, LegacyReflectionPropertyState, Nullable,
-    ScalarValue, SourceActivationDepth,
+    ScalarValue, SourceActivationDepth, SourceDepthOverflow,
 };
 
 mod property;
@@ -43,6 +43,32 @@ impl SourceActivation {
 }
 
 impl FunctionBuilder<'_> {
+    /// The one Throw of every rejected source entry, outlined from each
+    /// source body's depth guard: a RangeError of the rejected body's
+    /// execution Realm, returned as that body's Throw completion. The body
+    /// tail-calls it before any parameter, activation or reflection effect.
+    pub(crate) fn compile_source_depth_overflow_helper(&mut self) -> Result<Function, EmitError> {
+        let mut function =
+            self.begin_helper_body(crate::runtime_helpers::RuntimeHelperId::SourceDepthOverflow);
+        let parameters = self
+            .helper_parameters::<crate::runtime_helpers::SourceDepthOverflowParameters>(
+                &mut function,
+            );
+        let overflow = self.runtime_schema().reserve_completion(&mut function);
+        self.emit_throw_runtime_error(
+            NativeErrorKind::RangeError,
+            RuntimeErrorMessage::MAXIMUM_SOURCE_CALL_STACK_SIZE_EXCEEDED,
+            &overflow,
+            &mut function,
+        )?;
+        overflow.emit(&mut function);
+        overflow.clear(&mut function);
+        self.clear_helper_execution_realm(&mut function);
+        crate::runtime_helpers::HelperParameters::release(parameters, &mut function);
+        function.instruction(&Instruction::End);
+        Ok(self.finish_function(function))
+    }
+
     pub(crate) fn emit_enter_source_activation(
         &mut self,
         function: &mut Function,
@@ -61,15 +87,31 @@ impl FunctionBuilder<'_> {
         // Admission happens before parameter initialization or reflection
         // publication. The rejected body never owns or retires its caller's
         // depth or legacy properties, and its Throw remains catchable in JS.
+        // R-owned bodies (the empty dynamic-function bodies, see
+        // `SourceFunctions::partition`) cannot call a program-owned helper.
+        let runtime_owned = matches!(
+            self.planned_entry().map(|entry| entry.identity()),
+            Some(crate::FunctionIdentity::Script { id, .. })
+                if crate::builtins::is_empty_dynamic_function_id(&id)
+        );
         let depth = schema.enter_source_activation_depth(function, |function| {
-            let overflow = schema.reserve_completion(function);
-            self.emit_throw_runtime_error(
-                NativeErrorKind::RangeError,
-                RuntimeErrorMessage::MAXIMUM_SOURCE_CALL_STACK_SIZE_EXCEEDED,
-                &overflow,
-                function,
-            )?;
-            Ok::<_, EmitError>(overflow)
+            if runtime_owned {
+                let overflow = schema.reserve_completion(function);
+                self.emit_throw_runtime_error(
+                    NativeErrorKind::RangeError,
+                    RuntimeErrorMessage::MAXIMUM_SOURCE_CALL_STACK_SIZE_EXCEEDED,
+                    &overflow,
+                    function,
+                )?;
+                return Ok::<_, EmitError>(SourceDepthOverflow::Inline(overflow));
+            }
+            // A rejected entry is the rare arm.
+            function.rarely_reached();
+            let base = self.runtime_helper_base()?;
+            let realm = self.emit_execution_realm(function);
+            let tail = schema.return_call_source_depth_overflow(&realm, base, function);
+            realm.clear(function);
+            Ok(SourceDepthOverflow::ProgramHelper(tail))
         })?;
         let callable = schema.reserve_gc_local(function).initialize(
             self.body_entry_locals()

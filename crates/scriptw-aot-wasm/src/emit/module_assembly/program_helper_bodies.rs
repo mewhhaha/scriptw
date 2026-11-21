@@ -50,6 +50,20 @@ pub(super) fn compile_program_helper_bodies(
         checkpoint.compile_embedding_checkpoint(promise_rejection_policy)?,
     );
 
+    let mut depth_overflow = FunctionBuilder::new_runtime_operation_helper(
+        schema,
+        RuntimeHelperId::SourceDepthOverflow,
+        string_pool,
+        function_metas,
+        uses_heap,
+        runtime_bootstrap_plan.clone(),
+        runtime_helper_base,
+    );
+    helper_bodies.insert(
+        RuntimeHelperId::SourceDepthOverflow,
+        depth_overflow.compile_source_depth_overflow_helper()?,
+    );
+
     let compact_array_body = if string_pool.has_compact_array_recipes() {
         let mut builder = FunctionBuilder::new_runtime_operation_helper(
             schema,

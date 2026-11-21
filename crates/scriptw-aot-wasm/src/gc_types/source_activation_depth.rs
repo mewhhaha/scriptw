@@ -1,7 +1,9 @@
 //! Checked ownership of the implementation's finite source execution stack.
 //!
 //! Runtime and program modules share the declaration-owned scalar. A rejected
-//! entry returns a whole JavaScript Throw before an owner can be constructed.
+//! entry returns a whole JavaScript Throw before an owner can be constructed:
+//! a program body tail-calls one program-owned helper that builds the
+//! RangeError; an R-owned body builds it inline.
 //! The admitted owner restores its saved depth on each source-body exit.
 
 use super::*;
@@ -41,7 +43,7 @@ impl SourceActivationDepthGlobal {
     fn enter<E>(
         &self,
         function: &mut Function,
-        emit_overflow: impl FnOnce(&mut Function) -> Result<CompletionLocals, E>,
+        emit_overflow: impl FnOnce(&mut Function) -> Result<SourceDepthOverflow, E>,
     ) -> Result<SourceActivationDepth, E> {
         let previous = function.reserve_typed_local(ValType::I32);
         function.instruction(&Instruction::GlobalGet(self.index));
@@ -50,13 +52,17 @@ impl SourceActivationDepthGlobal {
         function.instruction(&Instruction::I32Const(MAX_ACTIVE_SOURCE_BODIES));
         function.instruction(&Instruction::I32GeU);
         function.instruction(&Instruction::If(BlockType::Empty));
-        let overflow = emit_overflow(function)?;
-        // The guard owns the terminal Throw, not merely a predicate which a
-        // caller could forget to route or accidentally turn into a normal entry.
-        overflow.set_kind(CompletionKind::Throw, function);
-        overflow.emit(function);
-        overflow.clear(function);
-        function.instruction(&Instruction::Return);
+        // The guard owns the terminal transfer, not merely a predicate which
+        // a caller could forget to route or turn into a normal entry.
+        match emit_overflow(function)? {
+            SourceDepthOverflow::ProgramHelper(SourceDepthOverflowTail { .. }) => {}
+            SourceDepthOverflow::Inline(overflow) => {
+                overflow.set_kind(CompletionKind::Throw, function);
+                overflow.emit(function);
+                overflow.clear(function);
+                function.instruction(&Instruction::Return);
+            }
+        }
         function.instruction(&Instruction::End);
         function.instruction(&Instruction::LocalGet(previous));
         function.instruction(&Instruction::I32Const(1));
@@ -67,6 +73,25 @@ impl SourceActivationDepthGlobal {
             previous,
         })
     }
+}
+
+/// How a rejected source entry ends. Either way its Throw is the body's
+/// completion and no parameter, activation or reflection effect happened.
+#[must_use = "the depth guard must end the rejected entry"]
+pub(crate) enum SourceDepthOverflow {
+    /// A program body tail-calls the one program-owned helper that builds
+    /// the RangeError, instead of a copy of it in every body.
+    ProgramHelper(SourceDepthOverflowTail),
+    /// An R-owned source body cannot reach a P helper: it builds the Throw
+    /// inline and the guard returns it.
+    Inline(CompletionLocals),
+}
+
+/// Proof that a rejected entry ended in a tail call of the program's
+/// `source_depth_overflow` helper. Only
+/// [`RuntimeSchema::return_call_source_depth_overflow`] mints it.
+pub(crate) struct SourceDepthOverflowTail {
+    _tail: (),
 }
 
 /// Only a successful checked entry can produce this non-copyable owner.
@@ -85,9 +110,9 @@ impl SourceActivationDepth {
         function.instruction(&Instruction::GlobalSet(self.global));
     }
 
+    /// Returns the saved-depth local to the pool without a store: nothing
+    /// reads it again, and the next holder writes it before reading it.
     pub(crate) fn clear(self, function: &mut Function) {
-        function.instruction(&Instruction::I32Const(0));
-        function.instruction(&Instruction::LocalSet(self.previous));
         function.release_typed_local(self.previous);
     }
 }
@@ -114,8 +139,26 @@ impl RuntimeSchema {
     pub(crate) fn enter_source_activation_depth<E>(
         &self,
         function: &mut Function,
-        emit_overflow: impl FnOnce(&mut Function) -> Result<CompletionLocals, E>,
+        emit_overflow: impl FnOnce(&mut Function) -> Result<SourceDepthOverflow, E>,
     ) -> Result<SourceActivationDepth, E> {
         self.source_activation_depth.enter(function, emit_overflow)
+    }
+
+    /// Ends a rejected source entry: the program-owned helper builds the
+    /// RangeError of `realm` (the rejected body's execution Realm) and its
+    /// Throw completion becomes this body's result. Source bodies return the
+    /// Completion ABI the helper returns, so the tail call is exact.
+    pub(crate) fn return_call_source_depth_overflow(
+        &self,
+        realm: &GcLocal<RealmRecord>,
+        base: crate::runtime_helpers::RuntimeHelperFunctionBase,
+        function: &mut Function,
+    ) -> SourceDepthOverflowTail {
+        self.return_call_helper(
+            crate::runtime_helpers::SourceDepthOverflowArguments::new(realm),
+            base,
+            function,
+        );
+        SourceDepthOverflowTail { _tail: () }
     }
 }

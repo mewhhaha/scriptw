@@ -180,13 +180,17 @@ async function asynchronous(target, value) { "use strict"; return target(value);
             let (proxy_index, proxy) = runtime.named_body("helper::proxy_call");
             let (function_index, function) = runtime.named_body("helper::function_call");
             let imported_proxy = program.imported_runtime_function(&runtime, proxy_index);
+            // A rejected source entry tail-calls the one P overflow helper;
+            // that is the depth guard's own exit, not a source tail call.
+            let (overflow, _) = program.named_body("helper::source_depth_overflow");
+            let source_tail = |tail: &[u32]| tail.iter().copied().filter(|callee| *callee != overflow).collect::<Vec<_>>();
             for name in ["tail", "method", "optional", "conditional", "logical", "comma"] {
                 let (_, body) = program.named_body(&format!("js::{name}#"));
-                assert_eq!(body.tail, [imported_proxy], "{name} must tail-call the linked whole-Completion dispatcher exactly once");
+                assert_eq!(source_tail(&body.tail), [imported_proxy], "{name} must tail-call the linked whole-Completion dispatcher exactly once");
             }
             for name in ["sloppy", "caught", "finalized", "disposed", "generator", "asynchronous"] {
                 let (_, body) = program.named_body(&format!("js::{name}#"));
-                assert!(body.tail.is_empty() && body.tail_references.is_empty(), "{name} must retain its continuation");
+                assert!(source_tail(&body.tail).is_empty() && body.tail_references.is_empty(), "{name} must retain its continuation");
                 assert!(body.normal.contains(&imported_proxy), "{name} still performs the real Call");
             }
             assert!(proxy.tail.contains(&function_index), "ordinary targets use raw FunctionCall tail forwarding");

@@ -56,6 +56,8 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::EmbeddingCall
             | RuntimeHelperId::EmbeddingRead
             | RuntimeHelperId::EmbeddingCheckpoint
+            // A source body's outlined depth rejection: no inline facade.
+            | RuntimeHelperId::SourceDepthOverflow
             | RuntimeHelperId::EmbeddingString
             | RuntimeHelperId::EmbeddingBytes
             | RuntimeHelperId::EmbeddingBytesRead

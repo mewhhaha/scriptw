@@ -40,8 +40,8 @@ mod native_recursion_depth;
 mod snapshot;
 use native_recursion_depth::NativeRecursionDepthGlobal;
 mod source_activation_depth;
-pub(crate) use source_activation_depth::SourceActivationDepth;
 use source_activation_depth::SourceActivationDepthGlobal;
+pub(crate) use source_activation_depth::{SourceActivationDepth, SourceDepthOverflow};
 #[cfg(test)]
 mod module_source_tests;
 #[cfg(test)]

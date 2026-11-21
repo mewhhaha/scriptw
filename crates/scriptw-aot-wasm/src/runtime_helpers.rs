@@ -1200,6 +1200,7 @@ runtime_helper_domain! {
     EmbeddingCall / EmbeddingCallArguments / EmbeddingCallParameters / "embedding_call" { callee:Value,this_value:Value,arguments:(Ref ValueArray NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     EmbeddingRead / EmbeddingReadArguments / EmbeddingReadParameters / "embedding_read" { target:Value,key:(Ref StringValue NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     EmbeddingCheckpoint / EmbeddingCheckpointArguments / EmbeddingCheckpointParameters / "embedding_checkpoint" { caller_execution_realm:(Ref RealmRecord NonNullable),caller_program:Program } => Completion;
+    SourceDepthOverflow / SourceDepthOverflowArguments / SourceDepthOverflowParameters / "source_depth_overflow" { caller_execution_realm:(Ref RealmRecord NonNullable) } => Completion;
     EmbeddingString / EmbeddingStringArguments / EmbeddingStringParameters / "embedding_string" { units:(Ref CodeUnitArray NonNullable) } => Completion;
     EmbeddingBytes / EmbeddingBytesArguments / EmbeddingBytesParameters / "embedding_bytes" { bytes:(Ref ByteArray NonNullable),caller_execution_realm:(Ref RealmRecord NonNullable) } => Completion;
     EmbeddingBytesRead / EmbeddingBytesReadArguments / EmbeddingBytesReadParameters / "embedding_bytes_read" { value:Value } => (Ref ByteArray Nullable);
@@ -1402,6 +1403,9 @@ impl RuntimeHelperId {
     pub(crate) const fn owner(self) -> HelperOwner {
         match self {
             Self::EmbeddingExport | Self::EmbeddingCheckpoint => HelperOwner::Program,
+            // Every source body's rejected entry tail-calls this one P body;
+            // it never enters R's index space or type section.
+            Self::SourceDepthOverflow => HelperOwner::Program,
             Self::EmbeddingCall
             | Self::EmbeddingRead
             | Self::EmbeddingString
@@ -1591,6 +1595,7 @@ impl RuntimeHelperId {
         match self {
             Self::EmbeddingExport
             | Self::EmbeddingCheckpoint
+            | Self::SourceDepthOverflow
             | Self::EmbeddingCall
             | Self::EmbeddingRead
             | Self::EmbeddingString
