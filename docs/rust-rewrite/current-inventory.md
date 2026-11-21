@@ -583,10 +583,12 @@ accepts `--case <file.js>`.
   are inherited by daemons a build starts (an sccache server would hold the
   lock after the run); `--check` creates the directories and lock files it
   validates and checks none of the pgo training inputs but `rsc.js`;
-  `CARGO_PROFILE_*` overrides are neither refused nor recorded; and the
-  `target/release/examples` RSC and precompiled hosts built at 2026-11-20
-  23:05 link jemalloc (rebuild them with default features before an RSC or
-  situations measurement). Owner: release engineering (dist recipe).
+  `CARGO_PROFILE_*` overrides are neither refused nor recorded; and in a
+  shared checkout `target/release/examples/compiler_precompiled_baseline`
+  may still be the jemalloc build verification left there on 2026-11-20
+  (`rsc_baseline` was rebuilt with default features on 2026-11-21): check
+  for `_rjem_malloc` and rebuild with default features before a
+  measurement. Owner: release engineering (dist recipe).
 
 ## Conformance boundaries
 
