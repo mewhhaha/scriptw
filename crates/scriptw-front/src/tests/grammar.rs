@@ -931,6 +931,54 @@ fn operator_chains_in_resumable_bodies_pay_only_when_they_suspend() {
     });
 }
 
+// The compiler parses a module's body again inside its module scaffolding, an
+// async arrow function eight levels deep, so the Module parse charges the body
+// as that reparse will: eight levels deeper than a Script, and as a resumable
+// body, where a chain with an `await` operand costs half a level per operator.
+// Either limit is then reported by the Module parse, at the module's own
+// source position, instead of in the reparse's generated text.
+#[test]
+fn module_bodies_are_charged_as_their_reparse_inside_the_module_scaffolding() {
+    use boa_parser::parser::MODULE_BODY_ENCLOSING_LEVELS;
+    let limit = MAX_SOURCE_NESTING_DEPTH as usize - MODULE_BODY_ENCLOSING_LEVELS as usize;
+    on_compiler_stack(move || {
+        let module_error = |source: &str| {
+            parse(source, ParseOptions::module())
+                .err()
+                .map(|error| error.message().to_string())
+                .filter(|message| message.contains("nesting exceeds the implementation limit"))
+        };
+        let parentheses = |depth: usize| {
+            format!(
+                "export const x = {}1{};",
+                "(".repeat(depth),
+                ")".repeat(depth)
+            )
+        };
+        // An exported declaration's initializer is one level, each
+        // parenthesis one more.
+        assert_eq!(module_error(&parentheses(limit - 1)), None);
+        let error = module_error(&parentheses(limit)).expect("past the module limit");
+        assert!(error.contains("at line 1, col"), "{error}");
+        let chain = |operators: usize| " + \"a\"".repeat(operators);
+        assert_eq!(
+            module_error(&format!("export const s = (await x){};", chain(1_900))),
+            None
+        );
+        assert_eq!(
+            module_error(&format!("export const s = x{};", chain(100_000))),
+            None
+        );
+        let error = module_error(&format!("export const s = (await x){};", chain(3_000)))
+            .expect("past the limit");
+        assert!(
+            error.contains("with an `await` or `yield` operand"),
+            "{error}"
+        );
+        assert!(error.contains("at line 1, col"), "{error}");
+    });
+}
+
 // A method call's property access and call cost half a level each, so about
 // 1,000 chained method calls fit, four times the other links. Other member, call
 // and optional links cost two levels, as each item of an optional chain does;

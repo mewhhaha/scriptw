@@ -286,6 +286,54 @@ fn module_prints(source: &str, expected: &str) {
     );
 }
 
+// Module lowering parses each module's body again inside generated module
+// scaffolding, eight levels deeper and as an async function. The Module parse
+// charges the body as that reparse does, so every limit is reported against
+// the module's own source: 992 parentheses, or a 3,000-operator chain with a
+// top-level `await` operand, passed the Module parse and failed the reparse,
+// at a position in the generated text.
+#[test]
+fn module_nesting_is_charged_as_its_scaffolded_reparse() {
+    let parentheses = |depth: usize| {
+        format!(
+            "export const x = {}1{}; print(x);",
+            "(".repeat(depth),
+            ")".repeat(depth)
+        )
+    };
+    module_prints(&parentheses(991), "1");
+    let module_error = |source: &str| {
+        scriptw_engine::configure_compilation_jobs(1).unwrap();
+        let (compile, run) = options();
+        let error = Engine::new(RealmBuilder::new().build())
+            .run_module(source, compile, run)
+            .expect_err("past the implementation limit");
+        format!("{error:?}")
+    };
+    for source in [
+        parentheses(992),
+        format!(
+            "export const s = (await 'a'){}; print(s.length);",
+            " + 'a'".repeat(3_000)
+        ),
+    ] {
+        let error = module_error(&source);
+        assert!(
+            error.contains("nesting exceeds the implementation limit")
+                && error.contains("at line 1, col")
+                && !error.contains("linked module source"),
+            "{error}"
+        );
+    }
+    module_prints(
+        &format!(
+            "export const s = (await 'a'){}; print(s.length);",
+            " + 'a'".repeat(1_800)
+        ),
+        "1801",
+    );
+}
+
 // In generator and async function bodies, the resumable lowering and state
 // planners recurse per operator once a chain's operand suspends, so there such
 // a chain's operators cost half a nesting level each. A chain that does not

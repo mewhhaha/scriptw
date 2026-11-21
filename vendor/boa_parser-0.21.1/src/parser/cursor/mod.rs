@@ -48,7 +48,8 @@ pub(super) struct Cursor<R> {
     reach: u32,
 
     /// Scriptw: whether the current token is in a generator or async function
-    /// body (see [`crate::parser::BINARY_LINK_UNITS`]).
+    /// body, or at an ES module's top level (see
+    /// [`crate::parser::BINARY_LINK_UNITS`]).
     resumable_body: bool,
 
     /// Scriptw: how many `await` and `yield` expressions of the current
@@ -231,6 +232,25 @@ where
         let parsed = parse(self, interner);
         self.resumable_body = enclosing;
         self.suspensions = suspensions;
+        parsed
+    }
+
+    /// Scriptw: parses an ES module's body (see
+    /// [`crate::parser::MODULE_BODY_ENCLOSING_LEVELS`]): as deep as the
+    /// compiler will parse it again, inside its module scaffolding, and as a
+    /// resumable body, since that scaffolding is an async function and a
+    /// module's top level may `await`.
+    pub(super) fn module_body<T>(
+        &mut self,
+        interner: &mut Interner,
+        parse: impl FnOnce(&mut Self, &mut Interner) -> ParseResult<T>,
+    ) -> ParseResult<T> {
+        let units =
+            crate::parser::MODULE_BODY_ENCLOSING_LEVELS * crate::parser::NESTING_UNITS_PER_LEVEL;
+        self.nesting += units;
+        self.reach = self.reach.max(self.nesting);
+        let parsed = self.function_body(true, interner, parse);
+        self.nesting -= units;
         parsed
     }
 

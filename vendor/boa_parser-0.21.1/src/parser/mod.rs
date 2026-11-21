@@ -103,6 +103,16 @@ pub const RESUMABLE_BINARY_LINK_UNITS: u32 = NESTING_UNITS_PER_LEVEL / 2;
 /// Scriptw: the greatest tree height, in units, a source may have.
 pub const MAX_NESTING_UNITS: u32 = MAX_NESTING_DEPTH * NESTING_UNITS_PER_LEVEL;
 
+/// Scriptw: the nesting levels, of [`MAX_NESTING_DEPTH`], that Scriptw's
+/// module scaffolding adds above an ES module's body. The compiler parses
+/// every module's body again inside that scaffolding (an async arrow function
+/// in an array in an arrow function called at a Script's top level), so the
+/// Module parse starts this deep, and source that parses as a Module never
+/// exceeds the limit only in the reparse, where the error would point into
+/// generated text. A module's body may nest eight levels less than a
+/// Script's.
+pub const MODULE_BODY_ENCLOSING_LEVELS: u32 = 8;
+
 /// Scriptw: the most formal parameters one function may have; more is a
 /// SyntaxError. ECMA-262 sets no limit. Node 24's V8 accepts at most 65,525,
 /// although its SyntaxError says 65,534 are allowed, so code that runs there
@@ -627,7 +637,9 @@ where
     fn parse(self, cursor: &mut Cursor<R>, interner: &mut Interner) -> ParseResult<Self::Output> {
         cursor.set_module();
 
-        let module = boa_ast::Module::new(ModuleItemList.parse(cursor, interner)?);
+        let module = boa_ast::Module::new(cursor.module_body(interner, |cursor, interner| {
+            ModuleItemList.parse(cursor, interner)
+        })?);
 
         // It is a Syntax Error if the LexicallyDeclaredNames of ModuleItemList contains any duplicate entries.
         let mut bindings = FxHashSet::default();

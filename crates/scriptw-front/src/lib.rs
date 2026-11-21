@@ -1165,7 +1165,9 @@ mod tests {
                 ) -> ParseResult<Self::Output> {
                     cursor.set_module();
 
-                    let module = boa_ast::Module::new(ModuleItemList.parse(cursor, interner)?);
+                    let module = boa_ast::Module::new(cursor.module_body(interner, |cursor, interner| {
+                        ModuleItemList.parse(cursor, interner)
+                    })?);
         "#;
         const MODULE_TRUE_PROJECTION: &str = r#"
             pub(super) fn set_module(&mut self) {
