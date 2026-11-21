@@ -223,7 +223,10 @@ fn operator_chains_in_resumable_bodies_pay_only_when_they_suspend() {
         "function* g() {{ var x = 1; (yield x){}; }}",
         "+x".repeat(4_000)
     ));
-    assert!(error.contains("after an `await` or `yield`"), "{error}");
+    assert!(
+        error.contains("with an `await` or `yield` operand"),
+        "{error}"
+    );
     // Comma chains of literals keep the native compile cheap (a long `+`
     // chain of top-level bindings compiles slowly; see the inventory).
     prints(
@@ -359,7 +362,8 @@ fn else_if_and_member_chains_are_bounded_by_their_compile_cost() {
 }
 
 // `(a0, a1, …) =>` is covered by a comma chain, converted to parameters in a
-// loop; more than 65,535 parameters is a SyntaxError, as in V8.
+// loop; more than 65,535 parameters is a SyntaxError (Node 24's V8 accepts at
+// most 65,525).
 #[test]
 fn arrow_parameter_lists_are_bounded() {
     let parameters = |count: usize| {

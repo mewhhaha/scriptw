@@ -104,8 +104,9 @@ pub const RESUMABLE_BINARY_LINK_UNITS: u32 = NESTING_UNITS_PER_LEVEL / 2;
 pub const MAX_NESTING_UNITS: u32 = MAX_NESTING_DEPTH * NESTING_UNITS_PER_LEVEL;
 
 /// Scriptw: the most formal parameters one function may have; more is a
-/// SyntaxError. ECMA-262 sets no limit, and V8 rejects more than 65,535 with a
-/// SyntaxError, so code that runs there fits.
+/// SyntaxError. ECMA-262 sets no limit. Node 24's V8 accepts at most 65,525,
+/// although its SyntaxError says 65,534 are allowed, so code that runs there
+/// fits.
 pub const MAX_FORMAL_PARAMETERS: usize = 65_535;
 
 /// Scriptw: what one charge against [`MAX_NESTING_UNITS`] is for. The limit
@@ -122,8 +123,9 @@ pub(crate) enum NestingCharge {
     MethodLink,
     /// A binary, logical, `??` or comma operator ([`BINARY_LINK_UNITS`]).
     Operator,
-    /// Such an operator after an `await` or `yield` in its chain
-    /// ([`RESUMABLE_BINARY_LINK_UNITS`]).
+    /// Such an operator of a chain that has an `await` or `yield` operand
+    /// ([`RESUMABLE_BINARY_LINK_UNITS`]); the operators before that operand
+    /// are charged it too.
     ResumableOperator,
 }
 
@@ -154,8 +156,8 @@ impl NestingCharge {
             }
             Self::Operator => " at this operator, which counts as 1/2048 of a level",
             Self::ResumableOperator => {
-                " at this operator, which counts as half a level after an `await` or `yield` \
-                 earlier in its chain"
+                " at this operator of a chain with an `await` or `yield` operand, each operator \
+                 of which counts as half a level"
             }
         }
     }

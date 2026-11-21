@@ -923,7 +923,10 @@ fn operator_chains_in_resumable_bodies_pay_only_when_they_suspend() {
             format!("function* g() {{ x{} + (yield); }}", chain(3_000)),
         ] {
             let error = nesting_error(&source).expect("past the limit");
-            assert!(error.contains("after an `await` or `yield`"), "{error}");
+            assert!(
+                error.contains("with an `await` or `yield` operand"),
+                "{error}"
+            );
         }
     });
 }
@@ -964,9 +967,9 @@ fn member_chains_are_charged_by_link_kind() {
 }
 
 // `(a0, a1, …) =>` is covered by a comma chain, converted to parameters
-// without recursing per comma. ECMA-262 sets no limit on parameters; V8
-// rejects more than 65,535 with a SyntaxError, and so does Scriptw, for every
-// function form.
+// without recursing per comma. ECMA-262 sets no limit on parameters; Node 24's
+// V8 accepts at most 65,525 (its SyntaxError says 65,534), and Scriptw rejects
+// more than 65,535 with a SyntaxError, for every function form.
 #[test]
 fn parameter_lists_are_bounded_and_converted_without_recursion() {
     let parameters = |count: usize| {

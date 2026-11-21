@@ -206,10 +206,9 @@ pub const MAX_PATTERN_NESTING_DEPTH: usize = 1000;
 /// Scriptw: whether the pattern `body` (its code points, or the bytes of its
 /// UTF-8 or WTF-8 encoding, whose ASCII bytes are its ASCII code points) nests
 /// groups (or `v`-mode classes) more than `limit` deep, scanning escapes and
-/// classes the way the pattern grammar does. It only over-counts parentheses
-/// inside a class in `v` mode, where a nested class starts with `[` and a
-/// parenthesis is a syntax error anyway. Scriptw's own pattern compiler
-/// applies the same scan to every pattern it is given.
+/// classes the way the pattern grammar does: parentheses inside a class never
+/// count, and a `[` inside a class nests only in `v` mode. Scriptw's own
+/// pattern compiler applies the same scan to every pattern it is given.
 pub fn pattern_nesting_exceeds(
     body: impl IntoIterator<Item = u32>,
     unicode_sets: bool,
