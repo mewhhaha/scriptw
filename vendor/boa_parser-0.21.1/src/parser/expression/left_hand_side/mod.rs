@@ -232,7 +232,7 @@ where
         let defer_sym = interner.get_or_intern("defer");
         let source_sym = interner.get_or_intern("source");
 
-        // Scriptw: an optional chain is one more tree level over its target.
+        // Scriptw: an optional chain charges each of its items as a link.
         let (mut lhs, mut height) = cursor.measured(interner, |cursor, interner| {
             Ok(
                 if let Some(start) = is_keyword_call(Keyword::Super, cursor, interner)? {
@@ -335,14 +335,10 @@ where
         if let Some(tok) = cursor.peek(0, interner)?
             && tok.kind() == &TokenKind::Punctuator(Punctuator::Optional)
         {
-            let (optional, chain_height) = cursor.measured(interner, |cursor, interner| {
-                OptionalExpression::new(self.allow_yield, self.allow_await, lhs)
-                    .parse(cursor, interner)
-            })?;
-            height = cursor.chain_height(
-                height.max(chain_height) + crate::parser::MEMBER_LINK_UNITS,
-                interner,
-            )?;
+            let (optional, optional_height) =
+                OptionalExpression::new(self.allow_yield, self.allow_await, lhs, height)
+                    .parse(cursor, interner)?;
+            height = optional_height;
             cursor.record_height(height);
             lhs = optional.into();
         }

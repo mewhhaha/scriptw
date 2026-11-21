@@ -4,7 +4,7 @@ use crate::{
     parser::ParseResult,
     source::{ReadChar, UTF8Input},
 };
-use boa_ast::{LinearPosition, PositionGroup};
+use boa_ast::{LinearPosition, PositionGroup, Punctuator};
 use boa_interner::Interner;
 use std::collections::VecDeque;
 
@@ -217,6 +217,45 @@ where
         };
 
         Ok(res_token)
+    }
+
+    /// Scriptw: the index, as [`Self::peek`] with `skip_line_terminators`
+    /// counts it, of the `)` that closes the `(` at index `open`, or `None`
+    /// when the source ends first. The tokens are scanned once: finding it by
+    /// calling `peek` with each index walked the buffer from its start every
+    /// time, quadratic in the tokens between the parentheses.
+    pub(super) fn closing_paren(
+        &mut self,
+        open: usize,
+        interner: &mut Interner,
+    ) -> ParseResult<Option<usize>> {
+        let mut read_index = 0;
+        let mut count = 0;
+        let mut depth = 0usize;
+        loop {
+            if read_index == self.peeked.len() {
+                self.fill(interner)?;
+            }
+            let Some(token) = &self.peeked[read_index] else {
+                return Ok(None);
+            };
+            if token.kind() != &TokenKind::LineTerminator {
+                if count >= open {
+                    match token.kind() {
+                        TokenKind::Punctuator(Punctuator::OpenParen) => depth += 1,
+                        TokenKind::Punctuator(Punctuator::CloseParen) => {
+                            depth = depth.saturating_sub(1);
+                            if depth == 0 {
+                                return Ok(Some(count));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                count += 1;
+            }
+            read_index += 1;
+        }
     }
 
     /// Gets current linear position in the source code.

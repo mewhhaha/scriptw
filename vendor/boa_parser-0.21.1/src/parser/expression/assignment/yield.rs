@@ -58,6 +58,8 @@ where
                 interner,
             )?
             .span();
+        // Scriptw: see `Cursor::binary_link`.
+        cursor.note_suspension();
 
         if matches!(
             cursor.peek_is_line_terminator(0, interner)?,

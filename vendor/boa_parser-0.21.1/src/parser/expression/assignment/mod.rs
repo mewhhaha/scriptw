@@ -106,24 +106,12 @@ fn async_starts_arrow_function<R: ReadChar>(
 
     match next.kind() {
         TokenKind::Punctuator(Punctuator::OpenParen) => {
-            let mut depth = 1usize;
-            let mut scan = 2usize;
-            while let Some(token) = cursor.peek(scan, interner)? {
-                match token.kind() {
-                    TokenKind::Punctuator(Punctuator::OpenParen) => depth += 1,
-                    TokenKind::Punctuator(Punctuator::CloseParen) => {
-                        depth -= 1;
-                        if depth == 0 {
-                            // `async(...)` ending the source is a call.
-                            return Ok(matches!(
-                                cursor.peek(scan + 1, interner)?.map(Token::kind),
-                                Some(TokenKind::Punctuator(Punctuator::Arrow))
-                            ));
-                        }
-                    }
-                    _ => {}
-                }
-                scan += 1;
+            if let Some(close) = cursor.closing_paren(1, interner)? {
+                // `async(...)` ending the source is a call.
+                return Ok(matches!(
+                    cursor.peek(close + 1, interner)?.map(Token::kind),
+                    Some(TokenKind::Punctuator(Punctuator::Arrow))
+                ));
             }
 
             if matches!(

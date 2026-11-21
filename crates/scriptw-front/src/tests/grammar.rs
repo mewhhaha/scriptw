@@ -878,3 +878,132 @@ fn long_operator_chains_parse_without_recursing_per_operator() {
     let source = format!("x{};", " + x".repeat(2_100_000));
     assert!(parse(&source, ParseOptions::script()).is_err());
 }
+
+fn on_compiler_stack(test: impl FnOnce() + Send + 'static) {
+    std::thread::Builder::new()
+        .stack_size(64 << 20)
+        .spawn(test)
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+fn nesting_error(source: &str) -> Option<String> {
+    parse(source, ParseOptions::script())
+        .err()
+        .map(|error| error.message().to_string())
+        .filter(|message| message.contains("nesting exceeds the implementation limit"))
+}
+
+// In a generator or async function body a binary chain costs half a level per
+// operator only when one of its operands suspends, and then for every one of
+// its operators. Otherwise it costs what it costs anywhere, so an ES module's
+// top-level code, which module lowering parses again inside an async arrow
+// function, pays nothing extra.
+#[test]
+fn operator_chains_in_resumable_bodies_pay_only_when_they_suspend() {
+    on_compiler_stack(|| {
+        let chain = |operators: usize| " + x".repeat(operators);
+        for source in [
+            format!("async () => {{ \"use strict\"; x{}; }}", chain(100_000)),
+            format!("async function f() {{ await x; x{}; }}", chain(100_000)),
+            format!("function* g() {{ yield; x{}; }}", chain(100_000)),
+            // A function inside the chain owns its suspensions.
+            format!(
+                "async () => {{ x + async function () {{ await x; }}{}; }}",
+                chain(100_000)
+            ),
+            format!("async () => {{ await x{}; }}", chain(1_900)),
+        ] {
+            assert_eq!(nesting_error(&source), None, "{}", &source[..40]);
+        }
+        for source in [
+            format!("async () => {{ await x{}; }}", chain(3_000)),
+            format!("async () => {{ x{} + await x; }}", chain(3_000)),
+            format!("function* g() {{ x{} + (yield); }}", chain(3_000)),
+        ] {
+            let error = nesting_error(&source).expect("past the limit");
+            assert!(error.contains("after an `await` or `yield`"), "{error}");
+        }
+    });
+}
+
+// A method call's property access and call cost half a level each, so about
+// 1,000 chained method calls fit, four times the other links. Other member, call
+// and optional links cost two levels, as each item of an optional chain does;
+// the error names what exceeded the limit.
+#[test]
+fn member_chains_are_charged_by_link_kind() {
+    on_compiler_stack(|| {
+        let ok = |source: &str| parse(source, ParseOptions::script()).is_ok();
+        assert!(ok(&format!("o{};", ".m()".repeat(950))));
+        assert!(ok(&format!("o{};", "[k](1)".repeat(950))));
+        assert!(ok(&format!("new Map(){};", ".set(1, 2)".repeat(950))));
+        assert!(ok(&format!("o?{};", ".m()".repeat(950))));
+        let error = nesting_error(&format!("o{};", ".m()".repeat(1_100))).expect("too long");
+        assert!(error.contains("method call"), "{error}");
+
+        assert!(ok(&format!("o{};", ".a".repeat(490))));
+        assert!(ok(&format!("o?{};", ".a".repeat(490))));
+        for source in [
+            format!("o{};", ".a".repeat(600)),
+            format!("o?{};", ".a".repeat(600)),
+            format!("f{};", "()".repeat(600)),
+        ] {
+            let error = nesting_error(&source).expect("too long");
+            assert!(error.contains("property access, call"), "{error}");
+        }
+        let error = nesting_error(&format!(
+            "var x = {}1{};",
+            "(".repeat(1_000),
+            ")".repeat(1_000)
+        ))
+        .expect("too deep");
+        assert!(error.contains("of 1000 levels at line"), "{error}");
+    });
+}
+
+// `(a0, a1, …) =>` is covered by a comma chain, converted to parameters
+// without recursing per comma. ECMA-262 sets no limit on parameters; V8
+// rejects more than 65,535 with a SyntaxError, and so does Scriptw, for every
+// function form.
+#[test]
+fn parameter_lists_are_bounded_and_converted_without_recursion() {
+    let parameters = |count: usize| {
+        (0..count)
+            .map(|index| format!("a{index}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let error = |source: String| {
+        parse(&source, ParseOptions::script())
+            .err()
+            .map(|error| error.message().to_string())
+            .unwrap_or_default()
+    };
+    // Boa's scope analysis looks bindings up linearly, so one function at the
+    // limit takes seconds (see the inventory); one form checks the boundary.
+    assert!(parse(
+        &format!("var f = ({}) => 0;", parameters(65_535)),
+        ParseOptions::script()
+    )
+    .is_ok());
+    let list = parameters(1_000);
+    for source in [
+        format!("var f = async ({list}) => 0;"),
+        format!("function f({list}) {{}}"),
+    ] {
+        assert!(parse(&source, ParseOptions::script()).is_ok());
+    }
+    for count in [65_536, 300_000] {
+        let list = parameters(count);
+        for source in [
+            format!("var f = ({list}) => 0;"),
+            format!("var f = async ({list}) => 0;"),
+            format!("function f({list}) {{}}"),
+        ] {
+            let message = error(source);
+            assert!(message.contains("too many formal parameters"), "{message}");
+        }
+    }
+}

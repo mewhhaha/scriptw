@@ -257,8 +257,6 @@ where
                     cursor
                         .next(interner)?
                         .expect("dot punctuator token disappeared"); // We move the parser forward.
-                    height =
-                        cursor.chain_height(height + crate::parser::MEMBER_LINK_UNITS, interner)?;
 
                     let token = cursor.next(interner).or_abrupt()?;
 
@@ -301,6 +299,8 @@ where
                             ));
                         }
                     };
+                    let charge = super::call::access_charge(cursor, interner)?;
+                    height = cursor.chain_height(height, charge, interner)?;
 
                     lhs = ast::Expression::PropertyAccess(access);
                 }
@@ -312,11 +312,9 @@ where
                         Expression::new(true, self.allow_yield, self.allow_await)
                             .parse(cursor, interner)
                     })?;
-                    height = cursor.chain_height(
-                        height.max(idx_height) + crate::parser::MEMBER_LINK_UNITS,
-                        interner,
-                    )?;
                     cursor.expect(Punctuator::CloseBracket, "member expression", interner)?;
+                    let charge = super::call::access_charge(cursor, interner)?;
+                    height = cursor.chain_height(height.max(idx_height), charge, interner)?;
                     lhs =
                         ast::Expression::PropertyAccess(SimplePropertyAccess::new(lhs, idx).into());
                 }
@@ -333,7 +331,8 @@ where
                             .parse(cursor, interner)
                         })?;
                     height = cursor.chain_height(
-                        height.max(template_height) + crate::parser::MEMBER_LINK_UNITS,
+                        height.max(template_height),
+                        crate::parser::NestingCharge::MemberLink,
                         interner,
                     )?;
                     lhs = tagged.into();

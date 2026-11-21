@@ -147,8 +147,8 @@ where
                         // Scriptw: an `else if` chain recurses here directly, one
                         // `else if` costing less than a whole nested Statement.
                         TokenKind::Keyword((Keyword::If, _)) => cursor
-                            .nested_units(
-                                crate::parser::ELSE_IF_UNITS,
+                            .nested_charge(
+                                crate::parser::NestingCharge::ElseIf,
                                 interner,
                                 |cursor, interner| self.parse(cursor, interner),
                             )?

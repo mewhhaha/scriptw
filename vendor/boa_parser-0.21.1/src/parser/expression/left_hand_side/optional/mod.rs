@@ -5,8 +5,10 @@ use crate::{
     Error,
     lexer::{Token, TokenKind},
     parser::{
-        AllowAwait, AllowYield, OrAbrupt, ParseResult, TokenParser, cursor::Cursor,
-        expression::Expression, expression::left_hand_side::arguments::Arguments,
+        AllowAwait, AllowYield, NestingCharge, OrAbrupt, ParseResult, TokenParser,
+        cursor::Cursor,
+        expression::Expression,
+        expression::left_hand_side::{arguments::Arguments, call::access_charge},
     },
     source::ReadChar,
 };
@@ -32,6 +34,8 @@ pub(in crate::parser) struct OptionalExpression {
     allow_yield: AllowYield,
     allow_await: AllowAwait,
     target: ast::Expression,
+    /// Scriptw: the tree height of `target` (see `Cursor::measured`).
+    target_height: u32,
 }
 
 impl OptionalExpression {
@@ -40,6 +44,7 @@ impl OptionalExpression {
         allow_yield: Y,
         allow_await: A,
         target: ast::Expression,
+        target_height: u32,
     ) -> Self
     where
         Y: Into<AllowYield>,
@@ -49,6 +54,7 @@ impl OptionalExpression {
             allow_yield: allow_yield.into(),
             allow_await: allow_await.into(),
             target,
+            target_height,
         }
     }
 }
@@ -57,7 +63,10 @@ impl<R> TokenParser<R> for OptionalExpression
 where
     R: ReadChar,
 {
-    type Output = Optional;
+    /// Scriptw: the chain and its tree height. The chain is one flat node, but
+    /// each item is charged as the link it would be outside an optional chain,
+    /// because its native compilation costs the same.
+    type Output = (Optional, u32);
 
     fn parse(self, cursor: &mut Cursor<R>, interner: &mut Interner) -> ParseResult<Self::Output> {
         fn parse_const_access(
@@ -104,6 +113,10 @@ where
         }
 
         let mut items = Vec::new();
+        let mut height = self.target_height;
+        // Whether the item before the next one is a property access, which a
+        // call item makes a method call.
+        let mut after_access = matches!(self.target, ast::Expression::PropertyAccess(_));
 
         while let Some(token) = cursor.peek(0, interner)? {
             let token_span = token.span();
@@ -118,6 +131,9 @@ where
                     let field = cursor.next(interner).or_abrupt()?;
 
                     let (item, item_span) = parse_const_access(&field, interner)?;
+                    let charge = access_charge(cursor, interner)?;
+                    height = cursor.chain_height(height, charge, interner)?;
+                    after_access = true;
                     items.push(OptionalOperation::new(
                         item,
                         false,
@@ -137,20 +153,35 @@ where
             let token = cursor.peek(0, interner).or_abrupt()?;
             let (item, item_span) = match token.kind() {
                 TokenKind::Punctuator(Punctuator::OpenParen) => {
-                    let (args, args_span) = Arguments::new(self.allow_yield, self.allow_await)
-                        .parse(cursor, interner)?;
+                    let ((args, args_span), args_height) =
+                        cursor.measured(interner, |cursor, interner| {
+                            Arguments::new(self.allow_yield, self.allow_await)
+                                .parse(cursor, interner)
+                        })?;
+                    let charge = if after_access {
+                        NestingCharge::MethodLink
+                    } else {
+                        NestingCharge::MemberLink
+                    };
+                    height = cursor.chain_height(height.max(args_height), charge, interner)?;
+                    after_access = false;
                     (OptionalOperationKind::Call { args }, args_span)
                 }
                 TokenKind::Punctuator(Punctuator::OpenBracket) => {
                     cursor
                         .next(interner)?
                         .expect("open bracket punctuator token disappeared"); // We move the parser forward.
-                    let idx = Expression::new(true, self.allow_yield, self.allow_await)
-                        .parse(cursor, interner)?;
+                    let (idx, idx_height) = cursor.measured(interner, |cursor, interner| {
+                        Expression::new(true, self.allow_yield, self.allow_await)
+                            .parse(cursor, interner)
+                    })?;
                     let end = cursor
                         .expect(Punctuator::CloseBracket, "optional chain", interner)?
                         .span()
                         .end();
+                    let charge = access_charge(cursor, interner)?;
+                    height = cursor.chain_height(height.max(idx_height), charge, interner)?;
+                    after_access = true;
                     (
                         OptionalOperationKind::SimplePropertyAccess {
                             field: PropertyAccessField::Expr(Box::new(idx)),
@@ -167,6 +198,9 @@ where
                 _ => {
                     let token = cursor.next(interner)?.expect("token disappeared");
                     let (item, item_span) = parse_const_access(&token, interner)?;
+                    let charge = access_charge(cursor, interner)?;
+                    height = cursor.chain_height(height, charge, interner)?;
+                    after_access = true;
                     (item, Span::new(token_span.start(), item_span.end()))
                 }
             };
@@ -181,10 +215,9 @@ where
             .end();
 
         let target_span_start = self.target.span().start();
-        Ok(Optional::new(
-            self.target,
-            items.into(),
-            Span::new(target_span_start, end),
+        Ok((
+            Optional::new(self.target, items.into(), Span::new(target_span_start, end)),
+            height,
         ))
     }
 }

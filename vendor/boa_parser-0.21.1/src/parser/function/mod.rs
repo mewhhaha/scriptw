@@ -99,6 +99,10 @@ where
                 )));
             }
 
+            // Scriptw: see `crate::parser::MAX_FORMAL_PARAMETERS`.
+            if params.len() == crate::parser::MAX_FORMAL_PARAMETERS {
+                return Err(too_many_parameters(start_position));
+            }
             params.push(next_param);
 
             if cursor
@@ -535,4 +539,16 @@ where
             })
         })
     }
+}
+
+/// Scriptw: the SyntaxError for a parameter list longer than
+/// [`crate::parser::MAX_FORMAL_PARAMETERS`].
+pub(in crate::parser) fn too_many_parameters(position: Position) -> Error {
+    Error::general(
+        format!(
+            "too many formal parameters: a function may have at most {} (an implementation limit)",
+            crate::parser::MAX_FORMAL_PARAMETERS
+        ),
+        position,
+    )
 }

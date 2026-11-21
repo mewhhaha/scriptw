@@ -559,6 +559,12 @@ where
             }
         }
 
+        // Scriptw: see `crate::parser::MAX_FORMAL_PARAMETERS`.
+        if parameters.len() > crate::parser::MAX_FORMAL_PARAMETERS {
+            return Err(crate::parser::function::too_many_parameters(
+                span_start.start(),
+            ));
+        }
         let parameters = FormalParameterList::from(parameters);
 
         if let Some(span) = tailing_comma
@@ -582,7 +588,33 @@ where
 }
 
 /// Convert an expression to a formal parameter and append it to the given parameter list.
+///
+/// Scriptw: `(a, b, c) =>` is covered by a left-deep comma chain; its operands
+/// are converted in a loop rather than by one recursion per comma, which
+/// overflowed the stack on a few hundred thousand parameters.
 fn expression_to_formal_parameters(
+    node: &ast::Expression,
+    parameters: &mut Vec<FormalParameter>,
+    strict: bool,
+    span: Span,
+) -> ParseResult<()> {
+    let mut later = Vec::new();
+    let mut first = node;
+    while let ast::Expression::Binary(bin_op) = first
+        && bin_op.op() == BinaryOp::Comma
+    {
+        later.push(bin_op.rhs());
+        first = bin_op.lhs();
+    }
+    expression_to_formal_parameter(first, parameters, strict, span)?;
+    for operand in later.into_iter().rev() {
+        expression_to_formal_parameter(operand, parameters, strict, span)?;
+    }
+    Ok(())
+}
+
+/// Convert one operand of a parameter cover's comma chain to a formal parameter.
+fn expression_to_formal_parameter(
     node: &ast::Expression,
     parameters: &mut Vec<FormalParameter>,
     strict: bool,
@@ -608,8 +640,7 @@ fn expression_to_formal_parameters(
             ));
         }
         ast::Expression::Binary(bin_op) if bin_op.op() == BinaryOp::Comma => {
-            expression_to_formal_parameters(bin_op.lhs(), parameters, strict, span)?;
-            expression_to_formal_parameters(bin_op.rhs(), parameters, strict, span)?;
+            expression_to_formal_parameters(node, parameters, strict, span)?;
         }
         ast::Expression::Assign(assign) => match assign.lhs() {
             AssignTarget::Identifier(ident) => {

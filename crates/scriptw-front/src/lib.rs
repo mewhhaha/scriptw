@@ -555,10 +555,11 @@ impl std::error::Error for ParseError {}
 /// The deepest nesting of recursive grammar productions a source may have;
 /// deeper source is a SyntaxError. The parser bounds the height of the tree,
 /// not only its own recursion: an `else if` counts two thirds of a level, a
-/// member or call link two levels, and a binary, logical, `??` or comma
-/// operator, which the compiler walks without recursing per operator, a
-/// two-thousandth of a level outside generator and async function bodies and
-/// half a level inside them (see `boa_parser::parser::MAX_NESTING_UNITS`). Parsing and
+/// member, call or optional chain link two levels, each link of a method call
+/// half a level, and a binary, logical, `??` or comma operator, which the
+/// compiler walks without recursing per operator, a two-thousandth of a level,
+/// or half a level in a generator or async function body when one of its
+/// chain's operands suspends (see `boa_parser::parser::NestingCharge`). Parsing and
 /// compiling a tree at the limit needs native stack in proportion to it:
 /// callers parse on the engine's 64 MiB compiler stack, not on a small
 /// default thread stack.

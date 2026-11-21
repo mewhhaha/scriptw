@@ -4,7 +4,7 @@ mod buffered_lexer;
 use crate::{
     Error,
     lexer::{InputElement, Lexer, Token, TokenKind},
-    parser::{OrAbrupt, ParseResult},
+    parser::{NestingCharge, OrAbrupt, ParseResult},
     source::ReadChar,
 };
 use boa_ast::{LinearPosition, PositionGroup, Punctuator, Spanned};
@@ -50,6 +50,35 @@ pub(super) struct Cursor<R> {
     /// Scriptw: whether the current token is in a generator or async function
     /// body (see [`crate::parser::BINARY_LINK_UNITS`]).
     resumable_body: bool,
+
+    /// Scriptw: how many `await` and `yield` expressions of the current
+    /// function body have been parsed so far; a chain compares it with its
+    /// value when the chain began (see [`Self::binary_link`]).
+    suspensions: u64,
+}
+
+/// Scriptw: the tree height, in units, of a binary, logical, `??` or comma
+/// chain so far (see [`Cursor::binary_link`]): as charged, and as it would be
+/// if every operator were charged [`NestingCharge::ResumableOperator`].
+#[derive(Debug, Clone, Copy)]
+pub(super) struct ChainHeight {
+    plain: u32,
+    resumable: u32,
+}
+
+impl ChainHeight {
+    /// The height of one operand, `height` units high.
+    pub(super) const fn operand(height: u32) -> Self {
+        Self {
+            plain: height,
+            resumable: height,
+        }
+    }
+
+    /// The height as charged.
+    pub(super) const fn height(self) -> u32 {
+        self.plain
+    }
 }
 
 impl<R> Cursor<R>
@@ -67,6 +96,7 @@ where
             nesting: 0,
             reach: 0,
             resumable_body: false,
+            suspensions: 0,
         }
     }
 
@@ -81,18 +111,19 @@ where
         interner: &mut Interner,
         parse: impl FnOnce(&mut Self, &mut Interner) -> ParseResult<T>,
     ) -> ParseResult<T> {
-        self.nested_units(crate::parser::NESTING_UNITS_PER_LEVEL, interner, parse)
+        self.nested_charge(NestingCharge::Level, interner, parse)
     }
 
-    /// Scriptw: [`Self::nested`] for a production that costs `units`.
-    pub(super) fn nested_units<T>(
+    /// Scriptw: [`Self::nested`] for a production that costs `charge`.
+    pub(super) fn nested_charge<T>(
         &mut self,
-        units: u32,
+        charge: NestingCharge,
         interner: &mut Interner,
         parse: impl FnOnce(&mut Self, &mut Interner) -> ParseResult<T>,
     ) -> ParseResult<T> {
+        let units = charge.units();
         if self.nesting + units > crate::parser::MAX_NESTING_UNITS {
-            return Err(self.nesting_limit_error(interner));
+            return Err(self.nesting_limit_error(charge, interner));
         }
         self.nesting += units;
         self.reach = self.reach.max(self.nesting);
@@ -121,15 +152,19 @@ where
         parsed.map(|parsed| (parsed, height))
     }
 
-    /// Scriptw: checks that a loop-built tree `height` units above the current
-    /// nesting stays within [`crate::parser::MAX_NESTING_UNITS`], and returns it.
+    /// Scriptw: adds one link of a loop-built tree, costing `charge`, over
+    /// operands `operands` units high, checks that the tree stays within
+    /// [`crate::parser::MAX_NESTING_UNITS`] above the current nesting, and
+    /// returns its height.
     pub(super) fn chain_height(
         &mut self,
-        height: u32,
+        operands: u32,
+        charge: NestingCharge,
         interner: &mut Interner,
     ) -> ParseResult<u32> {
+        let height = operands.saturating_add(charge.units());
         if self.nesting.saturating_add(height) > crate::parser::MAX_NESTING_UNITS {
-            return Err(self.nesting_limit_error(interner));
+            return Err(self.nesting_limit_error(charge, interner));
         }
         Ok(height)
     }
@@ -140,17 +175,51 @@ where
         self.reach = self.reach.max(self.nesting + height);
     }
 
-    /// Scriptw: the units of one binary, logical, `??` or comma operator here.
-    pub(super) const fn binary_link_units(&self) -> u32 {
-        if self.resumable_body {
-            crate::parser::RESUMABLE_BINARY_LINK_UNITS
+    /// Scriptw: the mark a binary, logical, `??` or comma chain takes before
+    /// its first operand (see [`Self::binary_link`]).
+    pub(super) const fn suspension_mark(&self) -> u64 {
+        self.suspensions
+    }
+
+    /// Scriptw: records an `await` or `yield` expression.
+    pub(super) fn note_suspension(&mut self) {
+        self.suspensions += 1;
+    }
+
+    /// Scriptw: adds one binary, logical, `??` or comma operator over `lhs`
+    /// and `rhs` to the chain that took `mark` before its first operand.
+    ///
+    /// The compiler walks these chains without recursing per operator, except
+    /// in a generator or async function body when one of the chain's operands
+    /// contains an `await` or `yield`: there the resumable lowering and state
+    /// planners recurse once per operator from that operand on, and test each
+    /// such operator's operands for a suspension. So once the chain has
+    /// parsed a suspension, every one of its operators is charged
+    /// [`NestingCharge::ResumableOperator`], the ones before it included.
+    pub(super) fn binary_link(
+        &mut self,
+        lhs: ChainHeight,
+        rhs: ChainHeight,
+        mark: u64,
+        interner: &mut Interner,
+    ) -> ParseResult<ChainHeight> {
+        let resumable_operands = lhs.resumable.max(rhs.resumable);
+        let resumable = resumable_operands.saturating_add(NestingCharge::ResumableOperator.units());
+        let plain = if self.resumable_body && self.suspensions != mark {
+            self.chain_height(
+                resumable_operands,
+                NestingCharge::ResumableOperator,
+                interner,
+            )?
         } else {
-            crate::parser::BINARY_LINK_UNITS
-        }
+            self.chain_height(lhs.plain.max(rhs.plain), NestingCharge::Operator, interner)?
+        };
+        Ok(ChainHeight { plain, resumable })
     }
 
     /// Scriptw: parses a function body, `resumable` when it is a generator or
-    /// async function's.
+    /// async function's. Its suspensions belong to it, not to a chain of the
+    /// enclosing body that contains the function.
     pub(super) fn function_body<T>(
         &mut self,
         resumable: bool,
@@ -158,20 +227,23 @@ where
         parse: impl FnOnce(&mut Self, &mut Interner) -> ParseResult<T>,
     ) -> ParseResult<T> {
         let enclosing = core::mem::replace(&mut self.resumable_body, resumable);
+        let suspensions = self.suspensions;
         let parsed = parse(self, interner);
         self.resumable_body = enclosing;
+        self.suspensions = suspensions;
         parsed
     }
 
-    fn nesting_limit_error(&mut self, interner: &mut Interner) -> Error {
+    fn nesting_limit_error(&mut self, charge: NestingCharge, interner: &mut Interner) -> Error {
         let position = match self.peek(0, interner) {
             Ok(Some(token)) => token.span().start(),
             _ => boa_ast::Position::new(1, 1),
         };
         Error::general(
             format!(
-                "source nesting exceeds the implementation limit of {} levels",
-                crate::parser::MAX_NESTING_DEPTH
+                "source nesting exceeds the implementation limit of {} levels{}",
+                crate::parser::MAX_NESTING_DEPTH,
+                charge.description()
             ),
             position,
         )
@@ -236,6 +308,17 @@ where
         interner: &mut Interner,
     ) -> ParseResult<Option<&Token>> {
         self.buffered_lexer.peek(skip_n, true, interner)
+    }
+
+    /// Scriptw: the [`Self::peek`] index of the `)` that closes the `(` at
+    /// index `open`, scanning the tokens between them once; `None` when the
+    /// source ends first.
+    pub(super) fn closing_paren(
+        &mut self,
+        open: usize,
+        interner: &mut Interner,
+    ) -> ParseResult<Option<usize>> {
+        self.buffered_lexer.closing_paren(open, interner)
     }
 
     /// Peeks a future token, without consuming it or advancing the cursor.

@@ -45,17 +45,18 @@ use self::statement::ModuleItemList;
 /// The parser recurses once per level, but loops build some trees deeper than
 /// the parser recursed: binary, logical, `??` and comma chains, and member,
 /// call, tagged template and optional chains add one tree level per operator.
-/// So the bound is on the height of the tree, in units: a counted production
-/// costs [`NESTING_UNITS_PER_LEVEL`], an `else if` [`ELSE_IF_UNITS`], a member
-/// or call link [`MEMBER_LINK_UNITS`] and a binary, logical, `??` or comma
-/// link [`BINARY_LINK_UNITS`] ([`RESUMABLE_BINARY_LINK_UNITS`] in generator
-/// and async function bodies), and no path from the root may exceed
+/// So the bound is on the height of the tree, in units: each [`NestingCharge`]
+/// costs its [`NestingCharge::units`], and no path from the root may exceed
 /// [`MAX_NESTING_UNITS`]. Every phase after the parser recurses once per
 /// level except through binary, logical, `??` and comma chains, which Boa's
-/// visitors, the tree's `Drop` and Scriptw's lowering walk iteratively, and
-/// which lowering splits into bounded IR. So at this bound the compiler stays
-/// well inside the 64 MiB stack it runs on, and those chains may have about
-/// two million operators (V8 handles chains of a million terms).
+/// visitors, the tree's `Drop` and Scriptw's lowering walk iteratively.
+/// Lowering also bounds the IR those chains become: it binds the value of a
+/// chain to a temporary whenever the chains enclosing an operator have nested
+/// it more than a fixed depth, so the IR is about as deep as the source's real
+/// nesting. So at this bound the compiler stays well inside the 64 MiB stack
+/// it runs on (about 18 KB of it per level, measured on nested array
+/// literals), and a chain may have about two million operators (V8 handles
+/// chains of a million terms).
 pub const MAX_NESTING_DEPTH: u32 = 1000;
 
 /// Scriptw: tree-height units of one counted production.
@@ -69,24 +70,96 @@ pub const NESTING_UNITS_PER_LEVEL: u32 = 2048;
 pub const ELSE_IF_UNITS: u32 = NESTING_UNITS_PER_LEVEL * 2 / 3;
 
 /// Scriptw: tree-height units of one link of a member, call, tagged template
-/// or optional chain (`a.b`, `a[b]`, `a(b)`, ``a`b` ``, `a?.b`): two levels,
-/// so a chain has at most about 500 links. Later phases recurse through each
-/// link, and native compilation of the chain grows faster than its length
-/// (1,000 links took 1.5 GB).
+/// or optional chain (`a.b`, `a[b]`, `a(b)`, ``a`b` ``, `a?.b` and each item
+/// after it) that is not part of a method call: two levels, so such a chain
+/// has at most about 500 links. Native compilation of a property access chain
+/// grows quadratically with its length (450 `.a` links took 0.5 GB, 1,000
+/// about 2.2 GB), and a call of a call result superlinearly.
 pub const MEMBER_LINK_UNITS: u32 = 2 * NESTING_UNITS_PER_LEVEL;
 
+/// Scriptw: tree-height units of each of the two links of a method call
+/// (`a.m(…)`, `a[k](…)` and their optional forms): the property access whose
+/// next token is the call's `(`, and the call whose callee is a property
+/// access. Half a level each, so a chain of about 1,000 method calls fits, four
+/// times the other links (builder and `Map#set` chains in generated code reach
+/// hundreds; Node runs 3,000). Each costs the compiler about 4 KB of stack, and
+/// native compilation of the chain grows superlinearly: 1,000 calls took
+/// 261 MB and 14 s with the Fast policy, 1,500 calls 1.25 GB, and 3,000 did not
+/// fit in 4 GiB.
+pub const METHOD_LINK_UNITS: u32 = NESTING_UNITS_PER_LEVEL / 2;
+
 /// Scriptw: tree-height units of one binary, logical, `??` or comma operator;
-/// the compiler walks these chains without recursing per operator. Inside a
-/// generator or async function body the compiler's resumable lowering still
+/// the compiler walks these chains without recursing per operator. In a
+/// generator or async function body, from the first operand of a chain that
+/// contains an `await` or `yield` on, the compiler's resumable lowering
 /// recurses per operator, so there one costs [`RESUMABLE_BINARY_LINK_UNITS`].
 pub const BINARY_LINK_UNITS: u32 = 1;
 
-/// Scriptw: tree-height units of one binary operator in a generator or async
-/// function body: half a level, so about 2,000 fit.
+/// Scriptw: tree-height units of one binary operator after an `await` or
+/// `yield` in its chain, in a generator or async function body: half a level,
+/// so about 2,000 fit.
 pub const RESUMABLE_BINARY_LINK_UNITS: u32 = NESTING_UNITS_PER_LEVEL / 2;
 
 /// Scriptw: the greatest tree height, in units, a source may have.
 pub const MAX_NESTING_UNITS: u32 = MAX_NESTING_DEPTH * NESTING_UNITS_PER_LEVEL;
+
+/// Scriptw: the most formal parameters one function may have; more is a
+/// SyntaxError. ECMA-262 sets no limit, and V8 rejects more than 65,535 with a
+/// SyntaxError, so code that runs there fits.
+pub const MAX_FORMAL_PARAMETERS: usize = 65_535;
+
+/// Scriptw: what one charge against [`MAX_NESTING_UNITS`] is for. The limit
+/// error names the construct that exceeded it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NestingCharge {
+    /// A counted production ([`NESTING_UNITS_PER_LEVEL`]).
+    Level,
+    /// An `else if` ([`ELSE_IF_UNITS`]).
+    ElseIf,
+    /// A member, call, tagged template or optional chain link ([`MEMBER_LINK_UNITS`]).
+    MemberLink,
+    /// A link of a method call ([`METHOD_LINK_UNITS`]).
+    MethodLink,
+    /// A binary, logical, `??` or comma operator ([`BINARY_LINK_UNITS`]).
+    Operator,
+    /// Such an operator after an `await` or `yield` in its chain
+    /// ([`RESUMABLE_BINARY_LINK_UNITS`]).
+    ResumableOperator,
+}
+
+impl NestingCharge {
+    /// The tree-height units of this charge.
+    pub(crate) const fn units(self) -> u32 {
+        match self {
+            Self::Level => NESTING_UNITS_PER_LEVEL,
+            Self::ElseIf => ELSE_IF_UNITS,
+            Self::MemberLink => MEMBER_LINK_UNITS,
+            Self::MethodLink => METHOD_LINK_UNITS,
+            Self::Operator => BINARY_LINK_UNITS,
+            Self::ResumableOperator => RESUMABLE_BINARY_LINK_UNITS,
+        }
+    }
+
+    /// What the limit error says the charge was for.
+    pub(crate) const fn description(self) -> &'static str {
+        match self {
+            Self::Level => "",
+            Self::ElseIf => " at this `else if`, which counts as two thirds of a level",
+            Self::MemberLink => {
+                " at this link of a property access, call, tagged template or optional chain, \
+                 which counts as two levels"
+            }
+            Self::MethodLink => {
+                " at this method call, each link of which counts as half a level"
+            }
+            Self::Operator => " at this operator, which counts as 1/2048 of a level",
+            Self::ResumableOperator => {
+                " at this operator, which counts as half a level after an `await` or `yield` \
+                 earlier in its chain"
+            }
+        }
+    }
+}
 
 type ScriptParseOutput = (boa_ast::Script, boa_ast::SourceText);
 type ModuleParseOutput = (boa_ast::Module, boa_ast::SourceText);

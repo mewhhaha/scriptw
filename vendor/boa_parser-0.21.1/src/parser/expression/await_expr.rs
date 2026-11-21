@@ -56,6 +56,8 @@ where
             )?
             .span()
             .start();
+        // Scriptw: see `Cursor::binary_link`.
+        cursor.note_suspension();
 
         let expr = cursor.nested(interner, |cursor, interner| {
             UnaryExpression::new(self.allow_yield, true).parse(cursor, interner)

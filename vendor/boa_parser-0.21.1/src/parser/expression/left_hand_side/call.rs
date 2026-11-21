@@ -12,7 +12,7 @@ use crate::{
     Error,
     lexer::TokenKind,
     parser::{
-        AllowAwait, AllowYield, Cursor, OrAbrupt, ParseResult, TokenParser,
+        AllowAwait, AllowYield, Cursor, NestingCharge, OrAbrupt, ParseResult, TokenParser,
         expression::{Expression, left_hand_side::template::TaggedTemplateLiteral},
     },
     source::ReadChar,
@@ -78,7 +78,8 @@ where
                     Arguments::new(self.allow_yield, self.allow_await).parse(cursor, interner)
                 })?;
             let height = cursor.chain_height(
-                self.first_member_height.max(args_height) + crate::parser::MEMBER_LINK_UNITS,
+                self.first_member_height.max(args_height),
+                call_charge(&self.first_member_expr),
                 interner,
             )?;
 
@@ -154,15 +155,14 @@ where
                                 .parse(cursor, interner)
                         })?;
                     height = cursor.chain_height(
-                        height.max(args_height) + crate::parser::MEMBER_LINK_UNITS,
+                        height.max(args_height),
+                        call_charge(&lhs),
                         interner,
                     )?;
                     lhs = Call::new(lhs, args, args_span).into();
                 }
                 TokenKind::Punctuator(Punctuator::Dot) => {
                     cursor.advance(interner);
-                    height =
-                        cursor.chain_height(height + crate::parser::MEMBER_LINK_UNITS, interner)?;
 
                     let token = cursor.next(interner).or_abrupt()?;
                     let access = match token.kind() {
@@ -203,6 +203,8 @@ where
                             ));
                         }
                     };
+                    let charge = access_charge(cursor, interner)?;
+                    height = cursor.chain_height(height, charge, interner)?;
 
                     lhs = ast::Expression::PropertyAccess(access);
                 }
@@ -212,11 +214,9 @@ where
                         Expression::new(true, self.allow_yield, self.allow_await)
                             .parse(cursor, interner)
                     })?;
-                    height = cursor.chain_height(
-                        height.max(idx_height) + crate::parser::MEMBER_LINK_UNITS,
-                        interner,
-                    )?;
                     cursor.expect(Punctuator::CloseBracket, "call expression", interner)?;
+                    let charge = access_charge(cursor, interner)?;
+                    height = cursor.chain_height(height.max(idx_height), charge, interner)?;
                     lhs =
                         ast::Expression::PropertyAccess(SimplePropertyAccess::new(lhs, idx).into());
                 }
@@ -233,7 +233,8 @@ where
                             .parse(cursor, interner)
                         })?;
                     height = cursor.chain_height(
-                        height.max(template_height) + crate::parser::MEMBER_LINK_UNITS,
+                        height.max(template_height),
+                        NestingCharge::MemberLink,
                         interner,
                     )?;
                     lhs = tagged.into();
@@ -245,4 +246,28 @@ where
 
         Ok(lhs)
     }
+}
+
+/// Scriptw: the nesting charge of a call of `callee`: a method call link when
+/// it calls a property access (see [`crate::parser::METHOD_LINK_UNITS`]).
+pub(super) const fn call_charge(callee: &ast::Expression) -> NestingCharge {
+    if matches!(callee, ast::Expression::PropertyAccess(_)) {
+        NestingCharge::MethodLink
+    } else {
+        NestingCharge::MemberLink
+    }
+}
+
+/// Scriptw: the nesting charge of the property access just parsed: a method
+/// call link when the next token starts its call's arguments.
+pub(super) fn access_charge<R: ReadChar>(
+    cursor: &mut Cursor<R>,
+    interner: &mut Interner,
+) -> ParseResult<NestingCharge> {
+    Ok(
+        match cursor.peek(0, interner)?.map(crate::lexer::Token::kind) {
+            Some(TokenKind::Punctuator(Punctuator::OpenParen)) => NestingCharge::MethodLink,
+            _ => NestingCharge::MemberLink,
+        },
+    )
 }

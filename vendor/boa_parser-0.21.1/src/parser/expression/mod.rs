@@ -24,7 +24,7 @@ use crate::{
     lexer::{InputElement, TokenKind},
     parser::{
         AllowAwait, AllowIn, AllowYield, Cursor, OrAbrupt, ParseResult, TokenParser,
-        expression::assignment::ExponentiationExpression,
+        cursor::ChainHeight, expression::assignment::ExponentiationExpression,
     },
     source::ReadChar,
 };
@@ -82,9 +82,11 @@ macro_rules! expression {
                 }
 
                 // Scriptw: a left-deep chain, one tree level per operator.
-                let (mut lhs, mut height) = cursor.measured(interner, |cursor, interner| {
+                let mark = cursor.suspension_mark();
+                let (mut lhs, height) = cursor.measured(interner, |cursor, interner| {
                     $lower::new($( self.$low_param ),*).parse(cursor, interner)
                 })?;
+                let mut height = ChainHeight::operand(height);
                 while let Some(tok) = cursor.peek(0, interner)? {
                     match *tok.kind() {
                         TokenKind::Punctuator(op) if $( op == $op )||* => {
@@ -92,8 +94,10 @@ macro_rules! expression {
                             let (rhs, rhs_height) = cursor.measured(interner, |cursor, interner| {
                                 $lower::new($( self.$low_param ),*).parse(cursor, interner)
                             })?;
-                            height = cursor.chain_height(
-                                height.max(rhs_height) + cursor.binary_link_units(),
+                            height = cursor.binary_link(
+                                height,
+                                ChainHeight::operand(rhs_height),
+                                mark,
                                 interner,
                             )?;
                             lhs = Binary::new(
@@ -105,7 +109,7 @@ macro_rules! expression {
                         _ => break
                     }
                 }
-                cursor.record_height(height);
+                cursor.record_height(height.height());
 
                 Ok(lhs)
             }
@@ -152,10 +156,12 @@ where
 
     fn parse(self, cursor: &mut Cursor<R>, interner: &mut Interner) -> ParseResult<Self::Output> {
         // Scriptw: a left-deep chain, one tree level per comma.
-        let (mut lhs, mut height) = cursor.measured(interner, |cursor, interner| {
+        let mark = cursor.suspension_mark();
+        let (mut lhs, height) = cursor.measured(interner, |cursor, interner| {
             AssignmentExpression::new(self.allow_in, self.allow_yield, self.allow_await)
                 .parse(cursor, interner)
         })?;
+        let mut height = ChainHeight::operand(height);
         while let Some(tok) = cursor.peek(0, interner)? {
             match *tok.kind() {
                 TokenKind::Punctuator(Punctuator::Comma) => {
@@ -177,8 +183,10 @@ where
                         AssignmentExpression::new(self.allow_in, self.allow_yield, self.allow_await)
                             .parse(cursor, interner)
                     })?;
-                    height = cursor.chain_height(
-                        height.max(rhs_height) + cursor.binary_link_units(),
+                    height = cursor.binary_link(
+                        height,
+                        ChainHeight::operand(rhs_height),
+                        mark,
                         interner,
                     )?;
                     lhs = Binary::new(
@@ -193,7 +201,7 @@ where
                 _ => break,
             }
         }
-        cursor.record_height(height);
+        cursor.record_height(height.height());
 
         Ok(lhs)
     }
@@ -250,26 +258,26 @@ where
         // `||` and `&&` chains (LogicalORExpression is left-recursive in
         // ECMA-262 13.13), instead of recursing once per `||`, which neither
         // bounded the parser's recursion nor the tree's height.
+        let mark = cursor.suspension_mark();
         let operand = |cursor: &mut Cursor<R>, interner: &mut Interner| {
-            cursor.measured(interner, |cursor, interner| {
-                BitwiseORExpression::new(self.allow_in, self.allow_yield, self.allow_await)
-                    .parse(cursor, interner)
-            })
+            cursor
+                .measured(interner, |cursor, interner| {
+                    BitwiseORExpression::new(self.allow_in, self.allow_yield, self.allow_await)
+                        .parse(cursor, interner)
+                })
+                .map(|(operand, height)| (operand, ChainHeight::operand(height)))
         };
         let link = |cursor: &mut Cursor<R>,
                     interner: &mut Interner,
                     op: LogicalOp,
-                    (lhs, lhs_height): (ast::Expression, u32),
-                    (rhs, rhs_height): (ast::Expression, u32)| {
-            let height = cursor.chain_height(
-                lhs_height.max(rhs_height) + cursor.binary_link_units(),
-                interner,
-            )?;
+                    (lhs, lhs_height): (ast::Expression, ChainHeight),
+                    (rhs, rhs_height): (ast::Expression, ChainHeight)| {
+            let height = cursor.binary_link(lhs_height, rhs_height, mark, interner)?;
             Ok::<_, Error>((Binary::new(BinaryOp::Logical(op), lhs, rhs).into(), height))
         };
         // The `||` operands before the current one, and the current `&&` (or
         // `??`) chain.
-        let mut disjunction: Option<(ast::Expression, u32)> = None;
+        let mut disjunction: Option<(ast::Expression, ChainHeight)> = None;
         let mut current = operand(cursor, interner)?;
         let mut previous = self.previous;
 
@@ -340,7 +348,7 @@ where
             Some(disjunction) => link(cursor, interner, LogicalOp::Or, disjunction, current)?,
             None => current,
         };
-        cursor.record_height(height);
+        cursor.record_height(height.height());
         Ok(expression)
     }
 }
