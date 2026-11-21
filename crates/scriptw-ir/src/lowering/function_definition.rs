@@ -222,25 +222,25 @@ impl<'a> ScriptLowerer<'a> {
             .captures
             .contains_key(DIRECT_EVAL_EXECUTION_CONTEXT_NAME);
         lowerer.current_this_binding = if captures_direct_eval_context {
-            CurrentThisBinding::Activation(unknown_runtime_value_info())
+            CurrentThisBinding::activation(unknown_runtime_value_info())
         } else if function.protocol.flavor() == FunctionFlavor::Arrow {
             if let Some(capture) = function.captures.get(LEXICAL_THIS_NAME) {
                 if capture.owner_id == SCRIPT_OWNER_ID {
                     CurrentThisBinding::Root(lowerer.root_this_binding)
                 } else {
-                    CurrentThisBinding::Activation(
+                    CurrentThisBinding::activation(
                         lowerer.capture_value_info(capture.owner_id.as_str(), LEXICAL_THIS_NAME),
                     )
                 }
             } else if function.lexical_derived_activation_owner.is_some() {
-                CurrentThisBinding::Activation(ValueInfo::undefined())
+                CurrentThisBinding::activation(ValueInfo::undefined())
             } else {
                 CurrentThisBinding::Root(lowerer.root_this_binding)
             }
         } else {
             let this_info =
                 lowerer.receiver_info_for_function(function, exact_context_signature.as_ref());
-            CurrentThisBinding::Activation(this_info)
+            CurrentThisBinding::activation(this_info)
         };
         if function.protocol.flavor() != FunctionFlavor::Arrow
             && !function.strict
@@ -249,7 +249,7 @@ impl<'a> ScriptLowerer<'a> {
             )
         {
             lowerer.current_this_binding =
-                CurrentThisBinding::Activation(lowerer.global_this_info());
+                CurrentThisBinding::activation(lowerer.global_this_info());
         }
         lowerer.current_construct_this_info = function
             .protocol

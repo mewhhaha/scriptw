@@ -997,7 +997,7 @@ impl<'a> ScriptLowerer<'a> {
             });
         }
         if let CurrentThisBinding::Activation(info) = &self.current_this_binding {
-            collect(info);
+            collect(info.as_ref());
         }
         if let Some(info) = &self.current_construct_this_info {
             collect(info);
@@ -1230,7 +1230,7 @@ impl<'a> ScriptLowerer<'a> {
             PendingOrdinaryPropertyPublication::CurrentThisShape { value_info } => {
                 self.current_construct_this_info = Some(value_info.clone());
                 if let CurrentThisBinding::Activation(current) = &mut self.current_this_binding {
-                    *current = value_info;
+                    *current = std::sync::Arc::new(value_info);
                 }
                 return;
             }

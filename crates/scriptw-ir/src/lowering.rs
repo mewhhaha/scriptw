@@ -1030,10 +1030,20 @@ enum InvocationThisObservation<'a> {
     },
 }
 
+/// The current activation's `this` binding. An activation's value
+/// information is shared, so that the flow-fact snapshot every conditionally
+/// reached expression takes does not copy it: a sloppy function's `this` is
+/// often the global object, whose shape holds every script global.
 #[derive(Debug, Clone)]
 enum CurrentThisBinding {
     Root(RootThisBinding),
-    Activation(ValueInfo),
+    Activation(std::sync::Arc<ValueInfo>),
+}
+
+impl CurrentThisBinding {
+    fn activation(info: ValueInfo) -> Self {
+        Self::Activation(std::sync::Arc::new(info))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -5228,7 +5238,7 @@ impl<'a> ScriptLowerer<'a> {
     fn current_this_info(&self) -> ValueInfo {
         match &self.current_this_binding {
             CurrentThisBinding::Root(binding) => self.root_this_info_for(*binding),
-            CurrentThisBinding::Activation(info) => info.clone(),
+            CurrentThisBinding::Activation(info) => ValueInfo::clone(info),
         }
     }
 
@@ -5242,7 +5252,9 @@ impl<'a> ScriptLowerer<'a> {
             CurrentThisBinding::Root(RootThisBinding::EvalCaller) => {
                 TypedExpr::from_info(unknown_runtime_value_info(), ExprIr::This)
             }
-            CurrentThisBinding::Activation(info) => TypedExpr::from_info(info, ExprIr::This),
+            CurrentThisBinding::Activation(info) => {
+                TypedExpr::from_info(ValueInfo::clone(&info), ExprIr::This)
+            }
         }
     }
 
@@ -5657,12 +5669,15 @@ impl<'a> ScriptLowerer<'a> {
             }
         }
         if let CurrentThisBinding::Activation(info) = &mut self.current_this_binding {
-            visit_present(
-                info.possible_kinds,
-                &info.function_targets,
-                &mut info.heap_shape,
-                &mut visit,
-            );
+            if info.heap_shape.is_some() {
+                let info = std::sync::Arc::make_mut(info);
+                visit_present(
+                    info.possible_kinds,
+                    &info.function_targets,
+                    &mut info.heap_shape,
+                    &mut visit,
+                );
+            }
         }
         visit_present(
             self.current_new_target_info.possible_kinds,
@@ -7244,7 +7259,7 @@ impl<'a> ScriptLowerer<'a> {
             FunctionExecutionKind::Ordinary | FunctionExecutionKind::Generator => {}
         }
         lowerer.current_owner_id = function_id.clone();
-        lowerer.current_this_binding = CurrentThisBinding::Activation(current_this_info.clone());
+        lowerer.current_this_binding = CurrentThisBinding::activation(current_this_info.clone());
         lowerer.current_new_target_info = current_new_target_info;
         lowerer.current_construct_this_info = current_construct_this_info.clone();
         lowerer.class_context = Some(class_context.clone());
@@ -7743,7 +7758,7 @@ impl<'a> ScriptLowerer<'a> {
         lowerer.is_function_body = true;
         lowerer.current_function_id = Some(function_id.clone());
         lowerer.current_owner_id = function_id.clone();
-        lowerer.current_this_binding = CurrentThisBinding::Activation(current_this_info.clone());
+        lowerer.current_this_binding = CurrentThisBinding::activation(current_this_info.clone());
         lowerer.current_new_target_info = ValueInfo::undefined();
         if class_element_execution_kind == ClassElementExecutionKind::StaticFieldInitializer {
             lowerer.current_construct_this_info = Some(current_this_info.clone());

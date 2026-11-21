@@ -109,8 +109,16 @@ impl<'a> ScriptLowerer<'a> {
                 debug_assert_eq!(left, right);
                 CurrentThisBinding::Root(*left)
             }
+            // A branch that left the binding as it was shares it.
+            (CurrentThisBinding::Activation(left), CurrentThisBinding::Activation(right))
+                if std::sync::Arc::ptr_eq(left, right) =>
+            {
+                CurrentThisBinding::Activation(std::sync::Arc::clone(left))
+            }
             (CurrentThisBinding::Activation(left), CurrentThisBinding::Activation(right)) => {
-                CurrentThisBinding::Activation(self.merge_value_infos(left.clone(), right.clone()))
+                CurrentThisBinding::activation(
+                    self.merge_value_infos(ValueInfo::clone(left), ValueInfo::clone(right)),
+                )
             }
             (CurrentThisBinding::Root(_), CurrentThisBinding::Activation(_))
             | (CurrentThisBinding::Activation(_), CurrentThisBinding::Root(_)) => {
