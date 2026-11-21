@@ -13,7 +13,9 @@ fn validate_provider_caller(source: &'static str, policy: HostSurfacePolicy) {
             assert!(program.is_wasm_supported(), "Locale information must lower");
             let artifact = emit(&program).expect("Locale information must emit");
             let runtime = artifact.runtime().expect("Locale information links R");
-            for bytes in [runtime.bytes(), artifact.bytes.as_slice()] {
+            // R's fixed host set declares the provider; P drops it, since
+            // only R bodies call it (final import compaction).
+            for (bytes, expected) in [(runtime.bytes(), 1), (artifact.bytes.as_slice(), 0)] {
                 Validator::new_with_features(WasmFeatures::all())
                     .validate_all(bytes)
                     .expect(
@@ -33,8 +35,8 @@ fn validate_provider_caller(source: &'static str, policy: HostSurfacePolicy) {
                     }
                 }
                 assert_eq!(
-                    provider_imports, 1,
-                    "each standalone caller must root the provider in both R and P"
+                    provider_imports, expected,
+                    "each standalone caller roots the provider in R, and P calls none"
                 );
             }
         })

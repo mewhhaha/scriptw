@@ -120,14 +120,17 @@ fn observable_intrinsics_keep_callable_bodies_and_provider_imports() {
     ] {
         let artifact = emit_source(source);
         // Every builtin body is compiled into R, which the program links, and
-        // both modules import the fixed provider host call.
+        // R imports the fixed provider host call. P keeps only host functions
+        // its own bodies call, and the provider's callers are all in R.
         let runtime = artifact.runtime().expect("heap program links R");
-        for (module, bytes) in [("R", &runtime.bytes()[..]), ("P", &artifact.bytes[..])] {
-            assert!(
-                imported_functions(bytes).contains(&provider),
-                "{module}: {source}"
-            );
-        }
+        assert!(
+            imported_functions(runtime.bytes()).contains(&provider),
+            "R: {source}"
+        );
+        assert!(
+            !imported_functions(&artifact.bytes).contains(&provider),
+            "P: {source}"
+        );
         let bodies = linked_bodies::linked_bodies(&artifact);
         let format = bodies.unique("builtin::Intl.NumberFormat Format Function");
         assert!(

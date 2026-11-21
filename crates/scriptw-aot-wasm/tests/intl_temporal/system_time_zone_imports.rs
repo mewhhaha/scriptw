@@ -12,11 +12,12 @@ fn assert_system_zone_import(source: &'static str, policy: HostSurfacePolicy) {
             let program = lower_with_host_surface_policy(&parsed, policy);
             let artifact = emit(&program).expect("configured-zone caller should emit");
             let runtime = artifact.runtime().expect("configured-zone caller links R");
-            // R and P import the same fixed host set, so each declares the
-            // snapshot import once; the Intl data identity is R's alone.
-            for (module, bytes, expected_identities) in [
-                ("R", &runtime.bytes()[..], 1),
-                ("P", artifact.bytes.as_slice(), 0),
+            // R imports the fixed host set, so it declares the snapshot import
+            // once; P keeps only host functions its own bodies call, and the
+            // zone's callers are R's. The Intl data identity is R's alone.
+            for (module, bytes, expected_imports, expected_identities) in [
+                ("R", &runtime.bytes()[..], 1, 1),
+                ("P", artifact.bytes.as_slice(), 0, 0),
             ] {
                 Validator::new_with_features(WasmFeatures::all())
                     .validate_all(bytes)
@@ -51,7 +52,7 @@ fn assert_system_zone_import(source: &'static str, policy: HostSurfacePolicy) {
                         _ => {}
                     }
                 }
-                assert_eq!(system_imports, 1, "{module}: {source}");
+                assert_eq!(system_imports, expected_imports, "{module}: {source}");
                 assert_eq!(identities, expected_identities, "{module}: {source}");
             }
         })

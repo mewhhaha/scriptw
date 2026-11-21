@@ -61,15 +61,14 @@ fn provider_import_counts(
         .expect("compiler worker must not panic")
 }
 
-/// A heap program's R and P both import the provider exactly once: the host
-/// import set is fixed, so neither module's imports depend on the source.
+/// A heap program's R imports the provider exactly once: R's host import set
+/// is fixed, so its imports do not depend on the source. The provider's
+/// callers are R bodies, and P keeps a host function import only when one of
+/// its own bodies calls it (final import compaction), so P has none.
 fn intl_import_count(source: &'static str, host_surface_policy: HostSurfacePolicy) -> usize {
     let counts = provider_import_counts(source, host_surface_policy);
     assert_eq!(counts.len(), 2, "heap program links R: {source}");
-    assert_eq!(
-        counts[0], counts[1],
-        "R/P share the exact host import prefix"
-    );
+    assert_eq!(counts[1], 0, "P calls no provider itself: {source}");
     counts[0]
 }
 
@@ -110,11 +109,12 @@ fn a_program_without_provider_callers_omits_the_intl_import() {
         provider_import_counts("1 + 1;", HostSurfacePolicy::default()),
         [0]
     );
-    // A heap program has no provider caller either, yet R and P still declare
-    // the import: it is part of the fixed host set, not a per-program gate.
+    // A heap program has no provider caller either, yet R still declares the
+    // import: it is part of R's fixed host set, not a per-program gate. P
+    // drops it, as every host function no P body calls.
     assert_eq!(
         provider_import_counts("print(1);", HostSurfacePolicy::default()),
-        [1, 1]
+        [1, 0]
     );
 }
 
