@@ -82,12 +82,14 @@ source constancy, or a particular missing lexical environment. Its explicit
 numeric ABI is `Eval=0`, `RealmEvalScript=1`, and ordinary/generator/async/async-
 generator Function construction `=2/3/4/5`.
 
-The mandatory `scriptw_host.reject_runtime_semantics(i64) -> ()` import receives the
-closed `RuntimeSemanticRejection` wire domain. The emitter always declares it; final
-P import compaction drops it, like any host function import, when no body calls it. It is the sole numeric authority:
+The `scriptw_host.reject_runtime_semantics(i64) -> ()` import receives the
+closed `RuntimeSemanticRejection` wire domain. The emitter always declares it, and
+R always imports it; final P import compaction drops it, like any host function
+import, when no body of P calls it, so P has no fixed index for it (calls are
+remapped through their index operands). It is the sole numeric authority:
 `DynamicSource(operation)` retains codes 0–5 above; `Gap(TemporalNamedTimeZone)`
 uses code 6 and belongs to T22; `Gap(RegExpRuntimePatternCompilation)` uses code 7
-and belongs to T19. The unary ABI and mandatory function index are unchanged. The Wasmtime binding rejects unassigned codes and returns a typed
+and belongs to T19. The unary ABI is unchanged. The Wasmtime binding rejects unassigned codes and returns a typed
 host error for a valid reason. Engine execution extracts this error before generic trap formatting;
 Test262 classifies the typed reason as Unsupported before JavaScript negative
 expectations. `EngineError::runtime_dynamic_source_operations()` returns every

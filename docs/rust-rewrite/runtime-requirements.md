@@ -97,16 +97,22 @@ differ. `LAYOUT_VERSION` in
 The emitter assumes that a Wasm local retains nothing once nothing reads it.
 Wasmtime compiles each local to Cranelift SSA values and finds GC roots
 through stack maps of the values live across each safepoint, so a reference
-left in a dead local is not a root. The emitter therefore stores nothing to
-end a holder: a released pooled reference local keeps its last value until
-its next holder writes it (the code sink checks, in test and debug builds,
-that every holder writes before it reads), a body's epilogue ends its
-holders without storing null (`Function::begin_exit`), and a constant
-store is elided where the local already holds the value on every path or
-has never been written (`Function::store_constant`). An engine that roots
-Wasm locals for their whole activation, rather than by liveness, would
-retain those dead references longer; this is part of the Wasmtime
-baseline, not a claim about other engines.
+left in a dead local is not a root. A released pooled reference local
+therefore keeps its last value until its next holder writes it, with no
+store of null (the code sink checks, in test and debug builds, that every
+holder writes before it reads). An engine that roots Wasm locals for their
+whole activation, rather than by liveness, would retain those dead
+references longer; this is part of the Wasmtime baseline, not a claim
+about other engines.
+
+Two other elisions are exact on any engine and rest on no such assumption.
+A body's epilogue ends its holders without storing null
+(`Function::begin_exit`): nothing runs in the activation after its final
+`end`. A constant store is elided (`Function::store_constant`) where the
+local already holds the value on every path, or where the local was never
+written, no loop is open and the value is the Wasm default the local starts
+with: in structured Wasm only a loop's back edge reaches an earlier point of
+the same activation.
 
 A reference the emitter's own types prove non-null (a non-null holder in a
 nullable pooled local, or a runtime root published before program code
