@@ -208,6 +208,8 @@ require_file "$native_template_signature_fixture_source"
 if [[ "$(head -n 1 "$native_template_signature_fixture_source")" != '#![cfg(test)]' ]]; then
   fail 'native signature binary fixtures must be compiled only for tests'
 fi
+# The code sink names struct.get/array.len only to classify the instruction
+# after a held-back refinement (refinement_is_redundant); it emits none.
 gc_instruction_escapes="$(
   grep -RnE --include='*.rs' --exclude-dir=gc_types \
     'Instruction::(Struct(New|Get|Set)|Array(New|Get|Set|Fill|Copy|Len))' \
@@ -215,6 +217,7 @@ gc_instruction_escapes="$(
     | grep -Fv \
       -e 'crates/scriptw-aot-wasm/src/native_program_template/tests.rs:' \
       -e 'crates/scriptw-aot-wasm/src/native_program_template/tests/program_owned_payload.rs:' \
+      -e 'crates/scriptw-aot-wasm/src/code_sink.rs:' \
     || true
 )"
 if [ -n "$gc_instruction_escapes" ]; then
@@ -361,7 +364,7 @@ done
 require_fixed_string_count "$wasm_body_entry" 'pub(crate) fn begin_helper_body(' 1 'registered helper body entry owner'
 require_fixed_string_count "$wasm_emit_parent" 'fn begin_helper_body(' 0 'no parent helper entry copy'
 require_fixed_string_count "$wasm_body_entry" 'FunctionModuleState::RuntimeOperation(actual) if actual == helper' 1 'helper entry matches its registered body'
-require_fixed_string_count "$wasm_body_compilation" 'self.clear_body_entry_roots(&mut function);' 2 'source and native root retirement consumers'
+require_fixed_string_count "$wasm_body_compilation" 'self.clear_body_entry_roots(&exit, &mut function);' 2 'source and native root retirement consumers'
 require_fixed_string_count "$wasm_program_entries" 'pub(crate) fn emit_script_module(' 1 'canonical physical module assembly entry'
 require_exact_line_count "$wasm_module_assembly" 'pub(super) use program_entries::emit_script_module;' 1 'private assembly entry re-export'
 require_fixed_string_count "$wasm_module_assembly" 'fn emit_script_module(' 0 'no assembly entry implementation copy'
