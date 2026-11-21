@@ -93,8 +93,9 @@
 //! collector sees what it saw before. A home's store is removed only when
 //! no load of the home is left in the function, reachable or not. If the
 //! equations are not solved within [`MAX_ROUNDS`] rounds, or their answer
-//! would hold more than [`MAX_KNOWN_PER_BLOCK`] entries per block, the
-//! function is left as it was.
+//! would hold more than [`MAX_KNOWN_PER_BLOCK`] entries per block on average
+//! over the function's reachable blocks, the function is left as it was:
+//! its loads all stay.
 
 use cranelift_codegen::cursor::{Cursor, FuncCursor};
 use cranelift_codegen::dominator_tree::DominatorTree;
@@ -107,8 +108,10 @@ use cranelift_entity::SecondaryMap;
 /// level of loop nesting can add one.
 const MAX_ROUNDS: usize = 12;
 
-/// Scriptw: the most entries the answer may hold, per block of the function,
-/// before the pass gives up. What is known at a block's end can grow with the
+/// Scriptw: the most entries the answer may hold, on average per reachable
+/// block of the function (the budget is this times their number, shared by
+/// all blocks), before the pass gives up. What is known at a block's end can
+/// grow with the
 /// path to it, so deeply nested code (2,000 nested `else if` branches) held
 /// a known set per block proportional to its depth, memory quadratic in the
 /// function's size (half of a 1 GB native compilation of 500 such branches).
@@ -455,7 +458,7 @@ impl Reloads {
     /// whole round changes nothing, and by then every reachable block has an
     /// answer that follows from its predecessors' answers. `None` when that
     /// takes more than [`MAX_ROUNDS`] rounds or the answer outgrows
-    /// [`MAX_KNOWN_PER_BLOCK`] entries per block.
+    /// [`MAX_KNOWN_PER_BLOCK`] entries per block on average.
     fn solve(
         &self,
         func: &ir::Function,

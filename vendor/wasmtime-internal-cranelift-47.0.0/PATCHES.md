@@ -232,7 +232,14 @@ stack-map slots and the stack maps themselves are untouched. `try_call` is a
 call, so exception handlers start knowing nothing but nulls; a trap leaves the
 function. The equations are iterated at most twelve rounds, after which the
 function is left as it was; so is a function whose answer would hold more
-than 64 entries per block (`MAX_KNOWN_PER_BLOCK`). What is known at a block's
+than 64 entries per block on average (`MAX_KNOWN_PER_BLOCK` times the number
+of reachable blocks, in total). Such a function keeps every load, so its
+native code differs from what the pass would make, deterministically; a small
+function with few blocks and many stack-map slots can exceed the budget
+(for example 3 blocks and 200 slots stored without a call between), and its
+Speed-policy cost is unmeasured. The byte-identity check in the Cranelift
+frontend notes (`vendor/cranelift-frontend-0.134.0/PATCHES.md`) covers only the
+listed fixtures, where the budget never fired. What is known at a block's
 end can grow with the path to it, so deeply nested code kept a known set per
 block proportional to its depth: half of a 1 GB native compilation of 500
 nested `else if` branches, and 3.3 GB for 1,000 (now 216 MB and 392 MB, and

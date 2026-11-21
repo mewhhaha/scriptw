@@ -59,21 +59,35 @@ trees deeper than the parser recursed: binary, logical, `??` and comma chains,
 and member, call, tagged template and optional chains add one tree level per
 operator, and every later phase walked them recursively (a 100,000-term `+`
 chain overflowed the compiler stack). So the limit is on the height of the
-tree, in units (`parser::MAX_NESTING_UNITS`): a counted production costs
-2,048; an `else if` 1,365, two thirds of a level, so about 1,500 compile (V8:
-about 3,000; it throws a RangeError at 10,000); a member, call, tagged
-template or optional link 4,096, so a chain has about 500 links; and a
-binary, logical, `??` or comma operator 1, or 1,024 inside a generator or
-async function body, whose resumable lowering still recurses per operator.
+tree, in units (`parser::MAX_NESTING_UNITS`), each charge a
+`parser::NestingCharge` that the limit error names: a counted production
+costs 2,048; an `else if` 1,365, two thirds of a level, so about 1,500
+compile (V8: about 3,000; it throws a RangeError at 10,000); a member, call,
+tagged template or optional link 4,096, so such a chain has about 500 links,
+and each item of an optional chain is charged as the link it would be outside
+one; the two links of a method call (`a.m(…)`, `a[k](…)`, `a?.m(…)`: a
+property access whose next token is `(`, and a call of a property access)
+1,024 each, so about 1,000 chained method calls fit (Node runs 3,000; their
+native compilation grows superlinearly too: 1,000 calls took 261 MB, 1,500
+took 1.25 GB); and a
+binary, logical, `??` or comma operator 1. In a generator or async function
+body, once a chain has parsed an `await` or `yield` (`Cursor::note_suspension`,
+not counting those of functions inside it), every operator of the chain costs
+1,024, the ones before the suspension included (`Cursor::binary_link` keeps
+both heights): the resumable lowering and state planners recurse per operator
+from the suspending operand on and test each such operator's operands for a
+suspension. A chain without one costs what it costs anywhere, so an ES
+module's top-level code, which Scriptw's module lowering parses again inside
+an async arrow function, is not limited to about 2,000 operators per chain.
 The `else if` and member weights also bound native compilation, which grows
-faster than those chains (1,000 member links took 1.5 GB, 2,000 `else if`
-branches 2.2 GB). `Cursor::measured` returns the height of an operand parsed
-by such a loop, and the loop adds its links (`Cursor::chain_height`) and
-records the total for the enclosing node (`Cursor::record_height`). `else if`
-recurses into `IfStatement` directly instead of through a whole Statement.
-`a || b || c` is now parsed in the same loop as `&&` into a left-deep chain,
-as ECMA-262 13.13's left-recursive LogicalORExpression has it; it recursed
-once per `||` before, unbounded.
+faster than those chains: a property access chain's native compilation memory
+is quadratic in its length (450 links took 0.5 GB). `Cursor::measured` returns the height of an
+operand parsed by such a loop, and the loop adds its links
+(`Cursor::chain_height`) and records the total for the enclosing node
+(`Cursor::record_height`). `else if` recurses into `IfStatement` directly
+instead of through a whole Statement. `a || b || c` is now parsed in the same
+loop as `&&` into a left-deep chain, as ECMA-262 13.13's left-recursive
+LogicalORExpression has it; it recursed once per `||` before, unbounded.
 
 The cheap binary operators rest on the rest of the pipeline walking those
 chains without recursion: in `boa_ast`, `Binary`'s `VisitWith` visits the
@@ -84,14 +98,35 @@ the first operand, `Binary` clones a chain from its first operator outwards
 and drops nested binary operands from an explicit stack, and
 `CoverParenthesizedExpressionAndArrowParameterList` moves the parenthesized
 expression instead of cloning it (which recursed through the whole subtree
-once per enclosing parenthesis). Scriptw's lowering does the rest. About two million operators fit; a
-chain of a million parses, compiles and runs. Tests: front
-`source_nesting_limit_is_exact` and
-`long_operator_chains_parse_without_recursing_per_operator`; engine
+once per enclosing parenthesis) and converts an arrow function's
+parenthesized comma chain to parameters in a loop (it recursed once per
+parameter). Scriptw's lowering does the rest, and bounds the IR those chains
+become by the source's real nesting: it binds a chain's value to a temporary
+every 256 operators and right after an operand whose own chains are deep, and
+arranges the temporaries as a tree, so a chain adds about two IR levels above
+its deepest operand (nested chains were 255 IR levels per parenthesis, and the
+emitter overflowed at about 230 such parentheses). About two million
+operators fit the parser; a chain of a million parses, and one of 100,000
+compiles and runs. Tests: front `source_nesting_limit_is_exact`,
+`long_operator_chains_parse_without_recursing_per_operator`,
+`operator_chains_in_resumable_bodies_pay_only_when_they_suspend` and
+`member_chains_are_charged_by_link_kind`; IR
+`nested_operator_chains_lower_to_ir_as_deep_as_their_nesting`; engine
 `source_nesting_beyond_the_limit_is_a_syntax_error_not_a_stack_overflow`,
-`hundred_thousand_operator_chains_compile_and_run`,
-`operator_chains_in_resumable_bodies_stay_within_the_nesting_limit` and
-`else_if_and_member_chains_have_twice_the_nesting_limit`.
+`hundred_thousand_term_chains_compile_and_run`,
+`operator_chains_in_resumable_bodies_pay_only_when_they_suspend`,
+`nested_chains_split_into_temporaries_keep_their_evaluation_order`,
+`long_chains_in_class_keys_and_heritage_compile` and
+`else_if_and_member_chains_are_bounded_by_their_compile_cost`.
+
+## Formal parameter count
+
+ECMA-262 sets no limit on formal parameters. A function with more than
+65,535 (`parser::MAX_FORMAL_PARAMETERS`) is now a SyntaxError, as in V8,
+from `FormalParameters` and from the arrow function cover grammar; 300,000
+arrow parameters overflowed the stack before. Tests: front
+`parameter_lists_are_bounded_and_converted_without_recursion`; engine
+`arrow_parameter_lists_are_bounded`.
 
 ## Regular expression literal nesting
 
@@ -100,7 +135,10 @@ recursive parser, which overflowed the stack on about 100,000 nested groups.
 A literal whose groups (and, with the `v` flag, classes) nest more than
 `lexer::regex::MAX_PATTERN_NESTING_DEPTH` (1,000) levels is now a SyntaxError
 before it is parsed (V8 compiles about 10,000 and reports a SyntaxError at
-20,000). Test: engine `regular_expression_nesting_is_bounded`.
+20,000). The scan, `lexer::regex::pattern_nesting_exceeds`, is public:
+Scriptw's own pattern compiler applies it to every pattern it is given,
+whatever its source. Tests: engine `regular_expression_nesting_is_bounded`;
+IR `regexp_patterns_nesting_past_the_limit_are_refused_before_parsing`.
 
 ## `export default async`
 

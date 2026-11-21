@@ -127,11 +127,12 @@ keeps half idle, so at most 512 MiB is live, and a 32 MiB Wasm stack):
 | Limit | Value | Error | Constraint |
 | --- | --- | --- | --- |
 | String length | 2^27 - 6 * 2^20 code units (127,926,272) | RangeError | A concatenation keeps its operands live beside its result, four bytes per result unit, in the 512 MiB live semi-space less 24 MiB for the runtime's own data (measured at about 17 MiB) (`MAX_STRING_LENGTH`). V8's 2^29 - 24 cannot be allocated in this heap. |
-| BigInt size | `MAX_STRING_LENGTH` - 1 bits | RangeError | ToString of a BigInt cannot throw; its radix-2 form, with a sign, must fit the String limit (`MAX_BIGINT_BITS`; V8: 2^30). A power whose size provably exceeds it throws before computing: the check bounds e log2\|base\| from below to within e / 2^19 bits, so small bases (`3n ** 100000000n`) throw at once. A power that fits, or one within that margin, still computes with quadratic multiplication (hours near the limit). |
+| BigInt size | `MAX_STRING_LENGTH` - 1 bits | RangeError | ToString of a BigInt cannot throw; its radix-2 form, with a sign, must fit the String limit (`MAX_BIGINT_BITS`; V8: 2^30). A power whose size provably exceeds it throws before computing: the check bounds e log2\|base\| from below to within e / 2^20 + e / 2^30 + 1 bits (exactly for a power-of-two base), so small bases (`3n ** 100000000n`) throw at once. A power that fits, or one within that margin, still computes with quadratic multiplication (hours near the limit). |
 | Bound function nesting | 4,096 levels | RangeError | Each level keeps its own `name`, "bound " plus its target's, so a chain's names grow quadratically; an unbounded chain trapped on heap exhaustion by 12,000 levels (measured before the limit). Callable Proxies between binds forward the name and count as levels. |
 | Nested helper recursion | 4,096 executing calls | RangeError | Proxy forwarding, JSON.stringify and helper-to-built-in calls recurse with the program's data; 20,000 such calls ran in the 32 MiB Wasm stack, so 4,096 stay under a quarter of it. |
-| Source nesting | 1,000 levels | SyntaxError | The parser and the compiler phases recurse per level on the 64 MiB compiler stack, so the bound is on the tree's height (`boa_parser::parser::MAX_NESTING_UNITS`): an `else if` costs two thirds of a level (about 1,500 compile), a member, call or optional link two levels (about 500), and a binary, logical, `??` or comma operator, which the compiler walks without recursion, a two-thousandth (about two million fit; a 100,000-term chain compiles and runs), or half a level in generator and async function bodies. Not a memory bound: see [compile memory](#compile-memory). |
-| Regular expression nesting | 1,000 groups | SyntaxError | The pattern parsers recurse per group (`lexer::regex::MAX_PATTERN_NESTING_DEPTH`); V8 compiles about 10,000. |
+| Source nesting | 1,000 levels | SyntaxError | The parser and the compiler phases recurse per level on the 64 MiB compiler stack (about 18 KB per level, measured on nested array literals), so the bound is on the tree's height (`boa_parser::parser::NestingCharge`; the error names the construct that exceeded it): an `else if` costs two thirds of a level (about 1,500 compile); a property access, call, tagged template or optional chain link, and each item of an optional chain, two levels (about 500), because native compilation of a property access chain is quadratic in its length; each of a method call's two links half a level (about 1,000 chained calls; their native compilation also grows superlinearly); and a binary, logical, `??` or comma operator, which the compiler walks without recursion and splits into IR as deep as the source's real nesting, a two-thousandth (about two million fit; a 100,000-term chain compiles and runs). In a generator or async function body, a chain of which an operand contains `await` or `yield` costs half a level per operator (about 2,000); others cost the same as anywhere, ES module top-level code included. Not a memory bound: see [compile memory](#compile-memory). |
+| Formal parameters | 65,535 per function | SyntaxError | ECMA-262 sets no limit; V8 rejects more with a SyntaxError (`boa_parser::parser::MAX_FORMAL_PARAMETERS`). |
+| Regular expression nesting | 1,000 groups and `v`-mode classes | SyntaxError for a literal | The pattern parsers recurse per group and nested `v`-mode class. A deeper literal is a SyntaxError (`lexer::regex::MAX_PATTERN_NESTING_DEPTH`). Scriptw's compile-time pattern compiler applies the same scan to every other pattern (a `RegExp` call's string argument, the runtime candidate table's string literals) and leaves a deeper one to the runtime compiler, which keeps its frames on the heap; V8 compiles about 10,000. |
 | Active source bodies | 128 | RangeError | Simultaneously active source function bodies, resumable bodies included while they run (`MAX_ACTIVE_SOURCE_BODIES`): a conservative bound on the 32 MiB Wasm stack, which no Wasm instruction measures. V8 allows about 10,000 frames. |
 
 A value within these limits can still exhaust a heap that other live values
@@ -156,6 +157,13 @@ is limited to 7,654,321 bytes by the Wasm validator, so a single very large
 body is a compile error. **An embedder that compiles untrusted source must
 run compilation under an OS memory limit** (a cgroup, `ulimit -v` or a
 container limit): a few kilobytes of nested source can still use gigabytes.
+Compile time is unbounded too, so such an embedder also needs a deadline:
+every conditionally reached expression (each right operand of `||`, `&&`
+and `??`, each conditional branch) copies the flow facts of the bindings in
+scope, so n object-valued globals and n logical operators take time
+quadratic in n (2,000 of each: 34 s), and native compilation of one large
+function grows superlinearly (a 10,000-term top-level `+` chain in a module:
+493 s and 2.9 GB).
 
 ## Dynamic source: eval and Function constructors
 

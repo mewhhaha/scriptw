@@ -370,19 +370,62 @@ accepts `--case <file.js>`.
   native compilation.
 - Left-deep binary, logical, `??` and comma chains are walked without
   recursion by the parser, Boa's visitors and the tree's Drop and Clone, and
-  lowering splits chains of more than 256 operators into temporaries
-  (`ChainSegments`). Generator and async function bodies are still lowered by
-  passes that recurse per operator, so there an operator costs half a nesting
-  level (about 2,000 per chain). Dynamic `Function` source candidates give up
-  on `+` chains of more than 64 operators. Conditional (`a ? b : c ? ...`)
-  chains still nest one AssignmentExpression per `?`, so about 1,000 compile.
-  Every right operand of `||`, `&&` and `??` (like every conditionally
-  reached expression) is lowered between two snapshots of all flow facts
-  (`capture_conditional_flow_facts` clones every binding's value information
-  and shape), so long logical chains compile slowly: a function returning a
-  2,000-link `||` chain takes 26 s to lower and emit, 10,000 links 294 s.
-  Fix: snapshot only facts the operand can change, or keep facts in
-  persistent maps. Owner: front end and lowering.
+  lowering splits them into IR as deep as the source's real nesting
+  (`ChainSegments`: a temporary every 256 operators and after a deep operand,
+  arranged as a tree). In generator and async function bodies, a chain with
+  an operand that suspends is still lowered and planned by passes that
+  recurse per operator, so each of its operators costs half a nesting level
+  (about 2,000 per chain); a chain without one is as cheap as anywhere.
+  Dynamic `Function` source candidates give up on `+` chains of more than 64
+  operators (`MAX_SOURCE_CANDIDATE_CHAIN`): a `new Function` body built from
+  more operands that mix literals and finite bindings is reported unsupported
+  where it compiled before, a cut against combinatorial growth (literal-only
+  chains still compile). Conditional (`a ? b : c ? ...`) chains still nest
+  one AssignmentExpression per `?`, so about 1,000 compile. Every right
+  operand of `||`, `&&` and `??` (like every conditionally reached
+  expression) is lowered between two snapshots of the flow facts
+  (`capture_conditional_flow_facts`). A sloppy function's `this` binding,
+  often the global object whose shape lists every script global, is now
+  shared rather than copied: a function returning a 2,000-link `||` chain
+  took 32 s to lower and emit and now takes 0.33 s, 10,000 links 177 s and
+  now 0.93 s. The other facts are still copied, so compile time grows with
+  the conditionally reached expressions times the tracked bindings in scope:
+  1,000 object-valued globals and a 1,000-link chain take 8 s, 2,000 of each
+  34 s, a compile-time cost untrusted source can drive (see
+  [runtime requirements](runtime-requirements.md#compile-memory)). Fix: keep
+  the facts in persistent maps. Owner: front end and lowering.
+- Property access chains (`a.b.c…`) and calls of call results (`f()()…`)
+  compile natively in memory quadratic and superlinear in their length (450
+  `.a` links: 0.5 GB with the Fast policy; 450 calls: 0.4 GB), while method
+  call chains grow more slowly (1,000 `.m()` calls: 261 MB and 14 s; 1,500:
+  1.25 GB and 37 s; 3,000, which Node runs, do not fit in 4 GiB; 1,500
+  `Map#set` calls: 132 s). So the parser charges those links two nesting
+  levels and a method call's links half a level each (about 1,000 calls). Fix:
+  find the per-link native cost (GC references or blocks kept live across
+  the chain) and lower the weight. Owner: AOT codegen and native compilation.
+- The frame-reload pass's budget is 64 known entries per reachable block on
+  average; a function over it keeps all its loads, deterministically, and its
+  Speed-policy cost is unmeasured (for example few blocks and many stack-map
+  slots). Measure such a function and consider a debug-build record when the
+  budget fires. Owner: native compilation (vendored Wasmtime translator).
+- Boa's scope analysis (`boa_ast::scope::Scope`) finds a binding by a linear
+  search of its scope, so a scope with n bindings costs O(n^2) to analyze:
+  one function of 65,535 parameters (the limit) takes about 25 s to parse,
+  and a script or function with tens of thousands of `var`s or parameters is
+  correspondingly slow. Fix: index each scope's bindings by name. Owner:
+  front end. (`async(...)` lookahead scanned the call's tokens quadratically
+  as well; it now scans them once.)
+- `annexB/language/function-code/block-decl-func-skip-arguments.js` (sloppy)
+  fails in every Test262 run: it expects the implicit Arguments object after
+  the block, while the pinned FunctionDeclarationInstantiation tests formal
+  `paramNames` only, so the Annex B function copy replaces `arguments`; the
+  unchanged staging test `block-scoped-functions-annex-b-arguments.js`
+  expects that replacement and passes
+  ([replay](failed-case-replay-20261021.md); Test262 #5113 and PR #5112,
+  [status](../../test262/errata/proposals/upstream-status-20261021.md)). It
+  is one of the four published failures; resolve it with the Test262 pin
+  that settles which reading the suite keeps. Owner: front end and lowering
+  (Annex B function declarations).
 - Correctness-batch review items left open, each with its reason: the cost of
   the native recursion guard on the hot path (an entry test in `proxy_call` and
   an eight-instruction bracket around each counted call) has no Callgrind or
@@ -395,8 +438,10 @@ accepts `--case <file.js>`.
   bound functions and callable Proxies, but a user function whose `name`
   getter returns its target's name can still forward a growing name between
   binds, which is ordinary user allocation bounded by the String limit and the
-  heap; and regular expression literals nest at most 1,000 groups where V8
-  compiles about 10,000 (the pattern parsers recurse per group). The earlier
+  heap; and regular expressions nest at most 1,000 groups (and `v`-mode classes)
+  where V8 compiles about 10,000 (the pattern parsers recurse per level; a
+  deeper literal is a SyntaxError, a deeper pattern from any other source is
+  left to the runtime compiler). The earlier
   compile memory figures of 9 to 14 GB were taken above the 4 GiB
   verification cap; the figures in the compile memory item were taken under
   it. Owners: emitter (first two), runtime built-ins (bind), front end
@@ -405,7 +450,8 @@ accepts `--case <file.js>`.
   (schoolbook digits; conversion divides by the largest radix power per
   pass). Values near `MAX_BIGINT_BITS` are bounded but slow: squaring a
   2^26-bit value takes hours. `**` throws at once when its result provably
-  exceeds the limit (the bound is within e / 2^19 bits of the true size), so
+  exceeds the limit (the bound is at most e / 2^20 + e / 2^30 + 1 bits below
+  the true size, and exact for a power-of-two base), so
   only a power whose result fits, or comes within that margin, computes for
   long; a work budget that refused a fitting result would be a RangeError the
   spec does not allow, so an embedder bounds the time with its execution

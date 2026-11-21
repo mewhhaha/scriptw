@@ -162,8 +162,10 @@ Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and t
 - **Implementation limits:** Strings of more than 2^27 - 6 * 2^20 code units,
   BigInts beyond that many bits, bound-function chains deeper than 4,096,
   helper recursion deeper than 4,096 calls, source nested deeper than 1,000
-  levels (about 1,500 `else if` branches, 500 member links; operator chains
-  such as `a + b + ...` may have about two million terms) and regular
+  levels (about 1,500 `else if` branches, 500 property access or call links,
+  1,000 chained method calls; operator chains such as `a + b + ...` may have
+  about two million terms, or 2,000 in a generator or async function when an
+  operand suspends), functions of more than 65,535 parameters and regular
   expressions nested deeper than 1,000 groups throw RangeError (SyntaxError
   for source), as the 1 GiB Store heap and the stacks require
   ([limits](docs/rust-rewrite/runtime-requirements.md#implementation-limits)).

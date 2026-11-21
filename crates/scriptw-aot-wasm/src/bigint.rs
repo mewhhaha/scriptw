@@ -2111,8 +2111,10 @@ impl FunctionBuilder<'_> {
     /// is computed to 20 bits by repeated squaring of t / 2^31 in 31-bit fixed
     /// point; every truncation rounds down, so the bits found are a lower
     /// bound and the check never throws for a result that fits. The bound is
-    /// within e / 2^19 bits of the true size, so `3n ** 100000000n`
-    /// (1.58e8 bits) throws before multiplying.
+    /// at most e / 2^20 + e / 2^30 + 1 bits below the true size (the 20-bit
+    /// fraction, the squarings' truncation and the final shift), so
+    /// `3n ** 100000000n` (1.58e8 bits) throws before multiplying; for a
+    /// power-of-two base the fraction is 0 and the bound exact.
     fn emit_bigint_power_exceeds_limit_i32(
         &mut self,
         lhs_ptr: &BigIntConstruction,
