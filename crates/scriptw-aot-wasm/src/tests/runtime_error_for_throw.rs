@@ -594,28 +594,39 @@ fn normal_cancellation_keeps_allocation_only_error_path_and_normal_completion() 
         crate::module::COMPLETION_TYPES.len()
     );
     // The body returns tag, scalar, reference, kind and target from their
-    // locals; the kind's last store names the returned kind. The target
-    // already holds 0, so `Function::store_constant` elides its store.
+    // locals. The kind's last store before that names the returned kind; a
+    // constant store the local already holds is elided
+    // (`Function::store_constant`), so a kind local nothing writes holds
+    // its Wasm default 0, which is Normal.
     let [Operator::LocalGet {
         local_index: kind_local,
     }, Operator::LocalGet { .. }, Operator::End] = &ops[ops.len() - 3..]
     else {
         panic!("the body returns its completion locals");
     };
-    let (position, kind) = ops
-        .windows(2)
+    assert!(
+        *kind_local as usize >= signature.params().len(),
+        "the returned kind is a body local, not a parameter"
+    );
+    let writes = ops
+        .iter()
         .enumerate()
-        .filter_map(|(position, window)| match window {
-            [Operator::I32Const { value }, Operator::LocalSet { local_index }]
-                if local_index == kind_local =>
-            {
-                Some((position, *value))
-            }
-            _ => None,
+        .filter(|(_, op)| {
+            matches!(op, Operator::LocalSet { local_index } | Operator::LocalTee { local_index }
+                if local_index == kind_local)
         })
-        .last()
-        .expect("completion kind and target are published");
-    assert!(position > calls(&ops, named(bytes, "helper::runtime_error_object"))[0]);
+        .map(|(position, _)| position)
+        .collect::<Vec<_>>();
+    let kind = match writes.last() {
+        None => crate::emit::CompletionKind::Normal.code() as i32,
+        Some(&position) => {
+            let Operator::I32Const { value } = ops[position - 1] else {
+                panic!("the returned kind is a closed constant");
+            };
+            assert!(position > calls(&ops, named(bytes, "helper::runtime_error_object"))[0]);
+            value
+        }
+    };
     assert_eq!(
         kind,
         crate::emit::CompletionKind::Normal.code() as i32,
