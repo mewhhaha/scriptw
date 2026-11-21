@@ -2333,16 +2333,18 @@ impl RuntimeSchema {
         ));
         // Null only until the ordinal's first use.
         function.likely(&Instruction::BrOnNonNull(0));
-        let ordinal = self.reserve_i32_local(function);
-        ordinal.set_constant(index.ordinal() as i32, function);
-        let _ = self.resolve_pooled_string_reference(ordinal, base, function);
-        self.release_i32_local(ordinal, function);
+        // The ordinal is the miss call's immediate argument.
+        let _ = self.resolve_pooled_string_reference(
+            GcIndex::Constant(index.ordinal()),
+            base,
+            function,
+        );
         function.instruction(&Instruction::End);
         GcStackReference::new()
     }
     pub(crate) fn resolve_pooled_string_reference(
         &self,
-        ordinal: I32Local,
+        ordinal: impl Into<GcIndex>,
         base: crate::runtime_helpers::RuntimeHelperFunctionBase,
         function: &mut Function,
     ) -> GcStackReference<StringValue> {
@@ -2825,14 +2827,32 @@ enum OperandSource {
     BooleanLocal(u32),
     Null(HeapType),
     DataDescriptor {
-        writable: u32,
-        enumerable: u32,
-        configurable: u32,
+        writable: DescriptorWordFlag,
+        enumerable: DescriptorWordFlag,
+        configurable: DescriptorWordFlag,
     },
     AccessorDescriptor {
-        enumerable: u32,
-        configurable: u32,
+        enumerable: DescriptorWordFlag,
+        configurable: DescriptorWordFlag,
     },
+}
+/// One attribute of a descriptor word: known at emission, or an i32 local
+/// whose nonzero value sets it. Known attributes fold into the word's
+/// immediate; only local ones are tested at run time.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DescriptorWordFlag {
+    Known(bool),
+    Local(I32Local),
+}
+impl From<I32Local> for DescriptorWordFlag {
+    fn from(local: I32Local) -> Self {
+        Self::Local(local)
+    }
+}
+impl From<bool> for DescriptorWordFlag {
+    fn from(value: bool) -> Self {
+        Self::Known(value)
+    }
 }
 /// A field operand carries its exact schema value and nullability. There is no
 /// conversion from a scalar operand to a typed reference operand.
@@ -2869,38 +2889,45 @@ impl<V: sealed::Sealed, N: GcFieldNullability> GcOperand<'_, V, N> {
                 configurable,
             } => {
                 use crate::heap::StoredPropertyAttributes;
-                function.instruction(&Instruction::I32Const(0));
-                for (index, word) in [
-                    (
-                        writable,
-                        StoredPropertyAttributes::Data {
-                            writable: true,
-                            enumerable: false,
-                            configurable: false,
-                        }
-                        .descriptor_word(),
-                    ),
-                    (
-                        enumerable,
-                        StoredPropertyAttributes::Data {
-                            writable: false,
-                            enumerable: true,
-                            configurable: false,
-                        }
-                        .descriptor_word(),
-                    ),
-                    (
-                        configurable,
-                        StoredPropertyAttributes::Data {
-                            writable: false,
-                            enumerable: false,
-                            configurable: true,
-                        }
-                        .descriptor_word(),
-                    ),
-                ] {
-                    emit_descriptor_boolean(index, word, function);
+                let base = StoredPropertyAttributes::Data {
+                    writable: false,
+                    enumerable: false,
+                    configurable: false,
                 }
+                .descriptor_word();
+                emit_descriptor_word(
+                    base,
+                    [
+                        (
+                            writable,
+                            StoredPropertyAttributes::Data {
+                                writable: true,
+                                enumerable: false,
+                                configurable: false,
+                            }
+                            .descriptor_word(),
+                        ),
+                        (
+                            enumerable,
+                            StoredPropertyAttributes::Data {
+                                writable: false,
+                                enumerable: true,
+                                configurable: false,
+                            }
+                            .descriptor_word(),
+                        ),
+                        (
+                            configurable,
+                            StoredPropertyAttributes::Data {
+                                writable: false,
+                                enumerable: false,
+                                configurable: true,
+                            }
+                            .descriptor_word(),
+                        ),
+                    ],
+                    function,
+                );
                 return;
             }
             OperandSource::AccessorDescriptor {
@@ -2913,42 +2940,72 @@ impl<V: sealed::Sealed, N: GcFieldNullability> GcOperand<'_, V, N> {
                     configurable: false,
                 }
                 .descriptor_word();
-                function.instruction(&Instruction::I32Const(base.as_i32()));
-                for (index, word) in [
-                    (
-                        enumerable,
-                        StoredPropertyAttributes::Data {
-                            writable: false,
-                            enumerable: true,
-                            configurable: false,
-                        }
-                        .descriptor_word(),
-                    ),
-                    (
-                        configurable,
-                        StoredPropertyAttributes::Data {
-                            writable: false,
-                            enumerable: false,
-                            configurable: true,
-                        }
-                        .descriptor_word(),
-                    ),
-                ] {
-                    emit_descriptor_boolean(index, word, function);
-                }
+                emit_descriptor_word(
+                    base,
+                    [
+                        (
+                            enumerable,
+                            StoredPropertyAttributes::Data {
+                                writable: false,
+                                enumerable: true,
+                                configurable: false,
+                            }
+                            .descriptor_word(),
+                        ),
+                        (
+                            configurable,
+                            StoredPropertyAttributes::Data {
+                                writable: false,
+                                enumerable: false,
+                                configurable: true,
+                            }
+                            .descriptor_word(),
+                        ),
+                    ],
+                    function,
+                );
                 return;
             }
         };
         function.instruction(&instruction);
     }
 }
-fn emit_descriptor_boolean(index: u32, word: crate::heap::DescriptorWord, function: &mut Function) {
-    function.instruction(&Instruction::LocalGet(index));
-    function.instruction(&Instruction::I32Eqz);
-    function.instruction(&Instruction::I32Eqz);
-    function.instruction(&Instruction::I32Const(word.as_i32()));
-    function.instruction(&Instruction::I32Mul);
-    function.instruction(&Instruction::I32Or);
+/// Pushes `base` with each set attribute's bit. Known attributes fold into
+/// one immediate; each local one adds `(local != 0) * bit`. A zero immediate
+/// is pushed only when no local attribute remains to be joined.
+fn emit_descriptor_word<const N: usize>(
+    base: crate::heap::DescriptorWord,
+    flags: [(DescriptorWordFlag, crate::heap::DescriptorWord); N],
+    function: &mut Function,
+) {
+    let known = flags
+        .iter()
+        .filter(|(flag, _)| *flag == DescriptorWordFlag::Known(true))
+        .fold(base.as_i32(), |word, (_, bit)| word | bit.as_i32());
+    let locals = flags.iter().filter_map(|(flag, bit)| match flag {
+        DescriptorWordFlag::Local(local) => Some((*local, *bit)),
+        DescriptorWordFlag::Known(_) => None,
+    });
+    let mut pushed = false;
+    if known != 0
+        || flags
+            .iter()
+            .all(|(flag, _)| matches!(flag, DescriptorWordFlag::Known(_)))
+    {
+        function.instruction(&Instruction::I32Const(known));
+        pushed = true;
+    }
+    for (local, bit) in locals {
+        local.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::I32Const(bit.as_i32()));
+        function.instruction(&Instruction::I32Mul);
+        if pushed {
+            function.instruction(&Instruction::I32Or);
+        }
+        pushed = true;
+    }
 }
 pub(crate) trait GcI32Field: sealed::Sealed {}
 pub(crate) trait GcNumericI32Field: GcI32Field {}
@@ -3146,24 +3203,27 @@ pub(crate) trait GcNumericI64Field: GcI64Field {}
 impl GcNumericI64Field for I64Value {}
 impl GcOperand<'_, crate::heap::DescriptorWord, NonNullable> {
     pub(crate) fn data_descriptor_flags(
-        writable: I32Local,
-        enumerable: I32Local,
-        configurable: I32Local,
+        writable: impl Into<DescriptorWordFlag>,
+        enumerable: impl Into<DescriptorWordFlag>,
+        configurable: impl Into<DescriptorWordFlag>,
     ) -> Self {
         Self {
             source: OperandSource::DataDescriptor {
-                writable: writable.index,
-                enumerable: enumerable.index,
-                configurable: configurable.index,
+                writable: writable.into(),
+                enumerable: enumerable.into(),
+                configurable: configurable.into(),
             },
             shape: PhantomData,
         }
     }
-    pub(crate) fn accessor_descriptor_flags(enumerable: I32Local, configurable: I32Local) -> Self {
+    pub(crate) fn accessor_descriptor_flags(
+        enumerable: impl Into<DescriptorWordFlag>,
+        configurable: impl Into<DescriptorWordFlag>,
+    ) -> Self {
         Self {
             source: OperandSource::AccessorDescriptor {
-                enumerable: enumerable.index,
-                configurable: configurable.index,
+                enumerable: enumerable.into(),
+                configurable: configurable.into(),
             },
             shape: PhantomData,
         }
@@ -3551,12 +3611,12 @@ where
     pub(crate) fn read<R: GcFieldNullability>(
         &self,
         owner: &GcLocal<T, R>,
-        index: I32Local,
+        index: impl Into<GcIndex>,
         _schema: &RuntimeSchema,
         function: &mut Function,
     ) -> GcFieldRead<V, N> {
         owner.access(function);
-        index.load(function);
+        index.into().emit(function);
         self.emit_get(function);
         GcFieldRead { shape: PhantomData }
     }
@@ -3564,13 +3624,42 @@ where
     pub(crate) fn read_top<R: GcFieldNullability>(
         &self,
         owner: GcStackReference<T, R>,
-        index: I32Local,
+        index: impl Into<GcIndex>,
         function: &mut Function,
     ) -> GcFieldRead<V, N> {
         let GcStackReference { .. } = owner;
-        index.load(function);
+        index.into().emit(function);
         self.emit_get(function);
         GcFieldRead { shape: PhantomData }
+    }
+}
+
+/// An array index or i32 helper argument. A compile-time value is pushed as
+/// its immediate instead of through a local only this operand reads. A P
+/// literal ordinal is relocated when the program is linked: it is pushed
+/// through the sink's relocation record and is never a constant, so no fact
+/// or fold may observe its unrelocated value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum GcIndex {
+    Local(I32Local),
+    Constant(u32),
+    Literal(ProgramLiteralIndex),
+}
+impl GcIndex {
+    pub(crate) fn emit(self, function: &mut Function) {
+        match self {
+            Self::Local(local) => local.load(function),
+            // Wasm indexes are unsigned: the bits are the u32 value.
+            Self::Constant(value) => {
+                function.instruction(&Instruction::I32Const(value as i32));
+            }
+            Self::Literal(index) => function.program_literal_index(index),
+        }
+    }
+}
+impl From<I32Local> for GcIndex {
+    fn from(local: I32Local) -> Self {
+        Self::Local(local)
     }
 }
 
@@ -3587,13 +3676,13 @@ where
     pub(crate) fn write<R: GcFieldNullability>(
         &self,
         owner: &GcLocal<T, R>,
-        index: I32Local,
+        index: impl Into<GcIndex>,
         value: GcOperand<'_, V, N>,
         _schema: &RuntimeSchema,
         function: &mut Function,
     ) {
         owner.access(function);
-        index.load(function);
+        index.into().emit(function);
         value.emit(function);
         self.emit_set(function);
     }
@@ -3601,12 +3690,12 @@ where
     pub(crate) fn write_top<R: GcFieldNullability>(
         &self,
         owner: GcStackReference<T, R>,
-        index: I32Local,
+        index: impl Into<GcIndex>,
         value: GcOperand<'_, V, N>,
         function: &mut Function,
     ) {
         let GcStackReference { .. } = owner;
-        index.load(function);
+        index.into().emit(function);
         value.emit(function);
         self.emit_set(function);
     }

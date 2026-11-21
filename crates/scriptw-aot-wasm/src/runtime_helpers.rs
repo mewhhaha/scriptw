@@ -828,10 +828,16 @@ macro_rules! helper_field {
     (@argument NativeErrorKind) => { scriptw_ir::NativeErrorKind };
     (@argument InstallationKey) => { RuntimeHelperIntrinsicKeyArgument<'a> };
     (@argument InstallationSpan) => { crate::data::RInstallationSpan };
-    (@argument I32) => { I32Local };
+    (@argument I32) => { crate::gc_types::GcIndex };
     (@argument I64) => { I64Local };
     (@argument EqRef) => { &'a crate::gc_types::EqRefLocal };
     (@argument (Ref $ty:ident $null:ident)) => { &'a GcLocal<$ty, $null> };
+    // An I32 argument is a local or an immediate (`GcIndex`), so a constant
+    // argument needs no local that only the call reads.
+    (@new_argument I32) => { impl Into<crate::gc_types::GcIndex> };
+    (@new_argument $shape:tt) => { helper_field!(@argument $shape) };
+    (@admit $value:ident, I32) => { $value.into() };
+    (@admit $value:ident, $shape:tt) => { $value };
     (@parameter Program) => { GcLocal<ProgramInstance> };
     (@parameter Value) => { ValueLocals };
     (@parameter OptionalValue) => { RuntimeHelperOptionalValueParameter };
@@ -867,7 +873,7 @@ macro_rules! helper_field {
     (@emit $value:expr, $schema:ident, $function:ident, NativeErrorKind) => { $function.instruction(&Instruction::I32Const($value as i32)) };
     (@emit $value:expr, $schema:ident, $function:ident, InstallationKey) => { $value.emit($function) };
     (@emit $value:expr, $schema:ident, $function:ident, InstallationSpan) => { $value.emit($function) };
-    (@emit $value:expr, $schema:ident, $function:ident, I32) => { $value.load($function) };
+    (@emit $value:expr, $schema:ident, $function:ident, I32) => { $value.emit($function) };
     (@emit $value:expr, $schema:ident, $function:ident, I64) => { $value.load($function) };
     (@emit $value:expr, $schema:ident, $function:ident, EqRef) => { $value.load($function) };
     (@emit $value:expr, $schema:ident, $function:ident, (Ref $ty:ident $null:ident)) => { { $value.load($schema, $function); } };
@@ -1145,8 +1151,8 @@ macro_rules! runtime_helper_domain {
                 lifetime: std::marker::PhantomData<&'a ()>,
             }
             impl<'a> $arguments<'a> {
-                pub(crate) fn new($( $field: helper_field!(@argument $shape) ),*) -> Self {
-                    Self { $( $field, )* lifetime: std::marker::PhantomData }
+                pub(crate) fn new($( $field: helper_field!(@new_argument $shape) ),*) -> Self {
+                    Self { $( $field: helper_field!(@admit $field, $shape), )* lifetime: std::marker::PhantomData }
                 }
             }
             helper_arguments!($id / $arguments { $($field:$shape),* } => $result; $($role)?);

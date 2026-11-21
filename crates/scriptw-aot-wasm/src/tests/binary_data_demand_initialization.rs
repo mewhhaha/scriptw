@@ -68,12 +68,7 @@ fn body(bytes: &[u8], target: u32) -> Vec<Operator<'_>> {
     for payload in Parser::new(0).parse_all(bytes) {
         if let Payload::CodeSectionEntry(body) = payload.unwrap() {
             if index == target {
-                return body
-                    .get_operators_reader()
-                    .unwrap()
-                    .into_iter()
-                    .map(Result::unwrap)
-                    .collect();
+                return crate::tests::emitted_operators(&body);
             }
             index += 1;
         }
@@ -401,21 +396,20 @@ fn canonical_runtime_defers_the_complete_binary_data_graph_with_a_void_realm_abi
     let mut slots = BTreeMap::new();
     for (index, op) in ensure.iter().enumerate() {
         if let Operator::LocalSet { local_index } | Operator::LocalTee { local_index } = op {
-            constants.remove(local_index);
+            constants.insert(*local_index, None);
             if let Some(Operator::I32Const { value }) = index.checked_sub(1).map(|i| &ensure[i]) {
-                constants.insert(*local_index, *value as u32);
+                constants.insert(*local_index, Some(*value as u32));
             }
         }
         if matches!(op, Operator::ArraySet { array_type_index } if *array_type_index == table_index)
         {
-            let Operator::LocalGet { local_index } = ensure[index - 3] else {
-                panic!("actual intrinsic write names its slot");
-            };
+            let slot = crate::tests::i32_operand(&ensure[index - 3], &constants)
+                .expect("actual intrinsic write names its slot");
             assert!(
                 building < index && index < ready,
                 "complete the graph before Ready"
             );
-            *slots.entry(constants[&local_index]).or_insert(0) += 1;
+            *slots.entry(slot).or_insert(0) += 1;
         }
     }
     assert_eq!(
@@ -493,33 +487,25 @@ fn physical_canonical_binary_data_reads_ensure_the_same_realm_before_table_acces
             if Some(index) == builder {
                 continue;
             }
-            let ops: Vec<_> = body
-                .get_operators_reader()
-                .unwrap()
-                .into_iter()
-                .map(Result::unwrap)
-                .collect();
+            let ops: Vec<_> = crate::tests::emitted_operators(&body);
             let mut constants = BTreeMap::new();
             for (position, op) in ops.iter().enumerate() {
                 if let Operator::LocalSet { local_index } | Operator::LocalTee { local_index } = op
                 {
-                    constants.remove(local_index);
+                    constants.insert(*local_index, None);
                     if let Some(Operator::I32Const { value }) =
                         position.checked_sub(1).map(|i| &ops[i])
                     {
-                        constants.insert(*local_index, *value as u32);
+                        constants.insert(*local_index, Some(*value as u32));
                     }
                 }
                 if !matches!(op, Operator::ArrayGet { array_type_index } if *array_type_index == table)
                 {
                     continue;
                 }
-                let Operator::LocalGet { local_index } = ops[position - 1] else {
-                    panic!("intrinsic read names its slot");
-                };
-                if !constants
-                    .get(&local_index)
-                    .is_some_and(|slot| slots.contains(slot))
+                // A dynamic slot (a layout row operand) names no fixed slot.
+                if !crate::tests::i32_operand(&ops[position - 1], &constants)
+                    .is_some_and(|slot| slots.contains(&slot))
                 {
                     continue;
                 }

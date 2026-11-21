@@ -29,13 +29,11 @@ impl FunctionBuilder<'_> {
                 .fixed(keys.iter().map(|key| GcOperand::reference(key, schema)), f),
             f,
         );
-        let zero = schema.reserve_i32_local(f);
-        zero.set_constant(0, f);
         let shape = schema.reserve_gc_local(f).initialize(
             schema.struct_type::<CompactDataShape>().construct(
                 (
                     GcOperand::reference(&key_table, schema),
-                    GcOperand::data_descriptor_flags(zero, zero, configurable),
+                    GcOperand::data_descriptor_flags(false, false, configurable),
                     GcOperand::boolean(true),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
@@ -47,7 +45,6 @@ impl FunctionBuilder<'_> {
         schema.publish_native_metadata_shape(configurable, &shape, f);
         result.replace(shape.load(schema, f).nullable(), f);
         shape.clear(f);
-        schema.release_i32_local(zero, f);
         key_table.clear(f);
         for key in keys {
             key.clear(f);

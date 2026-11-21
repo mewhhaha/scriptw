@@ -158,12 +158,7 @@ fn with_bodies(
     for payload in Parser::new(0).parse_all(&artifact.bytes) {
         if let Payload::CodeSectionEntry(body) = payload.unwrap() {
             if names.contains_key(&index) {
-                let operators = body
-                    .get_operators_reader()
-                    .unwrap()
-                    .into_iter()
-                    .map(Result::unwrap)
-                    .collect::<Vec<_>>();
+                let operators = crate::tests::emitted_operators(&body);
                 check(&names[&index], &operators, &types, &helpers);
                 checked += 1;
             }
@@ -275,13 +270,11 @@ fn named_data_hits_load_observed_values_before_materializing_the_key() {
                             .then_some(i)
                     })
                     .map(|index| {
-                        let sequence = &operators[index.saturating_sub(3)..=index];
-                        let [Operator::I32Const { value }, Operator::LocalSet { local_index: written },
-                            Operator::LocalGet { local_index: read }, Operator::Call { .. }] = sequence
-                        else {
+                        // The miss passes the pooled ordinal as the call's immediate.
+                        let sequence = &operators[index.saturating_sub(1)..=index];
+                        let [Operator::I32Const { value }, Operator::Call { .. }] = sequence else {
                             panic!("{key} in {variant}: unresolved pooled ordinal at {index}: {sequence:?}");
                         };
-                        assert_eq!(written, read, "{key} in {variant}: pooled ordinal at {index}");
                         (index, *value)
                     })
                     .collect::<Vec<_>>();

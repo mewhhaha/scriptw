@@ -1179,9 +1179,6 @@ impl FunctionBuilder<'_> {
         let writable = schema.reserve_i32_local(function);
         let final_writable = schema.reserve_i32_local(function);
         let valid = schema.reserve_i32_local(function);
-        let zero = schema.reserve_i32_local(function);
-        function.instruction(&Instruction::I32Const(0));
-        zero.store(function);
         let normalized = schema.reserve_value_local(function);
         let old_value = schema.reserve_value_local(function);
         let undefined = schema.reserve_value_local(function);
@@ -1272,7 +1269,7 @@ impl FunctionBuilder<'_> {
             .field(PropertyDescriptorSchema::FLAGS)
             .write(
                 &record,
-                GcOperand::data_descriptor_flags(writable, zero, zero),
+                GcOperand::data_descriptor_flags(writable, false, false),
                 schema,
                 function,
             );
@@ -1401,7 +1398,6 @@ impl FunctionBuilder<'_> {
         undefined.clear(function);
         old_value.clear(function);
         normalized.clear(function);
-        schema.release_i32_local(zero, function);
         schema.release_i32_local(valid, function);
         schema.release_i32_local(final_writable, function);
         schema.release_i32_local(writable, function);
@@ -1423,7 +1419,6 @@ impl FunctionBuilder<'_> {
         let value = schema.reserve_value_local(function);
         let undefined = schema.reserve_value_local(function);
         let writable = schema.reserve_i32_local(function);
-        let zero = schema.reserve_i32_local(function);
         schema
             .struct_type::<crate::gc_types::ArrayObject>()
             .field(crate::gc_types::ArrayObjectSchema::LENGTH)
@@ -1439,8 +1434,6 @@ impl FunctionBuilder<'_> {
             .field(crate::gc_types::ArrayObjectSchema::LENGTH_WRITABLE)
             .read(array, schema, function)
             .store(writable, function);
-        function.instruction(&Instruction::I32Const(0));
-        zero.store(function);
         undefined.set_undefined(function);
         let descriptor = self.emit_alloc_property_descriptor(
             StoredPropertyAttributes::Data {
@@ -1458,13 +1451,12 @@ impl FunctionBuilder<'_> {
             .field(PropertyDescriptorSchema::FLAGS)
             .write(
                 &descriptor,
-                GcOperand::data_descriptor_flags(writable, zero, zero),
+                GcOperand::data_descriptor_flags(writable, false, false),
                 schema,
                 function,
             );
         let result = slot.initialize(descriptor.load(schema, function), function);
         descriptor.clear(function);
-        schema.release_i32_local(zero, function);
         schema.release_i32_local(writable, function);
         undefined.clear(function);
         value.clear(function);

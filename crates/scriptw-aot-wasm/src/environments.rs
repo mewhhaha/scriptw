@@ -4,8 +4,8 @@ use crate::gc_types::{
     ArgumentsObject, ArrayObject, BindingCell, BindingCellSchema, BindingCellTable,
     DeclarativeEnvironment, DeclarativeEnvironmentSchema, DirectEvalDerivedBindings,
     DirectEvalDerivedBindingsSchema, DirectEvalExecutionContext, DirectEvalExecutionContextSchema,
-    Environment, EnvironmentSchema, FunctionObject, GcFieldNullability, GcLocal, GcOperand,
-    I32Local, NamedBindingTable, NonNullable, Nullable, ObjectEnvironment, RealmRecord,
+    Environment, EnvironmentSchema, FunctionObject, GcFieldNullability, GcIndex, GcLocal,
+    GcOperand, I32Local, NamedBindingTable, NonNullable, Nullable, ObjectEnvironment, RealmRecord,
     ScalarValue, StoredValue, StringValue, ValueArray, ValueLocals,
 };
 use scriptw_ir::{LexicalEnvironmentIr, NativeErrorKind, DIRECT_EVAL_EXECUTION_CONTEXT_NAME};
@@ -318,19 +318,15 @@ impl<'a> FunctionBuilder<'a> {
                     .reference(),
                 function,
             );
-        let index = schema.reserve_i32_local(function);
-        function.instruction(&Instruction::I32Const(slot as i32));
-        index.store(function);
         let cell = schema
             .reserve_gc_local::<BindingCell, NonNullable>(function)
             .initialize(
                 schema
                     .array_type::<BindingCellTable>()
-                    .read(&cells, index, schema, function)
+                    .read(&cells, GcIndex::Constant(slot), schema, function)
                     .reference(),
                 function,
             );
-        schema.release_i32_local(index, function);
         cells.clear(function);
         declarative.clear(function);
         cell

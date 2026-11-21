@@ -51,7 +51,7 @@ impl FunctionBuilder<'_> {
                 .initialize(self.emit_interned_string_reference(name, &mut f)?, &mut f);
             let key = PropertyKeyLocals::from_string(s, &text, &mut f);
             let descriptor = self.emit_alloc_data_property_descriptor_with_word(
-                GcOperand::data_descriptor_flags(zero, zero, p.configurable),
+                GcOperand::data_descriptor_flags(false, false, p.configurable),
                 value,
                 &mut f,
             );

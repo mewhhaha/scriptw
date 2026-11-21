@@ -220,6 +220,25 @@ fn function_names_in_bytes(bytes: &[u8]) -> BTreeMap<u32, String> {
     names
 }
 
+/// The u32 an i32 operand pushes: its immediate, or the immediate last
+/// stored to the local it reads (`constants`, kept by the caller from each
+/// `local.set`/`local.tee` of an `i32.const`). A compile-time index or slot
+/// is pushed either way.
+///
+/// A local the scan has not seen written holds its Wasm default, 0: the
+/// code sink elides a store of the default into a local nothing wrote yet
+/// (`Function::store_constant`). `constants` maps each local the scan saw
+/// written to its constant, or `None` for any other value.
+fn i32_operand(op: &Operator<'_>, constants: &BTreeMap<u32, Option<u32>>) -> Option<u32> {
+    match op {
+        Operator::I32Const { value } => Some(*value as u32),
+        Operator::LocalGet { local_index } => {
+            constants.get(local_index).copied().unwrap_or(Some(0))
+        }
+        _ => None,
+    }
+}
+
 /// Number of *function* imports, which is the index the first code-section
 /// body occupies. Read back from the encoded module rather than from the
 /// emitter's own variable, so it is an independent witness of the base the

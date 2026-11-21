@@ -580,15 +580,11 @@ impl ProgramInstanceLocals {
                 .reference(),
             function,
         );
-        let ordinal = schema.reserve_i32_local(function);
-        function.program_literal_index(index);
-        ordinal.store(function);
         let string = schema
             .array_type::<PooledStringTable>()
-            .read(&table, ordinal, schema, function)
+            .read(&table, GcIndex::Literal(index), schema, function)
             .reference()
             .require_non_null(function);
-        schema.release_i32_local(ordinal, function);
         table.clear(function);
         string
     }

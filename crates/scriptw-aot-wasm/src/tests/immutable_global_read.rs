@@ -62,12 +62,7 @@ fn with_bodies(
     for payload in Parser::new(0).parse_all(&artifact.bytes) {
         if let Payload::CodeSectionEntry(body) = payload.unwrap() {
             if let Some(name) = names.get(&index) {
-                let operators = body
-                    .get_operators_reader()
-                    .unwrap()
-                    .into_iter()
-                    .collect::<Result<Vec<_>, _>>()
-                    .unwrap();
+                let operators = crate::tests::emitted_operators(&body);
                 inspect(name, &operators);
                 checked += 1;
             }
@@ -112,16 +107,11 @@ fn lookups(artifact: &WasmArtifact, name: &str) -> BTreeMap<String, Lookups> {
             if Some(*function_index) != resolve {
                 continue;
             }
-            let sequence = &operators[index.saturating_sub(3)..=index];
-            let [Operator::I32Const { value }, Operator::LocalSet {
-                local_index: stored,
-            }, Operator::LocalGet {
-                local_index: loaded,
-            }, Operator::Call { .. }] = sequence
-            else {
+            // The miss path passes the pooled ordinal as the call's immediate.
+            let sequence = &operators[index.saturating_sub(1)..=index];
+            let [Operator::I32Const { value }, Operator::Call { .. }] = sequence else {
                 panic!("{variant}: unknown pooled ordinal at {index}: {sequence:?}")
             };
-            assert_eq!(stored, loaded);
             *lookup.keys.entry(*value).or_default() += 1;
         }
         result.insert(variant.to_owned(), lookup);

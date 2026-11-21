@@ -451,12 +451,7 @@ fn canonical_runtime_moves_all_date_rows_and_roots_inside_the_void_demand_owner(
     let mut owner = imported_function_count_in_bytes(bytes);
     for payload in Parser::new(0).parse_all(bytes) {
         if let Payload::CodeSectionEntry(encoded) = payload.unwrap() {
-            let ops: Vec<_> = encoded
-                .get_operators_reader()
-                .unwrap()
-                .into_iter()
-                .map(Result::unwrap)
-                .collect();
+            let ops: Vec<_> = crate::tests::emitted_operators(&encoded);
             for (_, rows) in installation_rows(bytes, &ops, run) {
                 if rows.iter().any(|row| expected.contains(&row[0])) {
                     assert_eq!(
@@ -782,29 +777,24 @@ fn both_physical_date_slot_readers_ensure_the_same_realm_before_table_access() {
             if Some(index) == builder {
                 continue;
             }
-            let ops: Vec<_> = encoded
-                .get_operators_reader()
-                .unwrap()
-                .into_iter()
-                .map(Result::unwrap)
-                .collect();
+            let ops: Vec<_> = crate::tests::emitted_operators(&encoded);
             let mut constants = BTreeMap::new();
             for (position, op) in ops.iter().enumerate() {
                 if let Operator::LocalSet { local_index } | Operator::LocalTee { local_index } = op
                 {
-                    constants.remove(local_index);
+                    constants.insert(*local_index, None);
                     if let Some(Operator::I32Const { value }) =
                         position.checked_sub(1).map(|i| &ops[i])
                     {
-                        constants.insert(*local_index, *value as u32);
+                        constants.insert(*local_index, Some(*value as u32));
                     }
                 }
                 if !matches!(op, Operator::ArrayGet { array_type_index } if *array_type_index == table)
                 {
                     continue;
                 }
-                let slot = constants.get(&local(&ops[position - 1]));
-                let Some(&slot) = slot.filter(|slot| DATE_SLOTS.map(Slot::gc_index).contains(slot))
+                let slot = crate::tests::i32_operand(&ops[position - 1], &constants);
+                let Some(slot) = slot.filter(|slot| DATE_SLOTS.map(Slot::gc_index).contains(slot))
                 else {
                     continue;
                 };

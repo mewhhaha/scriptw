@@ -27,9 +27,6 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
-        let slot = schema.reserve_i32_local(function);
-        function.instruction(&Instruction::I32Const(index as i32));
-        slot.store(function);
         let stored = schema.reserve_gc_local(function).initialize(
             schema
                 .struct_type::<StoredValue>()
@@ -38,13 +35,12 @@ impl FunctionBuilder<'_> {
         );
         schema.array_type::<IntrinsicTable>().write(
             &intrinsics,
-            slot,
+            crate::gc_types::GcIndex::Constant(index),
             crate::gc_types::GcOperand::reference(&stored, schema),
             schema,
             function,
         );
         stored.clear(function);
-        schema.release_i32_local(slot, function);
         intrinsics.clear(function);
     }
 
@@ -356,17 +352,18 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
-        let slot = schema.reserve_i32_local(function);
-        function.instruction(&Instruction::I32Const(index as i32));
-        slot.store(function);
         let stored = schema.reserve_gc_local(function).initialize(
             schema
                 .array_type::<IntrinsicTable>()
-                .read(&intrinsics, slot, schema, function)
+                .read(
+                    &intrinsics,
+                    crate::gc_types::GcIndex::Constant(index),
+                    schema,
+                    function,
+                )
                 .reference(),
             function,
         );
-        schema.release_i32_local(slot, function);
         intrinsics.clear(function);
         stored
     }
