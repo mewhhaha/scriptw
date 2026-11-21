@@ -695,3 +695,38 @@ fn nested_operator_chains_lower_to_ir_as_deep_as_their_nesting() {
         .join()
         .unwrap();
 }
+
+// A template literal's parts fold like a chain's operands, so a flat template
+// of any length lowers to IR about as deep as one chain segment; each `${}`
+// nested it one IR level deeper before.
+#[test]
+fn template_literals_lower_to_bounded_ir() {
+    std::thread::Builder::new()
+        .stack_size(64 << 20)
+        .spawn(|| {
+            let program = lower_script(&format!(
+                "var x = 'a'; var s = `{}`;",
+                "p${x}".repeat(100_000)
+            ));
+            assert!(program.is_wasm_supported());
+            let script = program.script.as_ref().expect("script ir should exist");
+            let height = script
+                .body
+                .statements
+                .iter()
+                .filter_map(|statement| match statement {
+                    StatementIr::Var(declarators) => declarators
+                        .iter()
+                        .filter_map(|declarator| declarator.init.as_ref())
+                        .map(chain_ir_height)
+                        .max(),
+                    _ => None,
+                })
+                .max()
+                .expect("a var initializer");
+            assert!(height < 256 + 24, "{height}");
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}

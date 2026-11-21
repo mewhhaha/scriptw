@@ -662,9 +662,10 @@ struct ChainSegment {
 /// one's body would nest k segments k deep; instead they form a binary tree
 /// whose left side evaluates first and binds the temporary the right side
 /// reads, so the order is unchanged. The tree is balanced, except that a
-/// segment much higher than the others (one holding a deeply nested chain) is
-/// kept next to the root, so a chain adds about two IR levels above its
-/// deepest operand.
+/// segment higher than a balanced tree of the others (one holding a deeply
+/// nested chain) is kept next to the root. So a chain adds about two IR levels
+/// above its deepest operand when that operand dominates, and about
+/// log2(k) + 1 above k comparably deep operands.
 #[derive(Default)]
 struct ChainSegments {
     segments: Vec<ChainSegment>,
@@ -6528,50 +6529,66 @@ impl<'a> ScriptLowerer<'a> {
         self.function_value_expr(function_id)
     }
 
+    /// 13.2.8.6: the parts in source order, each substitution evaluated and
+    /// ToString'd (hint String; `+` would use hint Default) before the next
+    /// one is evaluated, then concatenated. Empty literal parts are left out,
+    /// since every part is a string. The parts are folded by
+    /// [`Self::lower_chain`], so a flat template of any length lowers to IR
+    /// about [`CHAIN_SEGMENT_LINKS`] levels deep.
     fn lower_template_literal(&mut self, template: &TemplateLiteral) -> TypedExpr {
-        let mut lowered: Option<TypedExpr> = None;
         let elements = template.elements();
-        for (index, element) in elements.iter().enumerate() {
-            // A later substitution that suspends would otherwise be awaited
-            // before this part is even evaluated (13.2.8.6 evaluates the
-            // substitutions left to right).
-            let rest_suspends = elements[index + 1..].iter().any(|element| match element {
-                TemplateElement::Expr(expression) => {
-                    contains(expression, ContainsSymbol::AwaitExpression)
+        // Each part before the last substitution that suspends is pinned, so
+        // it is evaluated before that substitution is awaited.
+        let last_suspending = elements.iter().rposition(|element| match element {
+            TemplateElement::Expr(expression) => {
+                contains(expression, ContainsSymbol::AwaitExpression)
+            }
+            TemplateElement::String(_) => false,
+        });
+        let mut parts = elements
+            .iter()
+            .enumerate()
+            .filter(|(_, element)| match element {
+                TemplateElement::String(sym) => {
+                    !self.interner.resolve_expect(*sym).utf16().is_empty()
                 }
-                TemplateElement::String(_) => false,
+                TemplateElement::Expr(_) => true,
             });
+        let Some(first) = parts.next() else {
+            return TypedExpr::from_info(
+                ValueInfo::new(ValueKind::String),
+                ExprIr::String(String::new()),
+            );
+        };
+        let parts = parts.collect::<Vec<_>>();
+        let part = |this: &mut Self, (index, element): (usize, &TemplateElement)| {
             let part = match element {
                 TemplateElement::String(sym) => {
-                    let value = self.interned_runtime_string(*sym);
+                    let value = this.interned_runtime_string(*sym);
                     TypedExpr::from_info(ValueInfo::new(ValueKind::String), ExprIr::String(value))
                 }
-                // 13.2.8.6: each substitution is ToString'd (hint String)
-                // before the next one is evaluated; `+` would use hint Default.
                 TemplateElement::Expr(expr) => {
-                    TypedExpr::spec_to_string(self.lower_expression(expr))
+                    TypedExpr::spec_to_string(this.lower_expression(expr))
                 }
             };
-            let part =
-                self.pin_async_operand_before_suspension(part, rest_suspends, "async.template.");
-            lowered = Some(if let Some(lhs) = lowered {
+            let rest_suspends = last_suspending.is_some_and(|last| index < last);
+            this.pin_async_operand_before_suspension(part, rest_suspends, "async.template.")
+        };
+        self.lower_chain(
+            |this| part(this, first),
+            parts,
+            |this, lhs, element| {
+                let rhs = part(this, element);
                 TypedExpr::from_info(
                     ValueInfo::new(ValueKind::String),
                     ExprIr::StringConcat {
                         lhs: Box::new(lhs),
-                        rhs: Box::new(part),
+                        rhs: Box::new(rhs),
                     },
                 )
-            } else {
-                part
-            });
-        }
-        lowered.unwrap_or_else(|| {
-            TypedExpr::from_info(
-                ValueInfo::new(ValueKind::String),
-                ExprIr::String(String::new()),
-            )
-        })
+            },
+            "template.chain.",
+        )
     }
 
     fn lower_template_object(&mut self, template: &TaggedTemplate) -> TypedExpr {
@@ -12871,34 +12888,55 @@ impl<'a> ScriptLowerer<'a> {
 
     /// Lowers the left-deep chain whose first operand is `first`, then each
     /// operator with its right operand in source order, exactly as the
-    /// recursive lowering of each `Binary` node would.
-    ///
-    /// Long chains are split into segments: the value so far is bound to a
-    /// temporary that the rest of the chain reads (an
-    /// `ExprIr::MaterializeBinding`, which evaluates its value, propagating an
-    /// abrupt completion, before its body) every [`CHAIN_SEGMENT_LINKS`]
-    /// operators, and right after an operand whose own chains are at least
-    /// [`DEEP_CHAIN_OPERAND_HEIGHT`] IR levels high. [`ChainSegments`] keeps
-    /// the temporaries' nesting logarithmic, and a deep operand next to the
-    /// root. So a chain is at most about [`CHAIN_SEGMENT_LINKS`] levels higher
-    /// than its operands' chains, and about two when they are high: the IR is
-    /// as deep as the source's real nesting, which the parser bounds, and IR
-    /// passes and the emitter recurse through bounded depth.
+    /// recursive lowering of each `Binary` node would (see
+    /// [`Self::lower_chain`]).
     fn lower_binary_chain(
         &mut self,
         first: &Expression,
         links: Vec<(BinaryOp, &Expression)>,
     ) -> TypedExpr {
+        self.lower_chain(
+            |this| this.lower_expression(first),
+            links,
+            |this, value, (op, rhs)| this.lower_binary_link(op, value, rhs),
+            "binary.chain.",
+        )
+    }
+
+    /// Lowers a left-deep chain without recursing per link: `first` lowers
+    /// its first operand and `link` combines the value so far with the next
+    /// link, lowering that link's operand.
+    ///
+    /// Long chains are split into segments: the value so far is bound to a
+    /// temporary that the rest of the chain reads (an
+    /// `ExprIr::MaterializeBinding`, which evaluates its value, propagating an
+    /// abrupt completion, before its body) every [`CHAIN_SEGMENT_LINKS`]
+    /// links, and right after an operand whose own chains are at least
+    /// [`DEEP_CHAIN_OPERAND_HEIGHT`] IR levels high. [`ChainSegments`] keeps
+    /// the temporaries' nesting logarithmic, and a much deeper operand next to
+    /// the root. So a chain is
+    /// at most about [`CHAIN_SEGMENT_LINKS`] levels higher than its operands'
+    /// chains: about two when one operand is much deeper than the others, and
+    /// about log2(k) + 1 above k comparably deep operands. Operators outside
+    /// chains, unary operators, calls and literals still cost an IR level
+    /// each per level of source nesting, which the parser bounds.
+    fn lower_chain<L>(
+        &mut self,
+        first: impl FnOnce(&mut Self) -> TypedExpr,
+        links: Vec<L>,
+        mut link: impl FnMut(&mut Self, TypedExpr, L) -> TypedExpr,
+        hint: &str,
+    ) -> TypedExpr {
         let enclosing_height = std::mem::take(&mut self.chain_ir_height);
         let mut chain = ChainSegments::default();
-        let mut value = self.lower_expression(first);
+        let mut value = first(self);
         // The IR height of the current segment's chains so far, and its links.
         let mut segment_height = self.chain_ir_height;
         let mut segment_links = 0;
         let link_count = links.len();
-        for (index, (op, rhs)) in links.into_iter().enumerate() {
+        for (index, next) in links.into_iter().enumerate() {
             self.chain_ir_height = 0;
-            value = self.lower_binary_link(op, value, rhs);
+            value = link(self, value, next);
             let operand_height = if index == 0 {
                 self.chain_ir_height.max(segment_height)
             } else {
@@ -12910,7 +12948,7 @@ impl<'a> ScriptLowerer<'a> {
                 && (segment_links == CHAIN_SEGMENT_LINKS
                     || operand_height >= DEEP_CHAIN_OPERAND_HEIGHT)
             {
-                let name = self.alloc_temp_binding_name("binary.chain.");
+                let name = self.alloc_temp_binding_name(hint);
                 let read =
                     TypedExpr::from_info(value.value_info(), ExprIr::Identifier(name.clone()));
                 chain.bind(name, std::mem::replace(&mut value, read), segment_height);

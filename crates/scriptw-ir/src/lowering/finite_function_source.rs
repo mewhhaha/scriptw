@@ -871,16 +871,22 @@ impl ScriptLowerer<'_> {
             {
                 return Vec::new();
             }
-            tuples = tuples
-                .into_iter()
-                .flat_map(|tuple| {
-                    strings.iter().map(move |text| {
-                        let mut next = tuple.clone();
-                        next.push((*text).to_string());
-                        next
-                    })
-                })
-                .collect();
+            // Each tuple is extended in place by its last candidate and cloned
+            // only for the others: cloning it for every candidate made a long
+            // template or argument list quadratic.
+            let strings = strings.into_iter().collect::<Vec<_>>();
+            let (last, others) = strings.split_last().expect("at least one candidate");
+            let mut extended = Vec::with_capacity(tuples.len() * strings.len());
+            for mut tuple in tuples {
+                for text in others {
+                    let mut next = tuple.clone();
+                    next.push((*text).to_string());
+                    extended.push(next);
+                }
+                tuple.push(last.to_string());
+                extended.push(tuple);
+            }
+            tuples = extended;
         }
         tuples
     }

@@ -179,6 +179,96 @@ fn hundred_thousand_term_chains_compile_and_run() {
     );
 }
 
+// A template literal's parts are folded like a chain's operands, so a flat
+// template of any length lowers to bounded IR: each `${}` nested the IR one
+// level deeper, and 30,000 substitutions overflowed the emitter's stack after
+// a quadratic scan (100,000 ran for more than 15 minutes); Node runs 100,000.
+// Each substitution still emits about 500 Wasm bytes into the function body,
+// so 100,000 exceed the validator's body size limit, a compile error the
+// inventory's compile memory item owns (split large bodies).
+#[test]
+fn hundred_thousand_substitution_templates_lower_to_bounded_ir() {
+    scriptw_engine::configure_compilation_jobs(1).unwrap();
+    let source = format!(
+        "print((function (x) {{ return `{}`; }})('a').length);",
+        "${x}".repeat(100_000)
+    );
+    let (compile, run) = options();
+    let error = Engine::new(RealmBuilder::new().build())
+        .run_script(&source, compile, run)
+        .expect_err("one function body of 100,000 substitutions exceeds the Wasm body size limit");
+    assert!(
+        format!("{error:?}").contains("function body size count exceeds limit"),
+        "{error:?}"
+    );
+}
+
+// Each substitution is evaluated and ToString'd (hint String) before the next
+// one, also across the temporaries a template longer than 256 parts is split
+// with, and around an `await`; a tagged template's object is created once per
+// site and holds every part.
+#[test]
+fn long_templates_keep_their_evaluation_order() {
+    const PARTS: usize = 300;
+    let parts = |range: std::ops::Range<usize>| -> String {
+        range.map(|i| format!("${{f({i})}}")).collect()
+    };
+    let order =
+        |range: std::ops::Range<usize>| -> String { range.map(|i| format!("f{i}t{i}")).collect() };
+    // `valueOf` (hint Default) is never called.
+    let helpers = "var log = ''; function f(v) { log += 'f' + v; \
+                   return { toString() { log += 't' + v; return 'x'; }, valueOf() { return 'WRONG'; } }; }";
+    prints(
+        &format!(
+            "{helpers} var s = `{}`; print(s.length + ':' + log);",
+            parts(0..PARTS)
+        ),
+        &format!("{PARTS}:{}", order(0..PARTS)),
+    );
+    // An `await` after the first 150 parts: those are evaluated before it.
+    prints(
+        &format!(
+            "{helpers} (async function () {{ var s = `{}${{(log += 'A', await 'w')}}{}`; \
+             print(s.length + ':' + log); }})();",
+            parts(0..PARTS / 2),
+            parts(PARTS / 2..PARTS)
+        ),
+        &format!(
+            "{}:{}A{}",
+            PARTS + 1,
+            order(0..PARTS / 2),
+            order(PARTS / 2..PARTS)
+        ),
+    );
+    // A class key is lowered in async expression lowering, which pins the
+    // parts before the `await`.
+    prints(
+        &format!(
+            "{helpers} (async function () {{ class C {{ static [`{}${{(log += 'A', await 'w')}}{}`]() {{}} }} \
+             print(Object.getOwnPropertyNames(C).length + ':' + log); }})();",
+            parts(0..PARTS / 2),
+            parts(PARTS / 2..PARTS)
+        ),
+        &format!("4:{}A{}", order(0..PARTS / 2), order(PARTS / 2..PARTS)),
+    );
+    prints(
+        &format!(
+            "var first; function t(s, ...a) {{ first = first || s; \
+             return s.length + ':' + s.raw.length + ':' + a.length + ':' + (s === first); }} \
+             function g(x) {{ return t`{}`; }} g(1); print(g(2));",
+            "${x}".repeat(PARTS)
+        ),
+        &format!("{0}:{0}:{PARTS}:true", PARTS + 1),
+    );
+    prints(
+        &format!(
+            "print((function (x) {{ return String.raw`{}`; }})('a').length);",
+            "${x}\\n".repeat(PARTS)
+        ),
+        &(3 * PARTS).to_string(),
+    );
+}
+
 fn module_prints(source: &str, expected: &str) {
     scriptw_engine::configure_compilation_jobs(1).unwrap();
     let (compile, run) = options();
