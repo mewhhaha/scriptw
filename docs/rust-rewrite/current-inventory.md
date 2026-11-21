@@ -346,7 +346,11 @@ accepts `--case <file.js>`.
   top-level `+` chain: 27 s), backtracking allocation memory (1,500 `else if`:
   1.4 GB; a 1,000-term top-level `+` chain: 1.6 GB, 2.8 GB once the chain is
   split into temporaries), SSA values in deeply nested member chains (1,000
-  links: 1.5 GB, from block parameters), and the earlier measurements of object
+  links: 1.5 GB, from block parameters), one large body (a top-level script
+  costs about 990 Wasm bytes per global `x++` statement, 250 in a function
+  body; before these fixes 600 of them took 22.8 s and 400 MB with the Fast
+  policy, and 800 `if (x == i) { x++ }` statements 97 s and 2.0 GB, 8.7 s and
+  2.1 GB with the Speed policy), and the earlier measurements of object
   literals, binding patterns, templates, chained assignment and class heritage
   near the nesting limit (9.7, 9.2, 3.2, 4.1 GB at 997 levels and 3.5 GB at
   250 for heritage, before these fixes; source nested 997 levels did not
