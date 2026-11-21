@@ -23,11 +23,12 @@ impl FunctionBuilder<'_> {
         self.pop_scope();
         self.finish_source_activation_epilogue(epilogue, &mut function);
         self.completion.emit(&mut function);
-        self.clear_body_entry_roots(&mut function);
+        let exit = function.begin_exit();
+        self.clear_body_entry_roots(&exit, &mut function);
         if let Some(execution) = self.template_source_execution.take() {
             execution.clear(&mut function);
         }
-        function.instruction(&Instruction::End);
+        exit.end(&mut function);
         Ok(self.finish_function(function))
     }
 }

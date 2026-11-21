@@ -1,6 +1,7 @@
 //! Typed local operands, struct construction and the live scalar/reference ABI.
 
 use super::*;
+use crate::code_sink::LocalConstant;
 use crate::WasmRuntimeValueTag;
 
 mod binding_cell;
@@ -63,15 +64,13 @@ impl I32Local {
     }
 
     pub(crate) fn set_constant(self, value: i32, function: &mut Function) {
-        function.instruction(&Instruction::I32Const(value));
-        self.store(function);
+        function.store_constant(self.index, LocalConstant::I32(value));
     }
 }
 
 impl I64Local {
     pub(crate) fn set_constant(self, value: i64, function: &mut Function) {
-        function.instruction(&Instruction::I64Const(value));
-        self.store(function);
+        function.store_constant(self.index, LocalConstant::I64(value));
     }
 }
 
@@ -211,12 +210,15 @@ impl EqRefLocal {
     pub(crate) fn load(&self, function: &mut Function) {
         function.instruction(&Instruction::LocalGet(self.index));
     }
+    /// Stores null, unless the local already holds it on every path.
     pub(crate) fn clear(&self, function: &mut Function) {
-        function.instruction(&Instruction::RefNull(HeapType::Abstract {
-            shared: false,
-            ty: wasm_encoder::AbstractHeapType::Eq,
-        }));
-        function.instruction(&Instruction::LocalSet(self.index));
+        function.store_constant(
+            self.index,
+            LocalConstant::Null(HeapType::Abstract {
+                shared: false,
+                ty: wasm_encoder::AbstractHeapType::Eq,
+            }),
+        );
     }
     /// The reference as the sealed layout `T`, after branching to `other`
     /// for every other reference, null included.
@@ -327,12 +329,14 @@ impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
 }
 impl<T: GcHeapType> GcLocal<T, Nullable> {
     pub(crate) fn set_null(&self, schema: &RuntimeSchema, function: &mut Function) {
-        function.instruction(&Instruction::RefNull(
-            schema
-                .reference_type::<T>(GcNullability::Nullable)
-                .heap_type,
-        ));
-        function.instruction(&Instruction::LocalSet(self.index));
+        function.store_constant(
+            self.index,
+            LocalConstant::Null(
+                schema
+                    .reference_type::<T>(GcNullability::Nullable)
+                    .heap_type,
+            ),
+        );
     }
 
     /// The reference, after branching to `absent` when it is null.
@@ -483,12 +487,14 @@ impl<T: GcHeapType, N: GcFieldNullability> GcLocalSlot<T, N> {
             LocalDeclaration::Nullable,
             "a (ref T) local cannot hold null"
         );
-        function.instruction(&Instruction::RefNull(
-            schema
-                .reference_type::<T>(GcNullability::Nullable)
-                .heap_type,
-        ));
-        function.instruction(&Instruction::LocalSet(self.index));
+        function.store_constant(
+            self.index,
+            LocalConstant::Null(
+                schema
+                    .reference_type::<T>(GcNullability::Nullable)
+                    .heap_type,
+            ),
+        );
     }
 }
 impl<T: GcHeapType> GcLocalSlot<T, Nullable> {
@@ -497,12 +503,19 @@ impl<T: GcHeapType> GcLocalSlot<T, Nullable> {
         schema: &RuntimeSchema,
         function: &mut Function,
     ) -> GcLocal<T, Nullable> {
-        function.instruction(&Instruction::RefNull(
-            schema
-                .reference_type::<T>(GcNullability::Nullable)
-                .heap_type,
-        ));
-        self.initialize(GcStackReference::new(), function)
+        function.store_constant(
+            self.index,
+            LocalConstant::Null(
+                schema
+                    .reference_type::<T>(GcNullability::Nullable)
+                    .heap_type,
+            ),
+        );
+        GcLocal {
+            index: self.index,
+            owner: LocalOwner::Pooled(self.declaration),
+            shape: PhantomData,
+        }
     }
 }
 
@@ -935,10 +948,14 @@ impl<R: GcFunctionRole, N: GcFieldNullability> FunctionLocalSlot<R, N> {
 }
 impl<R: GcFunctionRole> FunctionLocalSlot<R, Nullable> {
     pub(crate) fn initialize_null(self, function: &mut Function) -> FunctionLocal<R, Nullable> {
-        function.instruction(&Instruction::RefNull(HeapType::Concrete(
-            R::SIGNATURE.type_index(),
-        )));
-        self.initialize(FunctionStackReference { shape: PhantomData }, function)
+        function.store_constant(
+            self.index,
+            LocalConstant::Null(HeapType::Concrete(R::SIGNATURE.type_index())),
+        );
+        FunctionLocal {
+            index: self.index,
+            shape: PhantomData,
+        }
     }
 }
 impl<R: GcFunctionRole> FunctionStackReference<R, Nullable> {
@@ -1737,10 +1754,8 @@ impl ValueLocals {
             ScalarValue::Boolean(value) => (WasmRuntimeValueTag::Boolean, i64::from(value)),
             ScalarValue::NumberBits(bits) => (WasmRuntimeValueTag::Number, bits),
         };
-        function.instruction(&Instruction::I32Const(tag as i32));
-        self.tag.store(function);
-        function.instruction(&Instruction::I64Const(scalar));
-        self.scalar.store(function);
+        self.tag.set_constant(tag as i32, function);
+        self.scalar.set_constant(scalar, function);
         self.reference.clear(function);
     }
     pub(crate) fn copy_from(&self, source: &Self, function: &mut Function) {
@@ -1761,8 +1776,8 @@ impl ValueLocals {
         function.instruction(&Instruction::LocalSet(self.reference.index));
     }
     pub(crate) fn set_boolean(&self, source: I32Local, function: &mut Function) {
-        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Boolean as i32));
-        self.tag.store(function);
+        self.tag
+            .set_constant(WasmRuntimeValueTag::Boolean as i32, function);
         source.load(function);
         function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::I32Eqz);
@@ -1771,8 +1786,8 @@ impl ValueLocals {
         self.reference.clear(function);
     }
     pub(crate) fn set_number(&self, bits: I64Local, function: &mut Function) {
-        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
-        self.tag.store(function);
+        self.tag
+            .set_constant(WasmRuntimeValueTag::Number as i32, function);
         bits.load(function);
         self.scalar.store(function);
         self.reference.clear(function);
@@ -1837,10 +1852,8 @@ impl ValueLocals {
         schema: &RuntimeSchema,
         function: &mut Function,
     ) {
-        function.instruction(&Instruction::I32Const(T::TAG as i32));
-        self.tag.store(function);
-        function.instruction(&Instruction::I64Const(0));
-        self.scalar.store(function);
+        self.tag.set_constant(T::TAG as i32, function);
+        self.scalar.set_constant(0, function);
         source.load(schema, function);
         function.instruction(&Instruction::LocalSet(self.reference.index));
     }
@@ -1918,26 +1931,22 @@ impl CompletionLocals {
     pub(crate) fn initialize(&self, function: &mut Function) {
         self.value.set_undefined(function);
         self.set_kind(crate::emit::CompletionKind::Normal, function);
-        function.instruction(&Instruction::I32Const(0));
-        self.target.store(function);
+        self.target.set_constant(0, function);
     }
     pub(crate) fn set_kind(&self, kind: crate::emit::CompletionKind, function: &mut Function) {
-        function.instruction(&Instruction::I32Const(kind.code() as i32));
-        self.kind.store(function);
+        self.kind.set_constant(kind.code() as i32, function);
     }
     pub(crate) fn set_normal(&self, value: &ValueLocals, function: &mut Function) {
         self.value.copy_from(value, function);
         self.set_kind(crate::emit::CompletionKind::Normal, function);
-        function.instruction(&Instruction::I32Const(0));
-        self.target.store(function);
+        self.target.set_constant(0, function);
     }
     pub(crate) fn set_throw(&self, value: &ValueLocals, function: &mut Function) {
         // A Throw completion is being made.
         function.rarely_reached();
         self.value.copy_from(value, function);
         self.set_kind(crate::emit::CompletionKind::Throw, function);
-        function.instruction(&Instruction::I32Const(0));
-        self.target.store(function);
+        self.target.set_constant(0, function);
     }
     pub(crate) fn commit_if_normal(&self, value: &ValueLocals, function: &mut Function) {
         self.kind.load(function);

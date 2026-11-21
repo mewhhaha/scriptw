@@ -4,7 +4,9 @@ mod async_generator_structured_owner;
 mod literal_roots;
 
 impl<'a> FunctionBuilder<'a> {
-    pub(super) fn clear_body_entry_roots(&mut self, function: &mut Function) {
+    /// Ends every body-entry holder inside the body's exit, where ending
+    /// one stores nothing: the locals die with the activation.
+    pub(super) fn clear_body_entry_roots(&mut self, _exit: &ExitSequence, function: &mut Function) {
         if let Some(projected) = self.projected_arguments.take() {
             projected.clear(self.schema, function);
         }
