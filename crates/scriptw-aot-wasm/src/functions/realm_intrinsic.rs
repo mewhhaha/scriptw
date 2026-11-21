@@ -383,18 +383,7 @@ impl FunctionBuilder<'_> {
             .read_into(stored, result, schema, function);
         // The table contains only completed intrinsic objects. An unpopulated
         // bootstrap slot is a compiler invariant failure at this boundary.
-        function.instruction(&Instruction::I32Const(0));
-        for tag in [
-            WasmRuntimeValueTag::Object,
-            WasmRuntimeValueTag::Array,
-            WasmRuntimeValueTag::Function,
-            WasmRuntimeValueTag::Arguments,
-        ] {
-            result.tag().load(function);
-            function.instruction(&Instruction::I32Const(tag as i32));
-            function.instruction(&Instruction::I32Eq);
-            function.instruction(&Instruction::I32Or);
-        }
+        crate::gc_types::emit_tag_in(result.tag(), crate::gc_types::OBJECT_TAGS, function);
         function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::If(BlockType::Empty));
         function.instruction(&Instruction::Unreachable);

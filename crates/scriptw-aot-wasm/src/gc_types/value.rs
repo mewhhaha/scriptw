@@ -16,6 +16,7 @@ mod program_initialize;
 mod program_instance;
 mod prototype_reference;
 mod string_accumulator;
+mod tag_set;
 pub(crate) use code_unit_kernels::{
     emit_ascii_narrow_kernel, emit_ascii_widen_helper_body, emit_code_unit_find_kernel,
     emit_json_plain_run_helper_body,
@@ -26,6 +27,9 @@ pub(crate) use program_instance::{
     ProgramMetadataView,
 };
 pub(crate) use string_accumulator::StringAccumulatorCursor;
+pub(crate) use tag_set::{
+    emit_i32_in, emit_tag_in, TagSet, OBJECT_OR_NULL_TAGS, OBJECT_TAGS, PRIMITIVE_TAGS,
+};
 mod program_string_descriptors;
 mod runtime_string_descriptors;
 pub(crate) use program_string_descriptors::ProgramStringDescriptorTable;
@@ -533,15 +537,14 @@ macro_rules! function_protocol_codes {
                 match self { $(Self::$code => $protocol),+ }
             }
             pub(crate) fn emit_is_constructable(input: I32Local, function: &mut Function) {
-                function.instruction(&Instruction::I32Const(0));
-                for code in Self::ALL {
-                    if code.protocol().is_constructable() {
-                        input.load(function);
-                        function.instruction(&Instruction::I32Const(code.encoding()));
-                        function.instruction(&Instruction::I32Eq);
-                        function.instruction(&Instruction::I32Or);
-                    }
-                }
+                emit_i32_in(
+                    input,
+                    Self::ALL
+                        .iter()
+                        .filter(|code| code.protocol().is_constructable())
+                        .map(|code| code.encoding()),
+                    function,
+                );
             }
         }
     };

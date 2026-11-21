@@ -87,15 +87,15 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I32And);
         // The same closed protocol authority used at code publication owns
         // lexical-this behavior. Async arrows cannot accidentally be boxed.
-        function.instruction(&Instruction::I32Const(0));
-        for code in FunctionProtocolCode::ALL {
-            if code.protocol().flavor() == FunctionFlavor::Ordinary {
-                protocol.load(function);
-                function.instruction(&Instruction::I32Const(code.encoding()));
-                function.instruction(&Instruction::I32Eq);
-                function.instruction(&Instruction::I32Or);
-            }
-        }
+        crate::gc_types::emit_i32_in(
+            protocol,
+            FunctionProtocolCode::ALL
+                .iter()
+                .copied()
+                .filter(|code| code.protocol().flavor() == FunctionFlavor::Ordinary)
+                .map(|code| code.encoding()),
+            function,
+        );
         function.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, function);
         self.compile_nullish_tagged_i32(supplied_this.tag(), function)?;

@@ -375,13 +375,14 @@ impl<'a> FunctionBuilder<'a> {
             .field(PromiseObjectSchema::STATE)
             .read(promise, schema, function)
             .store(state, function);
-        function.instruction(&Instruction::I32Const(0));
-        for kind in PromiseState::ALL {
-            state.load(function);
-            function.instruction(&Instruction::I32Const(GcI32Constant::encode(kind)));
-            function.instruction(&Instruction::I32Eq);
-            function.instruction(&Instruction::I32Or);
-        }
+        crate::gc_types::emit_i32_in(
+            state,
+            PromiseState::ALL
+                .iter()
+                .copied()
+                .map(|kind| GcI32Constant::encode(kind)),
+            function,
+        );
         function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::If(BlockType::Empty));
         function.instruction(&Instruction::Unreachable);

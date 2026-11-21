@@ -644,18 +644,7 @@ impl FunctionBuilder<'_> {
     }
 
     pub(super) fn emit_object_value_i32(&self, value: &ValueLocals, function: &mut Function) {
-        function.instruction(&Instruction::I32Const(0));
-        for tag in [
-            WasmRuntimeValueTag::Object,
-            WasmRuntimeValueTag::Array,
-            WasmRuntimeValueTag::Function,
-            WasmRuntimeValueTag::Arguments,
-        ] {
-            value.tag().load(function);
-            function.instruction(&Instruction::I32Const(tag as i32));
-            function.instruction(&Instruction::I32Eq);
-            function.instruction(&Instruction::I32Or);
-        }
+        crate::gc_types::emit_tag_in(value.tag(), crate::gc_types::OBJECT_TAGS, function);
     }
 
     /// CreateArrayFromList creates a JavaScript Array only after the complete

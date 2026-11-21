@@ -1477,24 +1477,7 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     pub(crate) fn emit_is_primitive_tag_i32(&self, tag: I32Local, function: &mut Function) {
-        tag.load(function);
-        function.instruction(&Instruction::I32Const(
-            WasmRuntimeValueTag::Undefined as i32,
-        ));
-        function.instruction(&Instruction::I32Eq);
-        for kind in [
-            WasmRuntimeValueTag::Null,
-            WasmRuntimeValueTag::Boolean,
-            WasmRuntimeValueTag::Number,
-            WasmRuntimeValueTag::BigInt,
-            WasmRuntimeValueTag::Symbol,
-            WasmRuntimeValueTag::String,
-        ] {
-            tag.load(function);
-            function.instruction(&Instruction::I32Const(kind as i32));
-            function.instruction(&Instruction::I32Eq);
-            function.instruction(&Instruction::I32Or);
-        }
+        crate::gc_types::emit_tag_in(tag, crate::gc_types::PRIMITIVE_TAGS, function);
     }
 
     pub(crate) fn emit_is_bigint_tag_i32(&self, tag: I32Local, function: &mut Function) {
@@ -1504,19 +1487,7 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     pub(crate) fn emit_is_heap_object_like_tag_i32(&self, tag: I32Local, function: &mut Function) {
-        tag.load(function);
-        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Object as i32));
-        function.instruction(&Instruction::I32Eq);
-        for kind in [
-            WasmRuntimeValueTag::Array,
-            WasmRuntimeValueTag::Function,
-            WasmRuntimeValueTag::Arguments,
-        ] {
-            tag.load(function);
-            function.instruction(&Instruction::I32Const(kind as i32));
-            function.instruction(&Instruction::I32Eq);
-            function.instruction(&Instruction::I32Or);
-        }
+        crate::gc_types::emit_tag_in(tag, crate::gc_types::OBJECT_TAGS, function);
     }
 
     fn emit_numeric_bigint_operation(

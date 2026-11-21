@@ -1153,15 +1153,15 @@ impl FunctionBuilder<'_> {
             .field(TypedArrayObjectSchema::ELEMENT_KIND)
             .read(target, schema, function)
             .store(kind, function);
-        function.instruction(&Instruction::I32Const(0));
-        for kind_value in TypedArrayElementKind::ALL {
-            if kind_value.content_type() == TypedArrayContentType::BigInt {
-                kind.load(function);
-                function.instruction(&Instruction::I32Const(kind_value.encode()));
-                function.instruction(&Instruction::I32Eq);
-                function.instruction(&Instruction::I32Or);
-            }
-        }
+        crate::gc_types::emit_i32_in(
+            kind,
+            TypedArrayElementKind::ALL
+                .iter()
+                .copied()
+                .filter(|kind_value| kind_value.content_type() == TypedArrayContentType::BigInt)
+                .map(|kind_value| kind_value.encode()),
+            function,
+        );
         self.open_frame(ControlFrameKind::If, function);
         self.emit_to_bigint_u64_word_from_value_locals(input, word, result, function)?;
         function.instruction(&Instruction::Else);

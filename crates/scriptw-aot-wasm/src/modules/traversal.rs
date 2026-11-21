@@ -382,13 +382,14 @@ impl FunctionBuilder<'_> {
             .field(ModuleRequestSchema::PHASE)
             .read(request, schema, function)
             .store(out, function);
-        function.instruction(&Instruction::I32Const(0));
-        for value in ModuleRequestPhase::ALL {
-            out.load(function);
-            function.instruction(&Instruction::I32Const(GcI32Constant::encode(value)));
-            function.instruction(&Instruction::I32Eq);
-            function.instruction(&Instruction::I32Or);
-        }
+        crate::gc_types::emit_i32_in(
+            out,
+            ModuleRequestPhase::ALL
+                .iter()
+                .copied()
+                .map(|value| GcI32Constant::encode(value)),
+            function,
+        );
         function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::If(BlockType::Empty));
         function.instruction(&Instruction::Unreachable);

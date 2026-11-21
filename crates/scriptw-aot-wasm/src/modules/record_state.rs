@@ -14,13 +14,14 @@ impl FunctionBuilder<'_> {
             .field(ModuleRecordSchema::STATE)
             .read(record, schema, function)
             .store(out, function);
-        function.instruction(&Instruction::I32Const(0));
-        for state in ModuleEvaluationState::ALL {
-            out.load(function);
-            function.instruction(&Instruction::I32Const(GcI32Constant::encode(state)));
-            function.instruction(&Instruction::I32Eq);
-            function.instruction(&Instruction::I32Or);
-        }
+        crate::gc_types::emit_i32_in(
+            out,
+            ModuleEvaluationState::ALL
+                .iter()
+                .copied()
+                .map(|state| GcI32Constant::encode(state)),
+            function,
+        );
         function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::If(BlockType::Empty));
         function.instruction(&Instruction::Unreachable);
@@ -39,13 +40,14 @@ impl FunctionBuilder<'_> {
             .field(ModuleRecordSchema::COMPLETION)
             .read(record, schema, function)
             .store(out, function);
-        function.instruction(&Instruction::I32Const(0));
-        for state in ModuleEvaluationCompletion::ALL {
-            out.load(function);
-            function.instruction(&Instruction::I32Const(GcI32Constant::encode(state)));
-            function.instruction(&Instruction::I32Eq);
-            function.instruction(&Instruction::I32Or);
-        }
+        crate::gc_types::emit_i32_in(
+            out,
+            ModuleEvaluationCompletion::ALL
+                .iter()
+                .copied()
+                .map(|state| GcI32Constant::encode(state)),
+            function,
+        );
         function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::If(BlockType::Empty));
         function.instruction(&Instruction::Unreachable);
@@ -64,13 +66,14 @@ impl FunctionBuilder<'_> {
             .field(ModuleRecordSchema::BODY_STATE)
             .read(record, schema, function)
             .store(out, function);
-        function.instruction(&Instruction::I32Const(0));
-        for state in ModuleBodyState::ALL {
-            out.load(function);
-            function.instruction(&Instruction::I32Const(GcI32Constant::encode(state)));
-            function.instruction(&Instruction::I32Eq);
-            function.instruction(&Instruction::I32Or);
-        }
+        crate::gc_types::emit_i32_in(
+            out,
+            ModuleBodyState::ALL
+                .iter()
+                .copied()
+                .map(|state| GcI32Constant::encode(state)),
+            function,
+        );
         function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::If(BlockType::Empty));
         function.instruction(&Instruction::Unreachable);
@@ -89,13 +92,14 @@ impl FunctionBuilder<'_> {
             .field(ModuleRecordSchema::ACTIVATION_KIND)
             .read(record, schema, function)
             .store(out, function);
-        function.instruction(&Instruction::I32Const(0));
-        for state in ModuleActivationKind::ALL {
-            out.load(function);
-            function.instruction(&Instruction::I32Const(GcI32Constant::encode(state)));
-            function.instruction(&Instruction::I32Eq);
-            function.instruction(&Instruction::I32Or);
-        }
+        crate::gc_types::emit_i32_in(
+            out,
+            ModuleActivationKind::ALL
+                .iter()
+                .copied()
+                .map(|state| GcI32Constant::encode(state)),
+            function,
+        );
         function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::If(BlockType::Empty));
         function.instruction(&Instruction::Unreachable);

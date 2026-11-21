@@ -33,15 +33,15 @@ impl FunctionBuilder<'_> {
             .read(&array, s, f)
             .store(kind, f);
         self.emit_builtin_arg_to_value(0, &value, f);
-        f.instruction(&Instruction::I32Const(0));
-        for k in TypedArrayElementKind::ALL {
-            if k.content_type() == TypedArrayContentType::BigInt {
-                kind.load(f);
-                f.instruction(&Instruction::I32Const(k.encode()));
-                f.instruction(&Instruction::I32Eq);
-                f.instruction(&Instruction::I32Or);
-            }
-        }
+        crate::gc_types::emit_i32_in(
+            kind,
+            TypedArrayElementKind::ALL
+                .iter()
+                .copied()
+                .filter(|k| k.content_type() == TypedArrayContentType::BigInt)
+                .map(|k| k.encode()),
+            f,
+        );
         self.open_frame(ControlFrameKind::If, f);
         self.emit_value_to_bigint_locals(&value, BigIntNumberPolicy::RejectNumber, &pending, f)?;
         f.instruction(&Instruction::Else);

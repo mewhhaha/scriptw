@@ -1,4 +1,5 @@
 const OPERATIONS_SOURCE: &str = include_str!("../../src/operations.rs");
+const TAG_SET_SOURCE: &str = include_str!("../../src/gc_types/value/tag_set.rs");
 fn bounded<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
     source
         .split_once(start)
@@ -17,10 +18,19 @@ fn object_target_projection_classifies_the_complete_runtime_value() {
         "fn emit_numeric_bigint_operation(",
     );
     assert!(projection.contains("tag: I32Local"));
+    assert!(projection.contains("emit_tag_in(tag, crate::gc_types::OBJECT_TAGS, function)"));
+    // The shared set names exactly the four Object kinds and no primitive;
+    // its const assertions keep it one range test that, with the primitive
+    // set, partitions every runtime tag.
+    let objects = bounded(
+        TAG_SET_SOURCE,
+        "pub(crate) const OBJECT_TAGS: TagSet = TagSet::of(&[",
+        "]);",
+    );
     for kind in ["Object", "Array", "Arguments", "Function"] {
         assert_eq!(
-            projection
-                .matches(&format!("WasmRuntimeValueTag::{kind}"))
+            objects
+                .matches(&format!("WasmRuntimeValueTag::{kind},"))
                 .count(),
             1
         );
@@ -34,10 +44,10 @@ fn object_target_projection_classifies_the_complete_runtime_value() {
         "Symbol",
         "String",
     ] {
-        assert!(!projection.contains(&format!("WasmRuntimeValueTag::{primitive}")));
+        assert!(!objects.contains(&format!("WasmRuntimeValueTag::{primitive}")));
     }
-    assert!(projection.contains("Instruction::I32Eq"));
-    assert!(projection.contains("Instruction::I32Or"));
+    assert!(TAG_SET_SOURCE.contains("assert!(OBJECT_TAGS.run_count() == 1);"));
+    assert!(TAG_SET_SOURCE.contains("assert!(PRIMITIVE_TAGS.0 & OBJECT_TAGS.0 == 0);"));
 }
 
 #[test]

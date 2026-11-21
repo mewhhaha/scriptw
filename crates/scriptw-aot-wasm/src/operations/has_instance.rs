@@ -2251,27 +2251,7 @@ fn emit_return_answer(answer: EntryAnswer, f: &mut Function) {
     f.instruction(&Instruction::Return);
 }
 
-/// The object tags are consecutive, so `emit_is_heap_object_like_tag_i32`'s
-/// four comparisons are one unsigned range test.
-const OBJECT_TAGS: [WasmRuntimeValueTag; 4] = [
-    WasmRuntimeValueTag::Object,
-    WasmRuntimeValueTag::Array,
-    WasmRuntimeValueTag::Function,
-    WasmRuntimeValueTag::Arguments,
-];
-const _: () = {
-    let mut index = 0;
-    while index < OBJECT_TAGS.len() {
-        assert!(OBJECT_TAGS[index] as i32 == OBJECT_TAGS[0] as i32 + index as i32);
-        index += 1;
-    }
-};
-
-/// Whether `tag` is one of `OBJECT_TAGS`.
+/// Whether `tag` is an Object tag: one unsigned range test.
 fn emit_is_object_tag_i32(tag: crate::gc_types::I32Local, f: &mut Function) {
-    tag.load(f);
-    f.instruction(&Instruction::I32Const(OBJECT_TAGS[0] as i32));
-    f.instruction(&Instruction::I32Sub);
-    f.instruction(&Instruction::I32Const(OBJECT_TAGS.len() as i32));
-    f.instruction(&Instruction::I32LtU);
+    crate::gc_types::emit_tag_in(tag, crate::gc_types::OBJECT_TAGS, f);
 }

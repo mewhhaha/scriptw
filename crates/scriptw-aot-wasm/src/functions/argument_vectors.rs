@@ -428,18 +428,7 @@ impl FunctionBuilder<'_> {
         let found = schema.reserve_i32_local(function);
         let exit = self.open_frame(ControlFrameKind::Block, function);
         result.initialize(function);
-        function.instruction(&Instruction::I32Const(0));
-        for tag in [
-            WasmRuntimeValueTag::Object,
-            WasmRuntimeValueTag::Array,
-            WasmRuntimeValueTag::Function,
-            WasmRuntimeValueTag::Arguments,
-        ] {
-            input.tag().load(function);
-            function.instruction(&Instruction::I32Const(tag as i32));
-            function.instruction(&Instruction::I32Eq);
-            function.instruction(&Instruction::I32Or);
-        }
+        crate::gc_types::emit_tag_in(input.tag(), crate::gc_types::OBJECT_TAGS, function);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
         self.emit_throw_runtime_error(NativeErrorKind::TypeError, not_object, result, function)?;

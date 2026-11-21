@@ -311,15 +311,15 @@ impl FunctionBuilder<'_> {
         kind: I32Local,
         function: &mut Function,
     ) {
-        function.instruction(&Instruction::I32Const(0));
-        for element in TypedArrayElementKind::ALL {
-            if element.content_type() == TypedArrayContentType::BigInt {
-                kind.load(function);
-                function.instruction(&Instruction::I32Const(element.encode()));
-                function.instruction(&Instruction::I32Eq);
-                function.instruction(&Instruction::I32Or);
-            }
-        }
+        crate::gc_types::emit_i32_in(
+            kind,
+            TypedArrayElementKind::ALL
+                .iter()
+                .copied()
+                .filter(|element| element.content_type() == TypedArrayContentType::BigInt)
+                .map(|element| element.encode()),
+            function,
+        );
     }
     pub(crate) fn emit_typed_array_species_element_write(
         &mut self,

@@ -8,19 +8,7 @@ impl RuntimeSchema {
         value: &ValueLocals,
         f: &mut Function,
     ) -> GcStackReference<JavaScriptObject, Nullable> {
-        f.instruction(&Instruction::I32Const(0));
-        for tag in [
-            WasmRuntimeValueTag::Null,
-            WasmRuntimeValueTag::Object,
-            WasmRuntimeValueTag::Array,
-            WasmRuntimeValueTag::Function,
-            WasmRuntimeValueTag::Arguments,
-        ] {
-            value.tag().load(f);
-            f.instruction(&Instruction::I32Const(tag as i32));
-            f.instruction(&Instruction::I32Eq);
-            f.instruction(&Instruction::I32Or);
-        }
+        emit_tag_in(value.tag(), OBJECT_OR_NULL_TAGS, f);
         f.instruction(&Instruction::I32Eqz);
         f.instruction(&Instruction::If(BlockType::Empty));
         f.instruction(&Instruction::Unreachable);

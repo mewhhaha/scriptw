@@ -223,21 +223,12 @@ impl FunctionBuilder<'_> {
         let value = s.reserve_value_local(f);
         s.struct_type::<StoredValue>()
             .read_into(&stored, &value, s, f);
-        value.tag().load(f);
-        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Function as i32));
-        f.instruction(&Instruction::I32Eq);
-        if !callable {
-            for tag in [
-                WasmRuntimeValueTag::Object,
-                WasmRuntimeValueTag::Array,
-                WasmRuntimeValueTag::Arguments,
-            ] {
-                value.tag().load(f);
-                f.instruction(&Instruction::I32Const(tag as i32));
-                f.instruction(&Instruction::I32Eq);
-                f.instruction(&Instruction::I32Or);
-            }
-        }
+        let expected = if callable {
+            crate::gc_types::TagSet::of(&[WasmRuntimeValueTag::Function])
+        } else {
+            crate::gc_types::OBJECT_TAGS
+        };
+        crate::gc_types::emit_tag_in(value.tag(), expected, f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
         f.instruction(&Instruction::Unreachable);
