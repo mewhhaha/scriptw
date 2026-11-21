@@ -142,9 +142,11 @@ fn hundred_thousand_term_chains_compile_and_run() {
     );
     prints(&format!("print(({}1));", "0, ".repeat(TERMS)), "1");
     // Logical chains lower in the same loop; each right operand is lowered
-    // as conditionally reached, which snapshots the flow facts, so they are
-    // tested shorter (see the inventory's chain item).
-    const LOGICAL_TERMS: usize = 500;
+    // as conditionally reached, between two snapshots of the flow facts. A
+    // sloppy function called with the global `this` once copied the global
+    // object's whole shape into each (10,000 links took 177 s); it is shared
+    // now (see the inventory's chain item).
+    const LOGICAL_TERMS: usize = 10_000;
     prints(
         &format!(
             "print((function (t) {{ return t{} || 'end'; }})(0));",
@@ -177,10 +179,31 @@ fn hundred_thousand_term_chains_compile_and_run() {
     );
 }
 
-// Generator and async function bodies are lowered by resumable passes that
-// still recurse per operator, so there an operator costs half a nesting level.
+fn module_prints(source: &str, expected: &str) {
+    scriptw_engine::configure_compilation_jobs(1).unwrap();
+    let (compile, run) = options();
+    let observed = Engine::new(RealmBuilder::new().build())
+        .observe_module(source, compile, run)
+        .unwrap_or_else(|error| panic!("{error:?}"));
+    assert!(
+        matches!(observed.completion, ObservedCompletion::Normal(_)),
+        "{:?}",
+        observed.completion
+    );
+    assert_eq!(
+        observed.output_events,
+        [HostOutputEvent::PrintLine(expected.into())]
+    );
+}
+
+// In generator and async function bodies, the resumable lowering and state
+// planners recurse per operator once a chain's operand suspends, so there such
+// a chain's operators cost half a nesting level each. A chain that does not
+// suspend costs what it costs anywhere: an ES module's top-level code, which
+// module lowering compiles inside an async function, compiled only about 2,000
+// operators per chain when every chain there paid.
 #[test]
-fn operator_chains_in_resumable_bodies_stay_within_the_nesting_limit() {
+fn operator_chains_in_resumable_bodies_pay_only_when_they_suspend() {
     prints(
         &format!(
             "var g = (function* () {{ var x = 1; yield x{}; }})(); print(g.next().value);",
@@ -188,20 +211,110 @@ fn operator_chains_in_resumable_bodies_stay_within_the_nesting_limit() {
         ),
         "1901",
     );
+    // `yield`'s operand chain does not suspend; one whose operand does pays.
+    prints(
+        &format!(
+            "var g = (function* () {{ var x = 1; yield x{}; }})(); print(g.next().value);",
+            "+x".repeat(4_000)
+        ),
+        "4001",
+    );
     let error = nesting_error(&format!(
-        "function* g() {{ var x = 1; yield x{}; }}",
+        "function* g() {{ var x = 1; (yield x){}; }}",
         "+x".repeat(4_000)
     ));
-    assert!(
-        error.contains("nesting exceeds the implementation limit"),
-        "{error}"
+    assert!(error.contains("after an `await` or `yield`"), "{error}");
+    // Comma chains of literals keep the native compile cheap (a long `+`
+    // chain of top-level bindings compiles slowly; see the inventory).
+    prints(
+        &format!(
+            "var g = (function* () {{ var y = (0{}, 5); yield y; }})(); print(g.next().value);",
+            ", 0".repeat(20_000)
+        ),
+        "5",
     );
+    module_prints(
+        &format!("export const n = (0{}, 7); print(n);", ", 0".repeat(20_000)),
+        "7",
+    );
+    module_prints(
+        &format!(
+            "const y = await Promise.resolve(7); print((0{}, y));",
+            ", 0".repeat(20_000)
+        ),
+        "7",
+    );
+}
+
+// Class declarations lower their heritage and computed keys in async
+// expression lowering, which pins operands before a suspension. A chain there
+// that does not suspend is lowered by the chain loop like any other.
+#[test]
+fn long_chains_in_class_keys_and_heritage_compile() {
+    // Comma chains of literals keep the native compile cheap.
+    prints(
+        &format!(
+            "class C {{ [(0{}, 'm')]() {{ return 7; }} }} print(new C().m());",
+            ", 0".repeat(100_000)
+        ),
+        "7",
+    );
+    prints(
+        &format!(
+            "class B {{}} class C extends (0{}, B) {{}} print(new C() instanceof B);",
+            ", 0".repeat(100_000)
+        ),
+        "true",
+    );
+    prints(
+        &format!(
+            "var k = 'a'; var o = {{ [k]: class {{ static [(0{}, k)]() {{ return 3; }} }} }}; print(o.a.a());",
+            ", 0".repeat(50_000)
+        ),
+        "3",
+    );
+}
+
+// Lowering binds a chain's value to a temporary every 256 operators and right
+// after an operand whose own chains are deep, and arranges the temporaries as
+// a tree; evaluation order and values are those of the plain left-deep chain.
+#[test]
+fn nested_chains_split_into_temporaries_keep_their_evaluation_order() {
+    for (levels, links) in [(12usize, 80usize), (3, 600), (40, 70)] {
+        let mut expression = String::from("f(0)");
+        for level in 1..=levels {
+            expression = format!(
+                "(f({level}) + {expression}{})",
+                format!(" + f({level})").repeat(links - 1)
+            );
+        }
+        // f(levels) … f(1), f(0), then each level's remaining operands from
+        // the innermost out.
+        let mut order: Vec<usize> = (0..=levels).rev().collect();
+        for level in 1..=levels {
+            order.extend(std::iter::repeat_n(level, links - 1));
+        }
+        let hash = order
+            .iter()
+            .fold(0u64, |hash, value| (hash * 31 + *value as u64) % 1_000_003);
+        let sum = links * levels * (levels + 1) / 2;
+        prints(
+            &format!(
+                "var h = 0; function f(v) {{ h = (h * 31 + v) % 1000003; return v; }} \
+                 var r = {expression}; print(r + ':' + h);"
+            ),
+            &format!("{sum}:{hash}"),
+        );
+    }
 }
 
 // An `else if` costs two thirds of a nesting level, so more than 1,000 branches
 // compile (about 1,500 fit; V8 runs about 3,000 and throws a RangeError at
-// 10,000). A member or call link costs two levels, so about 500 fit: native
-// compilation of both grows faster than their length.
+// 10,000). A property access, call or optional link costs two levels, so about
+// 500 fit: native compilation of a property access chain grows quadratically.
+// A method call's two links cost half a level each, so about 1,000 fit, as
+// builder and `Map#set` chains need (Node runs 3,000; native compilation of
+// such a chain grows superlinearly, see the inventory).
 #[test]
 fn else_if_and_member_chains_are_bounded_by_their_compile_cost() {
     let else_ifs = |n: usize| {
@@ -213,6 +326,7 @@ fn else_if_and_member_chains_are_bounded_by_their_compile_cost() {
         source
     };
     prints(&else_ifs(1_050), "end");
+    // The deepest branch's `print(` call may be what crosses the limit.
     let error = nesting_error(&else_ifs(1_600));
     assert!(
         error.contains("nesting exceeds the implementation limit"),
@@ -222,9 +336,57 @@ fn else_if_and_member_chains_are_bounded_by_their_compile_cost() {
     let members = |n: usize| format!("var a = {{}}; a.b = a; print(a{} === a);", ".b".repeat(n));
     prints(&members(490), "true");
     let error = nesting_error(&members(600));
+    assert!(error.contains("property access"), "{error}");
+
+    prints(
+        &format!(
+            "var o = {{ m() {{ return this; }} }}; print(o{} === o);",
+            ".m()".repeat(900)
+        ),
+        "true",
+    );
+    prints(
+        &format!(
+            "print(new Map(){}.size);",
+            (0..500)
+                .map(|i| format!(".set({i}, {i})"))
+                .collect::<String>()
+        ),
+        "500",
+    );
+    let error = nesting_error(&format!("var o = {{}}; o{};", ".m()".repeat(1_100)));
+    assert!(error.contains("method call"), "{error}");
+}
+
+// `(a0, a1, …) =>` is covered by a comma chain, converted to parameters in a
+// loop; more than 65,535 parameters is a SyntaxError, as in V8.
+#[test]
+fn arrow_parameter_lists_are_bounded() {
+    let parameters = |count: usize| {
+        (0..count)
+            .map(|index| format!("a{index}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    scriptw_engine::configure_compilation_jobs(1).unwrap();
+    let (compile, run) = options();
+    let error = Engine::new(RealmBuilder::new().build())
+        .run_script(
+            &format!("var f = ({}) => 0;", parameters(300_000)),
+            compile,
+            run,
+        )
+        .expect_err("too many parameters");
     assert!(
-        error.contains("nesting exceeds the implementation limit"),
-        "{error}"
+        format!("{error:?}").contains("too many formal parameters"),
+        "{error:?}"
+    );
+    prints(
+        &format!(
+            "var f = ({}) => a1; print(f.length + ':' + f(0, 5));",
+            parameters(5_000)
+        ),
+        "5000:5",
     );
 }
 
@@ -238,5 +400,20 @@ fn regular_expression_nesting_is_bounded() {
     assert!(
         error.contains("nest more than the implementation limit"),
         "{error}"
+    );
+    // A pattern string reaches the compile-time pattern compiler through the
+    // `RegExp` constructor; one nested past the limit is left to the runtime
+    // compiler, whose resource limit is a RangeError.
+    let classes = |n: usize| format!("{}a{}", "[".repeat(n), "]".repeat(n));
+    prints(
+        &format!("print(new RegExp('{}', 'v').test('a'));", classes(900)),
+        "true",
+    );
+    prints(
+        &format!(
+            "try {{ new RegExp('{}', 'v'); print('compiled'); }} catch (e) {{ print(e.name); }}",
+            classes(100_000)
+        ),
+        "RangeError",
     );
 }

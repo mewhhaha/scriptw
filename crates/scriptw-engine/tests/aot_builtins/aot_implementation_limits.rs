@@ -233,3 +233,35 @@ var s = (2n ** 100000n).toString(), t = (3n ** 5000n).toString(36), u = (-(7n **
         "RangeError,RangeError,RangeError,RangeError,RangeError,1,-1,0,RangeError,100001,RangeError,5,30103,999002093014,389883109376,1533,mfi5rk0rse9w,a8l6vjx20529,8424,-10000101111,001101000001,1001,999999999999999999,10000000000000000,31050262160105055621201,0,-101",
     );
 }
+
+// For a power-of-two base the bound is exact: (2^63)^e has 63e + 1 bits, which
+// is at most MAX_BIGINT_BITS (127,926,271) for e = 2,030,575 and more for
+// 2,030,576. The larger power throws at once; the one that fits must not
+// throw, so it is still multiplying (quadratically, for hours) when the
+// deadline interrupts it.
+#[test]
+fn bigint_power_bound_is_exact_for_a_power_of_two_base() {
+    assert_completion(
+        "try { (2n ** 63n) ** 2030576n; 'no error'; } catch (e) { String(e instanceof RangeError); }",
+        "true",
+    );
+    scriptw_engine::configure_compilation_jobs(1).expect("one bounded compilation worker");
+    let error = Engine::new(RealmBuilder::new().build())
+        .run_script(
+            "try { (2n ** 63n) ** 2030575n; } catch (e) { e instanceof RangeError ? 'RangeError' : 'other'; }",
+            CompileOptions {
+                host_surface_policy: HostSurfacePolicy::Test262,
+                ..CompileOptions::default()
+            },
+            RunOptions {
+                backend: ExecutionBackend::WasmAot,
+                timeout_ms: Some(3_000),
+                ..RunOptions::default()
+            },
+        )
+        .expect_err("a fitting power computes until the deadline");
+    assert!(
+        format!("{error:?}").contains("timeout exceeded"),
+        "{error:?}"
+    );
+}
