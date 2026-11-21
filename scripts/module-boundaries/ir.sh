@@ -1079,11 +1079,13 @@ require_fixed_string_count \
   'fn statement_completes_by_throw(' \
   0 \
   'if-branch abrupt-completion helper outside child module'
+# static_bool_expr and its `if` fold were removed: no compiler-produced IR
+# matched them (correctness round 5). Keep them from returning as dead code.
 require_fixed_string_count \
   "$ir_lowering" \
   'fn static_bool_expr(' \
-  1 \
-  'shared static boolean helper in parent'
+  0 \
+  'removed static boolean helper in parent'
 require_fixed_string_count \
   "$ir_if_statement_lowering" \
   'fn static_bool_expr(' \

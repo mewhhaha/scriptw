@@ -17,6 +17,7 @@ mod aot_catch_pattern_owners;
 mod aot_class_field_named_evaluation;
 mod aot_class_initializer_grammar_context;
 mod aot_class_name_source;
+mod aot_coercion_flow_facts;
 mod aot_compact_array_literals;
 mod aot_compact_native_metadata;
 mod aot_compact_row_regions;

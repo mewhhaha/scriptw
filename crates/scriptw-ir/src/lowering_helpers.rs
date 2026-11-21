@@ -13,8 +13,8 @@ pub(crate) use crate::async_pattern_source::{
 };
 
 pub(crate) use crate::async_with_source::{
-    append_async_statement_protocol_items, append_async_statement_protocol_states,
-    contains_plain_async_phase, AsyncWithSource, AsyncWithSourceStates,
+    append_async_statement_protocol_items, append_async_statement_protocol_states, AsyncWithSource,
+    AsyncWithSourceStates,
 };
 
 #[path = "generator_with_source.rs"]

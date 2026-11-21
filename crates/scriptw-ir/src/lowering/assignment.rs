@@ -341,6 +341,10 @@ impl<'a> ScriptLowerer<'a> {
                     && !string_add
                     && (lhs_info.kind != ValueKind::Number || value.kind != ValueKind::Number);
                 if coercive_add {
+                    // ApplyStringOrNumericBinaryOperator's ToPrimitive of
+                    // either operand can run user code before the PutValue.
+                    self.record_possible_to_primitive_effects(&lhs_info);
+                    self.record_possible_to_primitive_effects(&value.value_info());
                     let lhs =
                         TypedExpr::from_info(lhs_info, ExprIr::Identifier(storage_name.clone()));
                     let possible_kinds = KindSet::from_kind(ValueKind::String)

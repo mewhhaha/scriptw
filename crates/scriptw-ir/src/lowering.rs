@@ -3522,28 +3522,6 @@ impl<'a> ScriptLowerer<'a> {
             })
     }
 
-    fn static_bool_expr(expr: &TypedExpr) -> Option<bool> {
-        match &expr.expr {
-            ExprIr::StrictEquality { op, lhs, rhs } => {
-                let lhs = Self::static_string_expr(lhs)?;
-                let rhs = Self::static_string_expr(rhs)?;
-                Some(match op {
-                    EqualityBinaryOp::StrictEqual => lhs == rhs,
-                    EqualityBinaryOp::StrictNotEqual => lhs != rhs,
-                    _ => return None,
-                })
-            }
-            _ => None,
-        }
-    }
-
-    fn static_string_expr(expr: &TypedExpr) -> Option<&str> {
-        match &expr.expr {
-            ExprIr::String(value) => Some(value.as_str()),
-            _ => None,
-        }
-    }
-
     /// The resume state a plain `async function` body is currently at, or
     /// `None` for every other execution kind.
     ///
@@ -4717,10 +4695,14 @@ impl<'a> ScriptLowerer<'a> {
                     );
                     statements.push(yield_statement);
                     // Substitutions use ToString (hint String), unlike `+`.
-                    TypedExpr::spec_to_string(self.lower_identifier_name(received_name, false))
+                    let value = self.lower_identifier_name(received_name, false);
+                    self.record_possible_to_primitive_effects(&value.value_info());
+                    TypedExpr::spec_to_string(value)
                 }
                 TemplateElement::Expr(expression) => {
-                    TypedExpr::spec_to_string(self.lower_expression(expression))
+                    let value = self.lower_expression(expression);
+                    self.record_possible_to_primitive_effects(&value.value_info());
+                    TypedExpr::spec_to_string(value)
                 }
             };
             let accumulator = self.lower_identifier_name(accumulator_name.clone(), false);
@@ -6568,7 +6550,12 @@ impl<'a> ScriptLowerer<'a> {
                     TypedExpr::from_info(ValueInfo::new(ValueKind::String), ExprIr::String(value))
                 }
                 TemplateElement::Expr(expr) => {
-                    TypedExpr::spec_to_string(this.lower_expression(expr))
+                    let value = this.lower_expression(expr);
+                    // ToString of an object runs its `@@toPrimitive` or
+                    // `toString`, which is user code: facts lowered after it
+                    // must not survive it.
+                    this.record_possible_to_primitive_effects(&value.value_info());
+                    TypedExpr::spec_to_string(value)
                 }
             };
             let rest_suspends = last_suspending.is_some_and(|last| index < last);
@@ -12679,17 +12666,29 @@ impl<'a> ScriptLowerer<'a> {
             // must call `valueOf`. That is why the operand handed to
             // `immutable_binding_write` is the coercion and not the bare
             // read. Step 3 is unobservable once step 4 always throws.
+            let old_info = ValueInfo {
+                kind: binding.kind,
+                possible_kinds: binding.possible_kinds,
+                heap_shape: binding.heap_shape.clone(),
+                function_targets: binding.function_targets.clone(),
+            };
+            // A caught TypeError lets code after the update observe what
+            // `valueOf` changed.
+            self.record_possible_to_primitive_effects(&old_info);
             let old_value = TypedExpr::spec_to_numeric(TypedExpr::from_info(
-                ValueInfo {
-                    kind: binding.kind,
-                    possible_kinds: binding.possible_kinds,
-                    heap_shape: binding.heap_shape.clone(),
-                    function_targets: binding.function_targets.clone(),
-                },
+                old_info,
                 ExprIr::Identifier(binding.storage_name.clone()),
             ));
             return self.immutable_binding_write(&binding.storage_name, old_value);
         }
+        // ToNumeric of the old value runs `@@toPrimitive` or `valueOf` of an
+        // object, which is user code.
+        self.record_possible_to_primitive_effects(&ValueInfo {
+            kind: binding.kind,
+            possible_kinds: binding.possible_kinds,
+            heap_shape: None,
+            function_targets: FunctionTargetKnowledge::none(),
+        });
         let update_kind = if binding
             .possible_kinds
             .is_subset_of(KindSet::from_kind(ValueKind::BigInt))
@@ -13686,12 +13685,6 @@ impl<'a> ScriptLowerer<'a> {
         lhs: TypedExpr,
         rhs: &Expression,
     ) -> TypedExpr {
-        if let Some(lhs_bool) = Self::static_bool_expr(&lhs) {
-            match (logical, lhs_bool) {
-                (LogicalOp::And, false) | (LogicalOp::Or, true) => return lhs,
-                _ => {}
-            }
-        }
         if logical == LogicalOp::Coalesce
             && !lhs.possible_kinds.contains(ValueKind::Undefined)
             && !lhs.possible_kinds.contains(ValueKind::Null)

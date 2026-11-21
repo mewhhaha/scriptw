@@ -1252,7 +1252,7 @@ standard_builtin_catalog! {
     IteratorPrototypeConstructorSetter {
         function: FunctionOrdinal(145) => BUILTIN_ITERATOR_PROTOTYPE_CONSTRUCTOR_SETTER_FUNCTION_ID,
         debug: "set Iterator.prototype.constructor",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "set constructor",
     }
@@ -1273,7 +1273,7 @@ standard_builtin_catalog! {
     IteratorPrototypeToStringTagSetter {
         function: FunctionOrdinal(148) => BUILTIN_ITERATOR_PROTOTYPE_TO_STRING_TAG_SETTER_FUNCTION_ID,
         debug: "set Iterator.prototype[Symbol.toStringTag]",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "set [Symbol.toStringTag]",
     }
@@ -1897,14 +1897,14 @@ standard_builtin_catalog! {
     DateParse {
         function: FunctionOrdinal(236) => BUILTIN_DATE_PARSE_FUNCTION_ID,
         debug: "Date.parse",
-        flags: [STATIC_METHOD, SYSTEM_TIME_ZONE, INTL_HOST],
+        flags: [STATIC_METHOD, SYSTEM_TIME_ZONE, INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "parse",
     }
     DateUtc {
         function: FunctionOrdinal(237) => BUILTIN_DATE_UTC_FUNCTION_ID,
         debug: "Date.UTC",
-        flags: [STATIC_METHOD],
+        flags: [STATIC_METHOD, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "UTC",
     }
@@ -1918,7 +1918,7 @@ standard_builtin_catalog! {
     DatePrototypeSetTime {
         function: FunctionOrdinal(239) => BUILTIN_DATE_PROTOTYPE_SET_TIME_FUNCTION_ID,
         debug: "Date.prototype.setTime",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "setTime",
     }
@@ -2058,105 +2058,105 @@ standard_builtin_catalog! {
     DatePrototypeSetYear {
         function: FunctionOrdinal(259) => BUILTIN_DATE_PROTOTYPE_SET_YEAR_FUNCTION_ID,
         debug: "Date.prototype.setYear",
-        flags: [SYSTEM_TIME_ZONE, INTL_HOST],
+        flags: [SYSTEM_TIME_ZONE, INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "setYear",
     }
     DatePrototypeSetFullYear {
         function: FunctionOrdinal(260) => BUILTIN_DATE_PROTOTYPE_SET_FULL_YEAR_FUNCTION_ID,
         debug: "Date.prototype.setFullYear",
-        flags: [SYSTEM_TIME_ZONE, INTL_HOST],
+        flags: [SYSTEM_TIME_ZONE, INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "setFullYear",
     }
     DatePrototypeSetUtcFullYear {
         function: FunctionOrdinal(261) => BUILTIN_DATE_PROTOTYPE_SET_UTC_FULL_YEAR_FUNCTION_ID,
         debug: "Date.prototype.setUTCFullYear",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "setUTCFullYear",
     }
     DatePrototypeSetMonth {
         function: FunctionOrdinal(262) => BUILTIN_DATE_PROTOTYPE_SET_MONTH_FUNCTION_ID,
         debug: "Date.prototype.setMonth",
-        flags: [SYSTEM_TIME_ZONE, INTL_HOST],
+        flags: [SYSTEM_TIME_ZONE, INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "setMonth",
     }
     DatePrototypeSetUtcMonth {
         function: FunctionOrdinal(263) => BUILTIN_DATE_PROTOTYPE_SET_UTC_MONTH_FUNCTION_ID,
         debug: "Date.prototype.setUTCMonth",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "setUTCMonth",
     }
     DatePrototypeSetDate {
         function: FunctionOrdinal(264) => BUILTIN_DATE_PROTOTYPE_SET_DATE_FUNCTION_ID,
         debug: "Date.prototype.setDate",
-        flags: [SYSTEM_TIME_ZONE, INTL_HOST],
+        flags: [SYSTEM_TIME_ZONE, INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "setDate",
     }
     DatePrototypeSetUtcDate {
         function: FunctionOrdinal(265) => BUILTIN_DATE_PROTOTYPE_SET_UTC_DATE_FUNCTION_ID,
         debug: "Date.prototype.setUTCDate",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "setUTCDate",
     }
     DatePrototypeSetHours {
         function: FunctionOrdinal(266) => BUILTIN_DATE_PROTOTYPE_SET_HOURS_FUNCTION_ID,
         debug: "Date.prototype.setHours",
-        flags: [SYSTEM_TIME_ZONE, INTL_HOST],
+        flags: [SYSTEM_TIME_ZONE, INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "setHours",
     }
     DatePrototypeSetUtcHours {
         function: FunctionOrdinal(267) => BUILTIN_DATE_PROTOTYPE_SET_UTC_HOURS_FUNCTION_ID,
         debug: "Date.prototype.setUTCHours",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "setUTCHours",
     }
     DatePrototypeSetMinutes {
         function: FunctionOrdinal(268) => BUILTIN_DATE_PROTOTYPE_SET_MINUTES_FUNCTION_ID,
         debug: "Date.prototype.setMinutes",
-        flags: [SYSTEM_TIME_ZONE, INTL_HOST],
+        flags: [SYSTEM_TIME_ZONE, INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "setMinutes",
     }
     DatePrototypeSetUtcMinutes {
         function: FunctionOrdinal(269) => BUILTIN_DATE_PROTOTYPE_SET_UTC_MINUTES_FUNCTION_ID,
         debug: "Date.prototype.setUTCMinutes",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "setUTCMinutes",
     }
     DatePrototypeSetSeconds {
         function: FunctionOrdinal(270) => BUILTIN_DATE_PROTOTYPE_SET_SECONDS_FUNCTION_ID,
         debug: "Date.prototype.setSeconds",
-        flags: [SYSTEM_TIME_ZONE, INTL_HOST],
+        flags: [SYSTEM_TIME_ZONE, INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "setSeconds",
     }
     DatePrototypeSetUtcSeconds {
         function: FunctionOrdinal(271) => BUILTIN_DATE_PROTOTYPE_SET_UTC_SECONDS_FUNCTION_ID,
         debug: "Date.prototype.setUTCSeconds",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "setUTCSeconds",
     }
     DatePrototypeSetMilliseconds {
         function: FunctionOrdinal(272) => BUILTIN_DATE_PROTOTYPE_SET_MILLISECONDS_FUNCTION_ID,
         debug: "Date.prototype.setMilliseconds",
-        flags: [SYSTEM_TIME_ZONE, INTL_HOST],
+        flags: [SYSTEM_TIME_ZONE, INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "setMilliseconds",
     }
     DatePrototypeSetUtcMilliseconds {
         function: FunctionOrdinal(273) => BUILTIN_DATE_PROTOTYPE_SET_UTC_MILLISECONDS_FUNCTION_ID,
         debug: "Date.prototype.setUTCMilliseconds",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "setUTCMilliseconds",
     }
@@ -2170,14 +2170,14 @@ standard_builtin_catalog! {
     DatePrototypeToJson {
         function: FunctionOrdinal(275) => BUILTIN_DATE_PROTOTYPE_TO_JSON_FUNCTION_ID,
         debug: "Date.prototype.toJSON",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "toJSON",
     }
     DatePrototypeToPrimitive {
         function: FunctionOrdinal(276) => BUILTIN_DATE_PROTOTYPE_TO_PRIMITIVE_FUNCTION_ID,
         debug: "Date.prototype[Symbol.toPrimitive]",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "[Symbol.toPrimitive]",
     }
@@ -2191,21 +2191,21 @@ standard_builtin_catalog! {
     DatePrototypeToLocaleDateString {
         function: FunctionOrdinal(278) => BUILTIN_DATE_PROTOTYPE_TO_LOCALE_DATE_STRING_FUNCTION_ID,
         debug: "Date.prototype.toLocaleDateString",
-        flags: [INTL_HOST, SYSTEM_TIME_ZONE],
+        flags: [INTL_HOST, SYSTEM_TIME_ZONE, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "toLocaleDateString",
     }
     DatePrototypeToLocaleString {
         function: FunctionOrdinal(279) => BUILTIN_DATE_PROTOTYPE_TO_LOCALE_STRING_FUNCTION_ID,
         debug: "Date.prototype.toLocaleString",
-        flags: [INTL_HOST, SYSTEM_TIME_ZONE],
+        flags: [INTL_HOST, SYSTEM_TIME_ZONE, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "toLocaleString",
     }
     DatePrototypeToLocaleTimeString {
         function: FunctionOrdinal(280) => BUILTIN_DATE_PROTOTYPE_TO_LOCALE_TIME_STRING_FUNCTION_ID,
         debug: "Date.prototype.toLocaleTimeString",
-        flags: [INTL_HOST, SYSTEM_TIME_ZONE],
+        flags: [INTL_HOST, SYSTEM_TIME_ZONE, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "toLocaleTimeString",
     }
@@ -3703,7 +3703,7 @@ standard_builtin_catalog! {
     IntlGetCanonicalLocales {
         function: FunctionOrdinal(484) => BUILTIN_INTL_GET_CANONICAL_LOCALES_FUNCTION_ID,
         debug: "Intl.getCanonicalLocales",
-        flags: [INTL_HOST],
+        flags: [INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "getCanonicalLocales",
     }
@@ -3878,7 +3878,7 @@ standard_builtin_catalog! {
     IntlDateTimeFormatSupportedLocalesOf {
         function: FunctionOrdinal(492) => BUILTIN_INTL_DATE_TIME_FORMAT_SUPPORTED_LOCALES_OF_FUNCTION_ID,
         debug: "Intl.DateTimeFormat.supportedLocalesOf",
-        flags: [INTL_HOST],
+        flags: [INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "supportedLocalesOf",
     }
@@ -3899,28 +3899,28 @@ standard_builtin_catalog! {
     IntlDateTimeFormatPrototypeFormatToParts {
         function: FunctionOrdinal(495) => BUILTIN_INTL_DATE_TIME_FORMAT_PROTOTYPE_FORMAT_TO_PARTS_FUNCTION_ID,
         debug: "Intl.DateTimeFormat.prototype.formatToParts",
-        flags: [WALL_CLOCK, INTL_HOST],
+        flags: [WALL_CLOCK, INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "formatToParts",
     }
     IntlDateTimeFormatPrototypeFormatRange {
         function: FunctionOrdinal(496) => BUILTIN_INTL_DATE_TIME_FORMAT_PROTOTYPE_FORMAT_RANGE_FUNCTION_ID,
         debug: "Intl.DateTimeFormat.prototype.formatRange",
-        flags: [INTL_HOST],
+        flags: [INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "formatRange",
     }
     IntlDateTimeFormatPrototypeFormatRangeToParts {
         function: FunctionOrdinal(497) => BUILTIN_INTL_DATE_TIME_FORMAT_PROTOTYPE_FORMAT_RANGE_TO_PARTS_FUNCTION_ID,
         debug: "Intl.DateTimeFormat.prototype.formatRangeToParts",
-        flags: [INTL_HOST],
+        flags: [INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "formatRangeToParts",
     }
     IntlDateTimeFormatBoundFormat {
         function: FunctionOrdinal(498) => BUILTIN_INTL_DATE_TIME_FORMAT_BOUND_FORMAT_FUNCTION_ID,
         debug: "Intl.DateTimeFormat Format Function",
-        flags: [WALL_CLOCK, INTL_HOST],
+        flags: [WALL_CLOCK, INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "",
     }
@@ -3934,7 +3934,7 @@ standard_builtin_catalog! {
     IntlNumberFormatSupportedLocalesOf {
         function: FunctionOrdinal(832) => BUILTIN_INTL_NUMBER_FORMAT_SUPPORTED_LOCALES_OF_FUNCTION_ID,
         debug: "Intl.NumberFormat.supportedLocalesOf",
-        flags: [INTL_HOST],
+        flags: [INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "supportedLocalesOf",
     }
@@ -3955,28 +3955,28 @@ standard_builtin_catalog! {
     IntlNumberFormatPrototypeFormatToParts {
         function: FunctionOrdinal(835) => BUILTIN_INTL_NUMBER_FORMAT_PROTOTYPE_FORMAT_TO_PARTS_FUNCTION_ID,
         debug: "Intl.NumberFormat.prototype.formatToParts",
-        flags: [INTL_HOST],
+        flags: [INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "formatToParts",
     }
     IntlNumberFormatPrototypeFormatRange {
         function: FunctionOrdinal(836) => BUILTIN_INTL_NUMBER_FORMAT_PROTOTYPE_FORMAT_RANGE_FUNCTION_ID,
         debug: "Intl.NumberFormat.prototype.formatRange",
-        flags: [INTL_HOST],
+        flags: [INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "formatRange",
     }
     IntlNumberFormatPrototypeFormatRangeToParts {
         function: FunctionOrdinal(837) => BUILTIN_INTL_NUMBER_FORMAT_PROTOTYPE_FORMAT_RANGE_TO_PARTS_FUNCTION_ID,
         debug: "Intl.NumberFormat.prototype.formatRangeToParts",
-        flags: [INTL_HOST],
+        flags: [INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "formatRangeToParts",
     }
     IntlNumberFormatBoundFormat {
         function: FunctionOrdinal(838) => BUILTIN_INTL_NUMBER_FORMAT_BOUND_FORMAT_FUNCTION_ID,
         debug: "Intl.NumberFormat Format Function",
-        flags: [INTL_HOST],
+        flags: [INTL_HOST, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "",
     }
@@ -4251,7 +4251,7 @@ standard_builtin_catalog! {
     RegExpPrototypeFlagsGetter {
         function: FunctionOrdinal(501) => BUILTIN_REGEXP_PROTOTYPE_FLAGS_GETTER_FUNCTION_ID,
         debug: "get RegExp.prototype.flags",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "get flags",
     }
@@ -4335,42 +4335,42 @@ standard_builtin_catalog! {
     RegExpPrototypeCompile {
         function: FunctionOrdinal(513) => BUILTIN_REGEXP_PROTOTYPE_COMPILE_FUNCTION_ID,
         debug: "RegExp.prototype.compile",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "compile",
     }
     RegExpPrototypeExec {
         function: FunctionOrdinal(514) => BUILTIN_REGEXP_PROTOTYPE_EXEC_FUNCTION_ID,
         debug: "RegExp.prototype.exec",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "exec",
     }
     RegExpPrototypeTest {
         function: FunctionOrdinal(515) => BUILTIN_REGEXP_PROTOTYPE_TEST_FUNCTION_ID,
         debug: "RegExp.prototype.test",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "test",
     }
     RegExpPrototypeToString {
         function: FunctionOrdinal(516) => BUILTIN_REGEXP_PROTOTYPE_TO_STRING_FUNCTION_ID,
         debug: "RegExp.prototype.toString",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "toString",
     }
     RegExpPrototypeSymbolMatch {
         function: FunctionOrdinal(517) => BUILTIN_REGEXP_PROTOTYPE_SYMBOL_MATCH_FUNCTION_ID,
         debug: "RegExp.prototype[Symbol.match]",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "[Symbol.match]",
     }
     RegExpPrototypeSymbolMatchAll {
         function: FunctionOrdinal(518) => BUILTIN_REGEXP_PROTOTYPE_SYMBOL_MATCH_ALL_FUNCTION_ID,
         debug: "RegExp.prototype[Symbol.matchAll]",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "[Symbol.matchAll]",
     }
@@ -4384,14 +4384,14 @@ standard_builtin_catalog! {
     RegExpPrototypeSymbolSearch {
         function: FunctionOrdinal(520) => BUILTIN_REGEXP_PROTOTYPE_SYMBOL_SEARCH_FUNCTION_ID,
         debug: "RegExp.prototype[Symbol.search]",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "[Symbol.search]",
     }
     RegExpPrototypeSymbolSplit {
         function: FunctionOrdinal(521) => BUILTIN_REGEXP_PROTOTYPE_SYMBOL_SPLIT_FUNCTION_ID,
         debug: "RegExp.prototype[Symbol.split]",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "[Symbol.split]",
     }
@@ -4419,7 +4419,7 @@ standard_builtin_catalog! {
     JsonRawJson {
         function: FunctionOrdinal(525) => BUILTIN_JSON_RAW_JSON_FUNCTION_ID,
         debug: "JSON.rawJSON",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "rawJSON",
     }
@@ -5044,21 +5044,21 @@ standard_builtin_catalog! {
     StringFromCharCode {
         function: FunctionOrdinal(609) => BUILTIN_STRING_FROM_CHAR_CODE_FUNCTION_ID,
         debug: "String.fromCharCode",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "fromCharCode",
     }
     StringFromCodePoint {
         function: FunctionOrdinal(610) => BUILTIN_STRING_FROM_CODE_POINT_FUNCTION_ID,
         debug: "String.fromCodePoint",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "fromCodePoint",
     }
     StringRaw {
         function: FunctionOrdinal(611) => BUILTIN_STRING_RAW_FUNCTION_ID,
         debug: "String.raw",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "raw",
     }
@@ -6121,7 +6121,7 @@ standard_builtin_catalog! {
     SymbolFor {
         function: FunctionOrdinal(753) => BUILTIN_SYMBOL_FOR_FUNCTION_ID,
         debug: "Symbol.for",
-        flags: [STATIC_METHOD],
+        flags: [STATIC_METHOD, SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "for",
     }
@@ -6391,7 +6391,7 @@ standard_builtin_catalog! {
     FunctionPrototypeSymbolHasInstance {
         function: FunctionOrdinal(785) => BUILTIN_FUNCTION_PROTOTYPE_SYMBOL_HAS_INSTANCE_FUNCTION_ID,
         debug: "Function.prototype[Symbol.hasInstance]",
-        flags: [],
+        flags: [SYNCHRONOUS_USER_CODE],
         installer: None,
         native: "[Symbol.hasInstance]",
     }
@@ -7162,6 +7162,66 @@ const _: () = {
                 | StandardBuiltinId::FunctionPrototypeBind
                 | StandardBuiltinId::ArrayIteratorNext
                 | StandardBuiltinId::TypedArrayOf
+        ) {
+            assert!(builtin.may_run_user_code_synchronously());
+        }
+        // These coerce an argument or their receiver (ToString, ToNumber,
+        // ToPrimitive, a locale list, an options bag, `lastIndex`), call an
+        // overridable `exec`, or reach a Proxy trap, so a call can run user
+        // code. Their results are plain values, so nothing else marks them.
+        if matches!(
+            builtin,
+            StandardBuiltinId::SymbolFor
+                | StandardBuiltinId::DateUtc
+                | StandardBuiltinId::DateParse
+                | StandardBuiltinId::DatePrototypeSetTime
+                | StandardBuiltinId::DatePrototypeSetYear
+                | StandardBuiltinId::DatePrototypeSetFullYear
+                | StandardBuiltinId::DatePrototypeSetUtcFullYear
+                | StandardBuiltinId::DatePrototypeSetMonth
+                | StandardBuiltinId::DatePrototypeSetUtcMonth
+                | StandardBuiltinId::DatePrototypeSetDate
+                | StandardBuiltinId::DatePrototypeSetUtcDate
+                | StandardBuiltinId::DatePrototypeSetHours
+                | StandardBuiltinId::DatePrototypeSetUtcHours
+                | StandardBuiltinId::DatePrototypeSetMinutes
+                | StandardBuiltinId::DatePrototypeSetUtcMinutes
+                | StandardBuiltinId::DatePrototypeSetSeconds
+                | StandardBuiltinId::DatePrototypeSetUtcSeconds
+                | StandardBuiltinId::DatePrototypeSetMilliseconds
+                | StandardBuiltinId::DatePrototypeSetUtcMilliseconds
+                | StandardBuiltinId::DatePrototypeToJson
+                | StandardBuiltinId::DatePrototypeToPrimitive
+                | StandardBuiltinId::DatePrototypeToLocaleDateString
+                | StandardBuiltinId::DatePrototypeToLocaleString
+                | StandardBuiltinId::DatePrototypeToLocaleTimeString
+                | StandardBuiltinId::StringFromCharCode
+                | StandardBuiltinId::StringFromCodePoint
+                | StandardBuiltinId::StringRaw
+                | StandardBuiltinId::RegExpPrototypeCompile
+                | StandardBuiltinId::RegExpPrototypeExec
+                | StandardBuiltinId::RegExpPrototypeTest
+                | StandardBuiltinId::RegExpPrototypeToString
+                | StandardBuiltinId::RegExpPrototypeSymbolMatch
+                | StandardBuiltinId::RegExpPrototypeSymbolMatchAll
+                | StandardBuiltinId::RegExpPrototypeSymbolSearch
+                | StandardBuiltinId::RegExpPrototypeSymbolSplit
+                | StandardBuiltinId::RegExpPrototypeFlagsGetter
+                | StandardBuiltinId::JsonRawJson
+                | StandardBuiltinId::IntlGetCanonicalLocales
+                | StandardBuiltinId::IntlDateTimeFormatSupportedLocalesOf
+                | StandardBuiltinId::IntlNumberFormatSupportedLocalesOf
+                | StandardBuiltinId::IntlDateTimeFormatPrototypeFormatToParts
+                | StandardBuiltinId::IntlDateTimeFormatPrototypeFormatRange
+                | StandardBuiltinId::IntlDateTimeFormatPrototypeFormatRangeToParts
+                | StandardBuiltinId::IntlDateTimeFormatBoundFormat
+                | StandardBuiltinId::IntlNumberFormatPrototypeFormatToParts
+                | StandardBuiltinId::IntlNumberFormatPrototypeFormatRange
+                | StandardBuiltinId::IntlNumberFormatPrototypeFormatRangeToParts
+                | StandardBuiltinId::IntlNumberFormatBoundFormat
+                | StandardBuiltinId::FunctionPrototypeSymbolHasInstance
+                | StandardBuiltinId::IteratorPrototypeConstructorSetter
+                | StandardBuiltinId::IteratorPrototypeToStringTagSetter
         ) {
             assert!(builtin.may_run_user_code_synchronously());
         }

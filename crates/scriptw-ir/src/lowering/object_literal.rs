@@ -307,6 +307,9 @@ impl<'a> ScriptLowerer<'a> {
                 {
                     return Err(self.unsupported_expr("computed object key"));
                 }
+                // ToPropertyKey of an object key is user code, and it runs
+                // before the method is created.
+                self.record_possible_to_primitive_effects(&key.value_info());
                 let key_may_be_string = Self::computed_key_may_be_string(&key);
                 let Some((function, function_info)) =
                     self.lower_object_method_function(method, "<computed>")
@@ -415,6 +418,9 @@ impl<'a> ScriptLowerer<'a> {
                 {
                     return Err(self.unsupported_expr("computed object key"));
                 }
+                // ToPropertyKey of an object key is user code, and it runs
+                // before the value is evaluated.
+                self.record_possible_to_primitive_effects(&key.value_info());
                 let (lowered, name_inference) = if anonymous {
                     if let Expression::ClassExpression(class) =
                         Self::unwrap_parenthesized_expr(value)

@@ -33,25 +33,6 @@ impl<'a> ScriptLowerer<'a> {
         } else {
             (Vec::new(), self.lower_expression(if_statement.cond()))
         };
-        if condition_prefix.is_empty()
-            && !(self.plain_async_entry_state().is_some()
-                && (self.plain_async_with_depth > 0
-                    || self.plain_async_for_in_depth > 0
-                    || self.plain_async_for_of_depth > 0
-                    || self.plain_async_classic_depth > 0
-                    || self.plain_async_resource_depth > 0
-                    || contains_plain_async_phase(if_statement)))
-        {
-            if let Some(value) = Self::static_bool_expr(&condition) {
-                if value {
-                    return self.lower_statement(if_statement.body());
-                }
-                return match if_statement.else_node() {
-                    Some(else_node) => self.lower_statement(else_node),
-                    None => (StatementIr::Empty, ValueKind::Undefined),
-                };
-            }
-        }
         let async_entry_state = self.plain_async_entry_state();
         if let Some(entry_state) = async_entry_state {
             let Some(then_entry_state) = entry_state.checked_add(1) else {
