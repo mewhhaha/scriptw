@@ -2219,6 +2219,47 @@ passing), among them WeakRef, FinalizationRegistry, Iterator, JSON, Promise
 and `built-ins/Function`. Wall-clock panels were not remeasured for this
 section.
 
+### Emitter batch E-1 (2026-11-21)
+
+Batch E-1 removed emitter work that Cranelift either repeats or discards:
+null refinements of references the emitter's types prove non-null (E1),
+known constants folded into `array.get` indices, helper arguments and
+contiguous tag-range tests (E2), constant stores into locals that already hold
+the value and null stores that end a holder (E3a/E3b), the depth-guard
+overflow arm outlined into one P helper (E5c), P's uncalled host imports
+(E5b) and `local.set x; local.get x` pairs as `local.tee` (E5a). The
+semantics and the runtime assumption they rest on are in
+[runtime requirements](runtime-requirements.md#locals-and-gc-roots).
+
+Measured on the RSC bundle with a default-feature `rsc_baseline` host built
+from `063dfb301` (executable `dde092fc`), Speed policy, under Callgrind
+(`rsc_instruction_counts.py count`, 20 measured requests, CPUs 2 and 3):
+
+| | Before | E-1 | Change |
+| --- | ---: | ---: | ---: |
+| Sync request, median instructions | 2,797,323.5 | 2,761,266.5 | −1.29% |
+| Async request, median instructions | 3,029,506.5 | 2,991,643.0 | −1.25% |
+| P bytes | 4,337,431 | 3,890,373 | −10.3% |
+| P code bytes | 3,703,074 | 3,259,340 | −12.0% |
+| R bytes | 39,323,747 | 38,188,389 | −2.9% |
+| R code bytes | 14,485,883 | 13,351,701 | −7.8% |
+| `ref.as_non_null` in P / R | 74,015 / 202,630 | 49,474 / 115,594 | |
+| `ref.null` in P | 62,539 | 48,473 | |
+
+Both requests produced the exact Flight output. The base host was built from
+`3db599df5` with a module-replacement hook, so the instruction change also
+holds the commits between the two sources; the byte counts compare the P
+and R of the two dumps. Static attribution by item, from the dumped
+modules: E2's tag-range tests replace P's 2,167 and R's 14,216 zero-seeded
+`i32.or` chains (22 remain in R), its constant indices replace 7,982 P and
+13,619 R `local.set`/`local.get` pairs before `array.get` and all 3,949 P and
+33,565 R constant helper arguments; E5c shrinks P's 308 guard arms from
+60,718 to 4,621 bytes plus a 210-byte helper; E5b cuts P's function imports
+from 128 to 78. P has 58,566 `local.tee`s and R 153,870. Native preparation
+of P took 8.28 s against 8.51 s on a loaded machine, which is no
+measurement. Not measured: wall time, and binaryen's remaining headroom on
+the new modules.
+
 ### Descriptor work and physical allocation
 
 Compiler-created, already validated descriptors now call canonical ordinary/Array definition directly when admitted, retaining the exotic Reflect fallback. Known source accessor descriptors bypass the inline Array algorithm to control code growth. Public descriptor conversion and validation remain intact.

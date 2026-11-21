@@ -506,6 +506,23 @@ accepts `--case <file.js>`.
   already proves `Is(const)` for `i32.const; local.set`, so a completion-kind
   variant needs value sets through completion copies. Revisit when the next
   change removes completion writes. Owner: emitter completion protocol.
+- Emitter batch E-2 carries over from E-1, each needing an R layout bump:
+  E3c (release an `eqref` value local without its null store; the GC local
+  write check must then cover `eqref`, so it lands after a debug-verifier
+  Test262 sweep has run over E-1), E4 (bind immutable struct fields read in
+  dominated blocks once: P about 6K and R about 11K reads, `StringValue`
+  code units the largest), R hot-callee renumbering below index 128 (about
+  80 KB) and R's 15 duplicate bodies (14.9 KB, needs index aliasing in
+  `function_layout.rs`). Measured E-1 results are in
+  [benchmarks](benchmarks.md#emitter-batch-e-1-2026-11-21). Owner: emitter.
+- E-1 verification scope (the batch review's M2). Before E-1 landed, the
+  debug-verifier Test262 run covered 30 directories through
+  `built-ins/Proxy` (12,267 cases, no Bug or Crash). Not yet run with the
+  verifier: `built-ins/{TypedArray, TypedArrayConstructors, Array, Object,
+  Promise, RegExp, String, DataView, Function}` and
+  `language/{statements,expressions}/class`; precompiled-consumer
+  `end_to_end`; a full release `report-all` compared per case with the
+  2026-11-18 publication. Owner: emitter (batch E-1 follow-up).
 - Third-party notices: `THIRD-PARTY-NOTICES.md` reproduces only jemalloc's
   notice. The Rust dependencies under MIT, Apache-2.0 and Unicode-3.0 need a
   generated notice file, and CI uploads `cargo build --release` binaries for
