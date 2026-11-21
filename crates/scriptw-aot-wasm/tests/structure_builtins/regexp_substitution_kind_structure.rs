@@ -216,11 +216,17 @@ fn consumed_and_source_updates_follow_the_completed_replacement_piece() {
         "        self.emit_native_gc_string_length(&piece, piece_length, f);",
         "        pending.clear(f);",
     );
-    assert!(completed
-        .contains("RuntimeErrorMessage::REPLACEMENT_RESULT_WOULD_EXCEED_MAXIMUM_STRING_LENGTH"));
+    // The accumulated length, with this piece added, is checked against the
+    // String length limit before the piece is appended.
+    assert!(completed.contains("RuntimeErrorMessage::STRING_LENGTH_EXCEEDS_IMPLEMENTATION_LIMIT"));
     assert_before(
         completed,
-        "Instruction::I64Const(u32::MAX as i64)",
+        "total_length.store(f)",
+        "Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH)",
+    );
+    assert_before(
+        completed,
+        "Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH)",
         "self.emit_native_string_error_if(",
     );
     assert_before(
