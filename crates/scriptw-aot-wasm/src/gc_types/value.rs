@@ -264,8 +264,9 @@ enum LocalOwner {
     /// The function's own parameter, declared with exactly the holder's
     /// type (`(ref T)` or `(ref null T)`), aliased rather than copied: the
     /// sink binds each parameter to at most one holder
-    /// (`Function::bind_parameter`), so no other holder observes a
-    /// `replace`. A parameter is never released.
+    /// (`Function::bind_parameter`). A parameter holder is never written
+    /// (`replace` and `set_null` refuse it), so every raw read of the
+    /// parameter sees the argument, and it is never released.
     Parameter,
 }
 
@@ -305,7 +306,18 @@ impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
     }
     pub(crate) fn replace(&self, value: GcStackReference<T, N>, function: &mut Function) {
         let GcStackReference { .. } = value;
+        self.require_pooled("replace");
         function.instruction(&Instruction::LocalSet(self.index));
+    }
+    /// Refuses a write to an aliased parameter: its raw readers (an
+    /// adapter forwarding the argument, a tail call) would see the
+    /// replacement, which only the holder's own reads may observe.
+    fn require_pooled(&self, write: &str) {
+        assert!(
+            matches!(self.owner, LocalOwner::Pooled(_)),
+            "a parameter holder is never written ({write} of parameter {})",
+            self.index
+        );
     }
     /// Ends this holder: a pooled local returns to the pool for its next
     /// holder of the same type, without a store. A released local is never
@@ -333,6 +345,7 @@ impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
 }
 impl<T: GcHeapType> GcLocal<T, Nullable> {
     pub(crate) fn set_null(&self, schema: &RuntimeSchema, function: &mut Function) {
+        self.require_pooled("set_null");
         function.store_constant(
             self.index,
             LocalConstant::Null(
@@ -351,6 +364,23 @@ impl<T: GcHeapType> GcLocal<T, Nullable> {
     ) -> GcStackReference<T> {
         function.instruction(&Instruction::LocalGet(self.index));
         function.branch_on_null_to_label(absent);
+        GcStackReference::new()
+    }
+
+    /// The reference, or for null the one `absent` pushes in its place,
+    /// without writing this local.
+    pub(crate) fn non_null_or_else(
+        &self,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+        absent: impl FnOnce(&mut Function) -> GcStackReference<T>,
+    ) -> GcStackReference<T> {
+        let output = schema.reference_type::<T>(GcNullability::NonNullable);
+        function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(output))));
+        function.instruction(&Instruction::LocalGet(self.index));
+        function.instruction(&Instruction::BrOnNonNull(0));
+        let GcStackReference { .. } = absent(function);
+        function.instruction(&Instruction::End);
         GcStackReference::new()
     }
 }

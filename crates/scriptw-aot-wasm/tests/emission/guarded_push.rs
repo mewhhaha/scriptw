@@ -64,21 +64,26 @@ fn incoming_empty_argv_allocation(
         .checked_sub(1)
         .expect("the incoming count precedes its vector");
     assert_eq!(signature.params()[count as usize], ValType::I64);
-    // The vector parameter is its own holder (`parameter_gc` aliases it):
-    // the empty List replaces the parameter itself.
+    // The vector parameter is its own holder (`parameter_gc` aliases it) and
+    // is never written: a null one is replaced by an empty List on the stack,
+    // and the normalized List's length is then checked against the count.
     let allocations = body
-        .windows(12)
+        .windows(13)
         .enumerate()
         .filter_map(|(start, ops)| {
             matches!(ops,
-            [Operator::LocalGet { local_index: supplied }, Operator::RefIsNull, Operator::If { .. },
-             Operator::LocalGet { local_index: supplied_count }, Operator::I64Eqz, Operator::I32Eqz,
-             Operator::If { .. }, Operator::Unreachable, Operator::End,
-             Operator::ArrayNewFixed { array_type_index, array_size: 0 },
-             Operator::LocalSet { local_index: normalized }, Operator::Else]
-                if *supplied == vector && supplied == normalized
-                    && *supplied_count == count && *array_type_index == argv)
-            .then_some(start + 9)
+            [Operator::Block { .. }, Operator::LocalGet { local_index: supplied },
+             Operator::BrOnNonNull { relative_depth: 0 },
+             Operator::ArrayNewFixed { array_type_index, array_size: 0 }, Operator::End,
+             Operator::LocalSet { local_index: normalized },
+             Operator::LocalGet { local_index: read }, Operator::ArrayLen,
+             Operator::I64ExtendI32U, Operator::LocalSet { local_index: length },
+             Operator::LocalGet { local_index: compared },
+             Operator::LocalGet { local_index: supplied_count }, Operator::I64Ne]
+                if *supplied == vector && supplied != normalized && read == normalized
+                    && length == compared && *supplied_count == count
+                    && *array_type_index == argv)
+            .then_some(start + 3)
         })
         .collect::<Vec<_>>();
     assert_eq!(

@@ -92,8 +92,10 @@ fn callable_locals(schema: &RuntimeSchema, function: &mut Function) -> CallableL
     }
 }
 
-/// Null is an ABI encoding only for an empty vector. Check the physical count
-/// once, then keep a non-null vector and a count derived from that vector.
+/// Null is an ABI encoding only for an empty vector. Take an empty vector
+/// for it, then check the vector's length against the declared count once:
+/// null with a nonzero count fails it like a short vector. The parameter
+/// itself is never written, so a raw reader of it sees the argument.
 fn normalize_arguments(
     schema: &RuntimeSchema,
     count_parameter: u32,
@@ -102,37 +104,12 @@ fn normalize_arguments(
 ) -> (GcLocal<ValueArray>, I64Local) {
     let declared_count = schema.parameter_i64(count_parameter, function);
     let vector = schema.parameter_gc::<ValueArray, Nullable>(vector_parameter, function);
-    vector.load(schema, function);
-    function.instruction(&Instruction::RefIsNull);
-    function.instruction(&Instruction::If(BlockType::Empty));
-    declared_count.load(function);
-    function.instruction(&Instruction::I64Eqz);
-    function.instruction(&Instruction::I32Eqz);
-    function.instruction(&Instruction::If(BlockType::Empty));
-    function.instruction(&Instruction::Unreachable);
-    function.instruction(&Instruction::End);
-    vector.replace(
-        schema
-            .array_type::<ValueArray>()
-            .fixed([], function)
-            .nullable(),
-        function,
-    );
-    function.instruction(&Instruction::Else);
-    schema
-        .array_type::<ValueArray>()
-        .length(&vector, schema, function);
-    function.instruction(&Instruction::I64ExtendI32U);
-    declared_count.load(function);
-    function.instruction(&Instruction::I64Ne);
-    function.instruction(&Instruction::If(BlockType::Empty));
-    function.instruction(&Instruction::Unreachable);
-    function.instruction(&Instruction::End);
-    function.instruction(&Instruction::End);
-    let arguments = schema.reserve_gc_local(function).initialize(
-        vector.load(schema, function).require_non_null(function),
-        function,
-    );
+    let present = vector.non_null_or_else(schema, function, |function| {
+        schema.array_type::<ValueArray>().fixed([], function)
+    });
+    let arguments = schema
+        .reserve_gc_local(function)
+        .initialize(present, function);
     vector.clear(function);
     let count = schema.reserve_i64_local(function);
     schema
@@ -140,6 +117,12 @@ fn normalize_arguments(
         .length(&arguments, schema, function);
     function.instruction(&Instruction::I64ExtendI32U);
     count.store(function);
+    count.load(function);
+    declared_count.load(function);
+    function.instruction(&Instruction::I64Ne);
+    function.instruction(&Instruction::If(BlockType::Empty));
+    function.instruction(&Instruction::Unreachable);
+    function.instruction(&Instruction::End);
     (arguments, count)
 }
 
