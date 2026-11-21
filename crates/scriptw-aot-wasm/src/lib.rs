@@ -140,7 +140,7 @@ use abi::*;
 use arguments_protocol::*;
 use bigint::BigIntHelperOp;
 use builtins::*;
-use code_sink::{Function, LabelDepth, LocalDeclarations};
+use code_sink::{ExitSequence, Function, LabelDepth, LocalDeclarations};
 use data::*;
 pub use emit::emit;
 pub use emit::emit_with_intl_profile;

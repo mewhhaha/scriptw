@@ -94,6 +94,14 @@ impl Trace {
         }
     }
 
+    /// A store the sink elided because the local already holds the value
+    /// (`Function::store_constant`): the holder's write all the same.
+    pub(super) fn write(&mut self, local: u32) {
+        if let Some(&dense) = self.checked.get(&local) {
+            self.ops.push(Op::Write(dense));
+        }
+    }
+
     pub(super) fn release(&mut self, local: u32) {
         if let Some(&dense) = self.checked.get(&local) {
             self.ops.push(Op::Release(dense));

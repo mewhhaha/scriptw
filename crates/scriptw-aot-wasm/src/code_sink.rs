@@ -41,6 +41,28 @@ impl BranchDepth {
     }
 }
 
+/// A body's exit in progress (see [`Function::begin_exit`]): from it to
+/// the final `end` it emits, the body emits no instruction, so the holders
+/// it ends store nothing.
+#[must_use = "an exit sequence ends with the body's final end"]
+#[derive(Debug)]
+pub(crate) struct ExitSequence {
+    _private: (),
+}
+
+impl ExitSequence {
+    /// Emits the body's final `end`.
+    pub(crate) fn end(self, function: &mut Function) {
+        assert_eq!(
+            function.frames.len(),
+            1,
+            "an exit sequence ends the body's own frame"
+        );
+        function.exiting = false;
+        function.instruction(&Instruction::End);
+    }
+}
+
 /// An open counted-call scope (see [`Function::open_counted_calls`]). Not
 /// copyable: exactly one close consumes it.
 #[must_use = "a counted-call scope must be closed"]
@@ -108,19 +130,91 @@ impl Frame {
     }
 }
 
-/// What the sink knows of one i32 local at a program point.
+/// A value a local can be known to hold: the constants
+/// [`Function::store_constant`] stores and the sink sees pushed before a
+/// store. A float is known by its bits, so `-0.0` is not `+0.0`; a null is
+/// known whatever its heap type, since a local has one declared type.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum I32Fact {
+enum KnownValue {
+    I32(i32),
+    I64(i64),
+    F64(u64),
+    Null,
+}
+
+impl KnownValue {
+    /// The value of the instruction, if it pushes a constant.
+    fn pushed_by(instruction: &Instruction<'_>) -> Option<Self> {
+        match *instruction {
+            Instruction::I32Const(value) => Some(Self::I32(value)),
+            Instruction::I64Const(value) => Some(Self::I64(value)),
+            Instruction::F64Const(value) => Some(Self::F64(value.bits())),
+            Instruction::RefNull(_) => Some(Self::Null),
+            _ => None,
+        }
+    }
+
+    /// Whether a declared local of this value's type holds it on entry.
+    fn is_wasm_default(self) -> bool {
+        matches!(
+            self,
+            Self::I32(0) | Self::I64(0) | Self::F64(0) | Self::Null
+        )
+    }
+}
+
+/// A constant for [`Function::store_constant`], the single entry for
+/// storing a constant into a local.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum LocalConstant {
+    I32(i32),
+    I64(i64),
+    /// The null of a nullable reference local's heap type.
+    Null(wasm_encoder::HeapType),
+}
+
+impl LocalConstant {
+    fn known(self) -> KnownValue {
+        match self {
+            Self::I32(value) => KnownValue::I32(value),
+            Self::I64(value) => KnownValue::I64(value),
+            Self::Null(_) => KnownValue::Null,
+        }
+    }
+
+    fn instruction(self) -> Instruction<'static> {
+        match self {
+            Self::I32(value) => Instruction::I32Const(value),
+            Self::I64(value) => Instruction::I64Const(value),
+            Self::Null(heap_type) => Instruction::RefNull(heap_type),
+        }
+    }
+
+    /// Whether a local declared `ty` can hold this constant.
+    fn fits(self, ty: ValType) -> bool {
+        match (self, ty) {
+            (Self::I32(_), ValType::I32) | (Self::I64(_), ValType::I64) => true,
+            (Self::Null(heap_type), ValType::Ref(reference)) => {
+                reference.nullable && reference.heap_type == heap_type
+            }
+            _ => false,
+        }
+    }
+}
+
+/// What the sink knows of one local at a program point.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LocalFact {
     /// The local holds this value: its last write stored this constant.
-    Is(i32),
-    /// The local does not hold this value: a checked escape left on it.
+    Is(KnownValue),
+    /// The i32 local does not hold this value: a checked escape left on it.
     IsNot(i32),
 }
 
-impl I32Fact {
+impl LocalFact {
     fn excludes(self, value: i32) -> bool {
         match self {
-            Self::Is(known) => known != value,
+            Self::Is(known) => known != KnownValue::I32(value),
             Self::IsNot(excluded) => excluded == value,
         }
     }
@@ -131,7 +225,7 @@ impl I32Fact {
             (Self::Is(a), Self::Is(b)) if a == b => Some(Self::Is(a)),
             (Self::IsNot(a), Self::IsNot(b)) if a == b => Some(Self::IsNot(a)),
             (Self::Is(known), Self::IsNot(excluded)) | (Self::IsNot(excluded), Self::Is(known))
-                if known != excluded =>
+                if known != KnownValue::I32(excluded) =>
             {
                 Some(Self::IsNot(excluded))
             }
@@ -140,21 +234,21 @@ impl I32Fact {
     }
 }
 
-/// The i32 local facts that hold on every path to a program point, through
+/// The local facts that hold on every path to a program point, through
 /// the structured control flow the sink sees: a fact survives a join only
 /// when every edge into it carries it. Only stores and tees change a local,
 /// so calls keep every fact. A loop head and an exception handler entry
 /// start without facts, since their incoming edges are not all known.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-struct I32Facts {
-    facts: Vec<(u32, I32Fact)>,
+struct LocalFacts {
+    facts: Vec<(u32, LocalFact)>,
 }
 
-impl I32Facts {
+impl LocalFacts {
     /// Facts kept per program point; the oldest is forgotten beyond this.
-    const LIMIT: usize = 32;
+    const LIMIT: usize = 64;
 
-    fn get(&self, local: u32) -> Option<I32Fact> {
+    fn get(&self, local: u32) -> Option<LocalFact> {
         self.facts
             .iter()
             .find(|(known, _)| *known == local)
@@ -165,7 +259,7 @@ impl I32Facts {
         self.facts.retain(|(known, _)| *known != local);
     }
 
-    fn set(&mut self, local: u32, fact: I32Fact) {
+    fn set(&mut self, local: u32, fact: LocalFact) {
         self.forget(local);
         if self.facts.len() == Self::LIMIT {
             self.facts.remove(0);
@@ -190,9 +284,9 @@ impl I32Facts {
 }
 
 /// The facts at the current point, or none when no path reaches it.
-type ReachingI32Facts = Option<I32Facts>;
+type ReachingFacts = Option<LocalFacts>;
 
-fn meet_reaching(left: ReachingI32Facts, right: &ReachingI32Facts) -> ReachingI32Facts {
+fn meet_reaching(left: ReachingFacts, right: &ReachingFacts) -> ReachingFacts {
     match (left, right) {
         (None, right) => right.clone(),
         (left, None) => left,
@@ -203,9 +297,9 @@ fn meet_reaching(left: ReachingI32Facts, right: &ReachingI32Facts) -> ReachingI3
 /// The facts of one open frame: those carried by the edges to its label so
 /// far, and for an `if`, those at its opener for the arm that has not run.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-struct FrameI32Facts {
-    label: ReachingI32Facts,
-    other_arm: ReachingI32Facts,
+struct FrameFacts {
+    label: ReachingFacts,
+    other_arm: ReachingFacts,
 }
 
 /// The exact ordered local declaration consumed by one function body.
@@ -449,18 +543,35 @@ pub(crate) struct Function {
     locals: LocalDeclarations,
     frames: Vec<Frame>,
     parameters: Vec<ValType>,
+    /// The parameters a typed holder aliases ([`Function::bind_parameter`]).
+    bound_parameters: Vec<bool>,
     initial_local_count: u32,
     initial_prefix_len: usize,
     free_locals: FreeLocals,
     operator_count: u32,
     literal_operands: Vec<crate::program_literal_operands::FunctionSite>,
     native_program_context: Option<crate::native_program_contexts::FunctionContext>,
-    /// The i32 local facts at the current point.
-    i32_facts: ReachingI32Facts,
+    /// The local facts at the current point.
+    facts: ReachingFacts,
     /// The facts of each open frame, parallel to `frames`.
-    frame_i32_facts: Vec<FrameI32Facts>,
+    frame_facts: Vec<FrameFacts>,
     /// The constant the previous instruction pushed, for the next store.
-    pushed_i32_constant: Option<i32>,
+    pushed_constant: Option<KnownValue>,
+    /// Whether some instruction emitted so far writes the local, by Wasm
+    /// local index (parameters excluded: they hold their arguments).
+    written: Vec<bool>,
+    /// How many `loop` frames are open: a back edge not yet emitted may
+    /// bring a later write to the current point.
+    open_loops: u32,
+    /// A `ref.as_non_null` [`Function::refine_non_null`] asked for, not yet
+    /// encoded: the next instruction decides whether it is needed.
+    pending_non_null: bool,
+    /// A `local.set` whose bookkeeping is done but whose bytes are held
+    /// back: a `local.get` of the same local right after it is encoded with
+    /// it as one `local.tee` (see [`Function::uncounted_instruction`]).
+    pending_set: Option<u32>,
+    /// An [`ExitSequence`] is open.
+    exiting: bool,
     checked_escape_frames: Vec<LabelDepth>,
     /// Depth globals of the open counted-call scopes, innermost last.
     counted_calls: Vec<u32>,
@@ -489,15 +600,21 @@ impl Clone for Function {
             locals: self.locals.fork_for_body(),
             frames: self.frames.clone(),
             parameters: self.parameters.clone(),
+            bound_parameters: self.bound_parameters.clone(),
             initial_local_count: self.initial_local_count,
             initial_prefix_len: self.initial_prefix_len,
             free_locals: self.free_locals.clone(),
             operator_count: self.operator_count,
             literal_operands: self.literal_operands.clone(),
             native_program_context: self.native_program_context,
-            i32_facts: self.i32_facts.clone(),
-            frame_i32_facts: self.frame_i32_facts.clone(),
-            pushed_i32_constant: self.pushed_i32_constant,
+            facts: self.facts.clone(),
+            frame_facts: self.frame_facts.clone(),
+            pushed_constant: self.pushed_constant,
+            written: self.written.clone(),
+            open_loops: self.open_loops,
+            pending_non_null: self.pending_non_null,
+            pending_set: self.pending_set,
+            exiting: self.exiting,
             checked_escape_frames: self.checked_escape_frames.clone(),
             counted_calls: self.counted_calls.clone(),
             last_instruction_escapes: self.last_instruction_escapes,
@@ -525,6 +642,7 @@ impl Function {
             body,
             locals,
             frames: vec![Frame::new(FrameKind::Function, 0, None)],
+            bound_parameters: vec![false; parameters.len()],
             parameters,
             initial_local_count,
             initial_prefix_len,
@@ -532,9 +650,14 @@ impl Function {
             operator_count: 0,
             literal_operands: Vec::new(),
             native_program_context: None,
-            i32_facts: Some(I32Facts::default()),
-            frame_i32_facts: vec![FrameI32Facts::default()],
-            pushed_i32_constant: None,
+            facts: Some(LocalFacts::default()),
+            frame_facts: vec![FrameFacts::default()],
+            pushed_constant: None,
+            written: Vec::new(),
+            open_loops: 0,
+            pending_non_null: false,
+            pending_set: None,
+            exiting: false,
             checked_escape_frames: Vec::new(),
             counted_calls: Vec::new(),
             last_instruction_escapes: false,
@@ -554,6 +677,17 @@ impl Function {
     pub(crate) fn parameter_types(&self) -> &[ValType] {
         &self.parameters
     }
+    /// Records that one typed holder aliases parameter `index` instead of
+    /// copying it, so that holder's writes are the parameter's. A second
+    /// holder of the same parameter would observe the first one's writes.
+    pub(crate) fn bind_parameter(&mut self, index: u32) {
+        let bound = self
+            .bound_parameters
+            .get_mut(index as usize)
+            .expect("only a declared parameter can be bound");
+        assert!(!*bound, "parameter {index} is bound to a holder twice");
+        *bound = true;
+    }
     pub(crate) fn allocated_local_count(&self) -> u32 {
         self.locals.count()
     }
@@ -566,8 +700,9 @@ impl Function {
             !self.frames.is_empty(),
             "cannot reserve a local after function publication"
         );
+        assert!(!self.exiting, "an exit sequence reserves no local");
         if let Some(index) = self.free_locals.take(ty) {
-            self.forget_i32_local(index);
+            self.forget_local_facts(index);
             #[cfg(any(test, debug_assertions))]
             self.gc_local_trace
                 .reserve(index, ty, std::panic::Location::caller());
@@ -583,6 +718,7 @@ impl Function {
             !self.frames.is_empty(),
             "cannot reserve a local after function publication"
         );
+        assert!(!self.exiting, "an exit sequence reserves no local");
         let index = u32::try_from(self.parameters.len())
             .expect("parameter count overflow")
             .checked_add(self.locals.count())
@@ -601,7 +737,7 @@ impl Function {
             "only this body's dynamically reserved locals can be released"
         );
         assert!(!self.free_locals.contains(index), "local released twice");
-        self.forget_i32_local(index);
+        self.forget_local_facts(index);
         #[cfg(any(test, debug_assertions))]
         self.gc_local_trace.release(index);
         let ty = self
@@ -611,8 +747,8 @@ impl Function {
         self.free_locals.push(index, ty);
     }
 
-    fn forget_i32_local(&mut self, index: u32) {
-        if let Some(facts) = &mut self.i32_facts {
+    fn forget_local_facts(&mut self, index: u32) {
+        if let Some(facts) = &mut self.facts {
             facts.forget(index);
         }
     }
@@ -620,83 +756,94 @@ impl Function {
     /// Joins `facts` into the edge to the label `immediate` frames out of
     /// a stack `depth` frames deep. A loop label is its head, whose facts
     /// were already given up when the loop opened.
-    fn join_i32_facts_at(&mut self, depth: usize, immediate: u32, facts: &ReachingI32Facts) {
+    fn join_facts_at(&mut self, depth: usize, immediate: u32, facts: &ReachingFacts) {
         let index = depth - 1 - immediate as usize;
         if self.frames[index].kind == FrameKind::Loop {
             return;
         }
-        let label = self.frame_i32_facts[index].label.take();
-        self.frame_i32_facts[index].label = meet_reaching(label, facts);
+        let label = self.frame_facts[index].label.take();
+        self.frame_facts[index].label = meet_reaching(label, facts);
     }
 
-    /// Updates the i32 local facts across an admitted `instruction`, after
+    /// Updates the local facts across an admitted `instruction`, after
     /// the frame stack changed for it: `enclosing_depth` frames were open
     /// before it, and `closing` is the kind of the frame it closed.
-    fn flow_i32_facts(
+    fn flow_facts(
         &mut self,
         instruction: &Instruction<'_>,
         enclosing_depth: usize,
         closing: Option<FrameKind>,
     ) {
-        let pushed = self.pushed_i32_constant.take();
+        let pushed = self.pushed_constant.take();
+        if let Some(value) = KnownValue::pushed_by(instruction) {
+            self.pushed_constant = Some(value);
+        }
         match instruction {
-            Instruction::I32Const(value) => self.pushed_i32_constant = Some(*value),
             Instruction::LocalSet(local) | Instruction::LocalTee(local) => {
-                if let Some(facts) = &mut self.i32_facts {
+                let slot = *local as usize;
+                if self.written.len() <= slot {
+                    self.written.resize(slot + 1, false);
+                }
+                self.written[slot] = true;
+                if let Some(facts) = &mut self.facts {
                     facts.forget(*local);
                     if let Some(value) = pushed {
-                        facts.set(*local, I32Fact::Is(value));
+                        facts.set(*local, LocalFact::Is(value));
                     }
                 }
             }
-            Instruction::Block(_) => self.frame_i32_facts.push(FrameI32Facts::default()),
+            Instruction::Block(_) => self.frame_facts.push(FrameFacts::default()),
             Instruction::Loop(_) => {
-                self.frame_i32_facts.push(FrameI32Facts::default());
+                self.open_loops += 1;
+                self.frame_facts.push(FrameFacts::default());
                 // Back edges are not emitted yet.
-                if self.i32_facts.is_some() {
-                    self.i32_facts = Some(I32Facts::default());
+                if self.facts.is_some() {
+                    self.facts = Some(LocalFacts::default());
                 }
             }
-            Instruction::If(_) => self.frame_i32_facts.push(FrameI32Facts {
+            Instruction::If(_) => self.frame_facts.push(FrameFacts {
                 label: None,
-                other_arm: self.i32_facts.clone(),
+                other_arm: self.facts.clone(),
             }),
             Instruction::TryTable(_, catches) => {
                 // A handler can be entered from anywhere in the body.
-                let anywhere = Some(I32Facts::default());
+                let anywhere = Some(LocalFacts::default());
                 for catch in catches.iter() {
                     let (Catch::One { label, .. }
                     | Catch::OneRef { label, .. }
                     | Catch::All { label }
                     | Catch::AllRef { label }) = catch;
-                    self.join_i32_facts_at(enclosing_depth, *label, &anywhere);
+                    self.join_facts_at(enclosing_depth, *label, &anywhere);
                 }
-                self.frame_i32_facts.push(FrameI32Facts::default());
+                self.frame_facts.push(FrameFacts::default());
             }
-            Instruction::Try(_) => self.frame_i32_facts.push(FrameI32Facts::default()),
+            Instruction::Try(_) => self.frame_facts.push(FrameFacts::default()),
             Instruction::Catch(_) | Instruction::CatchAll => {
-                let current = self.i32_facts.take();
-                let frame = self.frame_i32_facts.last_mut().expect("an open legacy try");
+                let current = self.facts.take();
+                let frame = self.frame_facts.last_mut().expect("an open legacy try");
                 let label = frame.label.take();
                 frame.label = meet_reaching(label, &current);
-                self.i32_facts = Some(I32Facts::default());
+                self.facts = Some(LocalFacts::default());
             }
             Instruction::Delegate(_) => {
-                self.frame_i32_facts.pop();
-                self.i32_facts = Some(I32Facts::default());
+                self.frame_facts.pop();
+                self.facts = Some(LocalFacts::default());
             }
             Instruction::Else => {
-                let current = self.i32_facts.take();
-                let frame = self.frame_i32_facts.last_mut().expect("an open if");
+                let current = self.facts.take();
+                let frame = self.frame_facts.last_mut().expect("an open if");
                 let label = frame.label.take();
                 frame.label = meet_reaching(label, &current);
-                self.i32_facts = frame.other_arm.take();
+                self.facts = frame.other_arm.take();
             }
             Instruction::End => {
                 let kind = closing.expect("an admitted end closed a frame");
-                let frame = self.frame_i32_facts.pop().expect("facts of an open frame");
-                let current = self.i32_facts.take();
-                self.i32_facts = match kind {
+                if kind == FrameKind::Loop {
+                    self.open_loops -= 1;
+                }
+                let frame = self.frame_facts.pop().expect("facts of an open frame");
+                let current = self.facts.take();
+                self.facts = match kind {
                     // The label is the head; only the body's end falls out.
                     FrameKind::Loop | FrameKind::Function => current,
                     // The arm without code falls through from the opener.
@@ -712,8 +859,8 @@ impl Function {
                 };
             }
             Instruction::Br(label) => {
-                let current = self.i32_facts.take();
-                self.join_i32_facts_at(enclosing_depth, *label, &current);
+                let current = self.facts.take();
+                self.join_facts_at(enclosing_depth, *label, &current);
             }
             Instruction::BrIf(label)
             | Instruction::BrOnNull(label)
@@ -734,14 +881,14 @@ impl Function {
                 relative_depth: label,
                 ..
             } => {
-                let current = self.i32_facts.clone();
-                self.join_i32_facts_at(enclosing_depth, *label, &current);
+                let current = self.facts.clone();
+                self.join_facts_at(enclosing_depth, *label, &current);
             }
             Instruction::BrTable(labels, default) => {
-                let current = self.i32_facts.take();
-                self.join_i32_facts_at(enclosing_depth, *default, &current);
+                let current = self.facts.take();
+                self.join_facts_at(enclosing_depth, *default, &current);
                 for label in labels.iter() {
-                    self.join_i32_facts_at(enclosing_depth, *label, &current);
+                    self.join_facts_at(enclosing_depth, *label, &current);
                 }
             }
             Instruction::Return
@@ -751,7 +898,7 @@ impl Function {
             | Instruction::Throw(_)
             | Instruction::ThrowRef
             | Instruction::Rethrow(_)
-            | Instruction::Unreachable => self.i32_facts = None,
+            | Instruction::Unreachable => self.facts = None,
             Instruction::Suspend(_)
             | Instruction::Resume { .. }
             | Instruction::ResumeThrow { .. }
@@ -772,7 +919,7 @@ impl Function {
 
     /// Whether `local` is known not to hold `value` at the current point.
     fn excludes_i32_value(&self, local: u32, value: i32) -> bool {
-        self.i32_facts
+        self.facts
             .as_ref()
             .and_then(|facts| facts.get(local))
             .is_some_and(|fact| fact.excludes(value))
@@ -790,13 +937,8 @@ impl Function {
         value: i32,
         escape: impl FnOnce(&mut Self),
     ) {
-        let ty = self.parameter_type(local).or_else(|| {
-            local
-                .checked_sub(self.parameters.len() as u32)
-                .and_then(|index| self.locals.type_at(index))
-        });
         assert_eq!(
-            ty,
+            self.local_type(local),
             Some(ValType::I32),
             "checked guard requires an i32 local"
         );
@@ -833,9 +975,146 @@ impl Function {
         assert_eq!(self.checked_escape_frames.pop(), Some(guard));
         self.instruction(&Instruction::End);
         if !self.free_locals.contains(local) {
-            if let Some(facts) = &mut self.i32_facts {
-                facts.set(local, I32Fact::IsNot(value));
+            if let Some(facts) = &mut self.facts {
+                facts.set(local, LocalFact::IsNot(value));
             }
+        }
+    }
+
+    /// Begins the body's exit: its results are on the stack, and only the
+    /// final `end` the sequence emits follows. Holders ended in it (`clear`,
+    /// `set_null`) store nothing, since no instruction can read a local
+    /// after it; any other instruction emitted before that `end` is
+    /// refused.
+    pub(crate) fn begin_exit(&mut self) -> ExitSequence {
+        assert!(!self.exiting, "one exit sequence at a time");
+        self.flush_pending();
+        self.exiting = true;
+        ExitSequence { _private: () }
+    }
+
+    /// Whether the next instruction is in the body's own frame, outside
+    /// every block, loop, `if` and `try_table`.
+    pub(crate) fn at_function_level(&self) -> bool {
+        self.frames.len() == 1
+    }
+
+    /// The declared type of a parameter or local.
+    fn local_type(&self, local: u32) -> Option<ValType> {
+        self.parameter_type(local).or_else(|| {
+            local
+                .checked_sub(self.parameters.len() as u32)
+                .and_then(|index| self.locals.type_at(index))
+        })
+    }
+
+    /// Stores `value` into `local`: the one entry for a constant store.
+    ///
+    /// No instruction is emitted where every path here already leaves the
+    /// local holding `value`:
+    /// 1. no instruction so far writes the (non-parameter) local, no `loop`
+    ///    is open, and `value` is its type's Wasm default. Every edge into a
+    ///    point of a structured body comes from code emitted before it,
+    ///    except a loop's back edge, so the local still holds its default.
+    /// 2. the local facts prove it holds `value`: its last store on every
+    ///    path stored this constant.
+    ///
+    /// A skipped store still counts as the holder's write for the GC local
+    /// write check: the local holds what the holder would have stored.
+    pub(crate) fn store_constant(&mut self, local: u32, value: LocalConstant) {
+        if self.exiting {
+            // Only the final `end` follows: nothing reads the local.
+            return;
+        }
+        let ty = self
+            .local_type(local)
+            .expect("a constant is stored into a declared local");
+        assert!(value.fits(ty), "{value:?} does not fit a {ty:?} local");
+        assert!(
+            !self.free_locals.contains(local),
+            "a constant is stored into a live local"
+        );
+        let known = value.known();
+        let never_written = local >= self.parameters.len() as u32
+            && !self.written.get(local as usize).copied().unwrap_or(false)
+            && self.open_loops == 0
+            && known.is_wasm_default();
+        let already_held = self
+            .facts
+            .as_ref()
+            .and_then(|facts| facts.get(local))
+            .is_some_and(|fact| fact == LocalFact::Is(known));
+        if !(never_written || already_held) {
+            self.instruction(&value.instruction());
+            self.instruction(&Instruction::LocalSet(local));
+            return;
+        }
+        assert!(
+            !self.frames.is_empty(),
+            "instruction emitted after the function body's final end"
+        );
+        // What the elided store would have done to the sink's state.
+        self.flush_non_null_refinement();
+        self.pushed_constant = None;
+        if let Some(facts) = &mut self.facts {
+            facts.set(local, LocalFact::Is(known));
+        }
+        self.last_instruction_escapes = false;
+        #[cfg(any(test, debug_assertions))]
+        self.gc_local_trace.write(local);
+    }
+
+    /// Asks that the reference on the stack be refined to non-null, as
+    /// `ref.as_non_null` does. The refinement is held back for one
+    /// instruction and dropped when that instruction pops the reference and
+    /// accepts it nullable ([`refinement_is_redundant`]).
+    ///
+    /// Only a reference the emitter's types already own as non-null is
+    /// refined this way (a non-null holder pooled in a nullable local), so
+    /// the dropped check can only fail for a null that is a compiler bug.
+    /// For a consumer that traps on null itself (`struct.get`, `array.len`,
+    /// `ref.cast` to a non-null type) such a null traps at the next
+    /// instruction instead, with nothing observable in between. A
+    /// `local.set` into a nullable local moves that trap to the stored
+    /// reference's next refined read, or drops it if nothing reads it.
+    pub(crate) fn refine_non_null(&mut self) {
+        self.flush_pending();
+        self.pending_non_null = true;
+    }
+
+    /// Encodes a held-back refinement before anything that needs it: an
+    /// instruction it may not be dropped for, or a record of the current
+    /// operator ordinal or byte offset.
+    fn flush_non_null_refinement(&mut self) {
+        if std::mem::take(&mut self.pending_non_null) {
+            self.uncounted_instruction(&Instruction::RefAsNonNull);
+        }
+    }
+
+    /// Encodes everything held back, so that the next instruction is
+    /// encoded on its own at the next operator ordinal: a record of that
+    /// ordinal (a literal operand, a program context, a hint) names it.
+    fn flush_pending(&mut self) {
+        if let Some(local) = self.pending_set.take() {
+            self.body.instruction(&Instruction::LocalSet(local));
+        }
+        self.flush_non_null_refinement();
+    }
+
+    /// Whether `instruction`, the next after a held-back refinement, pops
+    /// the refined reference and accepts it nullable.
+    fn refinement_is_redundant(&self, instruction: &Instruction<'_>) -> bool {
+        match *instruction {
+            Instruction::StructGet { .. }
+            | Instruction::StructGetS { .. }
+            | Instruction::StructGetU { .. }
+            | Instruction::ArrayLen
+            | Instruction::RefCastNonNull(_) => true,
+            Instruction::LocalSet(local) => matches!(
+                self.local_type(local),
+                Some(ValType::Ref(reference)) if reference.nullable
+            ),
+            _ => false,
         }
     }
 
@@ -910,6 +1189,27 @@ impl Function {
                 );
             }
             panic!("instruction emitted after the function body's final end");
+        }
+        assert!(
+            !self.exiting,
+            "an exit sequence emits nothing before its end: {instruction:?}"
+        );
+        if let Some(local) = self.pending_set.take() {
+            if matches!(*instruction, Instruction::LocalGet(read) if read == local) {
+                // `local.set x; local.get x` is `local.tee x`. The set's
+                // bookkeeping (facts, writes, its operator ordinal, the GC
+                // local write check's write) is done; the read changes none
+                // of it and needs no ordinal of its own.
+                self.body.instruction(&Instruction::LocalTee(local));
+                return self;
+            }
+            self.body.instruction(&Instruction::LocalSet(local));
+        }
+        if self.pending_non_null {
+            self.pending_non_null = false;
+            if !self.refinement_is_redundant(instruction) {
+                self.uncounted_instruction(&Instruction::RefAsNonNull);
+            }
         }
 
         if matches!(
@@ -1102,7 +1402,7 @@ impl Function {
             }
             _ => {}
         }
-        self.flow_i32_facts(instruction, enclosing_depth, closing);
+        self.flow_facts(instruction, enclosing_depth, closing);
         #[cfg(any(test, debug_assertions))]
         self.gc_local_trace.instruction(instruction);
         self.last_instruction_escapes = matches!(
@@ -1123,7 +1423,12 @@ impl Function {
                 u32::try_from(self.body.byte_len()).expect("Wasm body exceeds u32 bytes"),
             ));
         }
-        self.body.instruction(instruction);
+        if let Instruction::LocalSet(local) = *instruction {
+            // Encoded by the next instruction, or as part of it.
+            self.pending_set = Some(local);
+        } else {
+            self.body.instruction(instruction);
+        }
         if let Some((space, index)) = IndexOperand::of(instruction) {
             let end = u32::try_from(self.body.byte_len()).expect("Wasm body exceeds u32 bytes");
             self.index_operands.push(IndexOperand {
@@ -1163,6 +1468,8 @@ impl Function {
             is_two_way_branch(instruction),
             "only a two-way branch takes a hint"
         );
+        // The hint records the ordinal the branch is emitted at.
+        self.flush_pending();
         self.branch_hints.insert(self.operator_count, likely);
         self.instruction(instruction)
     }
@@ -1244,6 +1551,7 @@ impl Function {
     }
 
     pub(crate) fn program_literal_count(&mut self, value: crate::gc_types::ProgramLiteralCount) {
+        self.flush_pending();
         self.literal_operands
             .push(crate::program_literal_operands::FunctionSite::count(
                 self.operator_count,
@@ -1252,10 +1560,11 @@ impl Function {
         self.instruction(&Instruction::I32Const(value.value() as i32));
         // The immediate is relocated when the program is linked, so it is no
         // constant a following store could make a fact of.
-        self.pushed_i32_constant = None;
+        self.pushed_constant = None;
     }
 
     pub(crate) fn program_literal_index(&mut self, value: crate::gc_types::ProgramLiteralIndex) {
+        self.flush_pending();
         self.literal_operands
             .push(crate::program_literal_operands::FunctionSite::index(
                 self.operator_count,
@@ -1263,7 +1572,7 @@ impl Function {
             ));
         self.instruction(&Instruction::I32Const(value.ordinal() as i32));
         // Relocated at link time, like the count above.
-        self.pushed_i32_constant = None;
+        self.pushed_constant = None;
     }
 
     pub(crate) fn literal_operands(&self) -> &[crate::program_literal_operands::FunctionSite] {
@@ -1285,6 +1594,7 @@ impl Function {
             self.native_program_context.is_none(),
             "one effective program binding per body"
         );
+        self.flush_pending();
         self.native_program_context =
             Some(crate::native_program_contexts::FunctionContext::Program {
                 schema,
@@ -1309,6 +1619,8 @@ impl Function {
         if self.native_program_context.is_none() {
             return;
         }
+        // The slot records the ordinal of the next operator.
+        self.flush_pending();
         let Some(crate::native_program_contexts::FunctionContext::Bootstrap {
             payload_operator,
             ..
@@ -1399,7 +1711,12 @@ impl Function {
 
     #[cfg(test)]
     pub(crate) fn byte_len(&self) -> usize {
+        assert!(!self.pending_non_null, "a refinement is still held back");
+        // A held-back `local.set` takes as many bytes as its `local.tee`.
         self.body.byte_len()
+            + self
+                .pending_set
+                .map_or(0, |local| 1 + leb128_len(local) as usize)
     }
 
     /// The finished body with its index operands and hinted branches, at
@@ -1410,6 +1727,8 @@ impl Function {
             "function body for {context} has an unclosed control frame: {} label(s) still open",
             self.frames.len()
         );
+        // The final `end` encoded anything held back.
+        debug_assert!(!self.pending_non_null && self.pending_set.is_none());
         #[cfg(any(test, debug_assertions))]
         self.gc_local_trace.verify(context);
         let raw = self.body.into_raw_body();
@@ -1491,3 +1810,7 @@ mod gc_local_type_tests;
 #[cfg(test)]
 #[path = "../tests/unit/throw_guard_fact.rs"]
 mod throw_guard_fact_tests;
+
+#[cfg(test)]
+#[path = "../tests/unit/sink_store_peepholes.rs"]
+mod sink_store_peephole_tests;
