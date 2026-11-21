@@ -164,14 +164,18 @@ Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and t
   BigInts beyond that many bits, bound-function chains deeper than 4,096,
   helper recursion deeper than 4,096 calls, source nested deeper than 1,000
   levels (about 1,500 `else if` branches, 500 property access or call links,
-  1,000 chained method calls; operator chains such as `a + b + ...` may have
-  about two million terms, or 2,000 in a generator or async function when an
-  operand suspends), functions of more than 65,535 parameters and regular
+  1,000 chained method calls, a module body eight levels less; operator chains
+  such as `a + b + ...` may have about two million terms, or 2,000 in a
+  generator or async function when an operand suspends, though one of 10,000
+  terms at a module's top level took 493 s and 2.9 GB to compile), functions
+  of more than 65,535 parameters and regular
   expressions nested deeper than 1,000 groups throw RangeError (SyntaxError
   for source), as the 1 GiB Store heap and the stacks require
   ([limits](docs/rust-rewrite/runtime-requirements.md#implementation-limits)).
-- **Compile memory:** compilation has no memory budget; compile untrusted
-  source under an OS memory limit
+- **Compile memory:** compilation has no memory budget, and native
+  compilation memory grows with each function body (2,700 method calls in one
+  function took 1.5 GB with the Speed policy); compile untrusted source under
+  an OS memory limit
   ([details](docs/rust-rewrite/runtime-requirements.md#compile-memory)).
 - **Runtime ABI 84:** rebuild Portable bundles and native images built under an
   earlier ABI ([details](docs/rust-rewrite/runtime-requirements.md#runtime-abi)).

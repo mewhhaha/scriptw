@@ -50,12 +50,19 @@ use self::statement::ModuleItemList;
 /// [`MAX_NESTING_UNITS`]. Every phase after the parser recurses once per
 /// level except through binary, logical, `??` and comma chains, which Boa's
 /// visitors, the tree's `Drop` and Scriptw's lowering walk iteratively.
-/// Lowering also bounds the IR those chains become: it binds the value of a
-/// chain to a temporary whenever the chains enclosing an operator have nested
-/// it more than a fixed depth, so the IR is about as deep as the source's real
-/// nesting. So at this bound the compiler stays well inside the 64 MiB stack
-/// it runs on (about 18 KB of it per level, measured on nested array
-/// literals), and a chain may have about two million operators (V8 handles
+/// Template literals are flat too: the parser loops over their parts, and
+/// lowering folds them like a chain's operands. Lowering bounds the IR those
+/// chains and templates become: it binds the value so far to a temporary
+/// every 256 links and after an operand whose own chains are deep, and
+/// arranges the temporaries as a tree, so a chain is at most about 256 IR
+/// levels above its operands (two above one much deeper operand, about
+/// log2(k) + 1 above k comparably deep ones). Every other construct costs
+/// about one IR level per tree level, so the IR's depth follows the tree's
+/// height, which this bound limits. The deepest compiler stack measured at
+/// this bound is about 35 KB per level (a ladder of precedence levels, two
+/// operators each, per parenthesis: 33.7 MB at 950 parentheses), about half
+/// of the 64 MiB stack the compiler runs on; nested array literals take about
+/// 18 KB per level. A chain may have about two million operators (V8 handles
 /// chains of a million terms).
 pub const MAX_NESTING_DEPTH: u32 = 1000;
 
@@ -82,10 +89,16 @@ pub const MEMBER_LINK_UNITS: u32 = 2 * NESTING_UNITS_PER_LEVEL;
 /// next token is the call's `(`, and the call whose callee is a property
 /// access. Half a level each, so a chain of about 1,000 method calls fits, four
 /// times the other links (builder and `Map#set` chains in generated code reach
-/// hundreds; Node runs 3,000). Each costs the compiler about 4 KB of stack, and
-/// native compilation of the chain grows superlinearly: 1,000 calls took
-/// 261 MB and 14 s with the Fast policy, 1,500 calls 1.25 GB, and 3,000 did not
-/// fit in 4 GiB.
+/// hundreds; Node runs 3,000). Each costs the compiler about 4 KB of stack.
+/// With the Speed policy, the embedding default, the longest admitted chain
+/// compiles in about 0.7 GB (950 `.m()` calls at a Script's top level:
+/// 647 MB and 10 s; 950 `Map#set` calls: 680 MB and 51 s). Native
+/// compilation memory follows the size of the whole function body, not the
+/// chain: three chains of 300 calls in one body cost what one of 900 does
+/// (about 510 MB), three of 900 took 1.9 GB, and 2,700 unchained `o.m();`
+/// statements 1.5 GB, which no nesting weight bounds (see the compile memory
+/// item of the inventory). With the Fast policy 1,000 calls took 261 MB and
+/// 14 s, and 1,500 calls 1.25 GB.
 pub const METHOD_LINK_UNITS: u32 = NESTING_UNITS_PER_LEVEL / 2;
 
 /// Scriptw: tree-height units of one binary, logical, `??` or comma operator;

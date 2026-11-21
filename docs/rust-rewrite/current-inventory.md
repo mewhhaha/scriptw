@@ -343,9 +343,16 @@ accepts `--case <file.js>`.
   whole subtree once per enclosing parenthesis. Still open, each growing
   faster than the source: native compilation time of one large function with
   the single-pass allocator (1,500 `else if` branches: 103 s; a 2,000-term
-  top-level `+` chain: 27 s), backtracking allocation memory (1,500 `else if`:
+  top-level `+` chain: 27 s; a 10,000-term `+` chain at a module's top level,
+  which the parser admits since module chains are no longer capped at 2,000
+  operators: 493 s and 2.9 GB), backtracking allocation memory (1,500 `else if`:
   1.4 GB; a 1,000-term top-level `+` chain: 1.6 GB, 2.8 GB once the chain is
-  split into temporaries), SSA values in deeply nested member chains (1,000
+  split into temporaries; with the Speed policy, the embedding default, native
+  memory follows the whole function body, chained or not: 2,700 `o.m();`
+  statements in one function took 1.5 GB, three 900-call chains 1.9 GB and
+  three 300-call chains what one 900-call chain does, about 510 MB, while two
+  separate 900-call functions peaked at 1.2 GB, so part of one large body's
+  memory outlives its compilation), SSA values in deeply nested member chains (1,000
   links: 1.5 GB, from block parameters), one large body (a top-level script
   costs about 990 Wasm bytes per global `x++` statement, 250 in a function
   body; before these fixes 600 of them took 22.8 s and 400 MB with the Fast
@@ -370,9 +377,11 @@ accepts `--case <file.js>`.
   native compilation.
 - Left-deep binary, logical, `??` and comma chains are walked without
   recursion by the parser, Boa's visitors and the tree's Drop and Clone, and
-  lowering splits them into IR as deep as the source's real nesting
-  (`ChainSegments`: a temporary every 256 operators and after a deep operand,
-  arranged as a tree). In generator and async function bodies, a chain with
+  lowering splits them, and template literals' parts, into IR at most about
+  256 levels above their operands (`ChainSegments`: a temporary every 256
+  links and after a deep operand, arranged as a tree, so about two levels
+  above one much deeper operand and log2(k) + 1 above k comparably deep
+  ones). In generator and async function bodies, a chain with
   an operand that suspends is still lowered and planned by passes that
   recurse per operator, so each of its operators costs half a nesting level
   (about 2,000 per chain); a chain without one is as cheap as anywhere.
@@ -394,15 +403,43 @@ accepts `--case <file.js>`.
   34 s, a compile-time cost untrusted source can drive (see
   [runtime requirements](runtime-requirements.md#compile-memory)). Fix: keep
   the facts in persistent maps. Owner: front end and lowering.
+- A template literal emits about 500 Wasm bytes per substitution into its
+  function body, in each of the function's copies (ToString's completion
+  transport and a concatenation with its length check, inline even for a
+  known String), and its native compilation grows faster than its length: at
+  a Script's top level 1,000 `${x}` substitutions took 47 s and 2.8 GB with
+  the Fast policy (72 s and 6.6 GB before the parts were folded into bounded
+  IR), 300 `${f(i)}` substitutions about 650 MB, and 10,000 `${x}`
+  substitutions in a function did not fit in 4 GiB. From about 14,000
+  substitutions in one function the body exceeds the validator's
+  7,654,321-byte limit, a compile error in about a second, where Node runs
+  100,000 (the IR is bounded now; 30,000 overflowed the compiler stack after a
+  scan of minutes). Tagged templates pass their substitutions as call
+  arguments and hit the same limit at 60,000, which Node runs.
+  Fix: emit each part through one out-of-line ToString-and-append helper, or
+  split large bodies (see the compile memory item). Owner: AOT codegen.
 - Property access chains (`a.b.c…`) and calls of call results (`f()()…`)
   compile natively in memory quadratic and superlinear in their length (450
   `.a` links: 0.5 GB with the Fast policy; 450 calls: 0.4 GB), while method
-  call chains grow more slowly (1,000 `.m()` calls: 261 MB and 14 s; 1,500:
-  1.25 GB and 37 s; 3,000, which Node runs, do not fit in 4 GiB; 1,500
-  `Map#set` calls: 132 s). So the parser charges those links two nesting
-  levels and a method call's links half a level each (about 1,000 calls). Fix:
-  find the per-link native cost (GC references or blocks kept live across
-  the chain) and lower the weight. Owner: AOT codegen and native compilation.
+  call chains grow more slowly (Fast: 1,000 `.m()` calls 261 MB and 14 s;
+  1,500: 1.25 GB and 37 s; 3,000, which Node runs, do not fit in 4 GiB;
+  1,500 `Map#set` calls: 132 s). So the parser charges those links two
+  nesting levels and a method call's links half a level each (about 1,000
+  calls, 998 at a Script's top level). Measured with the Speed policy at
+  bcfa01be7, the longest admitted chain stays under 0.7 GB: `.m()` at top
+  level 500 calls 297 MB and 3 s, 750 445 MB and 6 s, 950 647 MB and 10 s;
+  `Map#set` 500 378 MB and 10 s, 750 541 MB and 23 s, 950 680 MB and 51 s;
+  900 calls in a function body 514 MB and 24 s. Their memory is the body's
+  (see the compile memory item), which a chain weight cannot bound; a
+  per-body budget would have to count every call, chained or not. Each call
+  emits about 840 Wasm bytes and three new locals, in each of the function's
+  two copies (the exact-context clone). Lowering a method chain in a function
+  body is quadratic in its length (19 s of the 24 s at 900 calls):
+  `lower_call` clones the receiver's whole IR into the callee, and dynamic
+  `Function` source candidates (`function_source_value_candidates`) recurse
+  through the chain at every link. Fix: find the per-call native cost and
+  share one copy of the receiver, then lower the weight. Owner: AOT codegen
+  and native compilation (lowering: front end and lowering).
 - The frame-reload pass's budget is 64 known entries per reachable block on
   average; a function over it keeps all its loads, deterministically, and its
   Speed-policy cost is unmeasured (for example few blocks and many stack-map

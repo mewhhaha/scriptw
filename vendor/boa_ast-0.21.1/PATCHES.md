@@ -67,18 +67,24 @@ tagged template or optional link 4,096, so such a chain has about 500 links,
 and each item of an optional chain is charged as the link it would be outside
 one; the two links of a method call (`a.m(…)`, `a[k](…)`, `a?.m(…)`: a
 property access whose next token is `(`, and a call of a property access)
-1,024 each, so about 1,000 chained method calls fit (Node runs 3,000; their
-native compilation grows superlinearly too: 1,000 calls took 261 MB, 1,500
-took 1.25 GB); and a
+1,024 each, so about 1,000 chained method calls fit (Node runs 3,000; with
+the Speed policy the longest admitted chain, 950 calls, compiled natively in
+647 MB, or 680 MB for `Map#set`; native compilation memory follows the whole
+function body, chained or not, which no nesting weight bounds); and a
 binary, logical, `??` or comma operator 1. In a generator or async function
 body, once a chain has parsed an `await` or `yield` (`Cursor::note_suspension`,
 not counting those of functions inside it), every operator of the chain costs
 1,024, the ones before the suspension included (`Cursor::binary_link` keeps
 both heights): the resumable lowering and state planners recurse per operator
 from the suspending operand on and test each such operator's operands for a
-suspension. A chain without one costs what it costs anywhere, so an ES
-module's top-level code, which Scriptw's module lowering parses again inside
-an async arrow function, is not limited to about 2,000 operators per chain.
+suspension. A chain without one costs what it costs anywhere. An ES module's
+top level is charged as such a body too (`Cursor::module_body`), and eight
+levels deep (`parser::MODULE_BODY_ENCLOSING_LEVELS`): Scriptw's module
+lowering parses it again inside an async arrow function in generated
+scaffolding, and a module that passed the Module parse at the light charge
+or within eight levels of the limit failed only that reparse, with an error
+positioned in the generated text. A module chain without a suspension is not
+limited to about 2,000 operators.
 The `else if` and member weights also bound native compilation, which grows
 faster than those chains: a property access chain's native compilation memory
 is quadratic in its length (450 links took 0.5 GB). `Cursor::measured` returns the height of an
@@ -104,16 +110,25 @@ parameter). Scriptw's lowering does the rest, and bounds the IR those chains
 become by the source's real nesting: it binds a chain's value to a temporary
 every 256 operators and right after an operand whose own chains are deep, and
 arranges the temporaries as a tree, so a chain adds about two IR levels above
-its deepest operand (nested chains were 255 IR levels per parenthesis, and the
-emitter overflowed at about 230 such parentheses). About two million
+its deepest operand when that operand dominates, and about log2(k) + 1 above k
+comparably deep operands (nested chains were 255 IR levels per parenthesis,
+and the emitter overflowed at about 230 such parentheses). Template literals
+fold their parts the same way: the parser loops over the substitutions, and
+each `${}` nested the IR one level deeper before, so a flat template of 30,000
+substitutions overflowed the emitter (Node runs 100,000). About two million
 operators fit the parser; a chain of a million parses, and one of 100,000
 compiles and runs. Tests: front `source_nesting_limit_is_exact`,
 `long_operator_chains_parse_without_recursing_per_operator`,
-`operator_chains_in_resumable_bodies_pay_only_when_they_suspend` and
+`operator_chains_in_resumable_bodies_pay_only_when_they_suspend`,
+`module_bodies_are_charged_as_their_reparse_inside_the_module_scaffolding` and
 `member_chains_are_charged_by_link_kind`; IR
-`nested_operator_chains_lower_to_ir_as_deep_as_their_nesting`; engine
+`nested_operator_chains_lower_to_ir_as_deep_as_their_nesting` and
+`template_literals_lower_to_bounded_ir`; engine
 `source_nesting_beyond_the_limit_is_a_syntax_error_not_a_stack_overflow`,
 `hundred_thousand_term_chains_compile_and_run`,
+`hundred_thousand_substitution_templates_lower_to_bounded_ir`,
+`long_templates_keep_their_evaluation_order`,
+`module_nesting_is_charged_as_its_scaffolded_reparse`,
 `operator_chains_in_resumable_bodies_pay_only_when_they_suspend`,
 `nested_chains_split_into_temporaries_keep_their_evaluation_order`,
 `long_chains_in_class_keys_and_heritage_compile` and
@@ -122,7 +137,8 @@ compiles and runs. Tests: front `source_nesting_limit_is_exact`,
 ## Formal parameter count
 
 ECMA-262 sets no limit on formal parameters. A function with more than
-65,535 (`parser::MAX_FORMAL_PARAMETERS`) is now a SyntaxError, as in V8,
+65,535 (`parser::MAX_FORMAL_PARAMETERS`) is now a SyntaxError (Node 24's V8
+accepts at most 65,525, although its message says 65,534),
 from `FormalParameters` and from the arrow function cover grammar; 300,000
 arrow parameters overflowed the stack before. Tests: front
 `parameter_lists_are_bounded_and_converted_without_recursion`; engine
