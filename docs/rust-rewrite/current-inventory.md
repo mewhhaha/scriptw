@@ -347,9 +347,10 @@ accepts `--case <file.js>`.
   which the parser admits since module chains are no longer capped at 2,000
   operators: 493 s and 2.9 GB), backtracking allocation memory (1,500 `else if`:
   1.4 GB; a 1,000-term top-level `+` chain: 1.6 GB, 2.8 GB once the chain is
-  split into temporaries; with the Speed policy, the embedding default, native
-  memory follows the whole function body, chained or not: 2,700 `o.m();`
-  statements in one function took 1.5 GB, three 900-call chains 1.9 GB and
+  split into temporaries; with the Speed policy, the embedding default, and one
+  compilation job (`SCRIPTW_JOBS=1`), native memory follows the whole function
+  body, chained or not, and more jobs compile separate functions concurrently:
+  2,700 `o.m();` statements in one function took 1.5 GB, three 900-call chains 1.9 GB and
   three 300-call chains what one 900-call chain does, about 510 MB, while two
   separate 900-call functions peaked at 1.2 GB, so part of one large body's
   memory outlives its compilation), SSA values in deeply nested member chains (1,000
@@ -362,8 +363,8 @@ accepts `--case <file.js>`.
   near the nesting limit (9.7, 9.2, 3.2, 4.1 GB at 997 levels and 3.5 GB at
   250 for heritage, before these fixes; source nested 997 levels did not
   compile everywhere: heritage at 997 never finished). The parser weights
-  `else if` and member chains for their compile cost, not only their stack
-  (see the source nesting limit in
+  `else if` and member chains for the compile cost of one chain, not only
+  their stack, but not a body's total (see the source nesting limit in
   [runtime requirements](runtime-requirements.md#implementation-limits)); the
   other constructs are not weighted yet. One Wasm function body is limited to
   7,654,321 bytes by the validator, so a top-level script of about 20,000
@@ -415,7 +416,9 @@ accepts `--case <file.js>`.
   7,654,321-byte limit, a compile error in about a second, where Node runs
   100,000 (the IR is bounded now; 30,000 overflowed the compiler stack after a
   scan of minutes). Tagged templates pass their substitutions as call
-  arguments and hit the same limit at 60,000, which Node runs.
+  arguments and hit the same limit at 60,000, which Node runs. The engine
+  test `template_bodies_past_the_wasm_body_size_limit_are_a_compile_error`
+  tracks the limit at 20,000 substitutions and is inverted by the fix.
   Fix: emit each part through one out-of-line ToString-and-append helper, or
   split large bodies (see the compile memory item). Owner: AOT codegen.
 - Property access chains (`a.b.c…`) and calls of call results (`f()()…`)
@@ -425,9 +428,9 @@ accepts `--case <file.js>`.
   1,500: 1.25 GB and 37 s; 3,000, which Node runs, do not fit in 4 GiB;
   1,500 `Map#set` calls: 132 s). So the parser charges those links two
   nesting levels and a method call's links half a level each (about 1,000
-  calls, 998 at a Script's top level). Measured with the Speed policy at
-  bcfa01be7, the longest admitted chain stays under 0.7 GB: `.m()` at top
-  level 500 calls 297 MB and 3 s, 750 445 MB and 6 s, 950 647 MB and 10 s;
+  calls, 998 at a Script's top level). Measured with the Speed policy and one
+  compilation job (`SCRIPTW_JOBS=1`) at bcfa01be7, the longest admitted chain
+  stays under 0.7 GB: `.m()` at top level 500 calls 297 MB and 3 s, 750 445 MB and 6 s, 950 647 MB and 10 s;
   `Map#set` 500 378 MB and 10 s, 750 541 MB and 23 s, 950 680 MB and 51 s;
   900 calls in a function body 514 MB and 24 s. Their memory is the body's
   (see the compile memory item), which a chain weight cannot bound; a
