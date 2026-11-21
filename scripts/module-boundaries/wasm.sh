@@ -208,8 +208,10 @@ require_file "$native_template_signature_fixture_source"
 if [[ "$(head -n 1 "$native_template_signature_fixture_source")" != '#![cfg(test)]' ]]; then
   fail 'native signature binary fixtures must be compiled only for tests'
 fi
-# The code sink names struct.get/array.len only to classify the instruction
-# after a held-back refinement (refinement_is_redundant); it emits none.
+# The code sink names struct.get{,_s,_u} and array.len only as the four
+# match arms that classify the instruction after a held-back refinement
+# (refinement_is_redundant); it emits none. Only those arm lines are exempt,
+# and their counts are pinned.
 gc_instruction_escapes="$(
   grep -RnE --include='*.rs' --exclude-dir=gc_types \
     'Instruction::(Struct(New|Get|Set)|Array(New|Get|Set|Fill|Copy|Len))' \
@@ -217,12 +219,16 @@ gc_instruction_escapes="$(
     | grep -Fv \
       -e 'crates/scriptw-aot-wasm/src/native_program_template/tests.rs:' \
       -e 'crates/scriptw-aot-wasm/src/native_program_template/tests/program_owned_payload.rs:' \
-      -e 'crates/scriptw-aot-wasm/src/code_sink.rs:' \
+    | grep -Ev \
+      -e '^crates/scriptw-aot-wasm/src/code_sink\.rs:[0-9]+: +(\| )?Instruction::StructGet[SU]? \{ \.\. \}$' \
+      -e '^crates/scriptw-aot-wasm/src/code_sink\.rs:[0-9]+: +\| Instruction::ArrayLen$' \
     || true
 )"
 if [ -n "$gc_instruction_escapes" ]; then
   fail "raw Wasm-GC record/array instructions must stay in the central schema: $gc_instruction_escapes"
 fi
+require_fixed_string_count crates/scriptw-aot-wasm/src/code_sink.rs 'Instruction::StructGet' 3 'refinement-classifying struct.get arm'
+require_fixed_string_count crates/scriptw-aot-wasm/src/code_sink.rs 'Instruction::ArrayLen' 1 'refinement-classifying array.len arm'
 require_fixed_string_count \
   "$wasm_gc_layouts" \
   'function.instruction(&Instruction::StructNew(' \
