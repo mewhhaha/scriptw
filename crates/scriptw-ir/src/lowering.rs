@@ -634,53 +634,109 @@ pub(crate) fn binary_chain_longer_than(expression: &Expression, limit: usize) ->
 /// enumerated (see [`binary_chain_longer_than`]).
 pub(crate) const MAX_SOURCE_CANDIDATE_CHAIN: usize = 64;
 
-/// The most operators of a left-deep chain nested in one IR expression, and
-/// the most chain temporaries bound in one group (see [`ChainSegments`]).
+/// The most operators of a left-deep chain nested in one IR expression (see
+/// [`ChainSegments`]).
 const CHAIN_SEGMENT_LINKS: usize = 256;
 
-/// The temporaries of a long left-deep chain, in source order. Each holds the
-/// value of the chain up to a segment boundary, read by the next segment.
+/// The chain IR height (see `ScriptLowerer::chain_ir_height`) of an operand
+/// at or above which a chain binds its value right after that operand, so the
+/// operand ends up one link below a temporary rather than below the rest of
+/// its segment.
+const DEEP_CHAIN_OPERAND_HEIGHT: usize = 64;
+
+/// One segment of a long left-deep chain: the temporary that holds the
+/// chain's value at its end (`None` for the last segment, the chain's value),
+/// the segment's IR and its height.
+struct ChainSegment {
+    name: Option<String>,
+    value: Option<TypedExpr>,
+    height: usize,
+}
+
+/// The segments of a long left-deep chain, in source order. Each but the last
+/// binds the value of the chain up to its end to a temporary that the next
+/// segment reads.
 ///
-/// Binding them one inside the other would nest a chain of n operators n/256
-/// deep; binding each run of [`CHAIN_SEGMENT_LINKS`] temporaries inside the
-/// value of the run's last one keeps the nesting at most
-/// 256 + 256 + n/65,536 for any n.
+/// The temporaries are bound by nested `ExprIr::MaterializeBinding`s, which
+/// evaluate their value before their body. Binding each inside the previous
+/// one's body would nest k segments k deep; instead they form a binary tree
+/// whose left side evaluates first and binds the temporary the right side
+/// reads, so the order is unchanged. The tree is balanced, except that a
+/// segment much higher than the others (one holding a deeply nested chain) is
+/// kept next to the root, so a chain adds about two IR levels above its
+/// deepest operand.
 #[derive(Default)]
 struct ChainSegments {
-    group: Vec<(String, TypedExpr)>,
-    groups: Vec<(String, TypedExpr)>,
+    segments: Vec<ChainSegment>,
 }
 
 impl ChainSegments {
-    fn bind(&mut self, name: String, value: TypedExpr) {
-        self.group.push((name, value));
-        if self.group.len() == CHAIN_SEGMENT_LINKS {
-            let (name, last) = self.group.pop().expect("a full group");
-            let value = Self::materialize(std::mem::take(&mut self.group), last);
-            self.groups.push((name, value));
+    fn bind(&mut self, name: String, value: TypedExpr, height: usize) {
+        self.segments.push(ChainSegment {
+            name: Some(name),
+            value: Some(value),
+            height,
+        });
+    }
+
+    /// The chain's IR, ending with `value` (of IR height `height`), and its height.
+    fn finish(mut self, value: TypedExpr, height: usize) -> (TypedExpr, usize) {
+        self.segments.push(ChainSegment {
+            name: None,
+            value: Some(value),
+            height,
+        });
+        Self::tree(&mut self.segments)
+    }
+
+    fn tree(segments: &mut [ChainSegment]) -> (TypedExpr, usize) {
+        if let [segment] = segments {
+            let value = segment.value.take().expect("each segment is built once");
+            return (value, segment.height);
         }
+        let split = Self::split(segments);
+        let (left, right) = segments.split_at_mut(split);
+        let name = left
+            .last()
+            .and_then(|segment| segment.name.clone())
+            .expect("every segment but the last binds a temporary");
+        let (value, value_height) = Self::tree(left);
+        let (body, body_height) = Self::tree(right);
+        let height = value_height.max(body_height) + 1;
+        let expr = TypedExpr::from_info(
+            body.value_info(),
+            ExprIr::MaterializeBinding {
+                name,
+                value: Box::new(value),
+                body: Box::new(body),
+            },
+        );
+        (expr, height)
     }
 
-    fn finish(mut self, value: TypedExpr) -> TypedExpr {
-        let value = Self::materialize(std::mem::take(&mut self.group), value);
-        Self::materialize(self.groups, value)
-    }
-
-    /// `let name1 = value1 in (let name2 = value2 in ... body)`.
-    fn materialize(bindings: Vec<(String, TypedExpr)>, body: TypedExpr) -> TypedExpr {
-        bindings
-            .into_iter()
-            .rev()
-            .fold(body, |body, (name, value)| {
-                TypedExpr::from_info(
-                    body.value_info(),
-                    ExprIr::MaterializeBinding {
-                        name,
-                        value: Box::new(value),
-                        body: Box::new(body),
-                    },
-                )
-            })
+    /// Where to split `segments` (at least two): before the highest segment,
+    /// or after it when it is the first, if it is higher than a balanced tree
+    /// of the others would be; otherwise in the middle.
+    fn split(segments: &[ChainSegment]) -> usize {
+        let (highest, height) = segments
+            .iter()
+            .enumerate()
+            .map(|(index, segment)| (index, segment.height))
+            .max_by_key(|&(index, height)| (height, std::cmp::Reverse(index)))
+            .expect("at least two segments");
+        let others = segments
+            .iter()
+            .enumerate()
+            .filter(|&(index, _)| index != highest)
+            .map(|(_, segment)| segment.height)
+            .max()
+            .unwrap_or(0);
+        let balanced = others + segments.len().ilog2() as usize + 1;
+        if height > balanced {
+            highest.max(1)
+        } else {
+            segments.len() / 2
+        }
     }
 }
 
@@ -1343,6 +1399,11 @@ pub(crate) struct ScriptLowerer<'a> {
     current_resumable_plan: Option<ResumablePlanIr>,
     next_resumable_suspension_index: usize,
     async_expression_prefix: Option<Vec<StatementIr>>,
+    /// The height, in IR levels, of the binary chains in the expression
+    /// lowered last (see [`ScriptLowerer::lower_binary_chain`]): a chain reads
+    /// it after lowering each operand and leaves the larger of its own height
+    /// and the value before it.
+    chain_ir_height: usize,
     /// Operands already evaluated into `async_expression_prefix`, keyed by the
     /// address of the AST node they came from. See `lower_expression`.
     pinned_async_operands: HashMap<usize, TypedExpr>,
@@ -1843,6 +1904,7 @@ impl<'a> ScriptLowerer<'a> {
             current_resumable_plan: None,
             next_resumable_suspension_index: 0,
             async_expression_prefix: None,
+            chain_ir_height: 0,
             pinned_async_operands: HashMap::new(),
             root_this_binding,
             current_this_binding: CurrentThisBinding::Root(root_this_binding),
@@ -12731,60 +12793,126 @@ impl<'a> ScriptLowerer<'a> {
         self.combine_unary_value(op, lowered_target)
     }
 
+    // Not inlined: `lower_expression_with_pinned_operands`, whose frame is
+    // several kilobytes, calls this in tail position, so a chain nested in a
+    // chain's operand does not keep that frame on the stack (it doubled the
+    // stack each nested chain takes).
+    #[inline(never)]
     fn lower_binary(&mut self, op: BinaryOp, lhs: &Expression, rhs: &Expression) -> TypedExpr {
         // A left operand that is itself a binary expression starts a
         // left-deep chain (`a + b + c`, `a || b || c`, `a, b, c`), which
-        // minified code builds with tens of thousands of operators. Outside
-        // async expression lowering, whose operand pinning needs each operand's
-        // syntax, the chain is lowered by a loop rather than by one recursion
-        // per operator.
-        if self.async_expression_prefix.is_none() && matches!(lhs, Expression::Binary(_)) {
-            return self.lower_binary_chain(op, lhs, rhs);
+        // minified code builds with tens of thousands of operators. The chain
+        // is lowered by a loop rather than by one recursion per operator,
+        // except, in async expression lowering, up to its last right operand
+        // that contains an `await`: pinning operands before a suspension needs
+        // each of those operators' syntax.
+        if !matches!(lhs, Expression::Binary(_)) {
+            return self.lower_binary_operator(op, lhs, rhs);
         }
-        self.lower_binary_operator(op, lhs, rhs)
+        if self.async_expression_prefix.is_none() {
+            let mut links = vec![(op, rhs)];
+            let mut first = lhs;
+            while let Expression::Binary(binary) = first {
+                links.push((binary.op(), binary.rhs()));
+                first = binary.lhs();
+            }
+            links.reverse();
+            return self.lower_binary_chain(first, links);
+        }
+        self.lower_async_binary_chain(op, lhs, rhs)
     }
 
-    /// Lowers the left-deep chain whose last operator is `op`: the first
-    /// operand, then each operator with its right operand in source order,
-    /// exactly as the recursive lowering of each `Binary` node would. The
-    /// result keeps at most [`CHAIN_SEGMENT_LINKS`] operators nested in one
-    /// IR expression: every that many, the value so far is bound to a
-    /// temporary that the rest of the chain reads (an `ExprIr::MaterializeBinding`,
-    /// which evaluates its value, propagating an abrupt completion, before its
-    /// body), so IR passes and the emitter recurse through bounded depth.
-    fn lower_binary_chain(
+    /// [`Self::lower_binary`] in async expression lowering. The operators
+    /// after the last right operand that contains an `await` are lowered by
+    /// the chain loop: none of them pins its left operand, so each is lowered
+    /// exactly as [`Self::lower_binary_operator`] would. The operator before
+    /// them, if any, is lowered through [`Self::lower_expression`], which
+    /// recurses into the rest of the chain. So a chain whose operands do not
+    /// suspend, such as one in a class element's computed key, never
+    /// recurses per operator, and one that does recurses once per right
+    /// operand that contains an `await`, which the parser charges as half a
+    /// nesting level.
+    fn lower_async_binary_chain(
         &mut self,
         op: BinaryOp,
         lhs: &Expression,
         rhs: &Expression,
     ) -> TypedExpr {
+        if contains(rhs, ContainsSymbol::AwaitExpression) {
+            return self.lower_binary_operator(op, lhs, rhs);
+        }
         let mut links = vec![(op, rhs)];
         let mut first = lhs;
         while let Expression::Binary(binary) = first {
+            if contains(binary.rhs(), ContainsSymbol::AwaitExpression) {
+                break;
+            }
             links.push((binary.op(), binary.rhs()));
             first = binary.lhs();
         }
+        links.reverse();
+        self.lower_binary_chain(first, links)
+    }
+
+    /// Lowers the left-deep chain whose first operand is `first`, then each
+    /// operator with its right operand in source order, exactly as the
+    /// recursive lowering of each `Binary` node would.
+    ///
+    /// Long chains are split into segments: the value so far is bound to a
+    /// temporary that the rest of the chain reads (an
+    /// `ExprIr::MaterializeBinding`, which evaluates its value, propagating an
+    /// abrupt completion, before its body) every [`CHAIN_SEGMENT_LINKS`]
+    /// operators, and right after an operand whose own chains are at least
+    /// [`DEEP_CHAIN_OPERAND_HEIGHT`] IR levels high. [`ChainSegments`] keeps
+    /// the temporaries' nesting logarithmic, and a deep operand next to the
+    /// root. So a chain is at most about [`CHAIN_SEGMENT_LINKS`] levels higher
+    /// than its operands' chains, and about two when they are high: the IR is
+    /// as deep as the source's real nesting, which the parser bounds, and IR
+    /// passes and the emitter recurse through bounded depth.
+    fn lower_binary_chain(
+        &mut self,
+        first: &Expression,
+        links: Vec<(BinaryOp, &Expression)>,
+    ) -> TypedExpr {
+        let enclosing_height = std::mem::take(&mut self.chain_ir_height);
         let mut chain = ChainSegments::default();
         let mut value = self.lower_expression(first);
+        // The IR height of the current segment's chains so far, and its links.
+        let mut segment_height = self.chain_ir_height;
         let mut segment_links = 0;
         let link_count = links.len();
-        for (index, (op, rhs)) in links.into_iter().rev().enumerate() {
+        for (index, (op, rhs)) in links.into_iter().enumerate() {
+            self.chain_ir_height = 0;
             value = self.lower_binary_link(op, value, rhs);
+            let operand_height = if index == 0 {
+                self.chain_ir_height.max(segment_height)
+            } else {
+                self.chain_ir_height
+            };
+            segment_height = segment_height.max(operand_height) + 1;
             segment_links += 1;
-            if segment_links == CHAIN_SEGMENT_LINKS && index + 1 < link_count {
+            if index + 1 < link_count
+                && (segment_links == CHAIN_SEGMENT_LINKS
+                    || operand_height >= DEEP_CHAIN_OPERAND_HEIGHT)
+            {
                 let name = self.alloc_temp_binding_name("binary.chain.");
                 let read =
                     TypedExpr::from_info(value.value_info(), ExprIr::Identifier(name.clone()));
-                chain.bind(name, std::mem::replace(&mut value, read));
+                chain.bind(name, std::mem::replace(&mut value, read), segment_height);
+                segment_height = 0;
                 segment_links = 0;
             }
         }
-        chain.finish(value)
+        let (value, height) = chain.finish(value, segment_height);
+        self.chain_ir_height = enclosing_height.max(height);
+        value
     }
 
     /// One operator of a chain whose left operand is already lowered; the
     /// same operand order and combination as [`Self::lower_binary_operator`]
     /// outside async expression lowering.
+    // Not inlined into the chain loop, whose frame each nested chain keeps.
+    #[inline(never)]
     fn lower_binary_link(&mut self, op: BinaryOp, lhs: TypedExpr, rhs: &Expression) -> TypedExpr {
         match op {
             BinaryOp::Arithmetic(arithmetic) => {

@@ -596,3 +596,102 @@ fn lowers_identifier_logical_assignment_ir() {
         assert!(matches!(rhs.expr, ExprIr::AssignIdentifier { .. }));
     }
 }
+
+/// The height of the operator and chain-temporary nodes of `expression`, the
+/// longest path through `ExprIr::Comma`, arithmetic and
+/// `ExprIr::MaterializeBinding` nodes, measured without recursing.
+fn chain_ir_height(expression: &TypedExpr) -> usize {
+    let mut height = 0;
+    let mut pending = vec![(expression, 0)];
+    while let Some((expression, depth)) = pending.pop() {
+        match &expression.expr {
+            ExprIr::Comma { lhs, rhs }
+            | ExprIr::CoerciveAdd { lhs, rhs }
+            | ExprIr::BinaryNumber { lhs, rhs, .. }
+            | ExprIr::CoerciveBinaryNumber { lhs, rhs, .. }
+            | ExprIr::StringConcat { lhs, rhs, .. } => {
+                pending.push((lhs, depth + 1));
+                pending.push((rhs, depth + 1));
+            }
+            ExprIr::MaterializeBinding { value, body, .. } => {
+                pending.push((value, depth + 1));
+                pending.push((body, depth + 1));
+            }
+            _ => height = height.max(depth),
+        }
+    }
+    height
+}
+
+// IR passes and the emitter recurse once per IR node, so lowering keeps the
+// IR of operator chains about as deep as the source's real nesting: a chain
+// splits itself into segments of at most 256 operators, and binds its value
+// right after an operand whose own chains are deep, so a chain adds about two
+// levels above such an operand. Lowered chain by chain, the nested shape
+// below was about 400 * 255 IR levels deep, and the emitter overflowed its
+// stack.
+#[test]
+fn nested_operator_chains_lower_to_ir_as_deep_as_their_nesting() {
+    std::thread::Builder::new()
+        .stack_size(64 << 20)
+        .spawn(|| {
+            let height = |expression: &str| {
+                let program = lower_script(&format!("var x = 1; {expression};"));
+                let script = program.script.as_ref().expect("script ir should exist");
+                script
+                    .body
+                    .statements
+                    .iter()
+                    .filter_map(|statement| match statement {
+                        StatementIr::Expression(expression) => Some(chain_ir_height(expression)),
+                        StatementIr::Var(declarators) => declarators
+                            .iter()
+                            .filter_map(|declarator| declarator.init.as_ref())
+                            .map(chain_ir_height)
+                            .max(),
+                        _ => None,
+                    })
+                    .max()
+                    .expect("an expression statement")
+            };
+            // `(0, INNER, 0, …, 0)`: INNER sits below all of the chain's commas.
+            let nested = |levels: usize, links: usize| {
+                let mut expression = String::from("x");
+                for _ in 0..levels {
+                    expression = format!("(0, {expression}{})", ", 0".repeat(links - 1));
+                }
+                expression
+            };
+            assert_eq!(height(&nested(1, 200)), 200);
+            let deep = height(&nested(400, 255));
+            assert!(deep < 1_500, "{deep}");
+            let mut sum = String::from("x");
+            for _ in 0..400 {
+                sum = format!("(x + {sum}{})", " + x".repeat(254));
+            }
+            let deep = height(&sum);
+            assert!(deep < 1_500, "{deep}");
+            let deep = height(&format!("var r = {sum}"));
+            assert!(deep < 1_500, "{deep}");
+            let program =
+                lower_test262_script(&format!("function f(x) {{ return {sum}; }} print(f(1));"));
+            let deep = program
+                .script
+                .as_ref()
+                .expect("script")
+                .functions
+                .iter()
+                .filter_map(function_return)
+                .map(chain_ir_height)
+                .max()
+                .expect("f returns");
+            assert!(deep < 1_500, "{deep}");
+            // The shallow operands of one long chain sit under at most one
+            // segment and a balanced tree of its temporaries.
+            let long = height(&format!("(x{})", ", 0".repeat(100_000)));
+            assert!(long < 256 + 24, "{long}");
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
