@@ -90,8 +90,9 @@ pub const MEMBER_LINK_UNITS: u32 = 2 * NESTING_UNITS_PER_LEVEL;
 /// access. Half a level each, so a chain of about 1,000 method calls fits, four
 /// times the other links (builder and `Map#set` chains in generated code reach
 /// hundreds; Node runs 3,000). Each costs the compiler about 4 KB of stack.
-/// With the Speed policy, the embedding default, the longest admitted chain
-/// compiles in about 0.7 GB (950 `.m()` calls at a Script's top level:
+/// With the Speed policy, the embedding default, and one compilation job
+/// (`SCRIPTW_JOBS=1`; more jobs compile separate functions concurrently), the
+/// longest admitted chain compiles in about 0.7 GB (950 `.m()` calls at a Script's top level:
 /// 647 MB and 10 s; 950 `Map#set` calls: 680 MB and 51 s). Native
 /// compilation memory follows the size of the whole function body, not the
 /// chain: three chains of 300 calls in one body cost what one of 900 does
@@ -124,6 +125,15 @@ pub const MAX_NESTING_UNITS: u32 = MAX_NESTING_DEPTH * NESTING_UNITS_PER_LEVEL;
 /// exceeds the limit only in the reparse, where the error would point into
 /// generated text. A module's body may nest eight levels less than a
 /// Script's.
+///
+/// The reparse also rewrites three forms, which the Module parse charges as
+/// rewritten: `export var` is reached through a Statement once `export` is
+/// deleted (one level); an anonymous `export default function` (or generator,
+/// async or async generator function) becomes `var <name> = function …`, a
+/// Statement and an AssignmentExpression (two levels), and an anonymous
+/// `export default class` becomes `let <name> = class …` (one level); and
+/// `import(…)`, in a Script too, becomes a call of a generated function,
+/// charged that call's link (`NestingCharge::MemberLink`).
 pub const MODULE_BODY_ENCLOSING_LEVELS: u32 = 8;
 
 /// Scriptw: the most formal parameters one function may have; more is a

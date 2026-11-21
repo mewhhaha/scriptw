@@ -155,8 +155,13 @@ where
                     AstExportDeclaration::List(names)
                 }
             }
-            TokenKind::Keyword((Keyword::Var, false)) => VariableStatement::new(false, true)
-                .parse(cursor, interner)
+            // Scriptw: the compiler's reparse deletes `export`, so the
+            // VariableStatement is reached through a Statement there; it is
+            // charged that level here (see `MODULE_BODY_ENCLOSING_LEVELS`).
+            TokenKind::Keyword((Keyword::Var, false)) => cursor
+                .nested(interner, |cursor, interner| {
+                    VariableStatement::new(false, true).parse(cursor, interner)
+                })
                 .map(AstExportDeclaration::VarStatement)?,
             TokenKind::Keyword((Keyword::Default, false)) => {
                 cursor.advance(interner);
@@ -184,53 +189,59 @@ where
                     false
                 };
 
-                let tok = cursor.peek(0, interner).or_abrupt()?;
+                let reparse =
+                    DefaultDeclarationReparse::of(cursor, interner, async_function_declaration)?;
+                reparse.charged(cursor, interner, |cursor, interner| {
+                    let tok = cursor.peek(0, interner).or_abrupt()?;
 
-                match tok.kind() {
-                    TokenKind::Keyword((Keyword::Function, false)) => {
-                        let next_token = cursor.peek(1, interner).or_abrupt()?;
-                        if next_token.kind() == &TokenKind::Punctuator(Punctuator::Mul) {
-                            AstExportDeclaration::DefaultGeneratorDeclaration(
-                                GeneratorDeclaration::new(false, true, true)
-                                    .parse(cursor, interner)?,
-                            )
-                        } else {
-                            AstExportDeclaration::DefaultFunctionDeclaration(
-                                FunctionDeclaration::new(false, true, true)
-                                    .parse(cursor, interner)?,
+                    Ok(match tok.kind() {
+                        TokenKind::Keyword((Keyword::Function, false)) => {
+                            let next_token = cursor.peek(1, interner).or_abrupt()?;
+                            if next_token.kind() == &TokenKind::Punctuator(Punctuator::Mul) {
+                                AstExportDeclaration::DefaultGeneratorDeclaration(
+                                    GeneratorDeclaration::new(false, true, true)
+                                        .parse(cursor, interner)?,
+                                )
+                            } else {
+                                AstExportDeclaration::DefaultFunctionDeclaration(
+                                    FunctionDeclaration::new(false, true, true)
+                                        .parse(cursor, interner)?,
+                                )
+                            }
+                        }
+                        TokenKind::Keyword((Keyword::Async, false))
+                            if async_function_declaration =>
+                        {
+                            let next_token = cursor.peek(2, interner).or_abrupt()?;
+                            if next_token.kind() == &TokenKind::Punctuator(Punctuator::Mul) {
+                                AstExportDeclaration::DefaultAsyncGeneratorDeclaration(
+                                    AsyncGeneratorDeclaration::new(false, true, true)
+                                        .parse(cursor, interner)?,
+                                )
+                            } else {
+                                AstExportDeclaration::DefaultAsyncFunctionDeclaration(
+                                    AsyncFunctionDeclaration::new(false, true, true)
+                                        .parse(cursor, interner)?,
+                                )
+                            }
+                        }
+                        TokenKind::Keyword((Keyword::Class, false)) => {
+                            AstExportDeclaration::DefaultClassDeclaration(
+                                ClassDeclaration::new(false, true, true)
+                                    .parse(cursor, interner)?
+                                    .into(),
                             )
                         }
-                    }
-                    TokenKind::Keyword((Keyword::Async, false)) if async_function_declaration => {
-                        let next_token = cursor.peek(2, interner).or_abrupt()?;
-                        if next_token.kind() == &TokenKind::Punctuator(Punctuator::Mul) {
-                            AstExportDeclaration::DefaultAsyncGeneratorDeclaration(
-                                AsyncGeneratorDeclaration::new(false, true, true)
-                                    .parse(cursor, interner)?,
-                            )
-                        } else {
-                            AstExportDeclaration::DefaultAsyncFunctionDeclaration(
-                                AsyncFunctionDeclaration::new(false, true, true)
-                                    .parse(cursor, interner)?,
-                            )
+                        _ => {
+                            let expr = AssignmentExpression::new(true, false, true)
+                                .parse(cursor, interner)?;
+
+                            cursor.expect_semicolon("default expression export", interner)?;
+
+                            AstExportDeclaration::DefaultAssignmentExpression(expr)
                         }
-                    }
-                    TokenKind::Keyword((Keyword::Class, false)) => {
-                        AstExportDeclaration::DefaultClassDeclaration(
-                            ClassDeclaration::new(false, true, true)
-                                .parse(cursor, interner)?
-                                .into(),
-                        )
-                    }
-                    _ => {
-                        let expr =
-                            AssignmentExpression::new(true, false, true).parse(cursor, interner)?;
-
-                        cursor.expect_semicolon("default expression export", interner)?;
-
-                        AstExportDeclaration::DefaultAssignmentExpression(expr)
-                    }
-                }
+                    })
+                })?
             }
             _ => AstExportDeclaration::Declaration(
                 Declaration::new(false, true).parse(cursor, interner)?,
@@ -238,6 +249,82 @@ where
         };
 
         Ok(export_clause)
+    }
+}
+
+/// Scriptw: how the compiler's reparse of a module spells an `export default`
+/// form (`crates/scriptw-ir/src/modules/source.rs`), so the Module parse
+/// charges it the nesting levels that reparse adds (see
+/// `MODULE_BODY_ENCLOSING_LEVELS`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DefaultDeclarationReparse {
+    /// A named declaration keeps its text without the keywords, and an
+    /// expression becomes the initializer of `let <name> = …`: the reparse
+    /// charges them as this parse does.
+    Unchanged,
+    /// `function () {}`, and its generator and async forms, become
+    /// `var <name> = function () {}`: a Statement and an AssignmentExpression.
+    AnonymousFunction,
+    /// `class {}` becomes `let <name> = class {}`: an AssignmentExpression.
+    AnonymousClass,
+}
+
+impl DefaultDeclarationReparse {
+    /// The form of the `export default` whose first token is the next one.
+    fn of<R: ReadChar>(
+        cursor: &mut Cursor<R>,
+        interner: &mut Interner,
+        async_function_declaration: bool,
+    ) -> ParseResult<Self> {
+        let mut kind = |skip_n: usize| -> ParseResult<Option<TokenKind>> {
+            Ok(cursor
+                .peek(skip_n, interner)?
+                .map(|token| token.kind().clone()))
+        };
+        let open_paren = Some(TokenKind::Punctuator(Punctuator::OpenParen));
+        let star = Some(TokenKind::Punctuator(Punctuator::Mul));
+        // The index of the token after `function`, and after its `*`.
+        let name_at = match kind(0)? {
+            Some(TokenKind::Keyword((Keyword::Function, false))) => Some(1),
+            Some(TokenKind::Keyword((Keyword::Async, false))) if async_function_declaration => {
+                Some(2)
+            }
+            Some(TokenKind::Keyword((Keyword::Class, false))) => {
+                return Ok(match kind(1)? {
+                    Some(TokenKind::Punctuator(Punctuator::OpenBlock))
+                    | Some(TokenKind::Keyword((Keyword::Extends, _))) => Self::AnonymousClass,
+                    _ => Self::Unchanged,
+                });
+            }
+            _ => None,
+        };
+        let Some(mut name_at) = name_at else {
+            return Ok(Self::Unchanged);
+        };
+        if kind(name_at)? == star {
+            name_at += 1;
+        }
+        Ok(if kind(name_at)? == open_paren {
+            Self::AnonymousFunction
+        } else {
+            Self::Unchanged
+        })
+    }
+
+    /// Parses the declaration with the levels the reparse adds to it.
+    fn charged<R: ReadChar, T>(
+        self,
+        cursor: &mut Cursor<R>,
+        interner: &mut Interner,
+        parse: impl FnOnce(&mut Cursor<R>, &mut Interner) -> ParseResult<T>,
+    ) -> ParseResult<T> {
+        match self {
+            Self::Unchanged => parse(cursor, interner),
+            Self::AnonymousClass => cursor.nested(interner, parse),
+            Self::AnonymousFunction => {
+                cursor.nested(interner, |cursor, interner| cursor.nested(interner, parse))
+            }
+        }
     }
 }
 

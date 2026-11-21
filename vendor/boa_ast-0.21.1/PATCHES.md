@@ -68,7 +68,8 @@ and each item of an optional chain is charged as the link it would be outside
 one; the two links of a method call (`a.m(…)`, `a[k](…)`, `a?.m(…)`: a
 property access whose next token is `(`, and a call of a property access)
 1,024 each, so about 1,000 chained method calls fit (Node runs 3,000; with
-the Speed policy the longest admitted chain, 950 calls, compiled natively in
+the Speed policy and one compilation job, `SCRIPTW_JOBS=1`, the longest
+admitted chain, 950 calls, compiled natively in
 647 MB, or 680 MB for `Map#set`; native compilation memory follows the whole
 function body, chained or not, which no nesting weight bounds); and a
 binary, logical, `??` or comma operator 1. In a generator or async function
@@ -83,11 +84,21 @@ levels deep (`parser::MODULE_BODY_ENCLOSING_LEVELS`): Scriptw's module
 lowering parses it again inside an async arrow function in generated
 scaffolding, and a module that passed the Module parse at the light charge
 or within eight levels of the limit failed only that reparse, with an error
-positioned in the generated text. A module chain without a suspension is not
-limited to about 2,000 operators.
-The `else if` and member weights also bound native compilation, which grows
-faster than those chains: a property access chain's native compilation memory
-is quadratic in its length (450 links took 0.5 GB). `Cursor::measured` returns the height of an
+positioned in the generated text. The forms that reparse rewrites are
+charged what the rewrite adds: `export var` the Statement it is reached
+through once `export` is deleted; an anonymous `export default function`
+(and its generator and async forms), which becomes `var <name> = function …`,
+a Statement and an AssignmentExpression; an anonymous `export default class`,
+which becomes `let <name> = class …`, an AssignmentExpression; and every
+`import(…)`, which becomes a call of a generated function, that call's link
+(also in a Script, whose dynamic imports are rewritten the same way). A module
+chain without a suspension is not limited to about 2,000 operators.
+The `else if` and member weights were set for the native compilation cost of
+one chain, which grows faster than its length: a property access chain's
+native compilation memory is quadratic in its length (450 links took 0.5 GB
+with the Fast policy). They bound one chain only: native compilation memory
+follows the whole function body, so several chains in one body cost about
+their sum, which no nesting weight bounds. `Cursor::measured` returns the height of an
 operand parsed by such a loop, and the loop adds its links
 (`Cursor::chain_height`) and records the total for the enclosing node
 (`Cursor::record_height`). `else if` recurses into `IfStatement` directly
@@ -115,7 +126,10 @@ comparably deep operands (nested chains were 255 IR levels per parenthesis,
 and the emitter overflowed at about 230 such parentheses). Template literals
 fold their parts the same way: the parser loops over the substitutions, and
 each `${}` nested the IR one level deeper before, so a flat template of 30,000
-substitutions overflowed the emitter (Node runs 100,000). About two million
+substitutions overflowed the emitter (Node runs 100,000). Each substitution
+still adds about 500 bytes to its function's Wasm body, so from about 14,000
+substitutions in one function the body exceeds the Wasm body size limit, a
+compile error the compile memory item of the inventory owns. About two million
 operators fit the parser; a chain of a million parses, and one of 100,000
 compiles and runs. Tests: front `source_nesting_limit_is_exact`,
 `long_operator_chains_parse_without_recursing_per_operator`,
@@ -126,9 +140,10 @@ compiles and runs. Tests: front `source_nesting_limit_is_exact`,
 `template_literals_lower_to_bounded_ir`; engine
 `source_nesting_beyond_the_limit_is_a_syntax_error_not_a_stack_overflow`,
 `hundred_thousand_term_chains_compile_and_run`,
-`hundred_thousand_substitution_templates_lower_to_bounded_ir`,
+`template_bodies_past_the_wasm_body_size_limit_are_a_compile_error`,
 `long_templates_keep_their_evaluation_order`,
 `module_nesting_is_charged_as_its_scaffolded_reparse`,
+`rewritten_module_forms_are_charged_as_their_reparse`,
 `operator_chains_in_resumable_bodies_pay_only_when_they_suspend`,
 `nested_chains_split_into_temporaries_keep_their_evaluation_order`,
 `long_chains_in_class_keys_and_heritage_compile` and

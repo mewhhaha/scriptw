@@ -979,6 +979,121 @@ fn module_bodies_are_charged_as_their_reparse_inside_the_module_scaffolding() {
     });
 }
 
+// The reparse also rewrites `export var`, an anonymous default function or
+// class and `import(…)` (see `MODULE_BODY_ENCLOSING_LEVELS`). Each form nests
+// exactly as deep in the Module parse as its rewritten text does eight levels
+// deeper, in a Script, so the reparse never fails where the Module parse
+// passed, and never passes where it failed.
+#[test]
+fn rewritten_module_forms_are_charged_as_their_reparse() {
+    use boa_parser::parser::MODULE_BODY_ENCLOSING_LEVELS;
+    on_compiler_stack(|| {
+        let ok = |source: String, options: ParseOptions| match parse(&source, options) {
+            Ok(_) => true,
+            Err(error) => {
+                assert!(
+                    error
+                        .message()
+                        .contains("nesting exceeds the implementation limit"),
+                    "{}",
+                    error.message()
+                );
+                false
+            }
+        };
+        // The most parentheses `form` admits.
+        let deepest = |form: &dyn Fn(&str, &str) -> String, options: ParseOptions| {
+            let (mut low, mut high) = (0usize, MAX_SOURCE_NESTING_DEPTH as usize);
+            assert!(ok(form("", ""), options.clone()));
+            assert!(!ok(
+                form(&"(".repeat(high), &")".repeat(high)),
+                options.clone()
+            ));
+            while high - low > 1 {
+                let middle = (low + high) / 2;
+                if ok(
+                    form(&"(".repeat(middle), &")".repeat(middle)),
+                    options.clone(),
+                ) {
+                    low = middle;
+                } else {
+                    high = middle;
+                }
+            }
+            low
+        };
+        type Form = fn(&str, &str) -> String;
+        let pairs: [(&str, Form, Form); 10] = [
+            (
+                "export const",
+                |o, c| format!("export const x = {o}1{c};"),
+                |o, c| format!("const x = {o}1{c};"),
+            ),
+            (
+                "export var",
+                |o, c| format!("export var x = {o}1{c};"),
+                |o, c| format!("var x = {o}1{c};"),
+            ),
+            (
+                "default function",
+                |o, c| format!("export default function () {{ return {o}1{c}; }}"),
+                |o, c| format!("var $d = function () {{ return {o}1{c}; }};"),
+            ),
+            (
+                "default generator",
+                |o, c| format!("export default function* () {{ return {o}1{c}; }}"),
+                |o, c| format!("var $d = function* () {{ return {o}1{c}; }};"),
+            ),
+            (
+                "default async function",
+                |o, c| format!("export default async function () {{ return {o}1{c}; }}"),
+                |o, c| format!("var $d = async function () {{ return {o}1{c}; }};"),
+            ),
+            (
+                "default async generator",
+                |o, c| format!("export default async function* () {{ return {o}1{c}; }}"),
+                |o, c| format!("var $d = async function* () {{ return {o}1{c}; }};"),
+            ),
+            (
+                "default class",
+                |o, c| format!("export default class {{ m() {{ return {o}1{c}; }} }}"),
+                |o, c| format!("let $d = class {{ m() {{ return {o}1{c}; }} }};"),
+            ),
+            (
+                "named default function",
+                |o, c| format!("export default function f() {{ return {o}1{c}; }}"),
+                |o, c| format!("function f() {{ return {o}1{c}; }}"),
+            ),
+            (
+                "default expression",
+                |o, c| format!("export default {o}1{c};"),
+                |o, c| format!("let $d = {o}1{c};"),
+            ),
+            (
+                "import()",
+                |o, c| format!("export const p = import({o}s{c}).then(f);"),
+                |o, c| format!("const p = $import$0({o}s{c}).then(f);"),
+            ),
+        ];
+        let enclosing = MODULE_BODY_ENCLOSING_LEVELS as usize;
+        for (name, module, reparse) in pairs {
+            assert_eq!(
+                deepest(&module, ParseOptions::module()) + enclosing,
+                deepest(&reparse, ParseOptions::script()),
+                "{name}"
+            );
+        }
+        // A Script's `import(…)` is rewritten the same way.
+        assert_eq!(
+            deepest(&|o, c| format!("import({o}s{c});"), ParseOptions::script()),
+            deepest(
+                &|o, c| format!("$import$0({o}s{c});"),
+                ParseOptions::script()
+            ),
+        );
+    });
+}
+
 // A method call's property access and call cost half a level each, so about
 // 1,000 chained method calls fit, four times the other links. Other member, call
 // and optional links cost two levels, as each item of an optional chain does;

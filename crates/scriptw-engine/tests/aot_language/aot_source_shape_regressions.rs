@@ -179,24 +179,25 @@ fn hundred_thousand_term_chains_compile_and_run() {
     );
 }
 
-// A template literal's parts are folded like a chain's operands, so a flat
-// template of any length lowers to bounded IR: each `${}` nested the IR one
-// level deeper, and 30,000 substitutions overflowed the emitter's stack after
-// a quadratic scan (100,000 ran for more than 15 minutes); Node runs 100,000.
-// Each substitution still emits about 500 Wasm bytes into the function body,
-// so 100,000 exceed the validator's body size limit, a compile error the
-// inventory's compile memory item owns (split large bodies).
+// Known-failure tracker for the inventory's template code size item (owner:
+// AOT codegen), not a capability: each substitution emits about 500 Wasm bytes
+// into its function body, so from about 14,000 substitutions in one function
+// the body exceeds the validator's body size limit, a compile error, where
+// Node runs 100,000. 20,000 are past it with margin and emit about 10 MB
+// before the validator rejects them. When out-of-line ToString helpers or
+// body splitting land, this compiles and the test is inverted. The IR test
+// `template_literals_lower_to_bounded_ir` keeps 100,000 substitutions bounded.
 #[test]
-fn hundred_thousand_substitution_templates_lower_to_bounded_ir() {
+fn template_bodies_past_the_wasm_body_size_limit_are_a_compile_error() {
     scriptw_engine::configure_compilation_jobs(1).unwrap();
     let source = format!(
         "print((function (x) {{ return `{}`; }})('a').length);",
-        "${x}".repeat(100_000)
+        "${x}".repeat(20_000)
     );
     let (compile, run) = options();
     let error = Engine::new(RealmBuilder::new().build())
         .run_script(&source, compile, run)
-        .expect_err("one function body of 100,000 substitutions exceeds the Wasm body size limit");
+        .expect_err("one function body of 20,000 substitutions exceeds the Wasm body size limit");
     assert!(
         format!("{error:?}").contains("function body size count exceeds limit"),
         "{error:?}"
@@ -332,6 +333,89 @@ fn module_nesting_is_charged_as_its_scaffolded_reparse() {
         ),
         "1801",
     );
+}
+
+// The reparse also rewrites `export var` (reached through a Statement once
+// `export` is deleted), an anonymous default function (`var <name> =
+// function …`, two levels deeper) or class (`let <name> = class …`, one
+// level) and `import(…)` (a call of a generated function, a two-level call
+// link). The Module parse charges each as rewritten, so the deepest form it
+// admits compiles, and one more parenthesis is its error at the module's own
+// position: one more level than charged passed the Module parse and failed
+// the reparse, positioned in generated text.
+// The deepest parentheses each form admits, measured; HEAD 328274d42 admitted
+// one more for `export var`, two more for the anonymous default function and
+// `import(…)`, and one more for the class, and failed in the reparse.
+const EXPORT_VAR_DEPTH: usize = 990;
+const DEFAULT_FUNCTION_DEPTH: usize = 987;
+const DEFAULT_CLASS_DEPTH: usize = 988;
+const IMPORT_CALL_DEPTH: usize = 988;
+
+#[test]
+fn rewritten_module_forms_are_charged_as_their_reparse() {
+    type Form = fn(&str, &str) -> String;
+    let forms: [(Form, usize); 6] = [
+        (
+            |o, c| format!("export var x = {o}1{c}; print('ok');"),
+            EXPORT_VAR_DEPTH,
+        ),
+        (
+            |o, c| format!("export default function () {{ return {o}1{c}; }} print('ok');"),
+            DEFAULT_FUNCTION_DEPTH,
+        ),
+        (
+            |o, c| format!("export default async function* () {{ return {o}1{c}; }} print('ok');"),
+            DEFAULT_FUNCTION_DEPTH,
+        ),
+        (
+            |o, c| format!("export default class {{ m() {{ return {o}1{c}; }} }} print('ok');"),
+            DEFAULT_CLASS_DEPTH,
+        ),
+        (
+            |o, c| {
+                format!(
+                    "const s = 'x'; export const p = import({o}s{c}); \
+                     p.catch(() => {{}}); print('ok');"
+                )
+            },
+            IMPORT_CALL_DEPTH,
+        ),
+        // A named default declaration keeps its text: charged as before.
+        (
+            |o, c| format!("export default function f() {{ return {o}1{c}; }} print('ok');"),
+            DEFAULT_FUNCTION_DEPTH + 2,
+        ),
+    ];
+    let compile = || CompileOptions {
+        host_surface_policy: HostSurfacePolicy::Test262,
+        module_loading_policy: scriptw_runtime::ModuleLoadingPolicy::RejectAll,
+        ..CompileOptions::default()
+    };
+    let (_, run) = options();
+    for (form, depth) in forms {
+        let nested = |depth: usize| form(&"(".repeat(depth), &")".repeat(depth));
+        scriptw_engine::configure_compilation_jobs(1).unwrap();
+        let source = nested(depth);
+        let observed = Engine::new(RealmBuilder::new().build())
+            .observe_module(&source, compile(), run.clone())
+            .unwrap_or_else(|error| panic!("{error:?}\n{source}"));
+        assert_eq!(
+            observed.output_events,
+            [HostOutputEvent::PrintLine("ok".into())],
+            "{source}"
+        );
+        let source = nested(depth + 1);
+        let error = Engine::new(RealmBuilder::new().build())
+            .run_module(&source, compile(), run.clone())
+            .expect_err("past the implementation limit");
+        let error = format!("{error:?}");
+        assert!(
+            error.contains("nesting exceeds the implementation limit")
+                && error.contains("at line 1, col")
+                && !error.contains("linked module source"),
+            "{error}\n{source}"
+        );
+    }
 }
 
 // In generator and async function bodies, the resumable lowering and state

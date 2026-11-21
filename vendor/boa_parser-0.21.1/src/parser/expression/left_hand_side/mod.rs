@@ -20,7 +20,7 @@ use crate::{
     Error,
     lexer::{InputElement, TokenKind},
     parser::{
-        AllowAwait, AllowYield, Cursor, ParseResult, TokenParser,
+        AllowAwait, AllowYield, Cursor, NestingCharge, ParseResult, TokenParser,
         expression::{
             AssignmentExpression,
             left_hand_side::{
@@ -256,6 +256,15 @@ where
                                     "import.defer call",
                                 )
                             })?;
+                        // Scriptw: the compiler parses the source again with
+                        // each `import(…)` rewritten to a call of a generated
+                        // function, so it is charged that call's link (see
+                        // `MODULE_BODY_ENCLOSING_LEVELS`).
+                        let call_height = cursor.chain_height(
+                            call_height,
+                            NestingCharge::MemberLink,
+                            interner,
+                        )?;
                         CallExpressionTail::new(
                             self.allow_yield,
                             self.allow_await,
@@ -280,6 +289,15 @@ where
                                     "import.source call",
                                 )
                             })?;
+                        // Scriptw: the compiler parses the source again with
+                        // each `import(…)` rewritten to a call of a generated
+                        // function, so it is charged that call's link (see
+                        // `MODULE_BODY_ENCLOSING_LEVELS`).
+                        let call_height = cursor.chain_height(
+                            call_height,
+                            NestingCharge::MemberLink,
+                            interner,
+                        )?;
                         CallExpressionTail::new(
                             self.allow_yield,
                             self.allow_await,
@@ -302,6 +320,15 @@ where
                                     "import call",
                                 )
                             })?;
+                        // Scriptw: the compiler parses the source again with
+                        // each `import(…)` rewritten to a call of a generated
+                        // function, so it is charged that call's link (see
+                        // `MODULE_BODY_ENCLOSING_LEVELS`).
+                        let call_height = cursor.chain_height(
+                            call_height,
+                            NestingCharge::MemberLink,
+                            interner,
+                        )?;
                         CallExpressionTail::new(
                             self.allow_yield,
                             self.allow_await,
