@@ -702,6 +702,9 @@ impl Function {
         );
         assert!(!self.exiting, "an exit sequence reserves no local");
         if let Some(index) = self.free_locals.take(ty) {
+            // A held-back `local.set` of this local is a previous holder's:
+            // the new holder's first read may not be fused into it.
+            self.flush_pending_set_of(index);
             self.forget_local_facts(index);
             #[cfg(any(test, debug_assertions))]
             self.gc_local_trace
@@ -737,6 +740,9 @@ impl Function {
             "only this body's dynamically reserved locals can be released"
         );
         assert!(!self.free_locals.contains(index), "local released twice");
+        // The releasing holder's held-back `local.set` is encoded on its
+        // own, so the next holder's first read is never fused into it.
+        self.flush_pending_set_of(index);
         self.forget_local_facts(index);
         #[cfg(any(test, debug_assertions))]
         self.gc_local_trace.release(index);
@@ -1095,10 +1101,24 @@ impl Function {
     /// encoded on its own at the next operator ordinal: a record of that
     /// ordinal (a literal operand, a program context, a hint) names it.
     fn flush_pending(&mut self) {
+        self.flush_pending_set();
+        self.flush_non_null_refinement();
+    }
+
+    fn flush_pending_set(&mut self) {
         if let Some(local) = self.pending_set.take() {
             self.body.instruction(&Instruction::LocalSet(local));
         }
-        self.flush_non_null_refinement();
+    }
+
+    /// Encodes a held-back `local.set` of `local`, whose holder changes: a
+    /// fused `local.tee` never spans a release or a reservation of its
+    /// local. A held-back store of another local, or a held-back refinement
+    /// (which concerns the stack), stays: no holder of theirs changes.
+    fn flush_pending_set_of(&mut self, local: u32) {
+        if self.pending_set == Some(local) {
+            self.flush_pending_set();
+        }
     }
 
     /// Whether `instruction`, the next after a held-back refinement, pops
@@ -1199,7 +1219,12 @@ impl Function {
                 // `local.set x; local.get x` is `local.tee x`. The set's
                 // bookkeeping (facts, writes, its operator ordinal, the GC
                 // local write check's write) is done; the read changes none
-                // of it and needs no ordinal of its own.
+                // of it and needs no ordinal of its own. The GC local write
+                // check still sees the read: the set may be a previous
+                // holder's ([`Self::release_typed_local`] flushes it, but the
+                // check must not depend on that).
+                #[cfg(any(test, debug_assertions))]
+                self.gc_local_trace.instruction(instruction);
                 self.body.instruction(&Instruction::LocalTee(local));
                 return self;
             }

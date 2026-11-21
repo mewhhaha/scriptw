@@ -293,3 +293,45 @@ fn a_store_read_back_at_once_is_one_tee() {
         ]
     );
 }
+
+/// A holder's dead store, its release and a new holder of the same local
+/// that reads before writing: the GC local write check sees the read, even
+/// though `local.set; local.get` of one local is otherwise one `local.tee`.
+#[test]
+#[should_panic(expected = "a typed GC local is read on a path where its current holder")]
+fn a_new_holders_read_after_a_released_holders_store_is_checked() {
+    let mut function = body();
+    let first = function.reserve_typed_local(NULLABLE);
+    function.instruction(&Instruction::RefNull(STRUCT));
+    function.instruction(&Instruction::LocalSet(first));
+    function.release_typed_local(first);
+    let second = function.reserve_typed_local(NULLABLE);
+    assert_eq!(second, first);
+    function.instruction(&Instruction::LocalGet(second));
+    function.instruction(&Instruction::Drop);
+    operators(function);
+}
+
+/// A released holder's last store is encoded on its own: the next holder's
+/// read is never fused into it, for any local type.
+#[test]
+fn a_store_is_not_fused_with_a_read_across_a_change_of_holder() {
+    let mut function = body();
+    let first = function.reserve_typed_local(ValType::I32);
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::LocalSet(first));
+    function.release_typed_local(first);
+    let second = function.reserve_typed_local(ValType::I32);
+    assert_eq!(second, first);
+    function.instruction(&Instruction::LocalGet(second));
+    function.instruction(&Instruction::Drop);
+    assert_eq!(
+        operators(function),
+        [
+            "LocalGet { local_index: 0 }",
+            "LocalSet { local_index: 1 }",
+            "LocalGet { local_index: 1 }",
+            "Drop",
+        ]
+    );
+}
