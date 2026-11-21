@@ -34,6 +34,7 @@ mod plain_data_literals;
 mod primitive_string_length;
 mod private_numeric_remainder;
 mod program_cache_pages;
+mod program_entry_outlining;
 mod property_value_writeback;
 mod regexp_demand_initialization;
 mod regexp_programs;
@@ -134,21 +135,24 @@ fn heap_programs_link_against_one_runtime_module() {
             }
         }
     }
-    assert_eq!(
-        &actual[..host_imports as usize],
-        &catalog[..host_imports as usize]
-    );
-    let mut last = host_imports as usize;
-    for entry in &actual[host_imports as usize..] {
+    // Final compaction keeps only the host functions P calls and the R
+    // exports it reaches, each in the catalog's order with its exact type.
+    let mut last = 0;
+    for entry in &actual {
         let position = catalog[last..]
             .iter()
             .position(|candidate| candidate == entry)
             .map(|position| last + position)
-            .expect("P retains ordered R exports with exact types");
+            .expect("P retains ordered host and R imports with exact types");
         last = position + 1;
     }
+    let kept_host = actual
+        .iter()
+        .filter(|(module, ..)| module == crate::module::HOST_IMPORT_MODULE)
+        .count() as u32;
+    assert!(kept_host > 0 && kept_host < host_imports);
     assert!(
-        imports > host_imports && imports < host_imports + runtime_functions,
+        imports > kept_host && imports < kept_host + runtime_functions,
         "the actual program imports a proper nonempty typed subset of R"
     );
 }

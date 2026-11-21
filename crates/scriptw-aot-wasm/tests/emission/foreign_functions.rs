@@ -246,12 +246,21 @@ fn assert_foreign_wrappers() {
             ),
             ("dd", native)
         );
-        assert_eq!(
-            &functions[..host_prefix.len()],
-            host_prefix.as_slice(),
-            "P retains the exact ordered typed host-function prefix of R"
-        );
-        let runtime_imports = &functions[host_prefix.len()..foreign_index as usize];
+        // Final compaction keeps only the host functions P calls: an ordered
+        // subset of R's typed host-function prefix, before the R subset.
+        let kept_host = functions
+            .iter()
+            .take_while(|(module, ..)| module == "scriptw_host")
+            .count();
+        let mut cursor = 0;
+        for host in &functions[..kept_host] {
+            cursor += host_prefix[cursor..]
+                .iter()
+                .position(|candidate| candidate == host)
+                .expect("P host functions are an ordered typed subset of R's")
+                + 1;
+        }
+        let runtime_imports = &functions[kept_host..foreign_index as usize];
         assert!(!runtime_imports.is_empty());
         let mut previous = None;
         for (module, exported, signature, _) in runtime_imports {

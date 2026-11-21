@@ -61,16 +61,32 @@ fn import_names(bytes: &[u8]) -> Vec<(String, String)> {
 }
 
 #[test]
-fn removes_only_unused_runtime_imports_and_remaps_calls_refs_exports_and_names() {
+fn removes_only_unused_runtime_and_host_function_imports_and_remaps_everything_else() {
     let mut imports = wasm_encoder::ImportSection::new();
+    let host = crate::module::HOST_IMPORT_MODULE;
+    let compiler = crate::gc_types::GcHostImport::CompileDirectEval.name();
     for (module, name) in [
         (crate::RUNTIME_IMPORT_NAMESPACE, "dead"),
-        ("host", "unused-host"),
+        (host, "unused-host"),
         (crate::RUNTIME_IMPORT_NAMESPACE, "live"),
+        // The profile authority stays although no body calls it.
+        (host, compiler),
         ("foreign", "unused-foreign"),
     ] {
         imports.import(module, name, EntityType::Function(0));
     }
+    // A host memory has no function index and is never dropped.
+    imports.import(
+        host,
+        "shared_memory",
+        EntityType::Memory(wasm_encoder::MemoryType {
+            minimum: 1,
+            maximum: Some(1),
+            memory64: false,
+            shared: true,
+            page_size_log2: None,
+        }),
+    );
     imports.import(
         crate::RUNTIME_IMPORT_NAMESPACE,
         "dead-global",
@@ -82,23 +98,23 @@ fn removes_only_unused_runtime_imports_and_remaps_calls_refs_exports_and_names()
         EntityType::Global(global_type()),
     );
     let (code, mut table) = owned_body(
-        4,
+        5,
         &[
             Instruction::Call(2),
-            Instruction::RefFunc(4),
+            Instruction::RefFunc(5),
             Instruction::Drop,
             Instruction::GlobalGet(1),
             Instruction::Drop,
         ],
     );
     let mut exports = wasm_encoder::ExportSection::new();
-    exports.export("entry", ExportKind::Func, 4);
+    exports.export("entry", ExportKind::Func, 5);
     exports.export("state", ExportKind::Global, 1);
     let mut elements = wasm_encoder::ElementSection::new();
-    elements.declared(wasm_encoder::Elements::Functions(Cow::Borrowed(&[0, 2, 4])));
+    elements.declared(wasm_encoder::Elements::Functions(Cow::Borrowed(&[0, 2, 5])));
     let mut names = wasm_encoder::NameSection::new();
     let mut fs = wasm_encoder::NameMap::new();
-    for (i, n) in [(0, "dead"), (2, "live"), (4, "entry")] {
+    for (i, n) in [(0, "dead"), (2, "live"), (5, "entry")] {
         fs.append(i, n);
     }
     names.functions(&fs);
@@ -111,7 +127,7 @@ fn removes_only_unused_runtime_imports_and_remaps_calls_refs_exports_and_names()
         let mut inner = wasm_encoder::NameMap::new();
         inner.append(0, "slot");
         outer.append(0, &inner);
-        outer.append(4, &inner);
+        outer.append(5, &inner);
         if labels {
             names.labels(&outer);
         } else {
@@ -133,9 +149,10 @@ fn removes_only_unused_runtime_imports_and_remaps_calls_refs_exports_and_names()
     assert_eq!(
         import_names(&output),
         vec![
-            ("host".into(), "unused-host".into()),
             (crate::RUNTIME_IMPORT_NAMESPACE.into(), "live".into()),
+            (host.into(), compiler.into()),
             ("foreign".into(), "unused-foreign".into()),
+            (host.into(), "shared_memory".into()),
             (crate::RUNTIME_IMPORT_NAMESPACE.into(), "live-global".into())
         ]
     );
@@ -157,7 +174,7 @@ fn removes_only_unused_runtime_imports_and_remaps_calls_refs_exports_and_names()
                     .collect::<Vec<_>>();
                 assert!(matches!(
                     ops[0],
-                    wasmparser::Operator::Call { function_index: 1 }
+                    wasmparser::Operator::Call { function_index: 0 }
                 ));
                 assert!(matches!(
                     ops[1],
@@ -175,7 +192,7 @@ fn removes_only_unused_runtime_imports_and_remaps_calls_refs_exports_and_names()
                 };
                 assert_eq!(
                     r.into_iter().map(Result::unwrap).collect::<Vec<_>>(),
-                    vec![1, 3]
+                    vec![0, 3]
                 );
             }
             Payload::CustomSection(s) if s.name() == "name" => {
@@ -187,7 +204,7 @@ fn removes_only_unused_runtime_imports_and_remaps_calls_refs_exports_and_names()
                         wasmparser::Name::Function(r) => {
                             assert_eq!(
                                 r.into_iter().map(|n| n.unwrap().index).collect::<Vec<_>>(),
-                                vec![1, 3]
+                                vec![0, 3]
                             );
                             names_seen += 1;
                         }

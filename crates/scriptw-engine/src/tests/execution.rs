@@ -202,16 +202,22 @@ fn wasm_backend_characterization_matrix_locks_public_surface_and_outcomes() {
             .emit_wasm(&unit)
             .unwrap_or_else(|err| panic!("{label} should emit wasm: {err:?}"));
         let (imports, exports) = wasm_import_export_names(&artifact.bytes);
-        // Heap-backed programs import the current typed GC host boundary.
-        // Shared R functions remain named imports, admitted against that
-        // artifact's actual exports rather than a retired manual-heap ABI.
+        // Heap-backed programs link against R, which imports the current typed
+        // GC host boundary. Shared R functions remain named imports, admitted
+        // against that artifact's actual exports rather than a retired
+        // manual-heap ABI.
         let host_imports: Vec<_> = imports
             .iter()
             .filter(|name| name.starts_with("scriptw_host::"))
             .map(String::as_str)
             .collect();
+        let runtime = artifact
+            .runtime
+            .as_ref()
+            .unwrap_or_else(|| panic!("{label} requires a linked runtime"));
+        let (runtime_imports, runtime_exports) = wasm_import_export_names(runtime.bytes());
         assert_eq!(
-            host_imports,
+            runtime_imports,
             [
                 "scriptw_host::agent_broadcast_resource",
                 "scriptw_host::agent_call",
@@ -274,12 +280,18 @@ fn wasm_backend_characterization_matrix_locks_public_surface_and_outcomes() {
                 "scriptw_host::weak_ref_allocate",
                 "scriptw_host::weak_ref_deref",
             ],
-            "{label} host imports: {host_imports:?}"
+            "{label} R host imports: {runtime_imports:?}"
         );
-        let runtime = artifact
-            .runtime
-            .as_ref()
-            .unwrap_or_else(|| panic!("{label} requires a linked runtime"));
+        // P keeps only the host functions its own bodies call (final import
+        // compaction drops the rest) and the host memories; each is one of
+        // R's, with the same exact boundary.
+        assert!(!host_imports.is_empty(), "{label} P host imports");
+        for import in &host_imports {
+            assert!(
+                runtime_imports.iter().any(|runtime| runtime == import),
+                "{label} P host import {import} is part of R's fixed boundary"
+            );
+        }
         assert_eq!(
             runtime.0.source_compilation_profile(),
             scriptw_aot_wasm::RuntimeSourceCompilationProfile::Portable
@@ -288,11 +300,6 @@ fn wasm_backend_characterization_matrix_locks_public_surface_and_outcomes() {
             scriptw_aot_wasm::RuntimeSourceCompilationProfile::from_module(&artifact.bytes)
                 .unwrap(),
             runtime.0.source_compilation_profile()
-        );
-        let (runtime_imports, runtime_exports) = wasm_import_export_names(runtime.bytes());
-        assert_eq!(
-            runtime_imports, host_imports,
-            "{label} R and P must share the exact fixed host boundary"
         );
         let runtime_exports: std::collections::BTreeSet<_> = runtime_exports.into_iter().collect();
         for import in imports

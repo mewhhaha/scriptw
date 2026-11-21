@@ -1,11 +1,16 @@
 # Runtime imports in final program modules
 
 The compiler emits P against R’s canonical function/global layout, then compacts
-only unused imports from the reserved runtime namespace. All host and foreign
-imports remain in their original relative order. All defined functions and
-globals, GC recursive types, type indices, tables, memories, tags and segment
+unused imports: R functions and globals from the reserved runtime namespace, and
+host (`scriptw_host`) functions. The host's source-compiler imports
+(`compile_dynamic_function`, `compile_global_script`, `compile_direct_eval`)
+always remain: `RuntimeSourceCompilationProfile::from_module` reads P's
+compilation profile from their presence. Host memories, foreign imports and every
+other kept import remain in their original relative order. All defined functions
+and globals, GC recursive types, type indices, tables, memories, tags and segment
 indices remain. R’s exports, implementation, layout and native-image contract
-are unchanged.
+are unchanged. The engine links R exports and host functions by name, so an
+instance needs a definition only for an import P still declares.
 
 The final producer pass collects semantic function/global references through
 wasm-encoder’s exhaustive structural and operator adapters. This includes

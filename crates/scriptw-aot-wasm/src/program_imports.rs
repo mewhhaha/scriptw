@@ -1,4 +1,9 @@
 //! Final producer-P import compaction. R, types, bodies and operators are retained.
+//! Unreferenced R (`scriptw_runtime`) imports and unreferenced host
+//! (`scriptw_host`) function imports are dropped: both are linked by name, and
+//! an instance needs a definition only for an import it declares. Memories,
+//! tables, tags, foreign imports and the host's source-compiler imports (the
+//! P's compilation-profile authority) are always kept.
 //! Structural references outside the code section use the encoder's exhaustive
 //! index adapters; names and plain declarative ref.func lists do not keep
 //! otherwise unused imports alive. Code bodies are not decoded again: the code
@@ -108,6 +113,25 @@ impl Reencode for References {
         }
     }
 }
+/// Whether an unreferenced function import may be dropped. A source-compiler
+/// import is kept even when no body calls it:
+/// `RuntimeSourceCompilationProfile::from_module` reads the P's profile from
+/// their presence, and the engine selects its native compiler by them.
+fn removable_function_import(import: &wasmparser::Import<'_>) -> bool {
+    use crate::gc_types::GcHostImport;
+    const SOURCE_COMPILER: [GcHostImport; 3] = [
+        GcHostImport::CompileDynamicFunction,
+        GcHostImport::CompileGlobalScript,
+        GcHostImport::CompileDirectEval,
+    ];
+    match import.module {
+        crate::RUNTIME_IMPORT_NAMESPACE => true,
+        crate::module::HOST_IMPORT_MODULE => {
+            !SOURCE_COMPILER.iter().any(|row| row.name() == import.name)
+        }
+        _ => false,
+    }
+}
 struct Maps {
     functions: IndexMap<FunctionIndex>,
     globals: IndexMap<GlobalIndex>,
@@ -125,7 +149,10 @@ impl Maps {
                         match import.ty {
                             TypeRef::Func(_) | TypeRef::FuncExact(_) => {
                                 let index = u32::try_from(funcs.len()).map_err(invalid)?;
-                                funcs.push(!runtime || refs.functions.contains(&index));
+                                funcs.push(
+                                    !removable_function_import(&import)
+                                        || refs.functions.contains(&index),
+                                );
                             }
                             TypeRef::Global(_) => {
                                 let index = u32::try_from(globals.len()).map_err(invalid)?;
