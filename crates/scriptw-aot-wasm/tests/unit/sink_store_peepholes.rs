@@ -335,3 +335,73 @@ fn a_store_is_not_fused_with_a_read_across_a_change_of_holder() {
         ]
     );
 }
+
+/// A handler is entered from anywhere in its body, so it holds no null or
+/// i64 fact; the body's own fall-through keeps its facts.
+#[test]
+fn a_handler_entry_forgets_null_and_i64_facts() {
+    let empty = BlockType::Empty;
+    // A null fact across `try_table`.
+    let mut function = Function::with_parameters(LocalDeclarations::from_types([]), vec![NULLABLE]);
+    let local = function.reserve_typed_local(NULLABLE);
+    function.instruction(&Instruction::RefNull(STRUCT));
+    function.instruction(&Instruction::LocalSet(local));
+    function.instruction(&Instruction::Block(empty));
+    function.instruction(&Instruction::TryTable(
+        empty,
+        std::borrow::Cow::Owned(vec![wasm_encoder::Catch::All { label: 0 }]),
+    ));
+    function.instruction(&Instruction::Call(0));
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::LocalSet(local));
+    function.store_constant(local, LocalConstant::Null(STRUCT));
+    function.instruction(&Instruction::End);
+    // Only the body's end reaches here: it holds null.
+    function.store_constant(local, LocalConstant::Null(STRUCT));
+    function.instruction(&Instruction::End);
+    // The handler may have been entered holding the parameter.
+    function.store_constant(local, LocalConstant::Null(STRUCT));
+    assert_eq!(stores(&operators(function)), 4);
+
+    // An i64 fact across a legacy `try`/`catch_all`.
+    let mut function = body();
+    let local = function.reserve_typed_local(ValType::I64);
+    function.store_constant(local, LocalConstant::I64(7));
+    function.instruction(&Instruction::Try(empty));
+    function.instruction(&Instruction::Call(0));
+    function.store_constant(local, LocalConstant::I64(8));
+    function.instruction(&Instruction::CatchAll);
+    // The handler may have been entered holding 7.
+    function.store_constant(local, LocalConstant::I64(8));
+    function.instruction(&Instruction::End);
+    // Both the body and the handler end holding 8.
+    function.store_constant(local, LocalConstant::I64(8));
+    assert_eq!(stores(&operators(function)), 3);
+}
+
+/// Every `br_table` target receives the facts at the branch, for i64 and
+/// null facts as for i32 ones.
+#[test]
+fn a_br_table_carries_null_and_i64_facts_to_each_target() {
+    let empty = BlockType::Empty;
+    let mut function = body();
+    let number = function.reserve_typed_local(ValType::I64);
+    let reference = function.reserve_typed_local(NULLABLE);
+    function.store_constant(number, LocalConstant::I64(5));
+    function.instruction(&Instruction::RefNull(STRUCT));
+    function.instruction(&Instruction::LocalSet(reference));
+    function.instruction(&Instruction::Block(empty));
+    function.instruction(&Instruction::Block(empty));
+    function.instruction(&Instruction::LocalGet(0));
+    function.instruction(&Instruction::BrTable(std::borrow::Cow::Owned(vec![0]), 1));
+    function.instruction(&Instruction::End);
+    // Reached only from the table's first target.
+    function.store_constant(number, LocalConstant::I64(5));
+    function.store_constant(reference, LocalConstant::Null(STRUCT));
+    function.store_constant(number, LocalConstant::I64(6));
+    function.instruction(&Instruction::End);
+    // The default target joins with 5 here; the reference is null on both.
+    function.store_constant(number, LocalConstant::I64(6));
+    function.store_constant(reference, LocalConstant::Null(STRUCT));
+    assert_eq!(stores(&operators(function)), 4);
+}
