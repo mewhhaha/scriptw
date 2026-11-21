@@ -54,7 +54,7 @@ fn emitted_portable_and_native_r_keep_actual_compiler_import_domains() {
             .unwrap();
             let module = compile_wasm_module(&engine, runtime.bytes()).unwrap();
             assert_eq!(imports_native_source_compiler(&module), expected);
-            for row in SOURCE_COMPILER_IMPORTS {
+            for row in GcHostImport::SOURCE_COMPILERS {
                 assert_eq!(
                     module.imports().any(|import| {
                         import.module() == row.module() && import.name() == row.name()
@@ -83,7 +83,7 @@ fn emitted_portable_and_native_r_keep_actual_compiler_import_domains() {
 #[test]
 fn present_compiler_names_preserve_wrong_signature_kind_and_duplicate_rejection() {
     let engine = shared_wasm_engine().unwrap();
-    for (row, family) in SOURCE_COMPILER_IMPORTS.into_iter().zip([
+    for (row, family) in GcHostImport::SOURCE_COMPILERS.into_iter().zip([
         "native Function compiler",
         "native global Script compiler",
         "native direct eval compiler",
@@ -154,7 +154,7 @@ if (compiled() !== 23 || globalThis[token] !== 31 || local('value + 1; /* ' + to
 #[test]
 fn feature_off_rejects_all_native_compiler_import_names_before_binding() {
     let engine = shared_wasm_engine().unwrap();
-    for row in SOURCE_COMPILER_IMPORTS {
+    for row in GcHostImport::SOURCE_COMPILERS {
         for (descriptor, copies) in [(&[0, 0][..], 1), (&[2, 0, 1][..], 1), (&[0, 0][..], 2)] {
             let module = compile_wasm_module(
                 &engine,

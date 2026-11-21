@@ -8,15 +8,9 @@ use wasmtime::{ExternRef, Rooted};
 #[cfg(test)]
 mod tests;
 
-const SOURCE_COMPILER_IMPORTS: [GcHostImport; 3] = [
-    GcHostImport::CompileDynamicFunction,
-    GcHostImport::CompileGlobalScript,
-    GcHostImport::CompileDirectEval,
-];
-
 fn imports_native_source_compiler(module: &WasmtimeModule) -> bool {
     module.imports().any(|import| {
-        SOURCE_COMPILER_IMPORTS
+        GcHostImport::SOURCE_COMPILERS
             .iter()
             .any(|row| import.module() == row.module() && import.name() == row.name())
     })

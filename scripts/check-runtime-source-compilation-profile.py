@@ -66,24 +66,25 @@ def check(root, overrides=None):
             "[0]=>Some(Self::Portable),[1]=>Some(Self::NativeHost),_=>None" in profile,
             "closed profile defaults Portable and decodes exactly one 0/1 byte")
     require("ifself.profile.is_some(){returnErr(" in profile and
-            "self.imports[slot.index()]" in profile and
-            "self.imports[slot.index()]=true;" in profile and
-            "letSome(slot)=CompilerImportSlot::from_name(import.name)else{returnOk(());};" in profile and
-            'import.module!="scriptw_host"' in profile and
+            "||self.imports[slot]" in profile and
+            "self.imports[slot]=true;" in profile and
+            "letSome(slot)=compiler_import_slot(import.name)else{returnOk(());};" in profile and
+            "import.module!=COMPILER_IMPORTS[slot].module()" in profile and
             "TypeRef::Func(_)|TypeRef::FuncExact(_)" in profile and
-            "RuntimeSourceCompilationProfile::Portable=>[false;CompilerImportSlot::ALL.len()]" in profile and
-            "RuntimeSourceCompilationProfile::NativeHost=>[true;CompilerImportSlot::ALL.len()]" in profile and
+            "RuntimeSourceCompilationProfile::Portable=>[false;COMPILER_IMPORTS.len()]" in profile and
+            "RuntimeSourceCompilationProfile::NativeHost=>[true;COMPILER_IMPORTS.len()]" in profile and
             "ifself.imports!=expected" in profile,
             "duplicate/unknown frames and wrong, partial, duplicate or foreign compiler imports reject")
-    require("enumCompilerImportSlot{DynamicFunction,GlobalScript,DirectEval,}" in profile and
-            "constALL:[Self;3]=[Self::DynamicFunction,Self::GlobalScript,Self::DirectEval];" in profile and
-            "imports:[bool;CompilerImportSlot::ALL.len()]" in profile,
-            "exactly three typed compiler slots own the import census")
-    for index, (name, slot) in enumerate((("compile_dynamic_function", "DynamicFunction"),
-                                        ("compile_global_script", "GlobalScript"),
-                                        ("compile_direct_eval", "DirectEval"))):
-        require('"' + name + '"=>Some(Self::' + slot + '),' in profile and
-                'Self::' + slot + '=>' + str(index) + ',' in profile,
+    host = c[A + "gc_types/host.rs"]
+    require("constCOMPILER_IMPORTS:[GcHostImport;3]=GcHostImport::SOURCE_COMPILERS;" in profile and
+            "COMPILER_IMPORTS.iter().position(|row|row.name()==name)" in profile and
+            "imports:[bool;COMPILER_IMPORTS.len()]" in profile and
+            "pubconstSOURCE_COMPILERS:[Self;3]=[Self::CompileDynamicFunction,Self::CompileGlobalScript,Self::CompileDirectEval,];" in host,
+            "exactly three typed compiler slots, one shared import list, own the import census")
+    for name, row in (("compile_dynamic_function", "CompileDynamicFunction"),
+                      ("compile_global_script", "CompileGlobalScript"),
+                      ("compile_direct_eval", "CompileDirectEval")):
+        require(row + '=>("' + name + '",' in host,
                 "all three compiler roles have closed distinct admission: " + name)
     runtime = c[A + "runtime_artifact.rs"]
     require("Self::Program(runtime)=>runtime.source_compilation_profile()" in runtime and

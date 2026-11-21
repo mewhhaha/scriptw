@@ -1,4 +1,5 @@
 //! Source-compilation authority is explicit in the emitted module and identity.
+use crate::gc_types::GcHostImport;
 use crate::EmitError;
 use wasmparser::{Import, Parser, Payload, TypeRef};
 
@@ -57,49 +58,32 @@ impl RuntimeSourceCompilationProfile {
     }
 }
 
-#[derive(Clone, Copy)]
-enum CompilerImportSlot {
-    DynamicFunction,
-    GlobalScript,
-    DirectEval,
-}
-impl CompilerImportSlot {
-    const ALL: [Self; 3] = [Self::DynamicFunction, Self::GlobalScript, Self::DirectEval];
-    fn from_name(name: &str) -> Option<Self> {
-        match name {
-            "compile_dynamic_function" => Some(Self::DynamicFunction),
-            "compile_global_script" => Some(Self::GlobalScript),
-            "compile_direct_eval" => Some(Self::DirectEval),
-            _ => None,
-        }
-    }
-    const fn index(self) -> usize {
-        match self {
-            Self::DynamicFunction => 0,
-            Self::GlobalScript => 1,
-            Self::DirectEval => 2,
-        }
-    }
+/// The source-compiler imports' slots, one per
+/// [`GcHostImport::SOURCE_COMPILERS`] row.
+const COMPILER_IMPORTS: [GcHostImport; 3] = GcHostImport::SOURCE_COMPILERS;
+
+fn compiler_import_slot(name: &str) -> Option<usize> {
+    COMPILER_IMPORTS.iter().position(|row| row.name() == name)
 }
 
 #[derive(Default)]
 pub(super) struct SourceCompilationProfileAdmission {
     profile: Option<RuntimeSourceCompilationProfile>,
-    imports: [bool; CompilerImportSlot::ALL.len()],
+    imports: [bool; COMPILER_IMPORTS.len()],
 }
 
 impl SourceCompilationProfileAdmission {
     pub(super) fn import(&mut self, import: &Import<'_>) -> Result<(), EmitError> {
-        let Some(slot) = CompilerImportSlot::from_name(import.name) else {
+        let Some(slot) = compiler_import_slot(import.name) else {
             return Ok(());
         };
-        if import.module != "scriptw_host"
+        if import.module != COMPILER_IMPORTS[slot].module()
             || !matches!(import.ty, TypeRef::Func(_) | TypeRef::FuncExact(_))
-            || self.imports[slot.index()]
+            || self.imports[slot]
         {
             return Err(RuntimeSourceCompilationProfile::malformed());
         }
-        self.imports[slot.index()] = true;
+        self.imports[slot] = true;
         Ok(())
     }
 
@@ -119,8 +103,8 @@ impl SourceCompilationProfileAdmission {
             .profile
             .ok_or_else(RuntimeSourceCompilationProfile::malformed)?;
         let expected = match profile {
-            RuntimeSourceCompilationProfile::Portable => [false; CompilerImportSlot::ALL.len()],
-            RuntimeSourceCompilationProfile::NativeHost => [true; CompilerImportSlot::ALL.len()],
+            RuntimeSourceCompilationProfile::Portable => [false; COMPILER_IMPORTS.len()],
+            RuntimeSourceCompilationProfile::NativeHost => [true; COMPILER_IMPORTS.len()],
         };
         if self.imports != expected {
             return Err(RuntimeSourceCompilationProfile::malformed());

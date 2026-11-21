@@ -1308,7 +1308,10 @@ pub struct WasmArtifact {
 }
 
 impl WasmArtifact {
-    /// Exact imports selected by the same declaration plan that emitted bytes.
+    /// The host imports of the declaration plan that emitted the bytes. A
+    /// standalone module and R import exactly these; a linked P drops the
+    /// ones it never calls, so its final import section holds an ordered
+    /// subset of them (read P's own imports from `bytes`).
     pub fn gc_host_imports(&self) -> &[crate::gc_types::GcHostImport] {
         &self.gc_host_imports
     }

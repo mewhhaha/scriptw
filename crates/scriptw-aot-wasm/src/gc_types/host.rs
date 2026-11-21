@@ -497,6 +497,17 @@ macro_rules! gc_host_imports {
         }
     };
 }
+impl GcHostImport {
+    /// The source-compiler imports, in their profile slot order. A
+    /// NativeHost module imports all of them and a Portable one none
+    /// (`RuntimeSourceCompilationProfile::from_module`); the engine selects
+    /// its native source compiler by them, and P keeps them even uncalled.
+    pub const SOURCE_COMPILERS: [Self; 3] = [
+        Self::CompileDynamicFunction,
+        Self::CompileGlobalScript,
+        Self::CompileDirectEval,
+    ];
+}
 gc_host_imports! {
     CollectGc => ("collect_gc", HostCollectGc),
     ByteArrayAllocate => ("byte_array_allocate", HostByteArrayAllocate),

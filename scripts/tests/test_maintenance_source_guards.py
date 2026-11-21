@@ -143,17 +143,22 @@ class MaintenanceSourceGuards(unittest.TestCase):
         path = profile.A + "runtime_artifact/source_compilation.rs"
         source = (ROOT / path).read_text()
         for before, after in [
-            ("Self::DirectEval => 2,", "Self::DirectEval => 1,"),
-            ('"compile_global_script" => Some(Self::GlobalScript)',
-             '"compile_global_script" => Some(Self::DynamicFunction)'),
-            ("self.imports[slot.index()] = true;", "self.imports[slot.index()] = false;"),
-            ("[true; CompilerImportSlot::ALL.len()]", "[false; CompilerImportSlot::ALL.len()]"),
+            ("COMPILER_IMPORTS.iter().position(|row| row.name() == name)",
+             "COMPILER_IMPORTS.iter().position(|row| row.name() != name)"),
+            ("self.imports[slot] = true;", "self.imports[slot] = false;"),
+            ("[true; COMPILER_IMPORTS.len()]", "[false; COMPILER_IMPORTS.len()]"),
             ("if self.imports != expected", "if false"),
-            ('import.module != "scriptw_host"', "false"),
+            ("import.module != COMPILER_IMPORTS[slot].module()", "false"),
         ]:
             with self.subTest(before=before):
                 self.assertEqual(source.count(before), 1)
                 self.assertTrue(profile.check(ROOT, {path: source.replace(before, after)}))
+        host = profile.A + "gc_types/host.rs"
+        source = (ROOT / host).read_text()
+        before = "        Self::CompileGlobalScript,\n        Self::CompileDirectEval,\n    ];"
+        self.assertEqual(source.count(before), 1)
+        self.assertTrue(profile.check(ROOT, {host: source.replace(
+            before, "        Self::CompileDirectEval,\n        Self::CompileGlobalScript,\n    ];")}))
 
 
 class EmbeddedProfileGuards(unittest.TestCase):

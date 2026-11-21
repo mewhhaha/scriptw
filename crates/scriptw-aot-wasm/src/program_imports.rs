@@ -114,21 +114,15 @@ impl Reencode for References {
     }
 }
 /// Whether an unreferenced function import may be dropped. A source-compiler
-/// import is kept even when no body calls it:
-/// `RuntimeSourceCompilationProfile::from_module` reads the P's profile from
-/// their presence, and the engine selects its native compiler by them.
+/// import (`GcHostImport::SOURCE_COMPILERS`) is kept even when no body calls
+/// it: `RuntimeSourceCompilationProfile::from_module` reads the P's profile
+/// from their presence, and the engine selects its native compiler by them.
 fn removable_function_import(import: &wasmparser::Import<'_>) -> bool {
-    use crate::gc_types::GcHostImport;
-    const SOURCE_COMPILER: [GcHostImport; 3] = [
-        GcHostImport::CompileDynamicFunction,
-        GcHostImport::CompileGlobalScript,
-        GcHostImport::CompileDirectEval,
-    ];
     match import.module {
         crate::RUNTIME_IMPORT_NAMESPACE => true,
-        crate::module::HOST_IMPORT_MODULE => {
-            !SOURCE_COMPILER.iter().any(|row| row.name() == import.name)
-        }
+        crate::module::HOST_IMPORT_MODULE => !crate::gc_types::GcHostImport::SOURCE_COMPILERS
+            .iter()
+            .any(|row| row.name() == import.name),
         _ => false,
     }
 }
