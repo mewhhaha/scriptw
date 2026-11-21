@@ -275,9 +275,10 @@ fn module_state_storage_and_anchor_projections_are_borrowed_and_exhaustive() {
     }
     assert!(normalized_code(clear)
         .contains("self.current_private_environment.set_null(self.schema,function)"));
+    // Both epilogues end the roots inside the body's exit sequence.
     assert_eq!(
         COMPILATION
-            .matches("self.clear_body_entry_roots(&mut function);")
+            .matches("self.clear_body_entry_roots(&exit, &mut function);")
             .count(),
         2
     );

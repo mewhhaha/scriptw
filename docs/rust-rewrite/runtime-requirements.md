@@ -73,7 +73,7 @@ every engine or a fallback implementation for engines missing Wasm GC.
 
 ## Runtime ABI
 
-The runtime ABI is **83**. Portable bundles and native images built under an
+The runtime ABI is **84**. Portable bundles and native images built under an
 earlier ABI must be rebuilt. ABIs 58 to 77 added per-site read, write,
 `instanceof` and global read records, a dictionary position hint on Strings,
 further native call entries, one JSON output accumulator, compact shape
@@ -86,8 +86,36 @@ constructors and the ordinary global functions demand-built, and publish a new
 global object's bindings in one call
 ([contract](contracts/lazy-runtime-values.md)). ABI 83 adds the native
 recursion depth global that bounds helper recursion (see
-[implementation limits](#implementation-limits)). `LAYOUT_VERSION` in
+[implementation limits](#implementation-limits)). ABI 84 changes no
+interface: it re-emits R with fewer null refinements, stores and copies
+(see [locals and GC roots](#locals-and-gc-roots)), so R's bytes and key
+differ. `LAYOUT_VERSION` in
 `crates/scriptw-aot-wasm/src/runtime_artifact.rs` records each step.
+
+### Locals and GC roots
+
+The emitter assumes that a Wasm local retains nothing once nothing reads it.
+Wasmtime compiles each local to Cranelift SSA values and finds GC roots
+through stack maps of the values live across each safepoint, so a reference
+left in a dead local is not a root. The emitter therefore stores nothing to
+end a holder: a released pooled reference local keeps its last value until
+its next holder writes it (the code sink checks, in test and debug builds,
+that every holder writes before it reads), a body's epilogue ends its
+holders without storing null (`Function::begin_exit`), and a constant
+store is elided where the local already holds the value on every path or
+has never been written (`Function::store_constant`). An engine that roots
+Wasm locals for their whole activation, rather than by liveness, would
+retain those dead references longer; this is part of the Wasmtime
+baseline, not a claim about other engines.
+
+A reference the emitter's own types prove non-null (a non-null holder in a
+nullable pooled local, or a runtime root published before program code
+runs) is not refined again before an instruction that traps on null
+itself, and is stored into a nullable local without one. Such a reference
+is null only by a compiler bug, and for a correct program nothing changes;
+under such a bug the trap moves to the next instruction, or, after a store
+into a nullable local, to that local's next refined read (or is lost if
+nothing refines it again).
 
 ## Implementation limits
 

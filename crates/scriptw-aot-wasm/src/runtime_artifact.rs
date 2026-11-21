@@ -165,7 +165,13 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // activation depth: guarded helper recursion (Proxy forwarding, JSON
 // serialization, calls from helpers) counts its calls there and throws a
 // RangeError at the bound instead of exhausting the Wasm stack.
-const LAYOUT_VERSION: u32 = 83;
+// Version 84 re-emits every R body without an ABI change: refinements before
+// consumers that trap on null are dropped, typed parameters are their own
+// holders, constant stores a local already holds are elided, epilogues end
+// without stores, `local.set; local.get` is one `local.tee`, constant
+// indices and tag-set tests fold, and source-depth overflow is outlined.
+// Images and bundles keyed by version 83 hold different R bytes.
+const LAYOUT_VERSION: u32 = 84;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.
