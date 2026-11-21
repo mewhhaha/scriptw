@@ -50,37 +50,37 @@ fn guarded_value_copies(body: &[Operator<'_>]) -> usize {
 }
 
 fn direct_normal_publications(body: &[Operator<'_>]) -> usize {
-    let completion_tag = body
-        .windows(10)
-        .find_map(|ops| match ops {
-            [
-                Operator::I32Const { value: 0 },
-                Operator::LocalSet { local_index },
-                Operator::I64Const { value: 0 },
-                Operator::LocalSet { .. },
-                Operator::RefNull { .. },
-                Operator::LocalSet { .. },
-                Operator::I32Const { value: 0 },
-                Operator::LocalSet { .. },
-                Operator::I32Const { value: 0 },
-                Operator::LocalSet { .. },
-            ] => Some(*local_index),
-            _ => None,
-        })
-        .expect("source body initializes its enclosing Completion");
-    // Count publication into the enclosing Completion specifically. The
-    // expression's output copy followed by kind/target normalization has the
-    // same opcode shape but writes a different Value3 destination.
-    body.windows(10)
-        .filter(|ops| {
-            matches!(ops, [
-        Operator::LocalGet { local_index: source_tag },
-        Operator::LocalSet { local_index: result_tag },
-        Operator::LocalGet { .. }, Operator::LocalSet { .. },
-        Operator::LocalGet { .. }, Operator::LocalSet { .. },
-        Operator::I32Const { value: 0 }, Operator::LocalSet { .. },
-        Operator::I32Const { value: 0 }, Operator::LocalSet { .. }
-    ] if source_tag != result_tag && *result_tag == completion_tag)
+    // The epilogue returns the enclosing Completion's tag, scalar,
+    // reference, kind and target from its locals. (Its prologue
+    // initialization stores only Wasm defaults into locals nothing wrote
+    // yet, so `Function::store_constant` elides it.)
+    let completion_tag = match &body[body.len() - 6..] {
+        [Operator::LocalGet { local_index }, Operator::LocalGet { .. }, Operator::LocalGet { .. }, Operator::LocalGet { .. }, Operator::LocalGet { .. }, Operator::End] => {
+            *local_index
+        }
+        _ => panic!("source body returns its enclosing Completion"),
+    };
+    // Count publication into the enclosing Completion specifically: a
+    // Value3 copy into its locals, then the kind and target set to Normal
+    // and 0. The expression's output copy followed by kind/target
+    // normalization has the same opcode shape but writes a different Value3
+    // destination. A kind or target store that the local already holds is
+    // elided (`Function::store_constant`), so one of the two may be missing.
+    let copy = |ops: &[Operator<'_>]| {
+        matches!(ops, [
+            Operator::LocalGet { local_index: source_tag },
+            Operator::LocalSet { local_index: result_tag },
+            Operator::LocalGet { .. }, Operator::LocalSet { .. },
+            Operator::LocalGet { .. }, Operator::LocalSet { .. },
+        ] if source_tag != result_tag && *result_tag == completion_tag)
+    };
+    (0..body.len().saturating_sub(8))
+        .filter(|&start| {
+            copy(&body[start..start + 6])
+                && matches!(
+                    &body[start + 6..start + 8],
+                    [Operator::I32Const { value: 0 }, Operator::LocalSet { .. }]
+                )
         })
         .count()
 }

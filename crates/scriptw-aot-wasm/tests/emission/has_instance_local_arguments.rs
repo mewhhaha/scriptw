@@ -24,12 +24,7 @@ fn publishes_narrow_entry(bytes: &[u8], code_type: u32, ordinary: u32, local: u3
     for payload in Parser::new(0).parse_all(bytes) {
         match payload.expect("runtime module decodes") {
             Payload::CodeSectionEntry(body) => {
-                let operators = body
-                    .get_operators_reader()
-                    .expect("runtime function opens")
-                    .into_iter()
-                    .map(|op| op.expect("runtime operator decodes"))
-                    .collect::<Vec<_>>();
+                let operators = crate::linked_bodies::emitted_operators(&body);
                 let Some(ordinary_local) = local_for_function_reference(&operators, ordinary)
                 else {
                     continue;

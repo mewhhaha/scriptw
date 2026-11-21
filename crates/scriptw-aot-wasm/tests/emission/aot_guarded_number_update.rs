@@ -20,12 +20,7 @@ fn body_operators(bytes: &[u8], index: u32) -> Vec<Operator<'_>> {
             }
             Payload::CodeSectionEntry(body) => {
                 if next_function == index {
-                    return body
-                        .get_operators_reader()
-                        .expect("guarded update body opens")
-                        .into_iter()
-                        .map(|operator| operator.expect("guarded update operator decodes"))
-                        .collect();
+                    return crate::linked_bodies::emitted_operators(&body);
                 }
                 next_function += 1;
             }

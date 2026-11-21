@@ -52,7 +52,7 @@ fn regexp_failure_routes_converge_on_one_encoded_snapshot_restore_tail() {
                 Payload::CodeSectionEntry(body) => {
                     let index = next_function; next_function += 1;
                     if index != target { continue; }
-                    let ops: Vec<_> = body.get_operators_reader().unwrap().into_iter().map(Result::unwrap).collect();
+                    let ops: Vec<_> = crate::linked_bodies::emitted_operators(&body);
                     // Both ordinary ChoiceEntry recovery and RequiredRun logical
                     // template recovery restore PC24 followed by cursor40/48/56.
                     // Assertion cursor restores omit PC24 and are not recovery tails.

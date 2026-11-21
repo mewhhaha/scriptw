@@ -13,12 +13,7 @@ fn with_dispatch_bodies(source: &str, mut check: impl FnMut(&[Operator<'_>])) {
     for payload in Parser::new(0).parse_all(&artifact.bytes) {
         if let Payload::CodeSectionEntry(body) = payload.expect("Wasm parses") {
             if names.contains_key(&index) {
-                let operators = body
-                    .get_operators_reader()
-                    .unwrap()
-                    .into_iter()
-                    .collect::<Result<Vec<_>, _>>()
-                    .unwrap();
+                let operators = crate::tests::emitted_operators(&body);
                 check(&operators);
                 inspected += 1;
             }

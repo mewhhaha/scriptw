@@ -74,12 +74,7 @@ fn fulfilled_array_from_async_stages_share_one_physical_commit_and_drive() {
         if index != found[0] {
             continue;
         }
-        let ops: Vec<_> = body
-            .get_operators_reader()
-            .unwrap()
-            .into_iter()
-            .map(Result::unwrap)
-            .collect();
+        let ops: Vec<_> = crate::tests::emitted_operators(&body);
         let commits: Vec<_> = ops
             .iter()
             .enumerate()

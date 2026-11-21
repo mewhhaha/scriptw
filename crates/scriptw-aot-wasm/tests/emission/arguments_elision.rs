@@ -39,19 +39,22 @@ fn arguments_type(body: &[Operator<'_>], locals: &[ValType]) -> u32 {
     // The real observed control publishes an Arguments Value from its typed
     // allocation root. Derive P's type there; no snapshot exports or R/P type
     // index equality is assumed.
-    let types = body
-        .windows(7)
-        .filter_map(|ops| {
-            let [
-                Operator::I32Const { value },
-                Operator::LocalSet { .. },
-                Operator::I64Const { value: 0 },
-                Operator::LocalSet { .. },
-                Operator::LocalGet { local_index },
-                Operator::RefAsNonNull,
-                Operator::LocalSet { .. },
-            ] = ops
+    // `ValueLocals::set_reference`: the tag, a zero scalar (elided where
+    // the scalar already holds 0, `Function::store_constant`), then the
+    // root, stored into the nullable eqref without a refinement
+    // (`Function::refine_non_null`).
+    let types = (0..body.len())
+        .filter_map(|start| {
+            let [Operator::I32Const { value }, Operator::LocalSet { .. }, rest @ ..] =
+                &body[start..]
             else {
+                return None;
+            };
+            let rest = match rest {
+                [Operator::I64Const { value: 0 }, Operator::LocalSet { .. }, rest @ ..] => rest,
+                rest => rest,
+            };
+            let [Operator::LocalGet { local_index }, Operator::LocalSet { .. }, ..] = rest else {
                 return None;
             };
             if *value != WasmRuntimeValueTag::Arguments as i32 {

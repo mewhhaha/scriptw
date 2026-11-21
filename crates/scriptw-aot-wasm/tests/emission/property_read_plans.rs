@@ -87,11 +87,7 @@ impl<'a> Module<'a> {
                             .collect(),
                     );
                     let body = if operators {
-                        body.get_operators_reader()
-                            .expect("property-read function opens")
-                            .into_iter()
-                            .map(|operator| operator.expect("property-read operator decodes"))
-                            .collect()
+                        crate::linked_bodies::emitted_operators(&body)
                     } else {
                         Vec::new()
                     };

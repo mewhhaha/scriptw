@@ -18,12 +18,7 @@ fn number_loop_comparison_reaches_control_without_boolean_materialization() {
             continue;
         };
         if index == target {
-            let operators = body
-                .get_operators_reader()
-                .expect("source body operators parse")
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .expect("source operators decode");
+            let operators = crate::tests::emitted_operators(&body);
             let comparisons = operators
                 .iter()
                 .enumerate()

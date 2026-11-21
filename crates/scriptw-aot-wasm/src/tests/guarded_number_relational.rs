@@ -10,12 +10,7 @@ fn source_body<'a>(artifact: &'a WasmArtifact, name: &str) -> Vec<Operator<'a>> 
     for payload in Parser::new(0).parse_all(&artifact.bytes) {
         if let Payload::CodeSectionEntry(body) = payload.unwrap() {
             if index == target {
-                return body
-                    .get_operators_reader()
-                    .unwrap()
-                    .into_iter()
-                    .map(Result::unwrap)
-                    .collect();
+                return crate::tests::emitted_operators(&body);
             }
             index += 1;
         }

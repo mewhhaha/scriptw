@@ -41,12 +41,7 @@ fn call_shape(source: &str, name: &str) -> CallShape {
             continue;
         };
         if index == target {
-            let operators = body
-                .get_operators_reader()
-                .expect("source operators open")
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .expect("source operators decode");
+            let operators = crate::tests::emitted_operators(&body);
             let mut shape = CallShape::default();
             for pair in operators.windows(2) {
                 if matches!(pair, [Operator::I32Const { value: 128 }, Operator::I32LtU]) {

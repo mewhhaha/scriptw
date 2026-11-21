@@ -19,14 +19,7 @@ fn bodies(bytes: &[u8]) -> Vec<(u32, Vec<Operator<'_>>)> {
     let mut result = Vec::new();
     for payload in Parser::new(0).parse_all(bytes) {
         if let Payload::CodeSectionEntry(body) = payload.unwrap() {
-            result.push((
-                index,
-                body.get_operators_reader()
-                    .unwrap()
-                    .into_iter()
-                    .map(Result::unwrap)
-                    .collect(),
-            ));
+            result.push((index, crate::tests::emitted_operators(&body)));
             index += 1;
         }
     }
@@ -38,12 +31,7 @@ fn body(bytes: &[u8], index: u32) -> Vec<Operator<'_>> {
     for payload in Parser::new(0).parse_all(bytes) {
         if let Payload::CodeSectionEntry(body) = payload.unwrap() {
             if current == index {
-                return body
-                    .get_operators_reader()
-                    .unwrap()
-                    .into_iter()
-                    .map(Result::unwrap)
-                    .collect();
+                return crate::tests::emitted_operators(&body);
             }
             current += 1;
         }
@@ -149,9 +137,14 @@ fn caller_sets_throw(
             matches!(&ops[site-6..site], [Operator::I32Const {value},Operator::LocalGet {..},Operator::LocalGet {..},Operator::LocalGet {..},Operator::LocalGet {..},Operator::RefAsNonNull] if *value==kind),
             "closed kind immediate, full prototype Value and nonnull String message cross the ABI"
         );
-        assert!(ops[site+1..].windows(4).any(|window|matches!(window,
-            [Operator::I32Const {value},Operator::LocalSet {..},Operator::I32Const {value:0},Operator::LocalSet {..}]
-            if *value==crate::emit::CompletionKind::Throw.code() as i32)),"the caller publishes its Throw completion after the returned error");
+        // The kind store; the target already holds 0 on every path here,
+        // so `Function::store_constant` elides its store.
+        assert!(
+            ops[site + 1..].windows(2).any(|window| matches!(window,
+            [Operator::I32Const {value},Operator::LocalSet {..}]
+            if *value==crate::emit::CompletionKind::Throw.code() as i32)),
+            "the caller publishes its Throw completion after the returned error"
+        );
     }
     kinds
 }
@@ -468,21 +461,26 @@ fn nine_kind_tail_allocates_before_names_publishes_supplied_message_and_traps_in
     let Operator::LocalSet { local_index: error } = ops[allocation[0] + 1] else {
         panic!("fresh error rooted immediately");
     };
-    let supplied = ops[..allocation[0]]
-        .windows(2)
-        .find_map(|window| match window {
-            [Operator::LocalGet { local_index: 4 }, Operator::LocalSet { local_index }] => {
-                Some(*local_index)
-            }
-            _ => None,
-        })
-        .expect("nonnull message ABI parameter is rooted once");
+    // The `(ref String)` message parameter is its own holder
+    // (`parameter_gc` aliases it): no copy roots it, and its declaration
+    // proves every read non-null.
+    let supplied = 4;
     assert!(
-        matches!(&ops[allocation[0]-2..allocation[0]],[Operator::LocalGet {local_index},Operator::RefAsNonNull] if *local_index==supplied)
+        !ops[..allocation[0]].windows(2).any(|window| matches!(
+            window,
+            [
+                Operator::LocalGet { local_index: 4 },
+                Operator::LocalSet { .. }
+            ]
+        )),
+        "nonnull message ABI parameter is not copied"
+    );
+    assert!(
+        matches!(&ops[allocation[0]-1],Operator::LocalGet {local_index} if *local_index==supplied)
     );
     let publish = *writes(message).last().unwrap();
     assert!(
-        matches!(&ops[publish-2..publish],[Operator::LocalGet {local_index},Operator::RefAsNonNull] if *local_index==supplied),
+        matches!(&ops[publish-1],Operator::LocalGet {local_index} if *local_index==supplied),
         "publish original message String without resolving it again"
     );
     assert_eq!(
@@ -536,17 +534,8 @@ fn nine_kind_tail_allocates_before_names_publishes_supplied_message_and_traps_in
                 .count(),
             1
         );
-        let Operator::LocalGet {
-            local_index: ordinal,
-        } = selected[resolved[0] - 1]
-        else {
-            panic!("R pooled name operand");
-        };
-        let assignment = selected[..resolved[0]]
-            .iter()
-            .rposition(|op| matches!(op,Operator::LocalSet {local_index} if *local_index==ordinal))
-            .unwrap();
-        let Operator::I32Const { value } = selected[assignment - 1] else {
+        // The resolver takes the name's pooled ordinal as an immediate.
+        let Operator::I32Const { value } = selected[resolved[0] - 1] else {
             panic!("R owns the name ordinal constant");
         };
         ordinals.push(value as u32);
@@ -604,10 +593,28 @@ fn normal_cancellation_keeps_allocation_only_error_path_and_normal_completion() 
         signature.results().len(),
         crate::module::COMPLETION_TYPES.len()
     );
-    let (position, kind) = ops.windows(4).enumerate().filter_map(|(position,window)| match window {
-        [Operator::I32Const {value},Operator::LocalSet {..},Operator::I32Const {value:0},Operator::LocalSet {..}] => Some((position,*value)),
-        _ => None,
-    }).last().expect("completion kind and target are published");
+    // The body returns tag, scalar, reference, kind and target from their
+    // locals; the kind's last store names the returned kind. The target
+    // already holds 0, so `Function::store_constant` elides its store.
+    let [Operator::LocalGet {
+        local_index: kind_local,
+    }, Operator::LocalGet { .. }, Operator::End] = &ops[ops.len() - 3..]
+    else {
+        panic!("the body returns its completion locals");
+    };
+    let (position, kind) = ops
+        .windows(2)
+        .enumerate()
+        .filter_map(|(position, window)| match window {
+            [Operator::I32Const { value }, Operator::LocalSet { local_index }]
+                if local_index == kind_local =>
+            {
+                Some((position, *value))
+            }
+            _ => None,
+        })
+        .last()
+        .expect("completion kind and target are published");
     assert!(position > calls(&ops, named(bytes, "helper::runtime_error_object"))[0]);
     assert_eq!(
         kind,

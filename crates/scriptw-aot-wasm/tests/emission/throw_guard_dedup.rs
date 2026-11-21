@@ -10,24 +10,17 @@ use wasmparser::{Operator, Validator, WasmFeatures};
 
 use super::property_read_plans::Module;
 
+/// The body's own Completion kind local: the epilogue returns tag, scalar,
+/// reference, kind and target from the Completion's locals. (Its prologue
+/// initialization stores only Wasm defaults into locals nothing wrote yet,
+/// so `Function::store_constant` elides it.)
 fn completion_kind(body: &[Operator<'_>]) -> u32 {
-    body.windows(10)
-        .find_map(|window| match window {
-            [
-                Operator::I32Const { value: 0 },
-                Operator::LocalSet { .. },
-                Operator::I64Const { value: 0 },
-                Operator::LocalSet { .. },
-                Operator::RefNull { .. },
-                Operator::LocalSet { .. },
-                Operator::I32Const { value: 0 },
-                Operator::LocalSet { local_index },
-                Operator::I32Const { value: 0 },
-                Operator::LocalSet { .. },
-            ] => Some(*local_index),
-            _ => None,
-        })
-        .expect("source body initializes one complete entry Completion")
+    match &body[body.len() - 6..] {
+        [Operator::LocalGet { .. }, Operator::LocalGet { .. }, Operator::LocalGet { .. }, Operator::LocalGet { local_index }, Operator::LocalGet { .. }, Operator::End] => {
+            *local_index
+        }
+        _ => panic!("source body returns one complete entry Completion"),
+    }
 }
 
 fn check_guards(body: &[Operator<'_>]) -> usize {

@@ -92,12 +92,7 @@ fn number_remainder_guards_integer_conversion_and_retains_exact_significand_fall
         let Payload::CodeSectionEntry(body) = payload.expect("P parses") else {
             continue;
         };
-        let operators = body
-            .get_operators_reader()
-            .unwrap()
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+        let operators = crate::tests::emitted_operators(&body);
         for (remainder, _) in operators
             .iter()
             .enumerate()

@@ -46,14 +46,7 @@ fn packed_push_skips_key_probes_only_for_index_free_intrinsic_storage() {
     let mut index = imported_function_count_in_bytes(bytes);
     for payload in Parser::new(0).parse_all(bytes) {
         if let Payload::CodeSectionEntry(body) = payload.unwrap() {
-            bodies.insert(
-                index,
-                body.get_operators_reader()
-                    .unwrap()
-                    .into_iter()
-                    .map(Result::unwrap)
-                    .collect::<Vec<_>>(),
-            );
+            bodies.insert(index, crate::tests::emitted_operators(&body));
             index += 1;
         }
     }

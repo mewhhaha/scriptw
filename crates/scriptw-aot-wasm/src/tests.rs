@@ -2145,6 +2145,25 @@ fn memory_initial_pages(bytes: &[u8]) -> Vec<u64> {
     pages
 }
 
+/// A body's operators as its emitter wrote them. The code sink encodes a
+/// `local.set` read back at once as one `local.tee`
+/// (`code_sink::sink_store_peephole_tests` checks that); shape checks read
+/// it back as the set and the get, so they keep naming what the emitter
+/// emitted.
+pub(crate) fn emitted_operators<'a>(body: &wasmparser::FunctionBody<'a>) -> Vec<Operator<'a>> {
+    let mut operators = Vec::new();
+    for operator in body.get_operators_reader().expect("operators parse") {
+        match operator.expect("operators decode") {
+            Operator::LocalTee { local_index } => {
+                operators.push(Operator::LocalSet { local_index });
+                operators.push(Operator::LocalGet { local_index });
+            }
+            operator => operators.push(operator),
+        }
+    }
+    operators
+}
+
 fn code_body_context(bytes: &[u8], offset: usize) -> String {
     let mut defined_index = 0usize;
     for payload in Parser::new(0).parse_all(bytes) {

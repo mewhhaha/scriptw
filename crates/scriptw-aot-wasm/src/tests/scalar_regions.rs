@@ -1346,12 +1346,7 @@ fn with_source_artifact_variants(
             continue;
         };
         if let Some(name) = targets.get(&index) {
-            let operators = body
-                .get_operators_reader()
-                .expect("source operators parse")
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .expect("source operators decode");
+            let operators = crate::tests::emitted_operators(&body);
             check(name, &operators);
             seen += 1;
         }

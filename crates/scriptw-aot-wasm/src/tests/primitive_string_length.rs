@@ -10,12 +10,7 @@ fn source_body<'a>(artifact: &'a WasmArtifact, name: &str) -> Vec<Operator<'a>> 
     for payload in Parser::new(0).parse_all(&artifact.bytes) {
         if let Payload::CodeSectionEntry(body) = payload.unwrap() {
             if next == index {
-                return body
-                    .get_operators_reader()
-                    .unwrap()
-                    .into_iter()
-                    .map(Result::unwrap)
-                    .collect();
+                return crate::tests::emitted_operators(&body);
             }
             next += 1;
         }
@@ -504,12 +499,7 @@ fn object_read_length_key_rejects_symbols_and_other_extents_before_pool_resoluti
             continue;
         };
         if index == target {
-            let operators = body
-                .get_operators_reader()
-                .unwrap()
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+            let operators = crate::tests::emitted_operators(&body);
             for (start, window) in operators.windows(4).enumerate() {
                 if !matches!(window,
                     [Operator::LocalGet { .. }, Operator::I32Const { value },

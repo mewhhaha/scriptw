@@ -14,12 +14,7 @@ fn with_bodies(source: &str, name: &str, mut check: impl FnMut(&WasmArtifact, &[
     for payload in Parser::new(0).parse_all(&artifact.bytes) {
         if let Payload::CodeSectionEntry(body) = payload.expect("P parses") {
             if names.contains_key(&index) {
-                let operators = body
-                    .get_operators_reader()
-                    .expect("source body parses")
-                    .into_iter()
-                    .collect::<Result<Vec<_>, _>>()
-                    .expect("source operators decode");
+                let operators = crate::tests::emitted_operators(&body);
                 check(&artifact, &operators);
                 inspected += 1;
             }

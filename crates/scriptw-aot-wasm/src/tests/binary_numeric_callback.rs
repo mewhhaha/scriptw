@@ -84,12 +84,7 @@ fn ordinary_and_arrow_number_callbacks_publish_real_scalar_thunks() {
         let Payload::CodeSectionEntry(body) = payload.expect("P decodes") else {
             continue;
         };
-        let operators = body
-            .get_operators_reader()
-            .expect("body opens")
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()
-            .expect("operators decode");
+        let operators = crate::tests::emitted_operators(&body);
         for operator in &operators {
             if let Operator::RefFunc { function_index } = operator {
                 referenced.insert(*function_index);
@@ -166,12 +161,7 @@ fn optional_callback_field_is_typed_immutable_and_native_code_publishes_null() {
             let Payload::CodeSectionEntry(body) = payload.expect("module decodes") else {
                 return false;
             };
-            let operators = body
-                .get_operators_reader()
-                .unwrap()
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+            let operators = crate::tests::emitted_operators(&body);
             operators.windows(publication_width).any(|publication| {
                 matches!(publication.first(), Some(Operator::RefNull { hty }) if *hty == heap)
                     && publication[1..publication.len() - 1]

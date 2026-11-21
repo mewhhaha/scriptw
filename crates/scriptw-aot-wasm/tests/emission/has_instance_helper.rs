@@ -81,12 +81,7 @@ fn operators(bytes: &[u8], wanted: u32) -> Vec<Operator<'_>> {
             }
             Payload::CodeSectionEntry(body) => {
                 if index == wanted {
-                    return body
-                        .get_operators_reader()
-                        .unwrap()
-                        .into_iter()
-                        .map(Result::unwrap)
-                        .collect();
+                    return crate::linked_bodies::emitted_operators(&body);
                 }
                 index += 1;
             }

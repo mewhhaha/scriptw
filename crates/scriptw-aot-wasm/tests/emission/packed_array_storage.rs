@@ -72,14 +72,9 @@ impl<'a> Module<'a> {
                 }
                 Payload::CodeSectionEntry(body) => {
                     output.body_bytes.insert(next, body.range().len());
-                    output.functions.insert(
-                        next,
-                        body.get_operators_reader()
-                            .unwrap()
-                            .into_iter()
-                            .map(Result::unwrap)
-                            .collect(),
-                    );
+                    output
+                        .functions
+                        .insert(next, crate::linked_bodies::emitted_operators(&body));
                     next += 1;
                 }
                 Payload::CustomSection(section) => {

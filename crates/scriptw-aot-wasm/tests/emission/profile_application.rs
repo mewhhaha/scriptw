@@ -429,12 +429,7 @@ fn collection(artifact: &WasmArtifact) -> Collection {
     );
     let (mut increments, mut stray_accesses) = (0, 0);
     for body in &bodies[..bodies.len() - 1] {
-        let operators = body
-            .get_operators_reader()
-            .unwrap()
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+        let operators = crate::linked_bodies::emitted_operators(&body);
         for (at, operator) in operators.iter().enumerate() {
             let on_profile = |operator: &Operator| match operator {
                 Operator::I64Load { memarg } | Operator::I64Store { memarg } => {

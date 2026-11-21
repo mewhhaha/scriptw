@@ -6,12 +6,7 @@ fn body<'a>(bytes: &'a [u8], index: u32) -> Vec<Operator<'a>> {
     for payload in Parser::new(0).parse_all(bytes) {
         if let Payload::CodeSectionEntry(body) = payload.unwrap() {
             if next == index {
-                return body
-                    .get_operators_reader()
-                    .unwrap()
-                    .into_iter()
-                    .map(Result::unwrap)
-                    .collect();
+                return crate::tests::emitted_operators(&body);
             }
             next += 1;
         }

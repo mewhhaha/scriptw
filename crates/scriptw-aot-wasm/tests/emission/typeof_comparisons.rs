@@ -25,12 +25,16 @@ fn calls(body: &[Operator<'_>], callee: u32) -> usize {
 
 fn string_values(body: &[Operator<'_>]) -> usize {
     // A String reference becomes a JavaScript Value through its tag/scalar
-    // publication. A tag comparison alone cannot match this sequence.
+    // publication. A tag comparison alone cannot match this sequence. The
+    // zero scalar store is elided where the scalar already holds 0
+    // (`Function::store_constant`); the reference store follows at once.
     body.windows(4)
         .filter(|ops| {
             matches!(ops,
                 [Operator::I32Const { value }, Operator::LocalSet { .. },
                  Operator::I64Const { value: 0 }, Operator::LocalSet { .. }]
+                | [Operator::I32Const { value }, Operator::LocalSet { .. },
+                 Operator::LocalGet { .. }, Operator::LocalSet { .. }]
                     if *value == WasmRuntimeValueTag::String as i32
             )
         })

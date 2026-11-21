@@ -46,12 +46,7 @@ fn standalone_literal_units_copy_one_exact_passive_image_into_a_fresh_array() {
                 Payload::CodeSectionEntry(body) => {
                     if index == main {
                         body_bytes = Some(body.range().len());
-                        let operators = body
-                            .get_operators_reader()
-                            .unwrap()
-                            .into_iter()
-                            .map(Result::unwrap)
-                            .collect::<Vec<_>>();
+                        let operators = crate::tests::emitted_operators(&body);
                         for window in operators.windows(3) {
                             if let [Operator::I32Const { value: offset }, Operator::I32Const { value: extent }, Operator::ArrayNewData {
                                 array_data_index, ..

@@ -64,20 +64,21 @@ fn incoming_empty_argv_allocation(
         .checked_sub(1)
         .expect("the incoming count precedes its vector");
     assert_eq!(signature.params()[count as usize], ValType::I64);
+    // The vector parameter is its own holder (`parameter_gc` aliases it):
+    // the empty List replaces the parameter itself.
     let allocations = body
-        .windows(14)
+        .windows(12)
         .enumerate()
         .filter_map(|(start, ops)| {
             matches!(ops,
-            [Operator::LocalGet { local_index: parameter }, Operator::LocalSet { local_index: saved },
-             Operator::LocalGet { local_index: supplied }, Operator::RefIsNull, Operator::If { .. },
+            [Operator::LocalGet { local_index: supplied }, Operator::RefIsNull, Operator::If { .. },
              Operator::LocalGet { local_index: supplied_count }, Operator::I64Eqz, Operator::I32Eqz,
              Operator::If { .. }, Operator::Unreachable, Operator::End,
              Operator::ArrayNewFixed { array_type_index, array_size: 0 },
              Operator::LocalSet { local_index: normalized }, Operator::Else]
-                if *parameter == vector && saved == supplied && supplied == normalized
+                if *supplied == vector && supplied == normalized
                     && *supplied_count == count && *array_type_index == argv)
-            .then_some(start + 11)
+            .then_some(start + 9)
         })
         .collect::<Vec<_>>();
     assert_eq!(

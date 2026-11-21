@@ -42,6 +42,24 @@ impl EncodedBody<'_> {
     }
 }
 
+/// A body's operators as its emitter wrote them. The code sink encodes a
+/// `local.set` read back at once as one `local.tee`; shape checks read it
+/// back as the set and the get, so they keep naming what the emitter
+/// emitted.
+pub fn emitted_operators<'a>(body: &FunctionBody<'a>) -> Vec<Operator<'a>> {
+    let mut operators = Vec::new();
+    for operator in body.get_operators_reader().expect("body opens") {
+        match operator.expect("operator decodes") {
+            Operator::LocalTee { local_index } => {
+                operators.push(Operator::LocalSet { local_index });
+                operators.push(Operator::LocalGet { local_index });
+            }
+            operator => operators.push(operator),
+        }
+    }
+    operators
+}
+
 /// The defined bodies of one module, named by its `name` section.
 pub fn module_bodies(bytes: &[u8]) -> Vec<EncodedBody<'_>> {
     let mut names = BTreeMap::new();

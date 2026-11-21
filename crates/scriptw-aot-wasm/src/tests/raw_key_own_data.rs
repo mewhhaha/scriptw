@@ -103,12 +103,7 @@ fn computed_getv_hits_leave_before_boxing_conversion_and_full_lookup() {
                 .get(&index)
                 .is_some_and(|name| name.starts_with(&format!("js::{consumer}#")))
             {
-                let operators = body
-                    .get_operators_reader()
-                    .unwrap()
-                    .into_iter()
-                    .map(Result::unwrap)
-                    .collect::<Vec<_>>();
+                let operators = crate::tests::emitted_operators(&body);
                 let mut packed = 0;
                 let mut strings = 0;
                 for (guard, window) in operators.windows(4).enumerate() {

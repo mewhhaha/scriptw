@@ -104,12 +104,7 @@ fn inspect_dynamic_call(tail: bool, wide: bool) {
             continue;
         };
         if index == canonical {
-            let operators = body
-                .get_operators_reader()
-                .unwrap()
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+            let operators = crate::tests::emitted_operators(&body);
             let call = operators
                 .iter()
                 .position(|op| match op {
@@ -267,12 +262,7 @@ fn inspect_vector_adapter(wide: bool) {
         let Payload::CodeSectionEntry(body) = payload.expect("P decodes") else {
             continue;
         };
-        let operators = body
-            .get_operators_reader()
-            .unwrap()
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+        let operators = crate::tests::emitted_operators(&body);
         if operators.iter().any(|op| {
             matches!(op, Operator::ReturnCall { function_index } if *function_index == canonical)
         }) {
@@ -380,12 +370,7 @@ fn inspect_known_source_call(tail: bool, wide: bool) {
             continue;
         };
         if callers.contains(&index) {
-            let operators = body
-                .get_operators_reader()
-                .unwrap()
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+            let operators = crate::tests::emitted_operators(&body);
             let direct = operators
                 .iter()
                 .position(|op| match op {
@@ -496,12 +481,7 @@ fn module_held_reference_numeric_leaf_calls_inline_guarded_arithmetic_into_the_c
             continue;
         };
         if index == caller {
-            let operators = body
-                .get_operators_reader()
-                .unwrap()
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+            let operators = crate::tests::emitted_operators(&body);
             let arithmetic: Vec<_> = operators
                 .iter()
                 .enumerate()
