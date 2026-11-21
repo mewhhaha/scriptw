@@ -78,7 +78,7 @@ pub(crate) struct BodyEntryLocals {
 
 fn callable_locals(schema: &RuntimeSchema, function: &mut Function) -> CallableLocals {
     let callable = schema.parameter_gc::<FunctionObject, NonNullable>(0, function);
-    let context = schema.reserve_gc_local(function).initialize(
+    let context = schema.hold_gc_local(
         schema
             .struct_type::<FunctionObject>()
             .field(FunctionObjectSchema::CONTEXT)
@@ -293,6 +293,8 @@ impl PlannedBodyEntry<'_> {
             ArgumentLayout::Vector => self.program_parameter_index(),
             ArgumentLayout::Locals(entry) => 8 + 3 * entry.slot_count() as u32,
         };
+        // The native program context binds an initialized owner local,
+        // never the caller's parameter (native_program_template): a copy.
         let program_parameter =
             schema.parameter_gc::<ProgramInstance, NonNullable>(program_index, function);
         let calling_program =

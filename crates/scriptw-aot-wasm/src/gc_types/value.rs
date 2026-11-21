@@ -245,8 +245,22 @@ impl EqRefLocal {
 #[derive(Debug)]
 pub(crate) struct GcLocal<T: GcHeapType, N: GcFieldNullability = NonNullable> {
     index: u32,
-    declaration: LocalDeclaration,
+    owner: LocalOwner,
     shape: PhantomData<fn() -> (T, N)>,
+}
+
+/// Which Wasm local a [`GcLocal`] holds, and so what ending it does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LocalOwner {
+    /// A local reserved from the body's pool, with this declaration; the
+    /// holder's end returns it to the pool.
+    Pooled(LocalDeclaration),
+    /// The function's own parameter, declared with exactly the holder's
+    /// type (`(ref T)` or `(ref null T)`), aliased rather than copied: the
+    /// sink binds each parameter to at most one holder
+    /// (`Function::bind_parameter`), so no other holder observes a
+    /// `replace`. A parameter is never released.
+    Parameter,
 }
 
 /// The Wasm type a typed GC local is declared with.
@@ -274,9 +288,12 @@ impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
         function.instruction(&Instruction::LocalGet(self.index));
         // The local declaration already proves its concrete heap type.
         // Logical non-null ownership only needs a null refinement here,
-        // which a non-null declaration already proves.
-        if !N::NULLABLE && self.declaration == LocalDeclaration::Nullable {
-            function.instruction(&Instruction::RefAsNonNull);
+        // which a non-null declaration or parameter already proves. The
+        // sink drops it before a consumer that accepts null (see
+        // `Function::refine_non_null`): the holder is non-null by
+        // construction, so only a compiler bug could make it null.
+        if !N::NULLABLE && self.owner == LocalOwner::Pooled(LocalDeclaration::Nullable) {
+            function.refine_non_null();
         }
         GcStackReference::new()
     }
@@ -284,14 +301,19 @@ impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
         let GcStackReference { .. } = value;
         function.instruction(&Instruction::LocalSet(self.index));
     }
-    /// Ends this holder: the local returns to the pool for its next holder
-    /// of the same type, without a store. A released local is never read
-    /// again by this holder, and a GC root is an SSA value live across a
-    /// safepoint (Cranelift's stack maps), so a store of null here retained
-    /// nothing less. A next holder writes the local before reading it, which
-    /// the code sink checks in test and debug builds (`gc_local_writes`).
+    /// Ends this holder: a pooled local returns to the pool for its next
+    /// holder of the same type, without a store. A released local is never
+    /// read again by this holder, and a GC root is an SSA value live across
+    /// a safepoint (Cranelift's stack maps), so a store of null here
+    /// retained nothing less. A next holder writes the local before reading
+    /// it, which the code sink checks in test and debug builds
+    /// (`gc_local_writes`). An aliased parameter has nothing to return: it
+    /// keeps its value, which is equally dead to Cranelift once unread.
     pub(crate) fn clear(self, function: &mut Function) {
-        function.release_typed_local(self.index);
+        match self.owner {
+            LocalOwner::Pooled(_) => function.release_typed_local(self.index),
+            LocalOwner::Parameter => {}
+        }
     }
 }
 impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
@@ -439,7 +461,7 @@ impl<T: GcHeapType, N: GcFieldNullability> GcLocalSlot<T, N> {
         function.instruction(&Instruction::LocalSet(self.index));
         GcLocal {
             index: self.index,
-            declaration: self.declaration,
+            owner: LocalOwner::Pooled(self.declaration),
             shape: PhantomData,
         }
     }
@@ -2174,7 +2196,8 @@ impl RuntimeSchema {
     ) -> GcLocal<RegisteredSymbolTable> {
         let slot = self.reserve_gc_local::<RegisteredSymbolTable, NonNullable>(function);
         emit_root_get(function, self.registered_symbols);
-        function.instruction(&Instruction::RefAsNonNull);
+        // Installed with the realm: null only by a bug.
+        function.refine_non_null();
         slot.initialize(GcStackReference::new(), function)
     }
     pub(crate) fn replace_symbol_registry(
@@ -2275,7 +2298,8 @@ impl RuntimeSchema {
         function: &mut Function,
     ) -> GcStackReference<PooledStringTable> {
         emit_root_get(function, self.pooled_strings);
-        function.instruction(&Instruction::RefAsNonNull);
+        // Published before any program code runs: null only by a bug.
+        function.refine_non_null();
         GcStackReference::new()
     }
     pub(crate) fn pooled_string_reference(
@@ -2289,7 +2313,8 @@ impl RuntimeSchema {
         let output = self.reference_type::<StringValue>(GcNullability::NonNullable);
         function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(output))));
         emit_root_get(function, self.pooled_strings);
-        function.instruction(&Instruction::RefAsNonNull);
+        // `array.get` traps on a null table itself, and the index push
+        // between them has no effect: a `ref.as_non_null` would repeat it.
         function.instruction(&Instruction::I32Const(index.ordinal() as i32));
         function.instruction(&Instruction::ArrayGet(
             self.array_type::<PooledStringTable>().type_index().raw(),
@@ -2325,7 +2350,8 @@ impl RuntimeSchema {
             .position(|candidate| *candidate == symbol)
             .expect("closed symbol row");
         emit_root_get(function, self.well_known_symbols);
-        function.instruction(&Instruction::RefAsNonNull);
+        // `array.get` traps on a null table itself, and the index push
+        // between them has no effect: a `ref.as_non_null` would repeat it.
         function.instruction(&Instruction::I32Const(ordinal as i32));
         self.array_type::<WellKnownSymbolTable>().emit_get(function);
         GcStackReference::new()
@@ -2338,7 +2364,8 @@ impl RuntimeSchema {
         function: &mut Function,
     ) -> GcStackReference<SymbolValue> {
         emit_root_get(function, self.well_known_symbols);
-        function.instruction(&Instruction::RefAsNonNull);
+        // `array.get` traps on a null table itself, and the index push
+        // between them has no effect: a `ref.as_non_null` would repeat it.
         key.ordinal().load(function);
         self.array_type::<WellKnownSymbolTable>().emit_get(function);
         GcStackReference::new()
@@ -2379,7 +2406,8 @@ impl RuntimeSchema {
         function: &mut Function,
     ) -> GcStackReference<RealmRecord> {
         emit_root_get(function, self.current_realm);
-        function.instruction(&Instruction::RefAsNonNull);
+        // Installed before any program code runs: null only by a bug.
+        function.refine_non_null();
         GcStackReference::new()
     }
     pub(crate) fn replace_current_realm(
@@ -2636,6 +2664,25 @@ impl RuntimeSchema {
         }
     }
 
+    /// Holds `value` in a local initialized here. At the function's top
+    /// level the local is declared `(ref T)`: every later read of the
+    /// holder is then nested in the block that wrote it, as validation
+    /// requires, and Wasmtime checks none of them for null. Elsewhere it is
+    /// a pooled `(ref null T)` local whose reads are refined.
+    #[track_caller]
+    pub(crate) fn hold_gc_local<T: GcHeapType>(
+        &self,
+        value: GcStackReference<T>,
+        function: &mut Function,
+    ) -> GcLocal<T> {
+        let slot = if function.at_function_level() {
+            self.reserve_non_null_gc_local(function)
+        } else {
+            self.reserve_gc_local(function)
+        };
+        slot.initialize(value, function)
+    }
+
     pub(crate) fn parameter_i32(&self, index: u32, function: &Function) -> I32Local {
         assert_eq!(
             function.parameter_type(index),
@@ -2735,9 +2782,14 @@ impl RuntimeSchema {
             Some(expected),
             "typed GC parameter mismatch"
         );
-        let slot = self.reserve_gc_local(function);
-        function.instruction(&Instruction::LocalGet(index));
-        slot.initialize(GcStackReference::new(), function)
+        // The parameter is declared with exactly the holder's type: it is
+        // the holder, with no copy into a pooled local.
+        function.bind_parameter(index);
+        GcLocal {
+            index,
+            owner: LocalOwner::Parameter,
+            shape: PhantomData,
+        }
     }
     pub(crate) fn release_i32_local(&self, local: I32Local, function: &mut Function) {
         function.release_typed_local(local.index);
@@ -3186,9 +3238,13 @@ impl<T: GcHeapType, N: GcFieldNullability> GcLocal<T, N> {
     /// nullable declaration refines the read, which a non-null declaration
     /// already proves.
     fn non_null_source(&self) -> OperandSource {
-        match self.declaration {
-            LocalDeclaration::Nullable => OperandSource::NonNullLocal(self.index),
-            LocalDeclaration::NonNull => OperandSource::Local(self.index),
+        match self.owner {
+            LocalOwner::Pooled(LocalDeclaration::Nullable) => {
+                OperandSource::NonNullLocal(self.index)
+            }
+            LocalOwner::Pooled(LocalDeclaration::NonNull) | LocalOwner::Parameter => {
+                OperandSource::Local(self.index)
+            }
         }
     }
 }

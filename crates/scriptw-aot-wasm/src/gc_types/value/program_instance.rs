@@ -506,9 +506,7 @@ impl ProgramInstanceLocals {
         function: &mut Function,
     ) -> Self {
         Self {
-            owner: schema
-                .reserve_gc_local(function)
-                .initialize(reference, function),
+            owner: schema.hold_gc_local(reference, function),
         }
     }
 
