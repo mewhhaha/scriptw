@@ -738,6 +738,15 @@ impl FunctionBuilder<'_> {
         array.clear(function);
         self.emit_native_iterator_abrupt_exit(&pending, result, exit, function);
         function.instruction(&Instruction::Else);
+        // LengthOfArrayLike: an actual Array's `length` Get is unobservable
+        // and yields [[ArrayLength]] (see emit_actual_array_length_or_branch);
+        // every other iterated object, Proxy included, keeps Get + ToLength.
+        let measured = self.open_frame(ControlFrameKind::Block, function);
+        let generic = self.open_frame(ControlFrameKind::Block, function);
+        self.emit_actual_array_length_or_branch(&array_value, length, generic, function);
+        self.emit_branch_to_target(measured, function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
         let length_key = self.emit_iterator_named_key("length", function)?;
         self.emit_object_read(&array_value, &array_value, &length_key, &pending, function)?;
         length_key.clear(function);
@@ -745,6 +754,8 @@ impl FunctionBuilder<'_> {
         element.copy_from(pending.value(), function);
         self.emit_to_length_i64_from_value_locals(&element, length, &pending, function)?;
         self.emit_native_iterator_abrupt_exit(&pending, result, exit, function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         index.load(function);

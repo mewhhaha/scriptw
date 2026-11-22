@@ -788,8 +788,65 @@ impl FunctionBuilder<'_> {
 }
 
 impl FunctionBuilder<'_> {
+    /// LengthOfArrayLike of an actual Array, or a branch to `other` for every
+    /// other value (primitives, ordinary and exotic objects, Proxy, null).
+    ///
+    /// An Array exotic object's `length` is an own nonconfigurable data
+    /// property whose value is [[ArrayLength]], held only in LENGTH: a
+    /// non-writable length keeps it there (LENGTH_WRITABLE records only
+    /// [[Writable]]), Array [[DefineOwnProperty]] never publishes the key into
+    /// the ordinary header, and it can never become an accessor. Its Get is
+    /// therefore unobservable and returns exactly this uint32, whose ToLength
+    /// is the integer itself. A Proxy, even of an Array, is no ArrayObject.
+    pub(crate) fn emit_actual_array_length_or_branch(
+        &self,
+        value: &ValueLocals,
+        length: I64Local,
+        other: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        // One inline test proves and casts an actual Array.
+        let array = s.reserve_gc_local(f).initialize(
+            value.sealed_reference_or_branch::<ArrayObject>(s, self.local_branch_label(other), f),
+            f,
+        );
+        s.field(ArrayObjectSchema::LENGTH)
+            .read(&array, s, f)
+            .store_i64(length, f);
+        array.clear(f);
+    }
+
     /// One ToObject and one observable LengthOfArrayLike snapshot.
+    ///
+    /// An actual Array is already an object and its `length` Get is
+    /// unobservable, so it reads [[ArrayLength]] directly; every other value
+    /// keeps the generic ToObject, Get and ToLength path.
     pub(crate) fn emit_array_like_length_snapshot(
+        &mut self,
+        receiver: &ValueLocals,
+        length: I64Local,
+        pending: &CompletionLocals,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let done = self.open_frame(ControlFrameKind::Block, f);
+        let generic = self.open_frame(ControlFrameKind::Block, f);
+        self.emit_actual_array_length_or_branch(receiver, length, generic, f);
+        // ToObject is the identity here; leave the completion state the
+        // generic path leaves after it: normal.
+        pending.set_normal(receiver, f);
+        self.completion().copy_from(pending, f);
+        self.emit_branch_to_target(done, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        self.emit_array_like_length_snapshot_generic(receiver, length, pending, f)?;
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        Ok(())
+    }
+
+    /// The spec steps for any receiver: ToObject, Get(`length`), ToLength.
+    fn emit_array_like_length_snapshot_generic(
         &mut self,
         receiver: &ValueLocals,
         length: I64Local,
