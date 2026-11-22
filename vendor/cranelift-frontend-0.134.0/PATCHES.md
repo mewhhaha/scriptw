@@ -132,3 +132,24 @@ MB for `ssr.js` and 706 to 564 MB for R; times are unchanged (139 s and 141 s
 for `client.js`). The React Server Components program itself
 (`target/rsc-fixtures/rsc.js`) could not be emitted within the 4 GiB cap by
 either compiler, so it was not compared.
+
+## Null reference constants stay out of stack maps (2026-11-21)
+
+`FunctionBuilder::finalize` now removes from the needs-stack-map set every
+value whose alias-resolved definition is `iconst 0`
+(`exclude_null_constants_from_stack_maps` in `src/frontend.rs`) before the
+safepoint spiller runs. In Wasmtime's GC heap a null reference is the
+constant zero and a reference that is not null is never zero, and the
+collector neither traces nor moves a null, so a stack slot, its store after
+the definition, a stack-map entry at each safepoint and a reload before each
+use buy nothing. Lowering rematerializes the constant at its uses instead.
+Only values that are themselves the constant are removed: block parameters
+and any other value that may hold a null at run time keep their slots.
+
+This changes native code by design (fewer stores, slots, stack-map entries
+and reloads), unlike the SSA patch above. Tests: the new
+`null_reference_constants_are_left_out_of_stack_maps`, and the two upstream
+tests that used `iconst 0` as a stand-in reference
+(`needs_stack_map_simple`, `series_of_non_overlapping_live_ranges_needs_stack_map`)
+now use 4; all 64 crate tests pass (run out of tree: the crate is not a
+workspace member).

@@ -734,6 +734,15 @@ impl<'a> FunctionBuilder<'a> {
         // If we have any values that need inclusion in stack maps, then we need
         // to run our pass to spill those values to the stack at safepoints and
         // generate stack maps.
+        // Scriptw patch: a needs-stack-map value defined by `iconst 0` is a
+        // null reference. The collector never traces or moves it, so it needs
+        // no stack slot, spill or stack-map entry; lowering rematerializes the
+        // constant at each use. Block parameters that merge a null with a
+        // pointer are separate values and keep their slots.
+        exclude_null_constants_from_stack_maps(
+            &self.func,
+            self.func_ctx.ssa.stack_map_values_mut(),
+        );
         if !self.func_ctx.ssa.stack_map_values().is_empty() {
             self.func_ctx.safepoints.run(
                 &mut self.func,
@@ -1210,6 +1219,37 @@ impl<'a> FunctionBuilder<'a> {
             }
         }
     }
+}
+
+/// Scriptw patch: remove null reference constants from the needs-stack-map
+/// set. A value whose (alias-resolved) definition is `iconst 0` is a null
+/// reference: a GC reference that is not null is never the constant zero, and
+/// the collector neither traces nor moves a null, so a stack slot, its spill
+/// and its stack-map entries buy nothing. Values are removed only when they are
+/// themselves the constant; block parameters and other values that may hold a
+/// null at run time are left in the set.
+fn exclude_null_constants_from_stack_maps(func: &Function, values: &mut EntitySet<Value>) {
+    let nulls: SmallVec<[Value; 16]> = values
+        .iter()
+        .filter(|&value| is_zero_constant(func, value))
+        .collect();
+    for value in nulls {
+        values.remove(value);
+    }
+}
+
+fn is_zero_constant(func: &Function, value: Value) -> bool {
+    let value = func.dfg.resolve_aliases(value);
+    let ir::ValueDef::Result(inst, _) = func.dfg.value_def(value) else {
+        return false;
+    };
+    matches!(
+        func.dfg.insts[inst],
+        ir::InstructionData::UnaryImm {
+            opcode: ir::Opcode::Iconst,
+            imm,
+        } if imm.bits() == 0
+    )
 }
 
 #[cfg(test)]

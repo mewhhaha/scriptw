@@ -1317,8 +1317,76 @@ block0(v0: i32, v1: i32):
         );
     }
 
+    // Scriptw patch: a null reference constant needs no stack slot, spill or
+    // stack-map entry, while a reference parameter live across a call keeps
+    // them (the second call is the parameter's last use, so it has no map).
+    #[test]
+    fn null_reference_constants_are_left_out_of_stack_maps() {
+        let mut sig = Signature::new(CallConv::SystemV);
+        sig.params.push(AbiParam::new(ir::types::I32));
+
+        let mut fn_ctx = FunctionBuilderContext::new();
+        let mut func = Function::with_name_signature(ir::UserFuncName::testcase("sample"), sig);
+        let mut builder = FunctionBuilder::new(&mut func, &mut fn_ctx);
+
+        let name = builder
+            .func
+            .declare_imported_user_function(ir::UserExternalName {
+                namespace: 0,
+                index: 0,
+            });
+        let mut sig = Signature::new(CallConv::SystemV);
+        sig.params.push(AbiParam::new(ir::types::I32));
+        sig.params.push(AbiParam::new(ir::types::I32));
+        let signature = builder.func.import_signature(sig);
+        let func_ref = builder.import_function(ir::ExtFuncData {
+            name: ir::ExternalName::user(name),
+            signature,
+            colocated: true,
+            patchable: false,
+        });
+
+        let block0 = builder.create_block();
+        builder.append_block_params_for_function_params(block0);
+        builder.switch_to_block(block0);
+        let pointer = builder.func.dfg.block_params(block0)[0];
+        let null = builder.ins().iconst(ir::types::I32, 0);
+        builder.declare_value_needs_stack_map(pointer);
+        builder.declare_value_needs_stack_map(null);
+        builder.ins().call(func_ref, &[pointer, null]);
+        builder.ins().call(func_ref, &[pointer, null]);
+        builder.ins().return_(&[]);
+        builder.seal_all_blocks();
+        builder.finalize(systemv_frontend_config());
+
+        assert_eq_output!(
+            func.display().to_string(),
+            r#"
+function %sample(i32) system_v {
+    ss0 = explicit_slot 4, align = 4
+    sig0 = (i32, i32) system_v
+    fn0 = colocated u0:0 sig0
+
+block0(v0: i32):
+    v6 = stack_addr.i64 ss0
+    store notrap aligned v0, v6
+    v1 = iconst.i32 0
+    v4 = stack_addr.i64 ss0
+    v5 = load.i32 notrap aligned v4
+    call fn0(v5, v1), stack_map=[i32 @ ss0+0]  ; v1 = 0
+    v2 = stack_addr.i64 ss0
+    v3 = load.i32 notrap aligned v2
+    call fn0(v3, v1)  ; v1 = 0
+    return
+}
+            "#
+        );
+    }
+
     #[test]
     fn needs_stack_map_simple() {
+        // Scriptw patch: `iconst 0` is a null reference, which stack maps
+        // leave out, so the first fixture reference is 4.
         let _ = env_logger::try_init();
 
         let sig = Signature::new(CallConv::SystemV);
@@ -1364,7 +1432,7 @@ block0(v0: i32, v1: i32):
         let block0 = builder.create_block();
         builder.append_block_params_for_function_params(block0);
         builder.switch_to_block(block0);
-        let v0 = builder.ins().iconst(ir::types::I32, 0);
+        let v0 = builder.ins().iconst(ir::types::I32, 4);
         builder.declare_value_needs_stack_map(v0);
         let v1 = builder.ins().iconst(ir::types::I32, 1);
         builder.declare_value_needs_stack_map(v1);
@@ -1391,9 +1459,9 @@ function %sample() system_v {
     fn0 = colocated u0:0 sig0
 
 block0:
-    v0 = iconst.i32 0
+    v0 = iconst.i32 4
     v12 = stack_addr.i64 ss2
-    store notrap aligned v0, v12  ; v0 = 0
+    store notrap aligned v0, v12  ; v0 = 4
     v1 = iconst.i32 1
     v11 = stack_addr.i64 ss1
     store notrap aligned v1, v11  ; v1 = 1
@@ -2099,6 +2167,8 @@ block0(v0: i8, v1: i16, v2: i32, v3: i64, v4: i128, v5: f32, v6: f64, v7: i8x16,
 
     #[test]
     fn series_of_non_overlapping_live_ranges_needs_stack_map() {
+        // Scriptw patch: `iconst 0` is a null reference, which stack maps
+        // leave out, so the first fixture reference is 4.
         let sig = Signature::new(CallConv::SystemV);
 
         let mut fn_ctx = FunctionBuilderContext::new();
@@ -2158,7 +2228,7 @@ block0(v0: i8, v1: i16, v2: i32, v3: i64, v4: i128, v5: f32, v6: f64, v7: i8x16,
         let block0 = builder.create_block();
         builder.append_block_params_for_function_params(block0);
         builder.switch_to_block(block0);
-        let v0 = builder.ins().iconst(ir::types::I32, 0);
+        let v0 = builder.ins().iconst(ir::types::I32, 4);
         builder.declare_value_needs_stack_map(v0);
         builder.ins().call(foo_func_ref, &[]);
         builder.ins().call(consume_func_ref, &[v0]);
@@ -2189,9 +2259,9 @@ function %sample() system_v {
     fn1 = colocated u0:1 sig1
 
 block0:
-    v0 = iconst.i32 0
+    v0 = iconst.i32 4
     v15 = stack_addr.i64 ss0
-    store notrap aligned v0, v15  ; v0 = 0
+    store notrap aligned v0, v15  ; v0 = 4
     call fn0(), stack_map=[i32 @ ss0+0]
     v13 = stack_addr.i64 ss0
     v14 = load.i32 notrap aligned v13
