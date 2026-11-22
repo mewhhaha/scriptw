@@ -2,7 +2,7 @@
 
 use std::collections::{btree_map, BTreeMap, BTreeSet};
 use std::iter::Peekable;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 pub(super) struct CatalogOverlay<V: 'static> {
@@ -12,6 +12,48 @@ pub(super) struct CatalogOverlay<V: 'static> {
     /// entries changed since. Every mutable access records its key here, so
     /// an entry can never be treated as settled after it changed.
     settled: Vec<SettledEdit>,
+    /// Opt-in record of which recipe rows any state of this overlay, or of an
+    /// overlay forked, joined or restored from it, ever held differently.
+    deviations: Option<DeviationJournal<V>>,
+}
+
+/// The recipe keys whose effective row differed from the recipe row in at
+/// least one state of a family of overlays.
+///
+/// A flow analysis forks, joins, restores and discards fact overlays at every
+/// branch, return and loop, so no single surviving overlay can say whether a
+/// recipe fact held at *every* analysed program point. This journal is shared
+/// by every overlay cloned from the one that started it and is fed from the
+/// only place a row can change: each mutable access queues its key, and the
+/// row is compared with the recipe before the next mutable access, when the
+/// overlay is dropped, and when the journal is read. Every state an analysed
+/// program point can observe is therefore compared.
+#[derive(Debug, Clone)]
+struct DeviationJournal<V: 'static> {
+    recipe: &'static BTreeMap<String, V>,
+    differs: fn(Option<&V>, Option<&V>) -> bool,
+    deviated: Arc<Mutex<BTreeSet<String>>>,
+    /// Recipe keys accessed mutably since this overlay last compared them.
+    unchecked: BTreeSet<String>,
+}
+
+impl<V: 'static> DeviationJournal<V> {
+    /// The same journal for a new overlay with no queued comparisons.
+    fn fork_empty(&self) -> Self {
+        Self {
+            recipe: self.recipe,
+            differs: self.differs,
+            deviated: Arc::clone(&self.deviated),
+            unchecked: BTreeSet::new(),
+        }
+    }
+
+    fn deviated(&self) -> std::sync::MutexGuard<'_, BTreeSet<String>> {
+        // A poisoned set is still append-only and complete up to the panic.
+        self.deviated
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
 }
 
 /// An edit of each entry of a key set which is idempotent and reads or writes
@@ -58,7 +100,16 @@ impl<V: 'static> Default for CatalogOverlay<V> {
             baseline: None,
             changes: BTreeMap::new(),
             settled: Vec::new(),
+            deviations: None,
         }
+    }
+}
+
+impl<V: 'static> Drop for CatalogOverlay<V> {
+    /// A discarded branch or callee state is still a state some analysed
+    /// program point observed.
+    fn drop(&mut self) {
+        self.compare_queued_rows();
     }
 }
 
@@ -68,10 +119,40 @@ impl<V: 'static> CatalogOverlay<V> {
             baseline: Some(baseline),
             changes: BTreeMap::new(),
             settled: Vec::new(),
+            deviations: None,
+        }
+    }
+
+    /// Journal every queued recipe key whose current row is not its recipe
+    /// row. Runs before each mutable access, so the compared state is the one
+    /// the previous mutation left.
+    fn compare_queued_rows(&mut self) {
+        let queued = match &mut self.deviations {
+            Some(journal) if !journal.unchecked.is_empty() => {
+                std::mem::take(&mut journal.unchecked)
+            }
+            _ => return,
+        };
+        let journal = self
+            .deviations
+            .as_ref()
+            .expect("queued rows belong to a journal");
+        let deviating = queued
+            .into_iter()
+            .filter(|key| (journal.differs)(self.get(key), journal.recipe.get(key)))
+            .collect::<Vec<_>>();
+        if !deviating.is_empty() {
+            journal.deviated().extend(deviating);
         }
     }
 
     fn touch(&mut self, key: &str) {
+        self.compare_queued_rows();
+        if let Some(journal) = &mut self.deviations {
+            if journal.recipe.contains_key(key) && !journal.deviated().contains(key) {
+                journal.unchecked.insert(key.to_string());
+            }
+        }
         for settled in &mut self.settled {
             if settled.keys.contains(key) && !settled.touched.contains(key) {
                 settled.touched.insert(key.to_string());
@@ -241,7 +322,56 @@ impl<V: 'static> CatalogOverlay<V> {
             baseline: self.baseline,
             changes: BTreeMap::new(),
             settled: Vec::new(),
+            deviations: self.deviations.as_ref().map(DeviationJournal::fork_empty),
         }
+    }
+
+    /// Start journaling which recipe rows this overlay, and every overlay
+    /// later cloned, joined or restored from it, ever holds differently from
+    /// the recipe. `differs` decides whether a row means something other
+    /// than its recipe row; it may treat two encodings of one fact as equal.
+    /// Read the journal with [`Self::recipe_deviations`].
+    pub(super) fn record_recipe_deviations(&mut self, differs: fn(Option<&V>, Option<&V>) -> bool) {
+        let recipe = self
+            .baseline
+            .expect("only an overlay of a recipe catalog can compare rows with it");
+        assert!(
+            self.changes.is_empty() && self.deviations.is_none(),
+            "a deviation journal must start from the unchanged recipe"
+        );
+        self.deviations = Some(DeviationJournal {
+            recipe,
+            differs,
+            deviated: Arc::default(),
+            unchecked: BTreeSet::new(),
+        });
+    }
+
+    pub(super) fn records_recipe_deviations(&self) -> bool {
+        self.deviations.is_some()
+    }
+
+    /// An empty overlay with no recipe that still feeds this overlay's
+    /// deviation journal, for a join whose inputs do not share a recipe.
+    pub(super) fn empty_without_baseline(&self) -> Self {
+        Self {
+            baseline: None,
+            changes: BTreeMap::new(),
+            settled: Vec::new(),
+            deviations: self.deviations.as_ref().map(DeviationJournal::fork_empty),
+        }
+    }
+
+    /// Every recipe key whose effective row differed from the recipe row in
+    /// some state of this overlay or of any overlay cloned from it since
+    /// [`Self::record_recipe_deviations`].
+    pub(super) fn recipe_deviations(&mut self) -> BTreeSet<String> {
+        self.compare_queued_rows();
+        self.deviations
+            .as_ref()
+            .expect("recipe deviations are read only from an overlay that records them")
+            .deviated()
+            .clone()
     }
 }
 

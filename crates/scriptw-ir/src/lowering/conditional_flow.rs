@@ -335,10 +335,13 @@ impl<'a> ScriptLowerer<'a> {
         // An unchanged baseline fact joins with itself. Visit only deviations
         // when both branches share that immutable recipe catalog.
         let shared = left.same_baseline(right);
+        // Either way the join keeps feeding the inputs' deviation journal.
         let mut merged = if shared {
             left.empty_changes()
+        } else if left.records_recipe_deviations() {
+            left.empty_without_baseline()
         } else {
-            GlobalProperties::default()
+            right.empty_without_baseline()
         };
         let names = if shared {
             left.changed_keys()

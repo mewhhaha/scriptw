@@ -35,6 +35,7 @@ mod aot_deleted_global_bindings;
 mod aot_dense_switch;
 mod aot_descriptor_edges;
 mod aot_destructuring_var_binding_order;
+mod aot_dormant_builtin_replacement;
 mod aot_empty_function;
 mod aot_equality_operand_effects;
 mod aot_exact_context_budget;

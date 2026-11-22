@@ -265,6 +265,101 @@ impl GlobalPropertyInfo {
             source: *source,
         }
     }
+
+    /// Whether `row` states a different fact than the fresh-realm `recipe`
+    /// row, for the prepass deviation journal.
+    ///
+    /// No prototype link and a link to the empty `%Object.prototype%`
+    /// placeholder both read as inheriting `%Object.prototype%`, which is why
+    /// an ordinary write through a `{}`-shaped alias may cut one into the
+    /// other (`invalidate_prototype_link`). They are one fact here; every
+    /// other difference, however small, is a change.
+    fn differs_from_recipe(row: Option<&Self>, recipe: Option<&Self>) -> bool {
+        match (row, recipe) {
+            (Some(row), Some(recipe)) => {
+                row != recipe
+                    && !(row.proven_present == recipe.proven_present
+                        && row.configurable == recipe.configurable
+                        && row.source == recipe.source
+                        && same_value_fact(&row.value_info, &recipe.value_info))
+            }
+            (row, recipe) => row != recipe,
+        }
+    }
+}
+
+fn same_value_fact(left: &ValueInfo, right: &ValueInfo) -> bool {
+    left.kind == right.kind
+        && left.possible_kinds == right.possible_kinds
+        && left.function_targets == right.function_targets
+        && match (left.heap_shape.as_deref(), right.heap_shape.as_deref()) {
+            (Some(left), Some(right)) => same_shape_fact(left, right),
+            (None, None) => true,
+            (Some(_), None) | (None, Some(_)) => false,
+        }
+}
+
+fn same_shape_fact(left: &HeapShape, right: &HeapShape) -> bool {
+    match (left, right) {
+        (HeapShape::Object(left), HeapShape::Object(right)) => {
+            left.provenance == right.provenance
+                && left.private_brands == right.private_brands
+                && match (
+                    left.boxed_primitive.as_deref(),
+                    right.boxed_primitive.as_deref(),
+                ) {
+                    (Some(left), Some(right)) => same_value_fact(left, right),
+                    (None, None) => true,
+                    (Some(_), None) | (None, Some(_)) => false,
+                }
+                && same_property_facts(&left.properties, &right.properties)
+                && same_prototype_fact(left.prototype.as_deref(), right.prototype.as_deref())
+        }
+        (HeapShape::Array(left), HeapShape::Array(right)) => {
+            left.provenance == right.provenance
+                && left.elements.len() == right.elements.len()
+                && left
+                    .elements
+                    .iter()
+                    .zip(&right.elements)
+                    .all(|(left, right)| same_value_fact(left, right))
+                && same_property_facts(&left.properties, &right.properties)
+                && same_prototype_fact(left.prototype.as_deref(), right.prototype.as_deref())
+        }
+        (HeapShape::Object(_), HeapShape::Array(_))
+        | (HeapShape::Array(_), HeapShape::Object(_)) => false,
+    }
+}
+
+fn same_property_facts(
+    left: &BTreeMap<String, ObjectShapeProperty>,
+    right: &BTreeMap<String, ObjectShapeProperty>,
+) -> bool {
+    left.len() == right.len()
+        && left
+            .iter()
+            .zip(right)
+            .all(|((left_key, left), (right_key, right))| {
+                left_key == right_key
+                    && match (left, right) {
+                        (ObjectShapeProperty::Data(left), ObjectShapeProperty::Data(right)) => {
+                            same_value_fact(left, right)
+                        }
+                        (left, right) => left == right,
+                    }
+            })
+}
+
+fn same_prototype_fact(left: Option<&HeapShape>, right: Option<&HeapShape>) -> bool {
+    let placeholder = ScriptLowerer::empty_object_shape();
+    match (
+        left.filter(|shape| **shape != placeholder),
+        right.filter(|shape| **shape != placeholder),
+    ) {
+        (Some(left), Some(right)) => same_shape_fact(left, right),
+        (None, None) => true,
+        (Some(_), None) | (None, Some(_)) => false,
+    }
 }
 
 /// The joined global-property fact immediately before a logical assignment's
@@ -1429,7 +1524,10 @@ pub(crate) struct ScriptLowerer<'a> {
     /// the final pass. The final function pass runs before the final
     /// root-statement pass replays top-level writes, so a final body must not
     /// fold an intrinsic global this set names. It never touches flow state,
-    /// so accumulating it cannot perturb any fixpoint.
+    /// so accumulating it cannot perturb any fixpoint. After the prepass it
+    /// also holds every builtin global whose fact any prepass state changed
+    /// (`CatalogOverlay::recipe_deviations`), which covers the writes no
+    /// recording site can name.
     observed_script_global_writes: BTreeSet<String>,
     /// Per-intrinsic overrides of a well-known-symbol method on a builtin
     /// prototype, keyed by `(constructor name, symbol)`.
@@ -2070,6 +2168,11 @@ impl<'a> ScriptLowerer<'a> {
         let lower_trace = std::env::var_os("SCRIPTW_LOWER_TRACE").is_some();
         let tp = std::time::Instant::now();
         let mut prepass = self.child_lowerer(self.root_this_binding, SCRIPT_OWNER_ID.to_string());
+        // Every prepass flow state, root and body alike, forks from this
+        // overlay, so its journal sees each builtin fact any of them changed.
+        prepass
+            .global_properties
+            .record_recipe_deviations(GlobalPropertyInfo::differs_from_recipe);
         prepass.function_signatures = self.function_signatures.clone();
         prepass.function_source_parameter_candidates =
             self.function_source_parameter_candidates.clone();
@@ -2142,6 +2245,14 @@ impl<'a> ScriptLowerer<'a> {
         // nested body's) in a side channel that never touches flow state, so
         // carrying it cannot perturb any fixpoint.
         self.observed_script_global_writes = prepass.observed_script_global_writes;
+        // That channel names only the writes a recording site knows the name
+        // of. A computed key, an alias, a reflective or bulk builtin write, a
+        // call into unknown code and an inline intrinsic method publication
+        // instead change the flow fact itself. Any builtin fact some prepass
+        // state held differently from its fresh-realm row may already be
+        // stale when a final body runs.
+        self.observed_script_global_writes
+            .extend(prepass.global_properties.recipe_deviations());
         self.function_signatures = prepass.function_signatures;
         self.exact_context_function_observations = prepass.exact_context_function_observations;
         self.exact_context_callback_observations = prepass.exact_context_callback_observations;
@@ -16077,27 +16188,37 @@ impl<'a> ScriptLowerer<'a> {
     }
 
     /// Degrade every observed-written intrinsic in a nested body lowerer to
-    /// an unknown dynamic value, so shape reads, static calls and intrinsic
-    /// folds in the emitted body observe the possible replacement. Only
-    /// builtin-sourced entries degrade: declared script vars keep their
-    /// seeded values, which the nested-global flow machinery (not this set)
-    /// already keeps sound across bodies. Callers gate on the final phase;
-    /// prepass and propagation bodies keep baseline facts. The degradation
-    /// itself never feeds the write set back: these names are already members
-    /// by construction.
+    /// a possibly replaced value, so shape reads, static calls, result kinds
+    /// and intrinsic folds in the emitted body observe the possible
+    /// replacement. The row is the one an unknown effect leaves at the root
+    /// (`invalidate_possible_global_property_value_info`): the previous
+    /// callee stays only a candidate that the backend's runtime identity
+    /// guards must still confirm. Only builtin-sourced, writable entries
+    /// degrade: declared script vars keep their seeded values, which the
+    /// nested-global flow machinery (not this set) already keeps sound across
+    /// bodies, and `undefined`, `NaN` and `Infinity` are non-writable and
+    /// non-configurable, so their facts cannot go stale. Callers gate on the
+    /// final phase; prepass and propagation bodies keep baseline facts. The
+    /// degradation itself never feeds the write set back: these names are
+    /// already members by construction.
     fn degrade_observed_written_globals(&self, lowerer: &mut ScriptLowerer<'a>) {
         for name in &self.observed_script_global_writes {
-            let Some(property) = lowerer.global_properties.get_mut(name) else {
-                continue;
-            };
-            if !matches!(
-                property.source,
-                GlobalPropertySource::Builtin | GlobalPropertySource::HostBuiltin
-            ) {
+            if !Self::global_property_is_writable_name(name)
+                || !lowerer.global_properties.get(name).is_some_and(|property| {
+                    matches!(
+                        property.source,
+                        GlobalPropertySource::Builtin | GlobalPropertySource::HostBuiltin
+                    )
+                })
+            {
                 continue;
             }
-            property.value_info = ValueInfo::new(ValueKind::Dynamic);
-            property.source = GlobalPropertySource::GlobalWrite;
+            let property = lowerer
+                .global_properties
+                .get_mut(name)
+                .expect("a builtin global property row exists");
+            property.value_info.widen_for_possible_replacement();
+            property.source = GlobalPropertySource::Merged;
         }
     }
 
