@@ -3195,8 +3195,8 @@ impl FuncEnvironment<'_> {
     /// Record that code translated from here on, to the end of the innermost
     /// control frame's arm, runs only when the truth value `condition` is
     /// not zero.
-    pub fn prove_tested(&mut self, condition: ir::Value) {
-        gc::prove_tested(self, condition)
+    pub fn prove_tested(&mut self, dfg: &ir::DataFlowGraph, condition: ir::Value) {
+        gc::prove_tested(self, dfg, condition)
     }
 
     /// Record that the reference `value` is not null in code translated from

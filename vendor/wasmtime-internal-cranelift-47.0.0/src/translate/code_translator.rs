@@ -375,7 +375,7 @@ pub fn translate_operator(
                 else_is_cold,
             );
             // The consequent runs only when `val` is not zero.
-            environ.prove_tested(val);
+            environ.prove_tested(&builder.func.dfg, val);
         }
         Operator::Else => {
             let i = environ.stacks.control_stack.len() - 1;

@@ -1588,12 +1588,46 @@ pub fn prove_cast(func_env: &mut FuncEnvironment<'_>, value: ir::Value, ty: Wasm
 }
 
 /// Record what the latest `ref.test` found, for code that is entered only
-/// when `condition`, that test's result, is not zero.
-pub fn prove_tested(func_env: &mut FuncEnvironment<'_>, condition: ir::Value) {
+/// when `condition` is not zero: the test's result itself, or (Scriptw
+/// patch) an `i32.and` that has the result among its operands, directly or
+/// through further `i32.and`s. A `ref.test` result is 0 or 1, so a
+/// conjunction with it that is not zero has it at 1, whatever the other
+/// operands are; the emitter's `tag == X & ref.test T v` guards are of this
+/// shape.
+pub fn prove_tested(func_env: &mut FuncEnvironment<'_>, dfg: &ir::DataFlowGraph, condition: ir::Value) {
     if let Some((result, value, ty)) = func_env.proven_references.tested {
-        if result == condition {
+        if conjunction_contains(dfg, condition, result, 8) {
             prove_cast(func_env, value, ty);
         }
+    }
+}
+
+/// Whether `condition` is `operand` or an `band` tree, at most `depth` deep,
+/// with `operand` as a leaf.
+fn conjunction_contains(
+    dfg: &ir::DataFlowGraph,
+    condition: ir::Value,
+    operand: ir::Value,
+    depth: u32,
+) -> bool {
+    let condition = dfg.resolve_aliases(condition);
+    if condition == dfg.resolve_aliases(operand) {
+        return true;
+    }
+    if depth == 0 {
+        return false;
+    }
+    let ir::ValueDef::Result(inst, _) = dfg.value_def(condition) else {
+        return false;
+    };
+    match dfg.insts[inst] {
+        ir::InstructionData::Binary {
+            opcode: ir::Opcode::Band,
+            args,
+        } => args
+            .iter()
+            .any(|&arg| conjunction_contains(dfg, arg, operand, depth - 1)),
+        _ => false,
     }
 }
 

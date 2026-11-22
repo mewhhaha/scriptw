@@ -540,3 +540,25 @@ native code is unchanged. The React Server Components request is unchanged
 (Callgrind, Speed: sync 2,713,498 -> 2,712,790.5, async 2,939,522.5 ->
 2,939,548.5 Ir, both against the null-stack-map build, within noise; exact
 Flight output on all observations).
+
+## Conjunction proofs for `ref.test` (2026-11-22)
+
+`gc::prove_tested` (`src/func_environ/gc.rs`), which records that an `if`'s
+consequent may assume the latest `ref.test` succeeded, now also accepts a
+condition that is an `i32.and` tree (at most 8 deep) with that test's result
+as a leaf (`conjunction_contains`). A `ref.test` result is 0 or 1, so a
+conjunction with it that is not zero has it at 1 whatever the other operands
+are. Scriptw's emitter guards casts with `tag == X & ref.test T v`, and the
+cast in the consequent was translated again; `FuncEnvironment::prove_tested`
+now takes the data-flow graph, passed from `Operator::If`.
+
+Sound for the same reasons as the existing direct case (see
+`ProvenReferences`): the fact is recorded at the start of the consequent,
+which control enters only when the condition is not zero, and is used only
+while that arm is open.
+
+React Server Components request (Callgrind, Speed, against the build with
+the null-stack-map and alias-region patches): sync 2,712,790.5 -> 2,696,229
+Ir (-0.61%), async 2,939,548.5 -> 2,921,929 (-0.60%); exact Flight output on
+every observation. Engine aot_gc_entries, aot_language, aot_builtins,
+aot_realm_modules and lib, and the CLI suite pass.
