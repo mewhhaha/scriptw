@@ -92,8 +92,9 @@ fn callable_locals(schema: &RuntimeSchema, function: &mut Function) -> CallableL
     }
 }
 
-/// Null is an ABI encoding only for an empty vector. Take an empty vector
-/// for it, then check the vector's length against the declared count once:
+/// Null is an ABI encoding only for an empty vector. Take the module's shared
+/// empty vector for it (a zero-length array has no index to write and no
+/// consumer compares vector identity), then check the vector's length against the declared count once:
 /// null with a nonzero count fails it like a short vector. The parameter
 /// itself is never written, so a raw reader of it sees the argument.
 fn normalize_arguments(
@@ -105,7 +106,7 @@ fn normalize_arguments(
     let declared_count = schema.parameter_i64(count_parameter, function);
     let vector = schema.parameter_gc::<ValueArray, Nullable>(vector_parameter, function);
     let present = vector.non_null_or_else(schema, function, |function| {
-        schema.array_type::<ValueArray>().fixed([], function)
+        schema.empty_value_array(function)
     });
     let arguments = schema
         .reserve_gc_local(function)

@@ -10,6 +10,15 @@ use crate::heap::DescriptorMask;
 use crate::operations::PropertyKeyLocals;
 use crate::runtime_helpers::{OrdinaryPropertyFindArguments, RuntimeHelperFunctionBase};
 
+/// What an activation writes: the value captured at entry, restored at exit,
+/// or a value boxed only on the arm that stores it, so an unobserved
+/// property costs no allocation.
+#[derive(Clone, Copy)]
+enum Written<'a> {
+    Stored(&'a GcLocal<StoredValue, Nullable>),
+    Fresh(&'a ValueLocals),
+}
+
 pub(super) struct ReflectionProperty {
     object: GcLocal<OrdinaryObject>,
     key: PropertyKeyLocals,
@@ -103,7 +112,7 @@ impl ReflectionProperty {
 
     fn write(
         &self,
-        value: &GcLocal<StoredValue, Nullable>,
+        value: Written<'_>,
         schema: &RuntimeSchema,
         function: &mut Function,
     ) {
@@ -183,10 +192,18 @@ impl ReflectionProperty {
         function.instruction(&Instruction::If(BlockType::Empty));
         // A live original owner captured a non-null prior token; publication
         // also supplies a non-null token. Retired owners cannot reach this arm.
-        let stored = schema.reserve_gc_local(function).initialize(
-            value.load(schema, function).require_non_null(function),
-            function,
-        );
+        let stored = match value {
+            Written::Stored(value) => schema.reserve_gc_local(function).initialize(
+                value.load(schema, function).require_non_null(function),
+                function,
+            ),
+            Written::Fresh(value) => schema.reserve_gc_local(function).initialize(
+                schema
+                    .struct_type::<StoredValue>()
+                    .from_value(value, function),
+                function,
+            ),
+        };
         schema.field(PropertyDescriptorSchema::VALUE).write(
             &descriptor,
             GcOperand::subtype_reference(&stored, schema),
@@ -227,21 +244,11 @@ impl ReflectionProperty {
         schema: &RuntimeSchema,
         function: &mut Function,
     ) {
-        let stored = schema
-            .reserve_gc_local::<StoredValue, Nullable>(function)
-            .initialize(
-                schema
-                    .struct_type::<StoredValue>()
-                    .from_value(value, function)
-                    .nullable(),
-                function,
-            );
-        self.write(&stored, schema, function);
-        stored.clear(function);
+        self.write(Written::Fresh(value), schema, function);
     }
 
     pub(super) fn restore(&self, schema: &RuntimeSchema, function: &mut Function) {
-        self.write(&self.previous_value, schema, function);
+        self.write(Written::Stored(&self.previous_value), schema, function);
     }
 
     pub(super) fn clear(self, function: &mut Function) {
