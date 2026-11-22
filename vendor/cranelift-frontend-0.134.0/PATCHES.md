@@ -153,3 +153,50 @@ tests that used `iconst 0` as a stand-in reference
 (`needs_stack_map_simple`, `series_of_non_overlapping_live_ranges_needs_stack_map`)
 now use 4; all 64 crate tests pass (run out of tree: the crate is not a
 workspace member).
+
+## Joins of one repeated constant need no block parameter (2026-11-22)
+
+`src/ssa.rs`, `finish_predecessors_lookup`: upstream removes a would-be
+block parameter only when every predecessor passes the same `Value` (after
+alias resolution, ignoring the parameter itself on cycles). Wasmtime's
+translator materializes each Wasm `i32.const 0`, `i64.const 0` or
+`ref.null` with its own `iconst`, so a local written with the same constant
+on two paths met as a block parameter; the egraph later proved it constant
+but cannot rematerialize a block parameter, so the zero was copied into its
+parameter slot on every edge and reloaded at its uses (about 29K loads and
+17K stores per request on two functions of the React Server Components
+program; target/deepdive/frames/REPORT.md, fix 1).
+
+When the predecessors disagree on the `Value` but every one other than the
+parameter itself is defined by the same constant (`RepeatedConstant`: the
+same opcode among `iconst`, `f32const`, `f64const` and `vconst`, the same
+type, and the same immediate bits or vector-pool contents), the parameter
+is now removed as upstream removes it, and aliased to a fresh copy of that
+constant at the block's first insertion point. The fresh copy is needed
+because no predecessor's constant need dominate the block; the block's top
+dominates every use of the parameter, exactly as for the zero that upstream
+emits there for a variable without a definition, and like that zero the
+block is reported in `instructions_added_to_blocks`.
+
+Why it is exact: on every path into the block the variable holds that
+constant, or the parameter's own value on a cycle, so the parameter always
+equals the constant. Floating-point constants are compared by their bits
+(+0.0 and -0.0, or two NaN payloads, stay distinct). For a needs-stack-map
+variable only the null reference (`iconst 0`) is folded: the collector never
+traces or moves a null, so the fresh constant needs no stack slot and is not
+a needs-stack-map value (the parameter that becomes its alias was one, and
+`exclude_null_constants_from_stack_maps` would drop it anyway). A non-null
+constant of such a variable keeps its parameter, because a moving collector
+may give the parameter a different value than the constant.
+
+This changes CLIF and native code by design (fewer block parameters, branch
+arguments, edge copies and slot reloads). Tests: `join_of_one_integer_constant_is_a_fresh_constant`
+and `join_of_one_float_or_vector_constant_is_a_fresh_constant` (both
+sealing orders), `join_of_different_constants_keeps_its_parameter` (different
+immediates, +0.0 against -0.0, equal bits from different opcodes, a constant
+against a computed value), `stack_map_variable_folds_only_the_null_constant`,
+`loop_header_of_equal_entry_and_back_edge_constants_is_a_fresh_constant`
+and `join_with_a_cycle_back_to_itself_ignores_the_sentinel`; the five that
+expect a fold fail without the patch. All 70 crate tests pass, run out of
+tree as before: copy the crate to a scratch directory, append `[workspace]`
+to its `Cargo.toml` and run `cargo test --offline`.

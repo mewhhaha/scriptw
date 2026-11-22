@@ -15,7 +15,9 @@ use cranelift_codegen::cursor::{Cursor, FuncCursor};
 use cranelift_codegen::entity::{EntityList, EntitySet, ListPool, SecondaryMap};
 use cranelift_codegen::ir::immediates::{Ieee16, Ieee32, Ieee64, Ieee128};
 use cranelift_codegen::ir::types::{F16, F32, F64, F128, I64, I128};
-use cranelift_codegen::ir::{Block, Function, Inst, InstBuilder, Type, Value};
+use cranelift_codegen::ir::{
+    Block, Constant, Function, Inst, InstBuilder, InstructionData, Opcode, Type, Value, ValueDef,
+};
 use cranelift_codegen::packed_option::PackedOption;
 
 /// Structure containing the data relevant the construction of SSA for a given function.
@@ -296,6 +298,77 @@ impl SSABuilder {
             && self.calls.is_empty()
             && self.results.is_empty()
             && self.side_effects.is_empty()
+    }
+}
+
+/// Scriptw patch: a constant that every non-sentinel predecessor passes for a
+/// variable (after alias resolution), so the join needs no block parameter.
+#[derive(Clone, Copy)]
+enum RepeatedConstant {
+    Int(Type, i64),
+    F32(Ieee32),
+    F64(Ieee64),
+    Vector(Type, Constant),
+}
+
+impl RepeatedConstant {
+    /// The constant that defines `value`, if `value` is the result of an
+    /// `iconst`, `f32const`, `f64const` or `vconst`.
+    fn defining(func: &Function, value: Value) -> Option<Self> {
+        let ValueDef::Result(inst, 0) = func.dfg.value_def(value) else {
+            return None;
+        };
+        let ty = func.dfg.value_type(value);
+        Some(match func.dfg.insts[inst] {
+            InstructionData::UnaryImm {
+                opcode: Opcode::Iconst,
+                imm,
+            } => Self::Int(ty, imm.bits()),
+            InstructionData::UnaryIeee32 {
+                opcode: Opcode::F32const,
+                imm,
+            } => Self::F32(imm),
+            InstructionData::UnaryIeee64 {
+                opcode: Opcode::F64const,
+                imm,
+            } => Self::F64(imm),
+            InstructionData::UnaryConst {
+                opcode: Opcode::Vconst,
+                constant_handle,
+            } => Self::Vector(ty, constant_handle),
+            _ => return None,
+        })
+    }
+
+    /// Same opcode, type and bits (vector constants by their pool contents).
+    fn same_as(self, other: Self, func: &Function) -> bool {
+        match (self, other) {
+            (Self::Int(a_ty, a), Self::Int(b_ty, b)) => a_ty == b_ty && a == b,
+            (Self::F32(a), Self::F32(b)) => a.bits() == b.bits(),
+            (Self::F64(a), Self::F64(b)) => a.bits() == b.bits(),
+            (Self::Vector(a_ty, a), Self::Vector(b_ty, b)) => {
+                a_ty == b_ty && (a == b || func.dfg.constants.get(a) == func.dfg.constants.get(b))
+            }
+            _ => false,
+        }
+    }
+
+    /// The null reference: the only constant a needs-stack-map variable may
+    /// fold, because the collector never traces or moves it (see
+    /// `exclude_null_constants_from_stack_maps` in `frontend.rs`). A
+    /// non-null reference constant would have to keep the value the collector
+    /// gives the block parameter.
+    fn is_null_reference(self) -> bool {
+        matches!(self, Self::Int(_, 0))
+    }
+
+    fn emit(self, mut cur: FuncCursor) -> Value {
+        match self {
+            Self::Int(ty, bits) => cur.ins().iconst(ty, bits),
+            Self::F32(imm) => cur.ins().f32const(imm),
+            Self::F64(imm) => cur.ins().f64const(imm),
+            Self::Vector(ty, handle) => cur.ins().vconst(ty, handle),
+        }
     }
 }
 
@@ -697,6 +770,7 @@ impl SSABuilder {
     fn finish_predecessors_lookup(
         &mut self,
         func: &mut Function,
+        var: Variable,
         sentinel: Value,
         dest_block: Block,
     ) -> Value {
@@ -722,7 +796,23 @@ impl SSABuilder {
                 if iter.all(|other| other == val) {
                     Some(val)
                 } else {
-                    None
+                    // Scriptw patch: distinct definitions that are all the
+                    // same constant become one fresh constant at the top of
+                    // `dest_block`, which dominates every use of the sentinel
+                    // (an existing definition need not dominate the block).
+                    // Like the zero below, it is not a needs-stack-map value.
+                    let needs_stack_map = self.stack_map_vars.contains(var);
+                    Self::repeated_constant(func, results.as_slice(), sentinel)
+                        .filter(|constant| !needs_stack_map || constant.is_null_reference())
+                        .map(|constant| {
+                            if !func.layout.is_block_inserted(dest_block) {
+                                func.layout.append_block(dest_block);
+                            }
+                            self.side_effects
+                                .instructions_added_to_blocks
+                                .push(dest_block);
+                            constant.emit(FuncCursor::new(func).at_first_insertion_point(dest_block))
+                        })
                 }
             } else {
                 // The variable is used but never defined before. This is an irregularity in the
@@ -775,6 +865,25 @@ impl SSABuilder {
         }
     }
 
+    /// Scriptw patch: the constant that every predecessor value other than
+    /// `sentinel` is defined by, after alias resolution, if there is one.
+    fn repeated_constant(
+        func: &Function,
+        results: &[Value],
+        sentinel: Value,
+    ) -> Option<RepeatedConstant> {
+        let mut values = results
+            .iter()
+            .map(|&val| func.dfg.resolve_aliases(val))
+            .filter(|&val| val != sentinel);
+        let first = RepeatedConstant::defining(func, values.next()?)?;
+        values
+            .all(|val| {
+                RepeatedConstant::defining(func, val).is_some_and(|other| first.same_as(other, func))
+            })
+            .then_some(first)
+    }
+
     /// Returns the list of `Block`s that have been declared as predecessors of the argument.
     fn predecessors(&self, block: Block) -> &[Inst] {
         self.ssa_blocks[block]
@@ -806,7 +915,7 @@ impl SSABuilder {
                     self.use_var_nonlocal(func, var, ty, block);
                 }
                 Call::FinishPredecessorsLookup(sentinel, dest_block) => {
-                    let val = self.finish_predecessors_lookup(func, sentinel, dest_block);
+                    let val = self.finish_predecessors_lookup(func, var, sentinel, dest_block);
                     self.results.push(val);
                 }
             }
@@ -827,6 +936,8 @@ mod tests {
     use cranelift_codegen::ir::{Function, Inst, InstBuilder, JumpTableData, Opcode};
     use cranelift_codegen::settings;
     use cranelift_codegen::verify_function;
+    // Scriptw patch: for the repeated-constant tests.
+    use alloc::{boxed::Box, vec, vec::Vec};
 
     #[test]
     fn simple_block() {
@@ -1539,5 +1650,353 @@ mod tests {
 
         // The sealing algorithm would enter a infinite loop here
         ssa.seal_all_blocks(&mut func);
+    }
+
+    // Scriptw patch: joins of one repeated constant.
+
+    fn verify(func: &Function) {
+        let flags = settings::Flags::new(settings::builder());
+        if let Err(errors) = verify_function(func, &flags) {
+            panic!("{errors}\n{}", func.display());
+        }
+    }
+
+    /// The number of arguments `branch` passes to its first destination.
+    fn branch_argument_count(func: &Function, branch: Inst) -> usize {
+        func.dfg.insts[branch]
+            .branch_destination(&func.dfg.jump_tables, &func.dfg.exception_tables)[0]
+            .len(&func.dfg.value_lists)
+    }
+
+    struct Diamond {
+        func: Function,
+        ssa: SSABuilder,
+        join: ir::Block,
+        jumps: [Inst; 2],
+        /// The two definitions of `x`, and its value in the join block.
+        definitions: [ir::Value; 2],
+        joined: ir::Value,
+    }
+
+    /// ```text
+    /// block0: brif c, block1, block2
+    /// block1: x = first;  jump block3
+    /// block2: x = second; jump block3
+    /// block3: use x; return
+    /// ```
+    /// `use_before_seal` uses `x` in block3 before block3 is sealed (the
+    /// `Sealed::No` path), otherwise after.
+    fn build_diamond(
+        ty: ir::Type,
+        needs_stack_map: bool,
+        use_before_seal: bool,
+        first: impl FnOnce(&mut FuncCursor) -> ir::Value,
+        second: impl FnOnce(&mut FuncCursor) -> ir::Value,
+    ) -> Diamond {
+        let mut func = Function::new();
+        let mut ssa = SSABuilder::default();
+        let [block0, block1, block2, block3] = [(); 4].map(|()| func.dfg.make_block());
+        let x = Variable::new(0);
+        if needs_stack_map {
+            ssa.mark_var_needs_stack_map(x);
+        }
+        let mut cur = FuncCursor::new(&mut func);
+        for block in [block0, block1, block2, block3] {
+            cur.insert_block(block);
+            ssa.declare_block(block);
+        }
+        ssa.seal_block(block0, cur.func);
+        let mut cur = cur.at_bottom(block0);
+        let condition = cur.ins().iconst(I32, 1);
+        let brif = cur.ins().brif(condition, block1, &[], block2, &[]);
+        let mut definitions = Vec::new();
+        let mut jumps = Vec::new();
+        for (block, define) in [
+            (block1, Box::new(first) as Box<dyn FnOnce(&mut FuncCursor) -> ir::Value>),
+            (block2, Box::new(second)),
+        ] {
+            ssa.declare_block_predecessor(block, brif);
+            ssa.seal_block(block, cur.func);
+            let mut cur_block = FuncCursor::new(cur.func).at_bottom(block);
+            let value = define(&mut cur_block);
+            ssa.def_var(x, value, block);
+            definitions.push(value);
+            jumps.push(cur_block.ins().jump(block3, &[]));
+        }
+        let early_use = use_before_seal.then(|| ssa.use_var(cur.func, x, ty, block3).0);
+        for &jump in &jumps {
+            ssa.declare_block_predecessor(block3, jump);
+        }
+        ssa.seal_block(block3, cur.func);
+        let joined = early_use.unwrap_or_else(|| ssa.use_var(cur.func, x, ty, block3).0);
+        let mut cur = FuncCursor::new(&mut func).at_bottom(block3);
+        cur.ins().return_(&[]);
+        Diamond {
+            func,
+            ssa,
+            join: block3,
+            jumps: [jumps[0], jumps[1]],
+            definitions: [definitions[0], definitions[1]],
+            joined,
+        }
+    }
+
+    /// The join has no parameter; `x` there is a third constant, the first
+    /// instruction of the join, equal to both definitions.
+    fn assert_folded(diamond: &Diamond, opcode: Opcode) -> ir::Value {
+        let func = &diamond.func;
+        verify(func);
+        assert!(func.dfg.block_params(diamond.join).is_empty(), "{}", func.display());
+        for &jump in &diamond.jumps {
+            assert_eq!(branch_argument_count(func, jump), 0, "{}", func.display());
+        }
+        let value = func.dfg.resolve_aliases(diamond.joined);
+        assert!(!diamond.definitions.contains(&value));
+        let ir::ValueDef::Result(inst, 0) = func.dfg.value_def(value) else {
+            panic!("{value} is not an instruction result:\n{}", func.display());
+        };
+        assert_eq!(func.layout.first_inst(diamond.join), Some(inst));
+        assert_eq!(func.dfg.insts[inst].opcode(), opcode);
+        assert_eq!(func.dfg.value_type(value), func.dfg.value_type(diamond.definitions[0]));
+        value
+    }
+
+    /// The join keeps `x` as a block parameter that both jumps pass.
+    fn assert_kept(diamond: &Diamond) {
+        let func = &diamond.func;
+        verify(func);
+        assert_eq!(func.dfg.block_params(diamond.join), &[diamond.joined]);
+        for &jump in &diamond.jumps {
+            assert_eq!(branch_argument_count(func, jump), 1, "{}", func.display());
+        }
+    }
+
+    #[test]
+    fn join_of_one_integer_constant_is_a_fresh_constant() {
+        for use_before_seal in [false, true] {
+            let diamond = build_diamond(
+                I32,
+                false,
+                use_before_seal,
+                |cur| cur.ins().iconst(I32, 7),
+                |cur| cur.ins().iconst(I32, 7),
+            );
+            let value = assert_folded(&diamond, Opcode::Iconst);
+            let inst = diamond.func.dfg.value_def(value).unwrap_inst();
+            assert_eq!(
+                diamond.func.dfg.insts[inst],
+                ir::InstructionData::UnaryImm {
+                    opcode: Opcode::Iconst,
+                    imm: 7.into(),
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn join_of_one_float_or_vector_constant_is_a_fresh_constant() {
+        let f32_bits = ir::immediates::Ieee32::with_bits(0x7fc0_0001);
+        let diamond_f32 = build_diamond(
+            F32,
+            false,
+            false,
+            |cur| cur.ins().f32const(f32_bits),
+            |cur| cur.ins().f32const(f32_bits),
+        );
+        assert_folded(&diamond_f32, Opcode::F32const);
+        let f64_bits = ir::immediates::Ieee64::with_bits(1.5f64.to_bits());
+        let diamond_f64 = build_diamond(
+            F64,
+            false,
+            true,
+            |cur| cur.ins().f64const(f64_bits),
+            |cur| cur.ins().f64const(f64_bits),
+        );
+        assert_folded(&diamond_f64, Opcode::F64const);
+        let vector = |cur: &mut FuncCursor| {
+            let handle = cur.func.dfg.constants.insert(vec![3; 16].into());
+            cur.ins().vconst(I8X16, handle)
+        };
+        let diamond_vector = build_diamond(I8X16, false, false, vector, vector);
+        assert_folded(&diamond_vector, Opcode::Vconst);
+    }
+
+    #[test]
+    fn join_of_different_constants_keeps_its_parameter() {
+        for use_before_seal in [false, true] {
+            assert_kept(&build_diamond(
+                I32,
+                false,
+                use_before_seal,
+                |cur| cur.ins().iconst(I32, 7),
+                |cur| cur.ins().iconst(I32, 8),
+            ));
+        }
+        // +0.0 and -0.0 are different constants.
+        assert_kept(&build_diamond(
+            F64,
+            false,
+            false,
+            |cur| cur.ins().f64const(ir::immediates::Ieee64::with_bits(0)),
+            |cur| cur.ins().f64const(ir::immediates::Ieee64::with_bits(1 << 63)),
+        ));
+        // The same bits from different opcodes are different constants.
+        assert_kept(&build_diamond(
+            I32,
+            false,
+            false,
+            |cur| cur.ins().iconst(I32, 0),
+            |cur| {
+                let zero = cur.ins().f32const(ir::immediates::Ieee32::with_bits(0));
+                cur.ins().bitcast(I32, ir::MemFlagsData::new(), zero)
+            },
+        ));
+        // A constant and a computed value.
+        assert_kept(&build_diamond(
+            I32,
+            false,
+            false,
+            |cur| cur.ins().iconst(I32, 1),
+            |cur| {
+                let zero = cur.ins().iconst(I32, 0);
+                cur.ins().iadd_imm_s(zero, 1)
+            },
+        ));
+    }
+
+    #[test]
+    fn stack_map_variable_folds_only_the_null_constant() {
+        for use_before_seal in [false, true] {
+            let diamond = build_diamond(
+                I32,
+                true,
+                use_before_seal,
+                |cur| cur.ins().iconst(I32, 0),
+                |cur| cur.ins().iconst(I32, 0),
+            );
+            let null = assert_folded(&diamond, Opcode::Iconst);
+            assert!(!diamond.ssa.stack_map_values().contains(null));
+
+            // A non-null constant reference keeps the parameter, which stays a
+            // needs-stack-map value.
+            let diamond = build_diamond(
+                I32,
+                true,
+                use_before_seal,
+                |cur| cur.ins().iconst(I32, 4),
+                |cur| cur.ins().iconst(I32, 4),
+            );
+            assert_kept(&diamond);
+            assert!(diamond.ssa.stack_map_values().contains(diamond.joined));
+        }
+    }
+
+    /// ```text
+    /// block0: x = 5; jump block1
+    /// block1: y = x + x; brif y, block3, block2
+    /// block3: x = 5; jump block1
+    /// block2: return
+    /// ```
+    /// The header is used before it is sealed.
+    #[test]
+    fn loop_header_of_equal_entry_and_back_edge_constants_is_a_fresh_constant() {
+        let mut func = Function::new();
+        let mut ssa = SSABuilder::default();
+        let [block0, block1, block2, block3] = [(); 4].map(|()| func.dfg.make_block());
+        let x = Variable::new(0);
+        let mut cur = FuncCursor::new(&mut func);
+        for block in [block0, block1, block3, block2] {
+            cur.insert_block(block);
+            ssa.declare_block(block);
+        }
+        ssa.seal_block(block0, cur.func);
+        let mut cur = cur.at_bottom(block0);
+        let five = cur.ins().iconst(I32, 5);
+        ssa.def_var(x, five, block0);
+        let entry = cur.ins().jump(block1, &[]);
+        ssa.declare_block_predecessor(block1, entry);
+
+        let x_in_header = ssa.use_var(cur.func, x, I32, block1).0;
+        let mut cur = FuncCursor::new(cur.func).at_bottom(block1);
+        let sum = cur.ins().iadd(x_in_header, x_in_header);
+        let to_block3 = cur.ins().brif(sum, block3, &[], block2, &[]);
+        ssa.declare_block_predecessor(block3, to_block3);
+        ssa.declare_block_predecessor(block2, to_block3);
+        ssa.seal_block(block3, cur.func);
+        ssa.seal_block(block2, cur.func);
+
+        // block3 redefines x as another `iconst 5` on one back edge.
+        let mut cur = FuncCursor::new(cur.func).at_bottom(block3);
+        let five_again = cur.ins().iconst(I32, 5);
+        ssa.def_var(x, five_again, block3);
+        let back = cur.ins().jump(block1, &[]);
+        ssa.declare_block_predecessor(block1, back);
+
+        let mut cur = FuncCursor::new(cur.func).at_bottom(block2);
+        cur.ins().return_(&[]);
+        ssa.seal_block(block1, &mut func);
+
+        verify(&func);
+        assert!(func.dfg.block_params(block1).is_empty(), "{}", func.display());
+        assert_eq!(branch_argument_count(&func, entry), 0);
+        assert_eq!(branch_argument_count(&func, back), 0);
+        let value = func.dfg.resolve_aliases(x_in_header);
+        let inst = func.dfg.value_def(value).unwrap_inst();
+        assert_eq!(func.layout.first_inst(block1), Some(inst));
+        assert_eq!(
+            func.dfg.insts[inst],
+            ir::InstructionData::UnaryImm {
+                opcode: Opcode::Iconst,
+                imm: 5.into(),
+            }
+        );
+    }
+
+    /// The header's back edge passes the header's own value (the sentinel)
+    /// and its two entries pass equal constants. Upstream folded one entry
+    /// with the back edge; two equal constants are folded by the patch.
+    #[test]
+    fn join_with_a_cycle_back_to_itself_ignores_the_sentinel() {
+        let mut func = Function::new();
+        let mut ssa = SSABuilder::default();
+        let [block0, block1, block2, header, exit] = [(); 5].map(|()| func.dfg.make_block());
+        let x = Variable::new(0);
+        let mut cur = FuncCursor::new(&mut func);
+        for block in [block0, block1, block2, header, exit] {
+            cur.insert_block(block);
+            ssa.declare_block(block);
+        }
+        ssa.seal_block(block0, cur.func);
+        let mut cur = cur.at_bottom(block0);
+        let condition = cur.ins().iconst(I32, 1);
+        let brif = cur.ins().brif(condition, block1, &[], block2, &[]);
+        let mut entries = Vec::new();
+        for block in [block1, block2] {
+            ssa.declare_block_predecessor(block, brif);
+            ssa.seal_block(block, cur.func);
+            let mut cur_block = FuncCursor::new(cur.func).at_bottom(block);
+            let null = cur_block.ins().iconst(I64, 0);
+            ssa.def_var(x, null, block);
+            let entry = cur_block.ins().jump(header, &[]);
+            ssa.declare_block_predecessor(header, entry);
+            entries.push(entry);
+        }
+        let x_in_header = ssa.use_var(cur.func, x, I64, header).0;
+        let mut cur = FuncCursor::new(cur.func).at_bottom(header);
+        let back = cur.ins().brif(x_in_header, header, &[], exit, &[]);
+        ssa.declare_block_predecessor(header, back);
+        ssa.declare_block_predecessor(exit, back);
+        ssa.seal_block(header, cur.func);
+        ssa.seal_block(exit, cur.func);
+        let mut cur = FuncCursor::new(cur.func).at_bottom(exit);
+        cur.ins().return_(&[]);
+
+        verify(&func);
+        assert!(func.dfg.block_params(header).is_empty(), "{}", func.display());
+        for branch in entries.into_iter().chain([back]) {
+            assert_eq!(branch_argument_count(&func, branch), 0);
+        }
+        let inst = func.dfg.value_def(func.dfg.resolve_aliases(x_in_header)).unwrap_inst();
+        assert_eq!(func.layout.first_inst(header), Some(inst));
     }
 }
