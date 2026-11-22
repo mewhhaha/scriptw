@@ -128,6 +128,10 @@ enum AliasRegionKey {
     /// store.
     GcHeapBaseHome,
 
+    /// Scriptw patch: the region every key beyond the first
+    /// `ALIAS_REGIONS_OF_THEIR_OWN` of a function shares (see there).
+    Shared,
+
     /// An access of a function's home slot for its `vmctx` parameter (see
     /// `func_environ::gc::base_home`), with the same sharing between an
     /// inlined callee and its caller.
@@ -188,6 +192,7 @@ impl AliasRegionKey {
     const REMEMBERED_SLOTS_KIND: u32 = Self::new_kind(0b100001);
     const GC_HEAP_BASE_HOME_KIND: u32 = Self::new_kind(0b100010);
     const VMCTX_HOME_KIND: u32 = Self::new_kind(0b100011);
+    const SHARED_KIND: u32 = Self::new_kind(0b100100);
 
     /// Encode this key into a raw `u32` suitable for use as an
     /// `AliasRegionData::user_id`.
@@ -265,6 +270,7 @@ impl AliasRegionKey {
             AliasRegionKey::DataSegment => Self::DATA_SEGMENT_KIND,
             AliasRegionKey::GcHeapBaseHome => Self::GC_HEAP_BASE_HOME_KIND,
             AliasRegionKey::VmctxHome => Self::VMCTX_HOME_KIND,
+            AliasRegionKey::Shared => Self::SHARED_KIND,
         }
     }
 }
@@ -292,6 +298,7 @@ impl fmt::Debug for AliasRegionKey {
             AliasRegionKey::DataSegment => write!(f, "DataSegment"),
             AliasRegionKey::GcHeapBaseHome => write!(f, "GcHeapBaseHome"),
             AliasRegionKey::VmctxHome => write!(f, "VmctxHome"),
+            AliasRegionKey::Shared => write!(f, "Shared"),
         }
     }
 }
@@ -317,6 +324,28 @@ pub struct AliasRegions<Offsets> {
     cache: std::collections::HashMap<AliasRegionKey, ir::AliasRegion>,
 }
 
+/// Scriptw patch: how many alias regions a function gets before further keys
+/// share one. Cranelift's alias analysis clones and meets a table of every
+/// alias region a function uses at each block, so its cost is the number of
+/// blocks times the number of regions. Every spill slot and every defined
+/// global the function touches used to get a region of its own, so a single
+/// body with thousands of blocks, spill slots and globals (a 2.2 MB Test262
+/// body of 1,200 top-level asserts) spent many minutes in that fixpoint. Keys
+/// first used after this many regions exist share the `Shared` region. Sharing
+/// a region only assumes that the accesses may alias, which is always sound:
+/// their loads are forwarded less, never wrongly. A function that uses at most
+/// this many regions keeps exactly its previous regions.
+const ALIAS_REGIONS_OF_THEIR_OWN: usize = 256;
+
+/// The key whose region `key` uses, given the function's regions so far.
+fn shared_beyond_cap(regions: &ir::AliasRegionSet, key: AliasRegionKey) -> AliasRegionKey {
+    if regions.contains(key.into_raw()) || regions.len() < ALIAS_REGIONS_OF_THEIR_OWN {
+        key
+    } else {
+        AliasRegionKey::Shared
+    }
+}
+
 impl<Offsets> AliasRegions<Offsets> {
     /// Make the alias region for a stack map.
     pub fn stack_map_region(
@@ -325,7 +354,7 @@ impl<Offsets> AliasRegions<Offsets> {
         slot: ir::StackSlot,
         _offset: u32,
     ) -> Option<ir::AliasRegion> {
-        let key = AliasRegionKey::Stack { slot };
+        let key = shared_beyond_cap(regions, AliasRegionKey::Stack { slot });
         let id = key.into_raw();
         if let Some(region) = regions.get(id) {
             Some(region)
@@ -355,10 +384,13 @@ impl<Offsets> AliasRegions<Offsets> {
 
     /// Get the alias region for the given key.
     fn region(&mut self, func: &mut ir::Function, key: AliasRegionKey) -> ir::AliasRegion {
-        *self
-            .cache
-            .entry(key)
-            .or_insert_with(|| func.dfg.alias_regions.insert(key.into()))
+        if let Some(region) = self.cache.get(&key) {
+            return *region;
+        }
+        let shared = shared_beyond_cap(&func.dfg.alias_regions, key);
+        let region = func.dfg.alias_regions.insert(shared.into());
+        self.cache.insert(key, region);
+        region
     }
 }
 

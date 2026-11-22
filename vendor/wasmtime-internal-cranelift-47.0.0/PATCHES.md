@@ -509,3 +509,34 @@ Tests: the crate's unit tests, among them `func_environ::branch_threading::tests
 and `func_environ::gc::frame_reloads::tests::` (which cover the home slots),
 pass unchanged in a debug build.
 
+
+## Alias regions capped per function (2026-11-22)
+
+`src/alias_region.rs`: a function gets an alias region of its own for at most
+the first `ALIAS_REGIONS_OF_THEIR_OWN` (256) keys it uses; keys first used
+after that share the new `AliasRegionKey::Shared` region, both for the
+translator's own regions (`AliasRegions::region`) and for the safepoint
+spiller's stack-map slots (`stack_map_region`).
+
+Why: Cranelift's alias analysis (`cranelift-codegen` 0.134
+`alias_analysis.rs`, `compute_block_input_states`) clones a `LastStores`
+table of every alias region at each block visit and meets it into each
+successor, so its cost is the number of blocks times the number of regions.
+Every spill slot and every defined global a function touches had its own
+region, and a single body with thousands of blocks, spill slots and globals
+spent its compilation there: Test262
+`staging/sm/String/string-code-point-upper-lower-mapping.js` (1,200
+top-level asserts, one 2.2 MB code body) took 178 s in the 2026-11-18
+publication and timed out at 360 s afterwards; its Speed precompile ran past
+900 s and 4 GB. gdb stacks sampled during that compile were all in
+`compute_block_input_states` / `LastStores::meet_from`. With the cap it
+precompiles in 19 s at 1.3 GB. A cap on stack slots alone (64) only brought it
+to 461 s, since defined globals also number in the thousands there.
+
+Why it is sound: two accesses in one region are only assumed to possibly
+alias; that removes load forwarding between them, never adds any. A function
+that uses at most 256 regions inserts exactly the keys it did before, so its
+native code is unchanged. The React Server Components request is unchanged
+(Callgrind, Speed: sync 2,713,498 -> 2,712,790.5, async 2,939,522.5 ->
+2,939,548.5 Ir, both against the null-stack-map build, within noise; exact
+Flight output on all observations).
