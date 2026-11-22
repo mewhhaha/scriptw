@@ -266,6 +266,13 @@ Use the built CLI, original pinned suite and an exact case or subtree first:
 python3 -B scripts/limited_verification.py -- ./target/debug/scriptw --jobs 1 test262 run built-ins/Array/prototype/find --execution-backend wasm-aot --suite-root test262/vendor/test262 --threads 1 --timeout-ms 60000
 ```
 
+For a subtree of more than a few cases, add `--reuse-case-workers`: each worker
+process then serves up to 64 cases, each with a fresh Engine, Realm and Store
+and its own deadline, instead of loading the runtime and recomputing the suite
+pin once per case (`built-ins/WeakMap`, 281 executions: 194 s one-shot, 11 s
+reused). On a managed cloud machine also pass `--cloud-worker-cpus auto` to the
+wrapper; without it the run is pinned to one CPU, and parallel runs share it.
+
 For a full baseline without publication, use a new snapshot family:
 
 ```sh
