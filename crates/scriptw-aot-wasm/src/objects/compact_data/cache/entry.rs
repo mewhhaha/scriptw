@@ -425,12 +425,8 @@ impl FunctionBuilder<'_> {
         for ((_, kind, slot), _) in primitives.into_iter().rev() {
             self.pop_control(ControlFrameKind::Block);
             f.instruction(&Instruction::End);
-            let realm: GcLocal<RealmRecord> = self.load_current_realm(f);
-            let intrinsic = s.reserve_value_local(f);
-            self.emit_load_non_array_realm_intrinsic(&realm, slot, &intrinsic, f);
-            realm.clear(f);
-            let holder = self.emit_realm_prototype_header_or_branch(&intrinsic, exhausted, f);
-            intrinsic.clear(f);
+            let holder =
+                self.emit_primitive_receiver_prototype_header_or_branch(slot, exhausted, f);
             self.emit_record_scan(&head, f, |builder, candidate, next, f| {
                 builder.emit_receiver_rule_or_branch(candidate, kind, None, next, f);
                 builder.emit_recorded_place_hit(
@@ -1299,6 +1295,39 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
+        if storages.contains(&HolderStorage::Intrinsic) {
+            // A protected prototype of the current Realm that still holds
+            // its recorded rows is the header and intrinsic storage the
+            // classification below finds for it; the place is then decided
+            // exactly as its intrinsic arm decides it.
+            let general = self.open_frame(ControlFrameKind::Block, f);
+            let protected = self.emit_protected_prototype_holder_or_branch(
+                &crate::objects::ProtectedPrototype::HOLDER_ORDER,
+                prototype,
+                general,
+                f,
+            );
+            let slot = s.reserve_i32_local(f);
+            s.field(OwnDataReadCacheSchema::HOLDER_SLOT)
+                .read(record, s, f)
+                .store(slot, f);
+            found.set_constant(0, f);
+            self.emit_recorded_intrinsic_place(
+                record,
+                &protected.header,
+                &protected.rows,
+                slot,
+                value,
+                found,
+                miss,
+                answer,
+                f,
+            )?;
+            s.release_i32_local(slot, f);
+            protected.clear(f);
+            self.pop_control(ControlFrameKind::Block);
+            f.instruction(&Instruction::End);
+        }
         let holder = self.emit_prototype_header_or_branch(prototype, miss, f);
         self.emit_recorded_place_hit_on(
             storages, record, &holder, key, value, found, miss, answer, f,
@@ -1657,6 +1686,48 @@ impl FunctionBuilder<'_> {
         object
     }
 
+    /// The ordinary header of the current Realm's prototype in `slot` for a
+    /// primitive receiver, which ToObject would box with it: for String,
+    /// the one the Realm's armed protector record holds, which is the
+    /// table's; otherwise, or before the record is armed, the table's, by
+    /// `emit_realm_prototype_header_or_branch`.
+    pub(super) fn emit_primitive_receiver_prototype_header_or_branch(
+        &mut self,
+        slot: NonArrayRealmIntrinsicSlot,
+        miss: ControlTarget,
+        f: &mut Function,
+    ) -> GcLocal<OrdinaryObject> {
+        let s = self.runtime_schema();
+        let header = s
+            .reserve_gc_local::<OrdinaryObject, Nullable>(f)
+            .initialize_null(s, f);
+        let done = self.open_frame(ControlFrameKind::Block, f);
+        if matches!(slot, NonArrayRealmIntrinsicSlot::StringPrototype) {
+            let table = self.open_frame(ControlFrameKind::Block, f);
+            let protected = self.emit_string_prototype_header_or_branch(table, f);
+            header.replace(protected.load(s, f).nullable(), f);
+            protected.clear(f);
+            self.emit_branch_to_target(done, f);
+            self.pop_control(ControlFrameKind::Block);
+            f.instruction(&Instruction::End);
+        }
+        let realm: GcLocal<RealmRecord> = self.load_current_realm(f);
+        let intrinsic = s.reserve_value_local(f);
+        self.emit_load_non_array_realm_intrinsic(&realm, slot, &intrinsic, f);
+        realm.clear(f);
+        let table = self.emit_realm_prototype_header_or_branch(&intrinsic, miss, f);
+        intrinsic.clear(f);
+        header.replace(table.load(s, f).nullable(), f);
+        table.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let object = s
+            .reserve_non_null_gc_local(f)
+            .initialize(header.load(s, f).require_non_null(f), f);
+        header.clear(f);
+        object
+    }
+
     /// The ordinary header of a Realm's String or Number prototype, a
     /// primitive wrapper or an ordinary object; anything else branches to
     /// `miss`.
@@ -1866,22 +1937,10 @@ impl FunctionBuilder<'_> {
                         ),
                         f,
                     );
-                    s.field(IntrinsicPropertyStorageSchema::ADDRESS)
-                        .read(&intrinsic, s, f);
-                    s.field(OwnDataReadCacheSchema::HOLDER_LAYOUT)
-                        .read(record, s, f);
-                    f.instruction(&Instruction::I32Ne);
-                    self.emit_branch_if_to_target(miss, f);
-                    slot.load(f);
-                    f.instruction(&Instruction::I32Const(0));
-                    f.instruction(&Instruction::I32GeS);
-                    f.instruction(&Instruction::If(BlockType::Empty));
-                    self.emit_materialized_intrinsic_group(&intrinsic, slot, value, found, f);
-                    f.instruction(&Instruction::Else);
-                    self.emit_recorded_holder_absence(holder, slot, value, found, miss, f)?;
-                    f.instruction(&Instruction::End);
+                    self.emit_recorded_intrinsic_place(
+                        record, holder, &intrinsic, slot, value, found, miss, answer, f,
+                    )?;
                     intrinsic.clear(f);
-                    self.emit_found_answer_or_miss(found, value, miss, answer, f);
                     self.pop_control(ControlFrameKind::Block);
                     f.instruction(&Instruction::End);
                 }
@@ -1945,6 +2004,42 @@ impl FunctionBuilder<'_> {
         }
         s.release_i32_local(slot, f);
         holder_base.clear(f);
+        Ok(())
+    }
+
+    /// Answers the record's place on `holder`, whose storage is the
+    /// intrinsic `intrinsic`, or branches to `miss`; nothing falls through.
+    /// An intrinsic layout is immutable: storage at the recorded address has
+    /// the same rows, and keeps each materialized value in its group.
+    #[allow(clippy::too_many_arguments)]
+    fn emit_recorded_intrinsic_place(
+        &mut self,
+        record: &GcLocal<OwnDataReadCache>,
+        holder: &GcLocal<OrdinaryObject>,
+        intrinsic: &GcLocal<IntrinsicPropertyStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        found: I32Local,
+        miss: ControlTarget,
+        answer: ReadAnswer,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        s.field(IntrinsicPropertyStorageSchema::ADDRESS)
+            .read(intrinsic, s, f);
+        s.field(OwnDataReadCacheSchema::HOLDER_LAYOUT)
+            .read(record, s, f);
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(miss, f);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32GeS);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        self.emit_materialized_intrinsic_group(intrinsic, slot, value, found, f);
+        f.instruction(&Instruction::Else);
+        self.emit_recorded_holder_absence(holder, slot, value, found, miss, f)?;
+        f.instruction(&Instruction::End);
+        self.emit_found_answer_or_miss(found, value, miss, answer, f);
         Ok(())
     }
 

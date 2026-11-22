@@ -1,5 +1,6 @@
-//! Two private shape roots per runtime instance. They retain primitive key
-//! strings and immutable attributes only, never functions, values or Realms.
+//! Three private shape roots per runtime instance: the two native metadata
+//! shapes and the iterator result shape. They retain primitive key strings
+//! and immutable attributes only, never functions, values or Realms.
 use super::*;
 
 impl GcI32Constant for crate::heap::DescriptorWord {
@@ -40,5 +41,22 @@ impl RuntimeSchema {
         shape.load(self, function);
         emit_root_set(function, self.fixed_native_metadata);
         function.instruction(&Instruction::End);
+    }
+
+    pub(crate) fn load_iterator_result_shape(
+        &self,
+        output: &GcLocal<CompactDataShape, Nullable>,
+        function: &mut Function,
+    ) {
+        output.replace(self.iterator_result_shape.load_nullable(function), function);
+    }
+
+    pub(crate) fn publish_iterator_result_shape(
+        &self,
+        shape: &GcLocal<CompactDataShape>,
+        function: &mut Function,
+    ) {
+        shape.load(self, function);
+        emit_root_set(function, self.iterator_result_shape);
     }
 }

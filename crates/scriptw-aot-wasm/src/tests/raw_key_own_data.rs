@@ -160,3 +160,75 @@ fn computed_getv_hits_leave_before_boxing_conversion_and_full_lookup() {
         assert!(checked > 0, "inspect actual source variants");
     }
 }
+
+#[test]
+fn indexed_callees_read_packed_elements_inline_and_keep_the_complete_get() {
+    // `steps[0](row)` and `steps[k](row)` fetch the callee with the raw-key
+    // probe of a computed GetV read; the complete Get stays as the miss.
+    for source in [
+        "var steps;function frame(row){return steps[0](row);} frame;",
+        "var steps;function frame(row,k){var f=steps[k](row);return f;} frame;",
+    ] {
+        let artifact = emit_script(source).expect("indexed callee emits");
+        Validator::new_with_features(crate::runtime_artifact::program_validation_features())
+            .validate_all(&artifact.bytes)
+            .expect("indexed callee guards preserve typed GC roots");
+        let imports = runtime_imports(&artifact);
+        let complete = imports
+            .iter()
+            .find_map(|(index, name)| (name == "helper::dynamic_property_read").then_some(*index))
+            .expect("the complete Get remains linked");
+        let names = function_names(&artifact);
+        let mut index = imported_function_count(&artifact);
+        let mut checked = 0;
+        for payload in Parser::new(0).parse_all(&artifact.bytes) {
+            let Payload::CodeSectionEntry(body) = payload.unwrap() else {
+                continue;
+            };
+            if names
+                .get(&index)
+                .is_some_and(|name| name.starts_with("js::frame#"))
+            {
+                let operators = crate::tests::emitted_operators(&body);
+                let mut probes = 0;
+                for (guard, window) in operators.windows(4).enumerate() {
+                    let [Operator::LocalGet { .. }, Operator::I32Const { value }, Operator::I32Eq, Operator::If { .. }] =
+                        window
+                    else {
+                        continue;
+                    };
+                    if *value != WasmRuntimeValueTag::Number as i32 {
+                        continue;
+                    }
+                    let end = branch_end(&operators, guard + 4);
+                    // The probe's found word selects the complete Get.
+                    let Some([Operator::LocalGet { .. }, Operator::I32Eqz, Operator::If { .. }]) =
+                        operators.get(end + 1..end + 4)
+                    else {
+                        continue;
+                    };
+                    let branch = &operators[guard + 4..end];
+                    assert!(branch
+                        .iter()
+                        .any(|op| matches!(op, Operator::ArrayGet { .. })));
+                    assert!(
+                        !branch.iter().any(|op| matches!(op, Operator::Call { .. })),
+                        "a packed hit calls nothing"
+                    );
+                    let miss_end = branch_end(&operators, end + 4);
+                    assert!(
+                        operators[end + 4..miss_end].iter().any(
+                            |op| matches!(op, Operator::Call { function_index } if *function_index == complete)
+                        ),
+                        "a miss takes the complete Get"
+                    );
+                    probes += 1;
+                }
+                assert_eq!(probes, 1, "the callee has one guarded packed read");
+                checked += 1;
+            }
+            index += 1;
+        }
+        assert_eq!(checked, 1, "inspect the actual caller");
+    }
+}

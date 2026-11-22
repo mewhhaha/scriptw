@@ -34,6 +34,7 @@ mod infallible_booleans;
 mod internal_definition;
 mod iterator_helper_dispatch;
 mod json_enumerable_keys;
+mod json_stringify_plain_entry;
 mod numeric_bitwise_emission;
 mod ordinary_receiver_definition;
 mod own_descriptor_predicates;

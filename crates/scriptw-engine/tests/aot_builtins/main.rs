@@ -29,6 +29,7 @@ mod aot_define_property_entry;
 mod aot_flat_map;
 mod aot_float16_array;
 mod aot_for_in_enumeration;
+mod aot_fresh_builtin_results;
 mod aot_from_property_descriptor_fields;
 mod aot_function_apply_resizable;
 mod aot_function_caller;
@@ -46,6 +47,7 @@ mod aot_iterator_materialization;
 mod aot_json_canonical_reviver;
 mod aot_json_reviver_definitions;
 mod aot_json_stringify_direct_members;
+mod aot_json_stringify_plain_entry;
 mod aot_json_stringify_preparation;
 mod aot_legacy_accessor_definers;
 mod aot_live_prototype_consumers;
@@ -103,5 +105,6 @@ mod reflect_descriptor_object_realm;
 mod aot_web_events;
 
 mod aot_readable_byte_stream;
+mod aot_realm_protectors;
 
 mod aot_for_in_prefix_copy;

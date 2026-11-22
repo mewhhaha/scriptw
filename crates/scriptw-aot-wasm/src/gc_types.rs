@@ -540,6 +540,7 @@ impl RuntimeGcTypes {
         let stored_undefined = StoredUndefinedGlobal::declare(&self.layouts, &mut globals);
         let configurable_native_metadata = GcRootGlobal::declare(&self.layouts, &mut globals);
         let fixed_native_metadata = GcRootGlobal::declare(&self.layouts, &mut globals);
+        let iterator_result_shape = GcRootGlobal::declare(&self.layouts, &mut globals);
         let compact_shapes = CompactShapeGlobals::declare(&self.layouts, &mut globals);
         let snapshot =
             snapshot.then(|| snapshot::SnapshotRoots::declare(&self.layouts, &mut globals));
@@ -582,6 +583,7 @@ impl RuntimeGcTypes {
             stored_undefined,
             configurable_native_metadata,
             fixed_native_metadata,
+            iterator_result_shape,
             compact_shapes,
             snapshot,
             module_guards: ModuleGuardGlobals {
@@ -916,6 +918,7 @@ pub(crate) struct RuntimeSchema {
     stored_undefined: StoredUndefinedGlobal,
     configurable_native_metadata: GcRootGlobal<CompactDataShape>,
     fixed_native_metadata: GcRootGlobal<CompactDataShape>,
+    iterator_result_shape: GcRootGlobal<CompactDataShape>,
     compact_shapes: CompactShapeGlobals,
     snapshot: Option<snapshot::SnapshotRoots>,
     module_guards: ModuleGuardGlobals,

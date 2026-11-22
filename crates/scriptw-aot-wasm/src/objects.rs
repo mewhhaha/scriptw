@@ -53,6 +53,7 @@ mod packed_array_builtin;
 mod packed_array_index;
 mod plain_data_literal;
 pub(crate) use compact_data::MAX_COMPACT_SHAPE_KEYS;
+pub(crate) use compact_data::{ChainAnswer, ChainKey};
 pub(crate) use plain_data_literal::MAX_COMPACT_DATA_FIELDS;
 mod runtime_helpers;
 mod simple_own_data_read;
@@ -73,6 +74,8 @@ mod proxy_target_descriptor;
 mod regexp_literal;
 pub(crate) use proxy_target_descriptor::CompletedProxyTargetDescriptor;
 mod raw_numeric_array_read;
+mod realm_protectors;
+use realm_protectors::ProtectedPrototype;
 mod typed_array_elements;
 mod typed_array_species_create;
 

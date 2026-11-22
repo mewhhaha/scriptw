@@ -171,7 +171,12 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // without stores, `local.set; local.get` is one `local.tee`, constant
 // indices and tag-set tests fold, and source-depth overflow is outlined.
 // Images and bundles keyed by version 83 hold different R bytes.
-const LAYOUT_VERSION: u32 = 84;
+// Version 85 is the 2026-11-22 performance batch: RealmRecord gains the
+// PROTECTORS record (intrinsic prototypes and the storage they held when the
+// Realm's intrinsics were complete), InstanceofSiteRecord gains TERMINAL, a
+// root global caches the {value, done} iterator-result shape, and R gains the
+// json_stringify_plain_value helper.
+const LAYOUT_VERSION: u32 = 85;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

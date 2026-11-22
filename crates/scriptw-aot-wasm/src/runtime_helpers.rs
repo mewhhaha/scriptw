@@ -1382,6 +1382,7 @@ runtime_helper_domain! {
     CodeUnitFind / CodeUnitFindArguments / CodeUnitFindParameters / "code_unit_find" { units:(Ref CodeUnitArray NonNullable),start:I32,end:I32,unit:I32 } => I32;
     JsonPlainRun / JsonPlainRunArguments / JsonPlainRunParameters / "json_plain_run" { source:(Ref CodeUnitArray NonNullable),start:I32,end:I32,target:(Ref CodeUnitArray NonNullable),at:I32 } => I32;
     JsonStringifyValue / JsonStringifyValueArguments / JsonStringifyValueParameters / "json_stringify_value" { holder:Value,key:Value,fetched:I32,context:(Ref JsonStringifyContext NonNullable),indent:I64,caller_program:Program } => Completion;
+    JsonStringifyPlainValue / JsonStringifyPlainValueArguments / JsonStringifyPlainValueParameters / "json_stringify_plain_value" { value:Value,key:Value,context:(Ref JsonStringifyContext NonNullable),indent:I64,caller_program:Program } => Completion;
 }
 
 impl RuntimeHelperId {
@@ -1586,7 +1587,7 @@ impl RuntimeHelperId {
             Self::AsciiNarrow | Self::AsciiWiden | Self::CodeUnitFind | Self::JsonPlainRun => {
                 HelperOwner::Runtime
             }
-            Self::JsonStringifyValue => HelperOwner::Runtime,
+            Self::JsonStringifyValue | Self::JsonStringifyPlainValue => HelperOwner::Runtime,
             Self::CompactArrayLiteral => HelperOwner::Program,
             Self::InitializeInstanceElements => HelperOwner::ContextHook,
         }
@@ -1770,7 +1771,9 @@ impl RuntimeHelperId {
             Self::GlobalVarDeclarationCheck => true,
             Self::GlobalVarDeclarationInstall => true,
             Self::AsciiNarrow | Self::AsciiWiden | Self::CodeUnitFind | Self::JsonPlainRun => true,
-            Self::JsonStringifyValue => emission.holds(RuntimeHelperFact::UsesJsonStringify),
+            Self::JsonStringifyValue | Self::JsonStringifyPlainValue => {
+                emission.holds(RuntimeHelperFact::UsesJsonStringify)
+            }
             Self::CompactArrayLiteral => true,
             Self::InitializeInstanceElements => true,
         }
@@ -2028,13 +2031,19 @@ mod tests {
 
     #[test]
     // Retain the original control ID while checking the complete conditional domain.
-    fn json_stringify_is_the_only_conditional_helper() {
+    fn json_stringify_helpers_are_the_only_conditional_helpers() {
         let conditional = RuntimeHelperId::ALL
             .iter()
             .copied()
             .filter(|helper| helper.is_conditional())
             .collect::<Vec<_>>();
-        assert_eq!(conditional, vec![RuntimeHelperId::JsonStringifyValue]);
+        assert_eq!(
+            conditional,
+            vec![
+                RuntimeHelperId::JsonStringifyValue,
+                RuntimeHelperId::JsonStringifyPlainValue
+            ]
+        );
     }
 
     /// Every hint names a distinct body, and every body is a real helper in

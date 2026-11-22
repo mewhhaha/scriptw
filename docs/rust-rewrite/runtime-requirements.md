@@ -73,7 +73,7 @@ every engine or a fallback implementation for engines missing Wasm GC.
 
 ## Runtime ABI
 
-The runtime ABI is **84**. Portable bundles and native images built under an
+The runtime ABI is **85**. Portable bundles and native images built under an
 earlier ABI must be rebuilt. ABIs 58 to 77 added per-site read, write,
 `instanceof` and global read records, a dictionary position hint on Strings,
 further native call entries, one JSON output accumulator, compact shape
@@ -89,7 +89,12 @@ recursion depth global that bounds helper recursion (see
 [implementation limits](#implementation-limits)). ABI 84 changes no
 interface: it re-emits R with fewer null refinements, stores and copies
 (see [locals and GC roots](#locals-and-gc-roots)), so R's bytes and key
-differ. `LAYOUT_VERSION` in
+differ. ABI 85 adds the per-Realm protector record (each intrinsic
+prototype and the intrinsic storage it held when the Realm's intrinsics were
+complete; a fast path checks that identity against the live object), the
+`instanceof` site record's terminal `%Object.prototype%`, a cached
+`{value, done}` iterator-result shape and the plain `JSON.stringify` helper.
+`LAYOUT_VERSION` in
 `crates/scriptw-aot-wasm/src/runtime_artifact.rs` records each step.
 
 ### Locals and GC roots

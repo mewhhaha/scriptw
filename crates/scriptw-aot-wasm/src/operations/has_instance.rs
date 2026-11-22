@@ -17,7 +17,9 @@ use crate::runtime_helpers::{
     InstanceofEntryParameters, ObjectGetPrototypeOfArguments, RuntimeHelperId,
 };
 
+mod chain;
 mod site;
+pub(crate) use chain::ActiveInstanceofRun;
 
 /// The site word of a request that has no operator site: the native method
 /// and operators compiled outside source code. Site ids are never negative.
@@ -227,16 +229,25 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local::<crate::gc_types::Environment, Nullable>(function)
             .initialize(source.load(schema, function).nullable(), function);
         source.clear(function);
+        // A site of an `instanceof` run shares V's walked chain with the
+        // run's other sites (`has_instance/chain.rs`).
+        let run = self.instanceof_run.take();
+        let run_site = run.as_ref().and_then(|run| run.site(left));
         let done = self.open_frame(ControlFrameKind::Block, function);
         let slow = self.open_frame(ControlFrameKind::Block, function);
         // A site's records answer it, or it is in its first uses.
         self.rarely_taken(slow, function);
         self.emit_instanceof_global_answer(
-            read, cell, instance, &global, &object, answer, slow, function,
+            read, cell, instance, &global, &object, answer, slow, run_site, function,
         );
         self.emit_branch_to_target(done, function);
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
+        // From here on G's read and HasInstance may run user code.
+        if let Some(site) = run_site {
+            site.chain.forget(function);
+        }
+        self.instanceof_run = run;
         let constructor = schema.reserve_value_local(function);
         match operand {
             GlobalReadOperand::Identifier(identifier) => self
@@ -2254,4 +2265,20 @@ fn emit_return_answer(answer: EntryAnswer, f: &mut Function) {
 /// Whether `tag` is an Object tag: one unsigned range test.
 fn emit_is_object_tag_i32(tag: crate::gc_types::I32Local, f: &mut Function) {
     crate::gc_types::emit_tag_in(tag, crate::gc_types::OBJECT_TAGS, f);
+}
+
+/// Whether V's chain ends at `next`: null, or a TERMINAL whose [[Prototype]]
+/// is immutably null. A record without TERMINAL holds null there, which
+/// `next` then equals only when it is null itself.
+fn emit_chain_ends_i32(
+    next: &GcLocal<JavaScriptObject, Nullable>,
+    terminal: &GcLocal<JavaScriptObject, Nullable>,
+    s: &RuntimeSchema,
+    f: &mut Function,
+) {
+    let _ = next.load(s, f);
+    let _ = terminal.load(s, f);
+    f.instruction(&Instruction::RefEq);
+    next.load(s, f).is_null(f);
+    f.instruction(&Instruction::I32Or);
 }

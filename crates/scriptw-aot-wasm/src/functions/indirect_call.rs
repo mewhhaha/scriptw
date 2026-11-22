@@ -77,7 +77,7 @@ impl FunctionBuilder<'_> {
         let schema = self.runtime_schema();
         let callee = schema.reserve_value_local(function);
         let receiver = schema.reserve_value_local(function);
-        self.compile_expr_to_value(callee_expression, &callee, function)?;
+        self.compile_callee_to_value(callee_expression, &callee, function)?;
         self.emit_propagate_current_throw_if_needed(function);
         match this_expression {
             Some(expression) => {
@@ -231,6 +231,84 @@ impl FunctionBuilder<'_> {
         receiver.clear(function);
         callee.clear(function);
         Ok(())
+    }
+
+    /// The callee of `base[key](...)` with a key that may be a Number: the
+    /// base, then the key, then the same conversion-free own-data probe that
+    /// a computed GetV read (`rows[i & 63]`) uses, which answers a present
+    /// packed element of an actual Array without ToObject, ToPropertyKey or
+    /// a call. Every other case, a miss of any of its guards included, takes
+    /// the complete Get with the same evaluated base and raw key, exactly as
+    /// the read would on its own. The base value is the call's `this`
+    /// through the call's own materialized receiver binding.
+    fn compile_callee_to_value(
+        &mut self,
+        callee_expression: &TypedExpr,
+        callee: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let Some(read) = IndexedCalleeRead::of(callee_expression) else {
+            return self.compile_expr_to_value(callee_expression, callee, function);
+        };
+        // A projected `arguments` read keeps its own route.
+        if self.compile_projected_arguments_read(callee_expression, callee, function)? {
+            return Ok(());
+        }
+        let schema = self.runtime_schema();
+        let base = schema.reserve_value_local(function);
+        self.compile_expr_to_value(read.base, &base, function)?;
+        let key = schema.reserve_value_local(function);
+        self.compile_expr_to_value(read.key, &key, function)?;
+        let pending = schema.reserve_completion(function);
+        let found = self.emit_raw_numeric_array_own_data_read(&base, &key, &pending, function);
+        found.load(function);
+        schema.release_i32_local(found, function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        schema
+            .call_helper(
+                crate::runtime_helpers::DynamicPropertyReadArguments::new(
+                    &base,
+                    &base,
+                    &key,
+                    self.current_environment(),
+                    self.current_program(),
+                ),
+                self.runtime_helper_base()?,
+                function,
+            )
+            .store(&pending, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        key.clear(function);
+        base.clear(function);
+        self.emit_propagate_pending_throw(&pending, &[pending.value()], function);
+        callee.copy_from(pending.value(), function);
+        pending.clear(function);
+        Ok(())
+    }
+}
+
+/// `base[key]` as a callee, where `key` is a computed key that may be a
+/// Number and `base` may be an Array: the only reads the raw-key probe can
+/// answer. Lowering gives a constant index (`steps[0]`) this form.
+struct IndexedCalleeRead<'a> {
+    base: &'a TypedExpr,
+    key: &'a TypedExpr,
+}
+
+impl<'a> IndexedCalleeRead<'a> {
+    fn of(callee: &'a TypedExpr) -> Option<Self> {
+        let ExprIr::PropertyRead {
+            target,
+            key: PropertyKeyIr::ArrayIndex(key) | PropertyKeyIr::StringExpr(key),
+        } = &callee.expr
+        else {
+            return None;
+        };
+        (target.possible_kinds.contains(ValueKind::Array)
+            && key.possible_kinds.contains(ValueKind::Number))
+        .then_some(Self { base: target, key })
     }
 }
 

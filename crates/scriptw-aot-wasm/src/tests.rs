@@ -11,6 +11,7 @@ mod binary_numeric_callback;
 mod bootstrap_compact_metadata;
 mod bootstrap_undefined;
 mod call_arity;
+mod captured_loop_reads;
 mod constant_leaf;
 mod constant_regexp_sites;
 mod date_demand_initialization;
@@ -22,6 +23,7 @@ mod gc_local_writes;
 mod guarded_number_add;
 mod guarded_number_relational;
 mod immutable_global_read;
+mod instanceof_typeof_chains;
 mod intl_demand_initialization;
 mod intrinsic_accessor_allocation;
 mod intrinsic_array_read;
@@ -38,6 +40,7 @@ mod private_numeric_remainder;
 mod program_cache_pages;
 mod program_entry_outlining;
 mod property_value_writeback;
+mod realm_protectors;
 mod regexp_demand_initialization;
 mod regexp_programs;
 mod runtime_error_for_throw;
@@ -657,13 +660,13 @@ fn the_size_report_file_is_the_same_traversal_as_the_typed_report() {
 #[test]
 fn runtime_helper_count_is_derived_not_asserted() {
     // The same registry partitions helpers between R and P. Full bootstrap
-    // emits the JSON helper even when source never mentions JSON.
+    // emits the JSON helpers even when source never mentions JSON.
     assert_eq!(
         RuntimeHelperId::ALL
             .iter()
             .filter(|helper| helper.is_conditional())
             .count(),
-        1
+        2
     );
     let expected_program = RuntimeHelperId::ALL
         .iter()

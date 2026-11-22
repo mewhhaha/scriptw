@@ -590,6 +590,101 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         Ok(())
     }
+    /// Leaves in `fresh` whether Array.from's result is a fresh actual Array
+    /// that no code but this builtin can reach before it returns: `this` is
+    /// not a constructor (ArrayCreate) or is the current realm's own %Array%,
+    /// whose [[Construct]] with itself as NewTarget is ArrayCreate with its
+    /// non-writable, non-configurable "prototype" and runs no code. Neither
+    /// mapFn nor the iterator ever receives the result, so
+    /// CreateDataPropertyOrThrow on it always defines a default data element
+    /// at an array index. Every other constructor (a subclass, a Proxy, a
+    /// bound function, another realm's %Array%) keeps the generic definition.
+    fn emit_array_from_fresh_target(
+        &mut self,
+        constructor: &ValueLocals,
+        target: &ValueLocals,
+        fresh: I32Local,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        self.emit_is_constructor_i32(constructor, f);
+        f.instruction(&Instruction::I32Eqz);
+        let realm = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_current_function_realm(f), f);
+        let canonical = s.reserve_value_local(f);
+        self.emit_load_non_array_realm_intrinsic(
+            &realm,
+            crate::functions::NonArrayRealmIntrinsicSlot::ArrayConstructor,
+            &canonical,
+            f,
+        );
+        constructor.reference().load(f);
+        canonical.reference().load(f);
+        f.instruction(&Instruction::RefEq);
+        constructor.reference().load(f);
+        f.instruction(&Instruction::RefIsNull);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Or);
+        target.reference().load(f);
+        f.instruction(&Instruction::RefTestNonNull(
+            s.reference_type::<ArrayObject>(crate::gc_types::GcNullability::NonNullable)
+                .heap_type,
+        ));
+        f.instruction(&Instruction::I32And);
+        fresh.store(f);
+        canonical.clear(f);
+        realm.clear(f);
+    }
+
+    /// CreateDataPropertyOrThrow(A, ! ToString(index), value). On a fresh
+    /// result (see [`Self::emit_array_from_fresh_target`]) at an array index
+    /// this is the default data publication by integer key; `grow_length`
+    /// marks the iterator path, whose ArrayCreate(0) result has `length`
+    /// equal to `index` here, so the definition sets it to `index + 1`. The
+    /// fast arm leaves the normal `pending` untouched.
+    #[allow(clippy::too_many_arguments)]
+    fn emit_array_from_define(
+        &mut self,
+        fresh: I32Local,
+        target: &ValueLocals,
+        index: I64Local,
+        value: &ValueLocals,
+        grow_length: bool,
+        pending: &CompletionLocals,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        fresh.load(f);
+        index.load(f);
+        f.instruction(&Instruction::I64Const(i64::from(u32::MAX)));
+        f.instruction(&Instruction::I64LtU);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        let array = s
+            .reserve_gc_local(f)
+            .initialize(target.cast_reference::<ArrayObject>(s, f), f);
+        if grow_length {
+            let length = s.reserve_i64_local(f);
+            index.load(f);
+            f.instruction(&Instruction::I64Const(1));
+            f.instruction(&Instruction::I64Add);
+            length.store(f);
+            s.field(ArrayObjectSchema::LENGTH)
+                .write(&array, GcOperand::i64_local(length), s, f);
+            s.release_i64_local(length, f);
+        }
+        self.emit_array_indexed_publish_default_data(&array, index, value, f)?;
+        array.clear(f);
+        f.instruction(&Instruction::Else);
+        let key = self.emit_array_native_index_key(index, f)?;
+        self.emit_create_data_property_or_throw(target, &key, value, pending, f)?;
+        key.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        Ok(())
+    }
     pub(crate) fn emit_array_from_builtin(&mut self, f: &mut Function) -> Result<(), EmitError> {
         let s = self.runtime_schema();
         let constructor = s.reserve_value_local(f);
@@ -605,6 +700,7 @@ impl FunctionBuilder<'_> {
         let length = s.reserve_i64_local(f);
         let mapping = s.reserve_i32_local(f);
         let done = s.reserve_i32_local(f);
+        let fresh = s.reserve_i32_local(f);
         self.compile_this_to_locals(&constructor, f)?;
         self.emit_builtin_arg_to_value(0, &items, f);
         self.emit_builtin_arg_to_value(1, &mapper, f);
@@ -663,6 +759,7 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.emit_array_native_target(&constructor, None, &target, f)?;
+        self.emit_array_from_fresh_target(&constructor, &target, fresh, f);
         let argv = self.emit_pre_evaluated_arg_vector(&[], f);
         self.emit_function_or_proxy_call_with_argv(&method, &items, &argv, &pending, f)?;
         argv.clear(f);
@@ -696,9 +793,7 @@ impl FunctionBuilder<'_> {
         self.emit_array_from_mapper(mapping, &mapper, &this_arg, index, &value, &pending, f)?;
         self.emit_array_from_close_if_abrupt(&iterator, &pending, exit, f)?;
         value.copy_from(pending.value(), f);
-        let key = self.emit_array_native_index_key(index, f)?;
-        self.emit_create_data_property_or_throw(&target, &key, &value, &pending, f)?;
-        key.clear(f);
+        self.emit_array_from_define(fresh, &target, index, &value, true, &pending, f)?;
         self.emit_array_from_close_if_abrupt(&iterator, &pending, exit, f)?;
         index.load(f);
         f.instruction(&Instruction::I64Const(1));
@@ -730,6 +825,7 @@ impl FunctionBuilder<'_> {
         self.emit_to_length_i64_from_value_locals(&value, length, &pending, f)?;
         self.emit_array_native_propagate(&pending, f);
         self.emit_array_native_target(&constructor, Some(length), &target, f)?;
+        self.emit_array_from_fresh_target(&constructor, &target, fresh, f);
         f.instruction(&Instruction::I64Const(0));
         index.store(f);
         let finished = self.open_frame(ControlFrameKind::Block, f);
@@ -744,9 +840,8 @@ impl FunctionBuilder<'_> {
         self.emit_array_from_mapper(mapping, &mapper, &this_arg, index, &value, &pending, f)?;
         self.emit_array_native_propagate(&pending, f);
         value.copy_from(pending.value(), f);
-        let key = self.emit_array_native_index_key(index, f)?;
-        self.emit_create_data_property_or_throw(&target, &key, &value, &pending, f)?;
-        key.clear(f);
+        // ArrayCreate(len) made `length` already `len` on a fresh result.
+        self.emit_array_from_define(fresh, &target, index, &value, false, &pending, f)?;
         self.emit_array_native_propagate(&pending, f);
         index.load(f);
         f.instruction(&Instruction::I64Const(1));
@@ -770,6 +865,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
+        s.release_i32_local(fresh, f);
         s.release_i32_local(done, f);
         s.release_i32_local(mapping, f);
         s.release_i64_local(length, f);

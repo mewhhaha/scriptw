@@ -307,13 +307,13 @@ fn date_recipe_and_realm_fit_the_actual_copying_collector_records() {
     assert!(recipe.fields[0].is_gc_ref);
 
     let realm = collector_layout(schema.struct_type::<RealmRecord>().type_index().raw());
-    assert_eq!(realm.size, 96);
+    assert_eq!(realm.size, 112);
     assert_eq!(realm.align, 16);
-    assert_eq!(realm.fields.len(), 18);
+    assert_eq!(realm.fields.len(), 19);
     assert_eq!(realm.fields.len(), RealmRecord::FIELD_COUNT as usize);
     assert_eq!(
         realm.fields.iter().filter(|field| field.is_gc_ref).count(),
-        10
+        11
     );
 }
 

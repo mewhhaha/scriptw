@@ -125,12 +125,21 @@ impl FunctionBuilder<'_> {
         needle_units.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        let last = s.reserve_i32_local(f);
+        bound.load(f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Add);
+        f.instruction(&Instruction::I32WrapI64);
+        last.store(f);
         let next = self.open_frame(ControlFrameKind::Loop, f);
         cursor.load(f);
         bound.load(f);
         f.instruction(&Instruction::I64GtU);
         self.emit_branch_if_to_target(done, f);
-        // A position whose first unit differs cannot match a nonempty needle.
+        // A position whose first unit differs cannot match a nonempty needle:
+        // the leaf kernel skips to the next position holding that unit, or
+        // to one past the last position that leaves room for the needle.
+        // Its first unit equal, a one-unit needle matches without a compare.
         needle_length.load(f);
         f.instruction(&Instruction::I64Eqz);
         f.instruction(&Instruction::I32Eqz);
@@ -138,18 +147,27 @@ impl FunctionBuilder<'_> {
         cursor.load(f);
         f.instruction(&Instruction::I32WrapI64);
         at.store(f);
-        s.array_type::<CodeUnitArray>()
-            .read(&units, at, s, f)
-            .store(at, f);
+        s.call_helper(
+            crate::runtime_helpers::CodeUnitFindArguments::new(&units, at, last, first),
+            self.runtime_helper_base()
+                .expect("native string search requires its registered find helper"),
+            f,
+        )
+        .store(at, f);
         at.load(f);
-        first.load(f);
-        f.instruction(&Instruction::I32Ne);
+        f.instruction(&Instruction::I64ExtendI32U);
+        cursor.store(f);
+        at.load(f);
+        last.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(done, f);
+        needle_length.load(f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Eq);
         self.open_frame(ControlFrameKind::If, f);
         cursor.load(f);
-        f.instruction(&Instruction::I64Const(1));
-        f.instruction(&Instruction::I64Add);
-        cursor.store(f);
-        self.emit_branch_to_target(next, f);
+        found.store(f);
+        self.emit_branch_to_target(done, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
@@ -177,6 +195,7 @@ impl FunctionBuilder<'_> {
         self.emit_branch_to_target(next, f);
         self.pop_control(ControlFrameKind::Loop);
         f.instruction(&Instruction::End);
+        s.release_i32_local(last, f);
         s.release_i32_local(first, f);
         s.release_i32_local(at, f);
         units.clear(f);
@@ -496,7 +515,9 @@ impl FunctionBuilder<'_> {
             .initialize(pending.value().cast_reference::<StringValue>(s, f), f);
         self.emit_native_gc_string_length(input, input_length, f);
         self.emit_native_gc_string_length(&needle, needle_length, f);
-        let list = ArgumentListConstruction::new(self, f);
+        // The result List is private until CreateArrayFromList returns it,
+        // so each piece is appended once into the Array's own packed backing.
+        let list = crate::gc_types::PackedValueListConstruction::allocate(s, f);
         f.instruction(&Instruction::I64Const(0));
         count.store(f);
         f.instruction(&Instruction::I64Const(0));
@@ -598,8 +619,13 @@ impl FunctionBuilder<'_> {
         tail.clear(f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        let completed = list.finish(self, f);
-        let array = self.emit_native_string_list_result_array(completed, f)?;
+        let prototype = self.emit_load_current_function_realm_array_prototype(f);
+        let array = s.reserve_gc_local(f).initialize(
+            self.emit_publish_packed_value_list_with_current_function_realm_prototype(
+                list, prototype, f,
+            )?,
+            f,
+        );
         value.set_reference(&array, s, f);
         output.set_normal(&value, f);
         array.clear(f);

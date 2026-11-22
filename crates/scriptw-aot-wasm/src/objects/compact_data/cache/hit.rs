@@ -124,6 +124,9 @@ impl FunctionBuilder<'_> {
     /// computed: the registration proved that the layout's rows lack the
     /// key, and a use re-proves that the live prototype still has exactly
     /// those rows. Any other word, the unvisited one included, fails.
+    /// The current Realm's %Object.prototype% still holding its recorded
+    /// rows is that tail by its protector (`realm_protectors.rs`), which
+    /// replaces the header, parent and layout tests with two identities.
     pub(super) fn emit_recorded_closed_tail_or_branch(
         &mut self,
         object: &GcLocal<OrdinaryObject>,
@@ -159,6 +162,14 @@ impl FunctionBuilder<'_> {
             let span = self.strings.intrinsic_property_layout_span(
                 crate::intrinsics::IntrinsicPropertyLayoutId::ObjectPrototype,
             )?;
+            // The current Realm's protected %Object.prototype% is this
+            // tail; any other prototype takes the complete proof below.
+            let proved = self.open_frame(ControlFrameKind::Block, f);
+            let general = self.open_frame(ControlFrameKind::Block, f);
+            self.emit_unchanged_object_prototype_or_branch(&prototype, general, f);
+            self.emit_branch_to_target(proved, f);
+            self.pop_control(ControlFrameKind::Block);
+            f.instruction(&Instruction::End);
             let parent = s.reserve_gc_local(f).initialize(
                 prototype.sealed_subtype_or_branch::<OrdinaryObject>(
                     s,
@@ -202,6 +213,8 @@ impl FunctionBuilder<'_> {
                 self.emit_branch_if_to_target(fail, f);
             }
             storage.clear(f);
+            self.pop_control(ControlFrameKind::Block);
+            f.instruction(&Instruction::End);
         } else {
             // Without the layout no record registers this tail.
             self.emit_branch_to_target(fail, f);
@@ -215,7 +228,8 @@ impl FunctionBuilder<'_> {
     /// A missing compact own key can be cached only across these two closed
     /// prototype tails. No object/Realm edge is retained in cache metadata.
     /// Registration additionally proves absence in the sealed intrinsic rows;
-    /// hits need only revalidate that exact immutable layout and null parent.
+    /// hits need only revalidate that exact immutable layout and null parent,
+    /// which the current Realm's %Object.prototype% protector proves alone.
     pub(crate) fn emit_negative_cache_mode(
         &mut self,
         target: &ValueLocals,
@@ -250,6 +264,17 @@ impl FunctionBuilder<'_> {
             let span = self.strings.intrinsic_property_layout_span(
                 crate::intrinsics::IntrinsicPropertyLayoutId::ObjectPrototype,
             )?;
+            if registration_key.is_none() {
+                // The current Realm's protected %Object.prototype% is this
+                // tail. A registration still searches the rows for its key
+                // below.
+                let general = self.open_frame(ControlFrameKind::Block, f);
+                self.emit_unchanged_object_prototype_or_branch(&prototype, general, f);
+                mode.set_constant(NegativeCacheMode::ObjectPrototype.word(), f);
+                self.emit_branch_to_target(exit, f);
+                self.pop_control(ControlFrameKind::Block);
+                f.instruction(&Instruction::End);
+            }
             prototype.is_subtype::<OrdinaryObject>(s, f);
             f.instruction(&Instruction::I32Eqz);
             self.emit_branch_if_to_target(exit, f);

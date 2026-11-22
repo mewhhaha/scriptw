@@ -197,3 +197,54 @@ print(log.join());
     let expected = "true,false,false,true,true,false,0,false,true,false,true/true/true,true,false,3,true,false,false,true,true,false,true,false,true,getter,getter,true,true";
     run_at_top_level_and_in_a_function(source, expected);
 }
+
+#[test]
+fn instanceof_runs_reuse_one_walk_until_a_slow_path_runs_user_code() {
+    // Consecutive `if (o instanceof G) return ...` sites on one parameter:
+    // plain, class, subclass and deep instances, null-prototype objects,
+    // primitives, Arrays and functions; a global accessor G whose getter
+    // changes o's [[Prototype]] between two sites; and a Proxy on the chain,
+    // whose trap runs once per site.
+    let source = r#"
+// Script `var` bindings: every right-hand side is a global read.
+var MapCtor = Map, ObjectCtor = Object;
+var A = class {};
+var B = class extends A {};
+var C = class {};
+var D1 = class extends B {};
+var D2 = class extends D1 {};
+var D = class {};
+var current, traps = 0;
+Object.defineProperty(globalThis, "Hook", {
+  configurable: true,
+  get: function () {
+    if (current !== null && typeof current === "object" && current.morph) {
+      current.morph = false;
+      Object.setPrototypeOf(current, C.prototype);
+    }
+    return D;
+  }
+});
+function classify(o) {
+  current = o;
+  if (o instanceof MapCtor) return "map";
+  if (o instanceof A) return "A";
+  if (o instanceof Hook) return "hook";
+  if (o instanceof B) return "B";
+  if (o instanceof C) return "C";
+  if (o instanceof ObjectCtor) return "object";
+  return "other";
+}
+var proxied = Object.create(new Proxy({}, { getPrototypeOf: function (t) { traps++; return Object.getPrototypeOf(t); } }));
+var rounds = [];
+for (var round = 0; round < 3; round++) {
+  var values = [new Map(), new A(), new B(), new C(), {}, Object.create(null), 1, "s", undefined, null, [], function () {}, new D2(), { morph: true }, proxied, new D()];
+  rounds.push(values.map(classify).join());
+}
+print((rounds[0] === rounds[1] && rounds[1] === rounds[2] ? rounds[0] : rounds.join("|")) + " " + traps);
+"#;
+    run(
+        source,
+        "map,A,A,C,object,other,other,other,other,other,object,object,A,C,object,hook 18",
+    );
+}

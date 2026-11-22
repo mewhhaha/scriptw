@@ -2,7 +2,7 @@
 use super::super::*;
 use crate::functions::NonArrayRealmIntrinsicSlot;
 use crate::gc_types::{
-    ArrayIterationKind, ArrayIteratorObject, ArrayIteratorObjectSchema, CodeUnitArray,
+    ArrayIterationKind, ArrayIteratorObject, ArrayIteratorObjectSchema, ArrayObject, CodeUnitArray,
     CompletionLocals, GcI32Constant, GcLocal, GcNullability, GcOperand, GcStackReference, I32Local,
     I64Local, OrdinaryObject, RealmRecord, RegExpStringIteratorObject,
     RegExpStringIteratorObjectSchema, StoredValue, StringConstruction, StringIteratorObject,
@@ -250,7 +250,8 @@ impl FunctionBuilder<'_> {
 
 impl FunctionBuilder<'_> {
     /// CreateIteratorResultObject publishes two fresh W/E/C data properties
-    /// using the actual supplied execution Realm's Object prototype.
+    /// using the actual supplied execution Realm's Object prototype, in the
+    /// runtime's shared `{ value, done }` compact shape.
     pub(crate) fn emit_iterator_result_object_in_realm(
         &mut self,
         realm: &GcLocal<RealmRecord>,
@@ -266,31 +267,7 @@ impl FunctionBuilder<'_> {
             &prototype,
             function,
         );
-        let object = schema.reserve_gc_local(function).initialize(
-            self.emit_alloc_plain_object_with_prototype(Some(&prototype), function)?,
-            function,
-        );
-        let boolean = schema.reserve_value_local(function);
-        boolean.set_boolean(done, function);
-        for (name, field_value) in [("value", value), ("done", &boolean)] {
-            let text = schema.reserve_gc_local(function).initialize(
-                self.emit_interned_string_reference(name, function)?,
-                function,
-            );
-            let key = crate::objects::PropertyKeyLocals::from_string(schema, &text, function);
-            self.emit_object_append_data_property_with_flags(
-                &object,
-                &key,
-                field_value,
-                true,
-                true,
-                true,
-                function,
-            )?;
-            key.clear(function);
-            text.clear(function);
-        }
-        boolean.clear(function);
+        let object = self.emit_alloc_iterator_result_object(&prototype, value, done, function)?;
         prototype.clear(function);
         Ok(object)
     }
@@ -827,6 +804,32 @@ impl FunctionBuilder<'_> {
                     )?;
                     array.clear(function);
                     function.instruction(&Instruction::Else);
+                    // Get(O, ! ToString(index)) on an actual Array (never a
+                    // Proxy) whose own element at this index is a data
+                    // property is that value: OrdinaryGet finds it before
+                    // any prototype or accessor. index < length <= 2^32 - 1
+                    // is an array index. A hole or accessor, and every other
+                    // object, keeps the string-keyed Get.
+                    let found = schema.reserve_i32_local(function);
+                    found.set_constant(0, function);
+                    array_value.reference().load(function);
+                    function.instruction(&Instruction::RefTestNonNull(
+                        schema
+                            .reference_type::<ArrayObject>(GcNullability::NonNullable)
+                            .heap_type,
+                    ));
+                    self.open_frame(ControlFrameKind::If, function);
+                    let actual = schema.reserve_gc_local(function).initialize(
+                        array_value.cast_reference::<ArrayObject>(schema, function),
+                        function,
+                    );
+                    self.emit_array_own_indexed_value(&actual, index, &element, found, function);
+                    actual.clear(function);
+                    self.pop_control(ControlFrameKind::If);
+                    function.instruction(&Instruction::End);
+                    found.load(function);
+                    function.instruction(&Instruction::I32Eqz);
+                    self.open_frame(ControlFrameKind::If, function);
                     index.load(function);
                     function.instruction(&Instruction::F64ConvertI64U);
                     function.instruction(&Instruction::I64ReinterpretF64);
@@ -841,6 +844,9 @@ impl FunctionBuilder<'_> {
                     key.clear(function);
                     self.emit_native_iterator_abrupt_exit(&pending, result, exit, function);
                     element.copy_from(pending.value(), function);
+                    self.pop_control(ControlFrameKind::If);
+                    function.instruction(&Instruction::End);
+                    schema.release_i32_local(found, function);
                     self.pop_control(ControlFrameKind::If);
                     function.instruction(&Instruction::End);
                     match kind {

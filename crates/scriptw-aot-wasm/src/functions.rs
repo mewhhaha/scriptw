@@ -809,6 +809,7 @@ impl FunctionBuilder<'_> {
                 GcOperand::constant(crate::heap::ErrorInitializationState::Dormant),
                 GcOperand::constant(crate::heap::DateInitializationState::Dormant),
                 GcOperand::constant(crate::heap::RegExpInitializationState::Dormant),
+                GcOperand::null(schema),
             ),
             function,
         );

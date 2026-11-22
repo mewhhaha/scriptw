@@ -15,11 +15,12 @@ pub(crate) use cache::{
 };
 mod chain;
 mod computed;
+mod iterator_result;
 mod native_function;
 mod plain_snapshot;
 mod shape;
 mod transition;
-use chain::{ChainAnswer, ChainKey};
+pub(crate) use chain::{ChainAnswer, ChainKey};
 pub(crate) use transition::MAX_COMPACT_SHAPE_KEYS;
 
 /// A fresh literal of at most this many keys is born with inline slots, and

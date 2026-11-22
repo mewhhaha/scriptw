@@ -269,6 +269,12 @@ impl FunctionBuilder<'_> {
     /// key, unless sealed intrinsic storage proves there are no Array-index keys.
     /// Mutation promotes that storage to a dictionary and restores those checks.
     /// Other exotics, proxies and longer chains decline without invoking traps.
+    ///
+    /// A receiver whose [[Prototype]] is the current Realm's %Array.prototype%
+    /// is decided by its protector (`realm_protectors.rs`): no own index,
+    /// then %Object.prototype% with its recorded index-free rows and null
+    /// parent, the two steps the walk admits for that chain. Every other
+    /// chain, and that one once a fact fails, takes the walk.
     pub(in crate::objects) fn emit_packed_push_prototypes_permit_append(
         &mut self,
         receiver: &GcLocal<ArrayObject>,
@@ -279,6 +285,41 @@ impl FunctionBuilder<'_> {
         let s = self.runtime_schema();
         let permitted = s.reserve_i32_local(f);
         permitted.set_constant(0, f);
+        let decided = self.open_frame(ControlFrameKind::Block, f);
+        let walk = self.open_frame(ControlFrameKind::Block, f);
+        let receiver_header = s
+            .field(ArrayObjectSchema::OBJECT)
+            .read(receiver, s, f)
+            .reference();
+        let prototype = s.reserve_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROTOTYPE)
+                .read_top(receiver_header, f)
+                .reference(),
+            f,
+        );
+        self.emit_array_prototype_chain_without_indices_or_branch(&prototype, walk, f);
+        prototype.clear(f);
+        permitted.set_constant(1, f);
+        self.emit_branch_to_target(decided, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        self.emit_packed_push_prototype_walk(receiver, start, end, permitted, f)?;
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        Ok(permitted)
+    }
+
+    /// The complete walk of `emit_packed_push_prototypes_permit_append`:
+    /// sets `permitted` when the chain admits the append.
+    fn emit_packed_push_prototype_walk(
+        &mut self,
+        receiver: &GcLocal<ArrayObject>,
+        start: I64Local,
+        end: I64Local,
+        permitted: I32Local,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
         let header = s
             .reserve_gc_local::<OrdinaryObject, Nullable>(f)
             .initialize(
@@ -421,7 +462,7 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(acceptable, f);
         s.release_i64_local(index, f);
         s.release_i32_local(depth, f);
-        Ok(permitted)
+        Ok(())
     }
 
     fn emit_try_packed_array_append(

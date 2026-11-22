@@ -104,7 +104,7 @@ require_fixed_string_count "$native_global_script" \
 # current layout on purpose: whoever bumps the runtime ABI must revisit these
 # native global-source rules and then update the number here.
 require_fixed_string_count crates/scriptw-aot-wasm/src/runtime_artifact.rs \
-  'const LAYOUT_VERSION: u32 = 84;' 1 'current typed native global-source runtime contract (layout 84)'
+  'const LAYOUT_VERSION: u32 = 85;' 1 'current typed native global-source runtime contract (layout 85)'
 for native_global_raw_test in \
   crates/scriptw-aot-wasm/src/runtime_artifact/cache/tests.rs \
   crates/scriptw-aot-wasm/src/runtime_artifact/build_package/tests.rs; do

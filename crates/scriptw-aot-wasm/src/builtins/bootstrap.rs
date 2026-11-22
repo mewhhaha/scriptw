@@ -952,6 +952,12 @@ impl<'a> FunctionBuilder<'a> {
         }
         parent.clear(function);
         function_prototype.clear(function);
+        self.emit_arm_realm_protectors(
+            realm,
+            &object_prototype,
+            context.function_prototype(),
+            function,
+        )?;
         let plan = self.runtime_bootstrap_plan.clone();
         let reflect = (plan.full_standard_globals || plan.reflect_object)
             .then(|| self.init_reflect_object(&context, &object_prototype, function))

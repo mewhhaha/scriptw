@@ -108,6 +108,7 @@ fn a_dormant_function_observes_every_method_write_path() {
         "Object.assign(Math, { imul() { return \"x\"; } });",
         "function set(o, v) { o.imul = v; } function replace() { set(Math, function () { return \"x\"; }); } replace();",
         "(0, eval)(\"Math.imul = function () { return 'x'; }\");",
+        "var o = { valueOf() { Math.imul = function () { return \"x\"; }; return 1; } }; +o;",
     ] {
         run(&format!("{RUN}\n{write}\nprint(run());"), "x1");
     }

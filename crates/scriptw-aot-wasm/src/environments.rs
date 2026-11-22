@@ -61,6 +61,21 @@ pub(crate) enum EnvSlotInitialization {
 #[derive(Debug, Default)]
 pub(crate) struct InstantiatedActivationSlots(std::collections::BTreeSet<u32>);
 
+/// The cell table of each root-relative record a genuine ordinary source
+/// body names (`hops - environment_depth`, see `env_slot_initialization`),
+/// one non-null function-level local per distinct root distance.
+///
+/// `Environment.PARENT`, `Environment.DECLARATIVE` and
+/// `DeclarativeEnvironment.CELLS` are immutable fields, and such a body never
+/// replaces its root record, so the table at one root distance is a single
+/// value for the whole invocation. `reserve_root_cell_tables` computes every
+/// table once, with one parent walk, at the body's top level before any
+/// source code: the write dominates each use. The table is cached, never a
+/// cell, its value or its initialization state: those stay mutable and every
+/// use still reads them from the cell.
+#[derive(Debug, Default)]
+pub(crate) struct RootCellTables(Vec<(u32, GcLocal<BindingCellTable>)>);
+
 impl<'a> FunctionBuilder<'a> {
     /// Environment References already own an object base and canonical key.
     /// Retain the complete internal-method completion until the caller releases
@@ -293,7 +308,7 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     pub(crate) fn resolve_env_handle_local(
-        &mut self,
+        &self,
         hops: u32,
         function: &mut Function,
     ) -> GcLocal<Environment, Nullable> {
@@ -352,6 +367,122 @@ impl<'a> FunctionBuilder<'a> {
             );
         cells.clear(function);
         declarative.clear(function);
+        cell
+    }
+
+    /// Computes this body's root cell tables; see [`RootCellTables`].
+    /// Called once, at the top level of the body before any source code,
+    /// while the current environment is the root record. Each named root
+    /// distance is a declarative record: the analyzed captured chain records
+    /// a cell at it, or it is the body's own activation record.
+    fn reserve_root_cell_tables(&mut self, function: &mut Function) {
+        let eligible = self.environment_depth == 0
+            && self.root_cell_tables.0.is_empty()
+            && self
+                .planned_entry()
+                .is_some_and(|entry| entry.has_source_activation())
+            && self.current_function_meta().is_some_and(|meta| {
+                meta.protocol().execution_kind() == scriptw_ir::FunctionExecutionKind::Ordinary
+            })
+            && self.direct_eval_execution_context_local().is_none()
+            && !self.has_eval_environment()
+            // Written here, outside every block, each holder dominates
+            // every later use and is declared non-null.
+            && function.at_function_level();
+        if !eligible {
+            return;
+        }
+        let mut root_hops = self
+            .captured_bindings
+            .iter()
+            .filter(|binding| binding.name != DIRECT_EVAL_EXECUTION_CONTEXT_NAME)
+            .map(|binding| binding.hops)
+            .collect::<std::collections::BTreeSet<_>>();
+        if !self.owned_env_bindings.is_empty() {
+            root_hops.insert(0);
+        }
+        let Some(&deepest) = root_hops.last() else {
+            return;
+        };
+        let schema = self.runtime_schema();
+        let environment = self.resolve_env_handle_local(0, function);
+        let mut reached = 0;
+        let mut tables = Vec::with_capacity(root_hops.len());
+        for hops in root_hops {
+            while reached < hops {
+                environment.replace(
+                    schema
+                        .struct_type::<Environment>()
+                        .field(EnvironmentSchema::PARENT)
+                        .read(&environment, schema, function)
+                        .reference(),
+                    function,
+                );
+                reached += 1;
+            }
+            let declarative = schema
+                .reserve_gc_local::<DeclarativeEnvironment, Nullable>(function)
+                .initialize(
+                    schema
+                        .struct_type::<Environment>()
+                        .field(EnvironmentSchema::DECLARATIVE)
+                        .read(&environment, schema, function)
+                        .reference(),
+                    function,
+                );
+            let table = schema.hold_gc_local(
+                schema
+                    .struct_type::<DeclarativeEnvironment>()
+                    .field(DeclarativeEnvironmentSchema::CELLS)
+                    .read(&declarative, schema, function)
+                    .reference(),
+                function,
+            );
+            declarative.clear(function);
+            tables.push((hops, table));
+        }
+        debug_assert_eq!(reached, deepest);
+        environment.clear(function);
+        self.root_cell_tables.0 = tables;
+    }
+
+    /// The cached cell table of the record `hops` records above the current
+    /// environment. `None` keeps the caller's full walk: block, body and
+    /// head records inside the body (`hops < environment_depth`) and bodies
+    /// without the cache.
+    fn root_cell_table(&self, hops: u32) -> Option<&GcLocal<BindingCellTable>> {
+        let root_hops = hops.checked_sub(self.environment_depth)?;
+        self.root_cell_tables
+            .0
+            .iter()
+            .find(|(cached, _)| *cached == root_hops)
+            .map(|(_, table)| table)
+    }
+
+    /// The cell of a statically resolved environment slot: through the
+    /// cached root table where the slot is root-relative, else by walking
+    /// `hops` parent links from the current environment.
+    pub(crate) fn emit_binding_cell_local(
+        &mut self,
+        slot: u32,
+        hops: u32,
+        function: &mut Function,
+    ) -> GcLocal<BindingCell> {
+        let schema = self.runtime_schema();
+        if let Some(table) = self.root_cell_table(hops) {
+            return schema
+                .reserve_gc_local::<BindingCell, NonNullable>(function)
+                .initialize(
+                    schema
+                        .array_type::<BindingCellTable>()
+                        .read(table, GcIndex::Constant(slot), schema, function)
+                        .reference(),
+                    function,
+                );
+        }
+        let environment = self.resolve_env_handle_local(hops, function);
+        let cell = self.emit_environment_cell_local(&environment, slot, function);
+        environment.clear(function);
         cell
     }
 
@@ -689,12 +820,35 @@ impl<'a> FunctionBuilder<'a> {
         value: &ValueLocals,
         function: &mut Function,
     ) -> I32Local {
-        let environment = self.resolve_env_handle_local(hops, function);
-        let cell = self.emit_environment_cell_local(&environment, slot, function);
+        let cell = self.emit_binding_cell_local(slot, hops, function);
         let initialized = self.emit_read_environment_cell(&cell, value, function);
         cell.clear(function);
-        environment.clear(function);
         initialized
+    }
+
+    /// Reads a statically resolved slot for a region that runs no source
+    /// code between this read and the uses of `value`. The initialized flag
+    /// is returned only where the slot's TDZ obligation is
+    /// [`EnvSlotInitialization::Checked`]; the caller decides what an
+    /// uninitialized cell means (no ReferenceError is raised here).
+    pub(crate) fn read_env_slot_snapshot(
+        &mut self,
+        slot: u32,
+        hops: u32,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) -> Option<I32Local> {
+        match self.env_slot_initialization(slot, hops) {
+            EnvSlotInitialization::Checked => {
+                Some(self.read_env_slot_to_locals(slot, hops, value, function))
+            }
+            EnvSlotInitialization::BeforeAnyReference => {
+                let cell = self.emit_binding_cell_local(slot, hops, function);
+                self.emit_read_environment_cell_value(&cell, value, function);
+                cell.clear(function);
+                None
+            }
+        }
     }
 
     pub(crate) fn write_env_slot_from_locals(
@@ -704,11 +858,9 @@ impl<'a> FunctionBuilder<'a> {
         value: &ValueLocals,
         function: &mut Function,
     ) {
-        let environment = self.resolve_env_handle_local(hops, function);
-        let cell = self.emit_environment_cell_local(&environment, slot, function);
+        let cell = self.emit_binding_cell_local(slot, hops, function);
         self.emit_initialize_environment_cell(&cell, value, function);
         cell.clear(function);
-        environment.clear(function);
     }
 
     /// FunctionDeclarationInstantiation reuses the initialized arguments value
@@ -772,8 +924,7 @@ impl<'a> FunctionBuilder<'a> {
                     .store(function);
             }
             BindingStorage::EnvSlot { slot, hops } => {
-                let environment = self.resolve_env_handle_local(hops, function);
-                let cell = self.emit_environment_cell_local(&environment, slot, function);
+                let cell = self.emit_binding_cell_local(slot, hops, function);
                 let value = schema.reserve_value_local(function);
                 value.set_undefined(function);
                 self.emit_write_environment_cell(&cell, &value, function);
@@ -783,7 +934,6 @@ impl<'a> FunctionBuilder<'a> {
                     .write(&cell, GcOperand::boolean(false), schema, function);
                 value.clear(function);
                 cell.clear(function);
-                environment.clear(function);
             }
         }
     }
@@ -823,8 +973,7 @@ impl<'a> FunctionBuilder<'a> {
             BindingStorage::EnvSlot { slot, hops } => {
                 let schema = self.runtime_schema();
                 let initialization = self.env_slot_initialization(slot, hops);
-                let environment = self.resolve_env_handle_local(hops, function);
-                let cell = self.emit_environment_cell_local(&environment, slot, function);
+                let cell = self.emit_binding_cell_local(slot, hops, function);
                 let error = schema.reserve_value_local(function);
                 match initialization {
                     EnvSlotInitialization::Checked => {
@@ -877,13 +1026,13 @@ impl<'a> FunctionBuilder<'a> {
                 function.instruction(&Instruction::End);
                 error.clear(function);
                 cell.clear(function);
-                environment.clear(function);
             }
         }
         Ok(())
     }
 
     pub(crate) fn bind_captured_bindings(&mut self, function: &mut Function) {
+        self.reserve_root_cell_tables(function);
         let schema = self.runtime_schema();
         for binding in self.captured_bindings {
             // The retained direct-eval context is a strong typed Environment
@@ -1335,11 +1484,9 @@ impl<'a> FunctionBuilder<'a> {
                 if self.env_slot_initialization(slot, hops)
                     == EnvSlotInitialization::BeforeAnyReference =>
             {
-                let environment = self.resolve_env_handle_local(hops, function);
-                let cell = self.emit_environment_cell_local(&environment, slot, function);
+                let cell = self.emit_binding_cell_local(slot, hops, function);
                 self.emit_read_environment_cell_value(&cell, value, function);
                 cell.clear(function);
-                environment.clear(function);
             }
             BindingStorage::EnvSlot { slot, hops } => {
                 let schema = self.runtime_schema();

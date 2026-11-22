@@ -1063,8 +1063,10 @@ gc_layout_registry! {
         // header) whose [[Prototype]] was: its header, those edges and that
         // value. A direct edge repeats C's header as EDGE_HEADER, so a usable
         // record has both headers. HAS_INSTANCE is the well-known Symbol,
-        // whose hash identity the site reads. A declined record names no
-        // CONSTRUCTOR and holds nothing else. See
+        // whose hash identity the site reads. TERMINAL, when present, is
+        // that Realm's %Object.prototype%, read as an ordinary object with an
+        // immutable null [[Prototype]]: a chain that reaches it ends there.
+        // A declined record names no CONSTRUCTOR and holds nothing else. See
         // `operations/has_instance/site.rs`.
         struct InstanceofSiteRecord => InstanceofSiteRecordSchema {
             CONSTRUCTOR: AnyGcRef, Immutable, Nullable;
@@ -1074,6 +1076,7 @@ gc_layout_registry! {
             FUNCTION_PROTOTYPE: GcRef<JavaScriptObject>, Immutable, Nullable;
             PROTOTYPE: GcRef<JavaScriptObject>, Immutable, Nullable;
             HAS_INSTANCE: GcRef<SymbolValue>, Immutable, Nullable;
+            TERMINAL: GcRef<JavaScriptObject>, Immutable, Nullable;
         }
         struct OrdinaryPropertyStorage: ObjectPropertyStorage => OrdinaryPropertyStorageSchema {
             ENTRIES: GcRef<PropertyTable>, Mutable, NonNullable;
@@ -1678,6 +1681,28 @@ gc_layout_registry! {
             ERROR_STATE: crate::heap::ErrorInitializationState, Mutable, NonNullable;
             DATE_STATE: crate::heap::DateInitializationState, Mutable, NonNullable;
             REGEXP_STATE: crate::heap::RegExpInitializationState, Mutable, NonNullable;
+            // Null until the Realm's intrinsics are complete; written once,
+            // by objects/realm_protectors.rs, which alone reads it.
+            PROTECTORS: GcRef<RealmProtectors>, Mutable, Nullable;
+        }
+        // The Realm's protected intrinsic prototypes, recorded once when its
+        // intrinsics are complete. Each *_ROWS is the intrinsic storage the
+        // prototype's header held then (null when it held none): a header
+        // still holding the same storage still has exactly those rows,
+        // because every structural edit replaces the storage. Only
+        // objects/realm_protectors.rs constructs or reads this record.
+        // OBJECT_PROTOTYPE_ROWS is recorded only when they are the rows of
+        // the %Object.prototype% layout and that header's [[Prototype]] is
+        // its immutable null.
+        struct RealmProtectors => RealmProtectorsSchema {
+            OBJECT_PROTOTYPE: GcRef<OrdinaryObject>, Immutable, NonNullable;
+            OBJECT_PROTOTYPE_ROWS: GcRef<IntrinsicPropertyStorage>, Immutable, Nullable;
+            FUNCTION_PROTOTYPE: GcRef<FunctionObject>, Immutable, NonNullable;
+            FUNCTION_PROTOTYPE_ROWS: GcRef<IntrinsicPropertyStorage>, Immutable, Nullable;
+            ARRAY_PROTOTYPE: GcRef<ArrayObject>, Immutable, NonNullable;
+            ARRAY_PROTOTYPE_ROWS: GcRef<IntrinsicPropertyStorage>, Immutable, Nullable;
+            STRING_PROTOTYPE: GcRef<PrimitiveBox>, Immutable, NonNullable;
+            STRING_PROTOTYPE_ROWS: GcRef<IntrinsicPropertyStorage>, Immutable, Nullable;
         }
         // Opt-in host observations retain actual Realm records without adding
         // a JavaScript property or consulting mutable globals/prototypes.

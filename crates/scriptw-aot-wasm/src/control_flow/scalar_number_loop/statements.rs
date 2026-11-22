@@ -4,6 +4,8 @@ use super::*;
 pub(super) enum NumberStatement {
     Expression(NumberExpression),
     Initialize(NumberExpression),
+    /// An empty `alternate` is an `if` without `else`: a false test
+    /// completes the statement with undefined.
     If {
         test: NumberPredicate,
         consequent: Vec<Self>,
@@ -36,12 +38,34 @@ impl NumberStatement {
                 ..
             } => {
                 let left = consequent.last()?.domain(locals)?;
-                let right = alternate.last()?.domain(locals)?;
+                // Without `else`, the false test's undefined is carried by
+                // `LoopLocals::defined`, not by the Number local.
+                let Some(alternate) = alternate.last() else {
+                    return Some(left);
+                };
+                let right = alternate.domain(locals)?;
                 if left == right {
                     Some(left)
                 } else {
                     Some(NumberDomain::Number)
                 }
+            }
+        }
+    }
+
+    /// Whether this statement, as the last of the loop body, may leave the
+    /// body completion value undefined rather than a Number.
+    pub(super) fn may_complete_undefined(&self) -> bool {
+        match self {
+            Self::Expression(_) | Self::Initialize(_) => false,
+            Self::If {
+                consequent,
+                alternate,
+                ..
+            } => {
+                alternate.is_empty()
+                    || consequent.last().is_some_and(Self::may_complete_undefined)
+                    || alternate.last().is_some_and(Self::may_complete_undefined)
             }
         }
     }
@@ -73,6 +97,9 @@ impl NumberStatement {
             Self::Expression(expression) => {
                 if let Some(value) = value {
                     expression.emit_into(builder, locals, value, function);
+                    if let Some(defined) = locals.defined {
+                        defined.set_constant(1, function);
+                    }
                 } else {
                     expression.emit_discard(builder, locals, function);
                 }
@@ -88,6 +115,11 @@ impl NumberStatement {
                 Self::emit_list(consequent, builder, locals, value, function);
                 function.instruction(&Instruction::Else);
                 Self::emit_list(alternate, builder, locals, value, function);
+                if alternate.is_empty() && value.is_some() {
+                    if let Some(defined) = locals.defined {
+                        defined.set_constant(0, function);
+                    }
+                }
                 builder.pop_control(ControlFrameKind::If);
                 function.instruction(&Instruction::End);
             }

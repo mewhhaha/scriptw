@@ -1173,6 +1173,12 @@ impl<'a> FunctionBuilder<'a> {
                     next += run.len();
                     continue;
                 }
+                if let Some(taken) =
+                    self.try_compile_instanceof_run(&block.statements[next..], function)?
+                {
+                    next += taken;
+                    continue;
+                }
             }
             self.compile_statement(&block.statements[next], function)?;
             next += 1;
@@ -3332,6 +3338,14 @@ impl<'a> FunctionBuilder<'a> {
                     } else if let Some(else_branch) = else_branch {
                         self.compile_statement(else_branch, function)?;
                     }
+                    return Ok(());
+                }
+                if self.try_compile_typeof_if_chain(
+                    condition,
+                    then_branch,
+                    else_branch.as_deref(),
+                    function,
+                )? {
                     return Ok(());
                 }
                 self.compile_truthy_i32(condition, function)?;

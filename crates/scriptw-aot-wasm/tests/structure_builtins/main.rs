@@ -14,6 +14,7 @@ mod callable_function_prototype_structure;
 mod ecmascript_trim_mode_structure;
 mod error_builtin_dispatch_ownership_structure;
 mod find_via_predicate_structure;
+mod fresh_builtin_result_structure;
 mod function_prototype_materialization_structure;
 mod function_prototype_receiver_ownership_structure;
 mod function_prototype_symbol_has_instance_structure;

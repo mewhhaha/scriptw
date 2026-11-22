@@ -119,6 +119,7 @@ mod aot_strict_arguments_projection;
 mod aot_private_binding_names;
 
 mod aot_captured_call_regions;
+mod aot_captured_loop_invariants;
 mod aot_numeric_body;
 
 mod aot_compact_for_in;

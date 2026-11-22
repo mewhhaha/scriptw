@@ -23,7 +23,7 @@ use super::holder::HolderReceiverKind;
 use super::proof_trace::ProofStep;
 use super::*;
 use crate::emit::ControlTarget;
-use crate::gc_types::{JavaScriptObject, RealmRecord};
+use crate::gc_types::JavaScriptObject;
 use crate::profile::{CompactStorageLayout, PlaceHolder, ReadSpecialisation, ReceiverHeader};
 
 fn compact_layout(layout: CompactStorageLayout) -> CompactLayout {
@@ -222,12 +222,8 @@ impl FunctionBuilder<'_> {
                 self.emit_branch_if_to_target(fallback, f);
                 // As in the entry: ToObject would box the String with the
                 // current Realm's prototype, which holds the place.
-                let realm: GcLocal<RealmRecord> = self.load_current_realm(f);
-                let intrinsic = s.reserve_value_local(f);
-                self.emit_load_non_array_realm_intrinsic(&realm, slot, &intrinsic, f);
-                realm.clear(f);
-                let holder = self.emit_realm_prototype_header_or_branch(&intrinsic, fallback, f);
-                intrinsic.clear(f);
+                let holder =
+                    self.emit_primitive_receiver_prototype_header_or_branch(slot, fallback, f);
                 let (name, key) = self.emit_record_key(record, f);
                 let found = s.reserve_i32_local(f);
                 self.emit_record_scan(record, f, |builder, candidate, next, f| {

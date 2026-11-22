@@ -233,6 +233,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::GlobalVarDeclarationCheck
             | RuntimeHelperId::GlobalVarDeclarationInstall
             | RuntimeHelperId::JsonStringifyValue
+            | RuntimeHelperId::JsonStringifyPlainValue
             | RuntimeHelperId::AsciiNarrow
             | RuntimeHelperId::AsciiWiden
             | RuntimeHelperId::CodeUnitFind

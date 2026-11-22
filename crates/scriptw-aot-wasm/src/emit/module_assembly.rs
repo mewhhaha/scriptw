@@ -969,6 +969,20 @@ fn emit_script_module_with_factory(
             builder.compile_json_stringify_value_helper()
         })
         .transpose()?;
+    let json_stringify_plain_value_helper_function = (compile_runtime && uses_json_stringify)
+        .then(|| {
+            let mut builder = FunctionBuilder::new_runtime_operation_helper(
+                module_package.schema(),
+                RuntimeHelperId::JsonStringifyPlainValue,
+                string_pool,
+                &function_metas,
+                uses_heap,
+                runtime_bootstrap_plan.clone(),
+                runtime_helper_base,
+            );
+            builder.compile_json_stringify_plain_value_helper()
+        })
+        .transpose()?;
     let object_has_property_helper_function = compile_runtime
         .then(|| {
             let mut builder = FunctionBuilder::new_runtime_operation_helper(
@@ -1576,6 +1590,14 @@ fn emit_script_module_with_factory(
             helper_bodies.insert(
                 RuntimeHelperId::JsonStringifyValue,
                 json_stringify_value_helper_function,
+            );
+        }
+        if let Some(json_stringify_plain_value_helper_function) =
+            json_stringify_plain_value_helper_function
+        {
+            helper_bodies.insert(
+                RuntimeHelperId::JsonStringifyPlainValue,
+                json_stringify_plain_value_helper_function,
             );
         }
     }

@@ -30,6 +30,8 @@ use whole_trip::WholeTrip;
 mod captured_calls;
 pub(crate) use captured_calls::CapturedCallSource;
 use captured_calls::{CapturedCallRoots, CapturedCalls};
+mod captured_reads;
+use captured_reads::{CapturedReads, CapturedSnapshot};
 
 const MAX_NODES: usize = 256;
 const MAX_DEPTH: usize = 64;
@@ -69,6 +71,8 @@ impl NumberArithmetic {
 enum NumberExpression {
     Constant(u64),
     Binding(usize),
+    /// The entry Number snapshot of an unwritten captured cell.
+    Captured(usize),
     ArrayLength,
     ArrayElement,
     MaskedInputIndex,
@@ -119,6 +123,8 @@ enum NumberPredicate {
     Compare(RelationalBinaryOp, NumberExpression, NumberExpression),
     Equal(bool, NumberExpression, NumberExpression),
     ProjectedStrict(bool),
+    /// An entry IsStrictlyEqual of invariant operands; `false` negates it.
+    Invariant(usize, bool),
 }
 
 struct NumberBinding {
@@ -163,6 +169,11 @@ struct LoopLocals<'a> {
     values: Vec<LoopLocal>,
     invariant: Option<&'a RegionFact<'a>>,
     calls: Option<(&'a CapturedCalls, &'a CapturedCallRoots)>,
+    captured: Option<&'a CapturedSnapshot>,
+    /// Whether the body value local holds this iteration's statement value;
+    /// present only when the last body statement may complete with
+    /// undefined (an `if` without `else` whose test was false).
+    defined: Option<I32Local>,
 }
 
 impl LoopLocals<'_> {
@@ -178,6 +189,11 @@ impl LoopLocals<'_> {
             unreachable!("dense reads require their matching entry fact");
         };
         borrow
+    }
+
+    fn captured(&self) -> &CapturedSnapshot {
+        self.captured
+            .expect("captured reads require their entry snapshot")
     }
 
     fn joined(&self) -> &JoinedLengthFact {
@@ -232,12 +248,14 @@ pub(super) struct ScalarNumberLoop {
     dense_four_step: bool,
     whole_trip: Option<WholeTrip>,
     calls: CapturedCalls,
+    captured: CapturedReads,
 }
 
 /// Carries the actual guarded roots until either loop path has completed.
 pub(super) struct ScalarNumberLoopEntry<'a> {
     fact: Option<RegionFact<'a>>,
     calls: Option<CapturedCallRoots>,
+    captured: Option<CapturedSnapshot>,
 }
 
 impl<'a> ScalarNumberLoopEntry<'a> {
@@ -258,6 +276,9 @@ impl<'a> ScalarNumberLoopEntry<'a> {
     }
 
     pub(super) fn release(self, builder: &FunctionBuilder<'_>, function: &mut Function) {
+        if let Some(captured) = self.captured {
+            captured.release(builder, function);
+        }
         if let Some(calls) = self.calls {
             calls.release(builder, function);
         }
@@ -297,6 +318,10 @@ struct LoopProof<'a, 'b> {
     row_alias_initialized: bool,
     number_index_initialized: bool,
     calls: CapturedCalls,
+    /// `None` where this body keeps every captured read on its owner.
+    captured: Option<CapturedReads>,
+    /// An `if` statement outside the strict-pair projection was admitted.
+    conditional: bool,
 }
 
 impl ScalarNumberLoop {
@@ -364,6 +389,8 @@ impl ScalarNumberLoop {
             row_alias_initialized: false,
             number_index_initialized: false,
             calls: CapturedCalls::default(),
+            captured: CapturedReads::admitted(builder).then(CapturedReads::default),
+            conditional: false,
         };
         let test = proof.predicate(source_test, MAX_DEPTH)?;
         let mut expressions = Vec::new();
@@ -372,6 +399,17 @@ impl ScalarNumberLoop {
             Some(expression) => Some(proof.expression(expression, MAX_DEPTH)?),
             None => None,
         };
+        let captured = proof.captured.take().unwrap_or_default();
+        // Inlined captured calls defer their captured writes to loop exit, so
+        // a cell they may write is no longer invariant during the region.
+        if !captured.is_empty() && !proof.calls.is_empty() {
+            return None;
+        }
+        // Conditional statements are emitted only by the plain iteration
+        // path; every region fact keeps its own straight-line body shape.
+        if proof.conditional && proof.invariant.is_some() {
+            return None;
+        }
         // Captured writes are deferred only while every row is preflighted.
         // Streaming or non-array loops retain the ordinary call boundaries.
         if !proof.calls.is_empty() {
@@ -441,6 +479,7 @@ impl ScalarNumberLoop {
             dense_four_step,
             whole_trip: None,
             calls: proof.calls,
+            captured,
         };
         // Declining this narrower proof keeps the existing scalar plan intact.
         if plan.calls.is_empty() {
@@ -503,10 +542,14 @@ impl ScalarNumberLoop {
         }
         let mut fact = None;
         let mut calls = None;
-        if !self.imul.is_empty() || self.invariant.is_some() {
+        let mut captured = None;
+        if !self.imul.is_empty() || self.invariant.is_some() || !self.captured.is_empty() {
             let schema = builder.runtime_schema();
             let accepted = schema.reserve_i32_local(function);
             accepted.store(function);
+            if !self.captured.is_empty() {
+                captured = Some(self.captured.guard(builder, accepted, function)?);
+            }
             for guard in &self.imul {
                 accepted.load(function);
                 builder.open_frame(ControlFrameKind::If, function);
@@ -581,7 +624,11 @@ impl ScalarNumberLoop {
             accepted.load(function);
             schema.release_i32_local(accepted, function);
         }
-        Ok(ScalarNumberLoopEntry { fact, calls })
+        Ok(ScalarNumberLoopEntry {
+            fact,
+            calls,
+            captured,
+        })
     }
 }
 
@@ -592,7 +639,9 @@ impl LoopProof<'_, '_> {
     }
 
     fn binding(&mut self, name: &str, written: bool) -> Option<usize> {
-        // Captured cells and actual global mirrors keep their observable owner.
+        // Captured cells and actual global mirrors keep their observable
+        // owner: a write to either declines the region. An unwritten
+        // captured cell is read once at entry instead (`captured_reads`).
         let id = self.builder.private_local_binding(name)?;
         self.binding_id(id, written)
     }
@@ -663,6 +712,9 @@ impl LoopProof<'_, '_> {
         }
         Some(match &value.expr {
             ExprIr::Number(bits) => NumberExpression::Constant(*bits),
+            ExprIr::Identifier(name) if self.builder.private_local_binding(name).is_none() => {
+                NumberExpression::Captured(self.captured.as_mut()?.number(self.builder, value)?)
+            }
             ExprIr::Identifier(name) => NumberExpression::Binding(self.binding(name, false)?),
             ExprIr::UnaryPlus { expr } => return self.expression(expr, depth),
             ExprIr::UnaryMinusNumeric { expr } => {
@@ -763,6 +815,13 @@ impl LoopProof<'_, '_> {
                 return Some(NumberPredicate::ProjectedStrict(equal));
             }
         }
+        // IsStrictlyEqual never calls source code, so a pair of values
+        // nothing in the region can write has one result for the region.
+        if let (Some((equal, left, right)), Some(captured)) = (strict, self.captured.as_mut()) {
+            if let Some(index) = captured.strict_test(self.builder, left, right) {
+                return Some(NumberPredicate::Invariant(index, equal));
+            }
+        }
         Some(match &value.expr {
             ExprIr::Boolean(value) => NumberPredicate::Boolean(*value),
             ExprIr::LogicalNot { expr } => {
@@ -829,6 +888,35 @@ impl LoopProof<'_, '_> {
                 if !consequent.last()?.has_value() || !alternate.last()?.has_value() {
                     return None;
                 }
+                expressions.push(NumberStatement::If {
+                    test,
+                    consequent,
+                    alternate,
+                });
+            }
+            StatementIr::If {
+                condition,
+                then_branch,
+                else_branch,
+            } if !matches!(self.invariant, Some(RegionInvariant::StrictPairInputs(_))) => {
+                let test = self.predicate(condition, depth)?;
+                let mut consequent = Vec::new();
+                let mut alternate = Vec::new();
+                self.statement(then_branch, &mut consequent, depth)?;
+                if let Some(branch) = else_branch {
+                    self.statement(branch, &mut alternate, depth)?;
+                    if !alternate.last()?.has_value() {
+                        return None;
+                    }
+                }
+                // A branch ending without a statement value would complete
+                // with undefined/empty, which no Number local represents. A
+                // missing `else` completes with undefined, which the body
+                // value's `defined` flag represents.
+                if !consequent.last()?.has_value() {
+                    return None;
+                }
+                self.conditional = true;
                 expressions.push(NumberStatement::If {
                     test,
                     consequent,
@@ -917,6 +1005,7 @@ impl NumberExpression {
                 *domain
             }
             Self::Binding(_)
+            | Self::Captured(_)
             | Self::ArrayElement
             | Self::CompactPath(_)
             | Self::JoinedLength
@@ -1034,6 +1123,7 @@ impl NumberExpression {
             | Self::Call(_, _)
             | Self::CallSlot(_, _)
             | Self::Binding(_)
+            | Self::Captured(_)
             | Self::ArrayLength
             | Self::ArrayElement
             | Self::MaskedInputIndex
@@ -1196,6 +1286,7 @@ impl NumberExpression {
                 function.instruction(&Instruction::F64Const(Ieee64::from(f64::from_bits(*bits))));
             }
             Self::Binding(index) => locals.values[*index].load_number(function),
+            Self::Captured(index) => locals.captured().load_number(*index, function),
             Self::Call(index, _) => {
                 let (plan, roots) = locals.calls.expect("sealed captured call owner");
                 plan.emit_call(*index, roots, builder, locals, function);
@@ -1284,7 +1375,7 @@ impl NumberExpression {
 impl NumberPredicate {
     fn collect_writes(&self, writes: &mut [Option<NumberDomain>]) {
         match self {
-            Self::Boolean(_) | Self::ProjectedStrict(_) => {}
+            Self::Boolean(_) | Self::ProjectedStrict(_) | Self::Invariant(_, _) => {}
             Self::Truthy(value) => value.collect_writes(writes),
             Self::Not(value) => value.collect_writes(writes),
             Self::Compare(_, lhs, rhs) | Self::Equal(_, lhs, rhs) => {
@@ -1308,6 +1399,12 @@ impl NumberPredicate {
                 locals
                     .strict_pair()
                     .emit_predicate(locals, builder, function);
+                if !equal {
+                    function.instruction(&Instruction::I32Eqz);
+                }
+            }
+            Self::Invariant(index, equal) => {
+                locals.captured().load_test(*index, function);
                 if !equal {
                     function.instruction(&Instruction::I32Eqz);
                 }
@@ -1391,11 +1488,22 @@ impl FunctionBuilder<'_> {
                 local
             })
             .collect();
+        let defined = plan
+            .body
+            .last()
+            .is_some_and(NumberStatement::may_complete_undefined)
+            .then(|| {
+                let defined = schema.reserve_i32_local(function);
+                defined.set_constant(0, function);
+                defined
+            });
         let locals = LoopLocals {
             bindings: &plan.bindings,
             values,
             invariant: entry.fact.as_ref(),
             calls: entry.calls.as_ref().map(|roots| (&plan.calls, roots)),
+            captured: entry.captured.as_ref(),
+            defined,
         };
         // The body's last value is independent of later update/final-test
         // writes. Keep its proven representation until loop exit, too.
@@ -1528,14 +1636,29 @@ impl FunctionBuilder<'_> {
         if let Some(value) = value {
             iterated.load(function);
             self.open_frame(ControlFrameKind::If, function);
+            if let Some(defined) = locals.defined {
+                defined.load(function);
+                self.open_frame(ControlFrameKind::If, function);
+            }
             value.load_number(function);
             function.instruction(&Instruction::I64ReinterpretF64);
             self.completion().value().scalar().store(function);
             self.completion()
                 .value()
                 .set_number(self.completion().value().scalar(), function);
+            if locals.defined.is_some() {
+                // The last iteration's `if` without `else` completed with
+                // undefined (UpdateEmpty(undefined) of the loop body).
+                function.instruction(&Instruction::Else);
+                self.completion().value().set_undefined(function);
+                self.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
+            }
             self.pop_control(ControlFrameKind::If);
             function.instruction(&Instruction::End);
+        }
+        if let Some(defined) = locals.defined {
+            schema.release_i32_local(defined, function);
         }
         schema.release_i32_local(iterated, function);
         for local in value.into_iter().chain(locals.values.into_iter().rev()) {

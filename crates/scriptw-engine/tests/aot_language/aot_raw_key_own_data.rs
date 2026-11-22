@@ -134,3 +134,58 @@ true;
 "#,
     );
 }
+
+#[test]
+fn indexed_callees_keep_this_holes_accessors_proxies_and_key_order() {
+    // `steps[k](row)`: a packed element of an actual Array is the callee and
+    // the Array is `this`; every other base or element takes the complete Get
+    // with the same base and key, before the arguments.
+    check(
+        r#"
+function assert(value, message) { if (!value) throw new Error(message); }
+var steps = [function (row) { return [this, row]; }, function (row) { return row + 1; }];
+function call0(row) { return steps[0](row); }
+function callK(k, row) { var result = steps[k](row); return result; }
+for (var i = 0; i < 8; i++) {
+  var pair = call0(i);
+  assert(pair[0] === steps && pair[1] === i, 'constant index this');
+  assert(callK(1, i) === i + 1, 'variable index');
+  assert(callK(0, i)[0] === steps, 'variable index this');
+}
+// A hole reads through the prototype chain with the Array as receiver.
+var trace = '';
+Object.defineProperty(Array.prototype, 2, {
+  configurable: true,
+  get: function () { trace += 'get;'; assert(this === steps, 'getter receiver'); return function () { return this; }; }
+});
+steps.length = 3;
+assert(callK(2, 0) === steps && trace === 'get;', 'hole getter');
+delete Array.prototype[2];
+// An accessor element runs before the arguments are evaluated.
+Object.defineProperty(steps, 1, { configurable: true, get: function () { trace += 'element;'; return function (v) { return v; }; } });
+function callArgument(k) { return steps[k]((trace += 'argument;', 5)); }
+assert(callArgument(1) === 5 && trace === 'get;element;argument;', 'element before arguments');
+// Non-index keys and non-Array bases.
+var object = { 0: function () { return this; }, '1.5': function () { return 15; } };
+var bases = [object, 'xy', new Proxy([function () { return 'proxied'; }], {})];
+steps = object;
+assert(call0() === object && callK(1.5) === 15 && callK('0') === object, 'ordinary object');
+steps = bases[2];
+assert(call0() === 'proxied', 'proxy base');
+steps = 'xy';
+try { call0(); assert(false, 'string element is not callable'); } catch (error) { assert(error instanceof TypeError, 'string element call'); }
+steps = undefined;
+var keyRead = false;
+try { callK({ toString: function () { keyRead = true; return '0'; } }); assert(false, 'undefined base'); }
+catch (error) { assert(error instanceof TypeError && !keyRead, 'nullish base before key conversion'); }
+steps = [];
+try { call0(); assert(false, 'absent element'); } catch (error) { assert(error instanceof TypeError, 'absent element call'); }
+steps = [function () { return 'zero'; }];
+assert(callK(-0) === 'zero', 'numeric -0 is index 0');
+for (var key of [NaN, 0.5, -1, 4294967295, Infinity]) {
+  try { callK(key); assert(false, 'absent key ' + key); } catch (error) { assert(error instanceof TypeError, 'absent key call'); }
+}
+true;
+"#,
+    );
+}

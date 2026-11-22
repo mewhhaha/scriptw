@@ -13,6 +13,7 @@ use scriptw_ir::{AbruptCapability, NormalResult};
 mod bigint_equality;
 mod coercive_add;
 mod has_instance;
+pub(crate) use has_instance::ActiveInstanceofRun;
 mod intrinsic_installation_key;
 pub(crate) use intrinsic_installation_key::IntrinsicInstallationKey;
 mod loose_equality;

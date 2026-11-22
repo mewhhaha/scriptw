@@ -1,4 +1,9 @@
-//! SerializeJSONProperty is the sole registered recursive runtime owner.
+//! SerializeJSONProperty is owned by two registered recursive runtime
+//! helpers: this general one, which performs every step for every context,
+//! and the hot entry of a plain context (`stringify_plain`), which serializes
+//! actual Arrays and ordinary objects whose chains provably lack "toJSON"
+//! and hands every other value here by a tail call. In a plain context the
+//! general container walk hands its members back to the hot entry.
 //!
 //! Every property serialization appends straight into the one output
 //! accumulator of its JSON.stringify call; the helper result says only
@@ -500,7 +505,18 @@ impl FunctionBuilder<'_> {
         fetched.store(f);
         let indent = s.reserve_i64_local(f);
         json_i64(indent, 0, f);
+        // A plain context (no replacer function, no property list, an empty
+        // gap) serializes through the hot entry, which also serves every
+        // nested value; the general helper serves every other context.
+        let plain = self.emit_json_plain_context_i32(callable, &property_list, &gap, f);
+        plain.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_json_stringify_plain_call(&holder, &key, &context, indent, &appended, f)?;
+        f.instruction(&Instruction::Else);
         self.emit_json_stringify_call(&holder, &key, fetched, &context, indent, &appended, f)?;
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(plain, f);
         s.release_i32_local(fetched, f);
         output.set_undefined(f);
         self.emit_json_tag_test(&appended, WasmRuntimeValueTag::Undefined, f);
@@ -556,7 +572,7 @@ impl FunctionBuilder<'_> {
     /// Get(holder, key). An own data property is the whole result of
     /// ordinary [[Get]], so it is read directly; every other case (holes,
     /// accessors, inherited properties, Proxies, exotic objects) uses Get.
-    fn emit_json_property_get(
+    pub(super) fn emit_json_property_get(
         &mut self,
         holder: &ValueLocals,
         key: &ValueLocals,
@@ -748,7 +764,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Eqz);
         f.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, f);
-        self.emit_json_serialize_container(&value, context, &accumulator, indent, &realm, f)?;
+        self.emit_json_serialize_container(&value, context, &accumulator, indent, f)?;
         self.emit_branch_to_target(serialized, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -773,7 +789,7 @@ impl FunctionBuilder<'_> {
     }
     /// Appends a String, Number, null or Boolean value and branches to
     /// `serialized`; every other value falls through with nothing appended.
-    fn emit_json_serialize_primitive(
+    pub(super) fn emit_json_serialize_primitive(
         &mut self,
         value: &ValueLocals,
         accumulator: &GcLocal<StringAccumulator>,
@@ -871,7 +887,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         Ok(())
     }
-    fn emit_json_append_literal(
+    pub(super) fn emit_json_append_literal(
         &mut self,
         accumulator: &GcLocal<StringAccumulator>,
         text: &str,
@@ -896,15 +912,16 @@ impl FunctionBuilder<'_> {
         output.append_repeated_string(accumulator, gap, depth, s, f);
         output.close(accumulator, s, f);
     }
-    /// SerializeJSONObject and SerializeJSONArray share the cycle check, the
-    /// stack slot and the separator protocol.
-    fn emit_json_serialize_container(
+    /// The cycle check of SerializeJSONObject and SerializeJSONArray, then
+    /// the push of `value`: the enclosing containers occupy exactly the first
+    /// `indent` slots of the stack, so `value` takes slot `indent`, growing
+    /// the stack when it is full. A cycle throws the TypeError before
+    /// anything of `value` is serialized.
+    pub(super) fn emit_json_cycle_enter(
         &mut self,
         value: &ValueLocals,
         context: &GcLocal<JsonStringifyContext>,
-        accumulator: &GcLocal<StringAccumulator>,
         indent: I64Local,
-        realm: &GcLocal<RealmRecord>,
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
@@ -935,12 +952,20 @@ impl FunctionBuilder<'_> {
         value.reference().load(f);
         f.instruction(&Instruction::RefEq);
         self.open_frame(ControlFrameKind::If, f);
+        let realm = s.reserve_gc_local(f).initialize(
+            s.struct_type::<JsonStringifyContext>()
+                .field(JsonStringifyContextSchema::REALM)
+                .read(context, s, f)
+                .reference(),
+            f,
+        );
         self.emit_json_error(
-            realm,
+            &realm,
             NativeErrorKind::TypeError,
             RuntimeErrorMessage::CONVERTING_CIRCULAR_STRUCTURE_TO_JSON,
             f,
         )?;
+        realm.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         scan_index.load(f);
@@ -997,6 +1022,20 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(capacity, f);
         s.release_i32_local(scan_index, f);
         s.release_i32_local(depth, f);
+        Ok(())
+    }
+    /// SerializeJSONObject and SerializeJSONArray share the cycle check, the
+    /// stack slot and the separator protocol.
+    fn emit_json_serialize_container(
+        &mut self,
+        value: &ValueLocals,
+        context: &GcLocal<JsonStringifyContext>,
+        accumulator: &GcLocal<StringAccumulator>,
+        indent: I64Local,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        self.emit_json_cycle_enter(value, context, indent, f)?;
         let gap = s.reserve_gc_local(f).initialize(
             s.struct_type::<JsonStringifyContext>()
                 .field(JsonStringifyContextSchema::GAP)
@@ -1055,6 +1094,22 @@ impl FunctionBuilder<'_> {
         self.emit_json_tag_test(&entry, WasmRuntimeValueTag::Undefined, f);
         direct.store(f);
         entry.set_undefined(f);
+        // A container that reaches this general walk in a plain context
+        // (a toJSON method's result, a Proxy, an object whose toJSON lookup
+        // the hot entry could not prove absent) hands its members back to
+        // the hot entry.
+        let plain_children = s.reserve_i32_local(f);
+        s.struct_type::<JsonStringifyContext>()
+            .field(JsonStringifyContextSchema::PROPERTY_LIST)
+            .read(context, s, f)
+            .reference()
+            .is_null(f);
+        direct.load(f);
+        f.instruction(&Instruction::I32And);
+        gap_length.load(f);
+        f.instruction(&Instruction::I64Eqz);
+        f.instruction(&Instruction::I32And);
+        plain_children.store(f);
         self.emit_is_array_i32(value, is_array, &pending, f)?;
         self.completion().copy_from(&pending, f);
         self.emit_propagate_current_throw_if_needed(f);
@@ -1257,6 +1312,11 @@ impl FunctionBuilder<'_> {
         member.copy_from(&entry, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        // A plain context implies `direct`, so `member` is the fetched value.
+        plain_children.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_json_stringify_plain_call(&member, &key_value, context, child_depth, &result, f)?;
+        f.instruction(&Instruction::Else);
         self.emit_json_stringify_call(
             &member,
             &key_value,
@@ -1266,6 +1326,8 @@ impl FunctionBuilder<'_> {
             &result,
             f,
         )?;
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         member.set_undefined(f);
@@ -1309,6 +1371,7 @@ impl FunctionBuilder<'_> {
         self.emit_json_append_literal(accumulator, "}", f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        s.release_i32_local(plain_children, f);
         s.release_i32_local(direct, f);
         s.release_i32_local(fetched, f);
         member.clear(f);

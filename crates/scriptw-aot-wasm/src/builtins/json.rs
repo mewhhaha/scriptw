@@ -15,6 +15,7 @@ mod parse_frame_state;
 mod quote;
 mod reviver;
 mod stringify;
+mod stringify_plain;
 mod stringify_replacer;
 use stringify_replacer::{
     JsonStringifyReplacerFunctionLocals, JsonStringifyReplacerInvocationLocals,

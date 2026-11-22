@@ -373,6 +373,9 @@ pub(crate) struct FunctionBuilder<'a> {
     pub(crate) strict_arguments_projection:
         Option<crate::arguments_protocol::StrictArgumentsProjection>,
     pub(crate) projected_arguments: Option<crate::environments::ProjectedArgumentsLocals>,
+    /// The `instanceof` run whose statements are being compiled
+    /// (`operations/has_instance/chain.rs`).
+    pub(crate) instanceof_run: Option<crate::operations::ActiveInstanceofRun>,
     pub(crate) lexical_derived_activation: Option<&'a DerivedConstructorActivationIr>,
     pub(crate) is_derived_constructor: bool,
     pub(crate) strict: bool,
@@ -385,6 +388,8 @@ pub(crate) struct FunctionBuilder<'a> {
     /// Own activation cells already initialized by this body's declaration
     /// instantiation; consulted only through `env_slot_initialization`.
     pub(crate) instantiated_activation_slots: crate::environments::InstantiatedActivationSlots,
+    /// Root-relative cell tables, owned by `environments`.
+    pub(crate) root_cell_tables: crate::environments::RootCellTables,
     pub(crate) hoisted_vars: Vec<String>,
     emitted_local_count: u32,
     pub(crate) environment_depth: u32,
@@ -2126,6 +2131,7 @@ impl<'a> FunctionBuilder<'a> {
             numeric_body: None,
             strict_arguments_projection: None,
             projected_arguments: None,
+            instanceof_run: None,
             lexical_derived_activation,
             is_derived_constructor,
             strict,
@@ -2137,6 +2143,7 @@ impl<'a> FunctionBuilder<'a> {
             hoisted_vars,
             binding_scopes: Vec::new(),
             instantiated_activation_slots: Default::default(),
+            root_cell_tables: Default::default(),
             emitted_local_count: 0,
             environment_depth: 0,
             control_stack: Vec::new(),
@@ -2270,6 +2277,11 @@ impl<'a> FunctionBuilder<'a> {
                 false
             }
         }
+    }
+
+    /// Whether this body's own records are visible to source direct eval.
+    pub(crate) fn has_eval_environment(&self) -> bool {
+        self.eval_environment.is_some()
     }
 
     pub(crate) fn has_global_script_bindings(&self) -> bool {

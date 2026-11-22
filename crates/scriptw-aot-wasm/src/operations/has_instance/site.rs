@@ -17,6 +17,7 @@
 //! inline. Everything else, a Proxy on the chain, another right-hand side, a
 //! writable "prototype", a bound or non-callable C, goes on to the entry and
 //! the HasInstance helper having observed nothing: every step only reads.
+use super::chain::{ChainWalk, RunSite};
 use super::*;
 use crate::gc_types::{
     Environment, GlobalReadSiteRecord, InstanceofSiteRecord, InstanceofSiteRecordSchema,
@@ -85,7 +86,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(slow, f);
         let answer = s.reserve_i32_local(f);
-        self.emit_instanceof_usable_record_answer(&record, object, answer, slow, f);
+        self.emit_instanceof_usable_record_answer(&record, object, answer, slow, None, f);
         record.clear(f);
         result.initialize(f);
         result.value().set_boolean(answer, f);
@@ -111,6 +112,7 @@ impl FunctionBuilder<'_> {
         object: &ValueLocals,
         answer: I32Local,
         slow: ControlTarget,
+        chain: Option<RunSite<'_>>,
         f: &mut Function,
     ) {
         let s = self.runtime_schema();
@@ -137,7 +139,7 @@ impl FunctionBuilder<'_> {
         let record = s
             .reserve_gc_local::<InstanceofSiteRecord, Nullable>(f)
             .initialize(instance.load(s, f), f);
-        self.emit_instanceof_usable_record_answer(&record, object, answer, slow, f);
+        self.emit_instanceof_usable_record_answer(&record, object, answer, slow, chain, f);
         record.clear(f);
     }
 
@@ -196,13 +198,16 @@ impl FunctionBuilder<'_> {
     }
 
     /// Answers `V instanceof C` into `answer` from a usable record of C, or
-    /// branches to `slow`, having observed nothing.
+    /// branches to `slow`, having observed nothing. A site of an
+    /// `instanceof` run walks V's chain into the run's slots, or answers from
+    /// the slots its run's first site walked for this very V.
     fn emit_instanceof_usable_record_answer(
         &mut self,
         record: &GcLocal<InstanceofSiteRecord, Nullable>,
         object: &ValueLocals,
         answer: I32Local,
         slow: ControlTarget,
+        chain: Option<RunSite<'_>>,
         f: &mut Function,
     ) {
         let s = self.runtime_schema();
@@ -269,21 +274,50 @@ impl FunctionBuilder<'_> {
                     .reference(),
                 f,
             );
+        // The Realm's %Object.prototype%, when the record proved it: its
+        // [[Prototype]] is null and immutable, so a chain reaching it ends.
+        let terminal = s
+            .reserve_gc_local::<JavaScriptObject, Nullable>(f)
+            .initialize(
+                s.field(InstanceofSiteRecordSchema::TERMINAL)
+                    .read(record, s, f)
+                    .reference(),
+                f,
+            );
         let next = s
             .reserve_gc_local::<JavaScriptObject, Nullable>(f)
             .initialize_null(s, f);
         let current = s
             .reserve_gc_local::<JavaScriptObject, Nullable>(f)
             .initialize_null(s, f);
-        self.emit_chain_prototype_or_branch(
-            CandidateObject::Reference(object.reference()),
-            &next,
-            slow,
-            f,
-        );
+        // Leaves with the next object of V's chain to examine in `next`.
+        let candidates = self.open_frame(ControlFrameKind::Block, f);
+        match chain {
+            None => self.emit_chain_prototype_or_branch(
+                CandidateObject::Reference(object.reference()),
+                &next,
+                slow,
+                f,
+            ),
+            Some(site) => self.emit_run_chain_candidates(
+                site,
+                ChainWalk {
+                    object,
+                    prototype: &prototype,
+                    terminal: &terminal,
+                    next: &next,
+                    current: &current,
+                    answer,
+                    answered,
+                    candidates,
+                    slow,
+                },
+                f,
+            ),
+        }
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         let walk = self.open_frame(ControlFrameKind::Loop, f);
-        next.load(s, f).is_null(f);
-        self.emit_branch_if_to_target(answered, f);
         let _ = next.load(s, f);
         let _ = prototype.load(s, f);
         f.instruction(&Instruction::RefEq);
@@ -292,6 +326,8 @@ impl FunctionBuilder<'_> {
         self.emit_branch_to_target(answered, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        emit_chain_ends_i32(&next, &terminal, s, f);
+        self.emit_branch_if_to_target(answered, f);
         current.replace(next.load(s, f), f);
         self.emit_chain_prototype_or_branch(CandidateObject::Prototype(&current), &next, slow, f);
         self.emit_branch_to_target(walk, f);
@@ -301,6 +337,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         current.clear(f);
         next.clear(f);
+        terminal.clear(f);
         prototype.clear(f);
     }
 
@@ -457,6 +494,7 @@ impl FunctionBuilder<'_> {
                 .nullable(),
             f,
         );
+        let terminal = self.emit_immutable_null_prototype_terminal(&p.caller_execution_realm, f);
         let _ = s.struct_type::<InstanceofSiteRecord>().construct(
             (
                 GcOperand::eq_reference(&p.constructor),
@@ -466,10 +504,12 @@ impl FunctionBuilder<'_> {
                 GcOperand::reference(&reached, s),
                 GcOperand::reference(&prototype, s),
                 GcOperand::reference(&symbol, s),
+                GcOperand::reference(&terminal, s),
             ),
             f,
         );
         f.instruction(&Instruction::Return);
+        terminal.clear(f);
         symbol.clear(f);
         prototype.clear(f);
         reached.clear(f);
@@ -487,6 +527,7 @@ impl FunctionBuilder<'_> {
                 GcOperand::null(s),
                 GcOperand::null(s),
                 GcOperand::null(s),
+                GcOperand::null(s),
             ),
             f,
         );
@@ -494,5 +535,56 @@ impl FunctionBuilder<'_> {
         p.release(f);
         f.instruction(&Instruction::End);
         Ok(self.finish_function(body))
+    }
+
+    /// The Realm's %Object.prototype% as a record's TERMINAL, after reading
+    /// it as an ordinary object whose [[Prototype]] is null and immutable;
+    /// null otherwise. IMMUTABLE_PROTOTYPE never changes, and
+    /// [[SetPrototypeOf]] of such an object (SetImmutablePrototype) writes
+    /// nothing, so that [[Prototype]] stays null for good.
+    fn emit_immutable_null_prototype_terminal(
+        &mut self,
+        realm: &GcLocal<RealmRecord>,
+        f: &mut Function,
+    ) -> GcLocal<JavaScriptObject, Nullable> {
+        let s = self.runtime_schema();
+        let terminal = s
+            .reserve_gc_local::<JavaScriptObject, Nullable>(f)
+            .initialize_null(s, f);
+        let unproved = self.open_frame(ControlFrameKind::Block, f);
+        let stored = self.emit_load_non_array_realm_intrinsic_stored(
+            realm,
+            NonArrayRealmIntrinsicSlot::ObjectPrototype,
+            f,
+        );
+        let value = s.reserve_value_local(f);
+        s.struct_type::<StoredValue>()
+            .read_into(&stored, &value, s, f);
+        stored.clear(f);
+        let object = s
+            .reserve_gc_local::<OrdinaryObject, NonNullable>(f)
+            .initialize(
+                value.sealed_reference_or_branch::<OrdinaryObject>(
+                    s,
+                    self.local_branch_label(unproved),
+                    f,
+                ),
+                f,
+            );
+        s.field(OrdinaryObjectSchema::PROTOTYPE)
+            .read(&object, s, f)
+            .reference()
+            .is_null(f);
+        s.field(OrdinaryObjectSchema::IMMUTABLE_PROTOTYPE)
+            .read(&object, s, f);
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        object.clear(f);
+        self.emit_branch_if_to_target(unproved, f);
+        terminal.replace(s.prototype_reference(&value, f), f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        value.clear(f);
+        terminal
     }
 }

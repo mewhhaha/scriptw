@@ -12,6 +12,7 @@ mod native_direct_eval_compiler;
 mod native_function_compiler;
 mod native_global_script_compiler;
 mod object_header_projection;
+mod packed_value_list;
 mod program_initialize;
 mod program_instance;
 mod prototype_reference;
@@ -21,6 +22,7 @@ pub(crate) use code_unit_kernels::{
     emit_ascii_narrow_kernel, emit_ascii_widen_helper_body, emit_code_unit_find_kernel,
     emit_json_plain_run_helper_body,
 };
+pub(crate) use packed_value_list::PackedValueListConstruction;
 pub(crate) use program_instance::{
     FunctionProgramOwner, ProgramInstanceHooks, ProgramInstanceImage, ProgramInstanceLocals,
     ProgramLiteralCount, ProgramLiteralIndex, ProgramLiteralRoots, ProgramMetadataBytes,

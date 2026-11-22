@@ -1099,11 +1099,12 @@ impl<'a> FunctionBuilder<'a> {
         let output = schema
             .reserve_gc_local::<StringValue, crate::gc_types::Nullable>(function)
             .initialize_null(schema, function);
-        // An integer from 0 to 99 is one or two decimal digits, written into
-        // a fixed backing before any other case is examined: no digit count,
-        // no fill and no second call. The saturating truncation of every
-        // other Number, NaN included, differs from the Number or is at
-        // least 100; -0 truncates to 0 and equals it, and its String is "0".
+        // An integral Number from 0 to 2^32 - 1 is answered before any other
+        // case is examined: one or two digits below 100 are written into a
+        // fixed backing, larger ones by an i32 digit loop; no sign, NaN or
+        // safe-range test and no second call. The saturating truncation of
+        // every other Number, NaN included, differs from the Number; -0
+        // truncates to 0 and equals it, and its String is "0".
         let small = schema.reserve_i32_local(function);
         bits.load(function);
         function.instruction(&Instruction::F64ReinterpretI64);
@@ -1114,11 +1115,19 @@ impl<'a> FunctionBuilder<'a> {
         bits.load(function);
         function.instruction(&Instruction::F64ReinterpretI64);
         function.instruction(&Instruction::F64Eq);
+        function.instruction(&Instruction::If(BlockType::Empty));
         small.load(function);
         function.instruction(&Instruction::I32Const(100));
-        function.instruction(&Instruction::I32LtU);
-        function.instruction(&Instruction::I32And);
+        function.instruction(&Instruction::I32GeU);
         function.instruction(&Instruction::If(BlockType::Empty));
+        // An integral Number from 100 to 2^32 - 1: its String is its exact
+        // decimal digits (k <= n <= 21 in Number::toString), counted by
+        // comparisons and written from the least significant digit in i32.
+        output.replace(
+            self.emit_u32_decimal_string(small, function).nullable(),
+            function,
+        );
+        function.instruction(&Instruction::Else);
         let high = schema.reserve_i32_local(function);
         let low = schema.reserve_i32_local(function);
         small.load(function);
@@ -1168,6 +1177,7 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::End);
         schema.release_i32_local(low, function);
         schema.release_i32_local(high, function);
+        function.instruction(&Instruction::End);
         function.instruction(&Instruction::Else);
         let absolute = schema.reserve_i64_local(function);
         let sign = schema.reserve_i64_local(function);
@@ -1281,6 +1291,67 @@ impl<'a> FunctionBuilder<'a> {
         let result = output.load(schema, function).require_non_null(function);
         output.clear(function);
         Ok(result)
+    }
+
+    /// The decimal spelling of a u32 of at least 100, in a fresh string of
+    /// exactly its digit count. `value` is left unchanged.
+    fn emit_u32_decimal_string(
+        &self,
+        value: crate::gc_types::I32Local,
+        function: &mut Function,
+    ) -> crate::gc_types::GcStackReference<StringValue> {
+        let schema = self.runtime_schema();
+        let count = schema.reserve_i32_local(function);
+        let remaining = schema.reserve_i32_local(function);
+        let unit = schema.reserve_i32_local(function);
+        function.instruction(&Instruction::I32Const(3));
+        for threshold in [
+            1_000u32,
+            10_000,
+            100_000,
+            1_000_000,
+            10_000_000,
+            100_000_000,
+            1_000_000_000,
+        ] {
+            value.load(function);
+            function.instruction(&Instruction::I32Const(threshold as i32));
+            function.instruction(&Instruction::I32GeU);
+            function.instruction(&Instruction::I32Add);
+        }
+        count.store(function);
+        let text = crate::gc_types::StringConstruction::allocate(
+            schema,
+            schema.reserve_gc_local(function),
+            count,
+            function,
+        );
+        value.load(function);
+        remaining.store(function);
+        function.instruction(&Instruction::Loop(BlockType::Empty));
+        count.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Sub);
+        count.store(function);
+        remaining.load(function);
+        function.instruction(&Instruction::I32Const(10));
+        function.instruction(&Instruction::I32RemU);
+        function.instruction(&Instruction::I32Const(48));
+        function.instruction(&Instruction::I32Add);
+        unit.store(function);
+        text.write(count, unit, schema, function);
+        remaining.load(function);
+        function.instruction(&Instruction::I32Const(10));
+        function.instruction(&Instruction::I32DivU);
+        remaining.store(function);
+        count.load(function);
+        function.instruction(&Instruction::BrIf(0));
+        function.instruction(&Instruction::End);
+        let result = text.publish(schema, function);
+        schema.release_i32_local(unit, function);
+        schema.release_i32_local(remaining, function);
+        schema.release_i32_local(count, function);
+        result
     }
 
     fn emit_decimal_digit_count(
