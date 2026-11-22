@@ -110,12 +110,7 @@ impl ReflectionProperty {
         descriptor
     }
 
-    fn write(
-        &self,
-        value: Written<'_>,
-        schema: &RuntimeSchema,
-        function: &mut Function,
-    ) {
+    fn write(&self, value: Written<'_>, schema: &RuntimeSchema, function: &mut Function) {
         self.state.load(schema, function).is_null(function);
         function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::If(BlockType::Empty));
