@@ -39,7 +39,7 @@ fn argv_allocation(op: &Operator<'_>, array: u32) -> bool {
         if *array_type_index == array)
 }
 
-fn incoming_empty_argv_allocation(
+fn incoming_empty_argv_normalization(
     body: &[Operator<'_>],
     signature: &wasmparser::FuncType,
     argv: u32,
@@ -65,33 +65,34 @@ fn incoming_empty_argv_allocation(
         .expect("the incoming count precedes its vector");
     assert_eq!(signature.params()[count as usize], ValType::I64);
     // The vector parameter is its own holder (`parameter_gc` aliases it) and
-    // is never written: a null one is replaced by an empty List on the stack,
-    // and the normalized List's length is then checked against the count.
-    let allocations = body
+    // is never written: a null one is replaced by the module's shared empty
+    // List (no per-call allocation), and the normalized List's length is then
+    // checked against the count.
+    let normalizations = body
         .windows(13)
         .enumerate()
         .filter_map(|(start, ops)| {
             matches!(ops,
             [Operator::Block { .. }, Operator::LocalGet { local_index: supplied },
              Operator::BrOnNonNull { relative_depth: 0 },
-             Operator::ArrayNewFixed { array_type_index, array_size: 0 }, Operator::End,
+             Operator::GlobalGet { .. }, Operator::End,
              Operator::LocalSet { local_index: normalized },
              Operator::LocalGet { local_index: read }, Operator::ArrayLen,
              Operator::I64ExtendI32U, Operator::LocalSet { local_index: length },
              Operator::LocalGet { local_index: compared },
              Operator::LocalGet { local_index: supplied_count }, Operator::I64Ne]
                 if *supplied == vector && supplied != normalized && read == normalized
-                    && length == compared && *supplied_count == count
-                    && *array_type_index == argv)
+                    && length == compared && *supplied_count == count)
             .then_some(start + 3)
         })
         .collect::<Vec<_>>();
     assert_eq!(
-        allocations.len(),
+        normalizations.len(),
         1,
-        "only a null incoming vector with zero declared arguments constructs the entry's empty List"
+        "a null incoming vector takes the shared empty List once at entry"
     );
-    allocations[0]
+    let _ = argv;
+    normalizations[0]
 }
 
 #[test]
@@ -173,12 +174,12 @@ fn fixed_push_proves_actual_native_then_keeps_argument_allocations_in_fallback()
                     "the actual execution Realm is compared with the caller Realm");
                 assert_eq!(source_allocations(&body[..direct]), source_allocations(control),
                     "successful fixed push allocates no per-argument StoredValue snapshots");
-                let entry_argv = incoming_empty_argv_allocation(body, program.function_type(source), argv);
+                incoming_empty_argv_normalization(body, program.function_type(source), argv);
                 let before_push = body[..direct].iter().enumerate()
                     .filter_map(|(index, op)| argv_allocation(op, argv).then_some(index))
                     .collect::<Vec<_>>();
-                assert_eq!(before_push, [entry_argv],
-                    "the source entry alone normalizes incoming null argv; successful fixed push creates no argument List");
+                assert!(before_push.is_empty(),
+                    "incoming null argv takes the shared empty List; successful fixed push creates no argument List");
                 let fallback = body.windows(3).enumerate().find_map(|(start, ops)| {
                     let [Operator::LocalGet { .. }, Operator::I32Eqz, Operator::If { .. }] = ops else { return None; };
                     let end = frame_end(body, start + 2);
