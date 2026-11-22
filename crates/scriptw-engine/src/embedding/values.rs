@@ -122,19 +122,26 @@ impl JsValue {
         .2)
     }
 
+    /// This value's (tag, scalar, reference) Wasm representation, rooted in
+    /// the caller's scope, for typed bridge parameters.
+    pub(super) fn parts(
+        &self,
+        store: &mut impl AsContextMut<Data = WasmStoreState>,
+    ) -> Result<(i32, i64, Option<Rooted<EqRef>>), EngineError> {
+        self.check(store)?;
+        let reference = self.reference.as_ref().map(|r| r.to_rooted(&mut *store));
+        Ok((self.tag.tag(), self.scalar, reference))
+    }
+
     pub(super) fn arguments(
         &self,
         store: &mut impl AsContextMut<Data = WasmStoreState>,
     ) -> Result<[Val; 3], EngineError> {
-        self.check(store)?;
-        let reference = self
-            .reference
-            .as_ref()
-            .map(|r| r.to_rooted(&mut *store).to_anyref());
+        let (tag, scalar, reference) = self.parts(store)?;
         Ok([
-            Val::I32(self.tag.tag()),
-            Val::I64(self.scalar),
-            Val::AnyRef(reference),
+            Val::I32(tag),
+            Val::I64(scalar),
+            Val::AnyRef(reference.map(|r| r.to_anyref())),
         ])
     }
 }

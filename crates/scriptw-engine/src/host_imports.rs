@@ -154,17 +154,28 @@ pub(super) fn register(
             },
         )
         .map_err(|err| EngineError::new(format!("wasmtime linker setup failed: {err}")))?;
+    // The host module's instances are print's callers: resolve their memory
+    // export's index once instead of looking it up by name per line. Any
+    // other module's caller (the index names another module) keeps the name
+    // lookup, which yields the same export.
+    let memory_export = module.get_export_index("memory");
     linker
         .func_wrap(
             WASM_HOST_IMPORT_NAMESPACE,
             WASM_HOST_IMPORT_PRINT_LINE_UTF8,
-            |mut caller: WasmtimeCaller<'_, WasmHostState>,
-             ptr: i32,
-             len: i32|
-             -> wasmtime::Result<()> {
-                let memory = caller.get_export("memory").ok_or_else(|| {
-                    wasmtime::Error::msg("wasmtime host import failed: missing exported memory")
-                })?;
+            move |mut caller: WasmtimeCaller<'_, WasmHostState>,
+                  ptr: i32,
+                  len: i32|
+                  -> wasmtime::Result<()> {
+                let memory = memory_export
+                    .as_ref()
+                    .and_then(|export| caller.get_module_export(export))
+                    .or_else(|| caller.get_export("memory"))
+                    .ok_or_else(|| {
+                        wasmtime::Error::msg(
+                            "wasmtime host import failed: missing exported memory",
+                        )
+                    })?;
                 let ptr = usize::try_from(ptr).map_err(|_| {
                     wasmtime::Error::msg("wasmtime host import failed: negative utf-8 pointer")
                 })?;
@@ -184,18 +195,24 @@ pub(super) fn register(
                     .map_err(|err| {
                         wasmtime::Error::msg(format!("wasmtime host import failed: {err}"))
                     })?;
-                let mut bytes = vec![0; span.len()];
+                let print = |bytes: &[u8], state: &WasmHostState| -> wasmtime::Result<()> {
+                    let text = std::str::from_utf8(bytes).map_err(|err| {
+                        wasmtime::Error::msg(format!(
+                            "wasmtime host import failed: invalid utf-8: {err}"
+                        ))
+                    })?;
+                    state.output_events.record(text);
+                    state.realm.host_hooks().print_line(text);
+                    Ok(())
+                };
                 match memory {
+                    // Private memory cannot change while this import runs:
+                    // decode the validated span in place.
                     WasmtimeExtern::Memory(memory) => {
-                        memory
-                            .read(&caller, span.start, &mut bytes)
-                            .map_err(|err| {
-                                wasmtime::Error::msg(format!(
-                                    "wasmtime host import failed: unable to read memory: {err}"
-                                ))
-                            })?;
+                        print(&memory.data(&caller)[span], caller.data())
                     }
                     WasmtimeExtern::SharedMemory(memory) => {
+                        let mut bytes = vec![0; span.len()];
                         read_wasmtime_shared_memory(&memory, span.start, &mut bytes).map_err(
                             |err| {
                                 wasmtime::Error::msg(format!(
@@ -203,17 +220,10 @@ pub(super) fn register(
                                 ))
                             },
                         )?;
+                        print(&bytes, caller.data())
                     }
                     _ => unreachable!("memory kind was validated before allocation"),
                 }
-                let text = String::from_utf8(bytes).map_err(|err| {
-                    wasmtime::Error::msg(format!(
-                        "wasmtime host import failed: invalid utf-8: {err}"
-                    ))
-                })?;
-                caller.data().output_events.record(&text);
-                caller.data().realm.host_hooks().print_line(&text);
-                Ok(())
             },
         )
         .map_err(|err| EngineError::new(format!("wasmtime linker setup failed: {err}")))?;
@@ -337,5 +347,78 @@ mod tests {
         assert!(WasmtimeEngine::same(a.engine(), &first));
         assert!(WasmtimeEngine::same(b.engine(), &second));
         assert!(linker(&first, &second_module, key).is_err());
+    }
+
+    /// `(module (import "scriptw_host" "print_line_utf8" (func (param i32 i32)))
+    /// (memory (export "memory") 1) (data (i32.const 0) text)
+    /// (func (export "run") (call 0 (i32.const 0) (i32.const len))))`.
+    fn print_module(text: &[u8]) -> Vec<u8> {
+        fn section(id: u8, payload: &[u8]) -> Vec<u8> {
+            let mut bytes = vec![id, u8::try_from(payload.len()).unwrap()];
+            bytes.extend_from_slice(payload);
+            bytes
+        }
+        fn name(text: &str) -> Vec<u8> {
+            let mut bytes = vec![u8::try_from(text.len()).unwrap()];
+            bytes.extend_from_slice(text.as_bytes());
+            bytes
+        }
+        let len = u8::try_from(text.len()).unwrap();
+        assert!(len < 0x40, "single-byte signed LEB length");
+        let mut module = b"\0asm\x01\0\0\0".to_vec();
+        module.extend(section(1, &[2, 0x60, 2, 0x7f, 0x7f, 0, 0x60, 0, 0]));
+        let mut import = vec![1];
+        import.extend(name(WASM_HOST_IMPORT_NAMESPACE));
+        import.extend(name(WASM_HOST_IMPORT_PRINT_LINE_UTF8));
+        import.extend([0, 0]);
+        module.extend(section(2, &import));
+        module.extend(section(3, &[1, 1]));
+        module.extend(section(5, &[1, 0, 1]));
+        let mut export = vec![2];
+        export.extend(name("memory"));
+        export.extend([2, 0]);
+        export.extend(name("run"));
+        export.extend([0, 1]);
+        module.extend(section(7, &export));
+        let body = [0, 0x41, 0, 0x41, len, 0x10, 0, 0x0b];
+        let mut code = vec![1, u8::try_from(body.len()).unwrap()];
+        code.extend(body);
+        module.extend(section(10, &code));
+        let mut data = vec![1, 0, 0x41, 0, 0x0b, len];
+        data.extend_from_slice(text);
+        module.extend(section(11, &data));
+        module
+    }
+
+    #[test]
+    fn print_reads_the_host_module_memory_by_index_and_other_callers_by_name() {
+        let engine = shared_wasm_engine().unwrap();
+        let host = compile_wasm_module(&engine, &print_module(b"host line")).unwrap();
+        let other = compile_wasm_module(&engine, &print_module(b"other line")).unwrap();
+        assert!(host.get_export_index("memory").is_some());
+        let mut linker = WasmtimeLinker::new(&engine);
+        register(&mut linker, &host).unwrap();
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let mut state = state(false);
+        state.output_events = WasmOutputEvents::Capture(Arc::clone(&events));
+        let mut store = WasmtimeStore::new(&engine, state);
+        // The host module's callers use the index resolved at registration;
+        // another module's index lookup misses and falls back to its name.
+        for module in [&host, &other, &host] {
+            let instance = linker.instantiate(&mut store, module).unwrap();
+            instance
+                .get_typed_func::<(), ()>(&mut store, "run")
+                .unwrap()
+                .call(&mut store, ())
+                .unwrap();
+        }
+        assert_eq!(
+            *events.lock().unwrap(),
+            [
+                HostOutputEvent::PrintLine("host line".into()),
+                HostOutputEvent::PrintLine("other line".into()),
+                HostOutputEvent::PrintLine("host line".into()),
+            ]
+        );
     }
 }

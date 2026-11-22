@@ -486,6 +486,7 @@ impl EmbeddedRuntime {
             roots,
             store: Arc::clone(&state.store),
             bridges,
+            entry: None,
             profile_sites: self.profile_sites.clone(),
         })
     }
@@ -500,6 +501,9 @@ pub struct EmbeddedInstance {
     store: Arc<()>,
     /// Bridge handles fixed for the instance's lifetime, looked up once.
     bridges: operations::Bridges,
+    /// The entry Realm, global Environment and program, retained once
+    /// `main` has created them; see `operations::EntryContext`.
+    entry: Option<operations::EntryContext>,
     profile_sites: Option<execution_profile::ProfileSites>,
 }
 
@@ -578,6 +582,11 @@ impl EmbeddedInstance {
                 completion,
             )?);
         }
+        // `main` has created the entry Realm and installed this program's
+        // Module graph (also when its evaluation is pending or threw). If
+        // entry left them unresolvable, every operation keeps reading them
+        // afresh and reports exactly what it finds.
+        self.entry = operations::EntryContext::resolve(&self.bridges, &mut roots).ok();
         match module_entry_status(self.bridges.module_status.clone(), &mut roots)? {
             Some(WasmModuleEvaluationStatus::Pending) => Ok(EmbeddedEvaluation::Pending),
             Some(WasmModuleEvaluationStatus::NotStarted) => Err(EngineError::new(

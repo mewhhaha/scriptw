@@ -14,6 +14,7 @@ mod execution_fiber_controls;
 mod execution_profile;
 mod profiled_entry;
 mod reentrant_execution;
+mod retained_call_context;
 mod timers;
 
 fn registry(error_tag: bool) -> ForeignModuleRegistry {

@@ -1,12 +1,12 @@
 //! Operations execute compiler-emitted bridges using the owning Realm/program.
 use super::async_host::ForeignAsyncSettlement;
 use super::foreign_host::{allocate_array, copy_array};
-use super::values::{dynamic_completion, retained_value};
+use super::values::{dynamic_completion, retained_completion, retained_value};
 use super::*;
 use scriptw_aot_wasm::GcHostField;
 use wasmtime::{
-    ArrayRef, ArrayRefPre, ArrayType, EqRef, Func, Global, Rooted, StorageType, StructRef,
-    StructRefPre, Val,
+    ArrayRef, ArrayRefPre, ArrayType, EqRef, Func, Global, OwnedRooted, Rooted, StorageType,
+    StructRef, StructRefPre, TypedFunc, Val,
 };
 
 /// What the bridges retained requests enter on every call need from the
@@ -22,11 +22,33 @@ pub(super) struct Bridges {
     pub(super) module_status: Option<WasmtimeExtern>,
 }
 
+/// `scriptw.embed.call`'s exact parameters: callee and receiver as
+/// (tag, scalar, eqref) values, the canonical argument array, then the entry
+/// Realm, its global Environment and the defining program.
+type CallParameters = (
+    i32,
+    i64,
+    Option<Rooted<EqRef>>,
+    i32,
+    i64,
+    Option<Rooted<EqRef>>,
+    Rooted<ArrayRef>,
+    Rooted<EqRef>,
+    Option<Rooted<EqRef>>,
+    Rooted<EqRef>,
+);
+
+/// The call bridge, typed once so a call neither checks a `Val` slice
+/// against the bridge's `FuncType` nor allocates parameter/result vectors.
 struct CallBridge {
-    function: Func,
-    results: usize,
+    function: TypedFunc<CallParameters, GcMainCompletion>,
     arguments: ArrayRefPre,
     stored: StructRefPre,
+    /// One empty argument array shared by every zero-argument call. A
+    /// zero-length Wasm GC array has no element a callee could write, and
+    /// nothing compares argument arrays by identity: R itself shares one
+    /// empty `ValueArray` for every argument-free entry.
+    no_arguments: OwnedRooted<ArrayRef>,
 }
 
 impl Bridges {
@@ -51,6 +73,12 @@ impl Bridges {
             ),
         }
     }
+
+    /// Whether the call bridge was typed and retained at instantiation.
+    #[cfg(test)]
+    pub(super) fn has_typed_call(&self) -> bool {
+        self.call.is_some()
+    }
 }
 
 impl CallBridge {
@@ -59,7 +87,6 @@ impl CallBridge {
         function: Func,
     ) -> Result<Self, EngineError> {
         let ty = function.ty(&*store);
-        let results = ty.results().len();
         let arguments: ArrayType = ty
             .params()
             .nth(6)
@@ -79,13 +106,118 @@ impl CallBridge {
             .as_concrete_struct()
             .cloned()
             .ok_or_else(|| EngineError::new("embedding argument is not a StoredValue"))?;
+        let function = function
+            .typed::<CallParameters, GcMainCompletion>(&*store)
+            .map_err(|error| EngineError::new(format!("embedding call signature: {error:#}")))?;
+        let arguments = ArrayRefPre::new(&mut *store, arguments);
+        let no_arguments = {
+            let mut scope = wasmtime::RootScope::new(&mut *store);
+            ArrayRef::new_fixed(&mut scope, &arguments, &[])
+                .and_then(|empty| empty.to_owned_rooted(&mut scope))
+                .map_err(embedded_error)?
+        };
         Ok(CallBridge {
             function,
-            results,
             stored: StructRefPre::new(&mut *store, stored),
-            arguments: ArrayRefPre::new(&mut *store, arguments),
+            arguments,
+            no_arguments,
         })
     }
+}
+
+/// The entry Realm, its global Environment and its defining program, as
+/// rooted in one operation's scope.
+type EntryRoots = (Rooted<EqRef>, Option<Rooted<EqRef>>, Rooted<EqRef>);
+
+/// The entry Realm, its global Environment and the defining program that
+/// every retained operation enters, resolved once after `main` has run.
+///
+/// None of them can change afterwards. R publishes its entry Realm root only
+/// while that root is still null (`retain_snapshot_realm`); CreateRealm
+/// installs a Realm's global Environment once; and a Store admits exactly one
+/// P/R pair (`StorePhase`), whose P installs its Module graph in the entry
+/// Realm once (a second install traps) and, without a source compiler in an
+/// embedding Store, no other program can prepend a graph. Re-reading them
+/// per call through the host GC API re-derived every field's type and was
+/// the largest part of an exported call. `OwnedRooted` keeps them alive and
+/// current across moving collections and needs no Store to drop.
+pub(super) struct EntryContext {
+    realm: OwnedRooted<EqRef>,
+    environment: Option<OwnedRooted<EqRef>>,
+    program: OwnedRooted<EqRef>,
+}
+
+impl EntryContext {
+    pub(super) fn resolve(
+        bridges: &Bridges,
+        store: &mut impl AsContextMut<Data = WasmStoreState>,
+    ) -> Result<Self, EngineError> {
+        let (realm, environment, program) = resolve_entry(bridges, store)?;
+        let mut owned = |reference: Rooted<EqRef>| {
+            reference
+                .to_owned_rooted(&mut *store)
+                .map_err(embedded_error)
+        };
+        Ok(EntryContext {
+            realm: owned(realm)?,
+            environment: environment.map(&mut owned).transpose()?,
+            program: owned(program)?,
+        })
+    }
+
+    fn to_rooted(&self, store: &mut impl AsContextMut<Data = WasmStoreState>) -> EntryRoots {
+        (
+            self.realm.to_rooted(&mut *store),
+            self.environment
+                .as_ref()
+                .map(|environment| environment.to_rooted(&mut *store)),
+            self.program.to_rooted(&mut *store),
+        )
+    }
+
+    /// Whether a fresh read of the Realm root and its fields still yields
+    /// exactly the retained objects.
+    fn is_current(
+        &self,
+        bridges: &Bridges,
+        store: &mut impl AsContextMut<Data = WasmStoreState>,
+    ) -> Result<bool, EngineError> {
+        let (realm, environment, program) = resolve_entry(bridges, store)?;
+        let store = store.as_context();
+        let same = |retained: &OwnedRooted<EqRef>, live: &Rooted<EqRef>| {
+            Rooted::<EqRef>::ref_eq(&store, retained, live).map_err(embedded_error)
+        };
+        let environment = match (&self.environment, &environment) {
+            (None, None) => true,
+            (Some(retained), Some(live)) => same(retained, live)?,
+            _ => false,
+        };
+        Ok(environment && same(&self.realm, &realm)? && same(&self.program, &program)?)
+    }
+}
+
+/// Read the entry Realm root, its Module graph's defining program and its
+/// global Environment through the host GC API.
+fn resolve_entry(
+    bridges: &Bridges,
+    store: &mut impl AsContextMut<Data = WasmStoreState>,
+) -> Result<EntryRoots, EngineError> {
+    let realm = bridges
+        .realm
+        .ok_or_else(|| EngineError::new("compiled program has no embedding Realm root"))?
+        .get(&mut *store);
+    let realm =
+        eqref(store, realm)?.ok_or_else(|| EngineError::new("entry Realm was not initialized"))?;
+    let graph_field = wasm_gc_completion::field(store, realm, GcHostField::RealmModules)?;
+    let graph =
+        eqref(store, graph_field)?.ok_or_else(|| EngineError::new("entry Realm has no Module graph"))?;
+    let program_field = wasm_gc_completion::field(store, graph, GcHostField::ModuleGraphProgram)?;
+    let program = eqref(store, program_field)?
+        .ok_or_else(|| EngineError::new("Module graph has no defining program"))?;
+    let environment_field =
+        wasm_gc_completion::field(store, realm, GcHostField::RealmGlobalEnvironment)?;
+    let environment = eqref(store, environment_field)?;
+    Ok((realm, environment, program))
 }
 
 impl EmbeddedInstance {
@@ -131,28 +263,36 @@ impl EmbeddedInstance {
             .ok_or_else(|| EngineError::new(format!("compiled embedding bridge is absent: {name}")))
     }
 
+    /// The entry context retained at initialize, re-rooted in the caller's
+    /// scope. Before initialize retains it (or when entry left it
+    /// unresolvable), each operation reads it afresh and reports exactly what
+    /// a fresh read finds.
     fn context(
         &self,
         store: &mut impl AsContextMut<Data = WasmStoreState>,
-    ) -> Result<(Rooted<EqRef>, Option<Rooted<EqRef>>, Rooted<EqRef>), EngineError> {
-        let realm = self
-            .bridges
-            .realm
-            .ok_or_else(|| EngineError::new("compiled program has no embedding Realm root"))?
-            .get(&mut *store);
-        let realm = eqref(store, realm)?
-            .ok_or_else(|| EngineError::new("entry Realm was not initialized"))?;
-        let graph_field = wasm_gc_completion::field(store, realm, GcHostField::RealmModules)?;
-        let graph = eqref(store, graph_field)?
-            .ok_or_else(|| EngineError::new("entry Realm has no Module graph"))?;
-        let program_field =
-            wasm_gc_completion::field(store, graph, GcHostField::ModuleGraphProgram)?;
-        let program = eqref(store, program_field)?
-            .ok_or_else(|| EngineError::new("Module graph has no defining program"))?;
-        let environment_field =
-            wasm_gc_completion::field(store, realm, GcHostField::RealmGlobalEnvironment)?;
-        let environment = eqref(store, environment_field)?;
-        Ok((realm, environment, program))
+    ) -> Result<EntryRoots, EngineError> {
+        let Some(entry) = &self.entry else {
+            return resolve_entry(&self.bridges, store);
+        };
+        debug_assert!(
+            matches!(entry.is_current(&self.bridges, store), Ok(true)),
+            "retained embedding entry context went stale"
+        );
+        Ok(entry.to_rooted(store))
+    }
+
+    /// Whether the retained entry context still equals a fresh read; `None`
+    /// when initialize retained none.
+    #[cfg(test)]
+    pub(super) fn entry_context_is_current(
+        &self,
+        store: &mut WasmtimeStore<WasmStoreState>,
+    ) -> Result<Option<bool>, EngineError> {
+        let mut roots = wasmtime::RootScope::new(store);
+        self.entry
+            .as_ref()
+            .map(|entry| entry.is_current(&self.bridges, &mut roots))
+            .transpose()
     }
 
     fn execute(
@@ -367,38 +507,59 @@ impl EmbeddedInstance {
                 &built
             }
         };
-        u32::try_from(arguments.len())
-            .map_err(|_| EngineError::new("argument count exceeds Wasm32"))?;
-        let mut elements = Vec::new();
-        elements
-            .try_reserve_exact(arguments.len())
-            .map_err(|e| EngineError::new(e.to_string()))?;
-        for argument in arguments {
-            let [tag, scalar, reference] = argument.arguments(store)?;
-            let mut fields = [Val::I32(0); 3];
-            fields[GcHostField::StoredTag.definition().index() as usize] = tag;
-            fields[GcHostField::StoredScalar.definition().index() as usize] = scalar;
-            fields[GcHostField::StoredReference.definition().index() as usize] = reference;
-            let value =
-                StructRef::new(&mut *store, &bridge.stored, &fields).map_err(embedded_error)?;
-            elements.push(Val::AnyRef(Some(value.to_anyref())));
-        }
-        let args = ArrayRef::new_fixed(&mut *store, &bridge.arguments, &elements)
-            .map_err(embedded_error)?;
-        let mut inputs = callable.arguments(store)?.to_vec();
-        let undefined;
-        let receiver = if let Some(receiver) = receiver {
-            receiver
+        let args = if arguments.is_empty() {
+            bridge.no_arguments.to_rooted(&mut *store)
         } else {
-            undefined = self.value_inner(store, ForeignValue::Void)?;
-            &undefined
+            u32::try_from(arguments.len())
+                .map_err(|_| EngineError::new("argument count exceeds Wasm32"))?;
+            let mut elements = Vec::new();
+            elements
+                .try_reserve_exact(arguments.len())
+                .map_err(|e| EngineError::new(e.to_string()))?;
+            for argument in arguments {
+                let [tag, scalar, reference] = argument.arguments(store)?;
+                let mut fields = [Val::I32(0); 3];
+                fields[GcHostField::StoredTag.definition().index() as usize] = tag;
+                fields[GcHostField::StoredScalar.definition().index() as usize] = scalar;
+                fields[GcHostField::StoredReference.definition().index() as usize] = reference;
+                let value =
+                    StructRef::new(&mut *store, &bridge.stored, &fields).map_err(embedded_error)?;
+                elements.push(Val::AnyRef(Some(value.to_anyref())));
+            }
+            ArrayRef::new_fixed(&mut *store, &bridge.arguments, &elements)
+                .map_err(embedded_error)?
         };
-        inputs.extend(receiver.arguments(store)?);
-        inputs.push(Val::AnyRef(Some(args.to_anyref())));
+        let (callee_tag, callee_scalar, callee) = callable.parts(store)?;
+        // An absent receiver is exactly the undefined value: tag, zero, no root.
+        let (this_tag, this_scalar, this) = match receiver {
+            Some(receiver) => receiver.parts(store)?,
+            None => (JsValueKind::Undefined.tag(), 0, None),
+        };
         let (realm, environment, program) = self.context(store)?;
-        inputs.extend(context_arguments(realm, environment, program));
-        let results = self.execute_with(store, bridge.function, bridge.results, &inputs)?;
-        dynamic_completion(store, &results)
+        let completion = match bridge.function.call(
+            &mut *store,
+            (
+                callee_tag,
+                callee_scalar,
+                callee,
+                this_tag,
+                this_scalar,
+                this,
+                args,
+                realm,
+                environment,
+                program,
+            ),
+        ) {
+            Ok(completion) => completion,
+            Err(error) => {
+                if let Some(state) = store.as_context_mut().data_mut().embedding.as_mut() {
+                    state.phase = StorePhase::Failed;
+                }
+                return Err(embedded_error(error));
+            }
+        };
+        retained_completion(store, completion)
     }
 
     /// Copy an attached, in-bounds Uint8Array view into host-owned bytes.
