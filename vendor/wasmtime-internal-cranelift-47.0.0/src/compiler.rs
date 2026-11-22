@@ -50,6 +50,8 @@ use wasmtime_unwinder::ExceptionTableBuilder;
 pub(crate) mod component;
 mod context_pool;
 use context_pool::{ContextPool, ScratchExtent};
+#[cfg(test)]
+mod translation_tests;
 
 struct IncrementalCacheContext {
     cache_store: Arc<dyn CacheStore>,

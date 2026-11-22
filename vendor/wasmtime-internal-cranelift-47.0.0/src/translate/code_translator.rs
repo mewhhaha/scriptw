@@ -150,6 +150,10 @@ pub fn translate_operator(
         panic!("should always have operand types available for valid, reachable ops; op = {op:?}")
     });
 
+    // Scriptw patch: a `ref.as_non_null` check left to this operator (see
+    // `gc::DeferredNullCheck`).
+    let makes_deferred_null_check = environ.settle_deferred_null_check(builder, op);
+
     // This big match treats all Wasm code operators.
     match op {
         /********************************** Locals ****************************************
@@ -373,9 +377,10 @@ pub fn translate_operator(
                 results.len(),
                 *blockty,
                 else_is_cold,
+                Some(val),
             );
             // The consequent runs only when `val` is not zero.
-            environ.prove_tested(&builder.func.dfg, val);
+            environ.prove_condition(&builder.func.dfg, val, true);
         }
         Operator::Else => {
             let i = environ.stacks.control_stack.len() - 1;
@@ -389,6 +394,7 @@ pub fn translate_operator(
                     blocktype,
                     destination,
                     else_is_cold,
+                    condition,
                     ..
                 } => {
                     // We finished the consequent, so record its final
@@ -456,6 +462,11 @@ pub fn translate_operator(
                         // `ControlStackFrame` as another `Vec` allocation.
 
                         builder.switch_to_block(else_block);
+                        // The alternative runs only when the head's
+                        // condition is zero.
+                        if let Some(condition) = condition {
+                            environ.prove_condition(&builder.func.dfg, condition, false);
+                        }
 
                         // We don't bother updating the control frame's `ElseData`
                         // to `WithElse` because nothing else will read it.
@@ -1392,6 +1403,7 @@ pub fn translate_operator(
             let val = builder.ins().uextend(I32, val);
             if matches!(op, Operator::I32Eqz) {
                 environ.set_tests.zero_tested(val, arg);
+                environ.record_eqz(val, arg);
             }
             environ.stacks.push1(val);
         }
@@ -1429,6 +1441,7 @@ pub fn translate_operator(
                 unreachable!("validation")
             };
             let result = environ.translate_ref_is_null(builder.cursor(), value, *ty)?;
+            environ.record_ref_is_null(result, value, *ty);
             environ.stacks.push1(result);
         }
         Operator::RefFunc { function_index } => {
@@ -3439,6 +3452,9 @@ pub fn translate_operator(
         // catch-all as `Operator` is `#[non_exhaustive]`
         op => return Err(wasm_unsupported!("operator {op:?}")),
     };
+    if makes_deferred_null_check {
+        environ.assert_deferred_null_check_made();
+    }
     Ok(())
 }
 
@@ -3465,6 +3481,7 @@ fn translate_unreachable_operator(
                 0,
                 blockty,
                 false,
+                None,
             );
         }
         Operator::Loop { blockty: _ }
@@ -3480,6 +3497,7 @@ fn translate_unreachable_operator(
                     ref else_data,
                     head_is_reachable,
                     ref mut consequent_ends_reachable,
+                    condition,
                     ..
                 } => {
                     debug_assert!(consequent_ends_reachable.is_none());
@@ -3521,6 +3539,11 @@ fn translate_unreachable_operator(
                         };
 
                         builder.switch_to_block(else_block);
+                        // The alternative runs only when the head's
+                        // condition is zero.
+                        if let Some(condition) = condition {
+                            environ.prove_condition(&builder.func.dfg, condition, false);
+                        }
 
                         // Again, no need to push the parameters for the `else`,
                         // since we already did when we saw the original `if`. See
@@ -4127,6 +4150,8 @@ fn translate_br_if(
 
     builder.seal_block(next_block); // The only predecessor is the current block.
     builder.switch_to_block(next_block);
+    // Control falls through only when `val` is zero.
+    env.prove_condition(&builder.func.dfg, val, false);
 }
 
 /// End the current block with a Wasm conditional branch: to `target` with

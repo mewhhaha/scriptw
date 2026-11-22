@@ -170,6 +170,10 @@ pub struct FuncEnvironment<'module_environment> {
     /// base of a heap that cannot move.
     gc_heap_base_home: Option<gc::FrameHome>,
 
+    /// Scriptw patch: this function's home slot for the base of its
+    /// `VMContext`'s type-id array, once it has read the array.
+    type_ids_home: Option<gc::FrameHome>,
+
     /// What the function's code so far has checked of GC references, and
     /// where (see `gc::ProvenReferences`).
     proven_references: gc::ProvenReferences,
@@ -298,6 +302,7 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
             ty_to_gc_layout: std::collections::HashMap::new(),
             gc_heap: None,
             gc_heap_base_home: None,
+            type_ids_home: None,
             proven_references: gc::ProvenReferences::default(),
             set_tests: set_tests::SetTests::default(),
 
@@ -1129,9 +1134,8 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
         pos: &mut FuncCursor,
         interned_ty: ModuleInternedTypeIndex,
     ) -> ir::Value {
-        let vmctx = self.vmctx_val(pos);
         // Load the base pointer of the array of `VMSharedTypeIndex`es.
-        let shared_indices = self.alias_regions.vmctx_shared_type_ids_array(pos, vmctx);
+        let shared_indices = self.type_ids_array(pos);
 
         // Calculate the offset in that array for this type's entry.
 
@@ -1139,6 +1143,48 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
         // associated with at runtime from the array.
         self.alias_regions
             .type_ids_array_element(pos, shared_indices, interned_ty)
+    }
+
+    /// The base of the `VMContext`'s array of `VMSharedTypeIndex`es at `pos`.
+    ///
+    /// (Scriptw patch) The base is one value for an instance, so for a
+    /// whole activation; it is read from the function's home slot for it,
+    /// which this creates on first use, as the GC heap base is (see
+    /// `gc::FrameHome`): `place_frame_loads` keeps a load from the home only
+    /// after a call, instead of a load of the `vmctx` from its own home and
+    /// then of the base from the `vmctx` at every use.
+    fn type_ids_array(&mut self, pos: &mut FuncCursor) -> ir::Value {
+        let home = match self.type_ids_home {
+            Some(home) => home,
+            None => {
+                let home = self.create_type_ids_home(pos.func);
+                self.type_ids_home = Some(home);
+                home
+            }
+        };
+        home.load(pos)
+    }
+
+    /// Load the type-id array's base from the `vmctx` at the top of `func`'s
+    /// entry block and store it to a new home slot there, ahead of every
+    /// use.
+    fn create_type_ids_home(&mut self, func: &mut ir::Function) -> gc::FrameHome {
+        use cranelift_codegen::cursor::Cursor as _;
+        let entry = func
+            .layout
+            .entry_block()
+            .expect("the entry block is inserted before any translation");
+        let vmctx = func
+            .special_param(ir::ArgumentPurpose::VMContext)
+            .expect("Missing vmctx parameter");
+        let region = self.alias_regions.type_ids_home_region(func);
+        let pointer_type = self.pointer_type();
+        let mut pos = FuncCursor::new(func).at_first_insertion_point(entry);
+        // `readonly` and `can_move`, as the load it replaces.
+        let base = self
+            .alias_regions
+            .vmctx_shared_type_ids_array(&mut pos, vmctx);
+        gc::FrameHome::store_at_entry(&mut pos, region, pointer_type, base)
     }
 
     /// Does this function need a GC heap?
@@ -3194,9 +3240,30 @@ impl FuncEnvironment<'_> {
 
     /// Record that code translated from here on, to the end of the innermost
     /// control frame's arm, runs only when the truth value `condition` is
-    /// not zero.
-    pub fn prove_tested(&mut self, dfg: &ir::DataFlowGraph, condition: ir::Value) {
-        gc::prove_tested(self, dfg, condition)
+    /// not zero (`nonzero`) or only when it is zero.
+    pub fn prove_condition(
+        &mut self,
+        dfg: &ir::DataFlowGraph,
+        condition: ir::Value,
+        nonzero: bool,
+    ) {
+        gc::prove_condition(self, dfg, condition, nonzero)
+    }
+
+    /// Record that `result` is `ref.is_null` of `reference`, whose static
+    /// type is `ty`.
+    pub fn record_ref_is_null(
+        &mut self,
+        result: ir::Value,
+        reference: ir::Value,
+        ty: WasmRefType,
+    ) {
+        gc::record_ref_is_null(self, result, reference, ty)
+    }
+
+    /// Record that `result` is `i32.eqz` of `operand`.
+    pub fn record_eqz(&mut self, result: ir::Value, operand: ir::Value) {
+        gc::record_eqz(self, result, operand)
     }
 
     /// Record that the reference `value` is not null in code translated from
@@ -3209,6 +3276,22 @@ impl FuncEnvironment<'_> {
     /// here on, to the end of the innermost control frame's arm.
     pub fn prove_cast(&mut self, value: ir::Value, ty: WasmRefType) {
         gc::prove_cast(self, value, ty)
+    }
+
+    /// Before translating the reachable operator `op`: keep or emit a
+    /// deferred `ref.as_non_null` check; `true` when `op` makes it.
+    pub fn settle_deferred_null_check(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        op: &Operator<'_>,
+    ) -> bool {
+        gc::settle_deferred_null_check(self, builder, op)
+    }
+
+    /// After translating an operator that makes a deferred `ref.as_non_null`
+    /// check: it did.
+    pub fn assert_deferred_null_check_made(&self) {
+        gc::assert_deferred_null_check_made(self)
     }
 
     /// Translate `ref.as_non_null` of `value`: trap if it is null.

@@ -65,6 +65,10 @@ pub enum ControlStackFrame {
         else_is_cold: bool,
         /// Was the head of the `if` reachable?
         head_is_reachable: bool,
+        /// Scriptw patch: the truth value the head branched on, when the
+        /// head was reachable. The `else` arm is entered exactly when it is
+        /// zero (see `gc::ProvenReferences`).
+        condition: Option<Value>,
         /// What was the reachability at the end of the consequent?
         ///
         /// This is `None` until we're finished translating the consequent, and
@@ -537,8 +541,10 @@ impl FuncTranslationStacks {
         num_result_types: usize,
         blocktype: wasmparser::BlockType,
         else_is_cold: bool,
+        condition: Option<Value>,
     ) {
         debug_assert!(num_param_types <= self.stack.len());
+        debug_assert_eq!(condition.is_some(), self.reachable);
         self.assert_debug_stack_is_synced();
 
         // Push a second copy of our `if`'s parameters on the stack. This lets
@@ -569,6 +575,7 @@ impl FuncTranslationStacks {
             num_return_values: num_result_types,
             exit_is_branched_to: false,
             head_is_reachable: self.reachable,
+            condition,
             consequent_ends_reachable: None,
             blocktype,
             else_is_cold,

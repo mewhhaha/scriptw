@@ -136,6 +136,11 @@ enum AliasRegionKey {
     /// `func_environ::gc::base_home`), with the same sharing between an
     /// inlined callee and its caller.
     VmctxHome,
+
+    /// Scriptw patch: an access of a function's home slot for the base of
+    /// its `VMContext`'s type-id array (see `func_environ::gc::base_home`),
+    /// with the same sharing between an inlined callee and its caller.
+    TypeIdsHome,
 }
 
 impl AliasRegionKey {
@@ -193,6 +198,7 @@ impl AliasRegionKey {
     const GC_HEAP_BASE_HOME_KIND: u32 = Self::new_kind(0b100010);
     const VMCTX_HOME_KIND: u32 = Self::new_kind(0b100011);
     const SHARED_KIND: u32 = Self::new_kind(0b100100);
+    const TYPE_IDS_HOME_KIND: u32 = Self::new_kind(0b100101);
 
     /// Encode this key into a raw `u32` suitable for use as an
     /// `AliasRegionData::user_id`.
@@ -270,6 +276,7 @@ impl AliasRegionKey {
             AliasRegionKey::DataSegment => Self::DATA_SEGMENT_KIND,
             AliasRegionKey::GcHeapBaseHome => Self::GC_HEAP_BASE_HOME_KIND,
             AliasRegionKey::VmctxHome => Self::VMCTX_HOME_KIND,
+            AliasRegionKey::TypeIdsHome => Self::TYPE_IDS_HOME_KIND,
             AliasRegionKey::Shared => Self::SHARED_KIND,
         }
     }
@@ -298,6 +305,7 @@ impl fmt::Debug for AliasRegionKey {
             AliasRegionKey::DataSegment => write!(f, "DataSegment"),
             AliasRegionKey::GcHeapBaseHome => write!(f, "GcHeapBaseHome"),
             AliasRegionKey::VmctxHome => write!(f, "VmctxHome"),
+            AliasRegionKey::TypeIdsHome => write!(f, "TypeIdsHome"),
             AliasRegionKey::Shared => write!(f, "Shared"),
         }
     }
@@ -380,6 +388,12 @@ impl<Offsets> AliasRegions<Offsets> {
     /// Get the alias region for a function's `vmctx` home slot.
     pub fn vmctx_home_region(&mut self, func: &mut ir::Function) -> ir::AliasRegion {
         self.region(func, AliasRegionKey::VmctxHome)
+    }
+
+    /// Get the alias region for a function's home slot of its type-id
+    /// array's base.
+    pub fn type_ids_home_region(&mut self, func: &mut ir::Function) -> ir::AliasRegion {
+        self.region(func, AliasRegionKey::TypeIdsHome)
     }
 
     /// Get the alias region for the given key.

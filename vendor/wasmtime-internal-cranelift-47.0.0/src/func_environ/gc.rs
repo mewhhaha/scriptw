@@ -278,6 +278,11 @@ fn emit_gc_raw_alloc(
 /// guard (`access_end`, see `implicit_null_check`), the access itself is the
 /// check: the returned trap code is the one it must carry. Otherwise this
 /// emits an explicit check.
+///
+/// (Scriptw patch) An access through the operand of a `ref.as_non_null`
+/// whose check was deferred to it (see [`DeferredNullCheck`]) makes that
+/// check here, the same way, although validation then knows the operand to
+/// be non-null.
 fn emit_null_check(
     func_env: &mut FuncEnvironment<'_>,
     builder: &mut FunctionBuilder<'_>,
@@ -285,6 +290,18 @@ fn emit_null_check(
     non_null: bool,
     access_end: Option<u32>,
 ) -> Option<ir::TrapCode> {
+    let deferred = func_env
+        .proven_references
+        .deferred
+        .take_if(|deferred| deferred.value == gc_ref);
+    if let Some(deferred) = deferred {
+        func_env.prove(gc_ref, Proven::NonNull);
+        if access_end.is_some_and(|end| implicit_null_check(func_env, end)) {
+            return Some(crate::TRAP_NULL_REFERENCE);
+        }
+        deferred.emit(func_env, builder);
+        return None;
+    }
     if non_null || func_env.is_proven(gc_ref, Proven::NonNull) {
         return None;
     }
@@ -1529,12 +1546,28 @@ pub fn translate_ref_cast(
         return Ok(());
     };
 
-    // The same checks, in the same order, as `translate_ref_test` makes for
-    // such a type; each failure is the cast's.
-    if !func_env.is_proven(val, Proven::NonNull) {
+    // The same checks as `translate_ref_test` makes for such a type; each
+    // failure is the cast's, so their order is not observable: a null
+    // reference fails the cast whichever check finds it, and so does an
+    // `i31`, which is not null.
+    //
+    // (Scriptw patch) When the header load lies within the copying heap's
+    // null guard (see `implicit_null_check`), the load through a null
+    // reference faults there, and carrying the cast's trap code it is the
+    // null check. The `i31` test then comes first: the null reference, 0,
+    // has the `i31` bit clear and passes it to reach the load, an `i31`
+    // never reaches the load, and nothing between the two can trap.
+    let header_end = wasmtime_environ::VM_GC_HEADER_TYPE_INDEX_OFFSET
+        + u32::from(func_env.offsets.size_of_vmshared_type_index());
+    let null_trap = if func_env.is_proven(val, Proven::NonNull) {
+        None
+    } else if implicit_null_check(func_env, header_end) {
+        Some(crate::TRAP_CAST_FAILURE)
+    } else {
         let is_null = func_env.translate_ref_is_null(builder.cursor(), val, val_ty)?;
         func_env.trapnz(builder, is_null, crate::TRAP_CAST_FAILURE);
-    }
+        None
+    };
     let val_might_be_i31 = matches!(
         val_ty.heap_type,
         WasmHeapType::Any | WasmHeapType::Eq | WasmHeapType::I31
@@ -1555,11 +1588,13 @@ pub fn translate_ref_cast(
             access_size: func_env.offsets.size_of_vmshared_type_index(),
         },
     );
-    let gc_memflags = func_env.gc_memflags(&mut builder.func);
-    let actual_shared_ty =
-        builder
-            .ins()
-            .load(ir::types::I32, gc_memflags.with_readonly(), ty_addr, 0);
+    let mut header_flags = func_env.gc_memflags(&mut builder.func).with_readonly();
+    if let Some(code) = null_trap {
+        header_flags = header_flags.with_trap_code(Some(code));
+    }
+    let actual_shared_ty = builder
+        .ins()
+        .load(ir::types::I32, header_flags, ty_addr, 0);
     let cast_okay = func_env.is_subtype(
         builder,
         actual_shared_ty,
@@ -1587,48 +1622,103 @@ pub fn prove_cast(func_env: &mut FuncEnvironment<'_>, value: ir::Value, ty: Wasm
     }
 }
 
-/// Record what the latest `ref.test` found, for code that is entered only
-/// when `condition` is not zero: the test's result itself, or (Scriptw
-/// patch) an `i32.and` that has the result among its operands, directly or
-/// through further `i32.and`s. A `ref.test` result is 0 or 1, so a
-/// conjunction with it that is not zero has it at 1, whatever the other
-/// operands are; the emitter's `tag == X & ref.test T v` guards are of this
-/// shape.
-pub fn prove_tested(func_env: &mut FuncEnvironment<'_>, dfg: &ir::DataFlowGraph, condition: ir::Value) {
-    if let Some((result, value, ty)) = func_env.proven_references.tested {
-        if conjunction_contains(dfg, condition, result, 8) {
-            prove_cast(func_env, value, ty);
+/// Record what code that is entered only when `condition` is not zero
+/// (`nonzero`), or only when it is zero, knows of the references that
+/// `condition` was computed from (see [`ProvenReferences`]):
+///
+/// * `ref.is_null r` is zero exactly when `r` is not null;
+/// * the latest `ref.test` is not zero exactly when its operand is of the
+///   tested type;
+/// * `i32.eqz x` is not zero exactly when `x` is zero;
+/// * `i32.and a b` (a `band`) is not zero only when neither operand is, and
+///   `i32.or a b` (a `bor`) is zero only when both operands are.
+///
+/// The emitter's `tag == X & ref.test T v` guards, `ref.is_null` and its
+/// negation as an `if` or `br_if` condition, and disjunctions of null tests
+/// are of these shapes. Each step holds of the values for every bit
+/// pattern, so a fact found this way holds wherever control can only be with
+/// `condition` zero or not zero, which is where the caller records it.
+pub fn prove_condition(
+    func_env: &mut FuncEnvironment<'_>,
+    dfg: &ir::DataFlowGraph,
+    condition: ir::Value,
+    nonzero: bool,
+) {
+    prove_condition_within(func_env, dfg, condition, nonzero, 8);
+}
+
+/// [`prove_condition`], following at most `depth` operations.
+fn prove_condition_within(
+    func_env: &mut FuncEnvironment<'_>,
+    dfg: &ir::DataFlowGraph,
+    condition: ir::Value,
+    nonzero: bool,
+    depth: u32,
+) {
+    let condition = dfg.resolve_aliases(condition);
+    if nonzero {
+        if let Some((result, value, ty)) = func_env.proven_references.tested {
+            if dfg.resolve_aliases(result) == condition {
+                prove_cast(func_env, value, ty);
+            }
+        }
+    }
+    match func_env.proven_references.truths.get(&condition).copied() {
+        Some(Truth::IsNull(reference)) => {
+            if !nonzero {
+                func_env.prove(reference, Proven::NonNull);
+            }
+            return;
+        }
+        Some(Truth::Eqz(operand)) => {
+            if depth > 0 {
+                prove_condition_within(func_env, dfg, operand, !nonzero, depth - 1);
+            }
+            return;
+        }
+        None => {}
+    }
+    if depth == 0 {
+        return;
+    }
+    let ir::ValueDef::Result(inst, _) = dfg.value_def(condition) else {
+        return;
+    };
+    let ir::InstructionData::Binary { opcode, args } = dfg.insts[inst] else {
+        return;
+    };
+    // A conjunction that is not zero, or a disjunction that is zero, says
+    // the same of each operand.
+    if (opcode == ir::Opcode::Band && nonzero) || (opcode == ir::Opcode::Bor && !nonzero) {
+        for arg in args {
+            prove_condition_within(func_env, dfg, arg, nonzero, depth - 1);
         }
     }
 }
 
-/// Whether `condition` is `operand` or an `band` tree, at most `depth` deep,
-/// with `operand` as a leaf.
-fn conjunction_contains(
-    dfg: &ir::DataFlowGraph,
-    condition: ir::Value,
-    operand: ir::Value,
-    depth: u32,
-) -> bool {
-    let condition = dfg.resolve_aliases(condition);
-    if condition == dfg.resolve_aliases(operand) {
-        return true;
+/// Record that `result` is `ref.is_null` of `reference`, whose static type
+/// is `ty`. A non-nullable reference's test is the constant zero, which
+/// tells nothing.
+pub fn record_ref_is_null(
+    func_env: &mut FuncEnvironment<'_>,
+    result: ir::Value,
+    reference: ir::Value,
+    ty: WasmRefType,
+) {
+    if ty.nullable {
+        func_env
+            .proven_references
+            .truths
+            .insert(result, Truth::IsNull(reference));
     }
-    if depth == 0 {
-        return false;
-    }
-    let ir::ValueDef::Result(inst, _) = dfg.value_def(condition) else {
-        return false;
-    };
-    match dfg.insts[inst] {
-        ir::InstructionData::Binary {
-            opcode: ir::Opcode::Band,
-            args,
-        } => args
-            .iter()
-            .any(|&arg| conjunction_contains(dfg, arg, operand, depth - 1)),
-        _ => false,
-    }
+}
+
+/// Record that `result` is `i32.eqz` of `operand`.
+pub fn record_eqz(func_env: &mut FuncEnvironment<'_>, result: ir::Value, operand: ir::Value) {
+    func_env
+        .proven_references
+        .truths
+        .insert(result, Truth::Eqz(operand));
 }
 
 /// Translate `ref.as_non_null` of `val`, whose static type is `val_ty`,
@@ -1643,10 +1733,166 @@ pub fn translate_ref_as_non_null(
     if func_env.is_proven(val, Proven::NonNull) {
         return Ok(());
     }
-    let is_null = func_env.translate_ref_is_null(builder.cursor(), val, val_ty)?;
-    func_env.trapnz(builder, is_null, crate::TRAP_NULL_REFERENCE);
+    let check = DeferredNullCheck {
+        value: val,
+        ty: val_ty,
+        srcloc: builder.srcloc(),
+    };
+    if may_defer_null_check(func_env, val_ty) {
+        // The previous one was settled before this operator.
+        debug_assert!(func_env.proven_references.deferred.is_none());
+        func_env.proven_references.deferred = Some(check);
+        return Ok(());
+    }
+    check.emit(func_env, builder);
     func_env.prove(val, Proven::NonNull);
     Ok(())
+}
+
+/// Scriptw patch: the check of a `ref.as_non_null` that has not been
+/// translated yet.
+///
+/// The emitter reads a nullable local, applies `ref.as_non_null`, and
+/// accesses a field of the object, often with only other locals and
+/// constants read or written in between. Through the copying heap's null
+/// guard the access is its own null check (see `implicit_null_check`), so
+/// the explicit check is then all that `ref.as_non_null` costs. Its
+/// translation is therefore deferred while the following operators only
+/// read or write locals or push constants (`local.get`, `local.set`,
+/// `local.tee`, `*.const`), and made by the next operator: an access through
+/// the same value (`struct.get*`, `struct.set`, `array.len`, `array.get*`,
+/// `array.set` with it as the object operand) makes it as its own null
+/// check, with `ref.as_non_null`'s trap code, `TRAP_NULL_REFERENCE`, which
+/// is also that access's own; any other operator first emits it as
+/// `ref.as_non_null` would have (see [`settle_deferred_null_check`]).
+///
+/// # Why this is correct
+///
+/// The operators in between have no effect that outlives a trap and cannot
+/// trap themselves: a trap ends the function's activation, and with it its
+/// locals and operand stack, so a null operand traps with the same code
+/// before anything observable happens, exactly as it did. A non-null
+/// operand passes either check. The access through the value makes the
+/// check before anything else it does (`emit_null_check` comes first in
+/// each), and an access whose null check cannot be the access itself emits
+/// the explicit check there. Only the trap's recorded source location can
+/// move, to the access, when the access is the check; Wasm semantics do
+/// not depend on it. Nothing is deferred when fuel is consumed or the
+/// function keeps debugging state, whose counts and per-operator state a
+/// trap would expose, and the fact that the value is not null is recorded
+/// only where the check is made.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct DeferredNullCheck {
+    /// The operand of `ref.as_non_null`.
+    value: ir::Value,
+    /// Its static type.
+    ty: WasmRefType,
+    /// Where the `ref.as_non_null` is.
+    srcloc: ir::SourceLoc,
+}
+
+impl DeferredNullCheck {
+    /// Emit the check as `ref.as_non_null` emits it, attributed to the
+    /// `ref.as_non_null`.
+    fn emit(self, func_env: &mut FuncEnvironment<'_>, builder: &mut FunctionBuilder<'_>) {
+        let srcloc = builder.srcloc();
+        builder.set_srcloc(self.srcloc);
+        let is_null = func_env
+            .translate_ref_is_null(builder.cursor(), self.value, self.ty)
+            .expect("a GC reference has a null test");
+        func_env.trapnz(builder, is_null, crate::TRAP_NULL_REFERENCE);
+        builder.set_srcloc(srcloc);
+    }
+}
+
+/// Whether `ref.as_non_null` of a `ty` may leave its check to a following
+/// access (see [`DeferredNullCheck`]).
+fn may_defer_null_check(func_env: &mut FuncEnvironment<'_>, ty: WasmRefType) -> bool {
+    ty.nullable
+        && ty.heap_type.top() == WasmHeapTopType::Any
+        && !func_env.tunables.consume_fuel
+        && !func_env.tunables.debug_guest
+        && func_env.state_slot.is_none()
+        && implicit_null_check(func_env, 1)
+}
+
+/// Before the reachable operator `op` is translated: keep a deferred
+/// `ref.as_non_null` check for it, or emit it first (see
+/// [`DeferredNullCheck`]). `true` when `op` is the access that makes the
+/// check.
+pub fn settle_deferred_null_check(
+    func_env: &mut FuncEnvironment<'_>,
+    builder: &mut FunctionBuilder<'_>,
+    op: &wasmparser::Operator<'_>,
+) -> bool {
+    use wasmparser::Operator;
+    let Some(deferred) = func_env.proven_references.deferred else {
+        return false;
+    };
+    let stack = &func_env.stacks.stack;
+    // The value `depth` places below the top of the operand stack.
+    let operand = |depth: usize| {
+        stack
+            .len()
+            .checked_sub(depth + 1)
+            .map(|index| stack[index])
+    };
+    let object = match op {
+        Operator::LocalGet { .. }
+        | Operator::LocalSet { .. }
+        | Operator::LocalTee { .. }
+        | Operator::I32Const { .. }
+        | Operator::I64Const { .. }
+        | Operator::F32Const { .. }
+        | Operator::F64Const { .. } => return false,
+        Operator::StructGet { .. }
+        | Operator::StructGetS { .. }
+        | Operator::StructGetU { .. }
+        | Operator::ArrayLen => operand(0),
+        Operator::StructSet { .. }
+        | Operator::ArrayGet { .. }
+        | Operator::ArrayGetS { .. }
+        | Operator::ArrayGetU { .. } => operand(1),
+        Operator::ArraySet { .. } => operand(2),
+        _ => None,
+    };
+    if object == Some(deferred.value) {
+        return true;
+    }
+    flush_deferred_null_check(func_env, builder);
+    false
+}
+
+/// Emit a deferred `ref.as_non_null` check, if there is one, where it is
+/// due.
+pub fn flush_deferred_null_check(
+    func_env: &mut FuncEnvironment<'_>,
+    builder: &mut FunctionBuilder<'_>,
+) {
+    if let Some(deferred) = func_env.proven_references.deferred.take() {
+        deferred.emit(func_env, builder);
+        func_env.prove(deferred.value, Proven::NonNull);
+    }
+}
+
+/// After an operator that `settle_deferred_null_check` found to make a
+/// deferred check: it did.
+pub fn assert_deferred_null_check_made(func_env: &FuncEnvironment<'_>) {
+    assert!(
+        func_env.proven_references.deferred.is_none(),
+        "an access through the operand of a deferred `ref.as_non_null` makes its check"
+    );
+}
+
+/// What a truth value among the function's values is (see
+/// [`prove_condition`]).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Truth {
+    /// `ref.is_null` of this nullable reference: not zero exactly when the
+    /// reference is null.
+    IsNull(ir::Value),
+    /// `i32.eqz` of this value: not zero exactly when the value is zero.
+    Eqz(ir::Value),
 }
 
 /// A property that a check established of a reference value.
@@ -1687,8 +1933,13 @@ struct ProvenAt {
 /// A fact is recorded for a CLIF value `v` at a point `P` of the Wasm
 /// function that control passes only when the fact holds: after the
 /// instructions that trap unless it does, on the path a `br_on_null` or
-/// `br_on_cast_fail` falls through to, or at the start of the consequent of
-/// an `if` on the result of a `ref.test` of `v`. It is recorded together
+/// `br_on_cast_fail` falls through to, or at the start of a path that only a
+/// branch on a truth value computed from `v` enters, with the outcome that
+/// implies the fact (see [`prove_condition`]): the consequent of an `if`
+/// (its condition is not zero), the alternative of an `if` and the path a
+/// `br_if` falls through to (the condition is zero). The alternative's
+/// block has the `if`'s head as its only predecessor, and a `br_if`'s
+/// fall-through block the `br_if`. It is recorded together
 /// with `P`'s innermost control frame `F` and, for an `if`, its arm. It is
 /// used at a later point `Q` of the translation only while `F` is still on
 /// the control stack in the same arm.
@@ -1720,6 +1971,13 @@ pub(crate) struct ProvenReferences {
     /// the result is not zero exactly when the operand is of that type, and
     /// both are values, so that stays true wherever the result is in scope.
     tested: Option<(ir::Value, ir::Value, WasmRefType)>,
+    /// The results of `ref.is_null` and `i32.eqz` so far, with their
+    /// operands. Each is a pure function of its operand, so what it says
+    /// holds wherever it is in scope.
+    truths: std::collections::HashMap<ir::Value, Truth>,
+    /// A `ref.as_non_null` check left to the next operator (see
+    /// [`DeferredNullCheck`]).
+    deferred: Option<DeferredNullCheck>,
 }
 
 impl FuncEnvironment<'_> {
@@ -1978,13 +2236,14 @@ impl FuncEnvironment<'_> {
         // This changes branches, so it comes before the control-flow graph.
         super::branch_threading::thread(func);
         let base_home = self.gc_heap_base_home.take();
+        let type_ids_home = self.type_ids_home.take();
         let vmctx_home = func
             .special_param(ir::ArgumentPurpose::VMContext)
             .and_then(|vmctx| {
                 let region = self.alias_regions.vmctx_home_region(func);
                 FrameHome::of_parameter(func, region, vmctx)
             });
-        let homes: SmallVec<[ir::StackSlot; 2]> = [vmctx_home, base_home]
+        let homes: SmallVec<[ir::StackSlot; 3]> = [vmctx_home, base_home, type_ids_home]
             .iter()
             .flatten()
             .map(|home| home.slot())

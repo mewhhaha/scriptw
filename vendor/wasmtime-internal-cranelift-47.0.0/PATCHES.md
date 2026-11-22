@@ -14,8 +14,9 @@ The idle scratch policy modifies `src/compiler.rs`; the added private
 below modify `src/func_environ{.rs,/gc.rs}` and `src/translate/`; the section
 before the last adds `src/func_environ/gc/{base_home,frame_reloads}.rs` and
 `src/func_environ/{branch_threading,set_tests}.rs`, the one after it adds
-`src/func_environ/cold_paths.rs`, and the last adds
-`src/func_environ/operands.rs`.
+`src/func_environ/cold_paths.rs`, the one after it adds
+`src/func_environ/operands.rs`, and the last adds the translation tests in
+`src/compiler/translation_tests.rs`.
 Registry installation markers were omitted; all other release files are kept.
 The license text is unchanged; its trailing empty line is normalized.
 
@@ -543,6 +544,9 @@ Flight output on all observations).
 
 ## Conjunction proofs for `ref.test` (2026-11-22)
 
+(The functions named here are now `gc::prove_condition`, which the next
+section describes; this one's behavior is part of it.)
+
 `gc::prove_tested` (`src/func_environ/gc.rs`), which records that an `if`'s
 consequent may assume the latest `ref.test` succeeded, now also accepts a
 condition that is an `i32.and` tree (at most 8 deep) with that test's result
@@ -562,3 +566,104 @@ the null-stack-map and alias-region patches): sync 2,712,790.5 -> 2,696,229
 Ir (-0.61%), async 2,939,548.5 -> 2,921,929 (-0.60%); exact Flight output on
 every observation. Engine aot_gc_entries, aot_language, aot_builtins,
 aot_realm_modules and lib, and the CLI suite pass.
+
+## Null tests, deferred `ref.as_non_null`, cast null checks in the guard and the type-id home (2026-11-22)
+
+`src/func_environ{.rs,/gc.rs}`, `src/translate/{code_translator.rs,stack.rs}`,
+`src/alias_region.rs`; tests in `src/compiler/translation_tests.rs`. Wasm
+semantics and the code of every trap that an intact heap can raise are
+unchanged; the `VMContext` layout, stack maps, calling conventions and target
+settings are untouched.
+
+- **Facts from null tests** (`gc::prove_condition`, which replaces
+  `prove_tested` and `conjunction_contains`). The translator remembers which
+  CLIF value is `ref.is_null r` of a nullable reference and which is
+  `i32.eqz x`. Code that only a branch on a truth value enters with a known
+  outcome learns what that outcome implies: the consequent of an `if` (the
+  condition is not zero), and now also the alternative of an `if` and the
+  path a `br_if` falls through to (the condition is zero). `ref.is_null r`
+  zero means `r` is not null; `i32.eqz x` flips what is known of `x`; an
+  `i32.and` (a `band`) that is not zero has every operand not zero, an
+  `i32.or` (a `bor`) that is zero every operand zero (at most 8 operations
+  deep); the latest `ref.test` not zero is the cast it tests, as before. So
+  `br_if (ref.is_null x)`, `if (i32.eqz (ref.is_null x))`, the `else` of
+  `if (ref.is_null x)`, `br_if (i32.or (ref.is_null x) (ref.is_null y))` and
+  `br_if (i32.eqz (ref.test $t x))` all prove what follows them, and the
+  `ref.as_non_null`, null checks of GC accesses and casts that the proofs
+  imply emit nothing. The `if` frame keeps its condition for the `else`.
+  Why it is correct: each step holds for every bit pattern; the `else`
+  block's only predecessor is the `if`'s head and a `br_if`'s fall-through
+  block's the `br_if`, so the fact holds at the start of that arm or path,
+  and it is recorded and used under the scoping rules of `ProvenReferences`
+  (innermost frame and arm), unchanged.
+- **`ref.as_non_null` checked by the next access** (`gc::DeferredNullCheck`).
+  Where an access can be its own null check (the copying heap's null guard,
+  see "GC access code"), the check of `ref.as_non_null` of a nullable `any`
+  hierarchy reference is deferred while only `local.get`, `local.set`,
+  `local.tee` and `*.const` follow. The next `struct.get*`, `struct.set`,
+  `array.len`, `array.get*` or `array.set` whose object operand is that value
+  makes it as its own null check, with `TRAP_NULL_REFERENCE`, the code both
+  had; an access whose check cannot be the access (a `funcref` store, a field
+  beyond the guard) emits the explicit check first; any other operator first
+  emits the check exactly as `ref.as_non_null` did, with its source location.
+  Why it is correct: the operators in between cannot trap and have no effect
+  that outlives a trap, which ends the activation with its locals and operand
+  stack; each access makes its null check before anything else it does
+  (`emit_null_check` comes first), and translation asserts that the access it
+  was left to made it. Only the source location recorded for the trap moves,
+  to the access, when the access is the check. Nothing is deferred when fuel
+  is consumed or guest debugging keeps per-operator state, and the fact that
+  the value is not null is recorded only where the check is made.
+- **Casts: the `i31` test first, the null check in the header load**
+  (`gc::translate_ref_cast`). In a trapping `ref.cast` to a non-nullable
+  concrete type whose operand is not known to be non-null, when the header's
+  type-id load lies within the null guard, the load carries
+  `TRAP_CAST_FAILURE` and is the null check; the `i31` test (when the operand
+  can be an `i31`) comes before it. Reference 0 has the `i31` bit clear,
+  passes that test and faults in the guard, so a null operand still traps
+  with `TRAP_CAST_FAILURE`; an `i31` traps at its test as before; nothing
+  between the two can trap, and the trap code comes from the faulting
+  instruction's trap record, which the runtime looks up whatever the
+  address (`wasm_fault` accepts the guard, and an interrupt is recognized by
+  the address it made inaccessible, never by the code). Scriptw maps no
+  cast or null trap to a JavaScript value (only stack overflow and
+  interrupts are distinguished), and both codes stay what they were. A
+  heap without the guard keeps the explicit null check, in the old order.
+  A non-null reference into a corrupt heap that faults on the header now
+  reports a cast failure instead of `TRAP_GC_HEAP_CORRUPT`, as field
+  accesses that are their own null check already report a null reference.
+- **The type-id array's base in a home slot** (`type_ids_array` in
+  `func_environ.rs`, the `TypeIdsHome` alias region). Every type test,
+  allocation, typed funcref read and `call_indirect` signature check read
+  `[vmctx + type_ids_array]` at its use, and after a call that was the
+  `vmctx`'s home load, then the base, then the id: three dependent loads.
+  The base is now loaded once at the top of the entry block (`readonly`,
+  `can_move`, as before) into a `FrameHome` as the GC heap base is, and
+  `place_frame_loads` handles the third home like the other two: after a
+  call one load from the home, then the id. A function without a call loses
+  the home, its store and its slot, and reads the base from the `vmctx`
+  value at hand as it did. Costs: a function that calls and uses type ids
+  only on a rare path stores the base on every entry.
+
+Tests: `compiler::translation_tests::` translate and compile hand-assembled
+Wasm with this crate's `Compiler` on the product's GC heap settings and count
+CLIF traps by code, loads carrying a trap code and loads per alias region:
+facts after `br_if`, in each `if` arm, after the frame closes, from
+disjunctions and not from conjunctions, and from `br_if (i32.eqz (ref.test))`;
+the cast's two traps and faulting header load in the guard and its three
+traps without it; deferral to a field read and its flushing by a call and by
+an access through another reference, and no deferral without the guard; one
+base load per function, one home load after a call and no home without a
+call. With `SCRIPTW_TRANSLATION_DUMP=<dir>` they also write each function's
+CLIF and machine code. The crate's 57 unit tests pass.
+
+Native code (x86-64, `opt_level=speed`, from those dumps): a type test after
+a call reads `mov rax,[rsp]` (the home) and compares the header's id with
+`[rax]`; before, the same test read the `vmctx` home, then
+`[vmctx+0x28]`, then the id (`mov rax,[rsp+0xb0]; mov rax,[rax+0x28];
+cmp ecx,[rax+0x1e4]` in the React Server Components program's `run#f4`), one
+dependent load more. The entry block now stores the base once
+(`mov rcx,[rdi+0x28]; mov [rsp],rcx`). The cast of an `anyref` to a final
+struct type is `test edx,1; jne <trap>`, the heap base, then the header id
+load `mov eax,[r10+r11+4]`, which faults for reference 0, and the compare:
+no null test. Not yet measured with Callgrind.
