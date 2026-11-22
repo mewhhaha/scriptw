@@ -106,30 +106,53 @@ impl FunctionBuilder<'_> {
             function.instruction(&Instruction::I32Const(tag.tag()));
             function.instruction(&Instruction::I32Eq);
         } else {
+            // Classify from the tag first and decide each arm alone: only
+            // the Function tag can carry [[IsHTMLDDA]], and only the Object
+            // tag can be a callable Proxy (`emit_is_callable_i32`).
             match plan.spelling {
                 TypeofSpelling::Undefined => {
                     value.tag().load(function);
                     function
                         .instruction(&Instruction::I32Const(WasmRuntimeValueTag::Undefined.tag()));
                     function.instruction(&Instruction::I32Eq);
+                    function.instruction(&Instruction::If(BlockType::Result(ValType::I32)));
+                    function.instruction(&Instruction::I32Const(1));
+                    function.instruction(&Instruction::Else);
                     self.emit_is_htmldda_function_i32(&value, function)?;
-                    function.instruction(&Instruction::I32Or);
+                    function.instruction(&Instruction::End);
                 }
                 TypeofSpelling::Object => {
-                    self.emit_is_heap_object_like_tag_i32(value.tag(), function);
-                    self.emit_is_callable_i32(&value, function)?;
-                    function.instruction(&Instruction::I32Eqz);
-                    function.instruction(&Instruction::I32And);
                     value.tag().load(function);
-                    function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Null.tag()));
+                    function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Object.tag()));
                     function.instruction(&Instruction::I32Eq);
-                    function.instruction(&Instruction::I32Or);
+                    function.instruction(&Instruction::If(BlockType::Result(ValType::I32)));
+                    self.emit_object_tag_proxy_call_capability_i32(&value, function);
+                    function.instruction(&Instruction::I32Eqz);
+                    function.instruction(&Instruction::Else);
+                    // A Function-tagged value is callable or [[IsHTMLDDA]];
+                    // either way its typeof is not "object".
+                    crate::gc_types::emit_tag_in(
+                        value.tag(),
+                        crate::gc_types::TagSet::of(&[
+                            WasmRuntimeValueTag::Null,
+                            WasmRuntimeValueTag::Array,
+                            WasmRuntimeValueTag::Arguments,
+                        ]),
+                        function,
+                    );
+                    function.instruction(&Instruction::End);
                 }
                 TypeofSpelling::Function => {
-                    self.emit_is_callable_i32(&value, function)?;
-                    self.emit_is_htmldda_function_i32(&value, function)?;
+                    value.tag().load(function);
+                    function
+                        .instruction(&Instruction::I32Const(WasmRuntimeValueTag::Function.tag()));
+                    function.instruction(&Instruction::I32Eq);
+                    function.instruction(&Instruction::If(BlockType::Result(ValType::I32)));
+                    self.emit_function_tag_is_htmldda_i32(&value, function);
                     function.instruction(&Instruction::I32Eqz);
-                    function.instruction(&Instruction::I32And);
+                    function.instruction(&Instruction::Else);
+                    self.emit_object_tag_is_callable_proxy_i32(&value, function);
+                    function.instruction(&Instruction::End);
                 }
                 TypeofSpelling::Never => {
                     function.instruction(&Instruction::I32Const(0));
@@ -143,5 +166,30 @@ impl FunctionBuilder<'_> {
         }
         value.clear(function);
         Ok(true)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::gc_types::GcLayout;
+    use crate::WasmRuntimeValueTag;
+
+    /// `emit_is_callable_i32`, `emit_is_htmldda_function_i32` and the literal
+    /// typeof predicates classify from the tag first. That is exact only while
+    /// the Function tag names exactly the FunctionObject and BoundFunction
+    /// layouts and a Proxy, the one other callable, carries the Object tag.
+    #[test]
+    fn function_tag_names_exactly_the_function_layouts_and_proxies_are_objects() {
+        for layout in GcLayout::ALL {
+            assert_eq!(
+                layout.javascript_tag() == Some(WasmRuntimeValueTag::Function),
+                matches!(layout, GcLayout::FunctionObject | GcLayout::BoundFunction),
+                "{layout:?}"
+            );
+        }
+        assert_eq!(
+            GcLayout::ProxyObject.javascript_tag(),
+            Some(WasmRuntimeValueTag::Object)
+        );
     }
 }

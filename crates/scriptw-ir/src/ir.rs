@@ -3520,6 +3520,26 @@ pub struct CapturedBindingIr {
     pub mode: BindingMode,
     pub slot: u32,
     pub hops: u32,
+    pub initialization: CapturedBindingInitializationIr,
+}
+
+/// Whether a capturing body can observe its captured cell uninitialized.
+///
+/// Analysis alone decides this, from the binding's physical environment
+/// (`Analysis::captured_binding_initialization`); declaration spelling or the
+/// capture's `mode` alone is never the proof.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CapturedBindingInitializationIr {
+    /// Declaration instantiation of the owning function initializes the cell
+    /// before any closure that can name it exists: a `var` (FunctionDeclaration-
+    /// Instantiation or module InitializeEnvironment), a top-level function
+    /// declaration, or a parameter of a list without expressions. A read
+    /// needs no TDZ test.
+    BeforeAnyReference,
+    /// Every other binding, including let/const/class, parameters of a list
+    /// with expressions, imports, Annex B function copies, eval-introduced
+    /// bindings and `arguments`: reads and assignments test the cell.
+    Checked,
 }
 
 /// Compiler-private per-invocation state for a derived constructor.

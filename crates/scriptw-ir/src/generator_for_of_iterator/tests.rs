@@ -604,6 +604,7 @@ fn prepared_identifier_head_rejects_capture_and_owned_environment_registration()
         mode: BindingMode::Let,
         slot: 0,
         hops: 0,
+        initialization: crate::CapturedBindingInitializationIr::Checked,
     });
     assert_eq!(
         GeneratorForOfAssignmentIr::identifier(

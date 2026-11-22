@@ -172,9 +172,7 @@ pub(super) fn register(
                     .and_then(|export| caller.get_module_export(export))
                     .or_else(|| caller.get_export("memory"))
                     .ok_or_else(|| {
-                        wasmtime::Error::msg(
-                            "wasmtime host import failed: missing exported memory",
-                        )
+                        wasmtime::Error::msg("wasmtime host import failed: missing exported memory")
                     })?;
                 let ptr = usize::try_from(ptr).map_err(|_| {
                     wasmtime::Error::msg("wasmtime host import failed: negative utf-8 pointer")

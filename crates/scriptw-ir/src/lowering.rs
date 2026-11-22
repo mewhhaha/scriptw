@@ -15827,6 +15827,9 @@ impl<'a> ScriptLowerer<'a> {
                     ),
                     slot,
                     hops: self.generated_capture_hops(owner_id, environment_id),
+                    initialization: self
+                        .analysis
+                        .captured_binding_initialization(environment_id, name),
                 })
             })
             .collect()

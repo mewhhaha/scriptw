@@ -86,37 +86,68 @@ impl RuntimeOrdinaryBodyEntry {
 
 /// Native callbacks are opaque callers. Only actual forwarding intrinsics
 /// are transparent; changing a source binding or a public method cannot grant
-/// another callable that intrinsic's identity.
+/// another callable that intrinsic's identity. A JavaScript callee is never
+/// opaque here: it installs its own source activation.
 pub(super) fn emit_opaque_native_caller(
     callable: &GcLocal<FunctionObject>,
     schema: &RuntimeSchema,
     function: &mut Function,
 ) {
-    let code = schema.reserve_gc_local(function).initialize(
+    let code = emit_callable_code(callable, schema, function);
+    emit_native_code_i32(&code, schema, function);
+    function.instruction(&Instruction::If(BlockType::Result(ValType::I32)));
+    emit_opaque_native_code_i32(&code, schema, function);
+    function.instruction(&Instruction::Else);
+    function.instruction(&Instruction::I32Const(0));
+    function.instruction(&Instruction::End);
+    code.clear(function);
+}
+
+fn emit_callable_code(
+    callable: &GcLocal<FunctionObject>,
+    schema: &RuntimeSchema,
+    function: &mut Function,
+) -> GcLocal<ExecutableCode> {
+    schema.reserve_gc_local(function).initialize(
         schema
             .struct_type::<FunctionObject>()
             .field(FunctionObjectSchema::CODE)
             .read(callable, schema, function)
             .reference(),
         function,
-    );
-    let kind = schema.reserve_i32_local(function);
-    let builtin = schema.reserve_i32_local(function);
+    )
+}
+
+/// Whether the code is a native (standard or host) builtin rather than a
+/// JavaScript source body.
+fn emit_native_code_i32(
+    code: &GcLocal<ExecutableCode>,
+    schema: &RuntimeSchema,
+    function: &mut Function,
+) {
     schema
         .struct_type::<ExecutableCode>()
         .field(ExecutableCodeSchema::KIND)
-        .read(&code, schema, function)
-        .store(kind, function);
-    schema
-        .struct_type::<ExecutableCode>()
-        .field(ExecutableCodeSchema::STANDARD_BUILTIN)
-        .read(&code, schema, function)
-        .store(builtin, function);
-    kind.load(function);
+        .read(code, schema, function);
     function.instruction(&Instruction::I32Const(
         crate::gc_types::ExecutableCodeKind::JavaScript.encode(),
     ));
     function.instruction(&Instruction::I32Ne);
+}
+
+/// For native code: whether it is not one of the forwarding intrinsics.
+fn emit_opaque_native_code_i32(
+    code: &GcLocal<ExecutableCode>,
+    schema: &RuntimeSchema,
+    function: &mut Function,
+) {
+    let builtin = schema.reserve_i32_local(function);
+    schema
+        .struct_type::<ExecutableCode>()
+        .field(ExecutableCodeSchema::STANDARD_BUILTIN)
+        .read(code, schema, function)
+        .store(builtin, function);
+    function.instruction(&Instruction::I32Const(1));
     for forwarding in [
         StandardBuiltinId::FunctionPrototypeCall,
         StandardBuiltinId::FunctionPrototypeApply,
@@ -129,11 +160,21 @@ pub(super) fn emit_opaque_native_caller(
         function.instruction(&Instruction::I32And);
     }
     schema.release_i32_local(builtin, function);
-    schema.release_i32_local(kind, function);
-    code.clear(function);
 }
 
+/// The caller half of a native invocation's legacy-caller barrier.
+///
+/// Only a native callee needs it. A JavaScript callee (ExecutableCodeKind::
+/// JavaScript, exactly the planned User entries) installs its own source
+/// activation, which saves the active source function at entry and restores
+/// it on every body exit (`SourceActivation`); the proper-tail-call routes
+/// already rely on that and reach such a callee with no boundary. A
+/// caller-side save/restore around it would rewrite the value it already
+/// holds, so it is emitted only for native code: an opaque native publishes
+/// itself as the active function, and a forwarding intrinsic keeps the
+/// caller's while its target runs.
 pub(super) struct NativeCallerBoundary {
+    native: crate::gc_types::I32Local,
     previous: GcLocal<FunctionObject, Nullable>,
 }
 
@@ -145,16 +186,29 @@ impl NativeCallerBoundary {
     ) -> Self {
         let previous = schema
             .reserve_gc_local::<FunctionObject, Nullable>(function)
-            .initialize(schema.load_active_source_function(function), function);
-        emit_opaque_native_caller(callable, schema, function);
+            .initialize_null(schema, function);
+        let native = schema.reserve_i32_local(function);
+        let code = emit_callable_code(callable, schema, function);
+        emit_native_code_i32(&code, schema, function);
+        native.store(function);
+        native.load(function);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        previous.replace(schema.load_active_source_function(function), function);
+        emit_opaque_native_code_i32(&code, schema, function);
         function.instruction(&Instruction::If(BlockType::Empty));
         schema.replace_active_source_function(callable, function);
         function.instruction(&Instruction::End);
-        Self { previous }
+        function.instruction(&Instruction::End);
+        code.clear(function);
+        Self { native, previous }
     }
 
     pub(super) fn restore(self, schema: &RuntimeSchema, function: &mut Function) {
+        self.native.load(function);
+        function.instruction(&Instruction::If(BlockType::Empty));
         schema.replace_active_source_function(&self.previous, function);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(self.native, function);
         self.previous.clear(function);
     }
 }

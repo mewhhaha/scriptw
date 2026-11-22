@@ -129,9 +129,13 @@ fn callable_objects_and_htmldda_override_the_default_in_spec_order() {
         "pub(crate) fn emit_is_callable_i32(",
         "pub(crate) fn compile_string_concat_payload(",
     );
+    // IsCallable classifies from the tag first: the Function tag names exactly
+    // the FunctionObject and BoundFunction layouts (enforced by
+    // `typeof_comparison::tests`), and only an Object-tagged Proxy can have
+    // [[Call]] otherwise.
     for capability in [
-        "reference_type::<FunctionObject>",
-        "reference_type::<BoundFunction>",
+        "WasmRuntimeValueTag::Function",
+        "WasmRuntimeValueTag::Object",
         "reference_type::<ProxyObject>",
         ".field(ProxyObjectSchema::CALL_CAPABILITY)",
         "ProxyCallCapability::ObjectOnly",

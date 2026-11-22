@@ -184,3 +184,73 @@ fn candidate_runtime_descriptor_dedup_copies_into_program_relative_metadata() {
             .word()
     );
 }
+
+/// The emitted lookup binary-searches the key column, so the writer must store
+/// every row's key of its actual runtime code units, in unsigned order.
+#[test]
+fn candidate_rows_are_sorted_by_the_code_unit_key_the_lookup_recomputes() {
+    let mut pool = StringPool::default();
+    for literal in ["b", "a", "ab", "Ā\u{1F600}", "[a-z]+", "(", ""] {
+        pool.runtime_regexp_candidate_literals
+            .insert(literal.to_string());
+    }
+    for flags in ["g", "iu", "dgimsuy"] {
+        pool.script_string_literals.insert(flags.into());
+    }
+    pool.queue_runtime_regexp_programs();
+    let table = pool.runtime_regexp_table().expect("nonempty checked table");
+    assert_eq!(table.count() as usize, pool.runtime_regexp_programs.len());
+    let offset = (table.address - STATIC_DATA_OFFSET) as usize;
+    let keys = pool.bytes
+        [offset..offset + table.count() as usize * RUNTIME_REGEXP_RECORD_SIZE as usize]
+        .chunks_exact(RUNTIME_REGEXP_RECORD_SIZE as usize)
+        .map(|row| {
+            let at = RUNTIME_REGEXP_RECORD_KEY_WORD * 8;
+            u64::from_le_bytes(row[at..at + 8].try_into().unwrap())
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        keys.windows(2).all(|pair| pair[0] <= pair[1]),
+        "rows must be in unsigned key order: {keys:x?}"
+    );
+    for ((source, flags, _), key) in pool.runtime_regexp_programs.iter().zip(&keys) {
+        assert_eq!(
+            *key,
+            runtime_regexp_candidate_key(
+                &scriptw_ir::decode_js_string_utf16(source),
+                &scriptw_ir::decode_js_string_utf16(flags),
+            ),
+            "{source:?}/{flags:?}"
+        );
+    }
+    // Rejected and program rows both survive the sort.
+    assert!(pool
+        .runtime_regexp_programs
+        .iter()
+        .any(|(source, _, entry)| source == "(" && matches!(entry, RuntimeRegExpEntry::Rejected)));
+    assert!(pool
+        .runtime_regexp_programs
+        .iter()
+        .any(|(source, flags, entry)| source == "[a-z]+"
+            && flags == "g"
+            && matches!(entry, RuntimeRegExpEntry::Program(_))));
+}
+
+#[test]
+fn candidate_key_separates_source_from_flags_and_mixes_whole_code_units() {
+    let units = |text: &str| text.encode_utf16().collect::<Vec<_>>();
+    assert_ne!(
+        runtime_regexp_candidate_key(&units("ag"), &units("")),
+        runtime_regexp_candidate_key(&units("a"), &units("g"))
+    );
+    assert_ne!(
+        runtime_regexp_candidate_key(&[0x0100], &[]),
+        runtime_regexp_candidate_key(&[0x0001, 0x0000], &[])
+    );
+    // FNV-1a of the empty pair is the separator step alone.
+    assert_eq!(
+        runtime_regexp_candidate_key(&[], &[]),
+        (RUNTIME_REGEXP_CANDIDATE_KEY_OFFSET_BASIS ^ RUNTIME_REGEXP_CANDIDATE_KEY_SEPARATOR)
+            .wrapping_mul(RUNTIME_REGEXP_CANDIDATE_KEY_PRIME)
+    );
+}

@@ -46,3 +46,55 @@ fn captured_writes_publish_value_words_without_allocating_a_snapshot() {
         }), "the canonical cell write publishes all three words with no allocation or callback; other function work may allocate");
     }).unwrap().join().unwrap();
 }
+
+/// Declaration instantiation initializes `var`, top-level function and
+/// expression-free parameter cells before any closure exists or any body
+/// statement runs, so their reads have no TDZ branch. A `let` and a
+/// parameter of a list with expressions keep it.
+#[test]
+fn instantiated_cells_omit_tdz_while_lexical_and_expression_parameter_cells_keep_it() {
+    std::thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(|| {
+        let ir = lower(&parse(r#"
+            export function make(simple) {
+                var hoisted = 1;
+                let lexical = 2;
+                function declared() { return 0; }
+                return [
+                    function readVar() { return hoisted; },
+                    function readLet() { return lexical; },
+                    function readParam() { return simple; },
+                    function readDeclared() { return declared; },
+                ];
+            }
+            export function own(parameter) {
+                var local = parameter;
+                function hold() { return parameter + local; }
+                return [hold, parameter + local];
+            }
+            export function withDefault(first = 0, later) {
+                return function readLater() { return later; };
+            }
+        "#, ParseOptions::module()).unwrap());
+        assert!(ir.is_wasm_supported(), "{:?}", ir.diagnostics);
+        let artifact = emit(&ir).unwrap();
+        let runtime = artifact.runtime().unwrap();
+        for bytes in [artifact.bytes.as_slice(), runtime.bytes()] {
+            Validator::new_with_features(WasmFeatures::all()).validate_all(bytes).unwrap();
+        }
+        let p = Module::read(&artifact.bytes, true);
+        let r = Module::read(runtime.bytes(), true);
+        let (definition, _) = r.named("helper::lexical_binding_uninitialized");
+        let tdz = p.imported_runtime_function(&r, definition);
+        let calls = |name: &str| {
+            p.named(name).1.iter()
+                .filter(|op| matches!(op, Operator::Call { function_index } if *function_index == tdz))
+                .count()
+        };
+        for name in ["js::readVar#", "js::readParam#", "js::readDeclared#", "js::hold#", "js::own#"] {
+            assert_eq!(calls(name), 0, "{name}: an instantiated cell has no TDZ branch");
+        }
+        assert_eq!(calls("js::readLet#"), 1, "a captured let keeps its TDZ branch");
+        assert_eq!(calls("js::readLater#"), 1,
+            "a parameter of a list with expressions keeps its TDZ branch");
+    }).unwrap().join().unwrap();
+}

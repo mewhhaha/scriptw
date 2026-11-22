@@ -239,13 +239,17 @@ pub(crate) const RUNTIME_REGEXP_RECORD_ENTRY_KIND_WORD: usize = 3;
 /// The packed descriptor is always relative to this P's immutable metadata.
 pub(crate) const RUNTIME_REGEXP_RECORD_PROGRAM_DOMAIN_WORD: usize = 4;
 pub(crate) const RUNTIME_REGEXP_DESCRIPTOR_PROGRAM_DOMAIN: u64 = 1;
+/// [`runtime_regexp_candidate_key`] of the row's actual source and flags code
+/// units. Rows are sorted by this word (unsigned), so the emitted lookup
+/// binary-searches it and compares Strings only on rows with an equal key.
+pub(crate) const RUNTIME_REGEXP_RECORD_KEY_WORD: usize = 5;
 
 /// Number of `u64` words in one runtime RegExp program table record.
 ///
 /// Keep this the last word's index plus one: it is the length of the writer's
 /// array, so a word added without extending it fails to compile at the
 /// assignment rather than corrupting the next row.
-pub(crate) const RUNTIME_REGEXP_RECORD_WORDS: usize = RUNTIME_REGEXP_RECORD_PROGRAM_DOMAIN_WORD + 1;
+pub(crate) const RUNTIME_REGEXP_RECORD_WORDS: usize = RUNTIME_REGEXP_RECORD_KEY_WORD + 1;
 
 /// Byte stride between runtime RegExp program table records. **Derived**, never
 /// typed — see [`RUNTIME_REGEXP_RECORD_SOURCE_WORD`].
@@ -254,6 +258,30 @@ pub(crate) const RUNTIME_REGEXP_RECORD_SIZE: u64 = (RUNTIME_REGEXP_RECORD_WORDS 
 /// Byte offset of a record word in the bounded GC metadata view.
 pub(crate) const fn runtime_regexp_record_offset(word: usize) -> u64 {
     (word * 8) as u64
+}
+
+/// FNV-1a parameters of the candidate key. The table writer
+/// ([`runtime_regexp_candidate_key`]) and the emitted lookup share them.
+pub(crate) const RUNTIME_REGEXP_CANDIDATE_KEY_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
+/// See [`RUNTIME_REGEXP_CANDIDATE_KEY_OFFSET_BASIS`].
+pub(crate) const RUNTIME_REGEXP_CANDIDATE_KEY_PRIME: u64 = 0x0000_0100_0000_01b3;
+/// Mixed in between source and flags. It is not a UTF-16 code unit, so no
+/// (source, flags) split of one unit sequence can collide with another split.
+pub(crate) const RUNTIME_REGEXP_CANDIDATE_KEY_SEPARATOR: u64 = 0x1_0000;
+
+/// FNV-1a over the source's code units, a separator, then the flags' code
+/// units. Equal keys are only a filter: the lookup still compares both Strings.
+pub(crate) fn runtime_regexp_candidate_key(source: &[u16], flags: &[u16]) -> u64 {
+    let mix = |key: u64, unit: u64| (key ^ unit).wrapping_mul(RUNTIME_REGEXP_CANDIDATE_KEY_PRIME);
+    let key = source
+        .iter()
+        .fold(RUNTIME_REGEXP_CANDIDATE_KEY_OFFSET_BASIS, |key, unit| {
+            mix(key, u64::from(*unit))
+        });
+    let key = mix(key, RUNTIME_REGEXP_CANDIDATE_KEY_SEPARATOR);
+    flags
+        .iter()
+        .fold(key, |key, unit| mix(key, u64::from(*unit)))
 }
 
 /// Only the complete static-table writer creates these checked bounds.
@@ -3734,6 +3762,11 @@ impl StringPool {
                 static_regexp_compilation,
             } => {
                 self.uses_heap = true;
+                self.collect_constant_regexp_construction(
+                    callee,
+                    args,
+                    static_regexp_compilation.as_ref(),
+                );
                 // Two independent recognisers, and they are deliberately not
                 // the same test.
                 //
@@ -3819,6 +3852,11 @@ impl StringPool {
                 static_regexp_compilation,
             } => {
                 self.uses_heap = true;
+                self.collect_constant_regexp_construction(
+                    callee,
+                    args,
+                    static_regexp_compilation.as_ref(),
+                );
                 if static_regexp_compilation.is_some()
                     || matches!(callee.expr, ExprIr::GlobalPropertyRead { ref name } if name == "RegExp")
                     || callee
@@ -4278,6 +4316,33 @@ impl StringPool {
         self.pending_regexp_programs.push(key);
     }
 
+    /// The emitter binds exactly the sites this admits (one shared
+    /// constructor), so their strings and P descriptor exist before emission.
+    fn collect_constant_regexp_construction(
+        &mut self,
+        callee: &TypedExpr,
+        args: &[TypedExpr],
+        static_regexp_compilation: Option<&StaticRegExpCompilation>,
+    ) {
+        if let Some(site) = crate::expressions::ConstantRegExpConstructionSite::of(
+            callee,
+            args,
+            static_regexp_compilation,
+        ) {
+            self.intern_string(site.source());
+            self.intern_string(site.flags());
+            self.queue_regexp_program(site.program());
+        }
+    }
+
+    /// The key of the code units the row's pooled Strings hold at run time.
+    fn runtime_regexp_row_key(source: &str, flags: &str) -> u64 {
+        runtime_regexp_candidate_key(
+            &Self::runtime_code_units_for_string(source),
+            &Self::runtime_code_units_for_string(flags),
+        )
+    }
+
     fn queue_runtime_regexp_programs(&mut self) {
         let candidate_literals = if self.runtime_regexp_candidate_literals.is_empty() {
             &self.script_string_literals
@@ -4400,6 +4465,10 @@ impl StringPool {
         if self.runtime_regexp_programs.is_empty() {
             return;
         }
+        // The emitted lookup binary-searches the key word. A stable sort keeps
+        // equal-key rows (including duplicate pairs) in collection order.
+        self.runtime_regexp_programs
+            .sort_by_cached_key(|(source, flags, _)| Self::runtime_regexp_row_key(source, flags));
         // R descriptors remain R-owned. A candidate that deduplicated to one
         // receives a small P copy so no executable row selects a linear address.
         let references = self
@@ -4476,6 +4545,7 @@ impl StringPool {
             )
             .expect("candidate flags have a checked literal domain")
             .word();
+            record[RUNTIME_REGEXP_RECORD_KEY_WORD] = Self::runtime_regexp_row_key(source, flags);
             // Exhaustive on purpose. This is the site the `continue` used to
             // hide behind: a new entry kind must be given a record encoding
             // here, or this stops compiling.

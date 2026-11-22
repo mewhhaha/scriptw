@@ -157,11 +157,16 @@ fn proven_module_reads_load_cells_without_reference_or_name_lookup() {
                 .iter()
                 .filter(|(field, count)| **count > control.fields.get(*field).copied().unwrap_or(0))
                 .count();
-            assert!(added_fields >= 2,
-                "{variant}: direct value/initialization loads require additional cell fields: {actual:?} / {control:?}");
+            // The module `let` keeps its TDZ test. A parameter of a list
+            // without expressions is initialized before the body and before
+            // any closure exists: its read loads only the value words.
+            let tdz = usize::from(name == "root");
+            assert!(added_fields >= 1 + tdz,
+                "{variant}: direct value (and initialization) loads require additional cell fields: {actual:?} / {control:?}");
             assert_eq!(
                 actual.calls("helper::lexical_binding_uninitialized"),
-                control.calls("helper::lexical_binding_uninitialized") + 1
+                control.calls("helper::lexical_binding_uninitialized") + tdz,
+                "{variant}: {actual:?} / {control:?}"
             );
             assert_eq!(
                 actual.calls("helper::pooled_string_resolve"),
@@ -193,10 +198,12 @@ fn proven_typeof_keeps_tdz_while_non_simple_owner_keeps_named_fallback() {
     .expect("typeof and fallback emit");
     for name in ["rootType", "typed"] {
         for (variant, reads) in inspect(&artifact, name) {
-            assert!(reads.fields.len() >= 2, "{variant}: {reads:?}");
+            assert!(!reads.fields.is_empty(), "{variant}: {reads:?}");
+            // typeof of the module `let` keeps its TDZ; the completed
+            // parameter needs none.
             assert_eq!(
                 reads.calls("helper::lexical_binding_uninitialized"),
-                1,
+                usize::from(name == "rootType"),
                 "{variant}: {reads:?}"
             );
             assert!(

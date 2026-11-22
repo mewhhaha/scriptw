@@ -232,6 +232,15 @@ impl<'a> FunctionBuilder<'a> {
                 self.allocate_initialized_var_binding(&mut function)
             };
             self.initialize_function_var_binding(&name, storage, &mut function)?;
+            // The cell is initialized here, before any body statement is
+            // compiled. Only a genuine source callable records it; main and
+            // prepared Script bodies keep their checks.
+            if self
+                .planned_entry()
+                .is_some_and(|entry| entry.has_source_activation())
+            {
+                self.record_instantiated_var(&name, storage);
+            }
             self.binding_scopes
                 .last_mut()
                 .expect("binding scope stack must exist")

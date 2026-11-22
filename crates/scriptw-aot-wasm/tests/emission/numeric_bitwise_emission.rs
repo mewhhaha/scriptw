@@ -423,9 +423,13 @@ fn lexical_read_tdz_branches_share_one_runtime_error_without_erasing_reads() {
         .name("lexical-read-error-emission".into())
         .stack_size(64 * 1024 * 1024)
         .spawn(|| {
+            // A captured `let` is read through its cell and can be read before
+            // its declaration runs; a parameter cell is initialized first.
             let source = format!(
-                "function single(value) {{ value; }}\n\
-                 function repeated(value) {{ {} }}\n[single, repeated];",
+                "function outer() {{ let value = 0;\n\
+                 function single() {{ value; }}\n\
+                 function repeated() {{ {} }}\n\
+                 return [single, repeated]; }}\nouter();",
                 "value;\n".repeat(READS)
             );
             let parsed =

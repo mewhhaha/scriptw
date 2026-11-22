@@ -209,8 +209,8 @@ fn resolve_entry(
     let realm =
         eqref(store, realm)?.ok_or_else(|| EngineError::new("entry Realm was not initialized"))?;
     let graph_field = wasm_gc_completion::field(store, realm, GcHostField::RealmModules)?;
-    let graph =
-        eqref(store, graph_field)?.ok_or_else(|| EngineError::new("entry Realm has no Module graph"))?;
+    let graph = eqref(store, graph_field)?
+        .ok_or_else(|| EngineError::new("entry Realm has no Module graph"))?;
     let program_field = wasm_gc_completion::field(store, graph, GcHostField::ModuleGraphProgram)?;
     let program = eqref(store, program_field)?
         .ok_or_else(|| EngineError::new("Module graph has no defining program"))?;

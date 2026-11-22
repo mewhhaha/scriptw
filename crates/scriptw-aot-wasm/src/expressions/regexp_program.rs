@@ -4,6 +4,9 @@ use super::*;
 use scriptw_ir::RegExpProgram;
 
 mod candidate;
+mod static_construction;
+
+pub(crate) use static_construction::ConstantRegExpConstructionSite;
 
 impl<'a> FunctionBuilder<'a> {
     fn emit_collected_regexp_program(

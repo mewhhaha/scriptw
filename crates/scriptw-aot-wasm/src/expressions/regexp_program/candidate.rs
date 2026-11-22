@@ -11,8 +11,10 @@ impl FunctionBuilder<'_> {
     pub(crate) fn compile_regexp_program_candidate_hook(&mut self) -> Result<Function, EmitError> {
         use crate::data::{
             runtime_regexp_record_offset, RuntimeRegExpEntryKind,
-            RUNTIME_REGEXP_DESCRIPTOR_PROGRAM_DOMAIN, RUNTIME_REGEXP_RECORD_ENTRY_KIND_WORD,
-            RUNTIME_REGEXP_RECORD_FLAGS_WORD, RUNTIME_REGEXP_RECORD_PROGRAM_DOMAIN_WORD,
+            RUNTIME_REGEXP_CANDIDATE_KEY_OFFSET_BASIS, RUNTIME_REGEXP_CANDIDATE_KEY_PRIME,
+            RUNTIME_REGEXP_CANDIDATE_KEY_SEPARATOR, RUNTIME_REGEXP_DESCRIPTOR_PROGRAM_DOMAIN,
+            RUNTIME_REGEXP_RECORD_ENTRY_KIND_WORD, RUNTIME_REGEXP_RECORD_FLAGS_WORD,
+            RUNTIME_REGEXP_RECORD_KEY_WORD, RUNTIME_REGEXP_RECORD_PROGRAM_DOMAIN_WORD,
             RUNTIME_REGEXP_RECORD_PROGRAM_PAYLOAD_WORD, RUNTIME_REGEXP_RECORD_SIZE,
             RUNTIME_REGEXP_RECORD_SOURCE_WORD,
         };
@@ -39,17 +41,94 @@ impl FunctionBuilder<'_> {
             );
             let pointer = schema.reserve_i32_local(&mut function);
             let row = schema.reserve_i32_local(&mut function);
+            let upper = schema.reserve_i32_local(&mut function);
+            let middle = schema.reserve_i32_local(&mut function);
+            let key = schema.reserve_i64_local(&mut function);
             let literal = schema.reserve_i64_local(&mut function);
+            let matched = schema.reserve_i32_local(&mut function);
             let recognized = schema.reserve_i32_local(&mut function);
             let kind_word = schema.reserve_i64_local(&mut function);
             let payload = schema.reserve_i64_local(&mut function);
-            pointer.set_constant(0, &mut function);
+            key.set_constant(
+                RUNTIME_REGEXP_CANDIDATE_KEY_OFFSET_BASIS as i64,
+                &mut function,
+            );
+            self.emit_regexp_candidate_key_units(&parameters.source, key, &mut function);
+            key.load(&mut function);
+            function.instruction(&Instruction::I64Const(
+                RUNTIME_REGEXP_CANDIDATE_KEY_SEPARATOR as i64,
+            ));
+            function.instruction(&Instruction::I64Xor);
+            function.instruction(&Instruction::I64Const(
+                RUNTIME_REGEXP_CANDIDATE_KEY_PRIME as i64,
+            ));
+            function.instruction(&Instruction::I64Mul);
+            key.store(&mut function);
+            self.emit_regexp_candidate_key_units(&parameters.flags, key, &mut function);
+            // Lower bound of `key` in the unsigned-sorted key column.
             row.set_constant(0, &mut function);
+            upper.set_constant(candidates.count() as i32, &mut function);
+            let searched = self.open_frame(ControlFrameKind::Block, &mut function);
+            let halve = self.open_frame(ControlFrameKind::Loop, &mut function);
+            row.load(&mut function);
+            upper.load(&mut function);
+            function.instruction(&Instruction::I32GeU);
+            self.emit_branch_if_to_target(searched, &mut function);
+            // `row + upper` fits: both are at most the u32 row count, which a
+            // checked table extent bounds far below 2^31.
+            row.load(&mut function);
+            upper.load(&mut function);
+            function.instruction(&Instruction::I32Add);
+            function.instruction(&Instruction::I32Const(1));
+            function.instruction(&Instruction::I32ShrU);
+            middle.store(&mut function);
+            middle.load(&mut function);
+            function.instruction(&Instruction::I32Const(RUNTIME_REGEXP_RECORD_SIZE as i32));
+            function.instruction(&Instruction::I32Mul);
+            pointer.store(&mut function);
+            metadata.read_u64(
+                pointer,
+                runtime_regexp_record_offset(RUNTIME_REGEXP_RECORD_KEY_WORD) as u32,
+                schema,
+                &mut function,
+            );
+            key.load(&mut function);
+            function.instruction(&Instruction::I64LtU);
+            self.open_frame(ControlFrameKind::If, &mut function);
+            middle.load(&mut function);
+            function.instruction(&Instruction::I32Const(1));
+            function.instruction(&Instruction::I32Add);
+            row.store(&mut function);
+            function.instruction(&Instruction::Else);
+            middle.load(&mut function);
+            upper.store(&mut function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+            self.emit_branch_to_target(halve, &mut function);
+            self.pop_control(ControlFrameKind::Loop);
+            function.instruction(&Instruction::End);
+            self.pop_control(ControlFrameKind::Block);
+            function.instruction(&Instruction::End);
+            row.load(&mut function);
+            function.instruction(&Instruction::I32Const(RUNTIME_REGEXP_RECORD_SIZE as i32));
+            function.instruction(&Instruction::I32Mul);
+            pointer.store(&mut function);
+            // Rows with an equal key, in table order; the first String-equal
+            // row decides, exactly as the former whole-table scan did.
             let done = self.open_frame(ControlFrameKind::Block, &mut function);
             let next = self.open_frame(ControlFrameKind::Loop, &mut function);
             row.load(&mut function);
             function.instruction(&Instruction::I32Const(candidates.count() as i32));
             function.instruction(&Instruction::I32GeU);
+            self.emit_branch_if_to_target(done, &mut function);
+            metadata.read_u64(
+                pointer,
+                runtime_regexp_record_offset(RUNTIME_REGEXP_RECORD_KEY_WORD) as u32,
+                schema,
+                &mut function,
+            );
+            key.load(&mut function);
+            function.instruction(&Instruction::I64Ne);
             self.emit_branch_if_to_target(done, &mut function);
             metadata.read_u64(
                 pointer,
@@ -69,6 +148,11 @@ impl FunctionBuilder<'_> {
                     ),
                     &mut function,
                 );
+            self.emit_string_payload_equality_i32(&parameters.source, &source, &mut function);
+            matched.store(&mut function);
+            source.clear(&mut function);
+            matched.load(&mut function);
+            self.open_frame(ControlFrameKind::If, &mut function);
             metadata.read_u64(
                 pointer,
                 runtime_regexp_record_offset(RUNTIME_REGEXP_RECORD_FLAGS_WORD) as u32,
@@ -87,11 +171,12 @@ impl FunctionBuilder<'_> {
                     ),
                     &mut function,
                 );
-            self.emit_string_payload_equality_i32(&parameters.source, &source, &mut function);
             self.emit_string_payload_equality_i32(&parameters.flags, &flags, &mut function);
-            function.instruction(&Instruction::I32And);
+            matched.store(&mut function);
             flags.clear(&mut function);
-            source.clear(&mut function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+            matched.load(&mut function);
             self.open_frame(ControlFrameKind::If, &mut function);
             metadata.read_u64(
                 pointer,
@@ -183,10 +268,10 @@ impl FunctionBuilder<'_> {
             self.pop_control(ControlFrameKind::Block);
             function.instruction(&Instruction::End);
             metadata.clear(schema, &mut function);
-            for local in [pointer, row, recognized] {
+            for local in [pointer, row, upper, middle, matched, recognized] {
                 schema.release_i32_local(local, &mut function);
             }
-            for local in [kind_word, payload, literal] {
+            for local in [kind_word, payload, literal, key] {
                 schema.release_i64_local(local, &mut function);
             }
         }
@@ -201,6 +286,67 @@ impl FunctionBuilder<'_> {
         schema.release_i32_local(status, &mut function);
         function.instruction(&Instruction::End);
         Ok(self.finish_function(function))
+    }
+
+    /// Mixes `text`'s code units into `key` exactly as the table writer's
+    /// [`crate::data::runtime_regexp_candidate_key`] does.
+    fn emit_regexp_candidate_key_units(
+        &mut self,
+        text: &GcLocal<StringValue>,
+        key: I64Local,
+        function: &mut Function,
+    ) {
+        use crate::data::RUNTIME_REGEXP_CANDIDATE_KEY_PRIME;
+        use crate::gc_types::{CodeUnitArray, StringValueSchema};
+        let schema = self.runtime_schema();
+        let units = schema.reserve_gc_local(function).initialize(
+            schema
+                .struct_type::<StringValue>()
+                .field(StringValueSchema::CODE_UNITS)
+                .read(text, schema, function)
+                .reference(),
+            function,
+        );
+        let length = schema.reserve_i32_local(function);
+        schema
+            .array_type::<CodeUnitArray>()
+            .length(&units, schema, function);
+        length.store(function);
+        let index = schema.reserve_i32_local(function);
+        let unit = schema.reserve_i32_local(function);
+        index.set_constant(0, function);
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        let next = self.open_frame(ControlFrameKind::Loop, function);
+        index.load(function);
+        length.load(function);
+        function.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(done, function);
+        schema
+            .array_type::<CodeUnitArray>()
+            .read(&units, index, schema, function)
+            .store(unit, function);
+        key.load(function);
+        unit.load(function);
+        function.instruction(&Instruction::I64ExtendI32U);
+        function.instruction(&Instruction::I64Xor);
+        function.instruction(&Instruction::I64Const(
+            RUNTIME_REGEXP_CANDIDATE_KEY_PRIME as i64,
+        ));
+        function.instruction(&Instruction::I64Mul);
+        key.store(function);
+        index.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Add);
+        index.store(function);
+        self.emit_branch_to_target(next, function);
+        self.pop_control(ControlFrameKind::Loop);
+        function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        for local in [length, index, unit] {
+            schema.release_i32_local(local, function);
+        }
+        units.clear(function);
     }
 
     /// Literal/constructor collection supplies a checked span in this P image.

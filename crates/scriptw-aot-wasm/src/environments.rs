@@ -38,6 +38,29 @@ impl InitializedParameterLocal {
     }
 }
 
+/// The TDZ obligation of one environment-slot use, derived only by
+/// `FunctionBuilder::env_slot_initialization`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EnvSlotInitialization {
+    /// A read throws ReferenceError, and an assignment fails, while the cell
+    /// is uninitialized.
+    Checked,
+    /// Declaration instantiation initialized the cell before any code able to
+    /// name it runs, and nothing makes it uninitialized again: the
+    /// initialized flag is always set, so no use tests it.
+    BeforeAnyReference,
+}
+
+/// Slots of this body's own activation record that its declaration
+/// instantiation initialized before any later body code is compiled: hoisted
+/// `var` names and the parameters after the parameter producer completed.
+///
+/// The activation record is the root environment of every body that owns
+/// slots and is never replaced, so a slot index names one cell for the whole
+/// body. Only `record_instantiated_var` and `bind_parameters` add to it.
+#[derive(Debug, Default)]
+pub(crate) struct InstantiatedActivationSlots(std::collections::BTreeSet<u32>);
+
 impl<'a> FunctionBuilder<'a> {
     /// Environment References already own an object base and canonical key.
     /// Retain the complete internal-method completion until the caller releases
@@ -423,6 +446,96 @@ impl<'a> FunctionBuilder<'a> {
         initialized
     }
 
+    /// The value half of `emit_read_environment_cell` for a cell whose
+    /// initialized flag is proven set: it follows the same import TARGET.
+    fn emit_read_environment_cell_value(
+        &mut self,
+        cell: &GcLocal<BindingCell>,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        if !self.cells_may_be_linked() {
+            schema
+                .struct_type::<BindingCell>()
+                .read_value(cell, value, schema, function);
+            return;
+        }
+        let source = schema
+            .reserve_gc_local::<BindingCell, Nullable>(function)
+            .initialize(cell.load(schema, function).nullable(), function);
+        let target = schema
+            .reserve_gc_local::<BindingCell, Nullable>(function)
+            .initialize(
+                schema
+                    .struct_type::<BindingCell>()
+                    .field(BindingCellSchema::TARGET)
+                    .read(cell, schema, function)
+                    .reference(),
+                function,
+            );
+        target.load(schema, function);
+        function.instruction(&Instruction::RefIsNull);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        source.replace(target.load(schema, function), function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        schema
+            .struct_type::<BindingCell>()
+            .read_value(&source, value, schema, function);
+        target.clear(function);
+        source.clear(function);
+    }
+
+    /// Whether a use of the slot `hops` records above the current environment
+    /// must test the cell's initialized flag.
+    ///
+    /// A slot at or beyond the body's root (`hops >= environment_depth`) names
+    /// a root-relative cell: `root_hops == 0` is the body's own activation
+    /// record (or, for a body without one, the captured record at hop 0), and
+    /// every other root distance is the analyzed captured chain whose
+    /// `CapturedBindingIr` records the same slot and hops. Only those two
+    /// proofs omit the test; block, body and head records inside the body
+    /// (`hops < environment_depth`) are always checked.
+    pub(crate) fn env_slot_initialization(&self, slot: u32, hops: u32) -> EnvSlotInitialization {
+        let Some(root_hops) = hops.checked_sub(self.environment_depth) else {
+            return EnvSlotInitialization::Checked;
+        };
+        let own = root_hops == 0 && self.instantiated_activation_slots.0.contains(&slot);
+        let captured = self.captured_bindings.iter().any(|binding| {
+            binding.slot == slot
+                && binding.hops == root_hops
+                && binding.name != DIRECT_EVAL_EXECUTION_CONTEXT_NAME
+                && binding.name != LEXICAL_ARGUMENTS_NAME
+                && binding.initialization
+                    == scriptw_ir::CapturedBindingInitializationIr::BeforeAnyReference
+        });
+        if own || captured {
+            EnvSlotInitialization::BeforeAnyReference
+        } else {
+            EnvSlotInitialization::Checked
+        }
+    }
+
+    /// FunctionDeclarationInstantiation (10.2.11 step 27) has just initialized
+    /// this hoisted `var`'s own activation cell, before any body statement is
+    /// compiled. `arguments` keeps its check.
+    pub(crate) fn record_instantiated_var(&mut self, name: &str, storage: BindingStorage) {
+        if name != "arguments" {
+            self.record_instantiated_activation_slot(storage);
+        }
+    }
+
+    /// Only an own activation cell (`hops == environment_depth`) is recorded.
+    fn record_instantiated_activation_slot(&mut self, storage: BindingStorage) {
+        if let BindingStorage::EnvSlot { slot, hops } = storage {
+            if hops == self.environment_depth {
+                self.instantiated_activation_slots.0.insert(slot);
+            }
+        }
+    }
+
     pub(crate) fn emit_write_environment_cell(
         &mut self,
         cell: &GcLocal<BindingCell>,
@@ -709,24 +822,32 @@ impl<'a> FunctionBuilder<'a> {
             }
             BindingStorage::EnvSlot { slot, hops } => {
                 let schema = self.runtime_schema();
+                let initialization = self.env_slot_initialization(slot, hops);
                 let environment = self.resolve_env_handle_local(hops, function);
                 let cell = self.emit_environment_cell_local(&environment, slot, function);
                 let error = schema.reserve_value_local(function);
-                schema
-                    .struct_type::<BindingCell>()
-                    .field(BindingCellSchema::INITIALIZED)
-                    .read(&cell, schema, function);
-                function.instruction(&Instruction::I32Eqz);
-                self.open_frame(ControlFrameKind::If, function);
-                self.emit_environment_native_error(
-                    NativeErrorKind::ReferenceError,
-                    RuntimeErrorMessage::LEXICAL_BINDING_ACCESSED_BEFORE_INITIALIZATION,
-                    &error,
-                    function,
-                )?;
-                self.emit_propagate_current_throw_if_needed(function);
-                self.pop_control(ControlFrameKind::If);
-                function.instruction(&Instruction::End);
+                match initialization {
+                    EnvSlotInitialization::Checked => {
+                        schema
+                            .struct_type::<BindingCell>()
+                            .field(BindingCellSchema::INITIALIZED)
+                            .read(&cell, schema, function);
+                        function.instruction(&Instruction::I32Eqz);
+                        self.open_frame(ControlFrameKind::If, function);
+                        self.emit_environment_native_error(
+                            NativeErrorKind::ReferenceError,
+                            RuntimeErrorMessage::LEXICAL_BINDING_ACCESSED_BEFORE_INITIALIZATION,
+                            &error,
+                            function,
+                        )?;
+                        self.emit_propagate_current_throw_if_needed(function);
+                        self.pop_control(ControlFrameKind::If);
+                        function.instruction(&Instruction::End);
+                    }
+                    // The SetMutableBinding immutability test below stays:
+                    // the proof covers initialization only.
+                    EnvSlotInitialization::BeforeAnyReference => {}
+                }
                 self.open_frame(ControlFrameKind::Block, function);
                 schema
                     .struct_type::<BindingCell>()
@@ -862,6 +983,16 @@ impl<'a> FunctionBuilder<'a> {
                 for statement in statements {
                     self.compile_statement(statement, function)?;
                 }
+            }
+        }
+        // The same completed producer initialized every parameter's own
+        // activation cell, and nothing makes it uninitialized again. Code the
+        // body compiles from here on reads it without a test; default and
+        // pattern initializers above were emitted with the check. A closure
+        // reaches the cell only through its analyzed capture proof.
+        for param in self.params {
+            if let Some(storage) = self.lookup_binding(&param.name) {
+                self.record_instantiated_activation_slot(storage);
             }
         }
         // Only normal fallthrough reaches the body after every parameter and
@@ -1199,6 +1330,16 @@ impl<'a> FunctionBuilder<'a> {
             BindingStorage::Local(id) => {
                 self.check_local_binding_initialized(id, function)?;
                 value.copy_from(self.local_binding(id).value(), function);
+            }
+            BindingStorage::EnvSlot { slot, hops }
+                if self.env_slot_initialization(slot, hops)
+                    == EnvSlotInitialization::BeforeAnyReference =>
+            {
+                let environment = self.resolve_env_handle_local(hops, function);
+                let cell = self.emit_environment_cell_local(&environment, slot, function);
+                self.emit_read_environment_cell_value(&cell, value, function);
+                cell.clear(function);
+                environment.clear(function);
             }
             BindingStorage::EnvSlot { slot, hops } => {
                 let schema = self.runtime_schema();

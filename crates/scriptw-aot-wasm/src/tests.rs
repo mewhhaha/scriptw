@@ -12,6 +12,7 @@ mod bootstrap_compact_metadata;
 mod bootstrap_undefined;
 mod call_arity;
 mod constant_leaf;
+mod constant_regexp_sites;
 mod date_demand_initialization;
 mod demand_constructors;
 mod dense_switch;

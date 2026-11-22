@@ -96,6 +96,40 @@ impl FunctionBuilder<'_> {
         } else {
             None
         };
+        // A constant RegExp site binds its compile-time program only when the
+        // actual callee is this Realm's %RegExp%; any other callee takes the
+        // original dispatch with the same (effect-free, literal) operands.
+        if let Some(site) = matches!(continuation, CallContinuation::Continue)
+            .then(|| {
+                crate::expressions::ConstantRegExpConstructionSite::of(
+                    callee_expression,
+                    arguments,
+                    static_regexp_compilation,
+                )
+            })
+            .flatten()
+        {
+            let handled = self
+                .emit_constant_regexp_construction_if_intrinsic(&callee, &site, output, function)?;
+            handled.load(function);
+            function.instruction(&Instruction::I32Eqz);
+            self.open_frame(ControlFrameKind::If, function);
+            self.emit_indirect_call_from_locals_with_known_target(
+                &callee,
+                Some(&receiver),
+                arguments,
+                known_target.as_ref(),
+                continuation,
+                output,
+                function,
+            )?;
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+            self.runtime_schema().release_i32_local(handled, function);
+            receiver.clear(function);
+            callee.clear(function);
+            return Ok(());
+        }
         if let Some(meta) = &known_target {
             if self.try_emit_known_leaf_call_from_locals(
                 meta,
@@ -145,13 +179,18 @@ impl FunctionBuilder<'_> {
             callee.clear(function);
             return Ok(());
         }
-        // Target knowledge selects a candidate only. The actual once-read
-        // callee and evaluated operands still prove the guarded route at runtime.
+        // Target knowledge or `x.imul(...)` syntax selects a candidate only.
+        // The actual once-read callee and evaluated operands still prove the
+        // guarded route at runtime. Syntax matters where the receiver has no
+        // static facts, e.g. a module's `Math`, which resolves through the
+        // live global environment rather than the script's global property
+        // facts.
         let numeric_imul_candidate = callee_expression
             .function_targets
             .known_targets()
             .iter()
-            .any(|id| StandardBuiltinId::from_function_id(id) == Some(StandardBuiltinId::MathImul));
+            .any(|id| StandardBuiltinId::from_function_id(id) == Some(StandardBuiltinId::MathImul))
+            || callee_reads_static_property(callee_expression, "imul");
         // `x.call(...)` syntax or target knowledge only nominates the
         // forwarding guard; the actual callee's code identity decides, with
         // these once-evaluated operands.
@@ -159,20 +198,7 @@ impl FunctionBuilder<'_> {
             && (targets.iter().any(|id| {
                 StandardBuiltinId::from_function_id(id)
                     == Some(StandardBuiltinId::FunctionPrototypeCall)
-            }) || match &callee_expression.expr {
-                ExprIr::PropertyRead {
-                    key: PropertyKeyIr::StaticString(name),
-                    ..
-                } => name == "call",
-                ExprIr::SpecOperation {
-                    operation: scriptw_ir::SpecOperationIr::GetV,
-                    operands,
-                } => matches!(
-                    operands.get(1).map(|key| &key.expr),
-                    Some(ExprIr::String(name)) if name == "call"
-                ),
-                _ => false,
-            });
+            }) || callee_reads_static_property(callee_expression, "call"));
         if (!numeric_imul_candidate
             || !self.try_emit_numeric_imul_call(
                 &callee,
@@ -205,5 +231,24 @@ impl FunctionBuilder<'_> {
         receiver.clear(function);
         callee.clear(function);
         Ok(())
+    }
+}
+
+/// The callee is a `Get` of the static property `name`. Syntax only nominates
+/// a guarded native route; it never proves the callee.
+fn callee_reads_static_property(callee: &TypedExpr, name: &str) -> bool {
+    match &callee.expr {
+        ExprIr::PropertyRead {
+            key: PropertyKeyIr::StaticString(key),
+            ..
+        } => key == name,
+        ExprIr::SpecOperation {
+            operation: scriptw_ir::SpecOperationIr::GetV,
+            operands,
+        } => matches!(
+            operands.get(1).map(|key| &key.expr),
+            Some(ExprIr::String(key)) if key == name
+        ),
+        _ => false,
     }
 }

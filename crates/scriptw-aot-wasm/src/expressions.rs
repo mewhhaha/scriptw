@@ -9,6 +9,7 @@ mod environment_identifier;
 mod foreign_call;
 mod optional_chain;
 mod regexp_program;
+pub(crate) use regexp_program::ConstantRegExpConstructionSite;
 mod super_property_mutation;
 
 #[must_use = "raw Reference operands must enter their checked transition"]

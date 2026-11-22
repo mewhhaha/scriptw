@@ -144,3 +144,62 @@ fn immutable_script_capture_keeps_its_existing_exact_function_facts() {
         Some(&named(&program, "stable").id)
     );
 }
+
+/// Only bindings that their owner's declaration instantiation initializes
+/// before any closure can name them carry the capture TDZ proof.
+#[test]
+fn captured_binding_initialization_proves_only_instantiated_bindings() {
+    use scriptw_ir::CapturedBindingInitializationIr as Initialization;
+    let program = program(
+        r#"
+        let moduleLexical = 0;
+        function moduleDeclared() { return 0; }
+        export function make(simple) {
+            var hoisted = 1;
+            let lexical = 2;
+            const constant = 3;
+            class Klass {}
+            function declared() { return 0; }
+            return function read() {
+                return [hoisted, lexical, constant, Klass, declared, simple,
+                    moduleLexical, moduleDeclared];
+            };
+        }
+        export function withDefault(first = 0, later) {
+            return function readLater() { return later; };
+        }
+        "#,
+        ParseOptions::module(),
+    );
+    let capture = |function: &str, source: &str| {
+        named(&program, function)
+            .captured_bindings
+            .iter()
+            .find(|capture| capture.source_name == source)
+            .unwrap_or_else(|| panic!("{function} captures {source}"))
+            .initialization
+    };
+    for source in ["hoisted", "declared", "simple"] {
+        assert_eq!(
+            capture("read", source),
+            Initialization::BeforeAnyReference,
+            "{source}"
+        );
+    }
+    // Module function declarations stay checked: a cyclic import can reach
+    // them before the module body runs.
+    for source in [
+        "lexical",
+        "constant",
+        "Klass",
+        "moduleLexical",
+        "moduleDeclared",
+    ] {
+        assert_eq!(capture("read", source), Initialization::Checked, "{source}");
+    }
+    assert_eq!(
+        capture("readLater", "later"),
+        Initialization::Checked,
+        "a parameter of a list with expressions has its own TDZ"
+    );
+}

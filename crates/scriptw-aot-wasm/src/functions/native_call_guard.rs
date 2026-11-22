@@ -7,7 +7,7 @@ use crate::gc_types::{
 };
 
 impl FunctionBuilder<'_> {
-    pub(super) fn emit_with_current_native_builtin(
+    pub(crate) fn emit_with_current_native_builtin(
         &mut self,
         callee: &ValueLocals,
         builtin: StandardBuiltinId,

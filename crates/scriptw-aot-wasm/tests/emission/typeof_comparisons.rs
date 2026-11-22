@@ -174,3 +174,135 @@ fn literal_typeof_predicates_cover_spec_and_expression_comparisons_without_strin
         }
     }
 }
+
+/// A literal typeof predicate classifies from the tag first: primitives test
+/// no reference, only the Object tag tests for a callable Proxy, and only the
+/// Function tag tests the record for [[IsHTMLDDA]].
+#[test]
+fn literal_typeof_predicates_test_references_only_under_their_tag() {
+    let artifact = std::thread::Builder::new()
+        .name("typeof-tag-first-emission".into())
+        .stack_size(64 * 1024 * 1024)
+        .spawn(|| {
+            let parsed = parse(
+                r#"
+                export function isNever(value) { return typeof value === "not-a-type"; }
+                export function isNumber(value) { return typeof value === "number"; }
+                export function isString(value) { return typeof value === "string"; }
+                export function isUndefined(value) { return typeof value === "undefined"; }
+                export function isObject(value) { return typeof value === "object"; }
+                export function isFunction(value) { return typeof value === "function"; }
+            "#,
+                ParseOptions::module(),
+            )
+            .unwrap();
+            let program = lower(&parsed);
+            assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
+            emit(&program).expect("typeof predicates emit")
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+    for bytes in [
+        artifact.runtime().unwrap().bytes(),
+        artifact.bytes.as_slice(),
+    ] {
+        Validator::new_with_features(WasmFeatures::all())
+            .validate_all(bytes)
+            .expect("actual R/P validate");
+    }
+    let program = Module::read(&artifact.bytes, true);
+    let body = |name: &str| {
+        program
+            .named(&format!("js::{name}#"))
+            .1
+            .iter()
+            .filter(|op| !matches!(op, Operator::RefAsNonNull))
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    let tests = |ops: &[Operator<'_>]| {
+        ops.iter()
+            .filter(|op| {
+                matches!(
+                    op,
+                    Operator::RefTestNonNull { .. } | Operator::RefTestNullable { .. }
+                )
+            })
+            .count()
+    };
+    let casts = |ops: &[Operator<'_>]| {
+        ops.iter()
+            .filter(|op| {
+                matches!(
+                    op,
+                    Operator::BrOnCastFail { .. } | Operator::BrOnCast { .. }
+                )
+            })
+            .count()
+    };
+    // `tag == expected` opens the arm that holds the reference test.
+    fn guarded(
+        ops: &[Operator<'_>],
+        tag: WasmRuntimeValueTag,
+        test: fn(&Operator<'_>) -> bool,
+    ) -> bool {
+        (0..ops.len()).any(|start| {
+            matches!(&ops[start..],
+                [Operator::I32Const { value }, Operator::I32Eq, Operator::If { .. }, ..]
+                    if *value == tag as i32)
+                && ops[start + 3..ops.len().min(start + 12)].iter().any(test)
+        })
+    }
+    let never = body("isNever");
+    // The operand evaluation is shared; only the predicate differs.
+    for name in ["isNumber", "isString", "isUndefined"] {
+        assert_eq!(
+            tests(&body(name)),
+            tests(&never),
+            "{name}: no reference test"
+        );
+    }
+    for name in ["isNumber", "isString"] {
+        assert_eq!(
+            casts(&body(name)),
+            casts(&never),
+            "{name}: a primitive tag needs no cast"
+        );
+    }
+    for name in ["isObject", "isFunction"] {
+        let ops = body(name);
+        assert_eq!(
+            tests(&ops),
+            tests(&never) + 1,
+            "{name}: only the Proxy call-capability test reads the reference"
+        );
+        assert!(
+            guarded(&ops, WasmRuntimeValueTag::Object, |op| matches!(
+                op,
+                Operator::RefTestNonNull { .. }
+            )),
+            "{name}: the Proxy test runs only under the Object tag"
+        );
+    }
+    assert_eq!(
+        casts(&body("isObject")),
+        casts(&never),
+        "object needs no IsHTMLDDA record test"
+    );
+    for name in ["isUndefined", "isFunction"] {
+        let ops = body(name);
+        assert_eq!(
+            casts(&ops),
+            casts(&never) + 1,
+            "{name}: one IsHTMLDDA record test"
+        );
+        assert!(
+            guarded(&ops, WasmRuntimeValueTag::Function, |op| matches!(
+                op,
+                Operator::BrOnCastFail { .. }
+            )),
+            "{name}: the IsHTMLDDA record test runs only under the Function tag"
+        );
+    }
+}

@@ -58,7 +58,10 @@ export function hello() { print('hello'); }
         instance.bridges.has_typed_call(),
         "the call bridge must be typed once at instantiation"
     );
-    assert!(instance.entry.is_none(), "main has not created the entry Realm");
+    assert!(
+        instance.entry.is_none(),
+        "main has not created the entry Realm"
+    );
     assert!(matches!(
         instance.initialize(&mut store).unwrap(),
         EmbeddedEvaluation::Settled(JsCompletion::Normal(_))
@@ -77,8 +80,12 @@ export function hello() { print('hello'); }
     let global = export(&instance, &mut store, "global");
     let boom = export(&instance, &mut store, "boom");
     let hello = export(&instance, &mut store, "hello");
-    let one = instance.value(&mut store, ForeignValue::Number(1.0)).unwrap();
-    let two = instance.value(&mut store, ForeignValue::Number(2.0)).unwrap();
+    let one = instance
+        .value(&mut store, ForeignValue::Number(1.0))
+        .unwrap();
+    let two = instance
+        .value(&mut store, ForeignValue::Number(2.0))
+        .unwrap();
 
     for round in 0..2 {
         assert!(normal(instance.call(&mut store, &empty, None, &[]).unwrap()).is_undefined());
@@ -95,15 +102,26 @@ export function hello() { print('hello'); }
             );
         }
         for _ in 0..3 {
-            assert!(boolean(instance.call(&mut store, &keep, None, &[]).unwrap()));
+            assert!(boolean(
+                instance.call(&mut store, &keep, None, &[]).unwrap()
+            ));
         }
         // An absent receiver is undefined; an explicit one is passed as is.
-        assert!(boolean(instance.call(&mut store, &receiver, None, &[]).unwrap()));
+        assert!(boolean(
+            instance.call(&mut store, &receiver, None, &[]).unwrap()
+        ));
         assert_eq!(
-            normal(instance.call(&mut store, &identity, Some(&two), &[]).unwrap()).as_number(),
+            normal(
+                instance
+                    .call(&mut store, &identity, Some(&two), &[])
+                    .unwrap()
+            )
+            .as_number(),
             Some(2.0)
         );
-        assert!(boolean(instance.call(&mut store, &global, None, &[]).unwrap()));
+        assert!(boolean(
+            instance.call(&mut store, &global, None, &[]).unwrap()
+        ));
         let JsCompletion::Throw(thrown) = instance.call(&mut store, &boom, None, &[]).unwrap()
         else {
             panic!("boom throws");

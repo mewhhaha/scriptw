@@ -1,9 +1,9 @@
 use super::*;
 use crate::gc_types::{
-    BigIntLimbArray, BigIntValue, BigIntValueSchema, BoundFunction, CodeUnitArray,
-    CompletionLocals, FunctionObject, FunctionObjectSchema, GcLocal, I32Local, I64Local,
-    ProxyCallCapability, ProxyObject, ProxyObjectSchema, RuntimeSchema, StringValue,
-    StringValueSchema, SymbolValue, ValueLocals,
+    BigIntLimbArray, BigIntValue, BigIntValueSchema, CodeUnitArray, CompletionLocals,
+    FunctionObject, FunctionObjectSchema, GcLocal, I32Local, I64Local, ProxyCallCapability,
+    ProxyObject, ProxyObjectSchema, RuntimeSchema, StringValue, StringValueSchema, SymbolValue,
+    ValueLocals,
 };
 use crate::runtime_helpers::RuntimeHelperPropertyKeyParameter;
 use scriptw_ir::NativeErrorKind;
@@ -331,6 +331,27 @@ impl<'a> FunctionBuilder<'a> {
         let target = schema.reserve_value_local(function);
         let result = schema.reserve_completion(function);
         self.compile_expr_to_value(callee, &target, function)?;
+        // A constant site binds its compile-time program only when the actual
+        // callee is this Realm's %RegExp% (NewTarget is then that callee); the
+        // zero arm is the original construction. Its operands are literals.
+        let constant_regexp = crate::expressions::ConstantRegExpConstructionSite::of(
+            callee,
+            args,
+            static_regexp_compilation,
+        );
+        let bound_regexp = match &constant_regexp {
+            Some(site) => {
+                self.emit_propagate_current_throw_if_needed(function);
+                let handled = self.emit_constant_regexp_construction_if_intrinsic(
+                    &target, site, output, function,
+                )?;
+                handled.load(function);
+                function.instruction(&Instruction::I32Eqz);
+                self.open_frame(ControlFrameKind::If, function);
+                Some(handled)
+            }
+            None => None,
+        };
         let arguments = self.emit_call_args_vector(args, function)?;
         // A retained compilation plan applies to the actual acquired native
         // function only. All operands run before either validation or Call.
@@ -423,6 +444,11 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::End);
         schema.release_i32_local(native_regexp, function);
         arguments.clear(function);
+        if let Some(handled) = bound_regexp {
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+            schema.release_i32_local(handled, function);
+        }
         result.clear(function);
         target.clear(function);
         self.emit_propagate_current_throw_if_needed(function);
@@ -1036,10 +1062,29 @@ impl<'a> FunctionBuilder<'a> {
         value: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        // Only a FunctionObject has the [[IsHTMLDDA]] slot, and only the
+        // Function tag can carry one (`javascript_tag`): every other tag is 0
+        // without a reference test.
+        value.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Function.tag()));
+        function.instruction(&Instruction::I32Eq);
+        function.instruction(&Instruction::If(BlockType::Result(ValType::I32)));
+        self.emit_function_tag_is_htmldda_i32(value, function);
+        function.instruction(&Instruction::Else);
+        function.instruction(&Instruction::I32Const(0));
+        function.instruction(&Instruction::End);
+        Ok(())
+    }
+
+    /// [[IsHTMLDDA]] of a Function-tagged value. Bound functions share that
+    /// tag, so the record is tested once; the cast that proves it leaves the
+    /// record for its field.
+    pub(crate) fn emit_function_tag_is_htmldda_i32(
+        &self,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) {
         let schema = self.runtime_schema();
-        // Bound functions and callable proxies cannot acquire the HTMLDDA
-        // internal slot merely by being callable. Test the concrete record
-        // once: the cast that proves it leaves the record for its field.
         function.instruction(&Instruction::Block(BlockType::Result(ValType::I32)));
         function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(
             wasm_encoder::RefType::EQREF,
@@ -1055,7 +1100,6 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::Drop);
         function.instruction(&Instruction::I32Const(0));
         function.instruction(&Instruction::End);
-        Ok(())
     }
 
     pub(crate) fn compile_truthy_tagged_i32(
@@ -4342,28 +4386,52 @@ impl<'a> FunctionBuilder<'a> {
         Ok(())
     }
 
+    /// IsCallable from the tag first. A FunctionObject and a BoundFunction
+    /// are exactly the Function-tagged references, and every one is callable;
+    /// the only other callable is a Proxy whose target was callable, and a
+    /// Proxy carries the Object tag (`javascript_tag`). No primitive, Array or
+    /// Arguments value needs a reference test.
     pub(crate) fn emit_is_callable_i32(
         &self,
         value: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
-        value.reference().load(function);
-        function.instruction(&Instruction::RefTestNonNull(
-            schema
-                .reference_type::<FunctionObject>(crate::gc_types::GcNullability::NonNullable)
-                .heap_type,
-        ));
-        value.reference().load(function);
-        function.instruction(&Instruction::RefTestNonNull(
-            schema
-                .reference_type::<BoundFunction>(crate::gc_types::GcNullability::NonNullable)
-                .heap_type,
-        ));
-        function.instruction(&Instruction::I32Or);
+        value.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Function.tag()));
+        function.instruction(&Instruction::I32Eq);
         function.instruction(&Instruction::If(BlockType::Result(ValType::I32)));
         function.instruction(&Instruction::I32Const(1));
         function.instruction(&Instruction::Else);
+        self.emit_object_tag_is_callable_proxy_i32(value, function);
+        function.instruction(&Instruction::End);
+        Ok(())
+    }
+
+    /// Whether the value is a Proxy with [[Call]]: 0 for every tag but Object
+    /// without a reference test.
+    pub(crate) fn emit_object_tag_is_callable_proxy_i32(
+        &self,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) {
+        value.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Object.tag()));
+        function.instruction(&Instruction::I32Eq);
+        function.instruction(&Instruction::If(BlockType::Result(ValType::I32)));
+        self.emit_object_tag_proxy_call_capability_i32(value, function);
+        function.instruction(&Instruction::Else);
+        function.instruction(&Instruction::I32Const(0));
+        function.instruction(&Instruction::End);
+    }
+
+    /// [[Call]] presence of an Object-tagged value: only a Proxy can have it,
+    /// and a Proxy's call capability is fixed when it is created.
+    pub(crate) fn emit_object_tag_proxy_call_capability_i32(
+        &self,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
         value.reference().load(function);
         function.instruction(&Instruction::RefTestNonNull(
             schema
@@ -4392,8 +4460,6 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::Else);
         function.instruction(&Instruction::I32Const(0));
         function.instruction(&Instruction::End);
-        function.instruction(&Instruction::End);
-        Ok(())
     }
 
     pub(crate) fn compile_string_concat_payload(

@@ -382,6 +382,9 @@ pub(crate) struct FunctionBuilder<'a> {
     pub(crate) completion_exit: CompletionExit,
     module_state: FunctionModuleState<'a>,
     pub(crate) binding_scopes: Vec<BTreeMap<String, BindingStorage>>,
+    /// Own activation cells already initialized by this body's declaration
+    /// instantiation; consulted only through `env_slot_initialization`.
+    pub(crate) instantiated_activation_slots: crate::environments::InstantiatedActivationSlots,
     pub(crate) hoisted_vars: Vec<String>,
     emitted_local_count: u32,
     pub(crate) environment_depth: u32,
@@ -2133,6 +2136,7 @@ impl<'a> FunctionBuilder<'a> {
             module_state,
             hoisted_vars,
             binding_scopes: Vec::new(),
+            instantiated_activation_slots: Default::default(),
             emitted_local_count: 0,
             environment_depth: 0,
             control_stack: Vec::new(),

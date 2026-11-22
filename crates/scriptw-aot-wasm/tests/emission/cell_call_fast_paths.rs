@@ -65,13 +65,17 @@ fn strict_proven_cell_calls_and_numeric_rows_keep_live_target_tdz_and_typed_disp
         for name in ["root","owned","captured","rows"] {
             let (_,body)=p.named(&format!("js::{name}#"));
             assert_eq!(calls(body,generic),0,"{name}: no generic Reference GetValue");
-            for field in [initialized[0],GcHostField::BindingCellScalar.definition().index(),tag,GcHostField::BindingCellReference.definition().index()] {
+            for field in [GcHostField::BindingCellScalar.definition().index(),tag,GcHostField::BindingCellReference.definition().index()] {
                 assert!(body.iter().any(|op|matches!(op,Operator::StructGet{struct_type_index,field_index} if *struct_type_index==cell && *field_index==field)),"{name}: actual live field{field}");
             }
+            // The module `let` callee keeps its TDZ test; a parameter of a
+            // list without expressions (own cell or captured) has none.
+            let lexical=matches!(name,"root"|"rows");
+            assert_eq!(body.iter().any(|op|matches!(op,Operator::StructGet{struct_type_index,field_index} if *struct_type_index==cell && *field_index==initialized[0])),lexical,"{name}: initialization flag read only for the lexical callee");
             // This module imports nothing, so no cell's TARGET is ever linked:
             // the read follows no import edge.
             assert!(!body.iter().any(|op|matches!(op,Operator::StructGet{struct_type_index,field_index} if *struct_type_index==cell && *field_index==target[0])),"{name}: no import TARGET in a program without imports");
-            assert!(calls(body,tdz)>0,"{name}: TDZ failure remains a whole abrupt completion");
+            assert_eq!(calls(body,tdz)>0,lexical,"{name}: TDZ failure remains a whole abrupt completion where the cell can be uninitialized");
         }
         let (_,fallback)=p.named("js::fallback#");
         assert!(calls(fallback,generic)>0,"complex parameter owner retains generic Reference dispatch");

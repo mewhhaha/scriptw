@@ -908,6 +908,9 @@ impl<'a> ScriptLowerer<'a> {
                     mode: capture.mode,
                     slot: capture.slot,
                     hops: capture.hops,
+                    initialization: self
+                        .analysis
+                        .captured_binding_initialization(capture.environment_id, name),
                 })
                 .collect(),
         })
