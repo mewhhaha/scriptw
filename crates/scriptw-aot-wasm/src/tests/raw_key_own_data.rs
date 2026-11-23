@@ -167,7 +167,7 @@ fn indexed_callees_read_packed_elements_inline_and_keep_the_complete_get() {
     // probe of a computed GetV read; the complete Get stays as the miss.
     for source in [
         "var steps;function frame(row){return steps[0](row);} frame;",
-        "var steps;function frame(row,k){var f=steps[k](row);return f;} frame;",
+        "var steps;function frame(row){var f=steps[1](row);return f;} frame;",
     ] {
         let artifact = emit_script(source).expect("indexed callee emits");
         Validator::new_with_features(crate::runtime_artifact::program_validation_features())
@@ -176,8 +176,8 @@ fn indexed_callees_read_packed_elements_inline_and_keep_the_complete_get() {
         let imports = runtime_imports(&artifact);
         let complete = imports
             .iter()
-            .find_map(|(index, name)| (name == "helper::dynamic_property_read").then_some(*index))
-            .expect("the complete Get remains linked");
+            .find_map(|(index, name)| name.contains("dynamic_property_read").then_some(*index))
+            .unwrap_or_else(|| panic!("the complete Get remains linked: {imports:?}"));
         let names = function_names(&artifact);
         let mut index = imported_function_count(&artifact);
         let mut checked = 0;

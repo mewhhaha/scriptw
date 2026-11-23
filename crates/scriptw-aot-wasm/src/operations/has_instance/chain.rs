@@ -1,8 +1,10 @@
-//! Consecutive `instanceof` sites on one private local walk its chain once.
+//! Consecutive `instanceof` sites on one binding walk its chain once.
 //!
 //! An `instanceof` run is a prefix of a statement list in which every
-//! statement is `if (x instanceof G) S`, with no else, the same private local
-//! x, a read of a global binding G, and an S that never completes normally.
+//! statement is `if (x instanceof G) S`, with no else, the same declarative
+//! binding x (a Wasm local or an environment cell: reading either runs no
+//! code), a read of a global binding G, and an S that never completes
+//! normally.
 //! A later site is then reached only from the previous site's false answer:
 //! S leaves the list, no other statement runs between the sites, and a
 //! site's record path reads x, G's records and C's edges without observing
@@ -15,7 +17,7 @@
 //! sites that may run user code, forgets the slots first. The run starts
 //! with none, on every entry to its statement list.
 use super::*;
-use crate::emit::LocalBindingId;
+use crate::emit::BindingStorage;
 
 /// The prefix of V's chain the first site keeps: an ordinary object, a
 /// class instance and a subclass instance end within it at %Object.prototype%.
@@ -50,12 +52,14 @@ impl<'a> InstanceofRun<'a> {
     }
 }
 
-/// `if (x instanceof G) S` with a private local x, a global read G and an S
-/// that never completes normally: x's operand node and binding.
+/// `if (x instanceof G) S` with a declarative binding x, a global read G and
+/// an S that never completes normally: x's operand node and binding. A site
+/// answers from the slots only for the very V they were walked for, so x's
+/// identity matters only in that its read runs no code.
 fn run_site<'a>(
     builder: &FunctionBuilder<'_>,
     statement: &'a StatementIr,
-) -> Option<(&'a TypedExpr, LocalBindingId)> {
+) -> Option<(&'a TypedExpr, BindingStorage)> {
     let StatementIr::If {
         condition,
         then_branch,
@@ -70,7 +74,7 @@ fn run_site<'a>(
     let ExprIr::Identifier(name) = &lhs.expr else {
         return None;
     };
-    let id = builder.private_local_binding(name)?;
+    let id = builder.lookup_binding(name)?;
     GlobalReadOperand::of(rhs)?;
     never_completes_normally(then_branch).then_some((lhs, id))
 }

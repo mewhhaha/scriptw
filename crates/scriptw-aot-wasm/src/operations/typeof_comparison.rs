@@ -261,8 +261,9 @@ impl TypeofChainTest {
 }
 
 /// `if (T1) S1 else if (T2) S2 ... else E` in which every Ti compares
-/// `typeof x`, for one private local x, with a literal. Each Ti reads x and
-/// observes nothing else, and only a false Ti reaches T(i+1), so no code
+/// `typeof x`, for one declarative binding x (a Wasm local or an environment
+/// cell), with a literal. Each Ti reads x, which runs no code (a binding in
+/// its TDZ throws at T1, before any arm), and observes nothing else, and only a false Ti reaches T(i+1), so no code
 /// runs between two tests and x holds one value for all of them: each Ti is
 /// a function of typeof x, and the first true one is a function of that
 /// class. The chain reads x once, classifies it once, and selects its arm
@@ -314,11 +315,11 @@ impl<'a> TypeofIfChain<'a> {
     }
 }
 
-/// A chain test's operand, the private local it reads and its comparison.
+/// A chain test's operand, the binding it reads and its comparison.
 fn chain_test<'a>(
     builder: &FunctionBuilder<'_>,
     condition: &'a TypedExpr,
-) -> Option<(&'a TypedExpr, crate::emit::LocalBindingId, TypeofChainTest)> {
+) -> Option<(&'a TypedExpr, crate::emit::BindingStorage, TypeofChainTest)> {
     // `!==` and `!=` are the negated comparisons.
     let (comparison, negated) = match &condition.expr {
         ExprIr::LogicalNot { expr } => (&**expr, true),
@@ -354,7 +355,7 @@ fn chain_test<'a>(
     let ExprIr::Identifier(name) = &operand.expr else {
         return None;
     };
-    let binding = builder.private_local_binding(name)?;
+    let binding = builder.lookup_binding(name)?;
     Some((operand, binding, TypeofChainTest { spelling, negated }))
 }
 

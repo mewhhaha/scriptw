@@ -1,4 +1,4 @@
-//! Statement chains that test one private local: `instanceof` runs share
+//! Statement chains that test one binding: `instanceof` runs share
 //! the walked [[Prototype]] chain, and typeof if-else chains dispatch once.
 use super::*;
 
@@ -91,7 +91,7 @@ fn class_tables(operators: &[Operator<'_>]) -> usize {
 }
 
 #[test]
-fn typeof_if_chains_on_one_private_local_dispatch_from_one_classification() {
+fn typeof_if_chains_on_one_binding_dispatch_from_one_classification() {
     for (source, tables) in [
         (
             "function f(v){if(typeof v==='undefined')return 1;else if(typeof v=='object')return 2;else if('function'===typeof v)return 3;else if(typeof v!=='number')return 4;return 5;} f;",
@@ -114,3 +114,4 @@ fn typeof_if_chains_on_one_private_local_dispatch_from_one_classification() {
         assert_eq!(class_tables(&bodies[0]), tables, "{source}");
     }
 }
+
