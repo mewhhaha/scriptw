@@ -2500,6 +2500,51 @@ The 2026-11-17 situation cohort has 504 process observations and 60,984 exact ca
 All 21 programs compile and pass their exact-output checks under both policies on this source; the last full engine suite ran on `2957071d1` (2026-11-17), and each later change ran its affected suites and Test262 subtrees.
 
 <!-- runtime-comparison-details:start -->
+## Performance batch 2026-11-23
+
+Local A/B of the deep dive's waves 1 to 3 ([plan](performance-deep-dive-20261122.md)) against main
+`89792689a`. This is not a publication; the README panels above are unchanged until a quiet-machine
+republish.
+
+**RSC request:** Callgrind instructions (Speed, 20 requests after 30 warmups, 3 discarded), with exact
+Flight output on all 53 observations of each mode.
+
+| Mode | Main | Batch | Change |
+| --- | ---: | ---: | ---: |
+| Sync | 2,693,758.5 | 2,340,240.5 | −13.1% |
+| Async | 2,919,280.5 | 2,541,363.5 | −13.0% |
+
+**Focused situations:** medians of three alternating rounds of 21 retained calls (100 warmups) per
+host. Both hosts are Speed images built from main and from the batch, and both ran on the same CPU of
+the shared four-vCPU machine while a Test262 run loaded the other three. The figures are relative only.
+The frame situations come from the batch build that limits inline indexed-callee probes to 32 per body;
+without that limit `frame-branches512` was 21% slower than main.
+
+| Program · retained call | Main · ms | Batch · ms | Change |
+| --- | ---: | ---: | ---: |
+| `control-empty.js` | 0.0042 | 0.0017 | -59.5% |
+| `args-unused.js` | 0.0171 | 0.0144 | -15.8% |
+| `args-observed.js` | 0.0172 | 0.0131 | -23.8% |
+| `global-shallow.js` | 0.0542 | 0.0541 | -0.2% |
+| `global-deep8.js` | 0.0805 | 0.0642 | -20.2% |
+| `global-bound-deep.js` | 0.0640 | 0.0480 | -25.0% |
+| `global-getter-deep.js` | 0.2204 | 0.2167 | -1.7% |
+| `frame-compact.js` | 0.1810 | 0.1732 | -4.3% |
+| `frame-branches32.js` | 0.7319 | 0.6717 | -8.2% |
+| `frame-branches128.js` | 0.7926 | 0.7495 | -5.4% |
+| `frame-branches512.js` | 0.9174 | 0.8405 | -8.4% |
+| `property-stable.js` | 0.0282 | 0.0253 | -10.3% |
+| `property-mutated.js` | 0.0288 | 0.0253 | -12.2% |
+| `metadata-ordinary.js` | 0.0341 | 0.0267 | -21.7% |
+| `metadata-function.js` | 0.0345 | 0.0257 | -25.5% |
+| `metadata-intrinsic.js` | 0.0338 | 0.0270 | -20.1% |
+| `typeof-dispatch.js` | 0.0887 | 0.0641 | -27.7% |
+| `singleton-dispatch.js` | 0.0844 | 0.0777 | -7.9% |
+| `strict-equality-numbers.js` | 0.0156 | 0.0120 | -23.1% |
+| `strict-equality-mixed.js` | 0.0187 | 0.0137 | -26.7% |
+| `for-in-wide.js` | 0.0301 | 0.0232 | -22.9% |
+
+
 ## Runtime comparison
 
 **Measured 2026-11-17**, compiler fingerprint `697c47c22eb0`.

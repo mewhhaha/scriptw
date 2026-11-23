@@ -54,12 +54,28 @@ accepts `--case <file.js>`.
   Owner: IR lowering (global property facts) with the emitter.
 - Speed versus V8: the [2026-11-22 deep dive](performance-deep-dive-20261122.md)
   attributes the situation, RSC, SSR and edge-kernel gaps and ranks five waves of
-  fixes. Its wave 1 (zero-extension rule, typed embedding call, Array `length`
-  fast path, `var` TDZ and `typeof` dispatch, constant block parameters,
-  null-check dedupe, vmctx homes, constant `RegExp` sites, retained-module
-  intrinsic proofs) is next. It also found the 128-body recursion limit and
-  stale published SSR (now about 3.3× V8) and `args-observed` (about 5×)
-  numbers that need a republish. Owner: RSC compiler/runtime.
+  fixes.
+  - **Landed:** its waves 1 to 3 (protectors, plain `JSON.stringify`, fresh
+    builtin results, `instanceof`/`typeof` chains, captured loop snapshots).
+  - **Measured:** the RSC request is 13% fewer Callgrind instructions, and 20 of
+    the 21 situations are faster in a local A/B
+    ([batch results](benchmarks.md#performance-batch-2026-11-23)).
+  - **Next:**
+    - the stale builtin fact entry guard (above);
+    - int32 domain for bitwise results;
+    - JSON.parse direct builder;
+    - GC pretenure window;
+    - regalloc2 split-limit campaign;
+    - stack-map store placement;
+    - shared call-site machinery;
+    - preshaped sloppy ArgumentsObject;
+    - WeakMap in the GC heap;
+    - `Math.imul` in tail position.
+  - **Also open:** the 128-body recursion limit, and stale published SSR
+    (about 3.3× V8) and `args-observed` (about 5×) numbers that need a
+    republish.
+
+  Owner: RSC compiler/runtime.
 - Retained RSC requests: the 1 ms goal is met, and against Node 24
   `--jitless` the sync request is ahead and the async request level
   ([runs](benchmarks.md#branch-hints-the-async-requests-extra-work-and-node-2026-11-16)).
