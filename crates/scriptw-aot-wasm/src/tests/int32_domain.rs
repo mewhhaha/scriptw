@@ -1,8 +1,9 @@
 //! Bitwise results reach their int32 consumers without a binary64 round trip.
 use super::*;
 
-/// The encoded operators of each named source function, all of its emitted
-/// variants concatenated.
+/// The encoded operators of each named source function's primary body.
+/// Exact-helper-context clones (`name#id$...`) are left out: a clone can add
+/// its own argument handling, so only primary bodies compare like for like.
 fn bodies(source: &str) -> BTreeMap<String, Vec<Operator<'static>>> {
     let artifact = emit_script(source).expect("int32 source emits");
     expect_valid_module(&artifact, 1);
@@ -16,6 +17,7 @@ fn bodies(source: &str) -> BTreeMap<String, Vec<Operator<'static>>> {
                 .get(&index)
                 .and_then(|name| name.strip_prefix("js::"))
                 .and_then(|name| name.split_once('#'))
+                .filter(|(_, id)| !id.contains('$'))
             {
                 bodies
                     .entry(name.to_owned())

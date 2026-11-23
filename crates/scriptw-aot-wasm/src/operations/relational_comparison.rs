@@ -52,6 +52,12 @@ impl FunctionBuilder<'_> {
         if emits_number_result(lhs, 64) && emits_number_result(rhs, 64) {
             return self.compile_number_comparison_i32(op, lhs, rhs, function);
         }
+        // Int32-domain operands complete as Numbers (their own coercion runs
+        // inside their evaluation, left first), so IsLessThan is the exact
+        // integer relation.
+        if self.try_compile_int32_relation_i32(op, lhs, rhs, function)? {
+            return Ok(());
+        }
         let schema = self.runtime_schema();
         let left = schema.reserve_value_local(function);
         let right = schema.reserve_value_local(function);

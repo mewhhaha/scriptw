@@ -60,17 +60,20 @@ fn branch_end(operators: &[Operator<'_>], start: usize) -> usize {
 fn computed_getv_hits_leave_before_boxing_conversion_and_full_lookup() {
     // Unknown keys must retain both actual-tag arms. The three reads match
     // rows[i & 63][keys[i & 3]], including a dynamically produced String key.
-    for (source, consumer, packed_reads, string_reads) in [
+    // The two int32-domain keys probe with their bits instead of a tag guard.
+    for (source, consumer, packed_reads, int32_reads, string_reads) in [
         (
             "function read(value,key){return value[key];} read;",
             "read",
             1,
+            0,
             1,
         ),
         (
             "var rows,keys;function run(i){return rows[i&63][keys[i&3]];} run;",
             "run",
-            3,
+            1,
+            2,
             1,
         ),
     ] {
@@ -145,6 +148,26 @@ fn computed_getv_hits_leave_before_boxing_conversion_and_full_lookup() {
                 assert_eq!(
                     packed, packed_reads,
                     "each numeric consumer has its own guarded packed read"
+                );
+                let int32 = operators
+                    .windows(6)
+                    .filter(|window| {
+                        matches!(
+                            window,
+                            [
+                                Operator::I32Const { value: 0 },
+                                Operator::I32GeS,
+                                Operator::I32And,
+                                Operator::If { .. },
+                                Operator::LocalGet { .. },
+                                Operator::I64ExtendI32U,
+                            ]
+                        )
+                    })
+                    .count();
+                assert_eq!(
+                    int32, int32_reads,
+                    "each int32-domain key probes the packed elements with its bits"
                 );
                 assert_eq!(
                     strings, string_reads,
