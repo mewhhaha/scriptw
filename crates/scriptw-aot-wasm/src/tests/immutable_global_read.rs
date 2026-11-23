@@ -247,10 +247,30 @@ fn check_returned_constant(variant: &str, operators: &[Operator<'_>], tag: i32, 
             _ => None,
         })
         .expect("source return copies its value into the completion");
+    let stores = |local: u32| {
+        move |op: &Operator<'_>| {
+            matches!(op,
+                Operator::LocalSet { local_index } | Operator::LocalTee { local_index }
+                    if *local_index == local)
+        }
+    };
     for (part, local) in inputs.into_iter().enumerate() {
-        let store = operators[..copy].iter().rposition(|op| matches!(op,
-            Operator::LocalSet { local_index } | Operator::LocalTee { local_index } if *local_index == local))
-            .expect("returned value has an actual defining instruction");
+        let Some(store) = operators[..copy].iter().rposition(stores(local)) else {
+            // The code sink elides a store of the Wasm default into a local
+            // nothing wrote yet (`Function::store_constant`). A local the body
+            // never writes holds that default (0 or null) on every path.
+            assert!(
+                !operators.iter().any(stores(local)),
+                "{variant}: returned part {part} has a store, but none before its copy"
+            );
+            let default = match part {
+                0 => tag == 0,
+                1 => bits == 0,
+                _ => true,
+            };
+            assert!(default, "{variant}: returned part {part} is the never-written default, expected tag {tag}, bits {bits}, null reference");
+            continue;
+        };
         let definition = &operators[store - 1];
         let correct = match (part, definition) {
             (0, Operator::I32Const { value }) => *value == tag,
