@@ -14,6 +14,8 @@ mod arguments_index_mapping;
 mod arguments_object;
 mod async_generator_body;
 mod bound_function_allocation;
+mod builtin_entry_guard;
+pub(crate) use builtin_entry_guard::BuiltinEntryGuard;
 mod bound_function_record;
 mod call_dispatch;
 mod class_captures;

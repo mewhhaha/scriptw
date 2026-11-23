@@ -3590,9 +3590,95 @@ pub struct FunctionIr {
     pub constructor_instance: ValueInfo,
     pub owned_env_bindings: Vec<OwnedEnvBindingIr>,
     pub captured_bindings: Vec<CapturedBindingIr>,
+    /// The other body of a builtin entry guard pair, when this function is
+    /// one. See [`BuiltinEntryRoleIr`].
+    pub builtin_entry: Option<BuiltinEntryRoleIr>,
+}
+
+/// A fact about a Realm's builtin globals that a function body may assume
+/// from its first statement, because the body's entry proves it at run time.
+///
+/// A body is lowered before the statements that run ahead of its first call,
+/// and any of them may replace a builtin global or edit an intrinsic object
+/// (ECMA-262 19.1-19.4 make them writable and configurable). A fact therefore
+/// names something an entry can check without observable effect; the backend
+/// owns the check and matches this closed domain exhaustively.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BuiltinEntryFactIr {
+    /// The global binding `name` is an own data property of the global
+    /// object, with no global lexical declaration, whose value is the current
+    /// Realm's builtin function `function`.
+    Function { name: String, function: FunctionId },
+    /// The global binding `name` holds the current Realm's intrinsic
+    /// namespace object, whose own properties are still its intrinsic ones.
+    Namespace(BuiltinNamespaceIr),
+    /// The global binding `globalThis` holds the current Realm's global
+    /// object.
+    GlobalThis,
+}
+
+/// The namespace intrinsics whose own property rows the runtime keeps
+/// immutable until their first edit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BuiltinNamespaceIr {
+    Math,
+    Json,
+    Reflect,
+    Atomics,
+}
+
+impl BuiltinNamespaceIr {
+    pub const ALL: [Self; 4] = [Self::Math, Self::Json, Self::Reflect, Self::Atomics];
+
+    pub const fn global_name(self) -> &'static str {
+        match self {
+            Self::Math => "Math",
+            Self::Json => "JSON",
+            Self::Reflect => "Reflect",
+            Self::Atomics => "Atomics",
+        }
+    }
+}
+
+/// The two bodies of one source function whose builtin facts became proofs.
+///
+/// The guarded body keeps the function's identity and every entry; it checks
+/// `facts` before its first effect and, on a miss, tail-calls the fallback,
+/// a lowering of the same source that assumes no builtin fact. Each body
+/// carries the other, so that a decision about the pair (the argument ABI
+/// both must share) is a function of either one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BuiltinEntryRoleIr {
+    Guarded {
+        /// Sorted and free of duplicates.
+        facts: Vec<BuiltinEntryFactIr>,
+        fallback: std::sync::Arc<FunctionIr>,
+    },
+    Fallback {
+        guarded: std::sync::Arc<FunctionIr>,
+    },
+}
+
+impl BuiltinEntryRoleIr {
+    /// The other body of the pair, without its own back reference.
+    pub fn partner(&self) -> &FunctionIr {
+        match self {
+            Self::Guarded { fallback, .. } => fallback,
+            Self::Fallback { guarded } => guarded,
+        }
+    }
 }
 
 impl FunctionIr {
+    /// The facts this body's entry proves and the body that runs when one
+    /// does not hold.
+    pub fn builtin_entry_guard(&self) -> Option<(&[BuiltinEntryFactIr], &FunctionIr)> {
+        match self.builtin_entry.as_ref()? {
+            BuiltinEntryRoleIr::Guarded { facts, fallback } => Some((facts, fallback)),
+            BuiltinEntryRoleIr::Fallback { .. } => None,
+        }
+    }
+
     /// The name this named function expression binds to itself inside its
     /// own activation ([`crate::named_expression_binds_self_in_activation`]);
     /// the outer name record holds it either way.
@@ -4774,8 +4860,15 @@ impl ProgramIr {
         match &self.script {
             Some(script) => {
                 let mut counts = IrSummaryCounts::default();
-                counts.functions += script.functions.len();
-                for function in &script.functions {
+                // The summary describes the source program: a proof-free
+                // fallback is a second lowering of a function already counted.
+                for function in script.functions.iter().filter(|function| {
+                    !matches!(
+                        function.builtin_entry,
+                        Some(BuiltinEntryRoleIr::Fallback { .. })
+                    )
+                }) {
+                    counts.functions += 1;
                     counts.visit_function(function);
                 }
                 counts.visit_block(&script.body);

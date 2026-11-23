@@ -51,6 +51,16 @@ pub(crate) enum ProtectedPrototype {
     Array,
 }
 
+/// The protected prototypes a caller needs still holding their recorded
+/// rows, whatever object reads through them.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ProtectedPrototypeRows {
+    pub(crate) object: bool,
+    pub(crate) function: bool,
+    pub(crate) array: bool,
+    pub(crate) string: bool,
+}
+
 impl ProtectedPrototype {
     /// The order a holder's identity is compared in: `.call`/`.apply`
     /// places first, then Object.prototype's, then Array.prototype's.
@@ -427,6 +437,58 @@ impl FunctionBuilder<'_> {
             header: live,
             rows: recorded,
         }
+    }
+
+    /// Falls through while each prototype `rows` names is, in the current
+    /// Realm, still holding the intrinsic rows recorded for it: no property
+    /// of it was defined, deleted or redefined since. A Realm without an
+    /// armed record, a prototype recorded without rows and an edited one
+    /// branch to `unprotected`.
+    pub(crate) fn emit_protected_prototype_rows_unchanged_or_branch(
+        &mut self,
+        rows: ProtectedPrototypeRows,
+        unprotected: ControlTarget,
+        f: &mut Function,
+    ) {
+        if rows == ProtectedPrototypeRows::default() {
+            return;
+        }
+        let s = self.runtime_schema();
+        let protectors = self.emit_armed_realm_protectors_or_branch(unprotected, f);
+        for (wanted, prototype) in [
+            (rows.object, ProtectedPrototype::Object),
+            (rows.function, ProtectedPrototype::Function),
+            (rows.array, ProtectedPrototype::Array),
+        ] {
+            if !wanted {
+                continue;
+            }
+            let header = self.emit_protected_header(&protectors, prototype, f);
+            s.field(OrdinaryObjectSchema::PROPERTIES)
+                .read_top(header, f);
+            let _ = self.emit_protected_rows(&protectors, prototype, f);
+            f.instruction(&Instruction::RefEq);
+            f.instruction(&Instruction::I32Eqz);
+            self.emit_branch_if_to_target(unprotected, f);
+        }
+        if rows.string {
+            let string = s
+                .field(RealmProtectorsSchema::STRING_PROTOTYPE)
+                .read(&protectors, s, f)
+                .reference();
+            let header = s
+                .field(PrimitiveBoxSchema::OBJECT)
+                .read_top(string, f)
+                .reference();
+            s.field(OrdinaryObjectSchema::PROPERTIES)
+                .read_top(header, f);
+            s.field(RealmProtectorsSchema::STRING_PROTOTYPE_ROWS)
+                .read(&protectors, s, f);
+            f.instruction(&Instruction::RefEq);
+            f.instruction(&Instruction::I32Eqz);
+            self.emit_branch_if_to_target(unprotected, f);
+        }
+        protectors.clear(f);
     }
 
     /// The ordinary header of the current Realm's %String.prototype%, the

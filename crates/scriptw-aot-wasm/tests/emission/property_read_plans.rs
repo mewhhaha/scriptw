@@ -127,7 +127,9 @@ impl<'a> Module<'a> {
                         prefix.starts_with("js::"),
                         "only an explicit source function prefix may end in '#': {prefix}"
                     );
-                    name.starts_with(prefix)
+                    // The function's own body: a guarded body's proof-free
+                    // fallback is a second lowering of the same source.
+                    name.starts_with(prefix) && !name.ends_with("$builtin-fallback")
                 } else {
                     name.as_str() == prefix
                 }

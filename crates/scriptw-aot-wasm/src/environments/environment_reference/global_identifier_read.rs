@@ -64,8 +64,15 @@ impl FunctionBuilder<'_> {
             .initialize(global.load(schema, function).nullable(), function);
         // The site's record answers an own data property of the global
         // object; the name itself is needed only when it does not.
-        let found =
-            self.emit_global_read_site_with_i32(site, &record, name, read, value, function)?;
+        let found = self.emit_global_read_site_with_i32(
+            site,
+            &record,
+            name,
+            read,
+            crate::environments::GlobalDeclarativeNames::Unknown,
+            value,
+            function,
+        )?;
         record.clear(function);
         found.load(function);
         function.instruction(&Instruction::I32Eqz);

@@ -126,7 +126,13 @@ impl FunctionBuilder<'_> {
             .initialize(read.load(s, f), f);
         record.load(s, f).is_null(f);
         self.emit_branch_if_to_target(slow, f);
-        let data = self.emit_global_read_record_data_or_branch(&record, global, slow, f);
+        let data = self.emit_global_read_record_data_or_branch(
+            &record,
+            global,
+            crate::environments::GlobalDeclarativeNames::Unknown,
+            slow,
+            f,
+        );
         record.clear(f);
         let _ = data.load(s, f);
         let _ = stored.load(s, f);
@@ -176,7 +182,13 @@ impl FunctionBuilder<'_> {
             .initialize(read.load(s, f), f);
         record.load(s, f).is_null(f);
         self.emit_branch_if_to_target(skip, f);
-        let data = self.emit_global_read_record_data_or_branch(&record, global, skip, f);
+        let data = self.emit_global_read_record_data_or_branch(
+            &record,
+            global,
+            crate::environments::GlobalDeclarativeNames::Unknown,
+            skip,
+            f,
+        );
         record.clear(f);
         let stored = s
             .reserve_gc_local::<StoredValue, NonNullable>(f)

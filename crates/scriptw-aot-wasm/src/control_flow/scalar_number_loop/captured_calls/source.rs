@@ -16,6 +16,10 @@ pub(crate) struct CapturedCallSource {
 
 impl CapturedCallSource {
     pub(crate) fn new(function: &FunctionIr) -> Option<Self> {
+        // An inlined body would run without its builtin entry guard.
+        if function.builtin_entry.is_some() {
+            return None;
+        }
         let arguments = match crate::function_entry::LocalArgumentsPlan::for_function(function) {
             Some(_) => None,
             None => Some(StrictArgumentsProjection::admit(function)?),

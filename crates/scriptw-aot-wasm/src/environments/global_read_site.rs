@@ -57,6 +57,16 @@ use crate::runtime_helpers::{
 /// How many records a site asks for after its first.
 const GLOBAL_READ_RECORD_REMAKES: i32 = 8;
 
+/// What a read through a site's record knows of the Global Environment
+/// Record's declarative names, any of which could shadow the property.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum GlobalDeclarativeNames {
+    /// Nothing: the record answers only while there is none.
+    Unknown,
+    /// The caller proved that none of them is the name read.
+    ProvedOther,
+}
+
 impl FunctionBuilder<'_> {
     /// Reads the global binding `name` into `value` from this site's record
     /// and reports whether it did; a `typeof` read of a name the record
@@ -71,7 +81,15 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<I32Local, EmitError> {
         let site = self.next_site_record::<GlobalReadSiteRecord>()?;
-        self.emit_global_read_site_with_i32(site, global, name, read, value, function)
+        self.emit_global_read_site_with_i32(
+            site,
+            global,
+            name,
+            read,
+            GlobalDeclarativeNames::Unknown,
+            value,
+            function,
+        )
     }
 
     /// `emit_global_read_site_i32` for a record global the caller already
@@ -82,6 +100,7 @@ impl FunctionBuilder<'_> {
         global: &GcLocal<Environment, Nullable>,
         name: &str,
         read: EnvironmentIdentifierRead,
+        names: GlobalDeclarativeNames,
         value: &ValueLocals,
         function: &mut Function,
     ) -> Result<I32Local, EmitError> {
@@ -96,7 +115,8 @@ impl FunctionBuilder<'_> {
         let label = self.local_branch_label(miss);
         record.load(schema, function).is_null(function);
         self.emit_branch_if_to_target(miss, function);
-        let data = self.emit_global_read_record_data_or_branch(&record, global, miss, function);
+        let data =
+            self.emit_global_read_record_data_or_branch(&record, global, names, miss, function);
         let stored = schema
             .reserve_gc_local::<StoredValue, Nullable>(function)
             .initialize(
@@ -161,13 +181,15 @@ impl FunctionBuilder<'_> {
 
     /// The current data value of the property a non-null record's entry
     /// holds, after branching to `miss` unless the record is for the
-    /// Environment `global`, that Environment has no declarative names and
-    /// the entry's descriptor is a data descriptor: the value, or the
-    /// recipe that will make it, of the binding the site reads.
+    /// Environment `global`, that Environment has no declarative name that
+    /// could shadow the property (`names`) and the entry's descriptor is a
+    /// data descriptor: the value, or the recipe that will make it, of the
+    /// binding the site reads.
     pub(crate) fn emit_global_read_record_data_or_branch(
         &mut self,
         record: &GcLocal<GlobalReadSiteRecord, Nullable>,
         global: &GcLocal<Environment, Nullable>,
+        names: GlobalDeclarativeNames,
         miss: ControlTarget,
         function: &mut Function,
     ) -> GcLocal<PropertyValue, Nullable> {
@@ -180,14 +202,19 @@ impl FunctionBuilder<'_> {
         let _ = global.load(schema, function);
         function.instruction(&Instruction::RefEq);
         function.instruction(&Instruction::I32Eqz);
-        let _ = schema
-            .struct_type::<Environment>()
-            .field(EnvironmentSchema::NAMED_BINDINGS)
-            .read(global, schema, function)
-            .reference()
-            .is_null(function);
-        function.instruction(&Instruction::I32Eqz);
-        function.instruction(&Instruction::I32Or);
+        match names {
+            GlobalDeclarativeNames::Unknown => {
+                let _ = schema
+                    .struct_type::<Environment>()
+                    .field(EnvironmentSchema::NAMED_BINDINGS)
+                    .read(global, schema, function)
+                    .reference()
+                    .is_null(function);
+                function.instruction(&Instruction::I32Eqz);
+                function.instruction(&Instruction::I32Or);
+            }
+            GlobalDeclarativeNames::ProvedOther => {}
+        }
         self.emit_branch_if_to_target(miss, function);
         // A record that names an Environment holds an entry.
         let entry = schema

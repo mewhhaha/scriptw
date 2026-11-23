@@ -76,6 +76,7 @@ pub(crate) use proxy_target_descriptor::CompletedProxyTargetDescriptor;
 mod raw_numeric_array_read;
 mod realm_protectors;
 use realm_protectors::ProtectedPrototype;
+pub(crate) use realm_protectors::ProtectedPrototypeRows;
 mod typed_array_elements;
 mod typed_array_species_create;
 

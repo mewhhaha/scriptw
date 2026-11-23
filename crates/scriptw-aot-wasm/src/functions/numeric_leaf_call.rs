@@ -37,6 +37,10 @@ pub(crate) struct NumericLeafPlan {
 
 impl NumericLeafPlan {
     pub(crate) fn for_function(function: &FunctionIr) -> Option<Self> {
+        // A leaf entry bypasses the body, and with it a builtin entry guard.
+        if function.builtin_entry.is_some() {
+            return None;
+        }
         if !matches!(
             function.protocol,
             FunctionProtocolIr::OrdinaryCallAndConstruct | FunctionProtocolIr::Arrow

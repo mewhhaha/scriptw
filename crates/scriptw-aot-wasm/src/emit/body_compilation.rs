@@ -146,6 +146,10 @@ impl<'a> FunctionBuilder<'a> {
             self.init_script_global_object(&mut function)?;
             self.bind_captured_bindings(&mut function);
         }
+        // Everything above only binds this activation's own roots.
+        if let Some(guard) = self.builtin_entry_guard.take() {
+            self.emit_builtin_entry_guard(guard, &mut function)?;
+        }
         self.emit_enter_source_activation(&mut function)?;
         let source_activation_epilogue = self.open_source_activation_epilogue(&mut function);
         if let Some(plan) = self.numeric_body.take() {

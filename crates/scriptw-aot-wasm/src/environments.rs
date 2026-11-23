@@ -18,6 +18,7 @@ mod function_body_environment;
 mod global_declaration_instantiation;
 pub(crate) mod global_environment;
 mod global_read_site;
+pub(crate) use global_read_site::GlobalDeclarativeNames;
 mod immutable_global_read;
 mod lexical_binding_uninitialized;
 mod named_binding_mutation;

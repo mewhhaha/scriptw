@@ -96,6 +96,7 @@ impl EmptyDerivedFunction {
             })
             .collect(),
             captured_bindings: Vec::new(),
+            builtin_entry: None,
         }
     }
 }

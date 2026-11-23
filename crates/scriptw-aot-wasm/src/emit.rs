@@ -370,6 +370,8 @@ pub(crate) struct FunctionBuilder<'a> {
     pub(crate) function_flavor: FunctionFlavor,
     pub(crate) function_arguments_protocol: FunctionArgumentsProtocol,
     pub(crate) numeric_body: Option<crate::functions::NumericBodyPlan>,
+    /// The facts this source body's entry proves before its first effect.
+    pub(crate) builtin_entry_guard: Option<crate::functions::BuiltinEntryGuard<'a>>,
     pub(crate) strict_arguments_projection:
         Option<crate::arguments_protocol::StrictArgumentsProjection>,
     pub(crate) projected_arguments: Option<crate::environments::ProjectedArgumentsLocals>,
@@ -1837,6 +1839,7 @@ impl<'a> FunctionBuilder<'a> {
         );
         builder.compares_string_lengths_inline = true;
         builder.numeric_body = crate::functions::NumericBodyPlan::admit(function);
+        builder.builtin_entry_guard = crate::functions::BuiltinEntryGuard::admit(function);
         builder.strict_arguments_projection =
             crate::arguments_protocol::StrictArgumentsProjection::admit(function);
         Ok(builder)
@@ -2133,6 +2136,7 @@ impl<'a> FunctionBuilder<'a> {
             function_flavor,
             function_arguments_protocol,
             numeric_body: None,
+            builtin_entry_guard: None,
             strict_arguments_projection: None,
             projected_arguments: None,
             instanceof_run: None,

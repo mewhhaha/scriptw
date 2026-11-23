@@ -43,6 +43,28 @@ fn captured_declaration_target(
 }
 
 impl<'a> ScriptLowerer<'a> {
+    /// Whether this lowering of `function` starts from the builtin facts of
+    /// the state it is lowered in. A module activation is its module's own
+    /// top-level code, entered once from that state. Inference keeps them,
+    /// as it always did: its summaries describe the body entered from that
+    /// state. Only the emitted proof-free body of a guard pair, and a body
+    /// that can have no entry guard, start from none.
+    fn dormant_entry_keeps_builtin_facts(
+        &self,
+        function: &FunctionPlan<'a>,
+        purpose: FunctionLoweringPurpose,
+    ) -> bool {
+        if matches!(
+            function.protocol,
+            FunctionProtocolIr::ModuleActivation | FunctionProtocolIr::AsyncModuleActivation
+        ) {
+            return true;
+        }
+        self.is_prepass
+            || matches!(purpose, FunctionLoweringPurpose::Infer)
+            || self.dormant_builtin_facts == DormantBuiltinFacts::Guarded
+    }
+
     pub(super) fn lower_function(
         &mut self,
         function: &FunctionPlan<'a>,
@@ -155,6 +177,11 @@ impl<'a> ScriptLowerer<'a> {
         // their output is signatures and summaries, never emitted code.
         if !self.is_prepass {
             self.degrade_observed_written_globals(&mut lowerer);
+        }
+        // A body starts at an unknown later time. An emitted body keeps its
+        // builtin facts only when its entry proves them.
+        if !self.dormant_entry_keeps_builtin_facts(function, purpose) {
+            lowerer.forget_dormant_builtin_facts();
         }
         lowerer.exact_context_function_observations =
             std::mem::take(&mut self.exact_context_function_observations);
@@ -368,6 +395,7 @@ impl<'a> ScriptLowerer<'a> {
                 constructor_instance: ValueInfo::undefined(),
                 owned_env_bindings: Vec::new(),
                 captured_bindings: Vec::new(),
+                builtin_entry: None,
             });
         };
         if let Some(self_binding_name) = function.activation_self_binding_name() {
@@ -827,6 +855,7 @@ impl<'a> ScriptLowerer<'a> {
         self.used_host_builtins.extend(lowerer.used_host_builtins);
         self.host_builtin_calls += lowerer.host_builtin_calls;
         self.top_level_this_uses += lowerer.top_level_this_uses;
+        self.last_consulted_builtin_globals = lowerer.consulted_builtin_globals.take();
 
         if matches!(purpose, FunctionLoweringPurpose::Infer) {
             return None;
@@ -913,6 +942,7 @@ impl<'a> ScriptLowerer<'a> {
                         .captured_binding_initialization(capture.environment_id, name),
                 })
                 .collect(),
+            builtin_entry: None,
         })
     }
 }

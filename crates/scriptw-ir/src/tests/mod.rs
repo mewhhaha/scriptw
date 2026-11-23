@@ -43,6 +43,7 @@ include!("native_invocation.rs");
 include!("iteration_effects.rs");
 include!("prepared_eval.rs");
 include!("global_effects.rs");
+include!("builtin_entry_guard.rs");
 include!("collections.rs");
 include!("annex_b.rs");
 include!("template_literal.rs");

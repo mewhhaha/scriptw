@@ -104,6 +104,7 @@ impl FunctionBuilder<'_> {
                 &record,
                 &identifier.name,
                 read,
+                crate::environments::GlobalDeclarativeNames::Unknown,
                 value,
                 function,
             )?;

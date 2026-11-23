@@ -34,6 +34,7 @@ mod catalog_overlay;
 use catalog_overlay::{CatalogOverlay, IdempotentEdit};
 type FunctionSignatures = CatalogOverlay<FunctionSignature>;
 type GlobalProperties = CatalogOverlay<GlobalPropertyInfo>;
+mod builtin_entry_guard;
 mod call_candidate_analysis;
 mod call_expression;
 #[cfg(test)]
@@ -1340,6 +1341,18 @@ type ExactHelperContextId = String;
 type ExactCallbackContextKey = (FunctionId, ExactHelperContextId);
 type DirectCallContextKey = (FunctionId, ExactHelperContextId);
 
+/// The builtin facts an emitted function body starts from. The body runs at
+/// an unknown later time, after any statement may have replaced a builtin
+/// global or edited an intrinsic.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DormantBuiltinFacts {
+    /// The facts of the state the body is lowered in. Its entry must prove
+    /// them ([`BuiltinEntryRoleIr::Guarded`]).
+    Guarded,
+    /// None: every builtin global may have been replaced.
+    ProofFree,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ScriptGlobalCallObservationMode {
     DormantSummary,
@@ -1431,6 +1444,13 @@ pub(crate) struct ScriptLowerer<'a> {
     /// fold an intrinsic global this set names. It never touches flow state,
     /// so accumulating it cannot perturb any fixpoint.
     observed_script_global_writes: BTreeSet<String>,
+    /// What an emitted function body assumes of builtin globals on entry.
+    dormant_builtin_facts: DormantBuiltinFacts,
+    /// Builtin globals whose fact this body lowerer consulted by name. It is
+    /// a side channel like the write set: no flow state reads it.
+    consulted_builtin_globals: std::cell::RefCell<BTreeSet<String>>,
+    /// The set of the function body lowered last, for its entry guard.
+    last_consulted_builtin_globals: BTreeSet<String>,
     /// Per-intrinsic overrides of a well-known-symbol method on a builtin
     /// prototype, keyed by `(constructor name, symbol)`.
     ///
@@ -1927,6 +1947,9 @@ impl<'a> ScriptLowerer<'a> {
             current_construct_this_info: None,
             global_properties: builtin_catalog::global_properties(host_surface_policy),
             observed_script_global_writes: BTreeSet::new(),
+            dormant_builtin_facts: DormantBuiltinFacts::Guarded,
+            consulted_builtin_globals: std::cell::RefCell::new(BTreeSet::new()),
+            last_consulted_builtin_globals: BTreeSet::new(),
             well_known_symbol_prototype_properties: BTreeMap::new(),
             nested_script_global_value_infos: BTreeMap::new(),
             known_nested_script_global_value_infos: BTreeMap::new(),
@@ -2178,7 +2201,7 @@ impl<'a> ScriptLowerer<'a> {
                 .function_plans
                 .get(function_id)
                 .expect("function plan must exist");
-            functions.push(self.lower_function(plan, None, None));
+            self.lower_function_bodies(plan, None, None, &mut functions);
             let specializations = self
                 .exact_context_callback_specializations
                 .iter()
@@ -2188,11 +2211,12 @@ impl<'a> ScriptLowerer<'a> {
                 })
                 .collect::<Vec<_>>();
             for (helper_context_id, synthetic_id) in specializations {
-                functions.push(self.lower_function(
+                self.lower_function_bodies(
                     plan,
                     Some(synthetic_id),
                     Some((function_id.clone(), helper_context_id)),
-                ));
+                    &mut functions,
+                );
             }
             let helper_specializations = self
                 .exact_context_function_specializations
@@ -2203,11 +2227,12 @@ impl<'a> ScriptLowerer<'a> {
                 })
                 .collect::<Vec<_>>();
             for (helper_context_id, synthetic_id) in helper_specializations {
-                functions.push(self.lower_function(
+                self.lower_function_bodies(
                     plan,
                     Some(synthetic_id),
                     Some((function_id.clone(), helper_context_id)),
-                ));
+                    &mut functions,
+                );
             }
         }
         if lower_trace {
@@ -5309,6 +5334,7 @@ impl<'a> ScriptLowerer<'a> {
     }
 
     fn lookup_global_property(&self, name: &str) -> Option<ValueInfo> {
+        self.note_consulted_builtin_global(name);
         self.global_properties
             .get(name)
             .filter(|info| info.proven_present)
@@ -5316,10 +5342,59 @@ impl<'a> ScriptLowerer<'a> {
     }
 
     fn lookup_global_property_info(&self, name: &str) -> Option<&GlobalPropertyInfo> {
+        self.note_consulted_builtin_global(name);
         self.global_properties.get(name)
     }
 
+    /// Records that this body's lowering read the fact of the builtin global
+    /// `name`. A row the catalog does not seed is no builtin fact.
+    fn note_consulted_builtin_global(&self, name: &str) {
+        if !self.is_function_body {
+            return;
+        }
+        let mut consulted = self.consulted_builtin_globals.borrow_mut();
+        if !consulted.contains(name)
+            && builtin_catalog::is_builtin_global(self.host_surface_policy, name)
+        {
+            consulted.insert(name.to_string());
+        }
+    }
+
+    /// Replaces every builtin global fact by the fact that the binding may
+    /// hold anything: the row an unknown effect leaves at the root
+    /// (`invalidate_possible_global_property_value_info`). The intrinsic
+    /// stays a candidate callee that the backend's identity guards confirm.
+    /// `undefined`, `NaN` and `Infinity` are neither writable nor
+    /// configurable and keep their facts.
+    fn forget_dormant_builtin_facts(&mut self) {
+        let names = self
+            .global_properties
+            .iter()
+            .filter(|(name, property)| {
+                matches!(
+                    property.source,
+                    GlobalPropertySource::Builtin | GlobalPropertySource::HostBuiltin
+                ) && Self::global_property_is_writable_name(name)
+            })
+            .map(|(name, _)| name.clone())
+            .collect::<Vec<_>>();
+        for name in names {
+            let widened = match self.global_properties.get(&name) {
+                Some(property) => {
+                    let mut widened = property.without_heap_shape();
+                    widened.value_info.widen_for_possible_replacement();
+                    widened.proven_present = widened.proven_present && !widened.configurable;
+                    widened.source = GlobalPropertySource::Merged;
+                    widened
+                }
+                None => continue,
+            };
+            self.global_properties.insert(name, widened);
+        }
+    }
+
     fn global_property_is_proven_present(&self, name: &str) -> bool {
+        self.note_consulted_builtin_global(name);
         self.global_properties
             .get(name)
             .is_some_and(|info| info.proven_present)
@@ -5373,8 +5448,7 @@ impl<'a> ScriptLowerer<'a> {
     fn capture_pre_write_global_property_value(&self, name: &str) -> PreWriteGlobalPropertyValue {
         let value = Self::global_property_is_writable_name(name)
             .then(|| {
-                self.global_properties
-                    .get(name)
+                self.lookup_global_property_info(name)
                     .map(|property| property.value_info.clone())
                     .or_else(|| self.script_global_var_value_info(name))
             })
@@ -7232,6 +7306,11 @@ impl<'a> ScriptLowerer<'a> {
                 lowerer.seed_script_global_var_properties();
                 lowerer.script_global_call_observation_mode =
                     ScriptGlobalCallObservationMode::DormantSummary;
+                // A method, accessor, constructor or instance initializer
+                // runs at an unknown later time and has no entry guard: it
+                // assumes no builtin fact. A static element runs here, in
+                // the state this lowerer holds.
+                lowerer.forget_dormant_builtin_facts();
             }
         }
         // Same observed-write degradation as `lower_function`, final phase only.
@@ -7673,6 +7752,7 @@ impl<'a> ScriptLowerer<'a> {
                 .unwrap_or_else(ValueInfo::undefined),
             owned_env_bindings,
             captured_bindings,
+            builtin_entry: None,
         };
         self.generated_functions.push(function_ir);
 
@@ -7750,6 +7830,11 @@ impl<'a> ScriptLowerer<'a> {
                 lowerer.seed_script_global_var_properties();
                 lowerer.script_global_call_observation_mode =
                     ScriptGlobalCallObservationMode::DormantSummary;
+                // A method, accessor, constructor or instance initializer
+                // runs at an unknown later time and has no entry guard: it
+                // assumes no builtin fact. A static element runs here, in
+                // the state this lowerer holds.
+                lowerer.forget_dormant_builtin_facts();
             }
         }
         // Same observed-write degradation as `lower_function`, final phase only.
@@ -7969,6 +8054,7 @@ impl<'a> ScriptLowerer<'a> {
             constructor_instance: ValueInfo::undefined(),
             owned_env_bindings,
             captured_bindings,
+            builtin_entry: None,
         });
 
         GeneratedFunctionOutput {
@@ -8069,6 +8155,7 @@ impl<'a> ScriptLowerer<'a> {
                 .unwrap_or_else(ValueInfo::undefined),
             owned_env_bindings,
             captured_bindings,
+            builtin_entry: None,
         });
         GeneratedFunctionOutput {
             return_info: ValueInfo::undefined(),
@@ -8218,6 +8305,7 @@ impl<'a> ScriptLowerer<'a> {
             constructor_instance: ValueInfo::undefined(),
             owned_env_bindings: Vec::new(),
             captured_bindings: Vec::new(),
+            builtin_entry: None,
         });
     }
 

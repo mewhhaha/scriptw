@@ -215,6 +215,11 @@ impl LocalArgumentsPlan {
             _ => return None,
         };
         UnobservedStrictArguments::admit(source)?;
+        // A builtin entry guard tail-calls its fallback with the parameters
+        // it received: both bodies of the pair take one argument layout.
+        if let Some(pair) = &source.builtin_entry {
+            UnobservedStrictArguments::admit(pair.partner())?;
+        }
         Some(Self {
             source: source.id.clone(),
             parameter_count: source.params.len(),

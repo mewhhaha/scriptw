@@ -630,6 +630,7 @@ impl ScriptLowerer<'_> {
         constructor: StandardBuiltinId,
     ) -> Option<&ValueInfo> {
         let constructor_info = if let Some(name) = constructor.global_name() {
+            self.note_consulted_builtin_global(name);
             &self
                 .global_properties
                 .get(name)
@@ -649,6 +650,7 @@ impl ScriptLowerer<'_> {
                     .find(|(_, builtin)| *builtin == constructor)
                     .map(|(member, _)| (namespace, *member))
             })?;
+            self.note_consulted_builtin_global(namespace);
             let namespace = &self
                 .global_properties
                 .get(namespace)

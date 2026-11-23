@@ -12,44 +12,61 @@ Use the [21 focused programs and scores](benchmarks.md#focused-performance-situa
 to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-performance-situations)
 accepts `--case <file.js>`.
 
-- Stale builtin facts in function bodies (correctness, pre-existing):
-  - **Wrong result:** bodies are lowered before the top-level statements
-    replay, from fresh-realm builtin rows. A Script function declared before
-    `globalThis["Ma"+"th"] = {imul(){return "x"}}` returns `1` for
-    `Math.imul(2,3)+1`; Node returns `x1`.
-  - **Write paths and builtins affected:**
-    - write paths: `Object.defineProperty`, `Reflect.set` and
-      `Reflect.defineProperty`, `Object.assign`, `globalThis` aliases,
-      `this.Math`, helper functions, indirect eval, and plain method writes
-      such as `Math.imul = f`;
-    - builtins: every Math method and `Math.PI`, `String.prototype` methods,
-      `parseInt`, and the `Number(x)`/`String(x)`/`Boolean(x)` folds, which
-      have no guard.
-  - **Why it happens:** the emitter's call identity guards still dispatch
-    correctly, but the result kind comes from the stale fact.
-  - **Rejected approach:** a prepass deviation journal (555ccc648, reverted)
-    was exact, but cost almost every program its builtin facts.
-  - **Design to implement:**
-    - A body that consumes entry builtin facts checks those identities at entry,
-      with no side effects:
-      - no global lexical shadow;
-      - an own data property holding the realm intrinsic;
-      - the intrinsic storage identity as the
-        [Realm protectors](../../crates/scriptw-aot-wasm/src/objects/realm_protectors.rs)
-        record it;
-      - live `[[Prototype]]` links.
-    - On a miss it `return_call`s a proof-free lowering of the same body, with
-      return kinds joined.
-    - Open choices:
-      - numeric and local-argument specialised entries need a call-site guard,
-        or are dropped for guarded bodies;
-      - exact-context copies each need a guard;
-      - generators and async bodies stay proof-free;
-      - code size: only bodies whose facts became proofs should get a second
-        body.
-    - Keep the exact refinement that `Math` calls (except `sumPrecise`),
-      `isNaN`/`isFinite`, `parseInt`/`parseFloat` and host `print` with
-      primitive arguments run no user code (ECMA-262 7.1.4).
+- Builtin entry guards (landed 2026-11-23; follow-ups, correctness first):
+  - **What landed:** an ordinary function body is lowered twice, from the
+    builtin facts of the state it is lowered in and from none. When the two
+    lowerings differ, both are emitted: the first checks at entry, by reads
+    alone, the builtin globals its lowering consulted and tail-calls the
+    second on a miss
+    ([IR](../../crates/scriptw-ir/src/lowering/builtin_entry_guard.rs),
+    [entry](../../crates/scriptw-aot-wasm/src/functions/builtin_entry_guard.rs)).
+    A fact holds while the binding is an own data property of the global
+    object that no global lexical declaration shadows, its value is the
+    Realm's own intrinsic, and the intrinsic objects the fact reads through
+    keep their intrinsic rows: `Math`, `JSON`, `Reflect` and `Atomics`
+    themselves, a constructor allocated with a complete layout,
+    %Object.prototype%, %Function.prototype%, %String.prototype% and
+    %Array.prototype%
+    ([Realm protectors](../../crates/scriptw-aot-wasm/src/objects/realm_protectors.rs)).
+    Generators, async bodies and class elements have no guard and assume no
+    builtin fact. `Math.imul(2,3)+1` after
+    `globalThis["Ma"+"th"] = {imul(){return "x"}}` is `x1`.
+  - **Still stale (wrong result possible, as before):**
+    - a prototype with no protector record edited before a dormant body
+      reads through it: `Number.prototype`, `Boolean.prototype`, `Symbol`,
+      `BigInt`, `Promise`, `Map`, `Set`, the Error family, `Date`, `RegExp`,
+      `ArrayBuffer` and the typed arrays (for example
+      `Number.prototype.toFixed = f` before a body calls `x.toFixed()` on a
+      proven Number), and a constructor the Realm allocates without a layout;
+    - an own property of a builtin method's function object (`length`,
+      `name`, an added `call`);
+    - summaries read across bodies: a callee with an exact target (a class
+      static method, a method of a `const` object) keeps the return, effect
+      and parameter kinds inferred from fresh builtin facts, and a body
+      reads a captured `const` with the kind its initializer had under them;
+    - an intrinsic whose [[Prototype]] `Object.setPrototypeOf` changed (the
+      entry reads storage, not the link);
+    - prepared `eval`/`Function` units and `array_prototype_mutated`-style
+      flags, which are not global property facts.
+    Each needs either a protector record for the object or a summary that
+    carries the facts it was inferred from.
+  - **Never assumed (exact, at a precision cost):** a body that consults
+    `Intl`, `Temporal` or a host namespace such as `$262` is lowered
+    proof-free.
+  - **Cost, measured on 2026-11-23 against the same day's baseline host:**
+    the retained RSC request is 2,339,867 to 2,502,624 Callgrind
+    instructions sync (+7.0%) and 2,541,411 to 2,713,020 async (+6.8%), and
+    its setup under Callgrind 54 s to 86 s; P grows where guarded bodies dominate (`edge-router.js`
+    157,523 to 200,292 bytes, `edge-html.js` 140,285 to 192,967,
+    `integer.js` 67,089 to 86,915, `client.js` about 18.8 MB to 20.7 MB) and not at
+    all without one (`hello.js`, `objects.js`). A guard reads, per fact, the
+    site's record, its entry's descriptor and value cell and the
+    intrinsic's storage; lowering runs twice per ordinary body.
+  - **Follow-ups for the cost:** one fallback per source function instead of
+    one per exact-context copy; a guard hoisted to the caller for an inlined
+    captured call, a numeric leaf and a constant leaf, which a guarded body
+    currently gives up; facts narrowed from "consulted by name" to "became a
+    proof"; guards for class elements.
 
   Owner: IR lowering (global property facts) with the emitter.
 - Speed versus V8: the [2026-11-22 deep dive](performance-deep-dive-20261122.md)

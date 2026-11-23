@@ -20,6 +20,19 @@ fn global_property_baseline(
     cache.get_or_init(|| ScriptLowerer::build_builtin_global_properties(policy))
 }
 
+/// Whether the fresh-realm catalog seeds a fact for the global `name`.
+pub(super) fn is_builtin_global(policy: HostSurfacePolicy, name: &str) -> bool {
+    global_property_baseline(policy).contains_key(name)
+}
+
+/// The fresh-realm fact of the builtin global `name`.
+pub(super) fn builtin_global(
+    policy: HostSurfacePolicy,
+    name: &str,
+) -> Option<&'static GlobalPropertyInfo> {
+    global_property_baseline(policy).get(name)
+}
+
 pub(super) fn global_properties(policy: HostSurfacePolicy) -> GlobalProperties {
     GlobalProperties::new(global_property_baseline(policy))
 }

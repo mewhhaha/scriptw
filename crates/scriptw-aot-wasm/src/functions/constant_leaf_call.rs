@@ -24,6 +24,10 @@ pub(crate) struct ConstantLeafPlan {
 
 impl ConstantLeafPlan {
     pub(crate) fn for_function(function: &FunctionIr) -> Option<Self> {
+        // A call site that answers for the body skips its builtin entry guard.
+        if function.builtin_entry.is_some() {
+            return None;
+        }
         if function.protocol != FunctionProtocolIr::OrdinaryCallAndConstruct
             || !function.params.is_empty()
             || !function.captured_bindings.is_empty()

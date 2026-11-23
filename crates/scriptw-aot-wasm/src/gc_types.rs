@@ -386,6 +386,9 @@ impl GlobalLedger {
                 SiteRecordKind::GlobalValueCell => {
                     schema.reference_type::<StoredValue>(GcNullability::Nullable)
                 }
+                SiteRecordKind::GlobalLexicalNames => {
+                    schema.reference_type::<NamedBindingTable>(GcNullability::Nullable)
+                }
             };
             section.global(
                 GlobalType {
@@ -409,6 +412,9 @@ pub(crate) enum SiteRecordKind {
     Instanceof,
     GlobalRead,
     GlobalValueCell,
+    /// The declarative name table of a Global Environment Record that a
+    /// builtin entry guard proved to declare none of its names.
+    GlobalLexicalNames,
 }
 
 /// A record type a site global may hold, tied to its global's declared kind.
@@ -426,6 +432,9 @@ impl SiteRecordType for GlobalReadSiteRecord {
 }
 impl SiteRecordType for StoredValue {
     const KIND: SiteRecordKind = SiteRecordKind::GlobalValueCell;
+}
+impl SiteRecordType for NamedBindingTable {
+    const KIND: SiteRecordKind = SiteRecordKind::GlobalLexicalNames;
 }
 
 /// The global that holds one site's record: null until the site's first
