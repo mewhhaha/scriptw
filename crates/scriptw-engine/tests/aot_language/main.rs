@@ -62,6 +62,7 @@ mod aot_optional_private_calls;
 mod aot_packed_array_descriptor_reads;
 mod aot_packed_array_producers;
 mod aot_parameter_environment_lifetime;
+mod aot_parenthesized_callee_reference;
 mod aot_private_element_extensibility;
 mod aot_private_get_value_effects;
 mod aot_private_numeric_updates;

@@ -4,6 +4,21 @@ use super::call_candidate_analysis::DynamicSourceCallAdmission;
 use super::*;
 
 impl<'a> ScriptLowerer<'a> {
+    /// A ParenthesizedExpression evaluates to the Reference its operand
+    /// evaluates to (ECMA-262 13.2.1.1), so `(o.m)()` calls with `this` = o
+    /// and `(eval)(x)` is a direct eval (EvaluateCall reads the Reference).
+    /// Only an identifier or an ordinary property access keeps its Reference
+    /// through the parentheses: an optional chain `(a?.b)()` must still throw
+    /// when `a` is nullish instead of short-circuiting the call, and every
+    /// other operand already evaluates to a value.
+    fn reference_preserving_callee(callee: &Expression) -> &Expression {
+        let inner = Self::unwrap_parenthesized_expr(callee);
+        match inner {
+            Expression::Identifier(_) | Expression::PropertyAccess(_) => inner,
+            _ => callee,
+        }
+    }
+
     fn record_builtin_receiver_mutation(&mut self, builtin: StandardBuiltinId) {
         if builtin.mutates_indexed_receiver() {
             self.record_caller_flow_invalidation();
@@ -11,6 +26,7 @@ impl<'a> ScriptLowerer<'a> {
     }
 
     pub(super) fn lower_call(&mut self, callee: &Expression, args: &[Expression]) -> TypedExpr {
+        let callee = Self::reference_preserving_callee(callee);
         self.register_array_callback_source_candidates(callee, args);
         self.register_dynamic_source_candidates(callee, args);
         // A call nested in a computed property key can mutate the already
