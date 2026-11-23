@@ -390,6 +390,10 @@ pub(crate) struct FunctionBuilder<'a> {
     pub(crate) instantiated_activation_slots: crate::environments::InstantiatedActivationSlots,
     /// Root-relative cell tables, owned by `environments`.
     pub(crate) root_cell_tables: crate::environments::RootCellTables,
+    /// Indexed member-call callees given the inline packed-element probe in
+    /// this body so far; later sites keep the plain dynamic read, so a body
+    /// with hundreds of `a[k](...)` sites does not grow by one probe each.
+    pub(crate) inline_indexed_callee_sites: u32,
     pub(crate) hoisted_vars: Vec<String>,
     emitted_local_count: u32,
     pub(crate) environment_depth: u32,
@@ -2144,6 +2148,7 @@ impl<'a> FunctionBuilder<'a> {
             binding_scopes: Vec::new(),
             instantiated_activation_slots: Default::default(),
             root_cell_tables: Default::default(),
+            inline_indexed_callee_sites: 0,
             emitted_local_count: 0,
             environment_depth: 0,
             control_stack: Vec::new(),

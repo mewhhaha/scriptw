@@ -1,6 +1,9 @@
 use super::*;
 use crate::gc_types::{FunctionContext, ValueLocals};
 
+/// Indexed member-call callees per body that get the inline probe.
+const INLINE_INDEXED_CALLEE_SITES: u32 = 32;
+
 impl FunctionBuilder<'_> {
     pub(crate) fn emit_indirect_call(
         &mut self,
@@ -247,9 +250,15 @@ impl FunctionBuilder<'_> {
         callee: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        let Some(read) = IndexedCalleeRead::of(callee_expression) else {
+        // The probe is about 60 Wasm instructions per site: past the first
+        // INLINE_INDEXED_CALLEE_SITES sites of a body the extra native code
+        // costs more in instruction-cache misses than the probe saves.
+        let Some(read) = IndexedCalleeRead::of(callee_expression)
+            .filter(|_| self.inline_indexed_callee_sites < INLINE_INDEXED_CALLEE_SITES)
+        else {
             return self.compile_expr_to_value(callee_expression, callee, function);
         };
+        self.inline_indexed_callee_sites += 1;
         // A projected `arguments` read keeps its own route.
         if self.compile_projected_arguments_read(callee_expression, callee, function)? {
             return Ok(());

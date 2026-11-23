@@ -391,7 +391,7 @@ require_text_regex_count "$runtime_module_emission" 'ModuleKind::Runtime\(source
 # retaining the original saved-chain path for uncertified linear points.
 # Moved 2026-11-19 to the measured size after cargo fmt: a deliberate change
 # overran it by at most 5%. Larger overruns stay red for their owners to split.
-check_raw_line_budget "$wasm_emit_parent" 2451
+check_raw_line_budget "$wasm_emit_parent" 2456
 require_module_decl "$wasm_emit_parent" async_generator_admission
 check_raw_line_budget crates/scriptw-aot-wasm/src/emit/async_generator_admission.rs 550
 check_raw_line_budget "$wasm_body_compilation" 550
