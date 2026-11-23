@@ -1416,6 +1416,11 @@ pub(crate) struct ScriptLowerer<'a> {
     /// The emitted variant may differ from the analyzed source owner. Cell
     /// witnesses retain this identity without changing source analysis keys.
     current_output_function_id: Option<FunctionId>,
+    /// The identity the next lowered body's cell witnesses name instead of
+    /// its output identity: a builtin fallback body proves the cells of the
+    /// guarded body it stands in for, so the two compare equal when no
+    /// builtin fact changed the code.
+    binding_cell_proof_owner_override: Option<FunctionId>,
     current_param_names: Vec<String>,
     current_return: Option<FunctionReturnObservation>,
     current_generator_resume_state: Option<u32>,
@@ -1928,6 +1933,7 @@ impl<'a> ScriptLowerer<'a> {
             is_function_body: false,
             current_function_id: None,
             current_output_function_id: None,
+            binding_cell_proof_owner_override: None,
             current_param_names: Vec::new(),
             current_return: None,
             current_generator_resume_state: None,

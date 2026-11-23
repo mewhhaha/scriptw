@@ -367,6 +367,9 @@ pub(crate) struct FunctionBuilder<'a> {
     pub(crate) strings: &'a StringPool,
     pub(crate) functions: &'a FunctionMetaRegistry,
     pub(crate) function_id: Option<FunctionId>,
+    /// The identity this body's module cell proofs name
+    /// (`FunctionIr::binding_cell_proof_owner`).
+    pub(crate) binding_cell_proof_owner: Option<FunctionId>,
     pub(crate) function_flavor: FunctionFlavor,
     pub(crate) function_arguments_protocol: FunctionArgumentsProtocol,
     pub(crate) numeric_body: Option<crate::functions::NumericBodyPlan>,
@@ -1840,6 +1843,7 @@ impl<'a> FunctionBuilder<'a> {
         builder.compares_string_lengths_inline = true;
         builder.numeric_body = crate::functions::NumericBodyPlan::admit(function);
         builder.builtin_entry_guard = crate::functions::BuiltinEntryGuard::admit(function);
+        builder.binding_cell_proof_owner = Some(function.binding_cell_proof_owner().to_owned());
         builder.strict_arguments_projection =
             crate::arguments_protocol::StrictArgumentsProjection::admit(function);
         Ok(builder)
@@ -2132,6 +2136,7 @@ impl<'a> FunctionBuilder<'a> {
             captured_bindings,
             strings,
             functions,
+            binding_cell_proof_owner: function_id.clone(),
             function_id,
             function_flavor,
             function_arguments_protocol,

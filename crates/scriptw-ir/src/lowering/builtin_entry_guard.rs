@@ -70,6 +70,10 @@ impl<'a> ScriptLowerer<'a> {
                 .insert(function.id.clone(), signature);
         }
         let fallback_id = format!("{id}$builtin-fallback");
+        // The fallback stands in for the guarded body's activation, so its
+        // cell witnesses name the guarded identity
+        // (`FunctionIr::binding_cell_proof_owner`).
+        self.binding_cell_proof_owner_override = Some(id.clone());
         let mut fallback = self.lower_function_from(
             DormantBuiltinFacts::ProofFree,
             true,

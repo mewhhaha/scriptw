@@ -386,7 +386,9 @@ impl SourceCompiler<'_, '_, '_> {
         let ProvenBindingCellOrigin::Captured { entry_hops } = proof.origin() else {
             return None;
         };
-        if proof.owner() != self.source.function.id || proof.source_name() != reference.name {
+        if proof.owner() != self.source.function.binding_cell_proof_owner()
+            || proof.source_name() != reference.name
+        {
             return None;
         }
         self.source

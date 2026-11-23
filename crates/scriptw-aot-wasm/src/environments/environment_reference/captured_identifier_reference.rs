@@ -32,7 +32,8 @@ impl FunctionBuilder<'_> {
                 proof.storage_name(), proof.slot()
             ))
         };
-        if self.function_id.as_deref() != Some(proof.owner()) || proof.source_name() != source_name
+        if self.binding_cell_proof_owner.as_deref() != Some(proof.owner())
+            || proof.source_name() != source_name
         {
             return Err(invalid());
         }

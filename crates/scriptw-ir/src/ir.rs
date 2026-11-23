@@ -3679,6 +3679,16 @@ impl FunctionIr {
         }
     }
 
+    /// The identity a [`crate::ProvenBindingCellIr`] in this body names. A
+    /// builtin fallback runs in place of its guarded body, with the same
+    /// parameters and captured bindings, and proves the same cells.
+    pub fn binding_cell_proof_owner(&self) -> &str {
+        match &self.builtin_entry {
+            Some(BuiltinEntryRoleIr::Fallback { guarded }) => &guarded.id,
+            Some(BuiltinEntryRoleIr::Guarded { .. }) | None => &self.id,
+        }
+    }
+
     /// The name this named function expression binds to itself inside its
     /// own activation ([`crate::named_expression_binds_self_in_activation`]);
     /// the outer name record holds it either way.

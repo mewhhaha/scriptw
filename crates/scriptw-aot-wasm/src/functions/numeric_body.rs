@@ -200,7 +200,9 @@ impl Planner<'_> {
         let EnvironmentIdentifierResolutionStart::Cell(proof) = reference.resolution_start() else {
             return None;
         };
-        if proof.owner() != self.source.id || proof.source_name() != reference.name {
+        if proof.owner() != self.source.binding_cell_proof_owner()
+            || proof.source_name() != reference.name
+        {
             return None;
         }
         let ProvenBindingCellOrigin::Captured { entry_hops } = proof.origin() else {
