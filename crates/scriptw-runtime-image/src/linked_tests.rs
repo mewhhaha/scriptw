@@ -15,7 +15,9 @@ fn linked_images_match_their_build_digest_and_map_from_the_executable() {
             *image.build_digest(),
             "the packaging step attested exactly the bytes it linked"
         );
-        assert_eq!(image.bytes().as_ptr() as usize % (64 * 1024), 0);
+        // Older kernels only page-align a PIE's load bias, so the address is
+        // checked against the page; the file offset is checked below.
+        assert_eq!(image.bytes().as_ptr() as usize % 4096, 0);
         assert_eq!(&image.bytes()[..4], b"\x7fELF", "a raw Wasmtime image");
         if !cfg!(target_os = "linux") {
             assert!(image.executable_range().is_none());

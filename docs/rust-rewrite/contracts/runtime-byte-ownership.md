@@ -186,10 +186,14 @@ Admission is by origin and pairing, not by re-hashing at every start:
 
 The earlier loader decoded a zstd container and compared the decoded SHA-256
 with the manifest at every start. The image, the manifest, the digest and the
-code comparing them are one file under one kernel write protection (a running
-executable cannot be opened for writing), so that hash could not detect a
-change its own writer could not also hide. It covered accidents of the decode
-and write steps, which no longer exist. The check that remains meaningful at
+code comparing them are one file, so that hash could not detect a deliberate
+change its own writer could not also hide. It did catch accidents: the decode
+and write steps, which no longer exist, and accidental corruption of the file
+(a truncated copy, bit rot, or an in-place relink of a running executable),
+which now executes as it would in the process's own `.text`. Linux normally
+refuses to open a running executable for writing (ETXTBSY), but not on every
+kernel (6.11 dropped it; 6.13 restored it) or filesystem (NFS, FUSE, overlay
+lower layers), and Cargo's linkers replace the inode rather than rewrite it. The check that remains meaningful at
 load is the pairing above. A test in `scriptw-runtime-image` hashes the linked
 bytes against the attested digest and reads them back through the proved file
 range. Evidence of the bytes on disk is `CompilerIdentity`, whose SHA-256
