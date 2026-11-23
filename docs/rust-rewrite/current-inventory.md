@@ -12,6 +12,46 @@ Use the [21 focused programs and scores](benchmarks.md#focused-performance-situa
 to measure these hills individually; [the runner](../../CONTRIBUTING.md#focused-performance-situations)
 accepts `--case <file.js>`.
 
+- Stale builtin facts in function bodies (correctness, pre-existing):
+  - **Wrong result:** bodies are lowered before the top-level statements
+    replay, from fresh-realm builtin rows. A Script function declared before
+    `globalThis["Ma"+"th"] = {imul(){return "x"}}` returns `1` for
+    `Math.imul(2,3)+1`; Node returns `x1`.
+  - **Write paths and builtins affected:**
+    - write paths: `Object.defineProperty`, `Reflect.set` and
+      `Reflect.defineProperty`, `Object.assign`, `globalThis` aliases,
+      `this.Math`, helper functions, indirect eval, and plain method writes
+      such as `Math.imul = f`;
+    - builtins: every Math method and `Math.PI`, `String.prototype` methods,
+      `parseInt`, and the `Number(x)`/`String(x)`/`Boolean(x)` folds, which
+      have no guard.
+  - **Why it happens:** the emitter's call identity guards still dispatch
+    correctly, but the result kind comes from the stale fact.
+  - **Rejected approach:** a prepass deviation journal (555ccc648, reverted)
+    was exact, but cost almost every program its builtin facts.
+  - **Design to implement:**
+    - A body that consumes entry builtin facts checks those identities at entry,
+      with no side effects:
+      - no global lexical shadow;
+      - an own data property holding the realm intrinsic;
+      - the intrinsic storage identity as the
+        [Realm protectors](../../crates/scriptw-aot-wasm/src/objects/realm_protectors.rs)
+        record it;
+      - live `[[Prototype]]` links.
+    - On a miss it `return_call`s a proof-free lowering of the same body, with
+      return kinds joined.
+    - Open choices:
+      - numeric and local-argument specialised entries need a call-site guard,
+        or are dropped for guarded bodies;
+      - exact-context copies each need a guard;
+      - generators and async bodies stay proof-free;
+      - code size: only bodies whose facts became proofs should get a second
+        body.
+    - Keep the exact refinement that `Math` calls (except `sumPrecise`),
+      `isNaN`/`isFinite`, `parseInt`/`parseFloat` and host `print` with
+      primitive arguments run no user code (ECMA-262 7.1.4).
+
+  Owner: IR lowering (global property facts) with the emitter.
 - Speed versus V8: the [2026-11-22 deep dive](performance-deep-dive-20261122.md)
   attributes the situation, RSC, SSR and edge-kernel gaps and ranks five waves of
   fixes. Its wave 1 (zero-extension rule, typed embedding call, Array `length`
