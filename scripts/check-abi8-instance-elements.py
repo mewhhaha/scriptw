@@ -59,7 +59,7 @@ def check(sources: dict[str, str]) -> list[str]:
             "receiver ValueLocals must be imported by the actual hook owner")
     domain = sources["runtime_helpers.rs"].split("runtime_helper_domain! {", 1)[1].split("\n}", 1)[0]
     names = re.findall(r"^    (\w+) /", domain, re.M)
-    require(names[-1] == "JsonStringifyValue" and names.index("InitializeInstanceElements") < len(names) - 1 and
+    require(names[-2:] == ["JsonStringifyValue", "JsonStringifyPlainValue"] and names.index("InitializeInstanceElements") < len(names) - 2 and
             "const_:()=assert!(RuntimeHelperId::conditional_helpers_are_last());" in registry,
             "conditional helpers must remain a suffix with the compile-time assertion intact")
     work = body(hook, "has_instance_work")

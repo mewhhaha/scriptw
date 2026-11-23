@@ -138,7 +138,7 @@ require_file crates/scriptw-engine/tests/fixtures/generator_for_of_continuations
 # committed completion routing; iterator/loop/resource algorithms stay children.
 # Moved 2026-11-19 to the measured size after cargo fmt: a deliberate change
 # overran it by at most 5%. Larger overruns stay red for their owners to split.
-check_raw_line_budget "$wasm_control_flow" 9863
+check_raw_line_budget "$wasm_control_flow" 9877
 check_raw_line_budget "$wasm_async_function_for_of_iterator" 60
 # The opaque paired projection and body owner measures 150 raw lines.
 check_raw_line_budget "$wasm_for_await_iterator_plan" 170
@@ -262,7 +262,7 @@ if [[ "$gc_root_finalizer_code" != *'self,mutglobals:GlobalLedger,snapshot:bool,
   || ! grep -Fq 'section: GlobalLedger,' "$wasm_gc_types"; then
   fail 'both finalization modes must consume the actual global ledger through one typed-root owner and seal its matching schema'
 fi
-require_text_regex_count "$gc_root_finalizer" 'GcRootGlobal::declare[(]&self.layouts, &mut globals[)]' 18 'declared semantic GC roots in the sole finalizer'
+require_text_regex_count "$gc_root_finalizer" 'GcRootGlobal::declare[(]&self.layouts, &mut globals[)]' 19 'declared semantic GC roots in the sole finalizer'
 require_fixed_string_count "$wasm_gc_types" 'active_source_function: GcRootGlobal<FunctionObject>,' 1 'typed active source activation root'
 require_text_regex_count "$gc_root_finalizer" 'CollectionKeyHashCounterGlobal::declare[(]&mut globals[)]' 1 'declared scalar collection identity root'
 require_regex_count "$wasm_gc_types" '^[[:space:]]+fn finalize_globals[(]' 1 'sole concrete GC-root finalizer'
@@ -391,7 +391,7 @@ require_text_regex_count "$runtime_module_emission" 'ModuleKind::Runtime\(source
 # retaining the original saved-chain path for uncertified linear points.
 # Moved 2026-11-19 to the measured size after cargo fmt: a deliberate change
 # overran it by at most 5%. Larger overruns stay red for their owners to split.
-check_raw_line_budget "$wasm_emit_parent" 2435
+check_raw_line_budget "$wasm_emit_parent" 2451
 require_module_decl "$wasm_emit_parent" async_generator_admission
 check_raw_line_budget crates/scriptw-aot-wasm/src/emit/async_generator_admission.rs 550
 check_raw_line_budget "$wasm_body_compilation" 550

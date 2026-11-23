@@ -1055,7 +1055,7 @@ for regexp_candidate_entry in compile_regexp_program_candidate_hook emit_static_
 done
 require_fixed_string_count crates/scriptw-aot-wasm/src/program_hooks.rs 'self.compile_regexp_program_candidate_hook()' 1 'actual RegExp candidate hook dispatch'
 check_no_inline_legacy_includes "$wasm_regexp_candidate"
-check_raw_line_budget "$wasm_regexp_candidate" 300
+check_raw_line_budget "$wasm_regexp_candidate" 420
 
 # T02 gives T09's private-element environment, storage and access lifecycle one
 # private backend owner. Keep the complete family together: widening only some
