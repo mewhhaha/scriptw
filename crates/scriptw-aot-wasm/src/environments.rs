@@ -63,18 +63,23 @@ pub(crate) struct InstantiatedActivationSlots(std::collections::BTreeSet<u32>);
 
 /// The cell table of each root-relative record a genuine ordinary source
 /// body names (`hops - environment_depth`, see `env_slot_initialization`),
-/// one non-null function-level local per distinct root distance.
+/// one nullable local per distinct root distance.
 ///
 /// `Environment.PARENT`, `Environment.DECLARATIVE` and
 /// `DeclarativeEnvironment.CELLS` are immutable fields, and such a body never
 /// replaces its root record, so the table at one root distance is a single
-/// value for the whole invocation. `reserve_root_cell_tables` computes every
-/// table once, with one parent walk, at the body's top level before any
-/// source code: the write dominates each use. The table is cached, never a
-/// cell, its value or its initialization state: those stay mutable and every
-/// use still reads them from the cell.
+/// value for the whole invocation. `reserve_root_cell_tables` writes null
+/// into each local at the body's top level, before any source code, so the
+/// write dominates every use. A use fills its table on first reach with the
+/// walk it would otherwise perform, so no record is dereferenced that the
+/// uncached code would not dereference at that same point: a captured name
+/// whose analyzed record is not a declarative record at run time (a module
+/// instance's nonlocal, resolved through its Realm's global environment)
+/// never reaches the cache. The table is cached, never a cell, its value or
+/// its initialization state: those stay mutable and every use still reads
+/// them from the cell.
 #[derive(Debug, Default)]
-pub(crate) struct RootCellTables(Vec<(u32, GcLocal<BindingCellTable>)>);
+pub(crate) struct RootCellTables(Vec<(u32, GcLocal<BindingCellTable, Nullable>)>);
 
 impl<'a> FunctionBuilder<'a> {
     /// Environment References already own an object base and canonical key.
@@ -370,11 +375,10 @@ impl<'a> FunctionBuilder<'a> {
         cell
     }
 
-    /// Computes this body's root cell tables; see [`RootCellTables`].
-    /// Called once, at the top level of the body before any source code,
-    /// while the current environment is the root record. Each named root
-    /// distance is a declarative record: the analyzed captured chain records
-    /// a cell at it, or it is the body's own activation record.
+    /// Creates this body's empty root cell table cache; see
+    /// [`RootCellTables`]. Called once, at the top level of the body before
+    /// any source code, while the current environment is the root record.
+    /// Nothing is dereferenced here.
     fn reserve_root_cell_tables(&mut self, function: &mut Function) {
         let eligible = self.environment_depth == 0
             && self.root_cell_tables.0.is_empty()
@@ -386,8 +390,8 @@ impl<'a> FunctionBuilder<'a> {
             })
             && self.direct_eval_execution_context_local().is_none()
             && !self.has_eval_environment()
-            // Written here, outside every block, each holder dominates
-            // every later use and is declared non-null.
+            // Written here, outside every block, each null dominates every
+            // later use.
             && function.at_function_level();
         if !eligible {
             return;
@@ -401,62 +405,62 @@ impl<'a> FunctionBuilder<'a> {
         if !self.owned_env_bindings.is_empty() {
             root_hops.insert(0);
         }
-        let Some(&deepest) = root_hops.last() else {
-            return;
-        };
         let schema = self.runtime_schema();
-        let environment = self.resolve_env_handle_local(0, function);
-        let mut reached = 0;
-        let mut tables = Vec::with_capacity(root_hops.len());
-        for hops in root_hops {
-            while reached < hops {
-                environment.replace(
-                    schema
-                        .struct_type::<Environment>()
-                        .field(EnvironmentSchema::PARENT)
-                        .read(&environment, schema, function)
-                        .reference(),
-                    function,
-                );
-                reached += 1;
-            }
-            let declarative = schema
-                .reserve_gc_local::<DeclarativeEnvironment, Nullable>(function)
-                .initialize(
-                    schema
-                        .struct_type::<Environment>()
-                        .field(EnvironmentSchema::DECLARATIVE)
-                        .read(&environment, schema, function)
-                        .reference(),
-                    function,
-                );
-            let table = schema.hold_gc_local(
-                schema
-                    .struct_type::<DeclarativeEnvironment>()
-                    .field(DeclarativeEnvironmentSchema::CELLS)
-                    .read(&declarative, schema, function)
-                    .reference(),
-                function,
-            );
-            declarative.clear(function);
-            tables.push((hops, table));
-        }
-        debug_assert_eq!(reached, deepest);
-        environment.clear(function);
-        self.root_cell_tables.0 = tables;
+        self.root_cell_tables.0 = root_hops
+            .into_iter()
+            .map(|hops| {
+                let table = schema
+                    .reserve_gc_local::<BindingCellTable, Nullable>(function)
+                    .initialize_null(schema, function);
+                (hops, table)
+            })
+            .collect();
     }
 
     /// The cached cell table of the record `hops` records above the current
-    /// environment. `None` keeps the caller's full walk: block, body and
-    /// head records inside the body (`hops < environment_depth`) and bodies
-    /// without the cache.
-    fn root_cell_table(&self, hops: u32) -> Option<&GcLocal<BindingCellTable>> {
+    /// environment, filled here by the walk this use would otherwise
+    /// perform when no earlier use has filled it. `None` keeps the caller's
+    /// full walk: block, body and head records inside the body
+    /// (`hops < environment_depth`) and bodies without the cache.
+    fn emit_root_cell_table(
+        &self,
+        hops: u32,
+        function: &mut Function,
+    ) -> Option<&GcLocal<BindingCellTable, Nullable>> {
         let root_hops = hops.checked_sub(self.environment_depth)?;
-        self.root_cell_tables
+        let (_, table) = self
+            .root_cell_tables
             .0
             .iter()
-            .find(|(cached, _)| *cached == root_hops)
-            .map(|(_, table)| table)
+            .find(|(cached, _)| *cached == root_hops)?;
+        let schema = self.runtime_schema();
+        table.load(schema, function).is_null(function);
+        // No branch leaves this arm, so no builder control frame names it.
+        function.instruction(&Instruction::If(BlockType::Empty));
+        let environment = self.resolve_env_handle_local(hops, function);
+        let declarative = schema
+            .reserve_gc_local::<DeclarativeEnvironment, Nullable>(function)
+            .initialize(
+                schema
+                    .struct_type::<Environment>()
+                    .field(EnvironmentSchema::DECLARATIVE)
+                    .read(&environment, schema, function)
+                    .reference(),
+                function,
+            );
+        table.replace(
+            schema
+                .struct_type::<DeclarativeEnvironment>()
+                .field(DeclarativeEnvironmentSchema::CELLS)
+                .read(&declarative, schema, function)
+                .reference()
+                .nullable(),
+            function,
+        );
+        declarative.clear(function);
+        environment.clear(function);
+        function.instruction(&Instruction::End);
+        Some(table)
     }
 
     /// The cell of a statically resolved environment slot: through the
@@ -469,7 +473,7 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> GcLocal<BindingCell> {
         let schema = self.runtime_schema();
-        if let Some(table) = self.root_cell_table(hops) {
+        if let Some(table) = self.emit_root_cell_table(hops, function) {
             return schema
                 .reserve_gc_local::<BindingCell, NonNullable>(function)
                 .initialize(

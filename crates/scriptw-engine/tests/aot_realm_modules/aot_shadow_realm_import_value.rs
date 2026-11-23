@@ -555,6 +555,39 @@ export function replace(next) { offset = next; return offset; }
 }
 
 #[test]
+fn module_nonlocal_reads_of_script_lexicals_never_dereference_absent_cells() {
+    // The module function's analyzed capture of `offset` has no declarative
+    // record in the module instance's run-time chain; the read resolves
+    // through the Realm's global environment. Neither a captured read nor a
+    // root cell table may dereference that record, with or without a loop.
+    assert_files(
+        EmbeddedModuleGoal::Script,
+        r#"
+let offset = 7;
+import('./locals.js').then(m => print(m.sum(4) + ':' + m.direct() + ':' + m.inLoop(4)), e => print('err ' + e));
+true;
+"#,
+        &[(
+            "locals.js",
+            r#"
+export function direct() { return offset; }
+export function inLoop(stop) {
+  var total = 0;
+  for (var index = 0; index < stop; index++) total += offset;
+  return total;
+}
+export function sum(stop) {
+  var total = 0;
+  for (var index = 0; index < stop; index++) total += index;
+  return total + offset;
+}
+"#,
+        )],
+        &["13:7:28"],
+    );
+}
+
+#[test]
 fn pruned_module_entry_values_and_retained_context_captures_cross_realms() {
     assert_files(
         EmbeddedModuleGoal::Script,

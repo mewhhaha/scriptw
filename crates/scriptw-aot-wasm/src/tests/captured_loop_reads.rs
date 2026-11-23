@@ -145,6 +145,14 @@ make(1);
     }
 }
 
+/// Environment reads outside and inside cell-table fill arms: an `if`
+/// entered right after `local.get t; ref.is_null`, keyed by `t`.
+#[derive(Debug, Default, PartialEq)]
+struct EnvironmentReads {
+    unguarded: usize,
+    fills: BTreeMap<u32, usize>,
+}
+
 #[test]
 fn root_relative_cell_tables_are_walked_once_per_invocation() {
     let environment_reads = |source: &str| {
@@ -163,12 +171,39 @@ fn root_relative_cell_tables_are_walked_once_per_invocation() {
             panic!("Environment has a concrete registered type");
         };
         each_body(&artifact, "readCaptured", |body| {
-            body.iter()
-                .filter(|operator| {
-                    matches!(operator, Operator::StructGet { struct_type_index, .. }
-                        if *struct_type_index == environment)
-                })
-                .count()
+            let mut reads = EnvironmentReads::default();
+            let mut frames: Vec<Option<u32>> = Vec::new();
+            for (index, operator) in body.iter().enumerate() {
+                match operator {
+                    Operator::If { .. } => {
+                        let fill = match index.checked_sub(2).map(|start| &body[start..index]) {
+                            Some([Operator::LocalGet { local_index }, Operator::RefIsNull]) => {
+                                Some(*local_index)
+                            }
+                            _ => None,
+                        };
+                        if let Some(local) = fill {
+                            *reads.fills.entry(local).or_default() += 1;
+                        }
+                        frames.push(fill);
+                    }
+                    Operator::Block { .. } | Operator::Loop { .. } | Operator::TryTable { .. } => {
+                        frames.push(None)
+                    }
+                    Operator::End => {
+                        frames.pop();
+                    }
+                    Operator::StructGet {
+                        struct_type_index, ..
+                    } if *struct_type_index == environment
+                        && !frames.iter().any(Option::is_some) =>
+                    {
+                        reads.unguarded += 1;
+                    }
+                    _ => {}
+                }
+            }
+            reads
         })
     };
     let program = |reads: &str| {
@@ -179,11 +214,20 @@ fn root_relative_cell_tables_are_walked_once_per_invocation() {
     };
     let once = environment_reads(&program("return a;"));
     let thrice = environment_reads(&program("var x = a; var y = a; var z = a; return z;"));
-    assert!(
-        once.iter().all(|reads| *reads > 0),
-        "the entry walk reads the parent chain: {once:?}"
-    );
-    // Each further read of the same root-relative cell reuses the table: it
-    // walks no parent link and reads no declarative record again.
-    assert_eq!(once, thrice);
+    for (once, thrice) in once.iter().zip(&thrice) {
+        // Every further read of the same root-relative cell walks parent
+        // links only in a fill arm of the one table, which runs at most once
+        // per invocation; no unguarded walk is added per read.
+        assert_eq!(once.unguarded, thrice.unguarded, "{once:?} / {thrice:?}");
+        // Exactly the one root table gains a fill arm per added read.
+        let grown = thrice
+            .fills
+            .iter()
+            .filter(|(local, count)| once.fills.get(local).copied().unwrap_or(0) != **count)
+            .collect::<Vec<_>>();
+        assert_eq!(grown.len(), 1, "{once:?} / {thrice:?}");
+        let (local, count) = grown[0];
+        assert_eq!(*count, once.fills.get(local).copied().unwrap_or(0) + 2);
+        assert!(once.fills.contains_key(local), "{once:?} / {thrice:?}");
+    }
 }
