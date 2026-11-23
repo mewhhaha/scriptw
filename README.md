@@ -32,7 +32,7 @@ Test262 publication still use `--release`
 
 ## Benchmarks
 
-All panels except [Porffor](#porffor) were measured on **2026-11-17** at source `d2948d619` (compiler fingerprint `697c47c22eb0`), on a
+All panels except [Porffor](#porffor) and [process density](#process-density) were measured on **2026-11-17** at source `d2948d619` (compiler fingerprint `697c47c22eb0`), on a
 shared four-vCPU cloud machine (Intel Xeon, 2.30 GHz) with Node 24.22.1. Every
 engine gets the same two CPUs, so V8's compiler and collector threads do not
 preempt its main thread. They are not requalified on every commit.
@@ -114,6 +114,24 @@ when both run on Wasmtime (geometric mean; Scriptw is faster in 10/13 in both bl
 **0.163×** with Porffor on Node's WebAssembly engine. Scriptw compiles all 17 faster, at
 **0.644×** Porffor's time. [Tables, engines and failures](docs/rust-rewrite/benchmarks.md#2026-11-23-comparison-with-porffor) ·
 [data](docs/rust-rewrite/wasm-peer-current.json).
+
+### Process density
+
+**Process density · 2026-11-23**, local build `1edd6d329`, in the shape of [Porffor's](https://porffor.dev)
+"apps per GB": N = 1–32 concurrent processes held after a print-only program, summed PSS.
+
+| Print-only program | Memory per added process | Processes in 16 GiB | Process wall |
+| --- | ---: | ---: | ---: |
+| Scriptw, precompiled image (benchmark host) | 4.9 MiB | 3,372 | 306 ms |
+| Node 24.22.1 | 8.4 MiB | 1,946 | 42 ms |
+| Node 22.23.4 | 6.7 MiB | 2,444 | 46 ms |
+| Porffor 0.61.13 native | 0.3 MiB | 58,545 | 5 ms |
+
+Scriptw fits 1.7× as many processes as Node 24, but Node 22 fits more on a kernel that keeps 8,192
+objects live. Scriptw's startup is its weak point: hashing its own executable and loading the runtime
+image take about 290 ms before a 1 ms program. Timings ran under heavy machine load.
+[Method, kernels and limits](docs/rust-rewrite/benchmarks.md#process-density) ·
+[data](docs/rust-rewrite/process-density-current.json).
 
 ## Current Status
 <!-- scriptw-status:start -->

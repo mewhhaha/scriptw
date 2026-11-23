@@ -34,6 +34,9 @@ EXTERNAL_COMPARATOR_FILES = frozenset({
     "scripts/wasm_peer_node.cjs",
     "scripts/wasm_peer_wasmtime.py",
     "docs/rust-rewrite/wasm-peer-current.json",
+    "scripts/benchmark-density.py",
+    "scripts/tests/test_benchmark_density.py",
+    "docs/rust-rewrite/process-density-current.json",
 })
 DOCTEST = (
     '^[0-9]+:[[:space:]]*"/workspace/' + RETIRED

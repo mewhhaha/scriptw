@@ -454,6 +454,33 @@ scopes that `publish` refuses. `compile` times four fresh `scriptw build wasm` a
 processes per kernel on one CPU. `publish` writes the checked summary without host paths; paste
 the `tables` output into the benchmark details unedited.
 
+### Process density
+
+`scripts/benchmark-density.py` measures how many processes fit in memory, process wall time and
+per-entry runtime for Scriptw, Node 24.22.1 (default and lean flags), Node 22.23.4 and Porffor
+native on a startup program and five kernels. It reuses the Porffor tools above and needs `cc`
+(Porffor `native` compiles its C with it) and ptrace of the driver's own children. It never builds
+Scriptw. Keep the CPUs and cleared Node settings of the Porffor panel:
+
+```sh
+taskset -c 2,3 env -u NODE_OPTIONS -u NODE_EXTRA_CA_CERTS -u NODE_PATH \
+  python3 -B scripts/limited_verification.py --cloud --cloud-worker-cpus auto -- \
+  python3 -B scripts/benchmark-density.py prepare --cloud --output target/density/prepared \
+  --tools target/wasm-peer-tools --host /path/to/compiler_precompiled_baseline --scriptw /path/to/scriptw \
+  --node /path/to/node-24.22.1 --node22 /path/to/node-22.23.4 --time /usr/bin/time
+taskset -c 2,3 env -u NODE_OPTIONS -u NODE_EXTRA_CA_CERTS -u NODE_PATH \
+  python3 -B scripts/limited_verification.py --cloud --cloud-worker-cpus auto -- \
+  python3 -B scripts/benchmark-density.py run --cloud --prepared target/density/prepared --output target/density/run --time /usr/bin/time
+python3 -B scripts/benchmark-density.py publish --prepared target/density/prepared --run target/density/run \
+  --output docs/rust-rewrite/process-density-current.json
+python3 -B scripts/benchmark-density.py tables docs/rust-rewrite/process-density-current.json
+python3 -B -m unittest scripts.tests.test_benchmark_density
+```
+
+`run` holds N = 1, 8 and 32 concurrent processes per actor and program (two groups each) and admits
+a group only if its unshared RSS estimate leaves 6 GiB of `MemAvailable` free; skipped groups are
+recorded. `--smoke` (N = 1 and 4, short harness runs) checks the tooling and `publish` refuses it.
+
 ## Focused performance situations
 
 Generate the checked programs for each performance hill.

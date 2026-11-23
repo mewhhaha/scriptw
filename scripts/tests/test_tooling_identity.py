@@ -311,12 +311,17 @@ class IdentityTests(unittest.TestCase):
         self.assertEqual(result.stderr.count(path.name + ":1:"), 1)
 
     def test_external_comparator_files_admit_only_the_word(self):
-        path = self.root / "scripts/wasm_peer_node.cjs"
-        path.parent.mkdir(parents=True)
-        path.write_text("// " + RETIRED_NAME.title() + " Wasm\n", encoding="utf-8")
-        self.assertEqual(self.audit().returncode, 0)
-        path.write_text("const " + RETIRED_NAME + "_entry = 1;\n", encoding="utf-8")
-        self.assertEqual(self.audit().returncode, 1)
+        for name in ("scripts/benchmark-density.py", "scripts/tests/test_benchmark_density.py",
+                     "docs/rust-rewrite/process-density-current.json", "scripts/wasm_peer_node.cjs"):
+            with self.subTest(name=name):
+                path = self.root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('"' + RETIRED_NAME.title() + ' native"\n', encoding="utf-8")
+                self.assertEqual(self.audit().returncode, 0)
+                path.write_text('"' + RETIRED_NAME + '_entry"\n', encoding="utf-8")
+                self.assertEqual(self.audit().returncode, 1)
+                if name != "scripts/wasm_peer_node.cjs":
+                    path.unlink()
         other = self.root / "scripts/wasm_other_node.cjs"
         path.unlink()
         other.write_text("// " + RETIRED_NAME.title() + " Wasm\n", encoding="utf-8")
