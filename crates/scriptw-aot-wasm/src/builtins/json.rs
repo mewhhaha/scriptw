@@ -11,7 +11,11 @@ mod grammar;
 mod module_value;
 mod parse;
 mod parse_array;
+mod parse_cursor;
 mod parse_frame_state;
+mod parse_number;
+mod parse_object;
+mod parse_string;
 mod quote;
 mod reviver;
 mod stringify;
@@ -49,7 +53,7 @@ macro_rules! json_domain {
 }
 json_domain!(JsonParseFrameState {
     ArrayFirstOrEnd=0, ArrayValue=1, ArrayCommaOrEnd=2,
-    ObjectFirstKeyOrEnd=3, ObjectKey=4, ObjectColon=5, ObjectValue=6, ObjectCommaOrEnd=7,
+    ObjectFirstKeyOrEnd=3, ObjectKey=4, ObjectValue=5, ObjectCommaOrEnd=6,
 });
 json_domain!(JsonReviverFrameState { Enter=0, ArrayChildren=1, ObjectChildren=2, Apply=3 });
 json_domain!(JsonReviverPropertyRole { Nested=0, Root=1 });

@@ -58,6 +58,71 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::F64ReinterpretI64);
         f.instruction(&Instruction::I64TruncF64U);
         index.store(f);
+        self.emit_packed_array_own_data_at(lookup, index, result, found, f);
+        s.release_i64_local(index, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        found
+    }
+
+    /// The same probe for a raw key that is an int32-domain Number given by
+    /// its 32 bits: a nonnegative signed value, or an unsigned value other
+    /// than 2^32-1, is an array index as it stands. No binary64 conversion,
+    /// range test or integrality test is needed.
+    pub(crate) fn emit_int32_array_own_data_read(
+        &mut self,
+        lookup: &ValueLocals,
+        bits: I32Local,
+        signedness: crate::operations::Int32Signedness,
+        result: &CompletionLocals,
+        f: &mut Function,
+    ) -> I32Local {
+        let s = self.runtime_schema();
+        let found = s.reserve_i32_local(f);
+        found.set_constant(0, f);
+        lookup.reference().load(f);
+        f.instruction(&Instruction::RefTestNonNull(
+            s.reference_type::<ArrayObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        bits.load(f);
+        match signedness {
+            crate::operations::Int32Signedness::Signed => {
+                f.instruction(&Instruction::I32Const(0));
+                f.instruction(&Instruction::I32GeS);
+            }
+            crate::operations::Int32Signedness::Unsigned => {
+                f.instruction(&Instruction::I32Const(-1));
+                f.instruction(&Instruction::I32Ne);
+            }
+        }
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        let index = s.reserve_i64_local(f);
+        bits.load(f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        index.store(f);
+        self.emit_packed_array_own_data_at(lookup, index, result, found, f);
+        s.release_i64_local(index, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        found
+    }
+
+    /// `lookup` is an actual Array and `index` an array index below 2^32-1.
+    fn emit_packed_array_own_data_at(
+        &mut self,
+        lookup: &ValueLocals,
+        index: I64Local,
+        result: &CompletionLocals,
+        found: I32Local,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
         let array = s
             .reserve_gc_local(f)
             .initialize(lookup.cast_reference::<ArrayObject>(s, f), f);
@@ -78,14 +143,6 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         storage.clear(f);
         array.clear(f);
-        s.release_i64_local(index, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        found
     }
 
     /// A raw Number key inside a primitive String reads that String's own

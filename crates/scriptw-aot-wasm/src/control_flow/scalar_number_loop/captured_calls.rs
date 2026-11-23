@@ -52,6 +52,9 @@ enum Slot {
 pub(super) struct CapturedCalls {
     calls: Vec<Call>,
     slots: Vec<Slot>,
+    /// Per slot, whether it keeps int32 bits rather than a binary64 Number;
+    /// set once by `type_int32_slots` after the whole region is proven.
+    int32: Vec<bool>,
     depth: u32,
 }
 
@@ -716,6 +719,79 @@ impl SourceCompiler<'_, '_, '_> {
 }
 
 impl CapturedCalls {
+    /// Types a written captured slot int32 when every write to it in the
+    /// region is an int32-domain value (`tick = (tick + 1) & 255`): its
+    /// entry value is then admitted only as an exact int32 that is not -0,
+    /// so every value the slot holds is an int32 Number. Slots that may
+    /// alias at run time copy each other's values, so a slot that may alias
+    /// a binary64 slot keeps binary64 too. Reads of an int32 slot then carry
+    /// the Signed32 domain their values have.
+    pub(super) fn type_int32_slots(&mut self) {
+        let mut writes = vec![None; self.slots.len()];
+        for case in self.calls.iter_mut().flat_map(|call| &mut call.cases) {
+            let mut record = |value: &mut NumberExpression| {
+                if let NumberExpression::AssignCallSlot(slot, written) = value {
+                    let domain = written.intrinsic_domain();
+                    writes[*slot] = Some(match writes[*slot] {
+                        None => domain,
+                        Some(old) if old == domain => domain,
+                        Some(_) => NumberDomain::Number,
+                    });
+                }
+            };
+            for statement in &mut case.body {
+                statement.visit_mut(&mut record);
+            }
+            case.result.visit_mut(&mut record);
+        }
+        let mut int32: Vec<bool> = self
+            .slots
+            .iter()
+            .zip(&writes)
+            .map(|(slot, domain)| {
+                matches!(slot, Slot::Capture { written: true, .. })
+                    && *domain == Some(NumberDomain::Signed32)
+            })
+            .collect();
+        loop {
+            let mut changed = false;
+            for index in 0..int32.len() {
+                if int32[index]
+                    && (0..self.slots.len()).any(|other| {
+                        other != index
+                            && matches!(self.slots[other], Slot::Capture { .. })
+                            && !int32[other]
+                            && self.may_alias(index, other)
+                    })
+                {
+                    int32[index] = false;
+                    changed = true;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        for case in self.calls.iter_mut().flat_map(|call| &mut call.cases) {
+            let mut retype = |value: &mut NumberExpression| {
+                if let NumberExpression::CallSlot(slot, domain) = value {
+                    if int32[*slot] {
+                        *domain = NumberDomain::Signed32;
+                    }
+                }
+            };
+            for statement in &mut case.body {
+                statement.visit_mut(&mut retype);
+            }
+            case.result.visit_mut(&mut retype);
+        }
+        self.int32 = int32;
+    }
+
+    pub(super) fn slot_is_int32(&self, index: usize) -> bool {
+        self.int32.get(index).copied().unwrap_or(false)
+    }
+
     fn may_alias(&self, left: usize, right: usize) -> bool {
         // Only one source alternative at a call site is authenticated. Its
         // other alternatives retain null roots and cannot observe this write.

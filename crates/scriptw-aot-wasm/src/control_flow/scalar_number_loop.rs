@@ -443,6 +443,9 @@ impl ScalarNumberLoop {
         }) {
             return None;
         }
+        // Captured-call slots first: their int32 reads narrow the domains of
+        // the binding writes collected below.
+        proof.calls.type_int32_slots();
         // Every write establishes its range without a loop-carried range
         // assumption. Runtime entry checks establish the induction's base case.
         let mut writes = vec![None; proof.bindings.len()];
@@ -1203,11 +1206,91 @@ impl NumberExpression {
                 lhs.emit_discard(builder, locals, function);
                 rhs.emit_uint32(builder, locals, function);
             }
+            Self::CallSlot(index, _) if Self::int32_slot(locals, *index) => {
+                let (_, roots) = locals.calls.expect("sealed call slot");
+                roots.load_bits(*index, function);
+            }
+            Self::AssignCallSlot(index, value) if Self::int32_slot(locals, *index) => {
+                let (plan, roots) = locals.calls.expect("sealed call slot");
+                value.emit_uint32(builder, locals, function);
+                roots.store(*index, plan, builder, function);
+                roots.load_bits(*index, function);
+            }
             _ => {
                 self.emit(builder, locals, function);
                 self.emit_number_to_uint32(builder, locals, function);
             }
         }
+    }
+
+    /// Whether the captured-call slot keeps its value as int32 bits.
+    fn int32_slot(locals: &LoopLocals<'_>, index: usize) -> bool {
+        locals
+            .calls
+            .is_some_and(|(plan, _)| plan.slot_is_int32(index))
+    }
+
+    /// Emits the exact i64 value of an expression whose domain is a 32-bit
+    /// integer (never -0 or NaN) and returns true; emits nothing and returns
+    /// false for any other domain.
+    fn emit_exact_i64(
+        &self,
+        builder: &mut FunctionBuilder<'_>,
+        locals: &LoopLocals<'_>,
+        function: &mut Function,
+    ) -> bool {
+        match self.domain(locals) {
+            NumberDomain::Signed32 => {
+                self.emit_uint32(builder, locals, function);
+                function.instruction(&Instruction::I64ExtendI32S);
+            }
+            NumberDomain::Unsigned32 => {
+                self.emit_uint32(builder, locals, function);
+                function.instruction(&Instruction::I64ExtendI32U);
+            }
+            NumberDomain::Number | NumberDomain::SafeInteger => return false,
+        }
+        true
+    }
+
+    /// Whether `emit_exact_i64` represents this expression.
+    fn has_exact_i64(&self, locals: &LoopLocals<'_>) -> bool {
+        matches!(
+            self.domain(locals),
+            NumberDomain::Signed32 | NumberDomain::Unsigned32
+        )
+    }
+
+    /// Calls `visit` on this expression and every subexpression, children
+    /// first, in evaluation order.
+    fn visit_mut(&mut self, visit: &mut dyn FnMut(&mut Self)) {
+        match self {
+            Self::Constant(_)
+            | Self::Binding(_)
+            | Self::Captured(_)
+            | Self::ArrayLength
+            | Self::ArrayElement
+            | Self::MaskedInputIndex
+            | Self::CompactPath(_)
+            | Self::JoinedLength
+            | Self::Update(_, _, _)
+            | Self::Call(_, _)
+            | Self::CallSlot(_, _) => {}
+            Self::Negate(value)
+            | Self::Complement(value)
+            | Self::Assign(_, value)
+            | Self::Compound(_, _, value)
+            | Self::AssignCallSlot(_, value)
+            | Self::SelectCall(value, _, _) => value.visit_mut(visit),
+            Self::Arithmetic(_, lhs, rhs)
+            | Self::Bitwise(_, lhs, rhs)
+            | Self::Imul(lhs, rhs)
+            | Self::Comma(lhs, rhs) => {
+                lhs.visit_mut(visit);
+                rhs.visit_mut(visit);
+            }
+        }
+        visit(self);
     }
 
     fn emit_number_to_uint32(
@@ -1297,8 +1380,14 @@ impl NumberExpression {
                 .1
                 .load(*index, function),
             Self::AssignCallSlot(index, value) => {
-                value.emit(builder, locals, function);
                 let (plan, roots) = locals.calls.expect("sealed call slot");
+                // An int32 slot stores the write's bits; every write to it
+                // is int32-domain, so they are exact.
+                if plan.slot_is_int32(*index) {
+                    value.emit_uint32(builder, locals, function);
+                } else {
+                    value.emit(builder, locals, function);
+                }
                 roots.store(*index, plan, builder, function);
                 roots.load(*index, function);
             }
@@ -1373,6 +1462,53 @@ impl NumberExpression {
 }
 
 impl NumberPredicate {
+    /// An integral constant within 2^53 in magnitude (`-0` is `0`).
+    fn exact_constant(value: &NumberExpression) -> Option<i64> {
+        let NumberExpression::Constant(bits) = value else {
+            return None;
+        };
+        let number = f64::from_bits(*bits);
+        (number.fract() == 0.0 && number.abs() <= MAX_SAFE_INTEGER as f64 + 1.0)
+            .then_some(number as i64)
+    }
+
+    /// Both operands are exact integers and at least one is int32-domain.
+    fn exact_integer_pair(
+        lhs: &NumberExpression,
+        rhs: &NumberExpression,
+        locals: &LoopLocals<'_>,
+    ) -> bool {
+        let exact = |value: &NumberExpression| {
+            value.has_exact_i64(locals) || Self::exact_constant(value).is_some()
+        };
+        exact(lhs) && exact(rhs) && (lhs.has_exact_i64(locals) || rhs.has_exact_i64(locals))
+    }
+
+    fn emit_exact_integer(
+        value: &NumberExpression,
+        builder: &mut FunctionBuilder<'_>,
+        locals: &LoopLocals<'_>,
+        function: &mut Function,
+    ) {
+        if value.emit_exact_i64(builder, locals, function) {
+            return;
+        }
+        let integer = Self::exact_constant(value).expect("admitted exact integer operand");
+        function.instruction(&Instruction::I64Const(integer));
+    }
+
+    fn visit_mut(&mut self, visit: &mut dyn FnMut(&mut NumberExpression)) {
+        match self {
+            Self::Boolean(_) | Self::ProjectedStrict(_) | Self::Invariant(_, _) => {}
+            Self::Truthy(value) => value.visit_mut(visit),
+            Self::Not(value) => value.visit_mut(visit),
+            Self::Compare(_, lhs, rhs) | Self::Equal(_, lhs, rhs) => {
+                lhs.visit_mut(visit);
+                rhs.visit_mut(visit);
+            }
+        }
+    }
+
     fn collect_writes(&self, writes: &mut [Option<NumberDomain>]) {
         match self {
             Self::Boolean(_) | Self::ProjectedStrict(_) | Self::Invariant(_, _) => {}
@@ -1409,6 +1545,12 @@ impl NumberPredicate {
                     function.instruction(&Instruction::I32Eqz);
                 }
             }
+            Self::Truthy(value) if value.has_exact_i64(locals) => {
+                // An int32-domain Number is falsy exactly when it is +0.
+                value.emit_uint32(builder, locals, function);
+                function.instruction(&Instruction::I32Const(0));
+                function.instruction(&Instruction::I32Ne);
+            }
             Self::Truthy(value) => {
                 let schema = builder.runtime_schema();
                 let evaluated = schema.reserve_f64_local(function);
@@ -1426,6 +1568,26 @@ impl NumberPredicate {
             Self::Not(value) => {
                 value.emit(builder, locals, function);
                 function.instruction(&Instruction::I32Eqz);
+            }
+            Self::Compare(op, lhs, rhs) if Self::exact_integer_pair(lhs, rhs, locals) => {
+                // Exact integers order as their i64 values; no NaN occurs.
+                Self::emit_exact_integer(lhs, builder, locals, function);
+                Self::emit_exact_integer(rhs, builder, locals, function);
+                function.instruction(&match op {
+                    RelationalBinaryOp::LessThan => Instruction::I64LtS,
+                    RelationalBinaryOp::LessThanOrEqual => Instruction::I64LeS,
+                    RelationalBinaryOp::GreaterThan => Instruction::I64GtS,
+                    RelationalBinaryOp::GreaterThanOrEqual => Instruction::I64GeS,
+                });
+            }
+            Self::Equal(equal, lhs, rhs) if Self::exact_integer_pair(lhs, rhs, locals) => {
+                Self::emit_exact_integer(lhs, builder, locals, function);
+                Self::emit_exact_integer(rhs, builder, locals, function);
+                function.instruction(&if *equal {
+                    Instruction::I64Eq
+                } else {
+                    Instruction::I64Ne
+                });
             }
             Self::Compare(op, lhs, rhs) => {
                 lhs.emit(builder, locals, function);

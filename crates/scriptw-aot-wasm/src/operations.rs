@@ -13,7 +13,9 @@ use scriptw_ir::{AbruptCapability, NormalResult};
 mod bigint_equality;
 mod coercive_add;
 mod has_instance;
+mod int32_domain;
 pub(crate) use has_instance::ActiveInstanceofRun;
+pub(crate) use int32_domain::{Int32Expression, Int32Signedness};
 mod intrinsic_installation_key;
 pub(crate) use intrinsic_installation_key::IntrinsicInstallationKey;
 mod loose_equality;
@@ -470,6 +472,9 @@ impl<'a> FunctionBuilder<'a> {
             // returns a canonical i32; no Boolean value is needed here.
             return self.compile_compare_value_i32(*op, lhs, rhs, function);
         }
+        if self.try_compile_int32_truthy_i32(expr, function)? {
+            return Ok(());
+        }
         let input = self.runtime_schema().reserve_value_local(function);
         self.compile_expr_to_value(expr, &input, function)?;
         if expr.kind == ValueKind::Boolean {
@@ -498,7 +503,12 @@ impl<'a> FunctionBuilder<'a> {
         validate_spec_operation_operands(operation, operands.len())?;
         let direct_comparison = match operation {
             SpecOperationIr::StrictEqualityComparison => {
-                self.try_compile_typeof_comparison_i32(&operands[0], &operands[1], function)?
+                self.try_compile_int32_equality_i32(&operands[0], &operands[1], function)?
+                    || self.try_compile_typeof_comparison_i32(
+                        &operands[0],
+                        &operands[1],
+                        function,
+                    )?
                     || self.try_compile_strict_singleton_comparison_i32(
                         &operands[0],
                         &operands[1],
@@ -511,7 +521,12 @@ impl<'a> FunctionBuilder<'a> {
                     )?
             }
             SpecOperationIr::IsLooselyEqual => {
-                self.try_compile_typeof_comparison_i32(&operands[0], &operands[1], function)?
+                self.try_compile_int32_equality_i32(&operands[0], &operands[1], function)?
+                    || self.try_compile_typeof_comparison_i32(
+                        &operands[0],
+                        &operands[1],
+                        function,
+                    )?
                     || self.try_compile_loose_nullish_comparison_i32(
                         &operands[0],
                         &operands[1],
@@ -538,10 +553,25 @@ impl<'a> FunctionBuilder<'a> {
             return Ok(());
         }
         let schema = self.runtime_schema();
+        // A GetV key in the int32 domain keeps its bits for the Array probe;
+        // its Number is materialized only on the probe's miss path below.
+        let int32_key = match (operation, operands) {
+            (SpecOperationIr::GetV, [_, key]) => Int32Expression::of(key),
+            _ => None,
+        };
+        let mut key_bits = None;
         let mut inputs = Vec::with_capacity(operands.len());
-        for operand in operands {
+        for (position, operand) in operands.iter().enumerate() {
             let value = schema.reserve_value_local(function);
-            self.compile_expr_to_value(operand, &value, function)?;
+            match &int32_key {
+                Some(key) if position == 1 => {
+                    let bits = schema.reserve_i32_local(function);
+                    self.compile_int32_bits(key, function)?;
+                    bits.store(function);
+                    key_bits = Some((bits, key.signedness()));
+                }
+                _ => self.compile_expr_to_value(operand, &value, function)?,
+            }
             inputs.push(value);
         }
         // The catalog proves the operation itself cannot throw. Operand
@@ -746,13 +776,29 @@ impl<'a> FunctionBuilder<'a> {
                     // Both operands are saved. Concrete own-data probes neither
                     // coerce a key nor invoke user code, so a hit needs no boxing.
                     // A miss retains the original ToObject -> ToPropertyKey order.
-                    if operands[1].possible_kinds.contains(ValueKind::Number) {
+                    if let Some((bits, signedness)) = key_bits.take() {
+                        let found = self.emit_int32_array_own_data_read(
+                            &inputs[0], bits, signedness, &pending, function,
+                        );
+                        found.load(function);
+                        schema.release_i32_local(found, function);
+                        self.emit_branch_if_to_target(property_exit, function);
+                        // Every remaining route reads the raw key's Number.
+                        bits.load(function);
+                        signedness.emit_to_f64(function);
+                        function.instruction(&Instruction::I64ReinterpretF64);
+                        inputs[1].scalar().store(function);
+                        inputs[1].set_number(inputs[1].scalar(), function);
+                        schema.release_i32_local(bits, function);
+                    } else if operands[1].possible_kinds.contains(ValueKind::Number) {
                         let found = self.emit_raw_numeric_array_own_data_read(
                             &inputs[0], &inputs[1], &pending, function,
                         );
                         found.load(function);
                         schema.release_i32_local(found, function);
                         self.emit_branch_if_to_target(property_exit, function);
+                    }
+                    if operands[1].possible_kinds.contains(ValueKind::Number) {
                         // A String's own index reads its code unit without
                         // the wrapper ToObject would allocate.
                         if operands[0].possible_kinds.contains(ValueKind::String) {
@@ -1722,58 +1768,38 @@ impl<'a> FunctionBuilder<'a> {
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        // A Number operand, or `>>>`, excludes a BigInt result: the int32
+        // owner evaluates it and this Number consumer converts its bits once.
+        if let Some(value) = Int32Expression::binary(op, lhs, rhs) {
+            self.compile_int32_number_payload(&value, output.scalar(), function)?;
+            output.set_number(output.scalar(), function);
+            return Ok(());
+        }
+        let bigint_op = op
+            .bigint_op()
+            .expect("int32 admission owns every unsigned right shift");
         let schema = self.runtime_schema();
         let left = schema.reserve_value_local(function);
         let right = schema.reserve_value_local(function);
-        // A literal Number operand is its own ToNumeric and evaluates
-        // nothing: its ToUint32 is a compile-time constant.
-        let operands = |left: &ValueLocals, right: &ValueLocals| {
-            (
-                BitwiseOperand::literal(lhs).map_or(
-                    BitwiseOperand::Payload(left.scalar()),
-                    BitwiseOperand::Uint32,
-                ),
-                BitwiseOperand::literal(rhs).map_or(
-                    BitwiseOperand::Payload(right.scalar()),
-                    BitwiseOperand::Uint32,
-                ),
-            )
-        };
-        if lhs.kind == ValueKind::Number && rhs.kind == ValueKind::Number {
-            self.compile_expr_to_value(lhs, &left, function)?;
-            self.compile_expr_to_value(rhs, &right, function)?;
-            let (left_operand, right_operand) = operands(&left, &right);
-            self.emit_number_bitwise_to_locals(op, left_operand, right_operand, output, function);
-            right.clear(function);
-            left.clear(function);
-            return Ok(());
-        }
+        // Neither operand is a Number, so neither is a literal either.
         self.compile_numeric_operand_pair(lhs, rhs, &left, &right, function)?;
         self.emit_is_bigint_tag_i32(left.tag(), function);
         self.open_frame(ControlFrameKind::If, function);
-        if let Some(bigint_op) = op.bigint_op() {
-            self.emit_numeric_bigint_operation(
-                BigIntHelperOp::from_bitwise(bigint_op),
-                &left,
-                &right,
-                output,
-                function,
-            )?;
-        } else {
-            let error = schema.reserve_completion(function);
-            self.emit_throw_runtime_error(
-                NativeErrorKind::TypeError,
-                RuntimeErrorMessage::BIGINTS_DO_NOT_SUPPORT_UNSIGNED_RIGHT_SHIFT,
-                &error,
-                function,
-            )?;
-            self.completion().copy_from(&error, function);
-            error.clear(function);
-            self.emit_propagate_current_throw(function);
-        }
+        self.emit_numeric_bigint_operation(
+            BigIntHelperOp::from_bitwise(bigint_op),
+            &left,
+            &right,
+            output,
+            function,
+        )?;
         function.instruction(&Instruction::Else);
-        let (left_operand, right_operand) = operands(&left, &right);
-        self.emit_number_bitwise_to_locals(op, left_operand, right_operand, output, function);
+        self.emit_number_bitwise_to_locals(
+            op,
+            BitwiseOperand::Payload(left.scalar()),
+            BitwiseOperand::Payload(right.scalar()),
+            output,
+            function,
+        );
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         right.clear(function);
@@ -2088,17 +2114,16 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        let value = schema.reserve_value_local(function);
-        self.compile_expr_to_value(expr, &value, function)?;
         if expr.kind == ValueKind::Number {
-            match op {
-                UnaryBitwiseOp::Complement => {
-                    self.emit_number_bitwise_complement(value.scalar(), output, function);
-                }
-            }
-            value.clear(function);
+            let value = match op {
+                UnaryBitwiseOp::Complement => Int32Expression::of_complement(expr),
+            };
+            self.compile_int32_number_payload(&value, output.scalar(), function)?;
+            output.set_number(output.scalar(), function);
             return Ok(());
         }
+        let value = schema.reserve_value_local(function);
+        self.compile_expr_to_value(expr, &value, function)?;
         let pending = schema.reserve_completion(function);
         self.emit_value_to_numeric_locals(&value, &pending, function)?;
         self.finish_to_primitive_operation(
@@ -3750,7 +3775,9 @@ impl<'a> FunctionBuilder<'a> {
         rhs: &TypedExpr,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        if self.try_compile_typeof_comparison_i32(lhs, rhs, function)?
+        // Two Numbers are loosely equal exactly when strictly equal.
+        if self.try_compile_int32_equality_i32(lhs, rhs, function)?
+            || self.try_compile_typeof_comparison_i32(lhs, rhs, function)?
             || self.try_compile_loose_nullish_comparison_i32(lhs, rhs, function)?
         {
             return Ok(());
@@ -6550,7 +6577,8 @@ impl<'a> FunctionBuilder<'a> {
         right: &TypedExpr,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        if self.try_compile_typeof_comparison_i32(left, right, function)?
+        if self.try_compile_int32_equality_i32(left, right, function)?
+            || self.try_compile_typeof_comparison_i32(left, right, function)?
             || self.try_compile_strict_singleton_comparison_i32(left, right, function)?
             || self.try_compile_string_unit_comparison_i32(left, right, function)?
         {

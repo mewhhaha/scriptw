@@ -102,16 +102,14 @@ impl FunctionBuilder<'_> {
         // A constant RegExp site binds its compile-time program only when the
         // actual callee is this Realm's %RegExp%; any other callee takes the
         // original dispatch with the same (effect-free, literal) operands.
-        if let Some(site) = matches!(continuation, CallContinuation::Continue)
-            .then(|| {
-                crate::expressions::ConstantRegExpConstructionSite::of(
-                    callee_expression,
-                    arguments,
-                    static_regexp_compilation,
-                )
-            })
-            .flatten()
-        {
+        // A tail continuation admits it too: the bound allocation runs no
+        // user code, its value returns normally, and a miss keeps the proper
+        // tail call.
+        if let Some(site) = crate::expressions::ConstantRegExpConstructionSite::of(
+            callee_expression,
+            arguments,
+            static_regexp_compilation,
+        ) {
             let handled = self
                 .emit_constant_regexp_construction_if_intrinsic(&callee, &site, output, function)?;
             handled.load(function);
@@ -267,13 +265,37 @@ impl FunctionBuilder<'_> {
         let base = schema.reserve_value_local(function);
         self.compile_expr_to_value(read.base, &base, function)?;
         let key = schema.reserve_value_local(function);
-        self.compile_expr_to_value(read.key, &key, function)?;
         let pending = schema.reserve_completion(function);
-        let found = self.emit_raw_numeric_array_own_data_read(&base, &key, &pending, function);
+        // An int32-domain key probes with its bits; its Number is
+        // materialized only for the complete Get on a miss.
+        let (found, key_bits) = match crate::operations::Int32Expression::of(read.key) {
+            Some(value) => {
+                let bits = schema.reserve_i32_local(function);
+                self.compile_int32_bits(&value, function)?;
+                bits.store(function);
+                let signedness = value.signedness();
+                let found = self
+                    .emit_int32_array_own_data_read(&base, bits, signedness, &pending, function);
+                (found, Some((bits, signedness)))
+            }
+            None => {
+                self.compile_expr_to_value(read.key, &key, function)?;
+                let found =
+                    self.emit_raw_numeric_array_own_data_read(&base, &key, &pending, function);
+                (found, None)
+            }
+        };
         found.load(function);
         schema.release_i32_local(found, function);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
+        if let Some((bits, signedness)) = key_bits {
+            bits.load(function);
+            signedness.emit_to_f64(function);
+            function.instruction(&Instruction::I64ReinterpretF64);
+            key.scalar().store(function);
+            key.set_number(key.scalar(), function);
+        }
         schema
             .call_helper(
                 crate::runtime_helpers::DynamicPropertyReadArguments::new(
@@ -289,6 +311,9 @@ impl FunctionBuilder<'_> {
             .store(&pending, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
+        if let Some((bits, _)) = key_bits {
+            schema.release_i32_local(bits, function);
+        }
         key.clear(function);
         base.clear(function);
         self.emit_propagate_pending_throw(&pending, &[pending.value()], function);

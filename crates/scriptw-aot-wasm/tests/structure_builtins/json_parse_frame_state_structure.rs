@@ -18,7 +18,7 @@ fn between<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
 }
 
 #[test]
-fn parser_frame_state_has_one_closed_eight_word_domain() {
+fn parser_frame_state_has_one_closed_seven_word_domain() {
     let domain = compact(between(
         JSON_SOURCE,
         "json_domain!(JsonParseFrameState {",
@@ -30,13 +30,13 @@ fn parser_frame_state_has_one_closed_eight_word_domain() {
         ("ArrayCommaOrEnd", 2),
         ("ObjectFirstKeyOrEnd", 3),
         ("ObjectKey", 4),
-        ("ObjectColon", 5),
-        ("ObjectValue", 6),
-        ("ObjectCommaOrEnd", 7),
+        ("ObjectValue", 5),
+        ("ObjectCommaOrEnd", 6),
     ] {
         assert_eq!(domain.matches(&format!("{variant}={word},")).count(), 1);
     }
-    assert_eq!(domain.matches('=').count(), 8);
+    // The key state consumes its colon, so no state awaits one alone.
+    assert_eq!(domain.matches('=').count(), 7);
     let macro_source = compact(between(
         JSON_SOURCE,
         "macro_rules! json_domain {",
@@ -104,7 +104,7 @@ fn frame_construction_and_every_transition_require_typed_states() {
     );
     assert_eq!(
         PARSE_SOURCE.matches("self.emit_json_parse_state(").count(),
-        6,
+        5,
         "all subsequent transitions use the typed writer"
     );
     assert!(!PARSE_SOURCE.contains(".field(JsonParseFrameSchema::STATE)\n            .write"));
@@ -127,7 +127,6 @@ fn parser_dispatch_exhaustively_projects_the_same_closed_domain() {
         "ArrayCommaOrEnd",
         "ObjectFirstKeyOrEnd",
         "ObjectKey",
-        "ObjectColon",
         "ObjectValue",
         "ObjectCommaOrEnd",
     ] {

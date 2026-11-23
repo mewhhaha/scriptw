@@ -16,8 +16,10 @@ impl FunctionBuilder<'_> {
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<bool, EmitError> {
-        if !matches!(continuation, CallContinuation::Continue)
-            || !(1..=3).contains(&arguments.len())
+        // A tail continuation admits the same route: the guarded native push
+        // runs no user code, so only the caller's earlier retirement (stack
+        // depth) distinguishes it from the proper tail call its miss keeps.
+        if !(1..=3).contains(&arguments.len())
             || arguments.iter().any(|argument| {
                 matches!(
                     argument.expr,

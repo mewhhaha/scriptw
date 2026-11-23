@@ -59,14 +59,11 @@ impl<'a> FreshJsonArrayElement<'a> {
     }
     fn append(
         self,
-        value: &GcLocal<StoredValue>,
+        element: &ValueLocals,
         builder: &mut FunctionBuilder<'_>,
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = builder.runtime_schema();
-        let element = s.reserve_value_local(f);
-        s.struct_type::<StoredValue>()
-            .read_into(value, &element, s, f);
         let next = s.reserve_i64_local(f);
         self.ordinal.load(f);
         f.instruction(&Instruction::I64Const(1));
@@ -78,7 +75,7 @@ impl<'a> FreshJsonArrayElement<'a> {
         builder.open_frame(ControlFrameKind::If, f);
         // The private frame supplies an in-range unique Array ordinal. Storage
         // publication never substitutes for parser state or length validation.
-        builder.emit_array_indexed_publish_default_data(&self.array, self.ordinal, &element, f)?;
+        builder.emit_array_indexed_publish_default_data(&self.array, self.ordinal, element, f)?;
         s.struct_type::<ArrayObject>()
             .field(ArrayObjectSchema::LENGTH)
             .write(&self.array, GcOperand::i64_local(next), s, f);
@@ -88,12 +85,11 @@ impl<'a> FreshJsonArrayElement<'a> {
         let container = s.reserve_value_local(f);
         container.set_reference(&self.array, s, f);
         let key = builder.emit_json_index_key(self.ordinal, f)?;
-        builder.emit_json_define(&container, &key, &element, false, f)?;
+        builder.emit_json_define(&container, &key, element, false, f)?;
         key.clear(f);
         container.clear(f);
         builder.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        element.clear(f);
         s.struct_type::<JsonParseFrame>()
             .field(JsonParseFrameSchema::INDEX)
             .write(self.frame, GcOperand::i64_local(next), s, f);
@@ -107,7 +103,7 @@ impl FunctionBuilder<'_> {
     pub(super) fn emit_json_parse_array_append(
         &mut self,
         frame: &GcLocal<JsonParseFrame>,
-        value: &GcLocal<StoredValue>,
+        value: &ValueLocals,
         ordinal: I64Local,
         f: &mut Function,
     ) -> Result<(), EmitError> {

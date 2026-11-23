@@ -54,6 +54,7 @@ mod aot_infallible_booleans;
 mod aot_instanceof_and_global_reads;
 mod aot_instanceof_entry_records;
 mod aot_instanceof_site_records;
+mod aot_int32_domain;
 mod aot_local_concat_length;
 mod aot_loose_equality_codegen;
 mod aot_numeric_call_rows;

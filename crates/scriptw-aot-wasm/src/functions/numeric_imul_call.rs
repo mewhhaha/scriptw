@@ -17,14 +17,16 @@ impl FunctionBuilder<'_> {
         let [left, right] = arguments else {
             return Ok(false);
         };
-        if !matches!(continuation, CallContinuation::Continue)
-            || [left, right].iter().any(|argument| {
-                matches!(
-                    argument.expr,
-                    ExprIr::SpreadArgument(_) | ExprIr::CapturedArgumentList(_)
-                )
-            })
-        {
+        // A tail continuation admits the same route: a proper tail call to
+        // %Math.imul% is observable only through stack depth, which the
+        // inline arm never consumes. Its value then returns normally; a guard
+        // miss keeps the exact tail call with these once-evaluated operands.
+        if [left, right].iter().any(|argument| {
+            matches!(
+                argument.expr,
+                ExprIr::SpreadArgument(_) | ExprIr::CapturedArgumentList(_)
+            )
+        }) {
             return Ok(false);
         }
         let schema = self.runtime_schema();

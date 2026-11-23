@@ -128,9 +128,9 @@ fn constant_regexp_call_and_construct_sites_bind_the_compiled_program() {
 fn module_math_imul_reaches_the_guarded_numeric_route() {
     let program = lower(
         &parse(
-            // Not in return position: strict module code makes a returned
-            // call a tail call, which the numeric route (Continue only)
-            // never takes. This is the retained `integer.js` shape.
+            // Not in return position (the tail continuation is covered by
+            // `numeric_imul_specialization_reaches_strict_return_position`).
+            // This is the retained `integer.js` shape.
             "export function run(a, b) { return (Math.imul(a, b) + 1) >>> 0; }\n\
              export function other(a, b) { return (Math.max(a, b) + 1) >>> 0; }",
             ParseOptions::module(),

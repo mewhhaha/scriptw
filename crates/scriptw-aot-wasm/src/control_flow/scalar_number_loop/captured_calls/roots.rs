@@ -9,7 +9,50 @@ struct SlotRoot {
     cell: Option<GcLocal<BindingCell, Nullable>>,
     alias: I32Local,
     dirty: I32Local,
-    number: F64Local,
+    number: SlotNumber,
+}
+
+/// A slot's value: a binary64 Number, or the bits of an int32 Number for a
+/// slot `CapturedCalls::type_int32_slots` typed int32.
+#[derive(Clone, Copy)]
+enum SlotNumber {
+    Binary64(F64Local),
+    Int32(I32Local),
+}
+
+impl SlotNumber {
+    /// Stores the slot's own representation from the stack.
+    fn store(self, function: &mut Function) {
+        match self {
+            Self::Binary64(local) => local.store(function),
+            Self::Int32(local) => local.store(function),
+        }
+    }
+
+    fn load_number(self, function: &mut Function) {
+        match self {
+            Self::Binary64(local) => local.load(function),
+            Self::Int32(local) => {
+                local.load(function);
+                function.instruction(&Instruction::F64ConvertI32S);
+            }
+        }
+    }
+
+    /// Copies this slot's value into an aliased slot of the same type.
+    fn copy_to(self, other: Self, function: &mut Function) {
+        match (self, other) {
+            (Self::Binary64(from), Self::Binary64(to)) => {
+                from.load(function);
+                to.store(function);
+            }
+            (Self::Int32(from), Self::Int32(to)) => {
+                from.load(function);
+                to.store(function);
+            }
+            _ => unreachable!("slots that may alias share one representation"),
+        }
+    }
 }
 pub(in super::super) struct CapturedCallRoots {
     calls: Vec<CallRoot>,
@@ -79,9 +122,16 @@ impl CapturedCalls {
                     alias.set_constant(index as i32, function);
                     let dirty = s.reserve_i32_local(function);
                     dirty.set_constant(0, function);
-                    let number = s.reserve_f64_local(function);
-                    function.instruction(&Instruction::F64Const(Ieee64::from(0.0)));
-                    number.store(function);
+                    let number = if self.slot_is_int32(index) {
+                        let number = s.reserve_i32_local(function);
+                        number.set_constant(0, function);
+                        SlotNumber::Int32(number)
+                    } else {
+                        let number = s.reserve_f64_local(function);
+                        function.instruction(&Instruction::F64Const(Ieee64::from(0.0)));
+                        number.store(function);
+                        SlotNumber::Binary64(number)
+                    };
                     let cell = match slot {
                         Slot::Temporary => None,
                         Slot::Capture { .. } => {
@@ -268,9 +318,32 @@ impl CapturedCalls {
                     function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number.tag()));
                     function.instruction(&Instruction::I32Ne);
                     builder.emit_branch_if_to_target(decline, function);
-                    value.scalar().load(function);
-                    function.instruction(&Instruction::F64ReinterpretI64);
-                    roots.slots[*slot_index].number.store(function);
+                    match roots.slots[*slot_index].number {
+                        SlotNumber::Binary64(number) => {
+                            value.scalar().load(function);
+                            function.instruction(&Instruction::F64ReinterpretI64);
+                            number.store(function);
+                        }
+                        SlotNumber::Int32(number) => {
+                            // Admit only an exact int32 that is not -0: the
+                            // slot's every value is then an int32 Number.
+                            value.scalar().load(function);
+                            function.instruction(&Instruction::F64ReinterpretI64);
+                            function.instruction(&Instruction::I32TruncSatF64S);
+                            number.store(function);
+                            value.scalar().load(function);
+                            function.instruction(&Instruction::F64ReinterpretI64);
+                            number.load(function);
+                            function.instruction(&Instruction::F64ConvertI32S);
+                            function.instruction(&Instruction::F64Eq);
+                            value.scalar().load(function);
+                            function.instruction(&Instruction::I64Const(i64::MIN));
+                            function.instruction(&Instruction::I64Ne);
+                            function.instruction(&Instruction::I32And);
+                            function.instruction(&Instruction::I32Eqz);
+                            builder.emit_branch_if_to_target(decline, function);
+                        }
+                    }
                     cell.clear(function);
                 }
                 roots.calls[index]
@@ -332,8 +405,16 @@ impl CapturedCallRoots {
     pub(in super::super) fn selected(&self, call: usize, function: &mut Function) {
         self.calls[call].selected.load(function);
     }
+    /// The slot's Number as binary64.
     pub(in super::super) fn load(&self, slot: usize, function: &mut Function) {
-        self.slots[slot].number.load(function);
+        self.slots[slot].number.load_number(function);
+    }
+    /// The bits of an int32 slot's Number.
+    pub(in super::super) fn load_bits(&self, slot: usize, function: &mut Function) {
+        let SlotNumber::Int32(number) = self.slots[slot].number else {
+            unreachable!("only an int32 slot holds bits");
+        };
+        number.load(function);
     }
     pub(in super::super) fn store(
         &self,
@@ -356,8 +437,7 @@ impl CapturedCallRoots {
             other.alias.load(function);
             function.instruction(&Instruction::I32Eq);
             builder.open_frame(ControlFrameKind::If, function);
-            slot.number.load(function);
-            other.number.store(function);
+            slot.number.copy_to(other.number, function);
             other.dirty.set_constant(1, function);
             builder.pop_control(ControlFrameKind::If);
             function.instruction(&Instruction::End);
@@ -382,7 +462,7 @@ impl CapturedCallRoots {
             slot.dirty.load(function);
             function.instruction(&Instruction::I32And);
             builder.open_frame(ControlFrameKind::If, function);
-            slot.number.load(function);
+            slot.number.load_number(function);
             function.instruction(&Instruction::I64ReinterpretF64);
             bits.store(function);
             value.set_number(bits, function);
@@ -416,7 +496,10 @@ impl CapturedCallRoots {
             }
             s.release_i32_local(slot.alias, function);
             s.release_i32_local(slot.dirty, function);
-            s.release_f64_local(slot.number, function);
+            match slot.number {
+                SlotNumber::Binary64(number) => s.release_f64_local(number, function),
+                SlotNumber::Int32(number) => s.release_i32_local(number, function),
+            }
         }
     }
 }

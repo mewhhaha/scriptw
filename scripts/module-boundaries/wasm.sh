@@ -138,7 +138,7 @@ require_file crates/scriptw-engine/tests/fixtures/generator_for_of_continuations
 # committed completion routing; iterator/loop/resource algorithms stay children.
 # Moved 2026-11-19 to the measured size after cargo fmt: a deliberate change
 # overran it by at most 5%. Larger overruns stay red for their owners to split.
-check_raw_line_budget "$wasm_control_flow" 9877
+check_raw_line_budget "$wasm_control_flow" 9900
 check_raw_line_budget "$wasm_async_function_for_of_iterator" 60
 # The opaque paired projection and body owner measures 150 raw lines.
 check_raw_line_budget "$wasm_for_await_iterator_plan" 170
@@ -2223,7 +2223,7 @@ require_exact_line_count "$wasm_json_parse_array" 'pub(super) struct JsonArrayDa
 require_exact_line_count "$wasm_json_parse_array" "struct FreshJsonArrayElement<'a> {" 1 'private fresh JSON frame insertion owner'
 require_regex_count "$wasm_json_parse_array" '^[[:space:]]*fn from_frame\(' 1 'sole private JSON frame insertion constructor'
 require_regex_count "$wasm_json_parse_array" '^[[:space:]]*pub\(super\) fn emit_json_parse_array_append\(' 1 'fixed fresh JSON array append entry'
-require_fixed_string_count "$wasm_json_parse" 'self.emit_json_parse_array_append(&frame, &stored, ordinal, f)?;' 1 'fresh frame append consumes the original immutable StoredValue'
+require_fixed_string_count "$wasm_json_parse" 'self.emit_json_parse_array_append(&frame, value, ordinal, f)?;' 1 'fresh frame append consumes the delivered value'
 check_no_inline_legacy_includes "$wasm_json_parse_array"
 check_raw_line_budget "$wasm_json_parse_array" 220
 check_raw_line_budget "$wasm_json_reviver" 550

@@ -70,6 +70,23 @@ impl NumberStatement {
         }
     }
 
+    /// Calls `visit` on every expression of the statement, children first.
+    pub(super) fn visit_mut(&mut self, visit: &mut dyn FnMut(&mut NumberExpression)) {
+        match self {
+            Self::Expression(value) | Self::Initialize(value) => value.visit_mut(visit),
+            Self::If {
+                test,
+                consequent,
+                alternate,
+            } => {
+                test.visit_mut(visit);
+                for statement in consequent.iter_mut().chain(alternate) {
+                    statement.visit_mut(visit);
+                }
+            }
+        }
+    }
+
     pub(super) fn collect_writes(&self, writes: &mut [Option<NumberDomain>]) {
         match self {
             Self::Expression(value) | Self::Initialize(value) => value.collect_writes(writes),

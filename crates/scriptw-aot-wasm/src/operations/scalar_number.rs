@@ -90,6 +90,10 @@ impl FunctionBuilder<'_> {
         output: I64Local,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        // Bitwise results convert their int32 bits once, without a tag.
+        if let Some(value) = Int32Expression::of(expression) {
+            return self.compile_int32_number_payload(&value, output, function);
+        }
         match &expression.expr {
             ExprIr::Number(bits) => {
                 function.instruction(&Instruction::I64Const(*bits as i64));
@@ -146,6 +150,9 @@ impl FunctionBuilder<'_> {
         rhs: &TypedExpr,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        if self.try_compile_int32_relation_i32(op, lhs, rhs, function)? {
+            return Ok(());
+        }
         let schema = self.runtime_schema();
         let left = schema.reserve_i64_local(function);
         let right = schema.reserve_i64_local(function);

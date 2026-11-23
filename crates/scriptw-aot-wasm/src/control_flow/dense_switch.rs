@@ -76,17 +76,32 @@ impl<'a> DenseIntegerSwitch<'a> {
     }
 }
 
+/// The evaluated switch value as the table dispatch reads it.
+pub(super) enum DenseDiscriminant<'a> {
+    Value(&'a ValueLocals),
+    /// The bits of an int32-domain Number: always an exact integer, never
+    /// -0, so the only remaining test is an unsigned value above 2^31-1,
+    /// which no int32 case key equals.
+    Int32(I32Local, crate::operations::Int32Signedness),
+}
+
 impl FunctionBuilder<'_> {
     pub(super) fn compile_dense_integer_switch(
         &mut self,
         dispatch: &DenseIntegerSwitch<'_>,
-        discriminant: &ValueLocals,
+        discriminant: DenseDiscriminant<'_>,
         labels: &[String],
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let cases = dispatch.cases;
-        let index = schema.reserve_i32_local(function);
+        let (index, owned_index) = match discriminant {
+            DenseDiscriminant::Value(_) => {
+                let index = schema.reserve_i32_local(function);
+                (index, Some(index))
+            }
+            DenseDiscriminant::Int32(bits, _) => (bits, None),
+        };
         self.emit_statement_result(function);
         let break_frame = self.open_frame(ControlFrameKind::Block, function);
         self.breakable_stack.push(break_frame);
@@ -103,19 +118,31 @@ impl FunctionBuilder<'_> {
             CaseEntry::Exit => break_frame,
         };
 
-        discriminant.scalar().load(function);
-        function.instruction(&Instruction::F64ReinterpretI64);
-        function.instruction(&Instruction::I32TruncSatF64S);
-        index.store(function);
-        discriminant.tag().load(function);
-        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number.tag()));
-        function.instruction(&Instruction::I32Eq);
-        discriminant.scalar().load(function);
-        function.instruction(&Instruction::F64ReinterpretI64);
-        index.load(function);
-        function.instruction(&Instruction::F64ConvertI32S);
-        function.instruction(&Instruction::F64Eq);
-        function.instruction(&Instruction::I32And);
+        match discriminant {
+            DenseDiscriminant::Value(discriminant) => {
+                discriminant.scalar().load(function);
+                function.instruction(&Instruction::F64ReinterpretI64);
+                function.instruction(&Instruction::I32TruncSatF64S);
+                index.store(function);
+                discriminant.tag().load(function);
+                function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number.tag()));
+                function.instruction(&Instruction::I32Eq);
+                discriminant.scalar().load(function);
+                function.instruction(&Instruction::F64ReinterpretI64);
+                index.load(function);
+                function.instruction(&Instruction::F64ConvertI32S);
+                function.instruction(&Instruction::F64Eq);
+                function.instruction(&Instruction::I32And);
+            }
+            DenseDiscriminant::Int32(_, crate::operations::Int32Signedness::Signed) => {
+                function.instruction(&Instruction::I32Const(1));
+            }
+            DenseDiscriminant::Int32(_, crate::operations::Int32Signedness::Unsigned) => {
+                index.load(function);
+                function.instruction(&Instruction::I32Const(0));
+                function.instruction(&Instruction::I32GeS);
+            }
+        }
         function.instruction(&Instruction::If(BlockType::Empty));
         index.load(function);
         function.instruction(&Instruction::I32Const(dispatch.minimum));
@@ -138,7 +165,9 @@ impl FunctionBuilder<'_> {
         self.breakable_stack.pop();
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
-        schema.release_i32_local(index, function);
+        if let Some(index) = owned_index {
+            schema.release_i32_local(index, function);
+        }
         Ok(())
     }
 }

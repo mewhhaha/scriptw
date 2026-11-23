@@ -7328,9 +7328,23 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
+        let dense = dense_switch::DenseIntegerSwitch::analyze(self, cases);
         let discriminant = schema.reserve_value_local(function);
         self.emit_statement_result(function);
-        self.compile_expr_to_value(expression, &discriminant, function)?;
+        // A table dispatch reads an int32-domain discriminant's bits as they
+        // are; no case comparison needs its Number.
+        let int32 = match (&dense, crate::operations::Int32Expression::of(expression)) {
+            (Some(_), Some(value)) => {
+                let bits = schema.reserve_i32_local(function);
+                self.compile_int32_bits(&value, function)?;
+                bits.store(function);
+                Some((bits, value.signedness()))
+            }
+            _ => {
+                self.compile_expr_to_value(expression, &discriminant, function)?;
+                None
+            }
+        };
         self.emit_propagate_current_throw_if_needed(function);
         self.push_scope();
         if let Some(environment) = lexical_environment {
@@ -7342,8 +7356,17 @@ impl<'a> FunctionBuilder<'a> {
         for declaration in lexical_declarations {
             self.compile_statement(declaration, function)?;
         }
-        if let Some(dispatch) = dense_switch::DenseIntegerSwitch::analyze(self, cases) {
-            self.compile_dense_integer_switch(&dispatch, &discriminant, labels, function)?;
+        if let Some(dispatch) = dense {
+            let selector = match int32 {
+                Some((bits, signedness)) => {
+                    dense_switch::DenseDiscriminant::Int32(bits, signedness)
+                }
+                None => dense_switch::DenseDiscriminant::Value(&discriminant),
+            };
+            self.compile_dense_integer_switch(&dispatch, selector, labels, function)?;
+            if let Some((bits, _)) = int32 {
+                schema.release_i32_local(bits, function);
+            }
         } else {
             self.compile_linear_switch(&discriminant, cases, labels, function)?;
         }

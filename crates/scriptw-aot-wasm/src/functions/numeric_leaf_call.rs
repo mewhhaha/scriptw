@@ -261,8 +261,10 @@ impl FunctionBuilder<'_> {
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<bool, EmitError> {
-        if !matches!(continuation, CallContinuation::Continue)
-            || arguments.len() != plan.arity
+        // A tail continuation admits the same route: the leaf runs no
+        // observer, and a caller retired by a proper tail call would admit
+        // any depth the inline arm admits. A miss keeps the tail call.
+        if arguments.len() != plan.arity
             || arguments.iter().any(|argument| {
                 // Kind knowledge may decline a route, never replace its
                 // runtime Number guards or admit a coercion-free execution.

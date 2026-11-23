@@ -95,7 +95,9 @@ impl FunctionBuilder<'_> {
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<bool, EmitError> {
-        if !matches!(continuation, CallContinuation::Continue) || !arguments.is_empty() {
+        // A tail continuation admits the same route (see the numeric leaf):
+        // only stack depth could tell it from the tail call a miss keeps.
+        if !arguments.is_empty() {
             // Decline before any argument evaluation. An accepted candidate
             // owns both its guarded route and the once-evaluated fallback.
             return Ok(false);

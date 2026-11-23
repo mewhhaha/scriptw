@@ -16,8 +16,9 @@ impl FunctionBuilder<'_> {
     ) -> Result<bool, EmitError> {
         // Decline before any source argument evaluation. Once accepted here,
         // this emitter owns both the pure route and saved-operand fallback.
-        if !matches!(continuation, CallContinuation::Continue)
-            || arguments.len() > 1
+        // A tail continuation admits the same route: the guarded native join
+        // runs no user code, and a miss keeps the proper tail call.
+        if arguments.len() > 1
             || arguments.iter().any(|argument| {
                 matches!(
                     argument.expr,
