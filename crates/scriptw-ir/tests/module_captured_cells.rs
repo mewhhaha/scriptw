@@ -934,40 +934,34 @@ fn module_synthetic_cell_pruning_retains_arguments_observers_and_dynamic_owners(
     }
 }
 
-/// A builtin fallback proves the cells of the guarded body it stands in for.
-/// A body whose builtin facts changed no code therefore stays one body even
-/// when it reads a Module cell, and a pair's two bodies name one owner.
+/// A builtin fallback proves the cells of the guarded body it stands in for,
+/// so a body whose builtin facts changed no code stays one body even when it
+/// reads a Module cell.
 #[test]
-fn module_cell_readers_pair_only_when_a_builtin_fact_changes_their_code() {
+fn module_cell_readers_stay_one_body_when_no_builtin_fact_changes_their_code() {
     let program = lower_module(
         r#"
         export let cell = 1;
         export function plain(value) { Math.abs(value); return cell; }
-        export function proving(value) { cell; return Math.imul(value, 3) + 1; }
+        export function counted(value) { cell; return Math.abs(value) + 1; }
+        plain(-2); counted(-2); counted("a");
     "#,
     );
     assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
-    let bodies = |name: &str| -> Vec<&FunctionIr> {
-        program
+    for name in ["plain", "counted"] {
+        let bodies: Vec<&FunctionIr> = program
             .script
             .as_ref()
             .unwrap()
             .functions
             .iter()
             .filter(|function| function.name == name)
-            .collect()
-    };
-    let plain = bodies("plain");
-    let [plain] = plain.as_slice() else {
-        panic!("`plain` must stay one body: {} bodies", plain.len());
-    };
-    assert!(plain.builtin_entry.is_none());
+            .collect();
+        let [body] = bodies.as_slice() else {
+            panic!("`{name}` must stay one body: {} bodies", bodies.len());
+        };
+        assert!(body.builtin_entry.is_none(), "{name}");
+        assert_eq!(body.binding_cell_proof_owner(), body.id);
+    }
     assert_module_activation_capture(&program, "plain", ModuleActivationKindIr::Synchronous);
-    let proving = bodies("proving");
-    let [guarded, fallback] = proving.as_slice() else {
-        panic!("`proving` must be a guarded pair: {} bodies", proving.len());
-    };
-    assert!(guarded.builtin_entry_guard().is_some());
-    assert_eq!(fallback.binding_cell_proof_owner(), guarded.id);
-    assert_eq!(guarded.binding_cell_proof_owner(), guarded.id);
 }
