@@ -118,7 +118,10 @@ impl MemoryImage {
                     if let Some(source) = MemoryImageSource::from_file(file) {
                         return Ok(Some(MemoryImage {
                             source,
-                            source_offset: u64::try_from(data_start - start).unwrap(),
+                            // Scriptw patch: a range mapping starts at
+                            // its own offset in the file.
+                            source_offset: mmap.original_file_offset()
+                                + u64::try_from(data_start - start).unwrap(),
                             linear_memory_offset,
                             len,
                             module_source: module_source.clone(),

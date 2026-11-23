@@ -933,6 +933,23 @@ impl Engine {
         )
     }
 
+    /// Scriptw patch: like `load_code_file`, for a page-aligned range of an
+    /// open file.
+    #[cfg(all(feature = "std", unix, not(miri)))]
+    pub(crate) fn load_code_file_range(
+        &self,
+        file: File,
+        offset: u64,
+        len: usize,
+        expected: ObjectKind,
+    ) -> Result<Arc<crate::CodeMemory>> {
+        self.load_code(
+            crate::runtime::vm::MmapVec::from_file_range(file, offset, len)
+                .with_context(|| "Failed to create file range mapping".to_string())?,
+            expected,
+        )
+    }
+
     pub(crate) fn load_code(
         &self,
         mmap: crate::runtime::vm::MmapVec,

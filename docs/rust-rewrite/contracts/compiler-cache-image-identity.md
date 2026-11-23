@@ -73,8 +73,8 @@ nondefault cache-image cohorts must not be merged with their default reports.
 
 Runtime profiles additionally report R and P module loading separately. A P
 cache hit is not evidence of an R hit. Optional embedded-image spans cover
-manifest/digest admission, portable lease acquisition including decode/digest,
-and native deserialization. They are nested within R loading and the overall
+manifest/digest admission, the once-per-profile proof of the image's range of
+the executable, and native deserialization. They are nested within R loading and the overall
 module phase. Matched diagnostic images retain their existing separate access
 label; their production cost remains in R loading. Cache-owner observations
 report actual entry/image-byte limits and retained native image accounting,

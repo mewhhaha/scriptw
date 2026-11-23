@@ -25,6 +25,10 @@ pub struct AlignedLength {}
 pub struct UnalignedLength {
     #[cfg(feature = "std")]
     file: Option<Arc<File>>,
+    /// Scriptw patch: where in `file` this mapping starts. Zero for a
+    /// whole-file mapping and for anonymous memory.
+    #[cfg(feature = "std")]
+    file_offset: u64,
 }
 
 /// A platform-independent abstraction over memory-mapped data.
@@ -157,6 +161,8 @@ impl Mmap<AlignedLength> {
             data: UnalignedLength {
                 #[cfg(feature = "std")]
                 file: None,
+                #[cfg(feature = "std")]
+                file_offset: 0,
             },
         }
     }
@@ -248,8 +254,32 @@ impl Mmap<UnalignedLength> {
         let sys = mmap::Mmap::from_file(&file)?;
         Ok(Mmap {
             sys,
-            data: UnalignedLength { file: Some(file) },
+            data: UnalignedLength {
+                file: Some(file),
+                file_offset: 0,
+            },
         })
+    }
+
+    /// Scriptw patch: map `len` bytes of `file` starting at the
+    /// host-page-aligned `offset`, with the same private copy-on-write
+    /// semantics as [`Mmap::from_file`]. Unix hosts only.
+    #[cfg(all(unix, not(miri)))]
+    pub fn from_file_range(file: Arc<File>, offset: u64, len: usize) -> Result<Self> {
+        let sys = mmap::Mmap::from_file_range(&file, offset, len)?;
+        Ok(Mmap {
+            sys,
+            data: UnalignedLength {
+                file: Some(file),
+                file_offset: offset,
+            },
+        })
+    }
+
+    /// Scriptw patch: the offset in [`Mmap::original_file`] at which this
+    /// mapping starts.
+    pub fn original_file_offset(&self) -> u64 {
+        self.data.file_offset
     }
 
     /// Returns the underlying file that this mmap is mapping, if present.

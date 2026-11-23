@@ -106,6 +106,42 @@ impl Mmap {
         Ok(Mmap { memory })
     }
 
+    /// Scriptw patch: privately map `len` bytes of `file` starting at the
+    /// host-page-aligned `offset`. The range must lie inside the file, so no
+    /// page of the mapping can fault past its end.
+    #[cfg(feature = "std")]
+    pub fn from_file_range(file: &File, offset: u64, len: usize) -> Result<Self> {
+        let file_len = file
+            .metadata()
+            .context("failed to get file metadata")?
+            .len();
+        let end = u64::try_from(len)
+            .ok()
+            .and_then(|len| offset.checked_add(len))
+            .ok_or_else(|| crate::format_err!("file range overflows"))?;
+        if len == 0 || end > file_len {
+            crate::bail!("file range {offset:#x}+{len:#x} is empty or outside the file");
+        }
+        if offset % (crate::runtime::vm::host_page_size() as u64) != 0 {
+            crate::bail!("file range offset {offset:#x} is not host-page-aligned");
+        }
+        let ptr = unsafe {
+            rustix::mm::mmap(
+                ptr::null_mut(),
+                len,
+                rustix::mm::ProtFlags::READ | rustix::mm::ProtFlags::WRITE,
+                rustix::mm::MapFlags::PRIVATE,
+                &file,
+                offset,
+            )
+            .with_context(|| format!("mmap failed to map {len:#x} bytes at {offset:#x}"))?
+        };
+        let memory = std::ptr::slice_from_raw_parts_mut(ptr.cast(), len);
+        let memory = SendSyncPtr::new(NonNull::new(memory).unwrap());
+
+        Ok(Mmap { memory })
+    }
+
     pub unsafe fn make_accessible(
         &self,
         start: HostAlignedByteCount,

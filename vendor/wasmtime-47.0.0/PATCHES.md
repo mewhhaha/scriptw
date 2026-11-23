@@ -430,6 +430,29 @@ young generation needs this to fit at the limit (`aot_gc_virtual_reservation`
 in the engine's tests; `a_heap_near_its_limit_still_grows_to_the_limit` in
 `copying.rs`).
 
+## File-range deserialization
+
+`Module::deserialize_open_file_range(engine, file, offset, len)`
+(`src/runtime/module.rs`, with `Engine::load_code_file_range`,
+`MmapVec::from_file_range`, `Mmap::from_file_range` and the Unix
+`sys::unix::mmap::Mmap::from_file_range`) is `deserialize_open_file` for `len`
+bytes of an open file starting at `offset`. The range must be non-empty, lie
+inside the file and start on a host page boundary; otherwise it returns an
+error before mapping anything. The mapping is private and copy-on-write like a
+whole-file one. `UnalignedLength` records the mapping's offset in its file so
+that copy-on-write memory images (`src/runtime/vm/cow.rs`) map their data from
+`offset + position in the image` instead of from the position alone, and a
+`debug`-feature deep clone copies a range mapping instead of remapping the whole
+file. Whole-file mappings keep offset zero and their previous behavior. Unix
+hosts only (`cfg(all(feature = "std", unix, not(miri)))`).
+
+Scriptw maps its embedded native runtime images from the running executable
+through this entry
+([contract](../../docs/rust-rewrite/contracts/runtime-byte-ownership.md#native-backing-storage)).
+Test: `embedded_runtime::native_backing::tests` in `scriptw-engine` runs code
+and reads a data segment from a module mapped at a nonzero offset of a larger
+file, and checks the rejected ranges.
+
 Three upstream test feature guards are corrected so the collector control can
 compile with the product's narrow feature set plus `wat`: Linux copy-on-write
 tests in `src/runtime/vm/cow.rs` require `pooling-allocator`, and the hash-key

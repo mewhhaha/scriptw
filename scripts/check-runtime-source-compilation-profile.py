@@ -24,8 +24,10 @@ FILES = tuple(A + name for name in (
     "wasm_runtime_link.rs", "wasm_native_source_compiler.rs", "graph_observation.rs",
     "embedded_runtime/load.rs",
     "embedded_runtime/native_backing.rs",
-)) + tuple("crates/scriptw-runtime-image/src/" + name for name in ("lib.rs", "metadata.rs", "native_storage.rs", "native_lease.rs", "native_input.rs", "native_input/elf_origin.rs")) + (
+)) + tuple("crates/scriptw-runtime-image/src/" + name for name in ("lib.rs", "metadata.rs", "linked_native.rs", "native_input.rs", "native_input/elf_origin.rs")) + (
     "crates/scriptw-runtime-image/build/objects.rs",
+    "crates/scriptw-runtime-image/build/parts.rs",
+    "crates/scriptw-runtime-image/build/linked.rs",
 )
 
 
@@ -206,65 +208,59 @@ def check(root, overrides=None):
     require("if!self.matches(runtime,mode){returnNone;}" in load and
             "RuntimeSourceCompilationProfile::Portable=>scriptw_runtime_image::portable_native()?," in load and
             "RuntimeSourceCompilationProfile::NativeHost=>scriptw_runtime_image::native()?," in load and
-            "if!self.accepts_native(&lease){returnNone;}" in load and
-            "image.digest()==&self.manifest.native_digest" in load and
-            load.index("self.accepts_native(&lease)") < load.index("Module::deserialize(engine,bytes)") and
-            re.search(r"NativeBacking::from_cargo\(self\.images\.profile,&self\.manifest\.native_digest,?\)", load) is not None and
-            "Module::deserialize(engine,bytes)" in load and "drop(lease);" in load,
-            "both native profiles retain independent digest admission before backing publication and transient byte ownership")
+            "if!self.accepts_native(&image){returnNone;}" in load and
+            "image.build_digest()==&self.manifest.native_digest" in load and
+            "NativeBacking::from_cargo(&image)" in load and
+            load.index("self.accepts_native(&image)") < load.index("NativeBacking::from_cargo(&image)") < load.index("backing.deserialize(engine)") and
+            load.index("self.accepts_native(&image)") < load.index("Module::deserialize(engine,bytes)") and
+            "letbytes=image.bytes();" in load,
+            "both native profiles pair the linked image's build digest with the manifest before any mapping or copy")
     backing = c[E + "embedded_runtime/native_backing.rs"]
-    from_cargo = function(source[E + "embedded_runtime/native_backing.rs"], "from_cargo")
-    require(re.search(r"RuntimeSourceCompilationProfile::NativeHost=>\{?scriptw_runtime_image::write_native\(&mutfile\)", from_cargo) is not None and
-            re.search(r"RuntimeSourceCompilationProfile::Portable=>\{?scriptw_runtime_image::write_portable_native\(&mutfile\)", from_cargo) is not None and
-            "letbytes=file.metadata().ok()?.len();" in from_cargo and
-            "written.digest()!=expected||bytes!=written.decoded_bytes()asu64" in from_cargo and
-            from_cargo.index("written.digest()!=expected") < from_cargo.find("returnSome(Self{file,bytes});"),
-            "bounded Cargo output matches independent digest and file length before backing publication")
-    require("structNativeBacking{file:File,bytes:u64,}" in backing and "OFlags::TMPFILE|OFlags::EXCL|OFlags::CLOEXEC" in backing and
-            "file.write_all(bytes).ok()?" in backing and
-            "0x0102_1994|0x8584_58f6" in backing and
-            "Module::deserialize_open_file(engine,self.file.try_clone()?)" in backing,
-            "native file backing remains private, unlinked, non-tmpfs and owned by Wasmtime")
-    require("file.sync_data().ok()?" in backing,
-            "native file backing is synced before publication")
+    require("structNativeBacking{range:ExecutableImageRange,}" in backing and
+            "image.executable_range().map(|range|Self{range})" in backing and
+            "Module::deserialize_open_file_range(engine,self.range.try_clone_file()?,self.range.offset(),self.range.length(),)" in backing and
+            not any(word in backing.split("#[cfg(all(test,unix))]")[0] for word in (
+                "File::open", "OpenOptions", "OFlags", "cache::", "deserialize_file(", "deserialize_open_file(", "std::path")),
+            "native code is mapped only from the proved range of the running executable, never from a named, cache or digest-selected file")
     image = "crates/scriptw-runtime-image/src/"
     require("modmetadata;pubusemetadata::{metadata,portable_metadata};" in c[image + "lib.rs"] and
-            c[image + "lib.rs"].count("#[inline(never)]") == 9 and
+            c[image + "lib.rs"].count("#[inline(never)]") == 7 and c[image + "linked_native.rs"].count("#[inline(never)]") == 2 and
             c[image + "metadata.rs"].count("#[inline(never)]") == 2 and
             "pubfnmetadata()->&'static[u8]" in c[image + "metadata.rs"] and
             "pubfnportable_metadata()->&'static[u8]" in c[image + "metadata.rs"] and
             "returnunsafe{&SCRIPTW_RUNTIME_METADATA}" in c[image + "metadata.rs"] and
             "returnunsafe{&SCRIPTW_RUNTIME_PORTABLE_METADATA}" in c[image + "metadata.rs"] and
-            "constPARTS:[(&str,&str);11]" in c["crates/scriptw-runtime-image/build/objects.rs"] and
-            '"SCRIPTW_RUNTIME_METADATA","scriptw-runtime-metadata.bin"' in c["crates/scriptw-runtime-image/build/objects.rs"] and
-            '"SCRIPTW_RUNTIME_PORTABLE_METADATA","scriptw-runtime-portable-metadata.bin"' in c["crates/scriptw-runtime-image/build/objects.rs"] and
+            "constPARTS:[(&str,&str,Alignment);13]" in c["crates/scriptw-runtime-image/build/parts.rs"] and
+            '"SCRIPTW_RUNTIME_METADATA","scriptw-runtime-metadata.bin",Alignment::Byte' in c["crates/scriptw-runtime-image/build/parts.rs"] and
+            '"SCRIPTW_RUNTIME_PORTABLE_METADATA","scriptw-runtime-portable-metadata.bin",Alignment::Byte' in c["crates/scriptw-runtime-image/build/parts.rs"] and
             "pubfnexecution_metadata()->&'static[u8]" in c[image + "lib.rs"] and
             "pubfnportable_execution_metadata()->&'static[u8]" in c[image + "lib.rs"] and
             "returnunsafe{&SCRIPTW_RUNTIME_EXECUTION}" in function(source[image + "lib.rs"], "execution_metadata") and
             "returnunsafe{&SCRIPTW_RUNTIME_PORTABLE_EXECUTION}" in function(source[image + "lib.rs"], "portable_execution_metadata") and
-            '"SCRIPTW_RUNTIME_EXECUTION","scriptw-runtime-execution.bin"' in c["crates/scriptw-runtime-image/build/objects.rs"] and
-            '"SCRIPTW_RUNTIME_PORTABLE_EXECUTION","scriptw-runtime-portable-execution.bin"' in c["crates/scriptw-runtime-image/build/objects.rs"],
-            "eleven immutable image definitions use seven original and four receipt accessors")
-    lease = c[image + "native_lease.rs"]
-    storage = c[image + "native_storage.rs"]
-    require("Mutex<Result<Weak<NativeRuntimeBytes>,()>>" in lease and
-            "Arc::downgrade(&image)" in lease and
-            "super::native_storage::decode_reader(profile.reader())" in lease and
-            "super::native_storage::write_decoded(profile.reader(),writer)" in lease and
-            "&super::SCRIPTW_RUNTIME_PORTABLE_NATIVE[..]" in lease and
-            "&super::SCRIPTW_RUNTIME_NATIVE[..]" in lease and
-            "pubstructNativeRuntimeBytes{bytes:Box<[u8]>,digest:[u8;32],}" in storage and
-            "pubfnbytes(&self)->&[u8]{&self.bytes}" in storage and
-            "pubfndigest(&self)->&[u8;32]{&self.digest}" in storage and
-            "hash.update(&buffer[..count]);" in storage and
-            "letdigest:[u8;32]=hash.finalize().into();" in storage and
-            "iflength!=header.length||digest!=header.expected" in storage and
-            "letdigest=write_body(reader,header,&mutbytes)?.digest;" in storage and
-            "letmutbuffer=[0;64*1024];" in storage and
-            "decoder.window_log_max(23).ok()?;" in storage and
-            ".single_frame()" in storage and
-            "decoder.finish().read(&mutbuffer[..1]).ok()?!=0" in storage,
-            "only verified immutable Cargo bytes enter weak leases with a derived digest")
+            '"SCRIPTW_RUNTIME_EXECUTION","scriptw-runtime-execution.bin",Alignment::Byte' in c["crates/scriptw-runtime-image/build/parts.rs"] and
+            '"SCRIPTW_RUNTIME_PORTABLE_EXECUTION","scriptw-runtime-portable-execution.bin",Alignment::Byte' in c["crates/scriptw-runtime-image/build/parts.rs"],
+            "thirteen immutable image definitions use seven original, four receipt and two attested-digest symbols")
+    linked = c[image + "linked_native.rs"]
+    lib = c[image + "lib.rs"]
+    objects = c["crates/scriptw-runtime-image/build/objects.rs"]
+    parts = c["crates/scriptw-runtime-image/build/parts.rs"]
+    packaging = c["crates/scriptw-runtime-image/build/linked.rs"]
+    require("pubstructLinkedNativeImage{bytes:&'static[u8],build_digest:&'static[u8;32],}" in linked and
+            "pubstructExecutableImageRange{file:File,offset:u64,length:usize,}" in linked and
+            "let(file,offset)=super::native_input::executable_range(self.bytes)?;" in linked and
+            linked.count("Some(ExecutableImageRange{") == 1 and linked.count("ExecutableImageRange{") == 3 and "fnnew" not in linked and
+            "LinkedNativeImage{bytes:&super::SCRIPTW_RUNTIME_NATIVE.0,build_digest:&super::SCRIPTW_RUNTIME_NATIVE_DIGEST,}" in linked and
+            "LinkedNativeImage{bytes:&super::SCRIPTW_RUNTIME_PORTABLE_NATIVE.0,build_digest:&super::SCRIPTW_RUNTIME_PORTABLE_NATIVE_DIGEST,}" in linked and
+            linked.count("LinkedNativeImage{") == 4 and "LinkedNativeImage{" not in lib and
+            '"SCRIPTW_RUNTIME_NATIVE","scriptw-runtime-native.bin",Alignment::Page' in parts and
+            '"SCRIPTW_RUNTIME_PORTABLE_NATIVE","scriptw-runtime-portable-native.bin",Alignment::Page' in parts and
+            '"SCRIPTW_RUNTIME_NATIVE_DIGEST","scriptw-runtime-native.sha256",Alignment::Byte' in parts and
+            '"SCRIPTW_RUNTIME_PORTABLE_NATIVE_DIGEST","scriptw-runtime-portable-native.sha256",Alignment::Byte' in parts and
+            "constPAGE_ALIGNMENT:usize=64*1024;" in parts and "#[repr(C,align({PAGE_ALIGNMENT}))]" in objects and
+            'std::fs::read(out.join(format!("{prefix}-native.bin")))' in packaging and
+            "Sha256::digest(&raw).to_vec()" in packaging and
+            'out.join(format!("{prefix}-native.sha256"))' in packaging,
+            "only the two linked page-aligned Cargo images, each with the digest attested for its exact linked file, become native images")
     native_input = c[image + "native_input.rs"]
     require('File::open("/proc/self/exe")' in native_input and
             'File::open("/proc/self/maps")' in native_input and
@@ -272,12 +268,13 @@ def check(root, overrides=None):
             'inode!=self.inode' in native_input and 'major!=expected_major||minor!=expected_minor' in native_input and
             'address.checked_add(length)?>end' in native_input and
             'offset.checked_add(u64::try_from(length).ok()?)?<=self.length' in native_input and
-            'Some(file.take(u64::try_from(encoded.len()).ok()?))' in native_input and
-            'Self::Embedded(encoded)' in native_input,
-            "packed input binds immutable symbol range to executable inode with an exact read limit and static fallback")
+            'returnSome((file,offset));' in native_input and
+            'pub(super)fnexecutable_range(linked:&\'static[u8])->Option<(File,u64)>' in native_input and
+            'unsafe{' not in native_input,
+            "the linked symbol's range is bound to the executable inode, or no range is produced")
     origin = c[image + "native_input/elf_origin.rs"]
     require('ifletSome(offset)=matches.next()' in native_input and
-            'elf_origin::KernelMainElf::open()?.read_symbol(encoded,&maps)?' in native_input and
+            'elf_origin::KernelMainElf::open()?.locate_symbol(linked,&maps)?' in native_input and
             native_input.index('ifletSome(offset)=matches.next()') < native_input.index('elf_origin::KernelMainElf::open()') and
             'pub(super)fnopen()->Option<Self>' in origin and
             all('File::open("' + path + '")' in origin for path in ('/proc/self/exe', '/proc/self/auxv', '/proc/self/mem')) and

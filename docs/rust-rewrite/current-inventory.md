@@ -78,23 +78,31 @@ accepts `--case <file.js>`.
 - Process startup: the [density panel](benchmarks.md#process-density) fits
   1.7× as many Scriptw processes as Node 24 in memory, but measured a Scriptw
   process at about 306 ms against Node's 42 ms: about 194 ms hashing the
-  203 MiB executable and about 93 ms loading the runtime image. The hash is
-  gone from the product path. Compiler caches are keyed by the loaded image's
+  203 MiB executable and about 93 ms loading the runtime image. Both are gone
+  from the product path. Compiler caches are keyed by the loaded image's
   linker build ID
-  ([contract](contracts/compiler-cache-image-identity.md)), precompiled-image
-  admission needs only the build source, and the panel's wall processes report
-  a build-source identity while the driver hashes the host file. On the
-  loaded shared machine, one CPU, 15 processes each: warm `scriptw run` of the
-  print-only program 174 → 103 ms and the host's `execute-scriptw`
-  289 → 103 ms; evidence commands still hash (about 186 ms).
+  ([contract](contracts/compiler-cache-image-identity.md)), and the native
+  runtime image is linked raw and page-aligned and mapped from the running
+  executable
+  ([contract](contracts/runtime-byte-ownership.md#native-backing-storage))
+  instead of zstd-decoded (about 43 ms), SHA-256-admitted (about 31 ms) and
+  written to a private unnamed file (about 14 ms) in every process. R now
+  loads in about 2 ms. On the loaded shared machine, one CPU, 21 interleaved
+  processes each, medians: warm `scriptw run` of the print-only program
+  114 → 27 ms and the host's `execute-scriptw` 13 ms (103 ms before, from the
+  previous measurement; that host was not rebuilt), against 32 ms for Node 24
+  in the same rounds. Eight concurrent `scriptw run` processes held in a loop
+  used 6.3 MiB of PSS per added process, from 9.9 MiB: the runtime's touched
+  code pages are now shared file pages. The executable grew from 215.5 to
+  275.4 MB (the host from 212.5 to 272.6 MB), because both native images are
+  stored raw.
 
-  What remains is the embedded runtime image, about 90 ms of every process:
-  zstd-decoding 41.8 MiB, its SHA-256 admission (about 33 ms) and the write to
-  a private unnamed file that Wasmtime maps. Attribute those three, then
-  choose between a faster admission digest and an uncompressed, page-aligned
-  image mapped from the executable itself. Keep the rule that no pre-existing
-  or digest-selected native file is admitted. Then rerun the panel on a quiet
-  machine.
+  What remains: rerun the panel on a quiet machine with its own method (the
+  figures above are not the panel's). Engine construction is now the largest
+  part of a warm `scriptw run`, about 14 ms of 27. The two raw Wasm
+  packages (38 MiB each) are the next candidates if the executable's size
+  matters more than its page-cache sharing. Keep the rule that no
+  pre-existing, cache-directory or digest-selected native file is admitted.
 
   Owner: CLI and engine embedding.
 - Retained RSC requests: the 1 ms goal is met, and against Node 24

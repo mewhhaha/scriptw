@@ -198,6 +198,18 @@ impl MmapVec {
         Ok(MmapVec::new_mmap(mmap, len))
     }
 
+    /// Scriptw patch: like [`MmapVec::from_file`], for `len` bytes of `file`
+    /// starting at the host-page-aligned `offset`.
+    #[cfg(all(feature = "std", unix, not(miri)))]
+    pub fn from_file_range(file: File, offset: u64, len: usize) -> Result<MmapVec> {
+        let file = Arc::new(file);
+        let mmap =
+            Mmap::from_file_range(Arc::clone(&file), offset, len).with_context(move || {
+                format!("failed to create mmap for range {offset:#x}+{len:#x} of {file:?}")
+            })?;
+        Ok(MmapVec::new_mmap(mmap, len))
+    }
+
     /// Makes the specified `range` within this `mmap` to be read/execute.
     #[cfg(has_virtual_memory)]
     pub unsafe fn make_executable(
@@ -257,6 +269,19 @@ impl MmapVec {
         }
     }
 
+    /// Scriptw patch: the offset in [`MmapVec::original_file`] at which this
+    /// image starts (zero unless it maps a file range).
+    #[cfg(feature = "std")]
+    pub fn original_file_offset(&self) -> u64 {
+        match self {
+            #[cfg(not(has_virtual_memory))]
+            MmapVec::Alloc { .. } => 0,
+            MmapVec::ExternallyOwned { .. } => 0,
+            #[cfg(has_virtual_memory)]
+            MmapVec::Mmap { mmap, .. } => mmap.original_file_offset(),
+        }
+    }
+
     /// Returns the bounds, in host memory, of where this mmap
     /// image resides.
     pub fn image_range(&self) -> Range<*const u8> {
@@ -310,8 +335,12 @@ impl MmapVec {
             MmapVec::Mmap { mmap, len } => {
                 #[cfg(feature = "std")]
                 if let Some(original_file) = mmap.original_file() {
-                    let mmap = Mmap::from_file(original_file.clone())?;
-                    return Ok(MmapVec::Mmap { mmap, len: *len });
+                    // Scriptw patch: a whole-file remap of a range mapping
+                    // would hold other bytes; such a mapping is copied below.
+                    if mmap.original_file_offset() == 0 {
+                        let mmap = Mmap::from_file(original_file.clone())?;
+                        return Ok(MmapVec::Mmap { mmap, len: *len });
+                    }
                 }
                 MmapVec::from_slice_with_alignment(&self[..], crate::runtime::vm::host_page_size())
             }

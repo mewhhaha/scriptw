@@ -1,18 +1,16 @@
 //! Immutable Cargo-produced runtime images, isolated from compiler metadata.
 //!
 //! Every image comes from the current checked raw runtime producer. Engine
-//! independently admits source, target, modes, layout and byte digests before
+//! independently admits source, target, modes, layout and digests before
 //! deserializing native code. This crate accepts no caller bytes or paths.
 
 pub mod execution;
 mod metadata;
 pub use metadata::{metadata, portable_metadata};
-mod native_storage;
-pub use native_storage::{NativeRuntimeBytes, NativeRuntimeDigest};
-#[cfg(any(scriptw_runtime_image, test))]
+mod linked_native;
+pub use linked_native::{native, portable_native, ExecutableImageRange, LinkedNativeImage};
+#[cfg(all(target_os = "linux", any(scriptw_runtime_image, test)))]
 mod native_input;
-#[cfg(scriptw_runtime_image)]
-mod native_lease;
 
 #[cfg(scriptw_runtime_image)]
 include!(concat!(env!("OUT_DIR"), "/image_bindings.rs"));
@@ -56,14 +54,6 @@ pub fn package() -> &'static [u8] {
 }
 
 #[inline(never)]
-pub fn native() -> Option<std::sync::Arc<NativeRuntimeBytes>> {
-    #[cfg(scriptw_runtime_image)]
-    return native_lease::acquire(native_lease::Image::NativeHost);
-    #[cfg(not(scriptw_runtime_image))]
-    None
-}
-
-#[inline(never)]
 pub fn manifest_bytes() -> &'static [u8] {
     #[cfg(scriptw_runtime_image)]
     // SAFETY: same target-defined immutable array contract as package().
@@ -83,37 +73,6 @@ pub fn portable_package() -> &'static [u8] {
 }
 
 #[inline(never)]
-pub fn portable_native() -> Option<std::sync::Arc<NativeRuntimeBytes>> {
-    #[cfg(scriptw_runtime_image)]
-    return native_lease::acquire(native_lease::Image::Portable);
-    #[cfg(not(scriptw_runtime_image))]
-    None
-}
-
-/// Write only the linked Cargo producer's native image through bounded buffers.
-/// The digest describes this write; it cannot authorize unrelated native data.
-pub fn write_native(writer: &mut impl std::io::Write) -> Option<NativeRuntimeDigest> {
-    #[cfg(scriptw_runtime_image)]
-    return native_lease::write(native_lease::Image::NativeHost, writer);
-    #[cfg(not(scriptw_runtime_image))]
-    {
-        let _ = writer;
-        None
-    }
-}
-
-/// Portable-profile counterpart of write_native, with the same source boundary.
-pub fn write_portable_native(writer: &mut impl std::io::Write) -> Option<NativeRuntimeDigest> {
-    #[cfg(scriptw_runtime_image)]
-    return native_lease::write(native_lease::Image::Portable, writer);
-    #[cfg(not(scriptw_runtime_image))]
-    {
-        let _ = writer;
-        None
-    }
-}
-
-#[inline(never)]
 pub fn portable_manifest_bytes() -> &'static [u8] {
     #[cfg(scriptw_runtime_image)]
     // SAFETY: same target-defined immutable array contract as package().
@@ -123,4 +82,4 @@ pub fn portable_manifest_bytes() -> &'static [u8] {
 }
 
 #[cfg(all(test, scriptw_runtime_image))]
-mod lease_tests;
+mod linked_tests;

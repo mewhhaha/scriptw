@@ -1,10 +1,14 @@
-//! Per-Engine native admission and a transient private Cargo-byte lease.
+//! Per-Engine native admission and deserialization of the linked Cargo image.
 use super::native_backing::NativeLoadPath;
 use super::*;
 
 impl EmbeddedNativeRuntime {
-    pub(super) fn accepts_native(&self, image: &scriptw_runtime_image::NativeRuntimeBytes) -> bool {
-        image.digest() == &self.manifest.native_digest
+    /// Pairing admission: the digest the Cargo packaging step attested for
+    /// the bytes it linked must be the producer's manifest digest. The bytes
+    /// are not hashed again here; `scriptw_runtime_image::linked_native`
+    /// states why origin and pairing are what a load can establish.
+    pub(super) fn accepts_native(&self, image: &scriptw_runtime_image::LinkedNativeImage) -> bool {
+        image.build_digest() == &self.manifest.native_digest
     }
 
     pub(super) fn load(
@@ -26,56 +30,54 @@ impl EmbeddedNativeRuntime {
         mode: WasmNativeCompilationMode,
         timings: &mut crate::WasmRuntimeEmbeddedImageTimings,
     ) -> Option<Module> {
-        // Reuse only immutable backing storage. Every Engine still creates and
+        let image = match self.images.profile {
+            RuntimeSourceCompilationProfile::NativeHost => scriptw_runtime_image::native()?,
+            RuntimeSourceCompilationProfile::Portable => scriptw_runtime_image::portable_native()?,
+        };
+        if !self.accepts_native(&image) {
+            return None;
+        }
+        // Reuse only the proved executable range. Every Engine still creates and
         // admits its own Module; the existing module-cache budget is unchanged.
         let backing_started = std::time::Instant::now();
-        let backing = self.native_backing.get_or_init(|| {
-            native_backing::NativeBacking::from_cargo(
-                self.images.profile,
-                &self.manifest.native_digest,
-            )
-        });
+        let backing = self
+            .native_backing
+            .get_or_init(|| native_backing::NativeBacking::from_cargo(&image));
         timings.native_backing_preparation = backing_started.elapsed();
         if let Some(backing) = backing {
             let started = std::time::Instant::now();
             // SAFETY: this owner admitted Cargo source/profile/target/digests
-            // before construction, and matches() checked this actual R key/mode.
+            // before construction, matches() checked this actual R key/mode,
+            // and accepts_native() paired this image with the manifest.
             let loaded = unsafe { backing.deserialize(engine) };
             timings.deserialize += started.elapsed();
-            if let Ok(module) = loaded {
-                self.trace_hit(backing.bytes(), NativeLoadPath::PrivateInode, mode);
-                return Some(module);
+            match loaded {
+                Ok(module) => {
+                    self.trace_hit(backing.bytes(), NativeLoadPath::ExecutableMapping, mode);
+                    return Some(module);
+                }
+                Err(error) => {
+                    if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
+                        eprintln!(
+                            "scriptw wasm trace: runtime-native-bundle executable mapping unavailable: {error:#}"
+                        );
+                    }
+                }
             }
         }
-        // The weak lease shares only concurrent loads, never a mutable Store
-        // or a Module. Its private constructor hashes the exact decoded Box;
-        // the independent v5 manifest must admit that digest before deserialize.
-        let lease_started = std::time::Instant::now();
-        let lease = match self.images.profile {
-            RuntimeSourceCompilationProfile::NativeHost => scriptw_runtime_image::native()?,
-            RuntimeSourceCompilationProfile::Portable => scriptw_runtime_image::portable_native()?,
-        };
-        if !self.accepts_native(&lease) {
-            return None;
-        }
-        timings.native_lease_decode_and_digest = lease_started.elapsed();
-        let bytes = lease.bytes();
-        // SAFETY: bytes are exclusively the immutable Cargo output of the
-        // checked raw/native runtime producer. Each exact decoded digest is
-        // independently admitted above. Source/target/config/modes/raw key have
-        // already matched. No caller slice/path/cache blob enters this seam.
-        // Wasmtime owns its file-backed or copied mapping. deserialize_raw,
-        // which would borrow caller-owned executable memory, is not used.
-        // Compatibility is checked by the actual destination Engine; no build
-        // Engine or Module is cached here. Dropping the lease after this call
-        // cannot invalidate the Module's separate Arc<CodeMemory> mapping.
+        let bytes = image.bytes();
+        // SAFETY: bytes are exclusively the immutable linked Cargo output of
+        // the checked raw/native runtime producer, paired with the manifest
+        // above. Source/target/config/modes/raw key have already matched. No
+        // caller slice/path/cache blob enters this seam. Wasmtime copies them
+        // into its own mapping. deserialize_raw, which would borrow memory
+        // Wasmtime cannot make executable, is not used. Compatibility is
+        // checked by the actual destination Engine; no build Engine or Module
+        // is cached here.
         let started = std::time::Instant::now();
         let native_length = bytes.len();
-        // A filesystem without private backing keeps the same native image
-        // through the bounded-source reader and existing owned-byte lease.
         let loaded = unsafe { Module::deserialize(engine, bytes) };
         timings.deserialize += started.elapsed();
-        drop(lease);
         if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
             eprintln!(
                 "scriptw wasm trace: runtime-native-bundle deserialization: {:?}",
@@ -84,7 +86,7 @@ impl EmbeddedNativeRuntime {
         }
         match loaded {
             Ok(module) => {
-                self.trace_hit(native_length as u64, NativeLoadPath::Lease, mode);
+                self.trace_hit(native_length as u64, NativeLoadPath::Copied, mode);
                 Some(module)
             }
             Err(error) => {

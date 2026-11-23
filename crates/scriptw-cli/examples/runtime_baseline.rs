@@ -164,7 +164,6 @@ fn run() -> Result<(), String> {
                     "embedded_image_ns": p.module_loading.embedded_image.as_ref().map(|timings| json!({
                         "admission": timings.admission.as_nanos(),
                         "native_backing_preparation": timings.native_backing_preparation.as_nanos(),
-                        "native_lease_decode_and_digest": timings.native_lease_decode_and_digest.as_nanos(),
                         "deserialize": timings.deserialize.as_nanos(),
                     })),
                 },

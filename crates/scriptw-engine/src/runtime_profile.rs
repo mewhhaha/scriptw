@@ -28,12 +28,11 @@ pub enum WasmRuntimeModuleCacheOutcome {
 pub struct WasmRuntimeEmbeddedImageTimings {
     /// Immutable manifest/source/target/configuration and package digest checks.
     pub admission: Duration,
-    /// First bounded Cargo decode/digest and private backing creation, or
-    /// lookup of an existing backing. No decoded image-sized lease is required.
+    /// Proof, once per profile, that the linked native image is a range of
+    /// the running executable file; later loads reuse it.
     pub native_backing_preparation: Duration,
-    /// Either profile's transient decoding and exact native digest check.
-    /// Reusing an admitted private backing file needs no decoded lease.
-    pub native_lease_decode_and_digest: Duration,
+    /// Mapping that range (or copying the linked bytes where no range is
+    /// proved) and Wasmtime's own compatibility checks and registration.
     pub deserialize: Duration,
 }
 
@@ -546,10 +545,7 @@ mod tests {
             assert!(image.deserialize > Duration::ZERO);
             assert!(
                 profile.module_loading.runtime
-                    >= image.admission
-                        + image.native_backing_preparation
-                        + image.native_lease_decode_and_digest
-                        + image.deserialize
+                    >= image.admission + image.native_backing_preparation + image.deserialize
             );
         }
         assert_eq!(

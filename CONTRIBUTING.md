@@ -799,11 +799,13 @@ and links the copy's code even after canonical sources change. If that
 happened, remove every `target/<profile>/.fingerprint/` directory whose
 `dep-*` files name the copy, then rebuild.
 
-Use a disk-backed `SCRIPTW_CACHE_DIR` for footprint comparisons and record the
-cache filesystem and native backing mode alongside image digests. On Linux, the
-Cargo runtime's private-file loader rejects tmpfs/ramfs and uses anonymous loading.
-Moving a verification cache to `/tmp` or `/dev/shm` can change RSS for the same
-image. Compare RSS only across matching cache filesystems and backing modes.
+For footprint comparisons, record the native backing mode from the load trace
+(`SCRIPTW_WASM_TRACE=1`: `backing: executable-mapping` or `backing: copied`)
+alongside image digests. On Linux the Cargo runtime image is mapped from the
+running executable, whatever `SCRIPTW_CACHE_DIR` is; without procfs it is
+copied into anonymous memory, private to each process. An executable run from
+tmpfs keeps its pages in memory either way. Compare PSS or USS only across
+matching backing modes and executable filesystems.
 
 Keep evidence in durable workspace/archive storage; `/dev/shm` is scratch. Preserve
 outputs by digest before moving them, inspect symlink/hardlink destinations before

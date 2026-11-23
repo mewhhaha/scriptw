@@ -1,168 +1,157 @@
-//! Private immutable disk backing for admitted Cargo native bytes. It owns no
-//! Module or Engine. Wasmtime owns each independent private executable mapping.
-//! The unnamed backing lasts only for the process; completed file writes are
-//! visible to its mappings without a durability flush.
-use scriptw_aot_wasm::RuntimeSourceCompilationProfile;
-use std::fs::File;
-#[cfg(all(test, target_os = "linux"))]
-use std::io::Write;
+//! Mapping source for an admitted Cargo native image: the image's own range
+//! of the running executable. It owns no Module or Engine. Wasmtime owns each
+//! independent private executable mapping of that range, whose clean pages
+//! are the executable's page-cache pages, shared with every other process
+//! running the same file. Nothing is decoded, hashed, copied or written, and
+//! no other file can back native code: no pre-existing, cache-directory or
+//! digest-selected file is ever opened here.
+use scriptw_runtime_image::{ExecutableImageRange, LinkedNativeImage};
 
 /// Where an admitted embedded native runtime was deserialized from.
 #[derive(Clone, Copy)]
 pub(super) enum NativeLoadPath {
-    /// An unnamed private inode under the module cache directory.
-    PrivateInode,
-    /// The owned-byte lease, used where the cache directory cannot hold a
-    /// private inode (tmpfs, ramfs, or an unavailable cache).
-    Lease,
+    /// A private mapping of the image's range of the running executable.
+    ExecutableMapping,
+    /// A Wasmtime-owned copy of the linked bytes, used where the process
+    /// cannot prove the image's place in its executable (no procfs, an
+    /// image linked outside the main executable, or not Linux).
+    Copied,
 }
 
 impl NativeLoadPath {
     pub(super) fn as_str(self) -> &'static str {
         match self {
-            NativeLoadPath::PrivateInode => "private-inode",
-            NativeLoadPath::Lease => "lease",
+            NativeLoadPath::ExecutableMapping => "executable-mapping",
+            NativeLoadPath::Copied => "copied",
         }
     }
 }
 
 pub(super) struct NativeBacking {
-    file: File,
-    /// Length of the admitted native image, for the load trace.
-    bytes: u64,
+    range: ExecutableImageRange,
 }
 
 impl NativeBacking {
-    pub(super) fn from_cargo(
-        profile: RuntimeSourceCompilationProfile,
-        expected: &[u8; 32],
-    ) -> Option<Self> {
-        #[cfg(target_os = "linux")]
-        {
-            let mut file = Self::private_file()?;
-            // The only writer is the linked Cargo image decoder. Neither paths,
-            // caller bytes nor a digest-selected external cache enter this seam.
-            let written = match profile {
-                RuntimeSourceCompilationProfile::NativeHost => {
-                    scriptw_runtime_image::write_native(&mut file)
-                }
-                RuntimeSourceCompilationProfile::Portable => {
-                    scriptw_runtime_image::write_portable_native(&mut file)
-                }
-            }?;
-            let bytes = file.metadata().ok()?.len();
-            if written.digest() != expected || bytes != written.decoded_bytes() as u64 {
-                return None;
-            }
-            return Some(Self { file, bytes });
-        }
-        #[cfg(not(target_os = "linux"))]
-        {
-            let _ = (profile, expected);
-            None
-        }
+    /// Resolved once per profile: the proof reads `/proc/self/maps`, which is
+    /// short at the first load and grows with every later mapping.
+    pub(super) fn from_cargo(image: &LinkedNativeImage) -> Option<Self> {
+        image.executable_range().map(|range| Self { range })
     }
 
-    #[cfg(target_os = "linux")]
-    fn private_file() -> Option<File> {
-        use rustix::fs::{Mode, OFlags};
-        let directory = crate::cache::module_cache_directory().join("private-native-backing-v1");
-        std::fs::create_dir_all(&directory).ok()?;
-        // O_TMPFILE|EXCL has no pathname and cannot later be linked. Never
-        // accept a previously existing native file or expose a write handle.
-        let fd = rustix::fs::open(
-            &directory,
-            OFlags::RDWR | OFlags::TMPFILE | OFlags::EXCL | OFlags::CLOEXEC,
-            Mode::RUSR | Mode::WUSR,
-        )
-        .ok()?;
-        // Linux uapi magic.h: tmpfs/ramfs are unreclaimable without swap.
-        // Moving the image there would merely hide its bytes from RSS.
-        let stat = rustix::fs::fstatfs(&fd).ok()?;
-        if matches!(stat.f_type as u64, 0x0102_1994 | 0x8584_58f6) {
-            return None;
-        }
-        Some(File::from(fd))
-    }
-
-    #[cfg(test)]
-    fn create(bytes: &[u8]) -> Option<Self> {
-        #[cfg(target_os = "linux")]
-        {
-            let mut file = Self::private_file()?;
-            file.write_all(bytes).ok()?;
-            Some(Self {
-                file,
-                bytes: bytes.len() as u64,
-            })
-        }
-        #[cfg(not(target_os = "linux"))]
-        {
-            let _ = bytes;
-            None
-        }
-    }
-
+    /// Length of the admitted native image, for the load trace.
     pub(super) fn bytes(&self) -> u64 {
-        self.bytes
+        self.range.length() as u64
     }
 
     /// # Safety
-    /// This file must contain the exact already-admitted Cargo producer native
-    /// image. File construction proves immutability, not native-code authority.
+    /// The image this range was proved for must already be admitted against
+    /// the Cargo manifest. The range proves origin, not native-code authority.
     pub(super) unsafe fn deserialize(
         &self,
         engine: &wasmtime::Engine,
     ) -> wasmtime::Result<wasmtime::Module> {
-        // SAFETY: caller supplies native authority; the unlinked inode has no
-        // exposed mutation path. This type publishes no writable File/descriptor,
-        // and Wasmtime retains its own Arc<File> through Module/Store lifetimes.
-        unsafe { wasmtime::Module::deserialize_open_file(engine, self.file.try_clone()?) }
+        #[cfg(unix)]
+        {
+            // SAFETY: caller supplies native authority. The range is the
+            // linked image in the kernel's handle to the running executable,
+            // which the kernel keeps unwritable while it runs; this type
+            // publishes no descriptor. Wasmtime retains its own handle through
+            // Module/Store lifetimes and rejects an offset that is not a
+            // multiple of the host page size.
+            unsafe {
+                wasmtime::Module::deserialize_open_file_range(
+                    engine,
+                    self.range.try_clone_file()?,
+                    self.range.offset(),
+                    self.range.length(),
+                )
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = engine;
+            wasmtime::bail!("executable range mapping is unavailable on this host")
+        }
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
-    use super::*;
+    use std::io::Write;
 
+    /// The patched Wasmtime entry maps only the given range: code runs from
+    /// it, a data segment's copy-on-write image comes from the same range of
+    /// the file, and an unaligned or out-of-file range maps nothing.
     #[test]
-    fn private_inode_has_no_name_and_module_owns_its_lifetime() {
+    fn a_page_aligned_file_range_is_a_complete_module_owned_by_wasmtime() {
         let engine = crate::shared_wasm_engine().unwrap();
-        // Validated module: (func (export "answer") (result i32) i32.const 7).
+        // Validated module: (memory 1) (data (i32.const 8) "\2a")
+        // (func (export "answer") (result i32) (i32.load8_u (i32.const 8))).
         let wasm = [
-            0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 127, 3, 2, 1, 0, 7, 10, 1, 6, 97, 110,
-            115, 119, 101, 114, 0, 0, 10, 6, 1, 4, 0, 65, 7, 11,
+            0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 127, 3, 2, 1, 0, 5, 3, 1, 0, 1, 7, 10,
+            1, 6, 97, 110, 115, 119, 101, 114, 0, 0, 10, 9, 1, 7, 0, 65, 8, 45, 0, 0, 11, 11, 7, 1,
+            0, 65, 8, 11, 1, 42,
         ];
         let original = wasmtime::Module::new(&engine, wasm).unwrap();
         let native = original.serialize().unwrap();
-        let loaded = match NativeBacking::create(&native) {
-            Some(backing) => {
-                #[cfg(target_os = "linux")]
-                {
-                    use std::os::unix::fs::MetadataExt;
-                    assert_eq!(backing.file.metadata().unwrap().nlink(), 0);
-                    assert_eq!(backing.file.metadata().unwrap().len(), native.len() as u64);
-                    assert_eq!(backing.bytes(), native.len() as u64);
-                }
-                // SAFETY: exact Module::serialize output of this pinned engine.
-                // Dropping the backing before invocation proves Wasmtime retains
-                // the inode independently through all active module users.
-                unsafe { backing.deserialize(&engine).unwrap() }
-            }
-            None => {
-                // SAFETY: same exact trusted serialization, on a filesystem
-                // without private disk-backed mapping support.
-                unsafe { wasmtime::Module::deserialize(&engine, &native).unwrap() }
-            }
-        };
         drop(original);
-        drop(native);
-        let mut store = wasmtime::Store::new(&engine, ());
-        let instance = wasmtime::Instance::new(&mut store, &loaded, &[]).unwrap();
-        let answer = instance
-            .get_typed_func::<(), i32>(&mut store, "answer")
-            .unwrap();
-        drop(loaded);
-        assert_eq!(answer.call(&mut store, ()).unwrap(), 7);
+        let offset = 3 * 64 * 1024_u64;
+        let directory = std::env::temp_dir().join(format!(
+            "scriptw-range-mapping-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let path = directory.join("container");
+        let mut file = std::fs::File::create_new(&path).unwrap();
+        // Neighbours that are not a module: a whole-file or misplaced mapping
+        // cannot deserialize.
+        file.write_all(&vec![0xa5; offset as usize]).unwrap();
+        file.write_all(&native).unwrap();
+        file.write_all(&[0x5a; 4097]).unwrap();
+        drop(file);
+        let open = || std::fs::File::open(&path).unwrap();
+        // SAFETY: every range below is either the exact trusted serialization
+        // of this pinned engine or is rejected before any byte is interpreted
+        // as code (alignment, bounds and the image header checks).
+        unsafe {
+            for (bad_offset, length) in [
+                (offset + 1, native.len() - 1),
+                (offset, 0),
+                (offset, native.len() + 4098),
+                (u64::MAX - 4095, native.len()),
+                (0, native.len()),
+            ] {
+                assert!(
+                    wasmtime::Module::deserialize_open_file_range(
+                        &engine,
+                        open(),
+                        bad_offset,
+                        length
+                    )
+                    .is_err(),
+                    "range {bad_offset:#x}+{length:#x}"
+                );
+            }
+            assert!(wasmtime::Module::deserialize_open_file(&engine, open()).is_err());
+        }
+        // SAFETY: the exact trusted serialization at its page-aligned offset.
+        let loaded = unsafe {
+            wasmtime::Module::deserialize_open_file_range(&engine, open(), offset, native.len())
+                .unwrap()
+        };
+        // The mapping and Wasmtime's handle outlive the name.
+        std::fs::remove_dir_all(&directory).unwrap();
+        for _ in 0..2 {
+            let mut store = wasmtime::Store::new(&engine, ());
+            let instance = wasmtime::Instance::new(&mut store, &loaded, &[]).unwrap();
+            let answer = instance
+                .get_typed_func::<(), i32>(&mut store, "answer")
+                .unwrap();
+            assert_eq!(answer.call(&mut store, ()).unwrap(), 42);
+        }
     }
 }

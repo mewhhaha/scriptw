@@ -380,7 +380,7 @@ source fingerprints, admission rules or the per-profile publication sequence.
 The bundle is still admitted only after the producer finishes all artifacts.
 
 The Engine's private native authority accepts only immutable Cargo-produced
-linked arrays and their private verified decoder output. No file, cache blob or caller-provided native
+linked arrays. No named file, cache blob or caller-provided native
 slice can enter its unsafe deserializer. A manifest binds source, target,
 configuration, the R image mode and closed set of execution modes, the closed
 R allocator identity, and both image digests to the actual admitted R key.
@@ -395,29 +395,18 @@ module-cache key remains the execution Engine's mode and raw Wasm digest, so
 an image compiled in a different mode cannot cross Engine ownership.
 Native deserialization runs only inside the existing shared R/P cache factory.
 
-Portable native storage may use a private Cargo-produced compressed container.
-The producer first publishes its checked raw native image and unchanged v4
-manifest, then verifies an exact storage roundtrip. Runtime decoding admits the
-bounded output length, frame window and raw SHA-256 before returning a private
-immutable `NativeRuntimeBytes`. Its fields have no public constructor or mutable
-projection. A mutex/weak lease shares simultaneous decodes without retaining a
-strong process-lifetime owner. Portable metadata/package admission is cached;
-every actual load independently compares the derived digest with the v4 native
-manifest before `Module::deserialize` into the actual Engine. NativeHost keeps
-its once-per-process package/native digest admission. Decoder failure remains an
-optimization miss and ordinary checked native compilation.
-
-Wasmtime 47's `load_code_bytes` calls `MmapVec::from_slice_with_alignment`, copying
-the caller slice into Module-owned `CodeMemory`. The final lease drops immediately
-after that call; `deserialize_raw`, whose borrowing contract differs, is unused.
-Cache misses, bypass and a separate execution mode can decode again. Concurrent
-loads share an immutable Arc only while deserializing; no Store or Module moves
-into this lease cache. Measure transient and retained RSS and repeated-load cost
-separately; freeing the Box does not itself prove an RSS reduction. Raw package
-authority, NativeHost arrays and public artifact/cache formats are unchanged.
-Package-only selection does not decode the native payload. Compressed pages and
-decoded ownership must both count toward RSS; storage compression is not a
-claim of reduced live JS memory or reduced deserialization cost.
+Both native images are linked raw and page-aligned. The producer publishes its
+checked raw native image and manifest; the packaging step attests the SHA-256
+of the exact file it links. `LinkedNativeImage` and `ExecutableImageRange` have
+no public constructor or mutable projection. Every actual load compares the
+attested digest with the native manifest, then maps the image's proved range
+of the running executable through `Module::deserialize_open_file_range`, or,
+where no range is proved, copies the linked bytes through `Module::deserialize`
+into Module-owned `CodeMemory`; `deserialize_raw`, which borrows memory Wasmtime
+cannot make executable, is unused. A mapping failure is not a compiler
+fallback: the same paired image is copied instead. See
+[native backing storage](runtime-byte-ownership.md#native-backing-storage) for
+the admission argument. Package-only selection does not touch the native image.
 
 Runtime layout 15 introduced four immutable non-null zero-length GC array globals
 (values, property entries, property indexes and private elements) to the shared

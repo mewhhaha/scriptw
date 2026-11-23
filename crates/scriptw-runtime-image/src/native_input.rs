@@ -1,55 +1,26 @@
-//! Read linked Cargo storage without faulting its entire executable mapping.
-//! No caller path or native cache is an input. Linux binds the linked symbol's
-//! range to the actual executable inode; other cases retain the static source.
-use std::io::{self, Read};
-#[cfg(target_os = "linux")]
+//! Locate a linked Cargo image in the running executable file without
+//! reading it through its mapped address. No caller path or native cache is
+//! an input: the linked symbol's range is bound to the kernel's actual
+//! executable inode, or no range is produced.
+use std::fs::File;
+use std::io::Read;
 #[path = "native_input/elf_origin.rs"]
 mod elf_origin;
 
 fn trace_source(kind: &str) {
     if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
-        eprintln!("scriptw wasm trace: runtime-native packed source: {kind}");
+        eprintln!("scriptw wasm trace: runtime-native image source: {kind}");
     }
 }
 
-pub(super) enum PackedReader {
-    Embedded(&'static [u8]),
-    #[cfg(target_os = "linux")]
-    Executable(std::io::Take<std::fs::File>),
-}
-
-impl PackedReader {
-    /// The caller selects only immutable Cargo-defined arrays through Image.
-    pub(super) fn new(encoded: &'static [u8]) -> Self {
-        #[cfg(target_os = "linux")]
-        if let Some(reader) = executable_range(encoded) {
-            return Self::Executable(reader);
-        }
-        trace_source("embedded");
-        Self::Embedded(encoded)
-    }
-}
-
-impl Read for PackedReader {
-    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
-        match self {
-            Self::Embedded(bytes) => bytes.read(buffer),
-            #[cfg(target_os = "linux")]
-            Self::Executable(reader) => reader.read(buffer),
-        }
-    }
-}
-
-#[cfg(target_os = "linux")]
 struct ExecutableIdentity {
     device: u64,
     inode: u64,
     length: u64,
 }
 
-#[cfg(target_os = "linux")]
 impl ExecutableIdentity {
-    fn from_file(file: &std::fs::File) -> Option<Self> {
+    fn from_file(file: &File) -> Option<Self> {
         use std::os::unix::fs::MetadataExt;
         let metadata = file.metadata().ok()?;
         metadata.is_file().then_some(Self {
@@ -90,16 +61,16 @@ impl ExecutableIdentity {
     }
 }
 
-#[cfg(target_os = "linux")]
-fn executable_range(encoded: &'static [u8]) -> Option<std::io::Take<std::fs::File>> {
-    use std::io::{Seek, SeekFrom};
+/// The owned kernel executable handle and the file offset of `linked` in it.
+/// The caller passes only immutable Cargo-defined statics.
+pub(super) fn executable_range(linked: &'static [u8]) -> Option<(File, u64)> {
     const MAX_MAPS_BYTES: u64 = 1024 * 1024;
     // This kernel handle remains the running executable after rename/unlink.
     // A maps pathname or a current_exe() pathname is never opened as authority.
-    let mut file = std::fs::File::open("/proc/self/exe").ok()?;
+    let file = File::open("/proc/self/exe").ok()?;
     let identity = ExecutableIdentity::from_file(&file)?;
     let mut maps = String::new();
-    std::fs::File::open("/proc/self/maps")
+    File::open("/proc/self/maps")
         .ok()?
         .take(MAX_MAPS_BYTES + 1)
         .read_to_string(&mut maps)
@@ -107,24 +78,23 @@ fn executable_range(encoded: &'static [u8]) -> Option<std::io::Take<std::fs::Fil
     if maps.len() as u64 > MAX_MAPS_BYTES {
         return None;
     }
-    // as_ptr/len do not read the packed payload through its mapped address.
+    // as_ptr/len do not read the image through its mapped address.
     let mut matches = maps
         .lines()
-        .filter_map(|line| identity.range_offset(line, encoded.as_ptr() as usize, encoded.len()));
+        .filter_map(|line| identity.range_offset(line, linked.as_ptr() as usize, linked.len()));
     if let Some(offset) = matches.next() {
         if matches.next().is_some() {
             return None;
         }
-        file.seek(SeekFrom::Start(offset)).ok()?;
         trace_source("executable-inode");
-        return Some(file.take(u64::try_from(encoded.len()).ok()?));
+        return Some((file, offset));
     }
     // Some Linux filesystem views expose different device numbers through
     // stat and maps. Retain the strict identity path above; the alternative
     // proves origin independently from the kernel's main executable headers.
-    let reader = elf_origin::KernelMainElf::open()?.read_symbol(encoded, &maps)?;
+    let located = elf_origin::KernelMainElf::open()?.locate_symbol(linked, &maps)?;
     trace_source("kernel-main-elf");
-    Some(reader)
+    Some(located)
 }
 
 #[cfg(test)]
@@ -132,20 +102,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn linked_input_and_embedded_source_have_identical_bounded_bytes() {
+    fn a_linked_static_resolves_to_its_exact_bytes_of_the_executable_file() {
+        use std::os::unix::fs::FileExt;
         static INPUT: &[u8] = b"Cargo storage range\0with a strict end";
-        let mut reader = PackedReader::new(INPUT);
-        let mut read = Vec::new();
-        reader.read_to_end(&mut read).unwrap();
+        // Without procfs no range is produced and the caller keeps the static.
+        let Some((file, offset)) = executable_range(INPUT) else {
+            assert!(
+                File::open("/proc/self/maps").is_err() || File::open("/proc/self/exe").is_err()
+            );
+            return;
+        };
+        let mut read = vec![0; INPUT.len()];
+        file.read_exact_at(&mut read, offset).unwrap();
         assert_eq!(read, INPUT);
-        assert_eq!(reader.read(&mut [0; 1]).unwrap(), 0);
-        let mut fallback = PackedReader::Embedded(INPUT);
-        let mut read = Vec::new();
-        fallback.read_to_end(&mut read).unwrap();
-        assert_eq!(read, INPUT);
+        // A heap copy of the same bytes is not a linked range of the file.
+        let copied: &'static [u8] = Box::leak(INPUT.to_vec().into_boxed_slice());
+        assert!(executable_range(copied).is_none());
     }
 
-    #[cfg(target_os = "linux")]
     #[test]
     fn range_admission_rejects_aliases_mutability_wrong_inode_and_overflows() {
         let identity = ExecutableIdentity {
@@ -181,10 +155,9 @@ mod tests {
         assert!(wide.range_offset(line, 0x1800, 1).is_none());
     }
 
-    #[cfg(target_os = "linux")]
     #[test]
     fn inode_bound_reader_survives_rename_and_unlink_and_stops_at_its_range() {
-        use std::io::{Seek, SeekFrom, Write};
+        use std::io::{Read, Seek, SeekFrom, Write};
         use std::os::unix::fs::MetadataExt;
         let directory = std::env::temp_dir().join(format!(
             "scriptw-image-range-{}-{}",

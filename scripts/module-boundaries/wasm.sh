@@ -563,6 +563,8 @@ runtime_image_build="crates/scriptw-runtime-image/build.rs"
 runtime_image_source="crates/scriptw-runtime-image/src/lib.rs"
 runtime_image_metadata="crates/scriptw-runtime-image/src/metadata.rs"
 runtime_image_objects="crates/scriptw-runtime-image/build/objects.rs"
+runtime_image_parts="crates/scriptw-runtime-image/build/parts.rs"
+runtime_image_linked="crates/scriptw-runtime-image/src/linked_native.rs"
 wasm_build_package="crates/scriptw-aot-wasm/src/runtime_artifact/build_package.rs"
 for native_owner in "$engine_native_config" "$engine_embedded_runtime" "$engine_embedded_build" "$engine_embedded_compile" "$engine_native_stencils" "$runtime_image_build" "$runtime_image_source" "$runtime_image_objects" crates/scriptw-runtime-image/Cargo.toml "$wasm_build_package"; do
   require_file "$native_owner"
@@ -580,7 +582,8 @@ require_fixed_string_count "$engine_embedded_images" 'use scriptw_runtime_image 
 require_fixed_string_count "$engine_embedded_runtime" 'Images::package_for_profile(source_compilation_profile)' 1 'raw candidate uses its exact source profile'
 require_fixed_string_count "$engine_embedded_runtime" 'self.images.profile == runtime.source_compilation_profile()' 1 'native candidate rejects a foreign source profile'
 require_fixed_string_count "$engine_embedded_runtime" 'include_bytes!' 0 'image bytes do not enter Engine initializers'
-require_fixed_string_count "$runtime_image_source" '#[inline(never)]' 9 'nine non-inline image, execution and Intl metadata accessors'
+require_fixed_string_count "$runtime_image_source" '#[inline(never)]' 7 'seven non-inline package, manifest, execution and Intl metadata accessors'
+require_fixed_string_count "$runtime_image_linked" '#[inline(never)]' 2 'two non-inline linked native image accessors'
 require_file "$runtime_image_metadata"
 require_module_decl "$runtime_image_source" metadata
 require_exact_line_count "$runtime_image_source" 'pub use metadata::{metadata, portable_metadata};' 1 'the two immutable receipt accessors'
@@ -594,16 +597,19 @@ require_fixed_string_count "$runtime_image_build" 'objects::embed(&out, &target)
 require_fixed_string_count "$runtime_image_objects" '"--emit=obj"' 1 'data compilation emits no Rust metadata'
 require_fixed_string_count "$runtime_image_objects" '"-Cembed-bitcode=no"' 1 'data-only object contains no duplicate bitcode image'
 require_fixed_string_count "$runtime_image_objects" '.compile("scriptw_runtime_images")' 1 'target archiver owns the complete linked image'
-require_exact_line_count "$runtime_image_objects" 'const PARTS: [(&str, &str); 11] = [' 1 'exact image, receipt and execution-metadata definition inventory'
+require_file "$runtime_image_parts"
+require_exact_line_count "$runtime_image_parts" 'pub(super) const PARTS: [(&str, &str, Alignment); 13] = [' 1 'exact image, attested-digest, receipt and execution-metadata definition inventory'
 for image_part in package native manifest metadata; do
-  if [ "$image_part" = native ]; then
-    require_fixed_string_count "$runtime_image_objects" 'scriptw-runtime-native.packed' 1 'one compressed NativeHost native storage definition'
-    require_fixed_string_count "$runtime_image_objects" 'scriptw-runtime-portable-native.packed' 1 'one compressed Portable native storage definition'
-  else
-    require_fixed_string_count "$runtime_image_objects" "scriptw-runtime-${image_part}.bin" 1 'one raw NativeHost package/manifest/receipt definition'
-    require_fixed_string_count "$runtime_image_objects" "scriptw-runtime-portable-${image_part}.bin" 1 'one raw data definition per Portable package/manifest/receipt'
-  fi
+  require_fixed_string_count "$runtime_image_parts" "\"scriptw-runtime-${image_part}.bin\"" 1 'one raw NativeHost package/native/manifest/receipt definition'
+  require_fixed_string_count "$runtime_image_parts" "\"scriptw-runtime-portable-${image_part}.bin\"" 1 'one raw data definition per Portable package/native/manifest/receipt'
 done
+# Native images are linked raw and page-aligned, each beside the digest the
+# packaging step attested for the exact linked file. No compressed container.
+require_fixed_string_count "$runtime_image_parts" 'Alignment::Page,' 2 'exactly the two native images are page-aligned for mapping from the executable'
+require_fixed_string_count "$runtime_image_parts" '.sha256",' 2 'one attested digest per linked native image'
+require_fixed_string_count "$runtime_image_parts" '.packed' 0 'no compressed native storage definition'
+require_fixed_string_count crates/scriptw-runtime-image/Cargo.toml 'zstd' 0 'the image leaf links no decoder'
+require_fixed_string_count "$runtime_image_build" 'linked::write(&out);' 1 'the packaging step attests each linked native image'
 require_exact_line_count crates/scriptw-aot-wasm/src/runtime_artifact.rs 'mod build_package;' 1 'private checked build-package owner'
 require_fixed_string_count "$engine_native_config" 'pub(crate) fn base_config(' 1 'one shared native configuration constructor'
 require_fixed_string_count "$engine_native_config" 'PRODUCT_WASMTIME_POLICY.configure(&mut config);' 1 'same required product capability configuration'
@@ -637,11 +643,15 @@ require_fixed_string_count crates/scriptw-engine/src/lib.rs 'cache::NativeFuncti
 engine_embedded_load="crates/scriptw-engine/src/embedded_runtime/load.rs"
 require_file "$engine_embedded_load"
 require_module_decl "$engine_embedded_runtime" load
-# The private inode deserializes through deserialize_open_file; only the
-# file-unavailable fallback deserializes the admitted Cargo-byte lease.
-require_fixed_string_count "$engine_embedded_load" 'Module::deserialize(engine, bytes)' 1 'the file-unavailable fallback uses the admitted private Cargo-byte lease'
-require_fixed_string_count "$engine_embedded_load" 'if !self.accepts_native(&lease)' 1 'both decoded profiles match their independent native manifest'
-require_fixed_string_count "$engine_embedded_load" 'drop(lease);' 1 'native mapping releases the transient decoded-byte owner'
+# The linked image is mapped from its proved range of the running executable;
+# only where no range is proved are the same paired linked bytes copied.
+require_fixed_string_count "$engine_embedded_load" 'Module::deserialize(engine, bytes)' 1 'the range-unavailable fallback copies the paired linked Cargo bytes'
+require_fixed_string_count "$engine_embedded_load" 'if !self.accepts_native(&image)' 1 'both profiles pair the linked image with their independent native manifest'
+require_fixed_string_count "$engine_embedded_load" 'image.build_digest() == &self.manifest.native_digest' 1 'pairing compares the attested digest with the manifest'
+engine_embedded_backing="crates/scriptw-engine/src/embedded_runtime/native_backing.rs"
+require_file "$engine_embedded_backing"
+require_fixed_string_count "$engine_embedded_backing" 'self.range.try_clone_file()?,' 1 'one product mapping of the proved executable range'
+require_fixed_string_count "$engine_embedded_backing" 'TMPFILE' 0 'no private staging file backs native code'
 check_raw_line_budget "$engine_embedded_load" 120
 require_fixed_string_count "$engine_embedded_runtime" 'OnceLock<Option<EmbeddedNativeRuntime>>' 2 'independent lazy admission per source profile'
 require_fixed_string_count "$engine_embedded_runtime" 'OnceLock<Module>' 0 'no hidden retained native module'
@@ -672,14 +682,13 @@ check_raw_line_budget "$engine_embedded_publication" 40
 check_raw_line_budget "$engine_embedded_compile" 100
 check_raw_line_budget "$engine_native_stencils" 120
 check_raw_line_budget "$runtime_image_build" 80
-require_module_decl "$runtime_image_source" native_storage
-require_module_decl "$runtime_image_source" native_lease
-require_module_decl "$runtime_image_source" lease_tests
-require_file crates/scriptw-runtime-image/src/native_lease.rs
-require_file crates/scriptw-runtime-image/src/lease_tests.rs
-require_fixed_string_count crates/scriptw-runtime-image/src/native_lease.rs 'Mutex<Result<Weak<NativeRuntimeBytes>, ()>>' 2 'each fixed profile has a weak cache with no strong decoded bytes'
-check_raw_line_budget crates/scriptw-runtime-image/src/native_lease.rs 70
-check_raw_line_budget crates/scriptw-runtime-image/src/lease_tests.rs 70
+require_module_decl "$runtime_image_source" linked_native
+require_module_decl "$runtime_image_source" linked_tests
+require_file crates/scriptw-runtime-image/src/linked_tests.rs
+require_fixed_string_count "$runtime_image_linked" 'Weak<' 0 'linked images need no decoded-byte owner'
+check_raw_line_budget "$runtime_image_linked" 120
+check_raw_line_budget crates/scriptw-runtime-image/src/linked_tests.rs 70
+check_raw_line_budget "$runtime_image_parts" 90
 check_raw_line_budget "$runtime_image_source" 90
 check_raw_line_budget "$runtime_image_objects" 120
 check_raw_line_budget "$wasm_build_package" 230

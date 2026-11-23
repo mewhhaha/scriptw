@@ -3,7 +3,7 @@
 //! Safe raw packages retain complete identity, metadata, data and layout
 //! admission. Immutable Cargo output reuses its producer's bounded receipt.
 //! No native constructor accepts a caller slice/path/cache blob, and no Module
-//! is retained here.
+//! is retained here. Native code is mapped from the running executable only.
 
 #[cfg(test)]
 #[path = "embedded_runtime/compile.rs"]
@@ -110,8 +110,8 @@ impl EmbeddedNativeRuntime {
         }
         let started = std::env::var_os("SCRIPTW_WASM_TRACE").map(|_| std::time::Instant::now());
         let package_digest = digest();
-        // Both native images are bounded compressed storage. Their exact
-        // decoded digest is independently admitted on the first actual load.
+        // Both native images are linked raw. Each actual load pairs the
+        // linked image's build digest with this manifest's native digest.
         if let Some(started) = started {
             eprintln!(
                 "scriptw wasm trace: runtime-native-bundle digest admission: {:?}",

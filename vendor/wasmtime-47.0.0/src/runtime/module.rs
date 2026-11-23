@@ -492,6 +492,34 @@ impl Module {
         Module::from_parts(engine, code, None)
     }
 
+    /// Scriptw patch: same as [`deserialize_open_file`], except that the
+    /// precompiled module is the `len` bytes of `file` starting at `offset`
+    /// instead of the whole file. `offset` must be a multiple of the host
+    /// page size and the range must lie inside the file; otherwise an error
+    /// is returned and nothing is mapped.
+    ///
+    /// Only that range is mapped, private and copy-on-write, so an image
+    /// embedded in a larger file (for example in the running executable) is
+    /// used in place: its clean pages are the file's page-cache pages, shared
+    /// with every other mapping of the file.
+    ///
+    /// [`deserialize_open_file`]: Module::deserialize_open_file
+    ///
+    /// # Unsafety
+    ///
+    /// All of the reasons that [`deserialize_open_file`] is `unsafe` apply to
+    /// the given range of the file.
+    #[cfg(all(feature = "std", unix, not(miri)))]
+    pub unsafe fn deserialize_open_file_range(
+        engine: &Engine,
+        file: File,
+        offset: u64,
+        len: usize,
+    ) -> Result<Module> {
+        let code = engine.load_code_file_range(file, offset, len, ObjectKind::Module)?;
+        Module::from_parts(engine, code, None)
+    }
+
     /// Entrypoint for creating a `Module` for all above functions, both
     /// of the AOT and jit-compiled categories.
     ///

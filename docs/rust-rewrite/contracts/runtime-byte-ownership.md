@@ -154,53 +154,58 @@ Portable packages still receive full Wasm-body/layout and exact-frame checks.
 
 ## Native backing storage
 
-On Linux, admitted Cargo native images can use private disk-backed mappings.
-The loader creates an unnamed `O_TMPFILE|O_EXCL` inode under the configured
-module-cache directory, writes only the independently admitted image, syncs it
-and publishes an owner that exposes no mutation path. Wasmtime owns each
-private executable mapping and its file lifetime. Only immutable backing
-storage is shared, at most once per two fixed Cargo source profiles; no Engine,
-Module, Store or JavaScript Realm is retained by this owner. The normal bounded
-module cache retains its existing policy.
+Both Cargo native images are linked raw, unchanged from the checked producer,
+and aligned to 64 KiB so each starts on a page boundary of the executable
+file. On Linux the loader maps an image's own range of the running executable
+through the vendored Wasmtime's `Module::deserialize_open_file_range`
+([patch](../../../vendor/wasmtime-47.0.0/PATCHES.md#file-range-deserialization)).
+Nothing is decoded, hashed, copied or written at load, and no file is created
+in the cache directory. Wasmtime owns each private copy-on-write mapping; its
+clean pages are the executable's page-cache pages, shared with every process
+running the same file, so untouched code stays unfaulted and touched code is
+shared rather than private. Only the proved range is retained, at most once
+per two fixed Cargo source profiles; no Engine, Module, Store or JavaScript
+Realm is retained by this owner. The normal bounded module cache retains its
+existing policy.
 
-This permits unused code pages to remain unfaulted and clean file pages to be
-reclaimed. Tmpfs/ramfs are rejected for this optimization: moving bytes to
-unreclaimable memory would merely move them outside process RSS. Unsupported
-or read-only filesystems retain ordinary slice loading of the same admitted
-native image. Files, caller bytes and native disk-cache entries cannot enter
-this Cargo authority. Both source profiles stream decompression and SHA-256
-through a 64-KiB output buffer with an 8-MiB zstd history limit. Exact decoded
-length, single-frame EOF and the independent native manifest must agree before
-the private file is published. This path allocates no decoded-image-sized buffer.
-Unsupported backing filesystems retain bounded-source decoding into the existing
-weak byte lease; concurrent fallback loads can share that transient owner.
-Subsequent mappings reuse the admitted private file without retaining decoded
-storage, an Engine, or a Module.
+Admission is by origin and pairing, not by re-hashing at every start:
 
-Use a disk-backed `SCRIPTW_CACHE_DIR` for footprint comparisons, and record its
-filesystem and native backing mode with the image identities. Moving a cache to
-tmpfs/ramfs selects the existing fallback to anonymous loading and can change RSS
-without changing the compiler or image. An unscored same-host, same-image control
-reproduced this roughly 66 MB runtime copy: after-admission private dirty memory
-was 69,378,048 bytes with tmpfs versus 3,354,624 bytes with normal overlay-backed
-storage. These process endpoints do not measure live JavaScript ownership.
-Compare RSS only across matching cache filesystems and native backing modes;
-keep this admission effect separate from Date's CPU result.
+- **Origin.** `scriptw-runtime-image` constructs a `LinkedNativeImage` only
+  from its two linked statics, and an `ExecutableImageRange` only after it
+  proves that the static's exact address range is a read-only private mapping
+  of the file behind `/proc/self/exe`. The static's pointer and length select
+  an exact file-backed VMA in bounded `/proc/self/maps` data with matching
+  device and inode, or the kernel's own main-ELF program headers place it in a
+  read-only `PT_LOAD`. Renaming or unlinking the executable cannot redirect
+  its kernel handle. Maps pathnames, external files, the cache directory and
+  digest-selected blobs are never native-code authority.
+- **Pairing.** The Cargo packaging step hashes the exact file it links and
+  links that SHA-256 beside the image. Every load requires it to equal the
+  native digest in the producer's independent manifest before any mapping or
+  copy.
 
-The packed Cargo array remains part of the executable. On Linux, its pointer
-and length select an exact read-only file-backed VMA in bounded
-`/proc/self/maps` data. The loader opens only `/proc/self/exe`, requires matching
-device and inode, checks the complete file range and reads exactly that range
-through a bounded reader. Taking the linked array's address does not read its
-payload through the mapping. Renaming or unlinking the executable cannot
-redirect its kernel handle. Maps pathnames, external files and digest-selected
-cache blobs are never native-code authority. Missing procfs, a shared-library
-image, or an unprovable range uses the original immutable static source.
+The earlier loader decoded a zstd container and compared the decoded SHA-256
+with the manifest at every start. The image, the manifest, the digest and the
+code comparing them are one file under one kernel write protection (a running
+executable cannot be opened for writing), so that hash could not detect a
+change its own writer could not also hide. It covered accidents of the decode
+and write steps, which no longer exist. The check that remains meaningful at
+load is the pairing above. A test in `scriptw-runtime-image` hashes the linked
+bytes against the attested digest and reads them back through the proved file
+range. Evidence of the bytes on disk is `CompilerIdentity`, whose SHA-256
+covers the whole executable, images included.
 
-Reading through the executable file avoids faulting the complete packed array
-into that process's read-only mapping. The input and output still occupy
-reclaimable kernel file cache; a smaller RSS is not a claim that those physical
-cache pages disappeared. No eviction or collection is added to benchmark runs.
+Missing procfs, an image linked outside the main executable, a host page size
+that does not divide the image's file offset, and non-Linux hosts keep the
+same paired image through `Module::deserialize`, which copies the linked bytes
+into anonymous Wasmtime memory. The load trace names the path taken
+(`backing: executable-mapping` or `backing: copied`). Record it with the image
+identities in footprint comparisons: the copy is private to each process and
+the mapping is not.
+
+The raw images make the executable larger than the compressed containers did;
+the pages cost memory only when touched. RSS counts a shared mapped page once
+per process and PSS splits it, so compare PSS or USS across processes.
 
 RSS, anonymous memory and reclaimable file-cache observations must remain
 separate. Native perf-map text hashing touches every code page, so map captures

@@ -2383,7 +2383,6 @@ dependencies = [
  "scriptw-ir",
  "sha2",
  "wasmtime",
- "zstd",
 ]
 
 [[package]]

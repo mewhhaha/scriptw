@@ -71,6 +71,15 @@ host adapters are part of the execution environment.
 These are requirements of the current backend, not a promise of support for
 every engine or a fallback implementation for engines missing Wasm GC.
 
+On Linux the embedded native runtime is mapped straight from the running
+executable, which needs readable `/proc/self/exe` and `/proc/self/maps` (or
+`/proc/self/auxv` and `/proc/self/mem`) and an executable on a filesystem that
+permits executable mappings. Without them, and on other hosts, the same image
+is copied into anonymous memory: slower to start and private to each process,
+with identical behavior. The
+[byte-ownership contract](contracts/runtime-byte-ownership.md#native-backing-storage)
+states what admits that image.
+
 ## Runtime ABI
 
 The runtime ABI is **85**. Portable bundles and native images built under an

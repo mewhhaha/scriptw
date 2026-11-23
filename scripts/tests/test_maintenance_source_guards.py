@@ -173,14 +173,14 @@ class EmbeddedProfileGuards(unittest.TestCase):
                 self.assertTrue(profile.check(ROOT, {path: source.replace(before, "missing_profile_proof")}))
         path = profile.E + "embedded_runtime/load.rs"
         source = (ROOT / path).read_text()
-        for before in ("if !self.matches(runtime, mode)", "if !self.accepts_native(&lease)", "image.digest() == &self.manifest.native_digest", "drop(lease);"):
+        for before in ("if !self.matches(runtime, mode)", "if !self.accepts_native(&image)", "image.build_digest() == &self.manifest.native_digest"):
             with self.subTest(before=before):
                 self.assertEqual(source.count(before), 1)
                 self.assertTrue(profile.check(ROOT, {path: source.replace(before, "missing_native_admission_proof")}))
 
         path = profile.E + "embedded_runtime/native_backing.rs"
         source = (ROOT / path).read_text()
-        for before in ("OFlags::EXCL", "file.sync_data().ok()?", "struct NativeBacking {"):
+        for before in ("self.range.try_clone_file()?", "image.executable_range()", "struct NativeBacking {"):
             with self.subTest(before=before):
                 self.assertEqual(source.count(before), 1)
                 self.assertTrue(profile.check(ROOT, {path: source.replace(before, "missing_immutable_backing_proof")}))
@@ -190,28 +190,27 @@ class EmbeddedProfileGuards(unittest.TestCase):
         self.assertTrue(profile.check(ROOT, {path: source.replace("image::portable_package()", "image::package()")}))
 
 
-class TransientNativeImageGuards(unittest.TestCase):
-    def test_owned_digest_and_weak_lease_proofs_are_required(self):
+class LinkedNativeImageGuards(unittest.TestCase):
+    def test_attested_digest_and_page_aligned_link_proofs_are_required(self):
         self.assertEqual(profile.check(ROOT), [])
         for path, before in [
-            ("crates/scriptw-runtime-image/src/native_lease.rs", "Arc::downgrade(&image)"),
-            ("crates/scriptw-runtime-image/src/native_storage.rs", "hash.finalize().into()"),
-            ("crates/scriptw-runtime-image/src/native_storage.rs", "digest != header.expected"),
+            ("crates/scriptw-runtime-image/src/linked_native.rs", "&super::SCRIPTW_RUNTIME_NATIVE_DIGEST"),
+            ("crates/scriptw-runtime-image/src/linked_native.rs", "super::native_input::executable_range(self.bytes)?"),
+            ("crates/scriptw-runtime-image/build/linked.rs", "Sha256::digest(&raw)"),
+            ("crates/scriptw-runtime-image/build/parts.rs", "const PAGE_ALIGNMENT: usize = 64 * 1024;"),
         ]:
             with self.subTest(before=before):
                 source = (ROOT / path).read_text()
                 self.assertEqual(source.count(before), 1)
-                self.assertTrue(profile.check(ROOT, {path: source.replace(before, "missing_owned_byte_proof")}))
+                self.assertTrue(profile.check(ROOT, {path: source.replace(before, "missing_linked_image_proof")}))
 
-    def test_streamed_backing_requires_independent_admission_and_exact_executable_source(self):
+    def test_executable_mapping_requires_independent_admission_and_exact_executable_source(self):
         self.assertEqual(profile.check(ROOT), [])
         for path, before in [
-            (profile.E + "embedded_runtime/native_backing.rs", "written.digest() != expected"),
-            (profile.E + "embedded_runtime/native_backing.rs", "bytes != written.decoded_bytes() as u64"),
+            (profile.E + "embedded_runtime/load.rs", "native_backing::NativeBacking::from_cargo(&image)"),
             ("crates/scriptw-runtime-image/src/native_input.rs", "inode != self.inode"),
             ("crates/scriptw-runtime-image/src/native_input.rs", "major != expected_major || minor != expected_minor"),
             ("crates/scriptw-runtime-image/src/native_input.rs", "address.checked_add(length)? > end"),
-            ("crates/scriptw-runtime-image/src/native_storage.rs", "decoder.finish().read(&mut buffer[..1]).ok()? != 0"),
             ("crates/scriptw-runtime-image/src/native_input/elf_origin.rs", "table != loaded"),
             ("crates/scriptw-runtime-image/src/native_input/elf_origin.rs", "bias.checked_add(header.entry)? != aux.entry"),
             ("crates/scriptw-runtime-image/src/native_input/elf_origin.rs", "phdr.offset != header.phoff"),
@@ -327,12 +326,12 @@ class ImmutableReceiptGuards(unittest.TestCase):
                               before, "false", invariant)
 
     def test_receipt_accessors_select_two_distinct_immutable_images(self):
-        invariant = "eleven immutable image definitions use seven original and four receipt accessors"
+        invariant = "thirteen immutable image definitions use seven original, four receipt and two attested-digest symbols"
         self.rejected("crates/scriptw-runtime-image/src/metadata.rs",
                       "returnunsafe{&SCRIPTW_RUNTIME_PORTABLE_METADATA}",
                       "returnunsafe{&SCRIPTW_RUNTIME_METADATA}", invariant)
-        self.rejected("crates/scriptw-runtime-image/build/objects.rs",
-                      "constPARTS:[(&str,&str);11]", "constPARTS:[(&str,&str);9]", invariant)
+        self.rejected("crates/scriptw-runtime-image/build/parts.rs",
+                      "constPARTS:[(&str,&str,Alignment);13]", "constPARTS:[(&str,&str,Alignment);11]", invariant)
         self.rejected("crates/scriptw-runtime-image/src/lib.rs",
                       "returnunsafe{&SCRIPTW_RUNTIME_PORTABLE_EXECUTION}",
                       "returnunsafe{&SCRIPTW_RUNTIME_EXECUTION}", invariant)

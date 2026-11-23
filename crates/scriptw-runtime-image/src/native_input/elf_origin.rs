@@ -2,7 +2,7 @@
 //! Only open() can construct the file-owning proof; parsed layout facts and
 //! hashes never authorize an arbitrary file, caller slice or DSO payload.
 use std::fs::File;
-use std::io::{Read, Seek, SeekFrom, Take};
+use std::io::Read;
 use std::os::unix::fs::FileExt;
 
 const HEADER_BYTES: usize = 64;
@@ -340,9 +340,10 @@ impl KernelMainElf {
         })
     }
 
-    pub(super) fn read_symbol(mut self, encoded: &'static [u8], maps: &str) -> Option<Take<File>> {
-        let address = encoded.as_ptr() as usize as u64;
-        let length = u64::try_from(encoded.len()).ok()?;
+    /// The owned executable handle and the file offset of `linked` in it.
+    pub(super) fn locate_symbol(self, linked: &'static [u8], maps: &str) -> Option<(File, u64)> {
+        let address = linked.as_ptr() as usize as u64;
+        let length = u64::try_from(linked.len()).ok()?;
         let offset = self.layout.file_offset(address, length)?;
         let mut matching = maps
             .lines()
@@ -351,8 +352,7 @@ impl KernelMainElf {
         if matching.next().is_some() {
             return None;
         }
-        self.file.seek(SeekFrom::Start(offset)).ok()?;
-        Some(self.file.take(length))
+        Some((self.file, offset))
     }
 }
 
@@ -681,10 +681,6 @@ mod tests {
         static INPUT: &[u8] = b"actual kernel main ELF exact source\0with a bounded end";
         let fallback = |reason: &str| {
             eprintln!("kernel-main source capability unavailable: {reason}");
-            let mut source = super::super::PackedReader::Embedded(INPUT);
-            let mut bytes = Vec::new();
-            source.read_to_end(&mut bytes).unwrap();
-            assert_eq!(bytes, INPUT);
         };
         let Some(machine) = host_machine() else {
             fallback("host machine");
@@ -788,17 +784,16 @@ mod tests {
         assert!(
             KernelMainElf::open()
                 .expect("supported kernel-main source capability")
-                .read_symbol(INPUT, &duplicate_maps)
+                .locate_symbol(INPUT, &duplicate_maps)
                 .is_none(),
             "ambiguous mappings must fail closed"
         );
         let owner = KernelMainElf::open().expect("supported kernel-main source capability");
-        let mut source = owner
-            .read_symbol(INPUT, &mapping_text)
+        let (source, offset) = owner
+            .locate_symbol(INPUT, &mapping_text)
             .expect("eligible main-ELF static range");
-        let mut actual = Vec::new();
-        source.read_to_end(&mut actual).unwrap();
+        let mut actual = vec![0; INPUT.len()];
+        source.read_exact_at(&mut actual, offset).unwrap();
         assert_eq!(actual, INPUT);
-        assert_eq!(source.read(&mut [0; 1]).unwrap(), 0);
     }
 }

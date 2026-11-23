@@ -117,7 +117,7 @@ fn embedded_manifest_rejects_metadata_and_native_mismatches_before_deserialize()
                 scriptw_runtime_image::portable_native().unwrap()
             }
         };
-        assert_eq!(&digests::digest(native.bytes()), native.digest());
+        assert_eq!(&digests::digest(native.bytes()), native.build_digest());
         assert!(bundle.accepts_native(&native));
         let mut previous = images.manifest.to_vec();
         previous[8..12].copy_from_slice(&3_u32.to_le_bytes());
