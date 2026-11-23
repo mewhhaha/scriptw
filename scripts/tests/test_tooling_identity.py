@@ -310,6 +310,18 @@ class IdentityTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stderr.count(path.name + ":1:"), 1)
 
+    def test_external_comparator_files_admit_only_the_word(self):
+        path = self.root / "scripts/wasm_peer_node.cjs"
+        path.parent.mkdir(parents=True)
+        path.write_text("// " + RETIRED_NAME.title() + " Wasm\n", encoding="utf-8")
+        self.assertEqual(self.audit().returncode, 0)
+        path.write_text("const " + RETIRED_NAME + "_entry = 1;\n", encoding="utf-8")
+        self.assertEqual(self.audit().returncode, 1)
+        other = self.root / "scripts/wasm_other_node.cjs"
+        path.unlink()
+        other.write_text("// " + RETIRED_NAME.title() + " Wasm\n", encoding="utf-8")
+        self.assertEqual(self.audit().returncode, 1)
+
     def test_symlinks_are_followed_and_missing_paths_are_skipped(self):
         target = self.root / "target" / "fixture.json"
         target.parent.mkdir()

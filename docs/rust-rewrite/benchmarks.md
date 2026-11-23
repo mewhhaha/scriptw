@@ -2764,6 +2764,137 @@ method and host build, `execute-wasi`:
 Thread CPU agrees within one point. Pooling one actor and not the other would
 have credited Scriptw with 11–53% that belongs to allocation, not compiled code.
 
+## 2026-11-23 comparison with Porffor
+
+[Porffor](https://porffor.dev) 0.61.13 is another JavaScript-to-Wasm AOT compiler. It ran
+on the original17 runtime kernels against a local Scriptw build of `6d6e0c5d4` (source
+fingerprint `6bcd768386ac`; the performance batch's waves 1–3, not the requalified cohort of
+the panels above), with Node 24.22.1 (V8 13.6.233.17-node.58). This is a separate panel, not a
+republication of the runtime comparison.
+
+**Engines.** Each actor's engine is part of the comparison:
+
+| Actor | Program | Engine |
+| --- | --- | --- |
+| Scriptw | Scriptw P + R, precompiled native image | Wasmtime 47.0.0 / Cranelift, shared precompiled host, compiler disabled |
+| Porffor on Wasmtime | Porffor's Wasm | Wasmtime 47.0.1 / Cranelift through wasmtime-py, compiled in-process before timing |
+| Porffor on Node/V8 Wasm | the same Wasm | Node's WebAssembly: lazy Liftoff, dynamic tier-up to TurboFan |
+| Node/V8 JavaScript | the original source | Node `vm`: Ignition, Sparkplug, Maglev, TurboFan |
+
+Porffor's Wasm imports its own `print`, `printChar` and clock functions, so neither the shared
+host nor WASI can run it. Its own runner instantiates it in Node; `scripts/wasm_peer_node.cjs`
+does the same per entry. For an engine-matched number, `scripts/wasm_peer_wasmtime.py` runs it
+on Wasmtime with the host's native tier: SpeedAndSize, backtracking allocation, explicit
+`x86_64-unknown-linux-gnu` target without host CPU features, and a one-Store pool keeping
+16 MiB per memory slot resident. Wasmtime implements only exnref exceptions, so this works only
+where Porffor emits no legacy `try`; all 17 kernels qualify. Its output import is a Wasm adapter
+function in the same Store, so entries make no host call. The Python `ctypes` entry call is
+inside the timer, and its empty-call floor (2.2–3.2 µs median) is retained per entry, not
+subtracted.
+
+**Method.** The runtime panel's sampling is reused: per actor and kernel, eight fresh processes
+in two reversed blocks (Williams order), each with 21 measured entries after ten checked warmups.
+Every entry gets a fresh instance (Store, Realm or `vm` context) outside the timer, and every
+entry's output is checked. Times are medians of process medians. Porffor gets Scriptc's
+`print` adapter and its default `-O1`.
+
+**CPU.** An unrelated test process occupied CPU 3 for the whole session, so every actor ran on
+**CPU 2 alone**, with the other three vCPUs busy. V8's JIT and GC helper threads, and V8's
+Wasm tier-up, share that CPU with the measured thread. The V8 JavaScript column is therefore
+not comparable with the two-CPU 2026-11-17 panel (`integer.js`: 2.73 ms here against 1.29 ms
+there). An earlier run on CPUs 2–3, contended on CPU 3, is not published. Its per-kernel
+medians were 0.87–1.14× of these for Scriptw, 0.76–1.25× for Porffor on Wasmtime and
+0.71–1.45× for Porffor on Node/V8, so single kernels move by up to tens of percent under load.
+
+| Kernel | Scriptw (ms) | Porffor on Wasmtime (ms) | Porffor on Node/V8 Wasm (ms) | Node/V8 JavaScript (ms) | Scriptw ÷ Porffor on Wasmtime |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `sort-reverse-128.js` | 0.051 | 0.115 | 0.201 | 0.034 | 0.44× |
+| `sort-reverse-512.js` | 0.060 | 1.518 | 2.332 | 0.182 | 0.04× |
+| `sort-sorted-512.js` | 0.065 | 0.032 | 0.041 | 0.152 | 2.01× |
+| `to-sorted-512.js` | 0.068 | 1.489 | 2.349 | 0.150 | 0.05× |
+| `join-1024.js` | 0.090 | wrong output | wrong output | 0.058 | — |
+| `join-4096.js` | 0.236 | wrong output | wrong output | 1.279 | — |
+| `join-mixed-1024.js` | 0.092 | 0.048 | 0.064 | 0.417 | 1.93× |
+| `numeric-loop-10000.js` | 0.040 | 0.023 | 0.024 | 1.074 | 1.74× |
+| `numeric-loop-50000.js` | 0.038 | 0.066 | 0.090 | 1.573 | 0.57× |
+| `folded-string-4096.js` | 0.074 | 0.147 | 0.185 | 1.153 | 0.51× |
+| `dynamic-string-4096.js` | 0.082 | 0.142 | 0.098 | 1.257 | 0.58× |
+| `integer.js` | 0.042 | wrong output | wrong output | 2.731 | — |
+| `objects.js` | 0.090 | 0.103 | 1.611 | 0.075 | 0.88× |
+| `retained-objects.js` | 2.731 | runtime failed | runtime failed | 4.518 | — |
+| `join-empty-1024.js` | 0.044 | 0.166 | 0.850 | 0.305 | 0.26× |
+| `join-singleton-1024.js` | 0.046 | 0.295 | 3.397 | 0.368 | 0.16× |
+| `join-small-1024.js` | 0.048 | 0.286 | 3.273 | 0.417 | 0.17× |
+
+| Comparison | Kernels | Scriptw faster in both blocks | Scriptw time ÷ other, geomean | Range |
+| --- | ---: | ---: | ---: | --- |
+| Scriptw vs Porffor on Wasmtime | 13 | 10 | 0.394× | 0.04–2.01× |
+| Scriptw vs Porffor on Node/V8 Wasm | 13 | 10 | 0.163× | 0.01–1.67× |
+| Scriptw vs Node/V8 JavaScript | 17 | 14 | 0.190× | 0.02–1.56× |
+
+Porffor on Node/V8 Wasm is slow on `objects.js` and the small-join kernels. That is not
+warmup: `objects.js` stays at 1.49 ms after 100 warmups, against 0.10 ms for the same Wasm on
+Wasmtime. The cause was not profiled.
+
+**Failed attempts.** Porffor fails 4 of 17 kernels. The result is the same on both engines and
+in the package's own CLI runner on the same adapted source, which rules out the harnesses.
+The two join kernels, whose strings contain NUL and lone surrogates, give wrong checksums; the cause was not isolated. `integer.js` prints
+2147483647 (2^31 − 1) where its `Math.imul`/`>>> 0` recurrence should wrap. In
+`retained-objects.js`, the runner reports `TypeError: Cannot read property of undefined`.
+
+| Kernel | Actor | Failed attempt | Detail |
+| --- | --- | --- | --- |
+| `join-1024.js` | Porffor on Wasmtime | wrong-output | printed "5217\n", expected "60415\n" |
+| `join-1024.js` | Porffor on Node/V8 Wasm | wrong-output | printed "5217\n", expected "60415\n" |
+| `join-4096.js` | Porffor on Wasmtime | wrong-output | printed "54209\n", expected "75775\n" |
+| `join-4096.js` | Porffor on Node/V8 Wasm | wrong-output | printed "54209\n", expected "75775\n" |
+| `integer.js` | Porffor on Wasmtime | wrong-output | printed "2147483647\n", expected "730532261\n" |
+| `integer.js` | Porffor on Node/V8 Wasm | wrong-output | printed "2147483647\n", expected "730532261\n" |
+| `retained-objects.js` | Porffor on Wasmtime | runtime-failed | throw: thrown Wasm exception |
+| `retained-objects.js` | Porffor on Node/V8 Wasm | runtime-failed | throw: uncaught Porffor exception (type tag 38) |
+
+**Compilation.** Four fresh compiler processes per kernel (136 in all) ran on one CPU, in
+ABBA order across two reversed blocks. Scriptw `build wasm` writes P plus the shared 38 MB R
+sidecar. Porffor runs its JavaScript compiler on Node and writes standalone Wasm. Startup and
+output I/O are included. Scriptw is faster on **17/17** kernels, at **0.644×** Porffor's time
+by geometric mean. Median peak RSS is 77 MiB for Scriptw and 83 MiB for Porffor. Porffor
+compiles even the kernels it then runs wrongly.
+
+| Kernel | Scriptw build (ms) | Porffor build (ms) | Scriptw P Wasm (bytes) | Porffor Wasm (bytes) |
+| --- | ---: | ---: | ---: | ---: |
+| `sort-reverse-128.js` | 132.9 | 205.1 | 71,306 | 35,373 |
+| `sort-reverse-512.js` | 128.5 | 205.2 | 71,306 | 35,373 |
+| `sort-sorted-512.js` | 129.8 | 251.5 | 71,325 | 35,373 |
+| `to-sorted-512.js` | 130.8 | 208.2 | 72,625 | 35,522 |
+| `join-1024.js` | 132.2 | 215.0 | 68,482 | 35,287 |
+| `join-4096.js` | 130.0 | 236.1 | 68,482 | 35,287 |
+| `join-mixed-1024.js` | 127.2 | 207.6 | 63,381 | 34,116 |
+| `numeric-loop-10000.js` | 138.9 | 225.3 | 57,062 | 32,730 |
+| `numeric-loop-50000.js` | 177.1 | 217.0 | 57,062 | 32,730 |
+| `folded-string-4096.js` | 173.0 | 206.3 | 60,693 | 33,598 |
+| `dynamic-string-4096.js` | 167.1 | 228.1 | 58,733 | 32,993 |
+| `integer.js` | 147.5 | 227.9 | 67,135 | 32,788 |
+| `objects.js` | 130.4 | 216.9 | 75,081 | 34,506 |
+| `retained-objects.js` | 147.7 | 219.1 | 76,887 | 34,599 |
+| `join-empty-1024.js` | 130.9 | 208.0 | 64,471 | 33,884 |
+| `join-singleton-1024.js` | 132.0 | 202.7 | 64,871 | 33,926 |
+| `join-small-1024.js` | 133.8 | 216.5 | 65,257 | 34,019 |
+
+**Other panels.** Porffor completes none of the six edge kernels:
+
+- `edge-router.js`, `edge-query.js` and `edge-html.js` print wrong output.
+- `edge-json-api.js`, `edge-middleware.js` and `edge-nested-result.js` throw a
+  `ReferenceError` for a closure variable (`prices`, `now`, `projects`).
+- Wasmtime rejects three of the six modules (`edge-json-api.js`, `edge-query.js` and
+  `edge-nested-result.js`) because they use legacy `try`.
+
+This was an untimed probe, so no application panel is published. The focused situations use
+retained Modules with an untimed `prepare(input)` and a timed `run()`. Porffor's Wasm exports
+only its `main`, so it has no matched consumer there. React SSR and RSC were not attempted.
+
+[Data, identities and failures](wasm-peer-current.json) ·
+[Workflow](../../CONTRIBUTING.md#comparison-with-porffor).
+
 ## Compilation time
 
 

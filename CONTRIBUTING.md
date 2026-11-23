@@ -408,6 +408,52 @@ Only Scriptc receives the pinned `print` adapter. The checked publication retain
 source/tool hashes, diagnostics, raw wall/child-peak-RSS observations and portable
 artifacts. Compilation success does not verify runtime output or conformance.
 
+### Comparison with Porffor
+
+`scripts/benchmark-porffor.py` compares Scriptw with [Porffor](https://porffor.dev), another
+JavaScript-to-Wasm AOT compiler, on the original17 kernels: runtime and compilation. Install
+the pinned tools into one directory under `target/`, never globally, and keep its
+`package-lock.json`:
+
+```sh
+npm install --prefix target/wasm-peer-tools --no-audit --no-fund --ignore-scripts --save-exact porffor@0.61.13
+python3 -m venv target/wasm-peer-tools/wasmtime-env
+target/wasm-peer-tools/wasmtime-env/bin/pip install wasmtime==47.0.1
+```
+
+The driver checks both pins and Node 24.22.1. It takes a shared precompiled host
+(`compiler_precompiled_baseline`) and the `scriptw` CLI built from the same source, and
+never builds them. Give every timed command the same CPUs (here 2–3, the run stays on both;
+compilation takes the first) and unset the session's `NODE_OPTIONS`:
+
+```sh
+taskset -c 2,3 env -u NODE_OPTIONS python3 -B scripts/limited_verification.py --cloud --cloud-worker-cpus auto -- \
+  python3 -B scripts/benchmark-porffor.py prepare --cloud --output target/peer-prepared \
+  --tools target/wasm-peer-tools --wasmtime-python target/wasm-peer-tools/wasmtime-env/bin/python \
+  --host /path/to/compiler_precompiled_baseline --scriptw /path/to/scriptw \
+  --node /path/to/node-24.22.1 --time /usr/bin/time
+taskset -c 2,3 env -u NODE_OPTIONS python3 -B scripts/limited_verification.py --cloud --cloud-worker-cpus auto -- \
+  python3 -B scripts/benchmark-porffor.py run --cloud --prepared target/peer-prepared --output target/peer-run --time /usr/bin/time
+taskset -c 2,3 env -u NODE_OPTIONS python3 -B scripts/limited_verification.py --cloud -- \
+  python3 -B scripts/benchmark-porffor.py compile --cloud --prepared target/peer-prepared --output target/peer-compile --time /usr/bin/time
+python3 -B scripts/benchmark-porffor.py publish --prepared target/peer-prepared --run target/peer-run \
+  --compile target/peer-compile --output docs/rust-rewrite/wasm-peer-current.json
+python3 -B scripts/benchmark-porffor.py tables docs/rust-rewrite/wasm-peer-current.json
+```
+
+`prepare` builds Porffor Wasm (default `-O1`, Scriptc's `print` adapter) and Scriptw native
+images untimed, then runs every actor/kernel once with checked output. Compile failures,
+rejected modules, runtime failures and wrong outputs are retained as failed attempts, with
+Porffor's own runner on the same source as a cross-check, and are never timed. `run` uses the
+runtime panel's sampling (21 entries after ten checked warmups, eight fresh processes per
+actor/kernel in two reversed blocks, Williams order) for four actors: Scriptw on the shared
+Wasmtime host; Porffor's Wasm on Wasmtime through `scripts/wasm_peer_wasmtime.py` with the
+host's Cranelift settings and Store pool; the same Wasm on Node's WebAssembly engine through
+`scripts/wasm_peer_node.cjs`; and the source on Node/V8. `--smoke` and `--case` select tooling
+scopes that `publish` refuses. `compile` times four fresh `scriptw build wasm` and Porffor `wasm`
+processes per kernel on one CPU. `publish` writes the checked summary without host paths; paste
+the `tables` output into the benchmark details unedited.
+
 ## Focused performance situations
 
 Generate the checked programs for each performance hill.

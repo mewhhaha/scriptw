@@ -26,6 +26,15 @@ EXCLUDED = (
     "scripts/tests/check-readme-status-artifacts.sh",
 )
 RETIRED = "por" + "ffor"
+# The external compiler of the same name is a benchmark comparator. Only these
+# exact files may name it as a word; retired tokens and paths still fail in them.
+EXTERNAL_COMPARATOR_FILES = frozenset({
+    f"scripts/benchmark-{RETIRED}.py",
+    f"scripts/tests/test_benchmark_{RETIRED}.py",
+    "scripts/wasm_peer_node.cjs",
+    "scripts/wasm_peer_wasmtime.py",
+    "docs/rust-rewrite/wasm-peer-current.json",
+})
 DOCTEST = (
     '^[0-9]+:[[:space:]]*"/workspace/' + RETIRED
     + '/crates/scriptw-[^"]+[.]rs - [^"]+ [(]line [0-9]+[)]"[,]?[[:space:]]*$'
@@ -139,7 +148,7 @@ def main(path_pattern, token_pattern, word_pattern):
                     fail(error)
             for line in tokens.get(audit, []):
                 fail(path + ":" + os.fsdecode(line))
-            if path.endswith(".md") or path in ("index.html", "CNAME"):
+            if path.endswith(".md") or path in ("index.html", "CNAME") or path in EXTERNAL_COMPARATOR_FILES:
                 continue
             lines = [line for line in words.get(audit, [])
                 if os.fsencode("https://github.com/mewhhaha/" + RETIRED) not in line

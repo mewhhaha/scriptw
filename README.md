@@ -32,7 +32,7 @@ Test262 publication still use `--release`
 
 ## Benchmarks
 
-All panels were measured on **2026-11-17** at source `d2948d619` (compiler fingerprint `697c47c22eb0`), on a
+All panels except [Porffor](#porffor) were measured on **2026-11-17** at source `d2948d619` (compiler fingerprint `697c47c22eb0`), on a
 shared four-vCPU cloud machine (Intel Xeon, 2.30 GHz) with Node 24.22.1. Every
 engine gets the same two CPUs, so V8's compiler and collector threads do not
 preempt its main thread. They are not requalified on every commit.
@@ -104,6 +104,16 @@ on a retained call after 100 warmups. Speed is ahead of V8 in 9 of them and behi
 [Scores and workload bounds](docs/rust-rewrite/benchmarks.md#focused-performance-situations) · [Situation data](docs/rust-rewrite/situations-current.json).
 
 ![Global lookup situations](docs/rust-rewrite/assets/situations-current/global-lookup.svg)
+
+### Porffor
+
+**Porffor 0.61.13 · 2026-11-23**, a separate panel. It compares a local Scriptw build of
+`6d6e0c5d4` on the 17 runtime kernels, with every actor on one CPU. Porffor prints wrong output
+for 3 kernels and throws on 1. On the 13 it runs correctly, Scriptw takes **0.394×** Porffor's time
+when both run on Wasmtime (geometric mean; Scriptw is faster in 10/13 in both blocks), and
+**0.163×** with Porffor on Node's WebAssembly engine. Scriptw compiles all 17 faster, at
+**0.644×** Porffor's time. [Tables, engines and failures](docs/rust-rewrite/benchmarks.md#2026-11-23-comparison-with-porffor) ·
+[data](docs/rust-rewrite/wasm-peer-current.json).
 
 ## Current Status
 <!-- scriptw-status:start -->
