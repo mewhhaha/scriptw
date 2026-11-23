@@ -73,7 +73,7 @@ fn iterator_results_share_one_compact_shape_and_actual_arrays_read_by_index() {
     );
     assert!(!result.contains("emit_object_append_data_property_with_flags"));
     let shape = normalized(ITERATOR_RESULT);
-    assert!(shape.contains("for name in [\"value\",\"done\"]"));
+    assert!(shape.contains("fornamein[\"value\",\"done\"]"));
     assert!(shape.contains("schema.load_iterator_result_shape(&result,f)"));
     assert!(shape.contains("schema.publish_iterator_result_shape(&shape,f)"));
     let next = normalized(bounded(

@@ -27,7 +27,9 @@ fn intrinsic_is_one_rooted_nonconstructable_catalog_identity() {
     );
     assert!(catalog.contains("=> BUILTIN_FUNCTION_PROTOTYPE_SYMBOL_HAS_INSTANCE_FUNCTION_ID"));
     assert!(catalog.contains("debug: \"Function.prototype[Symbol.hasInstance]\""));
-    assert!(catalog.contains("flags: []"));
+    // OrdinaryHasInstance can run user code: Get(C, "prototype") may be a
+    // getter, and the receiver's chain may hold a Proxy getPrototypeOf trap.
+    assert!(catalog.contains("flags: [SYNCHRONOUS_USER_CODE]"));
     assert!(catalog.contains("installer: None"));
     assert!(catalog.contains("native: \"[Symbol.hasInstance]\""));
 
