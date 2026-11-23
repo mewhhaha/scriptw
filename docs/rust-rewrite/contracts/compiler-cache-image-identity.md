@@ -1,22 +1,59 @@
 # Loaded executable identity and startup experiments
 
-`CompilerIdentity::current()` continues to capture SHA-256 of the actual loaded
+Three identities describe the running compiler, and they are different types
+with no conversion between them:
+
+| Identity | Type | What it binds | Cost | Consumers |
+| --- | --- | --- | --- | --- |
+| Evidence | `CompilerIdentity` | build source and SHA-256 of the whole loaded executable | one full read, about 0.2 s for 200 MiB | `compiler-identity`, Test262 execution identity and publication, differential workers, benchmark reports (a benchmark host report under `SCRIPTW_BENCHMARK_REPORT_IDENTITY=build-source` carries a null digest instead, and its driver hashes the host file) |
+| Build source | `CompilerBuildIdentity` | the embedded source fingerprint and revision only | none | precompiled-image and portable-bundle admission, which also check their own digests |
+| Cache | `CompilerCacheIdentity` | build source and one image binding below | none by default | program-Wasm and runtime-artifact caches; execution-profile program keys |
+
+`CompilerIdentity::current()` captures SHA-256 of the actual loaded
 executable, opened through `/proc/self/exe` on Linux. It validates unchanged
 length/modification metadata around the read and rejects missing, unreadable,
-changing or empty images. Reports retain this full SHA-256 evidence regardless
-of the cache experiment. A source fingerprint alone never authorizes a
-compiler-bound cache.
+changing or empty images. Reports retain this full SHA-256 evidence whichever
+binding keys the caches. Only evidence producers call it: compilation, cache
+lookup and precompiled-image admission do not. A source fingerprint alone
+never authorizes a compiler-bound cache.
 
-`SCRIPTW_COMPILER_CACHE_IMAGE_HASH=sha256|blake3` selects a separate, closed
-compiler-cache image-hash cohort, parsed once per process. The default is the
-existing SHA-256 image digest and exact `scriptw-program-cache-compiler-v4`
-fingerprint. Explicit BLAKE3 hashes the same opened executable serially under
-the same metadata checks and uses the separate
-`scriptw-program-cache-compiler-v5-blake3` domain. Both cache fingerprints bind
-the validated build-source digest and actual executable digest. The outer cache
-fingerprint remains SHA-256; it never labels the BLAKE3 image digest SHA-256.
-Unknown selections and image read failures disable compiler-bound caches; the
-diagnostic accessor returns the concrete error without selecting another hash.
+`SCRIPTW_COMPILER_CACHE_IMAGE_HASH=build-id|blake3|sha256` selects a closed
+compiler-cache image binding, parsed once per process. Each has its own
+fingerprint domain, so entries of one binding are never read by another:
+
+- `build-id` (`scriptw-program-cache-compiler-v6-build-id`): the
+  `NT_GNU_BUILD_ID` note of the loaded image. The linker computes it over the
+  complete linked output, so two different links have different IDs. The
+  process reads it from its own kernel-loaded program headers (`AT_PHDR`,
+  through `/proc/self/mem`), not from a path, and admits it only from a
+  non-writable, file-backed `PT_LOAD`. An ID shorter than 16 bytes (lld's
+  `fast` style), a zeroed or filled one and a repeated note are refused. It
+  reads no executable bytes beyond the headers and the note.
+- `blake3` (`scriptw-program-cache-compiler-v5-blake3`) and `sha256`
+  (`scriptw-program-cache-compiler-v4`, the evidence digest): a serial hash of
+  the whole opened executable under the same metadata checks.
+
+With the variable unset the binding is `build-id` when the loaded image has an
+admissible ID and `blake3` otherwise: no build ID, not a 64-bit little-endian
+Linux image, procfs unavailable, no `PT_PHDR` (a static non-PIE link), an ID
+shorter than 16 bytes or constant-filled, a `PT_NOTE` over 64 KiB, or any
+malformed note. The unset default therefore depends on the environment as well
+as the binary: the same executable can bind `build-id` where `/proc/self/mem`
+is readable and `blake3` where it is not. Caches only miss across the two, but
+an execution profile's program key includes the fingerprint and is refused in
+the other cohort, so pin the variable when profiles move between environments.
+An explicit selection never falls back: an explicit `build-id`
+without an admissible ID, an unknown value and an image read failure disable
+compiler-bound caches, and the diagnostic accessor returns the concrete error.
+The outer cache fingerprint remains SHA-256 over the domain, the validated
+build-source digest and the image identity; it never labels a BLAKE3 digest or
+a build ID as SHA-256.
+
+The build ID assumes an honest build whose executable is the linker's output.
+It does not detect bytes edited in the file after linking while the note is
+kept, and a link given a constant `--build-id=0x...` has no per-build ID.
+Select `blake3` or `sha256` for such executables. The cache directory holds
+native code and is trusted to the same degree under every binding.
 
 The experiment pins the maintained official [`blake3` crate, version1.8.7](https://github.com/BLAKE3-team/BLAKE3/blob/1.8.7/Cargo.toml).
 Only its standard single-threaded API is used; the optional Rayon and mmap
@@ -29,7 +66,7 @@ admission. It supplies source identity without hashing the executable; it does
 not supply executable evidence. External bundle checksums, source/profile/Intl
 and full raw-Wasm/layout validation are unchanged.
 
-`compiler_cache_identity()` exposes the actual admitted algorithm, image digest
+`compiler_cache_identity()` exposes the actual admitted binding, image identity
 and domain. New boundary examples report those separately from the mandatory
 `executable_sha256`. The ordinary six benchmark harness files remain unchanged;
 nondefault cache-image cohorts must not be merged with their default reports.

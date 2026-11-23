@@ -131,7 +131,7 @@ when the profile no longer matches the code. `SCRIPTW_DIST_BOLT_PREP=1` links
 the PGO binary with `--emit-relocs` and `-z keep-text-section-prefix` for a
 later BOLT pass; it is off by default because BOLT is not part of the recipe
 (LLVM 18's instrumentation pass needed more than 8 GB of RAM on this binary)
-and the relocations add about 19 MB that every CLI run hashes.
+and the relocations add about 19 MB to the executable.
 
 Freeze a dist binary, not a release one, for a new compilation or RSC
 wall-time campaign, and keep its `scriptw.build-info`. For a long Test262
@@ -779,6 +779,16 @@ Reuse requires exact source, features, dependency graph, runtime/program identit
 and resource policy; filenames alone prove nothing. Keep fresh evidence directories
 for new cohorts and preserve failed receipts. Shared immutable runtime images and
 bounded caches reduce rebuilds without sharing mutable JavaScript state.
+
+Compiler-bound caches are keyed by the build source and the running
+executable's linker build ID, read from the loaded image without hashing the
+file ([contract](docs/rust-rewrite/contracts/compiler-cache-image-identity.md)).
+An executable whose bytes were edited after linking, or one linked with a
+constant `--build-id`, must run with `SCRIPTW_COMPILER_CACHE_IMAGE_HASH=blake3`
+(or `sha256`), which hashes the whole file. Evidence (`scriptw
+compiler-identity`, Test262 and benchmark reports) hashes it, except benchmark
+host reports run with `SCRIPTW_BENCHMARK_REPORT_IDENTITY=build-source`, which
+carry a null `executable_sha256` and leave the executable check to the driver.
 
 Give an experimental source copy its own `CARGO_TARGET_DIR`, or keep the copy
 outside `target/`. Cargo identifies workspace packages by their path relative

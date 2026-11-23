@@ -1,4 +1,4 @@
-use scriptw_engine::{CompilerIdentity, CompilerSourceRevision};
+use scriptw_engine::{CompilerBuildIdentity, CompilerIdentity, CompilerSourceRevision};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{fs, io::Write, path::Path};
@@ -9,16 +9,46 @@ fn hash(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+/// What a report binds its process to: `executable` (the default) or
+/// `build-source`. Any other value is refused, never ignored.
+///
+/// `executable` is evidence: the process hashes its whole loaded image
+/// (about 0.2 s for 200 MiB) and reports `executable_sha256`. `build-source`
+/// reports only the embedded source identity and a null `executable_sha256`,
+/// for a driver that hashes the host file itself before and after the run and
+/// measures process wall time. A null digest never equals a recorded one, so
+/// such a report fails every driver check that compares the reported digest;
+/// its schema is unchanged, so only `report_identity` marks it, and a reader
+/// that ignores the digest (per-entry times) must not treat it as evidence.
+const REPORT_IDENTITY_VARIABLE: &str = "SCRIPTW_BENCHMARK_REPORT_IDENTITY";
+
 fn identity() -> Result<Value, String> {
-    let identity = CompilerIdentity::current()?;
-    let revision = match identity.source_revision() {
+    let build = CompilerBuildIdentity::current()?;
+    let executable_sha256 = match std::env::var(REPORT_IDENTITY_VARIABLE).as_deref() {
+        Err(std::env::VarError::NotPresent) | Ok("executable") => {
+            Some(CompilerIdentity::current()?.executable_sha256().to_string())
+        }
+        Ok("build-source") => None,
+        Ok(other) => {
+            return Err(format!(
+                "{REPORT_IDENTITY_VARIABLE} must be executable or build-source, not {other:?}"
+            ))
+        }
+        Err(error) => return Err(format!("{REPORT_IDENTITY_VARIABLE}: {error}")),
+    };
+    let revision = match build.source_revision() {
         CompilerSourceRevision::GitCommit(commit) => Some(commit.as_str()),
         CompilerSourceRevision::UnversionedArchive => None,
     };
-    Ok(json!({"source_commit": revision,
-        "source_fingerprint": identity.source_fingerprint().to_string(),
-        "executable_sha256": identity.executable_sha256().to_string(),
-        "compiler_identity_scheme": CompilerIdentity::source_fingerprint_scheme()}))
+    let source_only = executable_sha256.is_none();
+    let mut report = json!({"source_commit": revision,
+        "source_fingerprint": build.source_fingerprint().to_string(),
+        "executable_sha256": executable_sha256,
+        "compiler_identity_scheme": CompilerIdentity::source_fingerprint_scheme()});
+    if source_only {
+        report["report_identity"] = json!("build-source");
+    }
+    Ok(report)
 }
 
 fn write_new(path: &Path, bytes: &[u8]) -> Result<(), String> {

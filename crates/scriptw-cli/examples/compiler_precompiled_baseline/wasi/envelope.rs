@@ -13,7 +13,8 @@ pub(super) struct Frame {
 }
 
 pub(crate) fn current_fingerprint() -> Result<[u8; 32], String> {
-    let value = CompilerIdentity::current()?
+    // Source identity only: framing never needs the executable hashed.
+    let value = scriptw_engine::CompilerBuildIdentity::current()?
         .source_fingerprint()
         .to_string();
     let mut fingerprint = [0; 32];

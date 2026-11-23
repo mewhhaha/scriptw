@@ -129,7 +129,9 @@ when both run on Wasmtime (geometric mean; Scriptw is faster in 10/13 in both bl
 
 Scriptw fits 1.7× as many processes as Node 24, but Node 22 fits more on a kernel that keeps 8,192
 objects live. Scriptw's startup is its weak point: hashing its own executable and loading the runtime
-image take about 290 ms before a 1 ms program. Timings ran under heavy machine load.
+image take about 290 ms before a 1 ms program. Timings ran under heavy machine load. Since this
+run the executable hash has left the product path (a warm `scriptw run` went from 174 to 103 ms on
+the same machine); the panel has not been rerun.
 [Method, kernels and limits](docs/rust-rewrite/benchmarks.md#process-density) ·
 [data](docs/rust-rewrite/process-density-current.json).
 

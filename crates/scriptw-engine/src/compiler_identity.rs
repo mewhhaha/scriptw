@@ -77,39 +77,61 @@ pub enum CompilerSourceRevision {
 }
 
 /// Build metadata has its own validated authority. Source-only admission can
-/// consume this fact without pretending it proves the loaded executable bytes.
-struct ValidatedBuildIdentity {
+/// consume this fact without pretending it proves the loaded executable bytes:
+/// no accessor of this type yields an executable digest, so it can neither key
+/// a compiler-bound cache alone nor stand in for [`CompilerIdentity`] evidence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompilerBuildIdentity {
     source_fingerprint: CompilerDigest,
     source_revision: CompilerSourceRevision,
 }
 
-fn build_identity() -> Result<&'static ValidatedBuildIdentity, String> {
-    static BUILD: OnceLock<Result<ValidatedBuildIdentity, String>> = OnceLock::new();
-    BUILD
-        .get_or_init(|| {
-            let source_fingerprint = CompilerDigest::parse(env!("SCRIPTW_COMPILER_FINGERPRINT"))?;
-            let revision = env!("SCRIPTW_COMPILER_SOURCE_REVISION");
-            let source_revision = match revision.strip_prefix("git:") {
-                Some(commit) => CompilerSourceRevision::GitCommit(CompilerCommitId::parse(commit)?),
-                None if revision == "unversioned-archive" => {
-                    CompilerSourceRevision::UnversionedArchive
-                }
-                None => return Err("invalid embedded compiler source revision".into()),
-            };
-            Ok(ValidatedBuildIdentity {
-                source_fingerprint,
-                source_revision,
+impl CompilerBuildIdentity {
+    /// The build inputs Cargo embedded in this compiler. Reads no file.
+    pub fn current() -> Result<&'static Self, String> {
+        static BUILD: OnceLock<Result<CompilerBuildIdentity, String>> = OnceLock::new();
+        BUILD
+            .get_or_init(|| {
+                let source_fingerprint =
+                    CompilerDigest::parse(env!("SCRIPTW_COMPILER_FINGERPRINT"))?;
+                let revision = env!("SCRIPTW_COMPILER_SOURCE_REVISION");
+                let source_revision = match revision.strip_prefix("git:") {
+                    Some(commit) => {
+                        CompilerSourceRevision::GitCommit(CompilerCommitId::parse(commit)?)
+                    }
+                    None if revision == "unversioned-archive" => {
+                        CompilerSourceRevision::UnversionedArchive
+                    }
+                    None => return Err("invalid embedded compiler source revision".into()),
+                };
+                Ok(CompilerBuildIdentity {
+                    source_fingerprint,
+                    source_revision,
+                })
             })
-        })
-        .as_ref()
-        .map_err(Clone::clone)
+            .as_ref()
+            .map_err(Clone::clone)
+    }
+
+    pub fn source_fingerprint(&self) -> CompilerDigest {
+        self.source_fingerprint
+    }
+    pub fn source_revision(&self) -> &CompilerSourceRevision {
+        &self.source_revision
+    }
 }
 
 pub(crate) fn build_source_fingerprint() -> Result<CompilerDigest, String> {
-    Ok(build_identity()?.source_fingerprint)
+    Ok(CompilerBuildIdentity::current()?.source_fingerprint)
 }
 
 /// Only checked source/executable parts can cross an execution-evidence boundary.
+///
+/// This is the evidence identity: `executable_sha256` is always SHA-256 of the
+/// complete loaded image, read in full by the process that reports it (or
+/// decoded from such a report). The cheaper compiler-cache identity
+/// ([`crate::CompilerCacheIdentity`]) is a different type with no conversion
+/// to this one, so a cache key can never be published as executable evidence.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompilerIdentity {
     source_fingerprint: CompilerDigest,
@@ -147,6 +169,13 @@ impl CompilerIdentity {
     /// Bind once to embedded build inputs and the actual executing image.
     /// Unreadable or changing image bytes reject evidence; no empty-image hash
     /// or current-checkout substitution can stand in for this compiler.
+    ///
+    /// The first call reads and hashes the whole executable (about 0.2 s for a
+    /// 200 MiB image). Only evidence producers call it: the `compiler-identity`
+    /// command, Test262 and benchmark reports (except a benchmark host run
+    /// with `SCRIPTW_BENCHMARK_REPORT_IDENTITY=build-source`). Compilation, compiler-bound
+    /// caches and precompiled-image admission never do, unless the SHA-256
+    /// cache cohort is selected explicitly.
     pub fn current() -> Result<&'static Self, String> {
         static IDENTITY: OnceLock<Result<CompilerIdentity, String>> = OnceLock::new();
         IDENTITY
@@ -156,7 +185,7 @@ impl CompilerIdentity {
     }
 
     fn capture() -> Result<Self, String> {
-        let build = build_identity()?;
+        let build = CompilerBuildIdentity::current()?;
         let executable_sha256 = loaded_executable_digest()
             .map_err(|error| format!("cannot bind the running compiler executable: {error}"))?;
         Ok(Self::from_parts(

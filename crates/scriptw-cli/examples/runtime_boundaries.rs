@@ -199,11 +199,11 @@ fn run() -> Result<Value, String> {
     let cache_identity = scriptw_engine::compiler_cache_identity()?;
     result["requested_compiler_cache_image_hash"] =
         json!(std::env::var("SCRIPTW_COMPILER_CACHE_IMAGE_HASH")
-            .unwrap_or_else(|_| cache_identity.algorithm().as_str().into()));
+            .unwrap_or_else(|_| cache_identity.binding().as_str().into()));
     result["compiler_cache_identity"] = json!({
-        "image_hash_algorithm": cache_identity.algorithm().as_str(),
-        "image_digest": cache_identity.image_digest_hex(),
-        "fingerprint_domain": cache_identity.algorithm().fingerprint_domain(),
+        "image_hash_algorithm": cache_identity.binding().as_str(),
+        "image_digest": cache_identity.image_identity_hex(),
+        "fingerprint_domain": cache_identity.binding().fingerprint_domain(),
     });
     let cache = scriptw_engine::wasm_runtime_module_cache_observation();
     result["module_cache_accounting"] = json!({

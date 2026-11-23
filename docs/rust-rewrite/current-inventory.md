@@ -76,12 +76,25 @@ accepts `--case <file.js>`.
 
   Owner: RSC compiler/runtime.
 - Process startup: the [density panel](benchmarks.md#process-density) fits
-  1.7× as many Scriptw processes as Node 24 in memory, but a Scriptw process
-  takes about 306 ms against Node's 42 ms. About 194 ms is hashing the
-  203 MiB executable for its identity and about 93 ms is loading the runtime
-  image; `scriptw run` with a warm cache pays the hash too. Compute the
-  identity once at build time or lazily, only where a cache key needs it,
-  then rerun the panel on a quiet machine.
+  1.7× as many Scriptw processes as Node 24 in memory, but measured a Scriptw
+  process at about 306 ms against Node's 42 ms: about 194 ms hashing the
+  203 MiB executable and about 93 ms loading the runtime image. The hash is
+  gone from the product path. Compiler caches are keyed by the loaded image's
+  linker build ID
+  ([contract](contracts/compiler-cache-image-identity.md)), precompiled-image
+  admission needs only the build source, and the panel's wall processes report
+  a build-source identity while the driver hashes the host file. On the
+  loaded shared machine, one CPU, 15 processes each: warm `scriptw run` of the
+  print-only program 174 → 103 ms and the host's `execute-scriptw`
+  289 → 103 ms; evidence commands still hash (about 186 ms).
+
+  What remains is the embedded runtime image, about 90 ms of every process:
+  zstd-decoding 41.8 MiB, its SHA-256 admission (about 33 ms) and the write to
+  a private unnamed file that Wasmtime maps. Attribute those three, then
+  choose between a faster admission digest and an uncompressed, page-aligned
+  image mapped from the executable itself. Keep the rule that no pre-existing
+  or digest-selected native file is admitted. Then rerun the panel on a quiet
+  machine.
 
   Owner: CLI and engine embedding.
 - Retained RSC requests: the 1 ms goal is met, and against Node 24
@@ -253,10 +266,11 @@ accepts `--case <file.js>`.
   [literal checkpoint](literal-admission-20261101.json) uses passive UTF-16 data
   and 204–205-byte main bodies on its seven literal inputs, without compiler
   pools or linear memory. Exact completions retain the existing WasmGC representation.
-  The [cache-identity checkpoint](cache-image-20261101.json) promotes full-image
-  BLAKE3 after an ordinary CLI-only comparison. It still reads the whole loaded
-  executable. Attribute remaining hashing, P lookup and Wasmtime loading before
-  changing cache policy; never substitute a source-only key. Measure cheap P
+  The [cache-identity checkpoint](cache-image-20261101.json) promoted full-image
+  BLAKE3 after an ordinary CLI-only comparison; the default is now the loaded
+  image's linker build ID, which reads no executable bytes (see process startup
+  above). Attribute P lookup and Wasmtime loading before changing cache policy
+  further; never substitute a source-only key. Measure cheap P
   regeneration separately: bypassing native caches can activate Cranelift and
   increase RSS. Earlier retained-object RSS rises and slow wall outliers still
   need attribution within their original cohorts.

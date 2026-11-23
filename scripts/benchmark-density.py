@@ -97,9 +97,10 @@ POLICY = dict(
               'figure gives all 16 GiB to these processes: no kernel, page-cache or OS reserve. USS (private clean + dirty) at '
               'Nmax is reported beside it.'),
     wall=('Fresh sequential processes under GNU time, spawn to exit, actor order rotated per round; output checked. Scriptw '
-          'runs the host, which hashes its own 200 MB executable for its identity report and executes the program four '
-          'times (3 samples + 1 warmup, its minimum); both costs are reported separately. Scriptw run is the product CLI '
-          'on a warm program cache: it reads the source and loads its cached native code instead of compiling it.'),
+          'runs the host with a build-source report identity: it executes the program four times (3 samples + 1 warmup, '
+          'its minimum) and does not hash its own 200 MB executable, which this driver hashes before and after the run. '
+          'The host identity command, which does hash it, is timed separately. Scriptw run is the product CLI on a warm '
+          'program cache: it reads the source and loads its cached native code instead of compiling it.'),
     steady=('Per-entry wall in fresh Stores/contexts through the Porffor panel harnesses: 21 measured entries after 10 '
             'checked warmups, four processes per actor/program in two blocks (second reversed); median of process medians.'),
     source=('Scriptw runs the original bytes with its print. Node and Porffor run the same print-to-console.log adapter '
@@ -648,7 +649,8 @@ def run(args):
         print(f'{number + 1}/{len(plan)}', entry['program'], entry['actor'], 'N=' + str(entry['count']),
               round(sum(s[1] for s in group['samples']) / 2**20, 1), 'MiB PSS total', flush=True)
     # (2) Process wall, spawn to exit; the Scriptw CLI cache was warmed by prepare's run and is warmed again here.
-    cache_env = dict(env, SCRIPTW_CACHE_DIR=str(output / 'cache'))
+    # A wall process reports its build source only; checked_inputs() binds the host file's digest around the whole run.
+    cache_env = dict(env, SCRIPTW_CACHE_DIR=str(output / 'cache'), SCRIPTW_BENCHMARK_REPORT_IDENTITY='build-source')
     for program in PROGRAMS:
         if 'scriptw.run' in admitted[program]:
             run_wall(wall_argv('scriptw.run', prepared, root, program), output / 'wall', 'warm-' + program, cache_env, args.time)

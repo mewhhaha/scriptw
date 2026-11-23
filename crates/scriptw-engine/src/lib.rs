@@ -40,10 +40,11 @@ pub use compilation_profile::{
 pub use compiler_inspection::{CompilerInspectionFailure, CompilerInspectionStage};
 mod runtime_profile;
 pub use compiler_cache_identity::{
-    compiler_cache_identity, CompilerCacheIdentity, CompilerCacheImageHashAlgorithm,
+    compiler_cache_identity, CompilerCacheIdentity, CompilerCacheImageBinding,
 };
 pub use compiler_identity::{
-    CompilerCommitId, CompilerDigest, CompilerIdentity, CompilerSourceRevision,
+    CompilerBuildIdentity, CompilerCommitId, CompilerDigest, CompilerIdentity,
+    CompilerSourceRevision,
 };
 pub use memory_module_cache::{
     wasm_runtime_module_cache_observation, WasmRuntimeModuleCacheObservation,
@@ -587,11 +588,11 @@ impl ProgramWasmArtifact {
     }
 }
 
+#[cfg(test)]
 fn compiler_identity_cache_fingerprint(identity: &CompilerIdentity) -> [u8; 32] {
     compiler_cache_identity::cache_fingerprint(
-        CompilerCacheImageHashAlgorithm::Sha256,
         identity.source_fingerprint(),
-        identity.executable_sha256().as_bytes(),
+        &compiler_cache_identity::CacheImage::Sha256(*identity.executable_sha256().as_bytes()),
     )
 }
 
@@ -603,8 +604,9 @@ thread_local! {
 fn compiler_fingerprint() -> Option<&'static [u8; 32]> {
     #[cfg(test)]
     COMPILER_CACHE_IDENTITY_REQUESTS.with(|requests| requests.set(requests.get() + 1));
-    // The selected algorithm admits actual loaded-image bytes. Full execution
-    // evidence remains independently SHA-256; errors disable compiler caches.
+    // The selected binding identifies the actual loaded image: its linker
+    // build ID by default, or a hash of all its bytes. Full execution evidence
+    // remains independently SHA-256; errors disable compiler caches.
     compiler_cache_identity()
         .ok()
         .map(CompilerCacheIdentity::fingerprint)

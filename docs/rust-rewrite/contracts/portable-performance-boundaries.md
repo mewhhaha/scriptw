@@ -87,9 +87,10 @@ three-case reference. Streaming, public browser-entry support and general
 React compatibility are not implied. Current Scriptw execution must pass
 before this fixture supplies a performance observation.
 
-Executable cache hashing is explicitly a cohort choice: default `sha256`
-retains the v4 domain; opt-in `SCRIPTW_COMPILER_CACHE_IMAGE_HASH=blake3` uses the
-distinct v5-blake3 domain. Every child must report the requested actual
+Executable cache hashing is explicitly a cohort choice: this harness sets
+`SCRIPTW_COMPILER_CACHE_IMAGE_HASH=sha256` (the v4 domain) unless the caller
+sets `blake3` (the distinct v5-blake3 domain); it does not measure the
+compiler's own `build-id` default. Every child must report the requested actual
 algorithm/domain/digest and agree with preparation. Full loaded executable
 SHA-256 evidence remains mandatory after the ready signal in both cohorts.
 Receipts label these as separate cohorts, including when the emitted Wasm is
