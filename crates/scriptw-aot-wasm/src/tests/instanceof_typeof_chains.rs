@@ -114,4 +114,3 @@ fn typeof_if_chains_on_one_binding_dispatch_from_one_classification() {
         assert_eq!(class_tables(&bodies[0]), tables, "{source}");
     }
 }
-
