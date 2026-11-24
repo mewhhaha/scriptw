@@ -1033,3 +1033,98 @@ fn typecheck<I>(
     }
     Ok(())
 }
+
+#[cfg(all(test, feature = "cranelift", feature = "wat"))]
+mod func_ref_text_tests {
+    use crate::code::ModuleWithCode;
+    use crate::{AsContextMut, Engine, Instance, Module, Store};
+    use wasmtime_environ::FuncKey;
+
+    /// Three escaping functions (exported, in a table, named by `ref.func`),
+    /// non-escaping ones around them and an imported one before them.
+    const WAT: &str = r#"
+        (module
+          (import "host" "f" (func $imported))
+          (table 4 funcref)
+          (elem (i32.const 0) $in_table $exported)
+          (elem declare func $referenced)
+          (func $private (result i32) (i32.const 1))
+          (func $exported (export "exported") (result i32) (call $private))
+          (func $in_table (param i32) (result i32) (local.get 0))
+          (func $referenced (export "referenced") (result funcref) (ref.func $referenced))
+          (func $start (call $imported))
+          (start $start)
+        )
+    "#;
+
+    /// The array-call and Wasm-call addresses of every escaping defined
+    /// function of `instance`, as its `VMFuncRef`s hold them and as the
+    /// function table and the store's registry give them.
+    fn check(store: &mut Store<()>, module: &Module, instance: Instance) -> usize {
+        let (mut vm, registry) = instance
+            .id
+            .get_mut_and_module_registry(store.as_context_mut().0);
+        let compiled = module.compiled_module();
+        let env = module.env_module();
+        let code = ModuleWithCode::in_store(registry, module).unwrap();
+        let mut escaping = 0;
+        for defined in env.defined_func_indices() {
+            let index = env.func_index(defined);
+            if !env.functions[index].is_escaping() {
+                continue;
+            }
+            escaping += 1;
+            let array = code.function(FuncKey::ArrayToWasmTrampoline(env.module_index, defined));
+            let wasm = code.function(FuncKey::DefinedWasmFunction(env.module_index, defined));
+            // First request, then the instance's initialized entry.
+            for _ in 0..2 {
+                let func_ref = vm.as_mut().get_func_ref(registry, index).unwrap();
+                // SAFETY: the instance's own initialized `VMFuncRef`.
+                let func_ref = unsafe { func_ref.as_ref() };
+                assert_eq!(
+                    func_ref.array_call.as_ptr().cast::<u8>().cast_const(),
+                    array.as_ptr()
+                );
+                let wasm_call = func_ref.wasm_call.unwrap();
+                assert_eq!(wasm_call.as_ptr().cast::<u8>().cast_const(), wasm.as_ptr());
+            }
+            // The module's cache, filled by now, and the table agree.
+            assert_eq!(
+                compiled.func_ref_text(defined),
+                compiled.locate_func_ref_text(defined)
+            );
+        }
+        escaping
+    }
+
+    #[test]
+    fn func_refs_match_the_function_table_in_every_store_and_instance() {
+        let engine = Engine::default();
+        let module = Module::new(&engine, WAT).unwrap();
+        let compiled = module.compiled_module();
+        for defined in module.env_module().defined_func_indices() {
+            let index = module.env_module().func_index(defined);
+            if module.env_module().functions[index].is_escaping() {
+                // Before any instance: located, then cached.
+                let located = compiled.locate_func_ref_text(defined);
+                assert_ne!(located.array_call, located.wasm_call);
+                assert_eq!(compiled.func_ref_text(defined), located);
+                assert_eq!(compiled.func_ref_text(defined), located);
+            }
+        }
+        // A second module of the same engine has its own cache.
+        let other = Module::new(&engine, WAT).unwrap();
+        for _ in 0..2 {
+            let mut store = Store::new(&engine, ());
+            let host = crate::Func::wrap(&mut store, || {});
+            for module in [&module, &other, &module] {
+                let instance = Instance::new(&mut store, module, &[host.into()]).unwrap();
+                assert_eq!(check(&mut store, module, instance), 3);
+                let exported = instance
+                    .get_typed_func::<(), i32>(&mut store, "exported")
+                    .unwrap();
+                assert_eq!(exported.call(&mut store, ()).unwrap(), 1);
+            }
+        }
+    }
+}

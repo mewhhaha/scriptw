@@ -2764,6 +2764,67 @@ method and host build, `execute-wasi`:
 Thread CPU agrees within one point. Pooling one actor and not the other would
 have credited Scriptw with 11–53% that belongs to allocation, not compiled code.
 
+### Pretenure window (2026-11-24)
+
+Two vendored runtime changes for fresh entries
+([patch notes](../../vendor/wasmtime-47.0.0/PATCHES.md): "Funcref code
+addresses" and the pretenure window under "Young generation"). Neither
+changes compiled code, the module compatibility check or the runtime image.
+
+- A defined function's `VMFuncRef` takes its code addresses from a
+  per-module offset table and the instance's cached text base, not from two
+  registry and two function-table searches (about 760 instructions each).
+- A heap's first full nursery does not collect: the Store goes on allocating
+  in about 3 MiB of the empty old space, and its first collection, if it
+  lives that long, is a full one. React SSR allocates between 2 and 5 MiB per
+  entry, so its one minor collection (4.1M of 14.1M instructions) is gone.
+
+Callgrind instructions of one fresh entry's evaluation (the third entry of a
+process; `compiler_precompiled_baseline execute-scriptw`, Speed policy,
+pooled Store, images prepared by each host; `HEAD` is `88239b2b0`):
+
+| Fixture | `HEAD` | funcref addresses | and pretenure window | Change |
+| --- | ---: | ---: | ---: | ---: |
+| react-ssr | 14,101,366 | 13,687,469 | 9,290,995 | −34.1% |
+| edge-html | 10,170,149 | | 10,155,877 | −0.1% |
+| edge-json-api | 3,100,712 | | 3,073,634 | −0.9% |
+| print-only | 162,897 | 155,148 | 155,148 | −4.8% |
+
+Wall clock of the same entries, the two hosts alternating for 21 processes
+each on CPU 3 of a 4-vCPU VM that was running a Test262 campaign on the other
+three (per process the median of 20 entries after 5 warmups; median and range
+of those 21, µs):
+
+| Fixture | Execution `HEAD` | Execution now | Whole entry `HEAD` | Whole entry now |
+| --- | ---: | ---: | ---: | ---: |
+| react-ssr | 1,985 (1,930–2,761) | 1,495 (1,424–1,694) | 3,004 (2,891–4,274) | 2,499 (2,409–2,944) |
+| edge-html | 1,060 (1,012–1,637) | 1,058 (1,005–1,752) | 1,732 (1,670–2,533) | 1,744 (1,676–2,802) |
+| edge-json-api | 415 (395–594) | 411 (389–443) | 1,038 (995–1,512) | 1,066 (1,001–1,114) |
+| print-only | 36.9 (33.5–57.2) | 35.9 (32.6–52.8) | 577 (546–949) | 577 (553–882) |
+
+React SSR's execution is 25% shorter (one unpooled process each: 3.24 →
+2.59 ms). The other three are within the noise of this machine; the
+registration phase read 3–6 µs longer in every pair although its instruction
+count fell, which is not explained. React SSR's private dirty memory after
+the entry fell from 27,064 to 26,420 KiB (no promoted copies). A Store that
+allocates up to the window's end without collecting keeps up to about 3 MiB
+more than before until its first collection.
+
+The retained RSC request is unchanged at the median (sync 2,359,626 →
+2,359,677 instructions, async 2,562,129 → 2,561,970; 97 requests). Its means
+moved with where the collection cycle falls in the measured requests (sync
+2,419,435 → 2,442,019, async 2,651,751 → 2,648,345): the Store's first
+collection is now a full one after about 5 MiB instead of a minor one after
+2 MiB, and later ones follow the same pattern as before.
+
+The window was first tried in front of the nursery (a fresh Store's first
+3 MiB allocated old). React SSR measured the same, but entries that never
+filled a nursery got slower: every reference store into a window object runs
+the write barrier's out-of-line old-slot test, which cost edge-json-api
++0.5% instructions, +4.2% instruction-cache misses (Callgrind's simulation)
+and +4.6% execution time. Opening the window only when the first nursery is
+full leaves those entries on the path they had.
+
 ## 2026-11-23 comparison with Porffor
 
 [Porffor](https://porffor.dev) 0.61.13 is another JavaScript-to-Wasm AOT compiler. It ran

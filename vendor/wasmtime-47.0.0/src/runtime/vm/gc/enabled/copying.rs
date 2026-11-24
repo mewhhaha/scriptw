@@ -101,6 +101,48 @@ const fn nursery_end_for_initial_size(initial_size: u64) -> u32 {
     }
 }
 
+/// The most a heap's pretenure window allocates in the old space (see
+/// `YoungAllocation`).
+const PRETENURE_WINDOW: u32 = 4 << 20;
+
+/// Where the mutator's JIT-visible bump pointer and limit allocate, in a heap
+/// with a nursery.
+///
+/// A heap that has not collected yet has nothing in its old space to keep
+/// apart from young objects. When its nursery first fills, the mutator goes
+/// on allocating in a window of the empty old semi-space instead of
+/// collecting: a Store that is dropped before the window fills too never
+/// collects, where it used to copy the first nursery's survivors. Window
+/// objects are old by address, which is how compiled barriers, the host
+/// barrier and the `externref` lists classify them.
+///
+/// Compiled code initializes a window object without barriers while the
+/// nursery holds objects, and a fault that interrupts it mid-initialization
+/// leaves a headerless gap, so the window's references into the nursery are
+/// neither all in the remembered slots nor findable by walking it. No
+/// collection has to find them: until one has evacuated the window's objects
+/// the next collection is a full one, which reaches objects from roots alone
+/// and copies the nursery's and the window's survivors into the other
+/// semi-space.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum YoungAllocation {
+    /// The JIT-visible pair bumps the nursery of a heap that has not
+    /// collected since it got its memory. A window opens when it fills.
+    FirstNursery,
+    /// The JIT-visible pair bumps the active old semi-space, up to the
+    /// window's end; `old_bump` is stale and the old space's allocation
+    /// pointer is the JIT-visible one. The nursery's objects end at
+    /// `nursery_bump`.
+    Pretenuring { nursery_bump: u32 },
+    /// The JIT-visible pair bumps the nursery again, and the old space holds
+    /// the closed window's objects: the next collection is full.
+    NurseryAfterWindow,
+    /// The JIT-visible pair bumps the nursery, and every old object was
+    /// copied by a collection or allocated by the runtime
+    /// (`allocate_with_nursery`).
+    Nursery,
+}
+
 /// Initial capacity of the remembered-slot buffer, in slots.
 const REMEMBERED_INITIAL: usize = 4096;
 /// Largest capacity the buffer grows to after overflowing.
@@ -451,8 +493,12 @@ struct CopyingHeap {
     /// nursery, when the JIT-visible pair is the active semi-space's.
     nursery_end: u32,
 
-    /// The active old semi-space's allocation pointer, with a nursery.
+    /// The active old semi-space's allocation pointer, with a nursery that
+    /// the mutator allocates in (stale while `young` is `Pretenuring`).
     old_bump: u32,
+
+    /// What the JIT-visible pair allocates, with a nursery.
+    young: YoungAllocation,
 
     /// The active old semi-space's end.
     old_end: u32,
@@ -503,6 +549,7 @@ impl CopyingHeap {
             null_guard_protected: false,
             nursery_end,
             old_bump: 0,
+            young: YoungAllocation::Nursery,
             old_end: 0,
             minor_requested: false,
             grew: false,
@@ -589,6 +636,11 @@ impl CopyingHeap {
         if self.nursery_end == 0 {
             return Ok(());
         }
+        // `gc` closed any window, and a collection that followed one was
+        // full: the window's survivors are copies in the other semi-space.
+        debug_assert!(!matches!(self.young, YoungAllocation::Pretenuring { .. }));
+        debug_assert!(!self.last_minor || self.young != YoungAllocation::NurseryAfterWindow);
+        self.young = YoungAllocation::Nursery;
         if cfg!(gc_zeal) {
             let start = usize::try_from(self.nursery_start()).unwrap();
             let end = usize::try_from(self.vmctx_data.bump_ptr()).unwrap();
@@ -611,6 +663,7 @@ impl CopyingHeap {
         if self.nursery_end == 0 {
             return;
         }
+        debug_assert!(!matches!(self.young, YoungAllocation::Pretenuring { .. }));
         let start = self.nursery_start();
         let end = self.nursery_window_end();
         self.vmctx_data.set_bump_ptr(start);
@@ -639,9 +692,22 @@ impl CopyingHeap {
         Ok(true)
     }
 
+    /// Whether the JIT-visible pair is the active old semi-space's
+    /// allocation pointer: always without a nursery, and with one while the
+    /// pretenure window is open.
+    fn mutator_bumps_old_space(&self) -> bool {
+        self.nursery_end == 0
+            || match self.young {
+                YoungAllocation::Pretenuring { .. } => true,
+                YoungAllocation::FirstNursery
+                | YoungAllocation::NurseryAfterWindow
+                | YoungAllocation::Nursery => false,
+            }
+    }
+
     /// The active old semi-space's allocation pointer.
     fn bump_ptr(&self) -> u32 {
-        if self.nursery_end == 0 {
+        if self.mutator_bumps_old_space() {
             self.vmctx_data.bump_ptr()
         } else {
             self.old_bump
@@ -649,11 +715,53 @@ impl CopyingHeap {
     }
 
     fn set_bump_ptr(&mut self, val: u32) {
-        if self.nursery_end == 0 {
+        if self.mutator_bumps_old_space() {
             self.vmctx_data.set_bump_ptr(val);
         } else {
             self.old_bump = val;
         }
+    }
+
+    /// The first full nursery of a heap that has not collected: lets the
+    /// mutator go on in the old space, if a window there has room for
+    /// `size` (see `YoungAllocation`). The window leaves the old space two
+    /// nurseries' room: one so that the allocation that fills the window asks
+    /// for a collection instead of growth, and that collection, a full one,
+    /// has the other semi-space for the old space's objects and the nursery.
+    fn open_pretenure_window(&mut self, size: u32) -> bool {
+        debug_assert_eq!(self.young, YoungAllocation::FirstNursery);
+        let reserve = self.nursery_capacity().saturating_mul(2);
+        let window = PRETENURE_WINDOW.min(self.old_free().saturating_sub(reserve)) & !(ALIGN - 1);
+        if window < size {
+            return false;
+        }
+        let nursery_bump = self.vmctx_data.bump_ptr();
+        let start = self.old_bump;
+        self.young = YoungAllocation::Pretenuring { nursery_bump };
+        self.vmctx_data.set_bump_ptr(start);
+        self.vmctx_data.set_active_space_end(start + window);
+        true
+    }
+
+    /// Ends the pretenure window, if it is open: the old space's allocation
+    /// pointer becomes the runtime's again and the mutator is back at the
+    /// nursery's end, where its next allocation asks for a collection. A
+    /// no-op in every other state.
+    fn close_pretenure_window(&mut self) {
+        let nursery_bump = match self.young {
+            YoungAllocation::Pretenuring { nursery_bump } => nursery_bump,
+            YoungAllocation::FirstNursery
+            | YoungAllocation::NurseryAfterWindow
+            | YoungAllocation::Nursery => return,
+        };
+        let bump = self.vmctx_data.bump_ptr();
+        debug_assert!(bump >= self.active_space_start);
+        debug_assert!(bump <= self.vmctx_data.active_space_end());
+        debug_assert!(self.vmctx_data.active_space_end() <= self.old_end);
+        self.old_bump = bump;
+        self.young = YoungAllocation::NurseryAfterWindow;
+        self.vmctx_data.set_bump_ptr(nursery_bump);
+        self.vmctx_data.set_active_space_end(nursery_bump);
     }
 
     /// The end of the active old semi-space.
@@ -684,6 +792,7 @@ impl CopyingHeap {
         self.resize_semi_spaces();
         self.reset_bump_ptr();
         self.reset_nursery();
+        self.young = YoungAllocation::FirstNursery;
     }
 
     fn resize_semi_spaces(&mut self) {
@@ -780,7 +889,21 @@ impl CopyingHeap {
     /// quarter of the nursery bump it. Larger ones, and the one retried right
     /// after the heap grew (the store then collects no more before it), go
     /// to the old space and are remembered whole until the next collection.
+    ///
+    /// While the pretenure window is open every size bumps it, as compiled
+    /// code does; the allocation that does not fit closes it. A heap's first
+    /// full nursery opens the window instead of asking for a collection.
     fn allocate_with_nursery(&mut self, size: u32) -> Option<u32> {
+        if let YoungAllocation::Pretenuring { .. } = self.young {
+            let bump = self.vmctx_data.bump_ptr();
+            if let Some(end) = bump.checked_add(size)
+                && end <= self.vmctx_data.active_space_end()
+            {
+                self.vmctx_data.set_bump_ptr(end);
+                return Some(bump);
+            }
+            self.close_pretenure_window();
+        }
         let capacity = self.nursery_capacity();
         let window_end = self.vmctx_data.active_space_end();
         let large = size > capacity / 4;
@@ -791,6 +914,15 @@ impl CopyingHeap {
             {
                 self.vmctx_data.set_bump_ptr(end);
                 return Some(bump);
+            }
+            if self.young == YoungAllocation::FirstNursery {
+                if self.open_pretenure_window(size) {
+                    let index = self.vmctx_data.bump_ptr();
+                    self.vmctx_data.set_bump_ptr(index + size);
+                    return Some(index);
+                }
+                // No room for a window: an ordinary nursery from here on.
+                self.young = YoungAllocation::Nursery;
             }
             // The nursery is full. With room in the old space for a whole
             // nursery, a minor collection follows. Otherwise the failure
@@ -1177,6 +1309,8 @@ unsafe impl GcHeap for CopyingHeap {
     fn detach(&mut self) -> crate::vm::Memory {
         assert!(self.is_attached());
 
+        // Any open window is abandoned with the memory.
+        self.young = YoungAllocation::Nursery;
         self.set_bump_ptr(0);
         self.set_active_space_end(0);
         self.vmctx_data.set_bump_ptr(0);
@@ -1220,6 +1354,7 @@ unsafe impl GcHeap for CopyingHeap {
             null_guard_protected: _,
             nursery_end: _,
             old_bump,
+            young: _,
             old_end,
             minor_requested,
             grew,
@@ -1536,10 +1671,22 @@ unsafe impl GcHeap for CopyingHeap {
         'b: 'a,
     {
         assert_eq!(self.no_gc_count, 0, "Cannot GC inside a no-GC scope!");
+        self.close_pretenure_window();
         // Only a full nursery asks for a minor collection, and only while the
         // old space can take everything in it; any other collection, explicit
-        // ones included, is full.
-        self.collecting_minor = self.nursery_end != 0 && self.minor_requested;
+        // ones included, is full. So is the one that follows a pretenure
+        // window: a minor collection would have to find the nursery
+        // references in the window's objects, which no barrier recorded and
+        // no scan may look for (see `YoungAllocation`).
+        self.collecting_minor = self.nursery_end != 0
+            && self.minor_requested
+            && match self.young {
+                YoungAllocation::FirstNursery | YoungAllocation::Nursery => true,
+                YoungAllocation::NurseryAfterWindow => false,
+                YoungAllocation::Pretenuring { .. } => {
+                    unreachable!("the window was just closed")
+                }
+            };
         Box::new(CopyingCollection {
             roots: Some(roots),
             trace_state,
@@ -1572,6 +1719,10 @@ unsafe impl GcHeap for CopyingHeap {
         debug_assert!(!memory.is_shared_memory());
         self.vmmemory = Some(memory.vmmemory());
         self.memory = Some(memory);
+
+        // The semi-spaces below are resized around the runtime's own old
+        // allocation pointer, and the nursery's limit is recomputed.
+        self.close_pretenure_window();
 
         // If the heap was previously empty, reinitialize the semi-spaces from
         // scratch.
@@ -2570,6 +2721,7 @@ mod global_root_tests {
     not(gc_zeal)
 ))]
 mod generational_tests {
+    use super::YoungAllocation;
     use crate::prelude::*;
     use crate::{
         AsContext, Collector, Config, Engine, GcEphemeron, Instance, Module, RootScope, Store,
@@ -2605,10 +2757,22 @@ mod generational_tests {
               (drop (struct.new $s (ref.null any) (local.get 0)))
               (local.set 0 (i32.add (local.get 0) (i32.const 1)))
               (br_if $l (i32.lt_u (local.get 0) (i32.const 200000)))))
+          ;; Allocate the given number of garbage structs.
+          (func (export "alloc") (param i32)
+            (loop $l
+              (drop (struct.new $s (ref.null any) (local.get 0)))
+              (local.set 0 (i32.sub (local.get 0) (i32.const 1)))
+              (br_if $l (local.get 0))))
           (func $child (param i32) (result (ref $s))
             (struct.new $s (ref.null any) (local.get 0)))
           (func (export "struct_set") (param i32)
             (struct.set $s 0 (global.get $old) (call $child (local.get 0))))
+          ;; A new struct that holds the old one.
+          (func (export "wrap")
+            (global.set $old (struct.new $s (global.get $old) (i32.const 0))))
+          (func (export "inner_read") (result i32)
+            (struct.get $s 1 (ref.cast (ref $s)
+              (struct.get $s 0 (ref.cast (ref $s) (struct.get $s 0 (global.get $old)))))))
           (func (export "struct_read") (result i32)
             (struct.get $s 1
               (ref.cast (ref $s) (struct.get $s 0 (global.get $old)))))
@@ -2700,6 +2864,294 @@ mod generational_tests {
                 .unwrap()
                 .gc_heap
                 .last_collection_was_minor()
+        }
+
+        fn heap(&self) -> &super::CopyingHeap {
+            let gc_store = self.store.as_context().0.optional_gc_store().unwrap();
+            gc_store.gc_heap.as_any().downcast_ref().unwrap()
+        }
+
+        /// Allocates garbage until the first nursery is full and the
+        /// pretenure window has opened.
+        fn enter_window(&mut self) {
+            while self.heap().young == YoungAllocation::FirstNursery {
+                self.call("alloc", &[Val::I32(64)], 0);
+            }
+            assert!(self.in_window());
+        }
+
+        fn in_window(&self) -> bool {
+            matches!(self.heap().young, YoungAllocation::Pretenuring { .. })
+        }
+
+        /// Allocates garbage until the pretenure window is full. The
+        /// allocation that closes it finds the nursery full too and asks
+        /// for the heap's first collection, a full one.
+        fn leave_window(&mut self) {
+            self.enter_window();
+            while self.in_window() {
+                self.call("alloc", &[Val::I32(1)], 0);
+            }
+            assert_eq!(self.heap().young, YoungAllocation::Nursery);
+            assert!(!self.last_minor());
+        }
+    }
+
+    #[test]
+    fn a_first_full_nursery_continues_in_the_old_space() {
+        // 16 MiB: a 2 MiB nursery and 7 MiB semi-spaces, whose window leaves
+        // room for two nurseries (each less the null guard): about 3 MiB.
+        let mut f = Fixture::new(16 << 20);
+        assert_eq!(f.heap().young, YoungAllocation::FirstNursery);
+        f.enter_window();
+        let heap = f.heap();
+        let window = heap.vmctx_data.active_space_end() - heap.active_space_start;
+        assert_eq!(window, (7 << 20) - 2 * heap.nursery_capacity());
+        assert!((3 << 20..(3 << 20) + (64 << 10)).contains(&window));
+
+        let mut f = Fixture::new(2 << 20);
+        f.call("make_old", &[Val::I32(64)], 0);
+        let heap = f.heap();
+        assert_eq!(heap.young, YoungAllocation::FirstNursery);
+        assert!(heap.is_young(heap.vmctx_data.bump_ptr()));
+        assert_eq!(heap.bump_ptr(), heap.active_space_start);
+
+        f.enter_window();
+        let heap = f.heap();
+        let YoungAllocation::Pretenuring { nursery_bump } = heap.young else {
+            unreachable!()
+        };
+        assert!(heap.nursery_limit() - nursery_bump < 64, "the nursery was filled");
+        let (start, end) = (heap.active_space_start, heap.vmctx_data.active_space_end());
+        assert_eq!(start, heap.nursery_end);
+        assert_eq!(end - start, (heap.old_end - start) - 2 * heap.nursery_capacity());
+        let allocated = heap.vmctx_data.bump_ptr();
+        assert!(start < allocated && allocated <= end);
+        assert_eq!(heap.bump_ptr(), allocated);
+
+        // The window fills to its end.
+        while f.heap().vmctx_data.active_space_end() - f.heap().vmctx_data.bump_ptr() >= 64 {
+            assert!(f.in_window());
+            f.call("alloc", &[Val::I32(1)], 0);
+        }
+        assert!(f.heap().old_end - f.heap().bump_ptr() >= 2 * f.heap().nursery_capacity());
+
+        // The collection that follows a window is full and evacuates both
+        // the nursery and the window's semi-space; later ones are minor and
+        // no second window opens.
+        f.leave_window();
+        let heap = f.heap();
+        assert!(heap.active_space_start > start, "the semi-spaces flipped");
+        assert_eq!(heap.vmctx_data.bump_ptr(), heap.nursery_start() + 32);
+        f.churn();
+        assert_eq!(f.heap().young, YoungAllocation::Nursery);
+    }
+
+    #[test]
+    fn edges_between_the_nursery_and_the_window_survive_the_first_collection() {
+        let mut f = Fixture::new(2 << 20);
+        // Nursery objects.
+        f.call("make_old", &[Val::I32(64)], 0);
+        f.call("struct_set", &[Val::I32(7)], 0);
+        f.enter_window();
+        // A window object whose initializing store, which has no barrier,
+        // holds the only reference to a nursery object.
+        f.call("wrap", &[], 0);
+        assert_eq!(f.i32("inner_read"), 7);
+        // Window objects stored into a nursery array, and a window array
+        // copied into it.
+        f.call("array_set_all", &[Val::I32(100)], 0);
+        assert!(f.in_window());
+        f.leave_window();
+        assert_eq!(f.i32("inner_read"), 7);
+        assert_eq!(f.i32("array_sum"), (100..164).sum::<i32>());
+        // The survivors are ordinary old objects now.
+        f.call("struct_set", &[Val::I32(11)], 0);
+        f.call("array_copy", &[Val::I32(2)], 0);
+        f.churn();
+        assert_eq!(f.i32("struct_read"), 11);
+        assert_eq!(f.i32("array_sum"), 2 * 64);
+
+        // A host store of a window object into a nursery object, and of a
+        // nursery object into a window object.
+        let mut f = Fixture::new(2 << 20);
+        f.call("make_old", &[Val::I32(4)], 0);
+        let nursery_object = f.call("old", &[], 1).remove(0);
+        f.enter_window();
+        f.call("wrap", &[], 0);
+        let window_object = f.call("old", &[], 1).remove(0);
+        {
+            let mut scope = RootScope::new(&mut f.store);
+            let inner = *nursery_object.unwrap_anyref().unwrap();
+            let outer = window_object.unwrap_anyref().unwrap().unwrap_struct(&scope).unwrap();
+            let in_window = young_struct(&mut scope, &outer, 9);
+            inner
+                .unwrap_struct(&scope)
+                .unwrap()
+                .set_field(&mut scope, 0, Val::AnyRef(Some(in_window.to_anyref())))
+                .unwrap();
+            // Rewrites the edge the initializing store made, with a barrier.
+            outer.set_field(&mut scope, 0, Val::AnyRef(Some(inner))).unwrap();
+        }
+        assert!(f.in_window());
+        assert_eq!(f.i32("inner_read"), 9);
+        f.leave_window();
+        f.churn();
+        assert_eq!(f.i32("inner_read"), 9);
+    }
+
+    #[test]
+    fn an_explicit_collection_ends_the_first_nursery_and_the_window() {
+        let mut f = Fixture::new(2 << 20);
+        f.call("make_old", &[Val::I32(8)], 0);
+        f.call("struct_set", &[Val::I32(5)], 0);
+        f.store.gc(None).unwrap();
+        assert_eq!(f.heap().young, YoungAllocation::Nursery);
+        assert_eq!(f.i32("struct_read"), 5);
+        // No window opens after a collection.
+        f.churn();
+        assert_eq!(f.heap().young, YoungAllocation::Nursery);
+        assert_eq!(f.i32("struct_read"), 5);
+
+        let mut f = Fixture::new(2 << 20);
+        f.call("make_old", &[Val::I32(8)], 0);
+        f.call("struct_set", &[Val::I32(5)], 0);
+        f.enter_window();
+        f.call("wrap", &[], 0);
+        f.call("array_set_all", &[Val::I32(1)], 0);
+        assert!(f.in_window());
+        f.store.gc(None).unwrap();
+        assert_eq!(f.heap().young, YoungAllocation::Nursery);
+        assert!(!f.last_minor());
+        assert_eq!(f.i32("inner_read"), 5);
+        assert_eq!(f.i32("array_sum"), (1..9).sum::<i32>());
+        f.call("struct_set", &[Val::I32(6)], 0);
+        f.churn();
+        assert_eq!(f.i32("struct_read"), 6);
+        assert_eq!(f.i32("array_sum"), (1..9).sum::<i32>());
+    }
+
+    #[test]
+    fn a_heap_that_grows_during_its_window_keeps_both_generations() {
+        let mut f = Fixture::new(2 << 20);
+        f.call("make_old", &[Val::I32(8)], 0);
+        f.call("struct_set", &[Val::I32(5)], 0);
+        f.enter_window();
+        f.call("wrap", &[], 0);
+        f.call("array_set_all", &[Val::I32(1)], 0);
+        assert!(f.in_window());
+        let before = f.store.gc_heap_capacity();
+        // 4 MiB of elements: more than the whole initial heap.
+        f.call("make_big", &[Val::I32(1 << 20), Val::I32(1)], 0);
+        assert!(f.store.gc_heap_capacity() > before);
+        assert!(!f.in_window());
+        assert_eq!(f.i32("inner_read"), 5);
+        assert_eq!(f.i32("array_sum"), (1..9).sum::<i32>());
+        assert_eq!(f.i32("big_sum"), 1 << 20);
+        f.call("struct_set", &[Val::I32(6)], 0);
+        f.churn();
+        assert_eq!(f.i32("struct_read"), 6);
+        assert_eq!(f.i32("array_sum"), (1..9).sum::<i32>());
+        assert_eq!(f.i32("big_sum"), 1 << 20);
+    }
+
+    #[test]
+    fn weak_references_and_externrefs_of_window_objects_follow_the_first_collection() {
+        use crate::ExternRef;
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        struct Flag(Arc<AtomicBool>);
+        impl Drop for Flag {
+            fn drop(&mut self) {
+                self.0.store(true, Ordering::Relaxed);
+            }
+        }
+        let (dropped_young, dropped_old) = (
+            Arc::new(AtomicBool::new(false)),
+            Arc::new(AtomicBool::new(false)),
+        );
+
+        let mut f = Fixture::new(2 << 20);
+        f.call("make_old", &[Val::I32(1)], 0);
+        {
+            let mut scope = RootScope::new(&mut f.store);
+            ExternRef::new(&mut scope, Flag(dropped_young.clone())).unwrap();
+        }
+        f.enter_window();
+        let old = f.call("old", &[], 1).remove(0);
+        let (weak_dead, weak_kept) = {
+            let mut scope = RootScope::new(&mut f.store);
+            let owner = *old.unwrap_anyref().unwrap();
+            let old = owner.unwrap_struct(&scope).unwrap();
+            let dead = young_struct(&mut scope, &old, 1).to_anyref();
+            let kept = young_struct(&mut scope, &old, 2).to_anyref();
+            old.set_field(&mut scope, 0, Val::AnyRef(Some(kept))).unwrap();
+            ExternRef::new(&mut scope, Flag(dropped_old.clone())).unwrap();
+            (
+                WeakAnyRef::new(&mut scope, &owner, &dead).unwrap(),
+                WeakAnyRef::new(&mut scope, &owner, &kept).unwrap(),
+            )
+        };
+        // The targets and the second `externref` are window objects.
+        assert!(f.in_window());
+        assert!(!dropped_young.load(Ordering::Relaxed) && !dropped_old.load(Ordering::Relaxed));
+        f.leave_window();
+        assert!(dropped_young.load(Ordering::Relaxed) && dropped_old.load(Ordering::Relaxed));
+        assert!(weak_dead.upgrade(&mut f.store).unwrap().is_none());
+        f.churn();
+        let mut scope = RootScope::new(&mut f.store);
+        let kept = weak_kept.upgrade(&mut scope).unwrap().unwrap();
+        let kept = kept.unwrap_struct(&scope).unwrap();
+        assert_eq!(kept.field(&mut scope, 1).unwrap().unwrap_i32(), 2);
+    }
+
+    #[cfg(feature = "pooling-allocator")]
+    #[test]
+    fn a_pooled_heap_starts_each_store_with_a_first_nursery() {
+        use crate::{InstanceAllocationStrategy, PoolingAllocationConfig};
+        let mut pooling = PoolingAllocationConfig::new();
+        pooling
+            .total_gc_heaps(1)
+            .total_memories(1)
+            .total_core_instances(1)
+            .total_tables(1)
+            .total_stacks(1);
+        let mut config = Config::new();
+        config
+            .wasm_gc(true)
+            .wasm_function_references(true)
+            .collector(Collector::Copying)
+            .gc_heap_initial_size(2 << 20)
+            .allocation_strategy(InstanceAllocationStrategy::Pooling(pooling));
+        let engine = Engine::new(&config).unwrap();
+        let module = Module::new(&engine, WAT).unwrap();
+        // Stores dropped in their first nursery, with the window open, after
+        // the first collection and after later ones: the next starts afresh.
+        for round in 0..5 {
+            let mut store = Store::new(&engine, ());
+            let instance = Instance::new(&mut store, &module, &[]).unwrap();
+            let mut f = Fixture { store, instance };
+            assert_eq!(f.heap().young, YoungAllocation::FirstNursery);
+            assert_eq!(f.heap().vmctx_data.bump_ptr(), f.heap().nursery_start());
+            assert_eq!(f.heap().bump_ptr(), f.heap().active_space_start);
+            f.call("make_old", &[Val::I32(64)], 0);
+            f.call("struct_set", &[Val::I32(round)], 0);
+            if round == 0 {
+                continue;
+            }
+            f.enter_window();
+            f.call("wrap", &[], 0);
+            f.call("array_set_all", &[Val::I32(round)], 0);
+            if round == 1 {
+                continue;
+            }
+            f.leave_window();
+            if round == 2 {
+                continue;
+            }
+            f.churn();
+            assert_eq!(f.i32("inner_read"), round);
+            assert_eq!(f.i32("array_sum"), (round..round + 64).sum::<i32>());
         }
     }
 

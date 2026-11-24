@@ -233,6 +233,33 @@ reads), `vm_copying_heap_data_func_refs_offsets` (the field offset, entry
 count and entry size against the translator's), and the engine probe
 `a_stored_funcref_is_the_function_that_was_stored`.
 
+## Funcref code addresses
+
+An instance writes a defined function's `VMFuncRef` into its `VMContext` the
+first time the function is asked for (`ref.func`, a table element, an export).
+Each write looked the module up in the store's registry (two B-tree searches)
+and located the array-call trampoline and the Wasm body in the compiled
+function table (a binary search each): about 760 Callgrind instructions per
+function, 459K of the 14.1M of a fresh React SSR entry (605 functions).
+
+- `src/runtime/instantiate.rs`: `CompiledModule::func_ref_text` returns the
+  two text-section offsets from a per-module table indexed by `FuncRefIndex`,
+  filled from the function table (`locate_func_ref_text`) on the first
+  request. The offsets depend on the immutable module alone, so the entries
+  are plain atomics: racing instances store the same values, and a half-read
+  entry is located again.
+- `src/runtime/vm/instance.rs`: an instance finds its store's copy of the
+  module's text in the registry once (`func_ref_text`) and adds the offsets,
+  bounds-checked against that text. The registry keeps the code at that
+  address for the store's life, which the `VMFuncRef`s already written rely
+  on. The module startup function, asked for once per instance, is still
+  located in the function table.
+- Nothing in the `VMFuncRef`, `VMContext` or compiled-code ABI changes.
+- Test: `func_ref_text_tests` in `src/runtime/instance.rs` compares every
+  escaping function's `VMFuncRef` with the registry and function-table
+  answer, on the first and on a repeated request, for two modules and three
+  instances in each of two stores.
+
 ## GC heap null guard
 
 The vendored translator lets a GC access through a nullable reference be its
@@ -376,6 +403,37 @@ The copying collector is generational when the GC heap starts at 2 MiB or more
   full. The policy's post-collection live size comes from full collections
   only (`GcHeap::last_collection_was_minor`). Each collection advances the
   weak epoch, since young keys move.
+- A heap's first full nursery does not collect
+  ([measurements](../../docs/rust-rewrite/benchmarks.md#pretenure-window-2026-11-24)).
+  While no collection has run since the heap got its memory, the old space is
+  empty, and the mutator's bump pointer and limit move to a *pretenure
+  window* at its start: the smaller of 4 MiB and the old semi-space less two
+  nurseries (about 3 MiB of the product's 7 MiB). A Store that is dropped
+  before the window fills never collects. `YoungAllocation` holds the state:
+  `FirstNursery`, `Pretenuring { nursery_bump }`, `NurseryAfterWindow`,
+  `Nursery`.
+  - Window objects are old by address, so compiled barriers, the host barrier
+    and the `externref` lists treat them as old with no change to compiled
+    code, tunables or the module compatibility check.
+  - Compiled code initializes a window object without barriers while the
+    nursery holds objects, and an
+    [interrupt](../../docs/rust-rewrite/contracts/execution-deadlines.md) can
+    unwind out of an initialization and leave a gap without a header. So the
+    window's references into the nursery are not all remembered, and the
+    window cannot be walked object by object. No collection needs either:
+    while the old space holds a window's objects (`Pretenuring`,
+    `NurseryAfterWindow`) the next collection is full. It reaches objects
+    from roots only, evacuates the nursery and the window's semi-space
+    together, and leaves an ordinary heap (`Nursery`). The window's size
+    leaves the other semi-space room for both.
+  - The window closes at the allocation that does not fit it (the nursery is
+    still full, so that allocation asks for the collection), at the start of
+    any collection, when the heap grows, and with `detach`. A pooled heap
+    starts each Store in `FirstNursery`. An explicit collection before the
+    first nursery fills ends `FirstNursery`: no window opens afterwards.
+  - Until that first collection the window's objects are kept, as promoted
+    objects are until a full collection. A Store that allocates between one
+    nursery and the window's end therefore holds up to about 3 MiB more.
 - The remembered-slot buffer (4,096 slots, doubling after an overflow up to
   1 Mi) is published in `VMCopyingHeapData` after the funcref view, at the
   offsets the vendored translator's `copying_heap_data` module defines.
@@ -418,7 +476,16 @@ The copying collector is generational when the GC heap starts at 2 MiB or more
   overflowing slot buffer; large objects allocated old with young
   initializers; weak references to young targets; a young value set on an
   ephemeron no minor collection visits any more; rejection of a module
-  compiled for another nursery).
+  compiled for another nursery; the pretenure window's bounds and its full
+  collection; a nursery object reachable only through a window object's
+  initializing store, and host and compiled stores between the two; an
+  explicit collection in the first nursery and in the window; growth with the
+  window open; weak references and `externref`s of window objects; a pooled
+  heap dropped in each state). The engine's `aot_gc_pretenure_window` runs a
+  6 MiB graph and weak collections through the same states from JavaScript.
+  No repository command runs the vendored tests; they were run from a copy of
+  this manifest with the workspace's `[patch]` paths and the features
+  `cranelift,gc,gc-copying,runtime,std,wat,pooling-allocator,threads,async,component-model,cache`.
 
 ## Growth to a limit
 

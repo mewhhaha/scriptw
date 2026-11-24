@@ -480,6 +480,9 @@ fn ten_thousand_keys_survive_index_growth_promotion_and_dead_key_reuse() {
     let events = run(r#"
         const COUNT = 10000, map = new WeakMap(), set = new WeakSet();
         let keys = [];
+        // A Store's first full nursery continues in the old space and its
+        // first collection is full: allocate past both first.
+        for (let j = 0; j < 400000; j++) ({garbage: [j, 'text' + j]});
         // Allocation between the stores runs minor collections, so keys are
         // stored young and looked up after promotion, without gc().
         for (let i = 0; i < COUNT; i++) {

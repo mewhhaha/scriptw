@@ -101,9 +101,12 @@ accepts `--case <file.js>`.
   - **Measured:** the RSC request is 13% fewer Callgrind instructions, and 20 of
     the 21 situations are faster in a local A/B
     ([batch results](benchmarks.md#performance-batch-2026-11-23)).
+  - **Landed since (2026-11-24):** the GC pretenure window and cached funcref
+    code addresses in the vendored runtime: a fresh React SSR entry runs 34%
+    fewer instructions and its execution is 25% shorter
+    ([measurements](benchmarks.md#pretenure-window-2026-11-24)).
   - **Next:**
     - the stale builtin fact entry guard (above);
-    - GC pretenure window;
     - regalloc2 split-limit campaign;
     - stack-map store placement;
     - shared call-site machinery;

@@ -2,7 +2,7 @@
 //! wasm module (except its callstack and register state). An
 //! `InstanceHandle` is a reference-counting handle for an `Instance`.
 
-use crate::code::ModuleWithCode;
+use crate::instantiate::FuncRefText;
 use crate::module::ModuleRegistry;
 use crate::prelude::*;
 use crate::runtime::vm::export::{Export, ExportMemory};
@@ -140,6 +140,13 @@ pub struct Instance {
     /// allocation because the `VMContext` itself is not.
     initialized_func_refs: TryVec<u64>,
 
+    /// This store's copy of the module's text section, which every
+    /// `VMFuncRef` of this instance points into: found in the store's module
+    /// registry when the first one is initialized. The registry keeps the
+    /// code, at this address, for as long as the store and so this instance
+    /// lives; the `VMFuncRef`s already written rely on the same.
+    func_ref_text: Option<SendSyncPtr<[u8]>>,
+
     // TODO: add support for multiple memories; `wmemcheck_state` corresponds to
     // memory 0.
     #[cfg(feature = "wmemcheck")]
@@ -219,6 +226,7 @@ impl Instance {
             tables: TryPrimaryMap::default(),
             passive_elements,
             initialized_func_refs,
+            func_ref_text: None,
             #[cfg(feature = "wmemcheck")]
             wmemcheck_state,
             store: None,
@@ -894,8 +902,6 @@ impl Instance {
         let type_index = func.signature.unwrap_engine_type_index();
         let func_ref = func.func_ref;
         let vmctx_offset = self.offsets().vmctx_func_ref(func_ref);
-        let array_to_wasm_key = FuncKey::ArrayToWasmTrampoline(module.module_index, def_index);
-        let wasm_key = FuncKey::DefinedWasmFunction(module.module_index, def_index);
         // `vmctx_func_ref` above has checked the index against
         // `num_escaped_funcs`, which sized the bitmap.
         let bit = usize::try_from(func_ref.as_u32()).unwrap();
@@ -905,16 +911,16 @@ impl Instance {
             // `VMContext`, written by the first request below.
             return Some(unsafe { self.vmctx_plus_offset_raw::<VMFuncRef>(vmctx_offset) });
         }
-        // SAFETY: the type/offset/keys here are all valid for the defined
-        // function at `def_index`.
+        let text = self
+            .runtime_module()
+            .expect("funcref impossible in fake module")
+            .compiled_module()
+            .func_ref_text(def_index);
+        // SAFETY: the type/offset/text offsets here are all valid for the
+        // defined function at `def_index`.
         let initialized = unsafe {
-            self.as_mut().initialize_and_return_funcref(
-                registry,
-                type_index,
-                vmctx_offset,
-                array_to_wasm_key,
-                wasm_key,
-            )
+            self.as_mut()
+                .initialize_and_return_funcref(registry, type_index, vmctx_offset, text)
         };
         // SAFETY: Not moving data out of `self`.
         unsafe { self.get_unchecked_mut() }.initialized_func_refs[word] |= mask;
@@ -933,19 +939,22 @@ impl Instance {
             }
         };
         let vmctx_offset = self.offsets().vmctx_startup_func_ref();
-        let array_to_wasm_key = FuncKey::ModuleStartup(Abi::Array, module.module_index);
-        let wasm_key = FuncKey::ModuleStartup(Abi::Wasm, module.module_index);
-        // SAFETY: the type/offset/keys here are all valid for the module
-        // startup function.
-        unsafe {
-            self.initialize_and_return_funcref(
-                registry,
-                type_index,
-                vmctx_offset,
-                array_to_wasm_key,
-                wasm_key,
-            )
-        }
+        let compiled = self
+            .runtime_module()
+            .expect("funcref impossible in fake module")
+            .compiled_module();
+        let start = |abi| {
+            compiled
+                .func_loc(FuncKey::ModuleStartup(abi, module.module_index))
+                .start
+        };
+        let text = FuncRefText {
+            array_call: start(Abi::Array),
+            wasm_call: start(Abi::Wasm),
+        };
+        // SAFETY: the type/offset/text offsets here are all valid for the
+        // module startup function.
+        unsafe { self.initialize_and_return_funcref(registry, type_index, vmctx_offset, text) }
     }
 
     /// Common implementation of initializing a `VMFuncRef` stored within this
@@ -954,16 +963,17 @@ impl Instance {
     /// # Safety
     ///
     /// This function requires that `type_index` accurately describes this
-    /// function and `vmctx_offset` is indeed the correct offset for the
-    /// functions here. Effectively all the arguments here must be "logically
-    /// correct" for the `VMFuncRef` being initialized.
+    /// function, `vmctx_offset` is indeed the correct offset for the
+    /// functions here and `text` holds where this module's text section has
+    /// the function's array-call trampoline and Wasm-call body. Effectively
+    /// all the arguments here must be "logically correct" for the `VMFuncRef`
+    /// being initialized.
     unsafe fn initialize_and_return_funcref(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         registry: &ModuleRegistry,
         type_index: VMSharedTypeIndex,
         vmctx_offset: u32,
-        array_to_wasm_key: FuncKey,
-        wasm_key: FuncKey,
+        text: FuncRefText,
     ) -> Option<NonNull<VMFuncRef>> {
         // For now, we eagerly initialize an funcref struct in-place whenever
         // asked for a reference to it. This is mostly fine, because in practice
@@ -986,25 +996,16 @@ impl Instance {
         // it's better for instantiation performance if we don't have to track
         // "is-initialized" state at all!
 
-        let module_with_code = ModuleWithCode::in_store(
-            registry,
-            self.runtime_module()
-                .expect("funcref impossible in fake module"),
-        )
-        .expect("module not in store");
+        let store_text = self.as_mut().func_ref_store_text(registry);
+        // SAFETY: the registry keeps this text mapped while the store that
+        // owns this instance lives (see `func_ref_text`).
+        let store_text = unsafe { store_text.as_ref() };
+        // Bounds-checked as the function's whole range used to be.
+        let code = |start: u32| NonNull::from(&store_text[usize::try_from(start).unwrap()..]);
 
-        let array_call =
-            VmPtr::from(NonNull::from(module_with_code.function(array_to_wasm_key)).cast());
-
+        let array_call = VmPtr::from(code(text.array_call).cast());
         let wasm_call = Some(VmPtr::from(
-            NonNull::new(
-                module_with_code
-                    .function(wasm_key)
-                    .as_ptr()
-                    .cast::<VMWasmCallFunction>()
-                    .cast_mut(),
-            )
-            .unwrap(),
+            code(text.wasm_call).cast::<VMWasmCallFunction>(),
         ));
 
         let vmctx = VMOpaqueContext::from_vmcontext(self.vmctx()).into();
@@ -1025,6 +1026,26 @@ impl Instance {
         }
 
         Some(func_ref_ptr)
+    }
+
+    /// This store's copy of the module's text section, looked up in the
+    /// store's registry once per instance.
+    fn func_ref_store_text(self: Pin<&mut Self>, registry: &ModuleRegistry) -> NonNull<[u8]> {
+        if let Some(text) = self.func_ref_text {
+            return text.as_non_null();
+        }
+        let module = self
+            .runtime_module()
+            .expect("funcref impossible in fake module");
+        let text = NonNull::from(
+            registry
+                .store_code(module.engine_code())
+                .expect("module not in store")
+                .text(),
+        );
+        // SAFETY: Not moving data out of `self`.
+        unsafe { self.get_unchecked_mut() }.func_ref_text = Some(SendSyncPtr::new(text));
+        text
     }
 
     /// Get the passive elements segment at the given index.

@@ -10,6 +10,7 @@ use crate::runtime::vm::CompiledModuleId;
 use alloc::sync::Arc;
 use core::ops::Range;
 use core::str;
+use core::sync::atomic::{AtomicU32, Ordering};
 use wasmtime_environ::{
     CompiledFunctionsTable, CompiledModuleInfo, DefinedFuncIndex, FilePos, FuncIndex, FuncKey,
     FunctionLoc, FunctionName, Metadata, Module, ModuleInternedTypeIndex, StaticModuleIndex,
@@ -25,6 +26,34 @@ pub struct CompiledModule {
     index: Arc<CompiledFunctionsTable>,
     /// Sorted list, by function index, of names we have for this module.
     func_names: Vec<FunctionName>,
+    /// Where each escaping defined function's code starts in the text
+    /// section, indexed by `FuncRefIndex` and filled when an instance first
+    /// initializes that function's `VMFuncRef` (see `func_ref_text`).
+    func_ref_text: Box<[CachedFuncRefText]>,
+}
+
+/// The text-section offsets a defined function's `VMFuncRef` points at.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FuncRefText {
+    /// Start of the array-to-Wasm trampoline.
+    pub array_call: u32,
+    /// Start of the function's Wasm-ABI body.
+    pub wasm_call: u32,
+}
+
+/// One `FuncRefText`, or `UNKNOWN` in either half until it is first located.
+/// The offsets are a function of the immutable module alone, so racing
+/// instances store the same values and a reader that sees only one half
+/// locates the function again.
+struct CachedFuncRefText {
+    array_call: AtomicU32,
+    wasm_call: AtomicU32,
+}
+
+impl CachedFuncRefText {
+    /// No function starts here: one starting at `u32::MAX` would be empty and
+    /// end the text section, and is then located on every request.
+    const UNKNOWN: u32 = u32::MAX;
 }
 
 impl CompiledModule {
@@ -51,6 +80,12 @@ impl CompiledModule {
         index: Arc<CompiledFunctionsTable>,
         profiler: &dyn ProfilingAgent,
     ) -> Result<Self> {
+        let mut func_ref_text = Vec::new();
+        func_ref_text.try_reserve_exact(info.module.num_escaped_funcs)?;
+        func_ref_text.resize_with(info.module.num_escaped_funcs, || CachedFuncRefText {
+            array_call: AtomicU32::new(CachedFuncRefText::UNKNOWN),
+            wasm_call: AtomicU32::new(CachedFuncRefText::UNKNOWN),
+        });
         let mut ret = Self {
             unique_id: CompiledModuleId::new(),
             engine_code,
@@ -58,6 +93,7 @@ impl CompiledModule {
             meta: info.meta,
             index,
             func_names: info.func_names,
+            func_ref_text: func_ref_text.into_boxed_slice(),
         };
         ret.register_profiling(profiler)?;
 
@@ -129,6 +165,45 @@ impl CompiledModule {
         let start = usize::try_from(loc.start).unwrap();
         let end = usize::try_from(loc.start + loc.length).unwrap();
         start..end
+    }
+
+    /// Where the code a `VMFuncRef` for the escaping defined function
+    /// `index` points at starts in the text section. Located through the
+    /// function table on the first request and read from a per-module cache
+    /// afterwards: every instance of the module in every store asks for the
+    /// same offsets, each time it first hands out one of its functions.
+    ///
+    /// Panics if `index` does not escape, as `VMOffsets::vmctx_func_ref`
+    /// does for its `VMFuncRef` slot.
+    pub fn func_ref_text(&self, index: DefinedFuncIndex) -> FuncRefText {
+        let func_ref = self.module.functions[self.module.func_index(index)].func_ref;
+        let cached = &self.func_ref_text[usize::try_from(func_ref.as_u32()).unwrap()];
+        let text = FuncRefText {
+            array_call: cached.array_call.load(Ordering::Relaxed),
+            wasm_call: cached.wasm_call.load(Ordering::Relaxed),
+        };
+        if text.array_call != CachedFuncRefText::UNKNOWN
+            && text.wasm_call != CachedFuncRefText::UNKNOWN
+        {
+            return text;
+        }
+        let text = self.locate_func_ref_text(index);
+        cached.array_call.store(text.array_call, Ordering::Relaxed);
+        cached.wasm_call.store(text.wasm_call, Ordering::Relaxed);
+        text
+    }
+
+    /// `func_ref_text` without the cache: the function table's answer.
+    pub fn locate_func_ref_text(&self, index: DefinedFuncIndex) -> FuncRefText {
+        let module = self.module_index();
+        FuncRefText {
+            array_call: self
+                .func_loc(FuncKey::ArrayToWasmTrampoline(module, index))
+                .start,
+            wasm_call: self
+                .func_loc(FuncKey::DefinedWasmFunction(module, index))
+                .start,
+        }
     }
 
     /// Get the Wasm-to-array trampoline for the given signature, as a
