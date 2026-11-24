@@ -2833,6 +2833,8 @@ fingerprint `6bcd768386ac`; the performance batch's waves 1–3, not the requali
 the panels above), with Node 24.22.1 (V8 13.6.233.17-node.58). This is a separate panel, not a
 republication of the runtime comparison.
 
+![Scriptw time over Porffor time on the 17 runtime kernels](assets/porffor-current/runtime.svg)
+
 **Engines.** Each actor's engine is part of the comparison:
 
 | Actor | Program | Engine |

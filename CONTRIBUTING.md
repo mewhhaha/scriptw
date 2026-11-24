@@ -439,7 +439,12 @@ taskset -c 2,3 env -u NODE_OPTIONS python3 -B scripts/limited_verification.py --
 python3 -B scripts/benchmark-porffor.py publish --prepared target/peer-prepared --run target/peer-run \
   --compile target/peer-compile --output docs/rust-rewrite/wasm-peer-current.json
 python3 -B scripts/benchmark-porffor.py tables docs/rust-rewrite/wasm-peer-current.json
+target/chart-env/bin/python scripts/render-porffor-comparison.py
 ```
+
+The last command redraws `docs/rust-rewrite/assets/porffor-current/runtime.svg` from the
+published data with the [chart environment](#benchmark-charts); `--check` verifies the
+committed chart.
 
 `prepare` builds Porffor Wasm (default `-O1`, Scriptc's `print` adapter) and Scriptw native
 images untimed, then runs every actor/kernel once with checked output. Compile failures,

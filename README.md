@@ -115,6 +115,8 @@ when both run on Wasmtime (geometric mean; Scriptw is faster in 10/13 in both bl
 **0.644×** Porffor's time. [Tables, engines and failures](docs/rust-rewrite/benchmarks.md#2026-11-23-comparison-with-porffor) ·
 [data](docs/rust-rewrite/wasm-peer-current.json).
 
+![Scriptw time over Porffor time on the 17 runtime kernels](docs/rust-rewrite/assets/porffor-current/runtime.svg)
+
 ### Process density
 
 **Process density · 2026-11-23**, local build `1edd6d329`, in the shape of [Porffor's](https://porffor.dev)
@@ -214,7 +216,7 @@ Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and t
   their peaks add up); compile untrusted source under an OS memory limit and a
   deadline
   ([details](docs/rust-rewrite/runtime-requirements.md#compile-memory)).
-- **Runtime ABI 88:** rebuild Portable bundles and native images built under an
+- **Runtime ABI 89:** rebuild Portable bundles and native images built under an
   earlier ABI ([details](docs/rust-rewrite/runtime-requirements.md#runtime-abi)).
 
 [Development and verification](CONTRIBUTING.md) ·
