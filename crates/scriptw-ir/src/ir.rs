@@ -3617,6 +3617,17 @@ pub enum BuiltinEntryFactIr {
     GlobalThis,
 }
 
+impl BuiltinEntryFactIr {
+    /// The global binding the fact is about.
+    pub fn global_name(&self) -> &str {
+        match self {
+            Self::Function { name, .. } => name,
+            Self::Namespace(namespace) => namespace.global_name(),
+            Self::GlobalThis => crate::GLOBAL_THIS_NAME,
+        }
+    }
+}
+
 /// The namespace intrinsics whose own property rows the runtime keeps
 /// immutable until their first edit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

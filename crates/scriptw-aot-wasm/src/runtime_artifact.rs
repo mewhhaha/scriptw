@@ -176,7 +176,11 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Realm's intrinsics were complete), InstanceofSiteRecord gains TERMINAL, a
 // root global caches the {value, done} iterator-result shape, and R gains the
 // json_stringify_plain_value helper.
-const LAYOUT_VERSION: u32 = 85;
+// Version 86 adds the builtin fact epoch global beside the depth globals,
+// PropertyEntry.WATCHED, and the epoch's advances in R: descriptor edits
+// through a watched entry, intrinsic row promotion, recipe write-back and
+// the Realm's global object publication.
+const LAYOUT_VERSION: u32 = 86;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

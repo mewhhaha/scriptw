@@ -489,6 +489,9 @@ impl FunctionBuilder<'_> {
             s,
             f,
         );
+        // The header no longer holds the rows a builtin entry proof or a
+        // Realm protector read: every such proof ends here.
+        s.emit_advance_builtin_fact_epoch(f);
         s.release_i32_local(index, f);
         s.release_i32_local(count, f);
         buckets.clear(f);

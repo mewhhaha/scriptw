@@ -28,6 +28,7 @@ mod allocation;
 mod arguments_properties;
 mod array_own_data_read;
 mod array_own_indexed_data;
+mod builtin_fact_epoch;
 mod compact_data;
 #[cfg(test)]
 pub(crate) use compact_data::dump_slot_for_test;
@@ -3578,6 +3579,7 @@ impl<'a> FunctionBuilder<'a> {
             schema,
             function,
         );
+        self.emit_watched_entry_edit(&entry, function);
         dead.clear(function);
         absent.clear(function);
         entry.clear(function);

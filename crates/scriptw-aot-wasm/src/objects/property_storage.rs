@@ -18,6 +18,8 @@ pub(super) struct PreparedOrdinaryDefinition<'key> {
     object: &'key GcLocal<OrdinaryObject>,
     prepared: PreparedOrdinaryPropertyKey<'key>,
     hash_ready: I32Local,
+    /// The property's entry and the descriptor it holds, or both null.
+    entry: GcLocal<PropertyEntry, Nullable>,
     current: GcLocal<PropertyDescriptor, Nullable>,
 }
 
@@ -28,6 +30,7 @@ impl PreparedOrdinaryDefinition<'_> {
 
     pub(super) fn release(self, schema: &crate::gc_types::RuntimeSchema, function: &mut Function) {
         self.current.clear(function);
+        self.entry.clear(function);
         schema.release_i32_local(self.hash_ready, function);
         schema.release_i64_local(self.prepared.hash, function);
     }
@@ -51,11 +54,11 @@ impl FunctionBuilder<'_> {
         let entry =
             self.emit_captured_ordinary_property_entry(object, &prepared, hash_ready, function)?;
         let current = self.emit_ordinary_entry_descriptor_reference(&entry, function);
-        entry.clear(function);
         Ok(PreparedOrdinaryDefinition {
             object,
             prepared,
             hash_ready,
+            entry,
             current,
         })
     }
@@ -85,6 +88,7 @@ impl FunctionBuilder<'_> {
         );
         function.instruction(&Instruction::Else);
         self.emit_copy_complete_descriptor(&lookup.current, descriptor, function);
+        self.emit_watched_entry_edit(&lookup.entry, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
     }
@@ -154,6 +158,7 @@ impl FunctionBuilder<'_> {
             schema,
             function,
         );
+        self.emit_watched_entry_edit(&present, function);
         present.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
@@ -248,6 +253,7 @@ impl FunctionBuilder<'_> {
                     GcOperand::reference(descriptor, schema),
                     GcOperand::i64_local(hash),
                     GcOperand::i32_local(length),
+                    GcOperand::boolean(false),
                 ),
                 function,
             ),

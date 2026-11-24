@@ -947,6 +947,11 @@ gc_layout_registry! {
             HASH: I64Value, Immutable, NonNullable;
             // Compaction moves a live entry record; nothing else writes this.
             POSITION: I32Value, Mutable, NonNullable;
+            // Set, never cleared, once a builtin entry proof was read from
+            // this entry's descriptor: every later write of that descriptor,
+            // and its replacement in this entry, advances the builtin fact
+            // epoch. See `objects/builtin_fact_epoch.rs`.
+            WATCHED: bool, Mutable, NonNullable;
         }
         array PropertyTable => PropertyTableSchema { ELEMENT: GcRef<PropertyEntry>, Mutable, Nullable; }
         // Logical insertion extent is independent of spare capacity and holes.
@@ -2554,6 +2559,17 @@ gc_layout_registry! {
             PARENT_DICTIONARY: GcRef<OrdinaryPropertyStorage>, Immutable, Nullable;
             PARENT_TABLE: GcRef<PropertyTable>, Immutable, Nullable;
             PARENT_LENGTH: I32Value, Immutable, NonNullable;
+        }
+        // What a builtin entry guard last proved, whole: every fact of the
+        // guard held when the body ran for the Global Environment Record
+        // ENVIRONMENT in the Realm REALM, while that Environment's
+        // declarative name table was NAMES and the builtin fact epoch was
+        // EPOCH. See `functions/builtin_entry_guard.rs`.
+        struct BuiltinEntryProof => BuiltinEntryProofSchema {
+            ENVIRONMENT: GcRef<Environment>, Immutable, NonNullable;
+            REALM: GcRef<RealmRecord>, Immutable, NonNullable;
+            NAMES: GcRef<NamedBindingTable>, Immutable, Nullable;
+            EPOCH: I64Value, Immutable, NonNullable;
         }
 }
 

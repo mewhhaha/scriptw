@@ -1669,6 +1669,7 @@ impl FunctionBuilder<'_> {
             schema,
             f,
         );
+        self.emit_watched_entry_edit(&entry, f);
         stored.clear(f);
         handled.set_constant(1, f);
         self.pop_control(ControlFrameKind::If);

@@ -39,6 +39,8 @@ pub use host::*;
 mod native_recursion_depth;
 mod snapshot;
 use native_recursion_depth::NativeRecursionDepthGlobal;
+mod builtin_fact_epoch;
+use builtin_fact_epoch::BuiltinFactEpochGlobal;
 mod source_activation_depth;
 use source_activation_depth::SourceActivationDepthGlobal;
 pub(crate) use source_activation_depth::{SourceActivationDepth, SourceDepthOverflow};
@@ -389,6 +391,9 @@ impl GlobalLedger {
                 SiteRecordKind::GlobalLexicalNames => {
                     schema.reference_type::<NamedBindingTable>(GcNullability::Nullable)
                 }
+                SiteRecordKind::BuiltinEntryProof => {
+                    schema.reference_type::<BuiltinEntryProof>(GcNullability::Nullable)
+                }
             };
             section.global(
                 GlobalType {
@@ -415,6 +420,8 @@ pub(crate) enum SiteRecordKind {
     /// The declarative name table of a Global Environment Record that a
     /// builtin entry guard proved to declare none of its names.
     GlobalLexicalNames,
+    /// What a builtin entry guard last proved of all its facts at once.
+    BuiltinEntryProof,
 }
 
 /// A record type a site global may hold, tied to its global's declared kind.
@@ -435,6 +442,9 @@ impl SiteRecordType for StoredValue {
 }
 impl SiteRecordType for NamedBindingTable {
     const KIND: SiteRecordKind = SiteRecordKind::GlobalLexicalNames;
+}
+impl SiteRecordType for BuiltinEntryProof {
+    const KIND: SiteRecordKind = SiteRecordKind::BuiltinEntryProof;
 }
 
 /// The global that holds one site's record: null until the site's first
@@ -533,6 +543,7 @@ impl RuntimeGcTypes {
         let active_source_function = GcRootGlobal::declare(&self.layouts, &mut globals);
         let source_activation_depth = SourceActivationDepthGlobal::declare(&mut globals);
         let native_recursion_depth = NativeRecursionDepthGlobal::declare(&mut globals);
+        let builtin_fact_epoch = BuiltinFactEpochGlobal::declare(&mut globals);
         let throw_name = GcRootGlobal::declare(&self.layouts, &mut globals);
         let throw_message = GcRootGlobal::declare(&self.layouts, &mut globals);
         let throw_constructor_name = GcRootGlobal::declare(&self.layouts, &mut globals);
@@ -576,6 +587,7 @@ impl RuntimeGcTypes {
             active_source_function,
             source_activation_depth,
             native_recursion_depth,
+            builtin_fact_epoch,
             throw_name,
             throw_message,
             throw_constructor_name,
@@ -911,6 +923,7 @@ pub(crate) struct RuntimeSchema {
     active_source_function: GcRootGlobal<FunctionObject>,
     source_activation_depth: SourceActivationDepthGlobal,
     native_recursion_depth: NativeRecursionDepthGlobal,
+    builtin_fact_epoch: BuiltinFactEpochGlobal,
     throw_name: GcRootGlobal<StringValue>,
     throw_message: GcRootGlobal<StringValue>,
     throw_constructor_name: GcRootGlobal<StringValue>,

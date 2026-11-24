@@ -1076,6 +1076,8 @@ impl<'a> FunctionBuilder<'a> {
                 schema,
                 function,
             );
+        // A Realm's global object and `globalThis` are written here alone.
+        schema.emit_advance_builtin_fact_epoch(function);
         stored.clear(function);
         let eval_meta = self
             .functions

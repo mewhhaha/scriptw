@@ -89,6 +89,7 @@ mod aot_undefined_metadata_snapshots;
 mod aot_unobserved_arguments;
 mod aot_utf16_property_keys;
 mod aot_walked_property_access;
+mod aot_warm_builtin_replacement;
 mod aot_with_has_binding;
 mod aot_with_var_hoisting;
 

@@ -82,7 +82,7 @@ states what admits that image.
 
 ## Runtime ABI
 
-The runtime ABI is **85**. Portable bundles and native images built under an
+The runtime ABI is **86**. Portable bundles and native images built under an
 earlier ABI must be rebuilt. ABIs 58 to 77 added per-site read, write,
 `instanceof` and global read records, a dictionary position hint on Strings,
 further native call entries, one JSON output accumulator, compact shape
@@ -103,6 +103,9 @@ prototype and the intrinsic storage it held when the Realm's intrinsics were
 complete; a fast path checks that identity against the live object), the
 `instanceof` site record's terminal `%Object.prototype%`, a cached
 `{value, done}` iterator-result shape and the plain `JSON.stringify` helper.
+ABI 86 adds the builtin fact epoch global, a watched mark on a dictionary
+entry, and the epoch's advances in R, which let a builtin entry guard keep
+its whole proof between edits.
 `LAYOUT_VERSION` in
 `crates/scriptw-aot-wasm/src/runtime_artifact.rs` records each step.
 

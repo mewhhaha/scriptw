@@ -53,20 +53,42 @@ accepts `--case <file.js>`.
   - **Never assumed (exact, at a precision cost):** a body that consults
     `Intl`, `Temporal` or a host namespace such as `$262` is lowered
     proof-free.
+  - **Whole proofs (same day):** an entry that proved every fact keeps the
+    proof for one builtin fact epoch, with the Environment, the Realm and
+    the Environment's declarative name table it ran for, and the next entry
+    compares those four instead of reading the facts. The epoch is one
+    counter shared by R and P; it advances on a write through a dictionary
+    entry a proof was read from (in-place Set, redefinition, replaced
+    descriptor, deletion), on the promotion of intrinsic rows, when a
+    deferred recipe is written back and when a Realm's global object is
+    published
+    ([writers](../../crates/scriptw-aot-wasm/src/objects/builtin_fact_epoch.rs)).
+    A write to any other global, a script's own `var` included, leaves every
+    proof standing.
   - **Cost, measured on 2026-11-23 against the same day's baseline host:**
-    the retained RSC request is 2,339,867 to 2,502,624 Callgrind
-    instructions sync (+7.0%) and 2,541,411 to 2,713,020 async (+6.8%), and
-    its setup under Callgrind 54 s to 86 s; P grows where guarded bodies dominate (`edge-router.js`
-    157,523 to 200,292 bytes, `edge-html.js` 140,285 to 192,967,
-    `integer.js` 67,089 to 86,915, `client.js` about 18.8 MB to 20.7 MB) and not at
-    all without one (`hello.js`, `objects.js`). A guard reads, per fact, the
-    site's record, its entry's descriptor and value cell and the
-    intrinsic's storage; lowering runs twice per ordinary body.
+    the retained RSC request is 2,339,863 Callgrind instructions sync
+    without guards, 2,449,457 with per-fact entries (+4.7%) and 2,359,531
+    with whole proofs (+0.8%), and 2,541,177, 2,657,029 (+4.6%) and
+    2,562,007 (+0.8%) async; Flight's serializer `vn` is entered 276 times
+    a request and its entry fell from about 400 to about 75 instructions.
+    P is 3,820,278 bytes without guards and 4,138,051 with them (+8.3%):
+    the second bodies, which whole proofs do not change. P grows where
+    guarded bodies dominate (`edge-router.js` 157,523 to 200,292 bytes,
+    `edge-html.js` 140,285 to 192,967, `integer.js` 67,089 to 86,915,
+    `client.js` about 18.8 MB to 20.7 MB, measured before whole proofs) and
+    not at all without one (`hello.js`, `objects.js`). Lowering runs twice
+    per ordinary body.
   - **Follow-ups for the cost:** one fallback per source function instead of
     one per exact-context copy; a guard hoisted to the caller for an inlined
     captured call, a numeric leaf and a constant leaf, which a guarded body
-    currently gives up; facts narrowed from "consulted by name" to "became a
-    proof"; guards for class elements.
+    currently gives up; guards for class elements; the facts' proving code
+    shared by a module's guards instead of repeated in each. Facts narrowed
+    from "consulted by name" to "became a proof" need a lowering without
+    side effects first: lowering a body again without each fact in turn
+    took the RSC bundle's guards from 17 facts to 6 and P down 15 KB, but a
+    body's lowering adds to the lowerer's finite-source candidates each
+    time it runs, and `private_get_value_effects/optional_tails.js`
+    exhausted 13 GB.
 
   Owner: IR lowering (global property facts) with the emitter.
 - Speed versus V8: the [2026-11-22 deep dive](performance-deep-dive-20261122.md)

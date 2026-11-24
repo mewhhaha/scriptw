@@ -289,6 +289,9 @@ impl FunctionBuilder<'_> {
                     s,
                     f,
                 );
+                // The descriptor's object is not known here, so this ends
+                // the builtin fact epoch for any: once per recipe.
+                s.emit_advance_builtin_fact_epoch(f);
             }
             PropertyValueOwner::IntrinsicDataGroup { storage, row } => {
                 // IntrinsicPropertyValue has already established this cache.

@@ -127,11 +127,12 @@ fn deferred_writes(operators: &[Operator<'_>], resolve: u32) -> (Origin, Vec<Wri
             | Operator::I32Const { .. }
             | Operator::I64Const { .. }
             // The native recursion count bracketing a call in a counted
-            // scope (`Function::open_counted_calls`).
+            // scope (`Function::open_counted_calls`), and the builtin fact
+            // epoch a descriptor write-back advances.
             | Operator::GlobalGet { .. } => {
                 stack.push(Origin::Other);
             }
-            Operator::I32Add => {
+            Operator::I32Add | Operator::I64Add => {
                 stack.pop().unwrap();
                 stack.pop().unwrap();
                 stack.push(Origin::Other);

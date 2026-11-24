@@ -28,18 +28,28 @@
 //! A value the Realm has not made yet is read first: that read of an own data
 //! property observes nothing. Every other state, another Realm's intrinsic
 //! included, is a miss.
+//!
+//! An entry that proved every fact keeps the whole proof in a
+//! `BuiltinEntryProof`: the Environment and Realm it ran for, the
+//! Environment's declarative name table and the builtin fact epoch. The next
+//! entry compares those four and reads no fact while they are unchanged:
+//! every other state the facts are read from is immutable or has a writer
+//! that advances the epoch (`objects/builtin_fact_epoch.rs`). The facts are
+//! read again only at the guard's first entry and after the epoch advanced,
+//! so an entry costs the same however many facts the guard has.
 use super::*;
 use crate::emit::ControlTarget;
 use crate::environments::environment_reference::EnvironmentIdentifierRead;
 use crate::environments::GlobalDeclarativeNames;
 use crate::function_entry::PlannedBodyEntry;
 use crate::gc_types::{
-    Environment, EnvironmentSchema, ExecutableCodeKind, ExecutableCodeSchema,
-    FunctionContextSchema, FunctionObject, FunctionObjectSchema, GcI32Constant, GcLocal,
-    GlobalReadSiteRecord, IntrinsicPropertyStorage, IntrinsicPropertyStorageSchema, NamedBinding,
-    NamedBindingTable, NonNullable, Nullable, ObjectPropertyStorage, OrdinaryObject,
-    OrdinaryObjectSchema, RealmRecord, RealmRecordSchema, RuntimeSchema, StoredValue,
-    StoredValueSchema, StringValue, ValueLocals,
+    BuiltinEntryProof, BuiltinEntryProofSchema, Environment, EnvironmentSchema, ExecutableCodeKind,
+    ExecutableCodeSchema, FunctionContextSchema, FunctionObject, FunctionObjectSchema,
+    GcI32Constant, GcLocal, GcOperand, GlobalReadSiteRecord, GlobalReadSiteRecordSchema,
+    IntrinsicPropertyStorage, IntrinsicPropertyStorageSchema, NamedBinding, NamedBindingTable,
+    NonNullable, Nullable, ObjectPropertyStorage, OrdinaryObject, OrdinaryObjectSchema,
+    PropertyEntry, PropertyEntrySchema, RealmRecord, RealmRecordSchema, RuntimeSchema,
+    SiteRecordGlobal, StoredValue, StoredValueSchema, StringValue, ValueLocals,
 };
 use crate::intrinsics::IntrinsicPropertyLayoutId;
 use crate::objects::ProtectedPrototypeRows;
@@ -59,14 +69,6 @@ impl<'a> BuiltinEntryGuard<'a> {
             facts,
             fallback: fallback.id.as_str(),
         })
-    }
-}
-
-fn fact_global_name(fact: &BuiltinEntryFactIr) -> &str {
-    match fact {
-        BuiltinEntryFactIr::Function { name, .. } => name.as_str(),
-        BuiltinEntryFactIr::Namespace(namespace) => namespace.global_name(),
-        BuiltinEntryFactIr::GlobalThis => "globalThis",
     }
 }
 
@@ -149,14 +151,29 @@ impl FunctionBuilder<'_> {
         let environment = schema
             .reserve_gc_local::<Environment, Nullable>(function)
             .initialize(global.load(schema, function).nullable(), function);
-        global.clear(function);
-        self.emit_no_global_lexical_or_branch(facts, &environment, miss, function)?;
         let realm = self.load_current_realm(function);
+        let whole = self.next_site_record::<BuiltinEntryProof>()?;
+        let proved = self.open_frame(ControlFrameKind::Block, function);
+        let unproved = self.open_frame(ControlFrameKind::Block, function);
+        self.emit_builtin_entry_proof_current_or_branch(
+            whole,
+            &environment,
+            &realm,
+            unproved,
+            function,
+        );
+        self.emit_branch_to_target(proved, function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        // The guard's first use, and its first after the epoch advanced.
+        self.emit_no_global_lexical_or_branch(facts, &environment, miss, function)?;
         let value = schema.reserve_value_local(function);
         let mut protected = ProtectedPrototypeRows::default();
+        let mut sites = Vec::with_capacity(facts.len());
         for fact in facts {
-            let name = fact_global_name(fact);
+            let name = fact.global_name();
             let site = self.next_site_record::<GlobalReadSiteRecord>()?;
+            sites.push(site);
             // The value cell the binding held when this guard last proved
             // the fact. A value cell never changes, so while the binding
             // still holds that cell, in this Environment, it holds the
@@ -389,10 +406,152 @@ impl FunctionBuilder<'_> {
             }
         }
         value.clear(function);
+        self.emit_protected_prototype_rows_unchanged_or_branch(protected, miss, function);
+        self.emit_keep_builtin_entry_proof_or_branch(
+            whole, &sites, &global, &realm, miss, function,
+        );
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
         realm.clear(function);
         environment.clear(function);
-        self.emit_protected_prototype_rows_unchanged_or_branch(protected, miss, function);
+        global.clear(function);
         Ok(())
+    }
+
+    /// Falls through while the guard's last whole proof still stands: it
+    /// was made for this Environment and Realm, the Environment still has
+    /// the declarative name table it had then, and the builtin fact epoch
+    /// has not advanced. Every state the facts below are read from either
+    /// is one of those three or cannot change without advancing the epoch
+    /// (`objects/builtin_fact_epoch.rs`), so each fact would be proved again.
+    fn emit_builtin_entry_proof_current_or_branch(
+        &mut self,
+        whole: SiteRecordGlobal<BuiltinEntryProof>,
+        environment: &GcLocal<Environment, Nullable>,
+        realm: &GcLocal<RealmRecord>,
+        unproved: ControlTarget,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        function.rarely_taken(self.local_branch_label(unproved));
+        let proof = schema
+            .reserve_gc_local::<BuiltinEntryProof, Nullable>(function)
+            .initialize(whole.load(schema, function), function);
+        proof.load(schema, function).is_null(function);
+        self.emit_branch_if_to_target(unproved, function);
+        schema
+            .field(BuiltinEntryProofSchema::EPOCH)
+            .read(&proof, schema, function);
+        schema.emit_builtin_fact_epoch(function);
+        function.instruction(&Instruction::I64Ne);
+        self.emit_branch_if_to_target(unproved, function);
+        let _ = schema
+            .field(BuiltinEntryProofSchema::ENVIRONMENT)
+            .read(&proof, schema, function)
+            .reference();
+        let _ = environment.load(schema, function);
+        function.instruction(&Instruction::RefEq);
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(unproved, function);
+        let _ = schema
+            .field(BuiltinEntryProofSchema::REALM)
+            .read(&proof, schema, function)
+            .reference();
+        let _ = realm.load(schema, function);
+        function.instruction(&Instruction::RefEq);
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(unproved, function);
+        let _ = schema
+            .field(BuiltinEntryProofSchema::NAMES)
+            .read(&proof, schema, function)
+            .reference();
+        let _ = schema
+            .struct_type::<Environment>()
+            .field(EnvironmentSchema::NAMED_BINDINGS)
+            .read(environment, schema, function)
+            .reference();
+        function.instruction(&Instruction::RefEq);
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(unproved, function);
+        proof.clear(function);
+    }
+
+    /// Keeps the whole proof just made, for the current epoch, after marking
+    /// the entry each fact was read from as one whose descriptor edits
+    /// advance the epoch. Each site's record is the one its fact was just
+    /// proved from, for this Environment. Nothing between the facts' reads
+    /// and this point runs source code, so the epoch read here is the one
+    /// the facts held in.
+    fn emit_keep_builtin_entry_proof_or_branch(
+        &mut self,
+        whole: SiteRecordGlobal<BuiltinEntryProof>,
+        sites: &[SiteRecordGlobal<GlobalReadSiteRecord>],
+        environment: &GcLocal<Environment>,
+        realm: &GcLocal<RealmRecord>,
+        miss: ControlTarget,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        for site in sites {
+            let record = schema
+                .reserve_gc_local::<GlobalReadSiteRecord, Nullable>(function)
+                .initialize(site.load(schema, function), function);
+            record.load(schema, function).is_null(function);
+            self.emit_branch_if_to_target(miss, function);
+            let _ = schema
+                .field(GlobalReadSiteRecordSchema::ENVIRONMENT)
+                .read(&record, schema, function)
+                .reference();
+            let _ = environment.load(schema, function);
+            function.instruction(&Instruction::RefEq);
+            function.instruction(&Instruction::I32Eqz);
+            self.emit_branch_if_to_target(miss, function);
+            // A record that names an Environment holds an entry.
+            let entry = schema
+                .reserve_gc_local::<PropertyEntry, Nullable>(function)
+                .initialize(
+                    schema
+                        .field(GlobalReadSiteRecordSchema::ENTRY)
+                        .read(&record, schema, function)
+                        .reference(),
+                    function,
+                );
+            record.clear(function);
+            schema.field(PropertyEntrySchema::WATCHED).write(
+                &entry,
+                GcOperand::boolean(true),
+                schema,
+                function,
+            );
+            entry.clear(function);
+        }
+        let names = schema
+            .reserve_gc_local::<NamedBindingTable, Nullable>(function)
+            .initialize(
+                schema
+                    .struct_type::<Environment>()
+                    .field(EnvironmentSchema::NAMED_BINDINGS)
+                    .read(environment, schema, function)
+                    .reference(),
+                function,
+            );
+        let epoch = schema.reserve_i64_local(function);
+        schema.emit_builtin_fact_epoch(function);
+        epoch.store(function);
+        whole.store(
+            schema.struct_type::<BuiltinEntryProof>().construct(
+                (
+                    GcOperand::reference(environment, schema),
+                    GcOperand::reference(realm, schema),
+                    GcOperand::reference(&names, schema),
+                    GcOperand::i64_local(epoch),
+                ),
+                function,
+            ),
+            function,
+        );
+        schema.release_i64_local(epoch, function);
+        names.clear(function);
     }
 
     /// Falls through when the Global Environment Record `environment`
@@ -436,7 +595,7 @@ impl FunctionBuilder<'_> {
             let key = schema
                 .reserve_gc_local::<StringValue, NonNullable>(function)
                 .initialize(
-                    self.emit_interned_string_reference(fact_global_name(fact), function)?,
+                    self.emit_interned_string_reference(fact.global_name(), function)?,
                     function,
                 );
             self.emit_find_own_named_binding(environment, &key, &entry, function);
