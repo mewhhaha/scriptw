@@ -237,6 +237,227 @@ fn only_compaction_and_fresh_publication_replace_a_dictionary_table() {
     );
 }
 
+/// Methods of a typed array layout that write or allocate (anything but
+/// `read`, `length` and `type_index`), at a direct `array_type::<T>()` use or
+/// through a `let` binding of one, as (file, enclosing fn, method), sorted.
+fn array_writes(sources: &[Source], element: &str) -> Vec<(String, String, String)> {
+    let token = format!("array_type::<{element}>()");
+    let method_after = |text: &str| -> Option<String> {
+        let rest = text.trim_start().strip_prefix('.')?.trim_start();
+        let length = rest.bytes().position(|byte| !is_identifier(byte))?;
+        rest[length..]
+            .starts_with('(')
+            .then(|| rest[..length].to_string())
+    };
+    let read_only = |method: &str| matches!(method, "read" | "length" | "type_index");
+    let mut writes = Vec::new();
+    for source in sources {
+        let text = &source.text;
+        for (offset, _) in text.match_indices(&token) {
+            let function = enclosing_function(text, offset).to_string();
+            let after = &text[offset + token.len()..];
+            if let Some(method) = method_after(after) {
+                if !read_only(&method) {
+                    writes.push((source.path.clone(), function, method));
+                }
+                continue;
+            }
+            // `let name = <schema>.array_type::<T>();`: follow `name.` up to
+            // the next `fn` item.
+            let statement = &text[text[..offset].rfind(';').map_or(0, |end| end + 1)..offset];
+            let name = statement
+                .trim_start()
+                .strip_prefix("let ")
+                .and_then(|rest| rest.split_once('='))
+                .map(|(name, _)| name.trim())
+                .filter(|name| !name.is_empty() && name.bytes().all(is_identifier))
+                .unwrap_or_else(|| {
+                    panic!("unclassified {token} use in {} {function}", source.path)
+                });
+            let body = after
+                .split_once("\n    fn ")
+                .map_or(after, |(body, _)| body);
+            let body = body.split_once("\n    pub").map_or(body, |(body, _)| body);
+            let binding = format!("{name}.");
+            for (use_offset, _) in body.match_indices(&binding) {
+                if use_offset > 0 && is_identifier(body.as_bytes()[use_offset - 1]) {
+                    continue;
+                }
+                let method = method_after(&body[use_offset + name.len()..])
+                    .unwrap_or_else(|| panic!("unclassified {name} use in {}", source.path));
+                if !read_only(&method) {
+                    writes.push((source.path.clone(), function.clone(), method));
+                }
+            }
+        }
+    }
+    writes.sort();
+    writes
+}
+
+#[test]
+fn only_insertion_compaction_and_deletion_write_a_dictionary_table() {
+    let sources = sources();
+    let rows = |rows: &[(&str, &str, &str)]| {
+        let mut rows = rows
+            .iter()
+            .map(|(path, function, method)| {
+                (path.to_string(), function.to_string(), method.to_string())
+            })
+            .collect::<Vec<_>>();
+        rows.sort();
+        rows
+    };
+    assert_eq!(
+        array_writes(&sources, "PropertyTable"),
+        rows(&[
+            // Deletion nulls the record's slot after swapping its descriptor.
+            ("objects.rs", "emit_object_delete_ordinary", "write"),
+            // A fresh dictionary's table, filled before its first rows.
+            (
+                "objects/fresh_publication.rs",
+                "compile_fresh_data_properties_publish_helper",
+                "filled"
+            ),
+            (
+                "objects/native_constructor.rs",
+                "compile_native_constructor_header_allocate_helper",
+                "filled"
+            ),
+            // Insertion appends a new record after a proof of absence.
+            (
+                "objects/property_storage.rs",
+                "emit_ordinary_insert_in_dictionary",
+                "write"
+            ),
+            // Compaction allocates a table and moves the same live records.
+            (
+                "objects/property_storage.rs",
+                "compile_ordinary_property_prepare_helper",
+                "filled"
+            ),
+            (
+                "objects/property_storage.rs",
+                "compile_ordinary_property_prepare_helper",
+                "write"
+            ),
+        ]),
+        "a new writer of a dictionary's PropertyTable must keep every live property's \
+         one record reachable; review the active legacy function reflection contract"
+    );
+    assert_eq!(
+        non_read_uses(&sources, "OrdinaryPropertyStorageSchema::INDEX"),
+        expected(&[
+            (
+                "objects/fresh_publication.rs",
+                "compile_fresh_data_properties_publish_helper",
+                "write"
+            ),
+            (
+                "objects/property_storage.rs",
+                "compile_ordinary_property_prepare_helper",
+                "write"
+            ),
+        ]),
+        "a new writer of a dictionary's key index must index every live record"
+    );
+    assert_eq!(
+        non_read_uses(&sources, "OrdinaryPropertyStorageSchema::LENGTH"),
+        expected(&[
+            (
+                "objects/property_storage.rs",
+                "emit_ordinary_insert_in_dictionary",
+                "write"
+            ),
+            (
+                "objects/property_storage.rs",
+                "compile_ordinary_property_prepare_helper",
+                "write"
+            ),
+            // Read-only host snapshot projection.
+            ("gc_types/snapshot.rs", "index", "other"),
+        ]),
+        "a new writer of a dictionary's length must keep every live record in range"
+    );
+    // Raw array writes stay in the typed layout API and its generic helpers.
+    for source in &sources {
+        for instruction in [
+            "Instruction::ArraySet",
+            "Instruction::ArrayCopy",
+            "Instruction::ArrayFill",
+            "Instruction::ArrayInitElem",
+            "Instruction::ArrayInitData",
+        ] {
+            if source.text.contains(instruction) {
+                assert!(
+                    matches!(
+                        source.path.as_str(),
+                        "gc_types/layouts.rs" | "gc_types/value.rs" | "gc_types/compact_shapes.rs"
+                    ),
+                    "raw {instruction} in {}",
+                    source.path
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn entry_records_are_inserted_only_after_a_proof_of_absence_or_into_a_fresh_table() {
+    let sources = sources();
+    let mut callers = sources
+        .iter()
+        .flat_map(|source| {
+            source
+                .text
+                .match_indices(".emit_ordinary_insert_in_dictionary(")
+                .map(|(offset, _)| {
+                    (
+                        source.path.clone(),
+                        enclosing_function(&source.text, offset).to_string(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    callers.sort();
+    let mut known = [
+        // Compact rows move into a fresh dictionary: their keys are distinct.
+        (
+            "objects/compact_data.rs",
+            "compile_ordinary_property_storage_ensure_helper",
+        ),
+        // Fresh data rows of a new dictionary; the helper traps unless empty.
+        (
+            "objects/fresh_publication.rs",
+            "compile_fresh_data_properties_publish_helper",
+        ),
+        // Intrinsic rows move into a fresh dictionary: their keys are distinct.
+        (
+            "objects/intrinsic_properties.rs",
+            "emit_promote_intrinsic_properties",
+        ),
+        // A native constructor's fresh header rows.
+        (
+            "objects/native_constructor.rs",
+            "compile_native_constructor_header_allocate_helper",
+        ),
+        // Append and define, after their lookup found no record for the key.
+        (
+            "objects/property_storage.rs",
+            "emit_ordinary_insert_prepared_property",
+        ),
+    ]
+    .map(|(path, function)| (path.to_string(), function.to_string()))
+    .to_vec();
+    known.sort();
+    assert_eq!(
+        callers, known,
+        "a new caller of dictionary insertion must prove the key absent, or a property \
+         gets a second record; review the active legacy function reflection contract"
+    );
+}
+
 #[test]
 fn entry_records_are_constructed_only_by_dictionary_insertion() {
     let sources = sources();
