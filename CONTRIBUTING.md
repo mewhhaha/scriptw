@@ -68,6 +68,30 @@ compile jemalloc's C code (`make` and `cc`) and run scriptw-cli's integration
 tests on jemalloc. The recipe is Linux x86_64 with lld only, and no CI job
 builds `--features jemalloc` or `--profile dist`.
 
+On Linux, release and dist builds alike link `scriptw` and the scriptw-cli
+example hosts (`compiler_precompiled_baseline` and the other benchmark hosts)
+as fixed-address, non-PIE executables: `crates/scriptw-cli/build.rs` passes
+`-no-pie` to those links only, so `readelf -h` shows `EXEC`. As a PIE, every
+process applied about 57,700 relative relocations to the executable's RELRO
+segment (`.data.rel.ro` and `.got`) and kept its 0.93 MiB private and dirty;
+the fixed link resolves them when linking, so those pages stay clean and
+shared between processes. On 2026-11-24 that cut the precompiled host's
+private dirty memory on `startup.js` from 2,852 to 1,940 KiB per process
+(the executable's own share from 956 to 44 KiB) and its marginal PSS
+between one and four held processes from about 3.0 to 2.0 MiB. The
+trade-off is executable ASLR: the executable's code, read-only data and GOT
+sit at the same addresses in every process, which helps an attacker who already holds a memory-safety bug in the host
+(for example an escape from compiled Wasm through Wasmtime or a host import).
+Shared libraries, stacks, the heap and every Wasm mapping (code, GC heap,
+linear memories) stay randomized. Code is still compiled PIC:
+`-C relocation-model=static` would rebuild every unit and only remove GOT
+indirections, so it is not used. Test binaries and
+`scriptw-precompiled-consumer` stay PIE, and the runtime image's origin proof
+admits a fixed image only at load bias 0
+([contract](docs/rust-rewrite/contracts/runtime-byte-ownership.md#native-backing-storage)).
+A build that needs executable ASLR back must drop those two lines and pay the
+private RELRO pages again.
+
 ```sh
 python3 -B scripts/limited_verification.py --cloud --cloud-cpus auto -- \
   scripts/build-dist.sh plain target/dist-out

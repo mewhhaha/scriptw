@@ -177,7 +177,10 @@ Admission is by origin and pairing, not by re-hashing at every start:
   of the file behind `/proc/self/exe`. The static's pointer and length select
   an exact file-backed VMA in bounded `/proc/self/maps` data with matching
   device and inode, or the kernel's own main-ELF program headers place it in a
-  read-only `PT_LOAD`. Renaming or unlinking the executable cannot redirect
+  read-only `PT_LOAD`: a PIE (`ET_DYN`) at the bias the kernel reports, a
+  fixed `ET_EXEC` image only at bias 0. `scriptw` and the scriptw-cli example
+  hosts link fixed (CONTRIBUTING, Dist compiler binary); test binaries stay
+  PIE. Renaming or unlinking the executable cannot redirect
   its kernel handle. Maps pathnames, external files, the cache directory and
   digest-selected blobs are never native-code authority.
 - **Pairing.** The Cargo packaging step hashes the exact file it links and

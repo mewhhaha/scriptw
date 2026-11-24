@@ -23,9 +23,10 @@
 #           and so is a directory holding a `scriptw` without a build-info.
 #
 # Linux x86_64 with lld only: the script hard-codes the host triple and
-# `-fuse-ld=lld`. A PGO build is not reproducible (the profile depends on the
-# training run), so its binary cannot resume or publish a Test262 sweep that
-# another binary started.
+# `-fuse-ld=lld`. As in a release build, crates/scriptw-cli/build.rs links the
+# binary non-PIE; CONTRIBUTING records the executable-ASLR trade-off. A PGO
+# build is not reproducible (the profile depends on the training run), so its
+# binary cannot resume or publish a Test262 sweep that another binary started.
 #
 # Environment:
 #   SCRIPTW_DIST_FEATURES   cargo feature flags, default "--features jemalloc"
