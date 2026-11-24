@@ -1000,8 +1000,12 @@ impl Instance {
         // SAFETY: the registry keeps this text mapped while the store that
         // owns this instance lives (see `func_ref_text`).
         let store_text = unsafe { store_text.as_ref() };
-        // Bounds-checked as the function's whole range used to be.
-        let code = |start: u32| NonNull::from(&store_text[usize::try_from(start).unwrap()..]);
+        // Panics on an offset at or past the text's end: every function body
+        // and trampoline is at least one byte.
+        let code = |start: u32| {
+            let start = usize::try_from(start).unwrap();
+            NonNull::from(&store_text[start..start + 1])
+        };
 
         let array_call = VmPtr::from(code(text.array_call).cast());
         let wasm_call = Some(VmPtr::from(

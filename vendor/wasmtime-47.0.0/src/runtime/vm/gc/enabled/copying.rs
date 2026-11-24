@@ -638,8 +638,8 @@ impl CopyingHeap {
         }
         // `gc` closed any window, and a collection that followed one was
         // full: the window's survivors are copies in the other semi-space.
-        debug_assert!(!matches!(self.young, YoungAllocation::Pretenuring { .. }));
-        debug_assert!(!self.last_minor || self.young != YoungAllocation::NurseryAfterWindow);
+        assert!(!matches!(self.young, YoungAllocation::Pretenuring { .. }));
+        assert!(!self.last_minor || self.young != YoungAllocation::NurseryAfterWindow);
         self.young = YoungAllocation::Nursery;
         if cfg!(gc_zeal) {
             let start = usize::try_from(self.nursery_start()).unwrap();
@@ -663,7 +663,7 @@ impl CopyingHeap {
         if self.nursery_end == 0 {
             return;
         }
-        debug_assert!(!matches!(self.young, YoungAllocation::Pretenuring { .. }));
+        assert!(!matches!(self.young, YoungAllocation::Pretenuring { .. }));
         let start = self.nursery_start();
         let end = self.nursery_window_end();
         self.vmctx_data.set_bump_ptr(start);
@@ -729,7 +729,7 @@ impl CopyingHeap {
     /// for a collection instead of growth, and that collection, a full one,
     /// has the other semi-space for the old space's objects and the nursery.
     fn open_pretenure_window(&mut self, size: u32) -> bool {
-        debug_assert_eq!(self.young, YoungAllocation::FirstNursery);
+        assert_eq!(self.young, YoungAllocation::FirstNursery);
         let reserve = self.nursery_capacity().saturating_mul(2);
         let window = PRETENURE_WINDOW.min(self.old_free().saturating_sub(reserve)) & !(ALIGN - 1);
         if window < size {
@@ -755,9 +755,9 @@ impl CopyingHeap {
             | YoungAllocation::Nursery => return,
         };
         let bump = self.vmctx_data.bump_ptr();
-        debug_assert!(bump >= self.active_space_start);
-        debug_assert!(bump <= self.vmctx_data.active_space_end());
-        debug_assert!(self.vmctx_data.active_space_end() <= self.old_end);
+        assert!(bump >= self.active_space_start);
+        assert!(bump <= self.vmctx_data.active_space_end());
+        assert!(self.vmctx_data.active_space_end() <= self.old_end);
         self.old_bump = bump;
         self.young = YoungAllocation::NurseryAfterWindow;
         self.vmctx_data.set_bump_ptr(nursery_bump);
@@ -3230,6 +3230,9 @@ mod generational_tests {
     fn large_objects_allocated_old_keep_their_young_initializers() {
         let mut f = Fixture::new(2 << 20);
         f.call("make_old", &[Val::I32(1)], 0);
+        // Past the heap's first, full, collection, so that the collection
+        // after `make_big` is minor and scans the old-allocated array.
+        f.churn();
         // 64 Ki elements of 4 bytes: larger than a quarter of the nursery.
         f.call("make_big", &[Val::I32(65_536), Val::I32(1)], 0);
         f.churn();

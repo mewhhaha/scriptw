@@ -405,10 +405,11 @@ The copying collector is generational when the GC heap starts at 2 MiB or more
   weak epoch, since young keys move.
 - A heap's first full nursery does not collect
   ([measurements](../../docs/rust-rewrite/benchmarks.md#pretenure-window-2026-11-24)).
-  While no collection has run since the heap got its memory, the old space is
-  empty, and the mutator's bump pointer and limit move to a *pretenure
-  window* at its start: the smaller of 4 MiB and the old semi-space less two
-  nurseries (about 3 MiB of the product's 7 MiB). A Store that is dropped
+  While no collection has run since the heap got its memory, the old space
+  holds only large objects allocated there directly, and the mutator's bump
+  pointer and limit move to a *pretenure window* at the old space's bump: the
+  smaller of 4 MiB and the old space's free bytes less two nurseries (about
+  3 MiB of the product's 7 MiB). A Store that is dropped
   before the window fills never collects. `YoungAllocation` holds the state:
   `FirstNursery`, `Pretenuring { nursery_bump }`, `NurseryAfterWindow`,
   `Nursery`.
