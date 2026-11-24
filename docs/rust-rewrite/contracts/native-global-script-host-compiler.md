@@ -148,9 +148,9 @@ Adding this distinct core host import and static GC signature changes the R/P
 contract: LAYOUT_VERSION is 7. Existing ABI4 envelope rejection tests are
 retained and ABI6 envelope rejection controls are added for raw cache and build
 packages. These checksum-preserving header controls do not substitute for an
-actual old-R/new-P native typed-link rejection proof. ProgramInstance retains
-its existing five immutable hook fields; no sixth hook or global current-P
-state is introduced. GcHostLayout::RealmRecord is a declaration-owned host
+actual old-R/new-P native typed-link rejection proof. This component adds
+no ProgramInstance hook field (it then had five; ABI 89 later added
+LITERAL_RESOLVE as the sixth) and no global current-P state. GcHostLayout::RealmRecord is a declaration-owned host
 projection, without a physical Realm field change.
 
 Six additional authored AOT controls cover the exact import signature/projection,

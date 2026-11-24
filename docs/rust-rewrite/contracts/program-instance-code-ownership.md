@@ -41,9 +41,10 @@ dynamic code generation, a complete host surface, or this proposed ABI6 repair.
 ## Central interfaces
 
 `ProgramInstance` is one internal GC record per physical P instance. Its
-immutable fields retain five separately typed nullable hook references, a
-P-only PooledStringTable, its compiler-prefix ordinal base/count, and an existing
-ImmutableByteArray containing P metadata. An absent hook retains the existing
+immutable fields retain six separately typed nullable hook references (the
+sixth, LITERAL_RESOLVE since ABI 89, publishes a P literal at its first use), a
+P-only PooledStringTable, its LITERAL_DESCRIPTORS rows, its compiler-prefix
+ordinal base/count, and an existing ImmutableByteArray containing P metadata. An absent hook retains the existing
 unprepared behavior; a present hook's type comes from its RuntimeHelperId row.
 The helper signature is not duplicated in StaticSignature. No JavaScript value
 tag, object-header projection, parallel object model or global selector is added.

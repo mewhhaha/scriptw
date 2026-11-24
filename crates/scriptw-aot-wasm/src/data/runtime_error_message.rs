@@ -15,7 +15,7 @@ pub(crate) struct RuntimeErrorMessage(RuntimeErrorMessageValue);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RuntimeErrorMessageValue {
     Catalog(&'static str),
-    CollectedSource(PooledStringIndex),
+    CollectedSource(StringPoolToken, PooledStringIndex),
 }
 
 macro_rules! runtime_error_message_catalog {
@@ -1278,14 +1278,17 @@ impl RuntimeErrorMessage {
     pub(crate) const fn catalog_text(self) -> Option<&'static str> {
         match self.0 {
             RuntimeErrorMessageValue::Catalog(text) => Some(text),
-            RuntimeErrorMessageValue::CollectedSource(_) => None,
+            RuntimeErrorMessageValue::CollectedSource(..) => None,
         }
     }
 
-    pub(super) const fn collected_source_index(self) -> Option<PooledStringIndex> {
+    /// The collected slot, only for the pool whose token minted this handle.
+    pub(super) fn collected_source_index(self, pool: StringPoolToken) -> Option<PooledStringIndex> {
         match self.0 {
             RuntimeErrorMessageValue::Catalog(_) => None,
-            RuntimeErrorMessageValue::CollectedSource(index) => Some(index),
+            RuntimeErrorMessageValue::CollectedSource(token, index) => {
+                (token == pool).then_some(index)
+            }
         }
     }
 }
@@ -1366,7 +1369,7 @@ impl StringPool {
                 ))
             })?;
         Ok(RuntimeErrorMessage(
-            RuntimeErrorMessageValue::CollectedSource(index),
+            RuntimeErrorMessageValue::CollectedSource(self.token, index),
         ))
     }
 

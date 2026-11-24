@@ -104,5 +104,7 @@ mod unobserved_arguments;
 mod empty_eval;
 #[path = "aot_native_program_templates/function_names.rs"]
 mod function_names;
+#[path = "aot_native_program_templates/lazy_source_text.rs"]
+mod lazy_source_text;
 #[path = "aot_native_program_templates/regexp_literals.rs"]
 mod regexp_literals;

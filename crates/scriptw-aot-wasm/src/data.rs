@@ -464,8 +464,21 @@ impl PoolBoundary {
     }
 }
 
+/// A pool's identity for the handles it mints. Every pool draws a fresh
+/// token, and a pool is never cloned, so equal tokens mean the same pool.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct StringPoolToken(u64);
+
+impl Default for StringPoolToken {
+    fn default() -> Self {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        Self(NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+    }
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct StringPool {
+    token: StringPoolToken,
     compiler_owned: PoolBoundary,
     shared_prefix: Option<std::sync::Arc<CompilerOwnedPool>>,
     runtime_string_descriptors: Option<RuntimeStringDescriptors>,
@@ -4774,19 +4787,13 @@ impl StringPool {
         if let Some(text) = message.catalog_text() {
             return self.pooled_string_index(text);
         }
-        // A collected source message carries the slot this pool interned for
-        // its text. A slot of another pool is rejected even when it is in
-        // range here. The handle never becomes a JavaScript value.
-        message
-            .collected_source_index()
-            .filter(|index| {
-                self.source_runtime_error_messages
-                    .values()
-                    .any(|collected| collected == index)
-            })
-            .ok_or_else(|| {
-                EmitError::unsupported("runtime diagnostic does not belong to this string pool")
-            })
+        // A collected source message carries the token of the pool that
+        // minted it and the slot that pool interned for its text. A handle of
+        // another pool is rejected, whatever its slot holds here. The handle
+        // never becomes a JavaScript value.
+        message.collected_source_index(self.token).ok_or_else(|| {
+            EmitError::unsupported("runtime diagnostic does not belong to this string pool")
+        })
     }
     pub(crate) fn runtime_code_units_for_string(value: &str) -> Vec<u16> {
         scriptw_ir::decode_js_string_utf16(value)
@@ -5282,20 +5289,23 @@ mod pooled_string_index_tests {
     }
 
     #[test]
-    fn source_diagnostics_from_another_pool_are_rejected_even_in_range() {
-        let mut collected = StringPool::default();
+    fn source_diagnostics_from_another_pool_are_rejected_even_at_a_collected_slot() {
         let source = SourceRuntimeErrorMessage::IdentifierWrite(
             scriptw_ir::IdentifierWriteErrorIr::ImmutableBinding,
         );
+        let mut collected = StringPool::default();
         collected.intern_source_runtime_error_message(source);
         let message = collected.source_runtime_error_message(source).unwrap();
         let index = collected.runtime_error_string_index(message).unwrap();
+        // The other pool collects the same diagnostic at the same slot, so
+        // neither the slot nor the text can tell the handles apart.
         let mut other = StringPool::default();
-        for ordinal in 0..=index.ordinal() + 1 {
-            other.intern_string(&format!("unrelated {ordinal}"));
-        }
-        assert!(index.ordinal() < other.pooled_string_count());
+        other.intern_source_runtime_error_message(source);
+        let own = other.source_runtime_error_message(source).unwrap();
+        assert_eq!(other.runtime_error_string_index(own).unwrap(), index);
+        assert_ne!(own, message);
         assert!(other.runtime_error_string_index(message).is_err());
+        assert!(collected.runtime_error_string_index(own).is_err());
     }
 
     #[test]
