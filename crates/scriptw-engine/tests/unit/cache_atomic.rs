@@ -58,7 +58,13 @@ fn preexisting_temporary_files_are_not_truncated() {
         .0
         .join(format!("entry.tmp-{}-0", std::process::id()));
     fs::write(&stale, b"do not touch").unwrap();
-    insert_atomic(&path, b"new bytes", &AtomicU64::new(0)).unwrap();
+    insert_atomic(
+        &path,
+        b"new bytes",
+        EntryPublication::SyncedBeforeRename,
+        &AtomicU64::new(0),
+    )
+    .unwrap();
     assert_eq!(fs::read(&stale).unwrap(), b"do not touch");
     assert_eq!(fs::read(&path).unwrap(), b"new bytes");
     assert_eq!(fs::read_dir(&directory.0).unwrap().count(), 2);
@@ -69,7 +75,13 @@ fn failed_publication_removes_its_temporary_file() {
     let directory = Directory::new();
     let path = directory.0.join("entry");
     fs::create_dir(&path).unwrap();
-    assert!(insert_atomic(&path, b"bytes", &AtomicU64::new(0)).is_err());
+    assert!(insert_atomic(
+        &path,
+        b"bytes",
+        EntryPublication::Unsynced,
+        &AtomicU64::new(0)
+    )
+    .is_err());
     assert!(path.is_dir());
     assert_eq!(fs::read_dir(&directory.0).unwrap().count(), 1);
 }
@@ -78,7 +90,13 @@ fn failed_publication_removes_its_temporary_file() {
 fn exhausted_temporary_identities_fail_without_wrapping() {
     let directory = Directory::new();
     let next = AtomicU64::new(u64::MAX);
-    assert!(insert_atomic(&directory.0.join("entry"), b"bytes", &next).is_err());
+    assert!(insert_atomic(
+        &directory.0.join("entry"),
+        b"bytes",
+        EntryPublication::Unsynced,
+        &next,
+    )
+    .is_err());
     assert_eq!(next.load(Ordering::Relaxed), u64::MAX);
     assert_eq!(fs::read_dir(&directory.0).unwrap().count(), 0);
 }
@@ -94,7 +112,13 @@ fn preexisting_temporary_symlinks_are_not_followed() {
         .0
         .join(format!("entry.tmp-{}-0", std::process::id()));
     std::os::unix::fs::symlink(&sentinel, &link).unwrap();
-    insert_atomic(&directory.0.join("entry"), b"new", &AtomicU64::new(0)).unwrap();
+    insert_atomic(
+        &directory.0.join("entry"),
+        b"new",
+        EntryPublication::Unsynced,
+        &AtomicU64::new(0),
+    )
+    .unwrap();
     assert_eq!(fs::read(&sentinel).unwrap(), b"unchanged");
     assert!(fs::symlink_metadata(&link)
         .unwrap()
