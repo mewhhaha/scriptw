@@ -59,23 +59,47 @@ opaque boundaries.
 ## Ownership and exit ordering
 
 The actual FunctionObject owns separate optional legacy-property state records.
-Each records the original descriptor and the last StoredValue reference written
-by automatic publication. Function allocation creates these states before the
+Each records the property's dictionary entry record, the original descriptor
+publication installed in it and the last StoredValue reference written by
+automatic publication. Function allocation creates these states before the
 callable escapes; separate closures sharing one source body have separate states.
 No JavaScript name, property currently containing the callable, source shape or
 estimated call depth selects the owner.
 
-Both publication and restoration perform a fresh own-property lookup without
-calling getters. A write requires the same original descriptor, a data property
-which remains configurable or writable, and the same last automatically written
-StoredValue record. Generic DefineOwnProperty mutates descriptor records in
-place but constructs a fresh StoredValue; the value-record identity therefore
-detects redefinition that descriptor identity alone would miss. Generic property
-definition, descriptor flags and ordinary Get behavior need no special case.
+Publication and restoration read the descriptor the recorded entry holds now,
+without a key lookup and without calling getters. That read answers what a
+fresh own-property lookup would, because of three heap rules:
 
-On an ownership mismatch or a frozen property, the state clears its descriptor
-and stored-value edges. No later activation revives it. An activation separately
-roots its saved prior value, actual object/key and state until its matching
+- A header whose storage is a dictionary keeps that dictionary. Only compact
+  and intrinsic storages are replaced: a compact storage by a compact storage
+  one key longer or by a dictionary, intrinsic rows by a dictionary. A fresh
+  object's first storage is installed once.
+- A property keeps its one entry record while it lives. Entry records are
+  constructed only by dictionary insertion after the key was proved absent.
+  Compaction and table growth move the record and update its position; a
+  replacement through the same key writes a new descriptor into the record.
+- Deletion, the only way a live entry leaves its table, replaces the record's
+  descriptor with a fresh accessor descriptor that no property owns. A later
+  definition of the same key creates a new record with a new descriptor.
+
+The `scriptw-aot-wasm` structure test
+`structure_language::legacy_reflection_entry_record_structure` pins every
+writer of the header's storage, of an entry's descriptor and of a dictionary's
+table, and the one entry constructor, so a new rebuild path fails that test
+until this contract is reviewed. The global read site record relies on the
+same rules.
+
+A write requires that the entry still holds the original descriptor, a data
+property which remains configurable or writable, and the same last
+automatically written StoredValue record. Generic DefineOwnProperty mutates
+descriptor records in place but constructs a fresh StoredValue; the
+value-record identity therefore detects redefinition that descriptor identity
+alone would miss. Generic property definition, descriptor flags and ordinary
+Get behavior need no special case.
+
+On an ownership mismatch or a frozen property, the state clears its entry,
+descriptor and stored-value edges. No later activation revives it. An
+activation separately roots its saved prior value and state until its matching
 exit. Recursive publication updates the shared state's expected token; a normal
 unsealed nested return restores the outer value and token. A frozen inner
 snapshot survives every enclosing restoration instead. User-owned saved
@@ -101,7 +125,12 @@ Its actual argument/caller identities and abrupt-restoration assertions remain.
 Four new Engine controls require inactive frozen consistency through active
 calls; inner/outer recursive and abrupt frozen snapshots; in-place user data
 definitions, accessors, deletion and recreation; and foreign arguments plus the
-actual cross-Realm caller across GC and later calls. Existing strict/non-ordinary
+actual cross-Realm caller across GC and later calls. Two controls cover the
+recorded entry: deletion and recreation of both properties inside an active
+call, including recreation with the original attributes and value and
+deletion in a nested activation, never revives automatic publication; and
+compaction and table growth of the function's dictionary while it is active
+keep publication and restoration working. Existing strict/non-ordinary
 poison, forwarding, private/mapped arguments, actual-caller and exit controls
 remain required. No IR source policy changes are involved.
 

@@ -130,14 +130,6 @@ impl FunctionBuilder<'_> {
         let reflection = if self.current_function_meta().is_some_and(|meta| {
             !meta.strict && meta.protocol() == FunctionProtocolIr::OrdinaryCallAndConstruct
         }) {
-            let object = schema.reserve_gc_local(function).initialize(
-                schema
-                    .struct_type::<FunctionObject>()
-                    .field(FunctionObjectSchema::OBJECT)
-                    .read(&callable, schema, function)
-                    .reference(),
-                function,
-            );
             let caller_state = schema
                 .reserve_gc_local::<LegacyReflectionPropertyState, Nullable>(function)
                 .initialize(
@@ -147,8 +139,7 @@ impl FunctionBuilder<'_> {
                         .reference(),
                     function,
                 );
-            let caller =
-                ReflectionProperty::capture(self, &object, "caller", caller_state, function)?;
+            let caller = ReflectionProperty::capture(self, caller_state, function);
             let arguments_state = schema
                 .reserve_gc_local::<LegacyReflectionPropertyState, Nullable>(function)
                 .initialize(
@@ -158,9 +149,7 @@ impl FunctionBuilder<'_> {
                         .reference(),
                     function,
                 );
-            let arguments =
-                ReflectionProperty::capture(self, &object, "arguments", arguments_state, function)?;
-            object.clear(function);
+            let arguments = ReflectionProperty::capture(self, arguments_state, function);
             let value = schema.reserve_value_local(function);
             value.set_scalar(ScalarValue::Null, function);
             previous_function.load(schema, function).is_null(function);

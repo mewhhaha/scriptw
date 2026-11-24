@@ -1164,10 +1164,16 @@ gc_layout_registry! {
             LEGACY_ARGUMENTS: GcRef<LegacyReflectionPropertyState>, Mutable, Nullable;
         }
         // Only the original optional legacy data properties own publication.
-        // Their last StoredValue is a mutation token, not a JavaScript value
-        // proof. A successful user definition rebuilds it; deletion changes
-        // the selected descriptor. Retiring both edges is permanent.
+        // ENTRY is the property's dictionary entry record and DESCRIPTOR the
+        // descriptor publication installed in it. A property keeps its one
+        // entry record for life and a dictionary header keeps its dictionary,
+        // so ENTRY.DESCRIPTOR answers a fresh own lookup: compaction moves
+        // the record, a replacement changes its descriptor, and deletion
+        // swaps in one that no property owns. The last StoredValue is a
+        // mutation token, not a JavaScript value proof; a successful user
+        // definition rebuilds it. Retiring all three edges is permanent.
         struct LegacyReflectionPropertyState => LegacyReflectionPropertyStateSchema {
+            ENTRY: GcRef<PropertyEntry>, Mutable, Nullable;
             DESCRIPTOR: GcRef<PropertyDescriptor>, Mutable, Nullable;
             EXPECTED_VALUE: GcRef<StoredValue>, Mutable, Nullable;
         }

@@ -3,7 +3,8 @@
 use super::*;
 use crate::gc_types::{
     FunctionObjectSchema, I32Local, LegacyReflectionPropertyState, OrdinaryObject,
-    OrdinaryObjectSchema, PropertyDescriptor, PropertyDescriptorSchema, ScalarValue,
+    OrdinaryObjectSchema, PropertyDescriptor, PropertyDescriptorSchema, PropertyEntry,
+    PropertyEntrySchema, ScalarValue,
 };
 use crate::runtime_helpers::HelperParameters;
 
@@ -203,12 +204,23 @@ impl FunctionBuilder<'_> {
                 configurable,
                 function,
             )?;
+            // The append above left a dictionary holding the property's one
+            // entry record; the state keeps that record and its descriptor.
             let key = self.emit_function_string_key(name, function)?;
-            let own = self.emit_ordinary_own_descriptor_reference(&object, &key, function)?;
+            let found = self.emit_ordinary_property_entry(&object, &key, function)?;
+            let entry = schema
+                .reserve_gc_local::<PropertyEntry, NonNullable>(function)
+                .initialize(
+                    found.load(schema, function).require_non_null(function),
+                    function,
+                );
             let descriptor = schema
                 .reserve_gc_local::<PropertyDescriptor, NonNullable>(function)
                 .initialize(
-                    own.load(schema, function).require_non_null(function),
+                    schema
+                        .field(PropertyEntrySchema::DESCRIPTOR)
+                        .read(&entry, schema, function)
+                        .reference(),
                     function,
                 );
             // These freshly published source-function legacy properties contain
@@ -230,6 +242,7 @@ impl FunctionBuilder<'_> {
                         .struct_type::<LegacyReflectionPropertyState>()
                         .construct(
                             (
+                                GcOperand::nullable_reference(&entry, schema),
                                 GcOperand::nullable_reference(&descriptor, schema),
                                 GcOperand::nullable_reference(&stored, schema),
                             ),
@@ -246,7 +259,8 @@ impl FunctionBuilder<'_> {
             state.clear(function);
             stored.clear(function);
             descriptor.clear(function);
-            own.clear(function);
+            entry.clear(function);
+            found.clear(function);
             key.clear(function);
         }
         schema.release_i32_local(configurable, function);

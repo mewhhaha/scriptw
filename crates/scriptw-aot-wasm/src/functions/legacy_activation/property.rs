@@ -2,13 +2,11 @@
 
 use super::*;
 use crate::gc_types::{
-    GcOperand, LegacyReflectionPropertyStateSchema, NonNullable, OrdinaryObject,
-    PropertyDescriptor, PropertyDescriptorSchema, PropertyEntry, PropertyEntrySchema,
-    PropertyValue, RuntimeSchema, StoredValue, ValueLocals,
+    GcOperand, LegacyReflectionPropertyStateSchema, NonNullable, PropertyDescriptor,
+    PropertyDescriptorSchema, PropertyEntrySchema, PropertyValue, RuntimeSchema, StoredValue,
+    ValueLocals,
 };
 use crate::heap::DescriptorMask;
-use crate::operations::PropertyKeyLocals;
-use crate::runtime_helpers::{OrdinaryPropertyFindArguments, RuntimeHelperFunctionBase};
 
 /// What an activation writes: the value captured at entry, restored at exit,
 /// or a value boxed only on the arm that stores it, so an unobserved
@@ -19,28 +17,21 @@ enum Written<'a> {
     Fresh(&'a ValueLocals),
 }
 
+/// The state names the property's entry record, so no write looks the key
+/// up: see `LegacyReflectionPropertyState` and the active legacy function
+/// reflection contract.
 pub(super) struct ReflectionProperty {
-    object: GcLocal<OrdinaryObject>,
-    key: PropertyKeyLocals,
     state: GcLocal<LegacyReflectionPropertyState, Nullable>,
     previous_value: GcLocal<StoredValue, Nullable>,
-    helpers: RuntimeHelperFunctionBase,
 }
 
 impl ReflectionProperty {
     pub(super) fn capture(
-        builder: &mut FunctionBuilder<'_>,
-        object: &GcLocal<OrdinaryObject>,
-        name: &str,
+        builder: &FunctionBuilder<'_>,
         state: GcLocal<LegacyReflectionPropertyState, Nullable>,
         function: &mut Function,
-    ) -> Result<Self, EmitError> {
+    ) -> Self {
         let schema = builder.runtime_schema();
-        let key = builder.emit_function_string_key(name, function)?;
-        let helpers = builder.runtime_helper_base()?;
-        let object = schema
-            .reserve_gc_local(function)
-            .initialize(object.load(schema, function), function);
         let previous_value = schema
             .reserve_gc_local::<StoredValue, Nullable>(function)
             .initialize_null(schema, function);
@@ -60,52 +51,38 @@ impl ReflectionProperty {
         );
         record.clear(function);
         function.instruction(&Instruction::End);
-        Ok(Self {
-            object,
-            key,
+        Self {
             state,
             previous_value,
-            helpers,
-        })
+        }
     }
 
-    // The helper base is admitted once at capture. Neither this fresh own
-    // lookup nor the identity/flag checks can enter JavaScript or invoke a Get.
+    // The descriptor the property's entry record holds now: what a fresh own
+    // lookup of the key would select while the property lives, and a
+    // descriptor no property owns once it was deleted. Only reads; it can
+    // neither enter JavaScript nor invoke a Get.
     fn current_descriptor(
-        &self,
+        state: &GcLocal<LegacyReflectionPropertyState>,
         schema: &RuntimeSchema,
         function: &mut Function,
-    ) -> GcLocal<PropertyDescriptor, Nullable> {
-        let entry = schema
-            .reserve_gc_local::<PropertyEntry, Nullable>(function)
-            .initialize(
-                schema.helper_reference_on_stack(schema.call_helper(
-                    OrdinaryPropertyFindArguments::new(&self.object, &self.key),
-                    self.helpers,
-                    function,
-                )),
-                function,
-            );
-        let descriptor = schema
-            .reserve_gc_local::<PropertyDescriptor, Nullable>(function)
-            .initialize_null(schema, function);
-        entry.load(schema, function).is_null(function);
-        function.instruction(&Instruction::I32Eqz);
-        function.instruction(&Instruction::If(BlockType::Empty));
-        let present = schema.reserve_gc_local(function).initialize(
-            entry.load(schema, function).require_non_null(function),
+    ) -> GcLocal<PropertyDescriptor> {
+        // Publication fills ENTRY, DESCRIPTOR and EXPECTED_VALUE together and
+        // retirement clears all three, so a live owner has its entry.
+        let entry = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(LegacyReflectionPropertyStateSchema::ENTRY)
+                .read(state, schema, function)
+                .reference()
+                .require_non_null(function),
             function,
         );
-        descriptor.replace(
+        let descriptor = schema.reserve_gc_local(function).initialize(
             schema
                 .field(PropertyEntrySchema::DESCRIPTOR)
-                .read(&present, schema, function)
-                .reference()
-                .nullable(),
+                .read(&entry, schema, function)
+                .reference(),
             function,
         );
-        present.clear(function);
-        function.instruction(&Instruction::End);
         entry.clear(function);
         descriptor
     }
@@ -134,7 +111,7 @@ impl ReflectionProperty {
             owned.load(schema, function).require_non_null(function),
             function,
         );
-        let current = self.current_descriptor(schema, function);
+        let current = Self::current_descriptor(&state, schema, function);
         let expected = schema
             .reserve_gc_local::<StoredValue, Nullable>(function)
             .initialize(
@@ -218,6 +195,9 @@ impl ReflectionProperty {
         // A user definition, deletion or freeze owns the observed value now.
         // Do not revive it at a later entry, and release the old active roots.
         schema
+            .field(LegacyReflectionPropertyStateSchema::ENTRY)
+            .write(&state, GcOperand::null(schema), schema, function);
+        schema
             .field(LegacyReflectionPropertyStateSchema::DESCRIPTOR)
             .write(&state, GcOperand::null(schema), schema, function);
         schema
@@ -249,7 +229,5 @@ impl ReflectionProperty {
     pub(super) fn clear(self, function: &mut Function) {
         self.previous_value.clear(function);
         self.state.clear(function);
-        self.key.clear(function);
-        self.object.clear(function);
     }
 }

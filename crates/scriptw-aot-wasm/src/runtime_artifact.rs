@@ -180,7 +180,10 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // PropertyEntry.WATCHED, and the epoch's advances in R: descriptor edits
 // through a watched entry, intrinsic row promotion, recipe write-back and
 // the Realm's global object publication.
-const LAYOUT_VERSION: u32 = 86;
+// Version 87 adds LegacyReflectionPropertyState.ENTRY: a sloppy source
+// activation checks its legacy caller/arguments property through the entry
+// record publication found, instead of an ordinary_property_find call.
+const LAYOUT_VERSION: u32 = 87;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

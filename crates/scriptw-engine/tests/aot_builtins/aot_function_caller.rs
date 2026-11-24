@@ -826,3 +826,192 @@ print('legacy-reflection-ok');
         vec![HostOutputEvent::PrintLine("legacy-reflection-ok".into())]
     );
 }
+
+#[test]
+fn deleting_and_recreating_active_legacy_properties_never_revives_publication() {
+    let body = r#"
+function original(target, key) {
+  var descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+  return descriptor !== undefined && descriptor.value === null && !descriptor.writable
+    && !descriptor.enumerable && descriptor.configurable;
+}
+function recreate(target, key) {
+  assert.sameValue(delete target[key], true);
+  assert.sameValue(Reflect.getOwnPropertyDescriptor(target, key), undefined);
+  // The original attributes and value: only the entry record differs.
+  Object.defineProperty(target, key,
+    {value: null, writable: false, enumerable: false, configurable: true});
+  assert.sameValue(original(target, key), true);
+}
+var outerArguments, middleArguments;
+function twin(depth) {
+  if (depth === 3) {
+    outerArguments = arguments;
+    assert.sameValue(twin.arguments, arguments);
+    assert.sameValue(twin.caller, driver);
+  }
+  if (depth === 2) {
+    middleArguments = arguments;
+    assert.sameValue(twin.arguments, arguments);
+    assert.sameValue(twin.caller, twin);
+    recreate(twin, 'arguments');
+    recreate(twin, 'caller');
+  }
+  if (depth < 2) {
+    // A nested entry after the recreation publishes nothing.
+    assert.sameValue(twin.arguments, null);
+    assert.sameValue(twin.caller, null);
+  }
+  if (depth) twin(depth - 1);
+  // No exit restores an earlier activation into the recreated properties.
+  assert.sameValue(twin.arguments, null);
+  assert.sameValue(twin.caller, null);
+  assert.sameValue(original(twin, 'arguments') && original(twin, 'caller'), true);
+  return arguments;
+}
+function driver() { return twin(3); }
+assert.sameValue(driver(), outerArguments);
+assert.sameValue(middleArguments[0], 2);
+assert.sameValue(twin(0)[0], 0);
+assert.sameValue(twin.arguments, null);
+assert.sameValue(twin.caller, null);
+
+// Deletion in a nested activation: the outer exit restores nothing, and a
+// recreation after both exits stays user-owned in later calls.
+var deepest;
+function nested(depth) {
+  if (depth < 0) {
+    assert.sameValue(nested.arguments, null);
+    assert.sameValue(nested.caller, null);
+    return arguments;
+  }
+  if (depth === 0) {
+    deepest = arguments;
+    assert.sameValue(nested.arguments, arguments);
+    assert.sameValue(delete nested.arguments, true);
+    assert.sameValue(delete nested.caller, true);
+    return arguments;
+  }
+  assert.sameValue(nested.arguments, arguments);
+  nested(depth - 1);
+  assert.sameValue(Reflect.getOwnPropertyDescriptor(nested, 'arguments'), undefined);
+  assert.sameValue(Reflect.getOwnPropertyDescriptor(nested, 'caller'), undefined);
+  return arguments;
+}
+assert.sameValue(nested(2)[0], 2);
+assert.sameValue(deepest[0], 0);
+assert.sameValue(Reflect.getOwnPropertyDescriptor(nested, 'arguments'), undefined);
+Object.defineProperty(nested, 'arguments',
+  {value: null, writable: false, enumerable: false, configurable: true});
+Object.defineProperty(nested, 'caller',
+  {value: null, writable: false, enumerable: false, configurable: true});
+assert.sameValue(nested(-1)[0], -1);
+assert.sameValue(nested.arguments, null);
+assert.sameValue(nested.caller, null);
+
+// Recreation while inactive, then an active call.
+function later(value) {
+  assert.sameValue(later.arguments, null);
+  assert.sameValue(later.caller, null);
+  return arguments;
+}
+recreate(later, 'arguments');
+recreate(later, 'caller');
+function laterCaller() { return later(5); }
+assert.sameValue(laterCaller()[0], 5);
+assert.sameValue(later.arguments, null);
+assert.sameValue(original(later, 'arguments') && original(later, 'caller'), true);
+print('legacy-reflection-ok');
+"#;
+    assert_reflection_script(
+        &format!("{REFLECTION_HARNESS}\n{body}"),
+        "deleted and recreated active legacy properties",
+    );
+}
+
+#[test]
+fn legacy_publication_survives_dictionary_compaction_and_growth_while_active() {
+    let body = r#"
+var observed = [];
+function grown(depth, expectedCaller) {
+  assert.sameValue(grown.arguments, arguments);
+  assert.sameValue(grown.caller, expectedCaller);
+  if (depth === 1) {
+    // Holes before caller and arguments, then enough insertions to compact
+    // and grow the function's dictionary: the entry records move.
+    assert.sameValue(delete grown.length, true);
+    assert.sameValue(delete grown.name, true);
+    for (var index = 0; index < 96; index++) grown['p' + index] = index;
+    for (var index = 0; index < 96; index += 2) delete grown['p' + index];
+    for (var index = 96; index < 160; index++) grown['p' + index] = index;
+    assert.sameValue(grown.arguments, arguments);
+    assert.sameValue(grown.caller, driver);
+    observed.push(grown(0, grown));
+    // The exit of the nested activation restored this one.
+    assert.sameValue(grown.arguments, arguments);
+    assert.sameValue(grown.caller, driver);
+  }
+  return arguments;
+}
+function driver() { return grown(1, driver); }
+var outer = driver();
+assert.sameValue(outer[0], 1);
+assert.sameValue(observed[0][0], 0);
+assert.sameValue(grown.arguments, null);
+assert.sameValue(grown.caller, null);
+assert.sameValue(grown.p95, 95);
+assert.sameValue(grown.p94, undefined);
+assert.sameValue(grown.p159, 159);
+var keys = Reflect.ownKeys(grown);
+assert.sameValue(keys.indexOf('length'), -1);
+assert.sameValue(keys.indexOf('caller') < keys.indexOf('p1'), true);
+// A later activation still owns both moved properties.
+function laterDriver() { return grown(0, laterDriver); }
+assert.sameValue(laterDriver()[0], 0);
+assert.sameValue(grown.arguments, null);
+
+// Growth inside a nested activation, restoration by the outer exit.
+function nestedGrowth(depth) {
+  if (depth) {
+    var active = arguments;
+    nestedGrowth(depth - 1);
+    assert.sameValue(nestedGrowth.arguments, active);
+    assert.sameValue(nestedGrowth.caller, nestedDriver);
+    return arguments;
+  }
+  for (var index = 0; index < 128; index++) nestedGrowth['q' + index] = index;
+  assert.sameValue(nestedGrowth.arguments, arguments);
+  assert.sameValue(nestedGrowth.caller, nestedGrowth);
+  return arguments;
+}
+function nestedDriver() { return nestedGrowth(1); }
+assert.sameValue(nestedDriver()[0], 1);
+assert.sameValue(nestedGrowth.arguments, null);
+assert.sameValue(nestedGrowth.caller, null);
+
+// A deleted record dropped by compaction stays dead after recreation.
+function dropped(first) {
+  if (first) {
+    assert.sameValue(delete dropped.arguments, true);
+    for (var index = 0; index < 128; index++) dropped['r' + index] = index;
+    Object.defineProperty(dropped, 'arguments',
+      {value: null, writable: false, enumerable: false, configurable: true});
+    dropped(false);
+    assert.sameValue(dropped.caller, droppedDriver);
+  } else {
+    assert.sameValue(dropped.caller, dropped);
+  }
+  assert.sameValue(dropped.arguments, null);
+  return arguments;
+}
+function droppedDriver() { return dropped(true); }
+assert.sameValue(droppedDriver()[0], true);
+assert.sameValue(dropped.arguments, null);
+assert.sameValue(dropped.caller, null);
+print('legacy-reflection-ok');
+"#;
+    assert_reflection_script(
+        &format!("{REFLECTION_HARNESS}\n{body}"),
+        "legacy publication across dictionary compaction and growth",
+    );
+}
