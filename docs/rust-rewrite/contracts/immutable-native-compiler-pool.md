@@ -20,8 +20,9 @@ their signatures. P publication reads only its own appended images and literal
 descriptors. No GC layout or R/P wire version changes.
 
 After collection, P may compact its passive UTF-16 suffix by sharing aligned,
-overlapping slices. Literal ordinals, WTF-8 metadata addresses and R's immutable
-prefix stay fixed. Every descriptor retains its exact length and code units;
+overlapping slices. Literal ordinals, metadata addresses and R's immutable
+prefix stay fixed. A pooled string's UTF-16 slice is its only encoding: neither
+R's static image nor P's metadata holds a UTF-8 or WTF-8 copy. Every descriptor retains its exact length and code units;
 String construction still uses the existing GC representation. Search work is
 bounded, and exhaustion appends the original bytes. Packing is published only
 when the physical image shrinks.

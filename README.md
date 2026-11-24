@@ -214,7 +214,7 @@ Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and t
   their peaks add up); compile untrusted source under an OS memory limit and a
   deadline
   ([details](docs/rust-rewrite/runtime-requirements.md#compile-memory)).
-- **Runtime ABI 87:** rebuild Portable bundles and native images built under an
+- **Runtime ABI 88:** rebuild Portable bundles and native images built under an
   earlier ABI ([details](docs/rust-rewrite/runtime-requirements.md#runtime-abi)).
 
 [Development and verification](CONTRIBUTING.md) ·

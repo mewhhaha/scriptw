@@ -44,8 +44,8 @@ impl StringPool {
         if packed.len() >= original.len() {
             return;
         }
-        // No code has been emitted yet. Ordinals, WTF-8 metadata addresses and
-        // the shared runtime prefix stay fixed; only final UTF-16 spans change.
+        // No code has been emitted yet. Ordinals, metadata addresses and the
+        // shared runtime prefix stay fixed; only final UTF-16 spans change.
         self.pooled_code_unit_bytes
             .replace_suffix(boundary.code_unit_bytes, packed);
         for entry in self.refs.program_values_mut() {

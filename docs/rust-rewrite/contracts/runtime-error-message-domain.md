@@ -32,7 +32,7 @@ of the IR allocation. An owner without a diagnostic or an uncollected diagnostic
 returns an emission error.
 There is no admission taking `String` or `&str`.
 
-The source handle is private and contains a validated payload. It is produced
+The source handle is private and contains the pooled string slot of its text. It is produced
 immediately from the consuming builder's immutable pool at each current call
 site. It does not encode a generative Rust identity for distinct pool instances;
 passing a previously produced source handle to a different module is outside
@@ -45,7 +45,7 @@ Static pool ordering changes when duplicate seed rows are removed, so emitted
 artifacts require the normal batch compile and functional checkpoint.
 
 The production empty-program pool regression checks each admitted static
-message's actual encoded bytes. Existing CLI/Engine error-message and Realm
+message's slot and actual UTF-16 code units. Existing CLI/Engine error-message and Realm
 fixtures remain the semantic observers. Existing structural regression sources
 follow the typed message projections while retaining their ordering, Realm and
 completion assertions. No compilation, execution or conformance count refresh

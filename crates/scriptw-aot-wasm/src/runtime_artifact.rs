@@ -183,7 +183,10 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 87 adds LegacyReflectionPropertyState.ENTRY: a sloppy source
 // activation checks its legacy caller/arguments property through the entry
 // record publication found, instead of an ordinary_property_find call.
-const LAYOUT_VERSION: u32 = 87;
+// Version 88 stops writing an unread WTF-8 copy of every pooled string into
+// R's static image and P's metadata image; strings keep only their UTF-16
+// slices. Every later static table and P metadata span moves.
+const LAYOUT_VERSION: u32 = 88;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

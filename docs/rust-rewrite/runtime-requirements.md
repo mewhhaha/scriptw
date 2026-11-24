@@ -82,7 +82,7 @@ states what admits that image.
 
 ## Runtime ABI
 
-The runtime ABI is **87**. Portable bundles and native images built under an
+The runtime ABI is **88**. Portable bundles and native images built under an
 earlier ABI must be rebuilt. ABIs 58 to 77 added per-site read, write,
 `instanceof` and global read records, a dictionary position hint on Strings,
 further native call entries, one JSON output accumulator, compact shape
@@ -108,7 +108,9 @@ entry, and the epoch's advances in R, which let a builtin entry guard keep
 its whole proof between edits. ABI 87 keeps the dictionary entry record in
 each legacy `caller`/`arguments` state, so a sloppy activation checks the
 property without a lookup
-([contract](contracts/active-legacy-function-reflection.md)).
+([contract](contracts/active-legacy-function-reflection.md)). ABI 88 drops the
+unread WTF-8 copy of each pooled string from R's static image and P's metadata
+image, so every later static table and P metadata span moves.
 `LAYOUT_VERSION` in
 `crates/scriptw-aot-wasm/src/runtime_artifact.rs` records each step.
 

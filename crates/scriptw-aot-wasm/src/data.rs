@@ -122,7 +122,7 @@ impl NormalizationRegion {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct PooledStringIndex(u32);
 impl PooledStringIndex {
     fn for_insertion(existing: usize) -> Self {
@@ -143,8 +143,8 @@ struct StringRef {
     // Interning assigns this once. Source literals cannot renumber an already
     // collected builtin literal merely by sorting before it.
     index: PooledStringIndex,
-    offset: u32,
-    len: u32,
+    // The UTF-16 slice is a string's only encoding in the module. No WTF-8
+    // copy reaches the static or metadata images: nothing reads one.
     code_units: PooledCodeUnits,
 }
 
@@ -481,7 +481,7 @@ pub(crate) struct StringPool {
     global_var_declarations: BTreeMap<scriptw_ir::StaticScriptId, GlobalVarDeclarationTables>,
     pooled_code_unit_bytes: PoolBytes,
     refs: PoolStringRefs,
-    source_runtime_error_messages: BTreeMap<String, i64>,
+    source_runtime_error_messages: BTreeMap<String, PooledStringIndex>,
     script_string_literals: BTreeSet<String>,
     runtime_regexp_candidate_literals: BTreeSet<String>,
     /// Pattern strings the script names **directly at a RegExp construction
@@ -1668,8 +1668,8 @@ impl CompilerOwnedPool {
             // i.e. literally the table
             // `FunctionBuilder::emit_temporal_resolve_era_to_year` reads, and
             // not a second `Era`-side list that could be short of it. That
-            // matters because the resolver emits `strings.payload(spelling)`
-            // for every spelling of every era of every calendar: an era
+            // matters because the resolver looks up the pooled string of
+            // every spelling of every era of every calendar: an era
             // reachable from `eras()` but missing here is the `string must
             // exist in pool` compiler panic fixed in e04bdc061, and no
             // `const` assertion can see a list that is never consulted.
@@ -4250,11 +4250,8 @@ impl StringPool {
         if self.refs.contains_key(value) {
             return;
         }
-        // Validate the resulting table length before mutating either image.
+        // Validate the resulting table length before mutating the UTF-16 image.
         let index = PooledStringIndex::for_insertion(self.refs.len());
-        let offset = STATIC_DATA_OFFSET + self.bytes.len() as u32;
-        let bytes = Self::runtime_bytes_for_string(value);
-        self.bytes.extend_from_slice(&bytes);
         let units = Self::runtime_code_units_for_string(value);
         let code_units = PooledCodeUnits {
             byte_offset: u32::try_from(self.pooled_code_unit_bytes.len())
@@ -4272,12 +4269,7 @@ impl StringPool {
         }
         self.refs.insert(
             value.to_string(),
-            StringRef {
-                index,
-                offset,
-                len: bytes.len() as u32,
-                code_units,
-            },
+            StringRef { index, code_units },
         );
     }
 
@@ -4617,66 +4609,6 @@ impl StringPool {
             .copied()
     }
 
-    pub(crate) fn runtime_bytes_for_string(value: &str) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(value.len());
-        let mut chars = value.chars().peekable();
-        while let Some(ch) = chars.next() {
-            if ch != JS_STRING_SURROGATE_SENTINEL {
-                Self::push_utf8_char(&mut bytes, ch);
-                continue;
-            }
-
-            if chars.peek().copied() == Some(JS_STRING_SURROGATE_SENTINEL) {
-                chars.next();
-                Self::push_utf8_char(&mut bytes, JS_STRING_SURROGATE_SENTINEL);
-                continue;
-            }
-
-            let mut consumed = String::new();
-            let mut code_unit = 0_u16;
-            let mut is_marker = true;
-            for _ in 0..4 {
-                let Some(hex) = chars.next() else {
-                    is_marker = false;
-                    break;
-                };
-                consumed.push(hex);
-                let Some(value) = hex.to_digit(16) else {
-                    is_marker = false;
-                    break;
-                };
-                code_unit = (code_unit << 4) | value as u16;
-            }
-
-            if is_marker && (0xD800..=0xDFFF).contains(&code_unit) {
-                Self::push_wtf8_code_unit(&mut bytes, code_unit);
-            } else {
-                Self::push_utf8_char(&mut bytes, JS_STRING_SURROGATE_SENTINEL);
-                bytes.extend_from_slice(consumed.as_bytes());
-            }
-        }
-        bytes
-    }
-
-    fn push_utf8_char(bytes: &mut Vec<u8>, ch: char) {
-        let mut buffer = [0; 4];
-        bytes.extend_from_slice(ch.encode_utf8(&mut buffer).as_bytes());
-    }
-
-    fn push_wtf8_code_unit(bytes: &mut Vec<u8>, code_unit: u16) {
-        let code = code_unit as u32;
-        if code < 0x80 {
-            bytes.push(code as u8);
-        } else if code < 0x800 {
-            bytes.push((0xC0 | (code >> 6)) as u8);
-            bytes.push((0x80 | (code & 0x3F)) as u8);
-        } else {
-            bytes.push((0xE0 | (code >> 12)) as u8);
-            bytes.push((0x80 | ((code >> 6) & 0x3F)) as u8);
-            bytes.push((0x80 | (code & 0x3F)) as u8);
-        }
-    }
-
     fn boundary(&self) -> PoolBoundary {
         PoolBoundary {
             static_bytes: self.bytes.len(),
@@ -4844,16 +4776,11 @@ impl StringPool {
         if let Some(text) = message.catalog_text() {
             return self.pooled_string_index(text);
         }
-        // A collected source message carries the pool's checked compiler-only
-        // handle. Resolve it here; that handle never becomes a JavaScript value.
-        let handle = self.runtime_error_payload(message);
-        self.refs
-            .values()
-            .find_map(|reference| {
-                let candidate =
-                    (((reference.offset as u64) << 32) | u64::from(reference.len)) as i64;
-                (candidate == handle).then_some(reference.index)
-            })
+        // A collected source message carries the slot this pool interned for
+        // its text. The handle never becomes a JavaScript value.
+        message
+            .collected_source_index()
+            .filter(|index| index.ordinal() < self.pooled_string_count())
             .ok_or_else(|| {
                 EmitError::unsupported("runtime diagnostic does not belong to this string pool")
             })
@@ -4862,17 +4789,17 @@ impl StringPool {
         scriptw_ir::decode_js_string_utf16(value)
     }
 
-    pub(crate) fn payload(&self, value: &str) -> i64 {
-        let string = self
-            .refs
-            .get(value)
-            .unwrap_or_else(|| panic!("string `{value}` must exist in pool"));
-        assert!(
-            string.offset < (1 << 31),
-            "string pool offset {} exceeds the PropertyKey marker boundary",
-            string.offset
-        );
-        (((string.offset as u64) << 32) | string.len as u64) as i64
+    /// The UTF-16 units the passive image holds for an interned string.
+    #[cfg(test)]
+    pub(crate) fn pooled_utf16_for_test(&self, value: &str) -> Vec<u16> {
+        let units = self
+            .pooled_code_units(value)
+            .unwrap_or_else(|error| panic!("string `{value}` must exist in pool: {error:?}"));
+        let start = units.byte_offset as usize;
+        self.pooled_code_unit_bytes[start..start + units.length as usize * 2]
+            .chunks_exact(2)
+            .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
+            .collect()
     }
 
     pub(crate) const fn runtime_regexp_table(&self) -> Option<RuntimeRegExpProgramTable> {
@@ -5040,11 +4967,9 @@ mod host_created_realm_property_name_pool_tests {
             &scriptw_intl::IntlDataSelection::new(scriptw_intl::IntlCompilationProfile::default()),
         )
         .expect("host-name pool should collect");
-        let payload = pool.payload(REALM_EVAL_SCRIPT_METHOD_NAME);
-        let length = (payload as u64 & 0xFFFF_FFFF) as usize;
         assert_eq!(
-            length,
-            StringPool::runtime_bytes_for_string(REALM_EVAL_SCRIPT_METHOD_NAME).len()
+            pool.pooled_utf16_for_test(REALM_EVAL_SCRIPT_METHOD_NAME),
+            StringPool::runtime_code_units_for_string(REALM_EVAL_SCRIPT_METHOD_NAME)
         );
     }
 
@@ -5071,11 +4996,9 @@ mod host_created_realm_property_name_pool_tests {
         )
         .expect("host-name pool should collect");
         for name in ["$262", "detachArrayBuffer"] {
-            let payload = pool.payload(name);
-            let length = (payload as u64 & 0xFFFF_FFFF) as usize;
             assert_eq!(
-                length,
-                StringPool::runtime_bytes_for_string(name).len(),
+                pool.pooled_utf16_for_test(name),
+                StringPool::runtime_code_units_for_string(name),
                 "created-realm $262 member `{name}` must be pooled"
             );
         }
@@ -5090,9 +5013,9 @@ mod runtime_error_message_pool_tests {
 
     #[test]
     #[should_panic(expected = "must exist in pool")]
-    fn payload_panics_for_a_string_that_was_never_interned() {
+    fn pooled_utf16_panics_for_a_string_that_was_never_interned() {
         let pool = StringPool::default();
-        let _ = pool.payload("a string that is deliberately absent from the pool");
+        let _ = pool.pooled_utf16_for_test("a string that is deliberately absent from the pool");
     }
 
     /// Exercise production collection, including its unconditional error catalog.
@@ -5134,12 +5057,9 @@ mod runtime_error_message_pool_tests {
                 "Temporal.PlainDate is outside the supported date range",
                 "plainTime",
             ] {
-                let payload = pool.payload(message) as u64;
-                let offset = (payload >> 32) as usize - STATIC_DATA_OFFSET as usize;
-                let len = (payload & 0xFFFF_FFFF) as usize;
                 assert_eq!(
-                    &pool.bytes[offset..offset + len],
-                    message.as_bytes(),
+                    pool.pooled_utf16_for_test(message),
+                    message.encode_utf16().collect::<Vec<_>>(),
                     "missing shared literal for {}",
                     builtin.debug_name(),
                 );
@@ -5197,12 +5117,9 @@ mod runtime_error_message_pool_tests {
                 "overflow",
                 "constrain",
             ] {
-                let payload = pool.payload(message) as u64;
-                let offset = (payload >> 32) as usize - STATIC_DATA_OFFSET as usize;
-                let len = (payload & 0xFFFF_FFFF) as usize;
                 assert_eq!(
-                    &pool.bytes[offset..offset + len],
-                    message.as_bytes(),
+                    pool.pooled_utf16_for_test(message),
+                    message.encode_utf16().collect::<Vec<_>>(),
                     "missing shared zoned literal for {}",
                     builtin.debug_name(),
                 );
@@ -5233,25 +5150,22 @@ mod runtime_error_message_pool_tests {
             "Temporal.PlainDateTime fields must be finite",
             "Temporal.PlainDateTime month and day must be positive",
         ] {
-            let payload = pool.payload(message) as u64;
-            let offset = (payload >> 32) as usize - STATIC_DATA_OFFSET as usize;
-            let len = (payload & 0xFFFF_FFFF) as usize;
-            assert_eq!(&pool.bytes[offset..offset + len], message.as_bytes());
+            assert_eq!(
+                pool.pooled_utf16_for_test(message),
+                message.encode_utf16().collect::<Vec<_>>()
+            );
         }
     }
 
     #[test]
     fn rejection_diagnostic_is_interned_without_moving_fixed_literals() {
         let pool = production_pool_for_an_empty_script();
-        assert_eq!(
-            pool.payload(","),
-            ((((STATIC_DATA_OFFSET as u64) + 14) << 32) | 1) as i64,
-        );
+        assert_eq!(pool.pooled_string_index(",").unwrap().ordinal(), 5);
         let message = UNHANDLED_REJECTION_TOSTRING_THROWN_MESSAGE;
-        let payload = pool.payload(message) as u64;
-        let offset = (payload >> 32) as usize - STATIC_DATA_OFFSET as usize;
-        let len = (payload & 0xFFFF_FFFF) as usize;
-        assert_eq!(&pool.bytes[offset..offset + len], message.as_bytes());
+        assert_eq!(
+            pool.pooled_utf16_for_test(message),
+            message.encode_utf16().collect::<Vec<_>>()
+        );
     }
 
     #[test]
@@ -5261,12 +5175,13 @@ mod runtime_error_message_pool_tests {
             let text = message
                 .catalog_text()
                 .expect("catalog row carries static text");
-            let payload = pool.runtime_error_payload(message) as u64;
-            let offset = (payload >> 32) as usize - STATIC_DATA_OFFSET as usize;
-            let len = (payload & 0xffff_ffff) as usize;
+            let index = pool
+                .runtime_error_string_index(message)
+                .expect("catalog message resolves in the production pool");
+            assert_eq!(index, pool.pooled_string_index(text).unwrap());
             assert_eq!(
-                &pool.bytes[offset..offset + len],
-                StringPool::runtime_bytes_for_string(text)
+                pool.pooled_utf16_for_test(text),
+                StringPool::runtime_code_units_for_string(text)
             );
         }
     }
@@ -5275,6 +5190,28 @@ mod runtime_error_message_pool_tests {
 #[cfg(test)]
 mod pooled_string_index_tests {
     use super::*;
+    use scriptw_ir::JS_STRING_SURROGATE_SENTINEL;
+
+    #[test]
+    fn string_pool_encodes_literal_lone_surrogates_as_one_code_unit() {
+        let encoded = format!("{JS_STRING_SURROGATE_SENTINEL}D800");
+        let mut pool = StringPool::default();
+        pool.intern_string(&encoded);
+        assert_eq!(pool.pooled_utf16_for_test(&encoded), vec![0xD800]);
+    }
+
+    #[test]
+    fn string_pool_escapes_literal_surrogate_sentinel() {
+        let encoded = format!("{JS_STRING_SURROGATE_SENTINEL}{JS_STRING_SURROGATE_SENTINEL}");
+        let mut pool = StringPool::default();
+        pool.intern_string(&encoded);
+        assert_eq!(
+            pool.pooled_utf16_for_test(&encoded),
+            JS_STRING_SURROGATE_SENTINEL
+                .encode_utf16(&mut [0; 2])
+                .to_vec()
+        );
+    }
 
     #[test]
     fn later_literals_preserve_collected_slots_and_initialization_data() {

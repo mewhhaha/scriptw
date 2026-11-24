@@ -1,4 +1,5 @@
 use super::*;
+use scriptw_ir::JS_STRING_SURROGATE_SENTINEL;
 
 #[test]
 fn descriptor_rows_keep_only_program_local_slots_and_utf16_spans() {

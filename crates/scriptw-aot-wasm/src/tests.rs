@@ -2126,24 +2126,6 @@ fn data_segment_bytes(bytes: &[u8]) -> Vec<u8> {
     collected
 }
 
-#[test]
-fn string_pool_encodes_literal_lone_surrogates_as_wtf8_bytes() {
-    let encoded = format!("{JS_STRING_SURROGATE_SENTINEL}D800");
-    assert_eq!(
-        StringPool::runtime_bytes_for_string(&encoded),
-        vec![0xED, 0xA0, 0x80]
-    );
-}
-
-#[test]
-fn string_pool_escapes_literal_surrogate_sentinel() {
-    let encoded = format!("{JS_STRING_SURROGATE_SENTINEL}{JS_STRING_SURROGATE_SENTINEL}");
-    assert_eq!(
-        StringPool::runtime_bytes_for_string(&encoded),
-        JS_STRING_SURROGATE_SENTINEL.to_string().as_bytes().to_vec()
-    );
-}
-
 fn global_init_i64s(bytes: &[u8]) -> Vec<i64> {
     let mut values = Vec::new();
     for payload in Parser::new(0).parse_all(bytes) {
@@ -3143,12 +3125,18 @@ fn preseeded_wire_data_stays_in_private_memory() {
     let artifact = emit_script("({ value: \",\" });").expect("emit should work");
     expect_valid_module(&artifact, 0);
     let runtime = artifact.runtime().expect("heap program links R");
-    assert!(data_segment_at(
-        runtime.bytes(),
-        crate::data::RUNTIME_STATIC_SEGMENT_ORDER[0]
-    )
-    .starts_with(&expected_prefix));
-    assert!(runtime_virtual_static_image(runtime.bytes()).starts_with(&expected_prefix));
+    // The preseeded Strings are R's leading passive UTF-16 units; its active
+    // static image holds no second encoding of them.
+    let expected_units = String::from_utf8(expected_prefix.clone())
+        .unwrap()
+        .encode_utf16()
+        .flat_map(u16::to_le_bytes)
+        .collect::<Vec<_>>();
+    assert!(data_segment_at(runtime.bytes(), 0).starts_with(&expected_units));
+    let runtime_static = runtime_virtual_static_image(runtime.bytes());
+    assert!(!runtime_static
+        .windows(expected_prefix.len())
+        .any(|window| window == expected_prefix));
     assert_eq!(wire_data_segment_counts(runtime.bytes()), (4, 4));
     assert_eq!(wire_data_segment_counts(&artifact.bytes), (4, 0));
     assert!(data_segment_at(&artifact.bytes, 3).is_empty());
@@ -3242,6 +3230,46 @@ fn regexp_descriptor_from_pool(
     let length = reference.payload() as u32 as usize;
     scriptw_ir::ValidatedRegExpProgram::from_bytes(pool.bytes[offset..offset + length].to_vec())
         .unwrap()
+}
+
+#[test]
+fn pooled_strings_are_encoded_only_as_utf16_in_both_modules() {
+    // Strings are built from their UTF-16 slices alone. Neither P's metadata
+    // nor R's static image may carry a second, unread UTF-8/WTF-8 copy.
+    const LITERAL: &str = "a P literal that only its UTF-16 image holds";
+    let function = format!("function sourceTextOnlyInUtf16() {{ return '{LITERAL}'; }}");
+    let artifact = emit_script(&format!("{function}\nsourceTextOnlyInUtf16.toString();"))
+        .expect("emit should work");
+    let runtime = artifact.runtime().expect("the program links R");
+    let utf16 = |text: &str| {
+        text.encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect::<Vec<_>>()
+    };
+    let contains = |haystack: &[u8], needle: &[u8]| {
+        haystack.windows(needle.len()).any(|window| window == needle)
+    };
+    let program_utf16 = data_segment_at(&artifact.bytes, 0);
+    let program_metadata = data_segment_at(&artifact.bytes, 1);
+    for text in [LITERAL, function.as_str()] {
+        assert!(contains(&program_utf16, &utf16(text)), "P pools `{text}`");
+        assert!(
+            !contains(&program_metadata, text.as_bytes()),
+            "P metadata must not duplicate `{text}`"
+        );
+    }
+    let runtime_utf16 = data_segment_at(runtime.bytes(), 0);
+    let runtime_static = runtime_virtual_static_image(runtime.bytes());
+    for text in [
+        "yield* iterator result must be object",
+        "yield* return method must be callable",
+    ] {
+        assert!(contains(&runtime_utf16, &utf16(text)), "R pools `{text}`");
+        assert!(
+            !contains(&runtime_static, text.as_bytes()),
+            "R static data must not duplicate `{text}`"
+        );
+    }
 }
 
 #[test]

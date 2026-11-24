@@ -15,7 +15,7 @@ pub(crate) struct RuntimeErrorMessage(RuntimeErrorMessageValue);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RuntimeErrorMessageValue {
     Catalog(&'static str),
-    CollectedSource(i64),
+    CollectedSource(PooledStringIndex),
 }
 
 macro_rules! runtime_error_message_catalog {
@@ -1281,6 +1281,13 @@ impl RuntimeErrorMessage {
             RuntimeErrorMessageValue::CollectedSource(_) => None,
         }
     }
+
+    pub(super) const fn collected_source_index(self) -> Option<PooledStringIndex> {
+        match self.0 {
+            RuntimeErrorMessageValue::Catalog(_) => None,
+            RuntimeErrorMessageValue::CollectedSource(index) => Some(index),
+        }
+    }
 }
 
 /// These owners define all source-dependent compiler-thrown messages. There is
@@ -1332,9 +1339,11 @@ impl StringPool {
             return;
         };
         self.intern_string(&text);
-        let payload = self.payload(&text);
+        let index = self
+            .pooled_string_index(&text)
+            .expect("interned source diagnostic has a pooled slot");
         self.source_runtime_error_messages
-            .insert(text.into_owned(), payload);
+            .insert(text.into_owned(), index);
     }
 
     /// Validate a source-owned diagnostic once, while the pool is immutable.
@@ -1347,7 +1356,7 @@ impl StringPool {
         let text = source.text().ok_or_else(|| {
             EmitError::unsupported("runtime error source does not carry an error message")
         })?;
-        let payload = self
+        let index = self
             .source_runtime_error_messages
             .get(text.as_ref())
             .copied()
@@ -1357,15 +1366,8 @@ impl StringPool {
                 ))
             })?;
         Ok(RuntimeErrorMessage(
-            RuntimeErrorMessageValue::CollectedSource(payload),
+            RuntimeErrorMessageValue::CollectedSource(index),
         ))
-    }
-
-    pub(crate) fn runtime_error_payload(&self, message: RuntimeErrorMessage) -> i64 {
-        match message.0 {
-            RuntimeErrorMessageValue::Catalog(text) => self.payload(text),
-            RuntimeErrorMessageValue::CollectedSource(payload) => payload,
-        }
     }
 
     pub(super) fn intern_runtime_error_catalog(&mut self) {

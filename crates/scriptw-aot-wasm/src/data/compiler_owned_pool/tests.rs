@@ -69,6 +69,28 @@ fn program_appendices_share_the_exact_immutable_prefix_storage() {
 }
 
 #[test]
+fn program_strings_grow_only_the_utf16_image() {
+    let prefix = freeze(prefix());
+    let collect = |literal: &str| {
+        CompilerOwnedPool::collect_program(
+            &prefix,
+            &script(&format!("let local = '{literal}'; local;")),
+            &BTreeMap::new(),
+        )
+        .unwrap()
+    };
+    let short = collect("a short program-local literal");
+    let long = collect(&"a long program-local literal ".repeat(64));
+    assert_eq!(short.pooled_string_count(), long.pooled_string_count());
+    assert!(long.program_utf16_bytes().len() > short.program_utf16_bytes().len());
+    assert_eq!(
+        long.program_metadata_bytes(),
+        short.program_metadata_bytes(),
+        "P metadata holds no encoding of its strings"
+    );
+}
+
+#[test]
 fn regexp_literals_and_static_constructors_copy_an_r_descriptor_once_into_p() {
     let mut prefix = prefix();
     let program = RegExpProgram::compile("a", "").unwrap();
@@ -160,7 +182,10 @@ fn shared_program_images_and_ordinals_match_fresh_collection_with_exact_utf16() 
                     shared.pooled_string_index(name).unwrap().ordinal(),
                     index.ordinal()
                 );
-                assert_eq!(shared.payload(name), fresh.payload(name));
+                assert_eq!(
+                    shared.pooled_utf16_for_test(name),
+                    fresh.pooled_utf16_for_test(name)
+                );
             }
         }
     }
