@@ -624,8 +624,9 @@ require_fixed_string_count "$engine_embedded_build" 'let module_cache = if host 
 require_fixed_string_count "$engine_embedded_build" 'build_cache::module_cache()' 1 'build-only module cache directory selection'
 engine_embedded_build_cache="crates/scriptw-engine/src/embedded_runtime/build_cache.rs"
 require_file "$engine_embedded_build_cache"
-require_fixed_string_count "$engine_embedded_build_cache" 'crate::cache::module_cache()' 1 'unset build override retains the ordinary module cache'
-require_fixed_string_count "$engine_embedded_build_cache" 'crate::cache::module_cache_at(' 1 'override reuses the existing bounded module cache owner'
+require_fixed_string_count "$engine_embedded_build_cache" 'unwrap_or_else(crate::cache::build_module_cache_directory)' 1 'unset build override retains the build-only Wasmtime module cache directory'
+require_fixed_string_count "$engine_embedded_build_cache" 'crate::cache::prune_directory_to_limit(&directory, limit_bytes)?;' 1 'the producer enforces the shared bound when it opens its cache'
+require_fixed_string_count crates/scriptw-engine/src/cache.rs 'CacheConfig' 0 'the product cache module opens no Wasmtime module cache'
 require_fixed_string_count "$engine_embedded_build_cache" 'crate::cache::module_cache_limit_bytes()' 1 'build override preserves the existing budget'
 require_fixed_string_count "$engine_embedded_build_cache" 'SCRIPTW_BUILD_MODULE_CACHE_DIR' 1 'one build-only cache directory override'
 require_fixed_string_count "$runtime_image_build" '"SCRIPTW_BUILD_MODULE_CACHE_DIR"' 1 'Cargo tracks build cache directory changes'

@@ -44,7 +44,11 @@ actual source, admission and execution observations decide the result.
 Each fresh pair has one recorded, unmeasured child warmup and seven measured
 fresh children by default. Scriptw retains a private bounded native disk cache
 within that receipt; raw native module/cache phases remain available, so this
-does not claim cold native compilation or OS page-cache eviction. Alternating
+does not claim cold native compilation or OS page-cache eviction. Since
+2026-11-24 a native-module hit maps its cache file
+([contract](runtime-byte-ownership.md#native-module-cache)) instead of
+decompressing it into private memory, so receipts from before and after that
+date differ in module-load time and in which pages are private. Alternating
 runtime order reduces a simple order bias without establishing statistical
 confidence.
 

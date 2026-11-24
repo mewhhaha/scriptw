@@ -71,6 +71,16 @@ and domain. New boundary examples report those separately from the mandatory
 `executable_sha256`. The ordinary six benchmark harness files remain unchanged;
 nondefault cache-image cohorts must not be merged with their default reports.
 
+The native-module tier is not keyed by `CompilerCacheIdentity`. Its key is the
+exact Wasm and the Engine's precompile compatibility hash, whose module version
+carries the native compiler fingerprint
+([layout and trust](runtime-byte-ownership.md#native-module-cache)), so a
+Scriptw source edit that emits the same Wasm for the same native compiler
+reuses the entry. The tiers under the cache root are
+`cranelift-functions-v1`, `native-modules-v1`, `program-wasm-v1` and the
+build-only `wasmtime-modules-v1`. None of them is listed when a process opens
+or reads it; each is listed and bounded by the processes that insert.
+
 Runtime profiles additionally report R and P module loading separately. A P
 cache hit is not evidence of an R hit. Optional embedded-image spans cover
 manifest/digest admission, the once-per-profile proof of the image's range of

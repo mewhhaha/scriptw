@@ -47,6 +47,16 @@ unchanged. Cargo now watches `SCRIPTW_MODULE_CACHE_LIMIT_BYTES` as well as the
 existing cache inputs. Explicit target selection and serial native compilation
 remain unchanged.
 
+Since 2026-11-24 the producer is the only user of that Wasmtime cache
+directory (`wasmtime-modules-v1`): product Engines map whole modules from
+`native-modules-v1`
+([contract](runtime-byte-ownership.md#native-module-cache)). The producer's
+directory keeps the module budget for itself, is listed and pruned when the
+producer opens it, is cleared by `scriptw cache prune` and is reported by
+`scriptw cache status` as `build-module-cache`. Entries that product
+processes wrote there before that date are never read again and age out under
+the same bound.
+
 Meaningful controls compare direct precompile with cold and warm cached images,
 check actual cache counters, execute both in a Fast product Engine, and require
 misses plus correct execution after raw Wasm, allocator or optimization changes.

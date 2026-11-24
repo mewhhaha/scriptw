@@ -2,13 +2,13 @@ use std::borrow::Cow;
 use std::cmp::Reverse;
 use std::ffi::OsString;
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::SystemTime;
 
-use wasmtime::{Cache, CacheConfig, CacheStore};
+use wasmtime::CacheStore;
 
 #[path = "cache/native.rs"]
 mod native;
@@ -56,7 +56,8 @@ pub(crate) fn function_cache_limit_bytes() -> u64 {
     *LIMIT.get_or_init(|| tier_limit_bytes(FUNCTION_CACHE_LIMIT_ENV, cache_limit_bytes()))
 }
 
-/// Budget for the Wasmtime native-module tier.
+/// Budget for the native-module tier, and separately for the build-only
+/// Wasmtime module cache.
 pub(crate) fn module_cache_limit_bytes() -> u64 {
     static LIMIT: OnceLock<u64> = OnceLock::new();
     *LIMIT.get_or_init(|| tier_limit_bytes(MODULE_CACHE_LIMIT_ENV, cache_limit_bytes() / 2))
@@ -89,7 +90,11 @@ fn parse_cache_limit(raw: Option<&str>) -> u64 {
 }
 
 const FUNCTION_CACHE_FORMAT: &str = "cranelift-functions-v1";
-const MODULE_CACHE_DIR: &str = "wasmtime-modules-v1";
+/// Whole native modules, mapped by the product (`NativeModuleCache`).
+const NATIVE_MODULE_CACHE_DIR: &str = "native-modules-v1";
+/// Wasmtime's own compressed module cache. Only the Cargo runtime-image
+/// producer still configures it; no product Engine does.
+const BUILD_MODULE_CACHE_DIR: &str = "wasmtime-modules-v1";
 const PROGRAM_CACHE_DIR: &str = "program-wasm-v1";
 
 // A process can own several cache instances for the same directory. Their
@@ -143,6 +148,7 @@ pub struct CacheDirectoryStatus {
 pub struct CacheStatus {
     pub function_cache: CacheDirectoryStatus,
     pub module_cache: CacheDirectoryStatus,
+    pub build_module_cache: CacheDirectoryStatus,
     pub program_cache: CacheDirectoryStatus,
     pub legacy_wasmtime_cache: CacheDirectoryStatus,
 }
@@ -155,11 +161,19 @@ pub struct CachePruneReport {
     pub legacy_files_removed: u64,
 }
 
+/// A flat, bounded directory of immutable entries named by their key.
+///
+/// Opening the store and reading from it never list the directory: a process
+/// whose lookups all hit pays for those entries only, however many others the
+/// directory holds. The size bound is enforced by writers. The first insert
+/// of a process observes the directory once (pruning it if it is over its
+/// limit, whoever grew it), and later inserts account for their own bytes.
 #[derive(Debug)]
 pub(crate) struct FunctionCache {
     directory: PathBuf,
     limit_bytes: u64,
-    current_bytes: AtomicU64,
+    /// Unset until this process has listed the directory.
+    observed_bytes: OnceLock<AtomicU64>,
     hits: AtomicU64,
     misses: AtomicU64,
     prune_lock: Mutex<()>,
@@ -168,16 +182,14 @@ pub(crate) struct FunctionCache {
 impl FunctionCache {
     pub(crate) fn new(directory: PathBuf, limit_bytes: u64) -> io::Result<Self> {
         fs::create_dir_all(&directory)?;
-        let cache = Self {
+        Ok(Self {
             directory,
             limit_bytes,
-            current_bytes: AtomicU64::new(0),
+            observed_bytes: OnceLock::new(),
             hits: AtomicU64::new(0),
             misses: AtomicU64::new(0),
             prune_lock: Mutex::new(()),
-        };
-        cache.prune_if_needed()?;
-        Ok(cache)
+        })
     }
 
     fn entry_path(&self, key: &[u8]) -> PathBuf {
@@ -202,8 +214,30 @@ impl FunctionCache {
             // replacement for observing the files that actually remain.
             CachePruneResult::Pruned => directory_usage(&self.directory)?.0,
         };
-        self.current_bytes.store(bytes, Ordering::Relaxed);
+        // Set and replaced only under `prune_lock`.
+        match self.observed_bytes.get() {
+            Some(observed) => observed.store(bytes, Ordering::Relaxed),
+            None => {
+                let _ = self.observed_bytes.set(AtomicU64::new(bytes));
+            }
+        }
         Ok(())
+    }
+
+    /// Opens an entry and marks it recently used, even on noatime mounts.
+    /// Failing to mark it must not lose an entry that can be read.
+    ///
+    /// Counts neither a hit nor a miss: a caller that maps the file instead
+    /// of reading it decides whether the entry was usable.
+    pub(crate) fn open(&self, key: &[u8]) -> io::Result<fs::File> {
+        let path = self.entry_path(key);
+        let file = fs::File::options()
+            .read(true)
+            .write(true)
+            .open(&path)
+            .or_else(|_| fs::File::open(&path))?;
+        let _ = file.set_modified(SystemTime::now());
+        Ok(file)
     }
 
     pub(crate) fn counters(&self) -> (u64, u64) {
@@ -229,8 +263,9 @@ impl FunctionCache {
         let path = self.entry_path(key);
         if let Ok(metadata) = path.metadata() {
             if fs::remove_file(path).is_ok() {
-                self.current_bytes
-                    .fetch_sub(metadata.len(), Ordering::Relaxed);
+                if let Some(observed) = self.observed_bytes.get() {
+                    observed.fetch_sub(metadata.len(), Ordering::Relaxed);
+                }
             }
         }
     }
@@ -238,15 +273,15 @@ impl FunctionCache {
 
 impl CacheStore for FunctionCache {
     fn get(&self, key: &[u8]) -> Option<Cow<'_, [u8]>> {
-        let path = self.entry_path(key);
-        match fs::read(&path) {
+        // Cranelift calls this trait method directly, so function and
+        // program hits both refresh their recency here.
+        let read = self.open(key).and_then(|mut file| {
+            let mut bytes = Vec::new();
+            file.read_to_end(&mut bytes)?;
+            Ok(bytes)
+        });
+        match read {
             Ok(bytes) => {
-                // Cranelift calls this trait method directly. Refresh both
-                // function and program cache hits even on noatime mounts;
-                // metadata failure must not discard the bytes already read.
-                if let Ok(file) = fs::File::options().write(true).open(&path) {
-                    let _ = file.set_modified(SystemTime::now());
-                }
                 self.hits.fetch_add(1, Ordering::Relaxed);
                 Some(Cow::Owned(bytes))
             }
@@ -263,18 +298,24 @@ impl CacheStore for FunctionCache {
         if insert_atomic(&path, &value, &NEXT_CACHE_TEMP).is_err() {
             return false;
         }
+        let Some(observed) = self.observed_bytes.get() else {
+            // This process's first insert. The listing includes the entry
+            // just published and enforces the limit against everything other
+            // processes left here.
+            return self.prune_if_needed().is_ok();
+        };
         let new_len = value.len() as u64;
         let retained = if new_len >= old_len {
-            self.current_bytes
+            observed
                 .fetch_add(new_len - old_len, Ordering::Relaxed)
                 .saturating_add(new_len - old_len)
         } else {
-            self.current_bytes
+            observed
                 .fetch_sub(old_len - new_len, Ordering::Relaxed)
                 .saturating_sub(old_len - new_len)
         };
-        // The common path is O(1). The directory walk only happens on startup
-        // and when the tracked total crosses the hard limit.
+        // The common path is O(1). The directory is listed on the first
+        // insert and when the tracked total crosses the hard limit.
         retained <= self.limit_bytes || self.prune_if_needed().is_ok()
     }
 }
@@ -283,34 +324,18 @@ pub(crate) fn function_cache_directory() -> PathBuf {
     scriptw_cache_root().join(FUNCTION_CACHE_FORMAT)
 }
 
-pub(crate) fn module_cache_directory() -> PathBuf {
-    scriptw_cache_root().join(MODULE_CACHE_DIR)
+pub(crate) fn native_module_cache_directory() -> PathBuf {
+    scriptw_cache_root().join(NATIVE_MODULE_CACHE_DIR)
+}
+
+/// Wasmtime's own compressed module cache, opened only by the Cargo
+/// runtime-image producer (`embedded_runtime/build_cache.rs`).
+pub(crate) fn build_module_cache_directory() -> PathBuf {
+    scriptw_cache_root().join(BUILD_MODULE_CACHE_DIR)
 }
 
 pub(crate) fn program_cache_directory() -> PathBuf {
     scriptw_cache_root().join(PROGRAM_CACHE_DIR)
-}
-
-pub(crate) fn module_cache() -> io::Result<Cache> {
-    module_cache_at(module_cache_directory(), module_cache_limit_bytes())
-}
-
-pub(crate) fn module_cache_at(directory: PathBuf, limit_bytes: u64) -> io::Result<Cache> {
-    fs::create_dir_all(&directory)?;
-    // Wasmtime prunes on a background worker. A short-lived Test262 case
-    // process can exit before that worker handles its update, so enforce the
-    // same bound synchronously whenever a process opens Scriptw's cache.
-    prune_directory_to_limit(&directory, limit_bytes)?;
-
-    let mut config = CacheConfig::new();
-    config
-        .with_directory(directory)
-        .with_files_total_size_soft_limit(limit_bytes)
-        .with_files_total_size_limit_percent_if_deleting(CACHE_PRUNE_PERCENT as u8)
-        .with_file_count_limit_percent_if_deleting(CACHE_PRUNE_PERCENT as u8)
-        // Ask the long-lived process worker to check after every update too.
-        .with_cleanup_interval(std::time::Duration::ZERO);
-    Cache::new(config).map_err(io::Error::other)
 }
 
 pub fn cache_status() -> io::Result<CacheStatus> {
@@ -320,7 +345,11 @@ pub fn cache_status() -> io::Result<CacheStatus> {
             Some(function_cache_limit_bytes()),
         )?,
         module_cache: directory_status(
-            &module_cache_directory(),
+            &native_module_cache_directory(),
+            Some(module_cache_limit_bytes()),
+        )?,
+        build_module_cache: directory_status(
+            &build_module_cache_directory(),
             Some(module_cache_limit_bytes()),
         )?,
         program_cache: directory_status(
@@ -333,16 +362,19 @@ pub fn cache_status() -> io::Result<CacheStatus> {
 
 pub fn prune_caches(include_legacy_wasmtime: bool) -> io::Result<CachePruneReport> {
     let function_path = function_cache_directory();
-    let module_path = module_cache_directory();
+    let module_path = native_module_cache_directory();
+    let build_module_path = build_module_cache_directory();
     let program_path = program_cache_directory();
     let function = remove_directory_contents(&function_path)?;
     let module = remove_directory_contents(&module_path)?;
+    let build_module = remove_directory_contents(&build_module_path)?;
     let program = remove_directory_contents(&program_path)?;
     // A long-lived embedder may invoke the reusable command entrypoint again
     // after pruning. Keep initialized cache objects usable without requiring a
     // process restart.
     fs::create_dir_all(function_path)?;
     fs::create_dir_all(module_path)?;
+    fs::create_dir_all(build_module_path)?;
     fs::create_dir_all(program_path)?;
     let legacy = if include_legacy_wasmtime {
         remove_directory_contents(&legacy_wasmtime_cache_directory())?
@@ -353,10 +385,12 @@ pub fn prune_caches(include_legacy_wasmtime: bool) -> io::Result<CachePruneRepor
         scriptw_bytes_removed: function
             .0
             .saturating_add(module.0)
+            .saturating_add(build_module.0)
             .saturating_add(program.0),
         scriptw_files_removed: function
             .1
             .saturating_add(module.1)
+            .saturating_add(build_module.1)
             .saturating_add(program.1),
         legacy_bytes_removed: legacy.0,
         legacy_files_removed: legacy.1,
@@ -420,12 +454,15 @@ fn directory_usage(path: &Path) -> io::Result<(u64, u64)> {
     Ok((bytes, files))
 }
 
-enum CachePruneResult {
+pub(crate) enum CachePruneResult {
     WithinLimit { observed_bytes: u64 },
     Pruned,
 }
 
-fn prune_directory_to_limit(path: &Path, limit_bytes: u64) -> io::Result<CachePruneResult> {
+pub(crate) fn prune_directory_to_limit(
+    path: &Path,
+    limit_bytes: u64,
+) -> io::Result<CachePruneResult> {
     let mut entries = cache_files(path)?;
     let total = entries.iter().map(|entry| entry.1).sum::<u64>();
     if total <= limit_bytes {
@@ -668,14 +705,27 @@ mod tests {
     }
 
     #[test]
-    fn module_cache_prunes_short_lived_process_growth_on_startup() {
-        let root = temp_cache("module-startup-prune");
+    fn opening_and_reading_an_over_limit_store_lists_nothing_until_an_insert() {
+        let root = temp_cache("lazy-observation");
         let _ = fs::remove_dir_all(&root);
-        fs::create_dir_all(&root).unwrap();
-        fs::write(root.join("older"), [1; 60]).unwrap();
-        fs::write(root.join("newer"), [2; 60]).unwrap();
+        let writer = FunctionCache::new(root.clone(), 1024).unwrap();
+        assert!(writer.insert(b"older", vec![1; 60]));
+        assert!(writer.insert(b"newer", vec![2; 60]));
 
-        let _cache = module_cache_at(root.clone(), 100).unwrap();
+        // Another process's view of the same directory, now over its limit.
+        let cache = FunctionCache::new(root.clone(), 100).unwrap();
+        assert_eq!(cache.get(b"older").as_deref(), Some(&[1; 60][..]));
+        assert!(cache.get(b"absent").is_none());
+        assert!(cache.contains(b"newer"));
+        assert!(cache.open(b"newer").is_ok());
+        // A listing would have recorded its total and pruned to 70 bytes.
+        assert!(cache.observed_bytes.get().is_none());
+        assert_eq!(directory_usage(&root).unwrap(), (120, 2));
+
+        // The first insert observes what every process left and enforces
+        // the bound.
+        assert!(cache.insert(b"mine", vec![3; 5]));
+        assert!(cache.observed_bytes.get().is_some());
         let (bytes, _) = directory_usage(&root).unwrap();
         assert!(bytes <= 70, "cache retained {bytes} bytes");
         let _ = fs::remove_dir_all(root);

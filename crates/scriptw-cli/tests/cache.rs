@@ -87,9 +87,11 @@ fn cache_identity_boundary_prunes_only_the_selected_scriptw_roots() {
     let scriptw_root = xdg_cache.join("scriptw");
     let function = reported_path(&status, "function-cache");
     let module = reported_path(&status, "module-cache");
+    let build_module = reported_path(&status, "build-module-cache");
     let program = reported_path(&status, "program-cache");
     let reported_wasmtime = reported_path(&status, "legacy-wasmtime-cache");
-    for path in [&function, &module, &program] {
+    assert_ne!(module, build_module);
+    for path in [&function, &module, &build_module, &program] {
         assert_eq!(path.parent(), Some(scriptw_root.as_path()));
     }
     assert_eq!(reported_wasmtime, xdg_cache.join("wasmtime"));
@@ -97,6 +99,7 @@ fn cache_identity_boundary_prunes_only_the_selected_scriptw_roots() {
     let scriptw_markers = [
         function.join("entry"),
         module.join("entry"),
+        build_module.join("entry"),
         program.join("entry"),
     ];
     for marker in &scriptw_markers {
@@ -104,7 +107,7 @@ fn cache_identity_boundary_prunes_only_the_selected_scriptw_roots() {
     }
 
     let prune = run_cache_command(&xdg_cache, &retired_override, &["prune"]);
-    assert!(prune.contains("scriptw-files-removed: 3"));
+    assert!(prune.contains("scriptw-files-removed: 4"));
     assert!(prune.contains("legacy-files-removed: 0"));
     assert!(prune.contains("legacy-wasmtime-cache: retained"));
     assert!(scriptw_markers.iter().all(|marker| !marker.exists()));

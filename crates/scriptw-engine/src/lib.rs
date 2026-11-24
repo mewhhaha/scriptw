@@ -34,6 +34,8 @@ mod compilation_profile;
 mod compiler_cache_identity;
 mod compiler_identity;
 mod compiler_inspection;
+#[path = "cache/native_module.rs"]
+mod native_modules;
 pub use compilation_profile::{
     ScriptCompilationProfile, WasmArtifactFootprint, WasmSectionFootprint,
 };
@@ -477,25 +479,30 @@ where
     })
 }
 
-/// Scriptw-owned Wasmtime whole-module cache. It is deliberately separate from
-/// Wasmtime's global default cache so Scriptw can enforce its 1GiB/70% bounds
-/// without changing another Wasmtime application's artifacts.
-fn wasmtime_module_cache() -> Option<wasmtime::Cache> {
-    static CACHE: OnceLock<Option<wasmtime::Cache>> = OnceLock::new();
+/// Scriptw-owned whole-module native cache. Product Engines configure no
+/// Wasmtime module cache; `compile_wasm_module` is the one place a product
+/// module is compiled, and it loads from and stores into this cache.
+fn native_module_cache() -> Option<&'static native_modules::NativeModuleCache> {
+    static CACHE: OnceLock<Option<native_modules::NativeModuleCache>> = OnceLock::new();
     CACHE
-        .get_or_init(|| match cache::module_cache() {
-            Ok(cache) => Some(cache),
-            Err(err) => {
-                if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
-                    eprintln!(
-                        "scriptw wasm trace: module cache unavailable, running \
-                         uncached: {err}"
-                    );
+        .get_or_init(|| {
+            match native_modules::NativeModuleCache::new(
+                cache::native_module_cache_directory(),
+                cache::module_cache_limit_bytes(),
+            ) {
+                Ok(cache) => Some(cache),
+                Err(err) => {
+                    if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
+                        eprintln!(
+                            "scriptw wasm trace: module cache unavailable, running \
+                             uncached: {err}"
+                        );
+                    }
+                    None
                 }
-                None
             }
         })
-        .clone()
+        .as_ref()
 }
 
 fn cranelift_function_cache() -> Option<Arc<cache::NativeFunctionCache>> {
@@ -1579,27 +1586,45 @@ fn compile_wasm_module(
     engine: &WasmtimeEngine,
     bytes: &[u8],
 ) -> Result<WasmtimeModule, EngineError> {
-    on_native_compilation_thread(compilation_jobs(), || WasmtimeModule::new(engine, bytes))?
-        .map_err(|err| {
-            let message = format!("wasmtime module validation failed: {err:#}");
-            // Cranelift's per-function limits are the one failure class whose
-            // message names neither the function nor its size. Attach the two
-            // index rankings, so the failure detail recorded by the Test262
-            // runner points at a specific code-section body.
-            //
-            // This says nothing about the `[origin:…]` prefix that detail also
-            // carries: that is a `scriptw-test262` `FailureOrigin` value, and
-            // the attribution is index-only precisely so it cannot perturb it
-            // (see `describe_largest_wasm_code_body`). The retry in
-            // `run_with_wasm_aot_inner` matches on the `Code for function is
-            // too large` substring, which this only ever appends to.
-            if message.contains(WASM_CODE_TOO_LARGE_MESSAGE) {
-                if let Some(attribution) = describe_largest_wasm_code_body(bytes) {
-                    return EngineError::new(format!("{message}; {attribution}"));
-                }
+    enum Failure {
+        CompilationThread(EngineError),
+        Wasmtime(wasmtime::Error),
+    }
+    let compile = || {
+        on_native_compilation_thread(compilation_jobs(), || WasmtimeModule::new(engine, bytes))
+            .map_err(Failure::CompilationThread)?
+            .map_err(Failure::Wasmtime)
+    };
+    // A cached module is mapped on the calling thread; only a miss needs the
+    // compiler's stack and workers.
+    match native_module_cache() {
+        Some(cache) => cache.load_or_compile(engine, bytes, compile),
+        None => compile(),
+    }
+    .map_err(|failure| {
+        let err = match failure {
+            Failure::CompilationThread(error) => return error,
+            Failure::Wasmtime(error) => error,
+        };
+        let message = format!("wasmtime module validation failed: {err:#}");
+        // Cranelift's per-function limits are the one failure class whose
+        // message names neither the function nor its size. Attach the two
+        // index rankings, so the failure detail recorded by the Test262
+        // runner points at a specific code-section body.
+        //
+        // This says nothing about the `[origin:…]` prefix that detail also
+        // carries: that is a `scriptw-test262` `FailureOrigin` value, and
+        // the attribution is index-only precisely so it cannot perturb it
+        // (see `describe_largest_wasm_code_body`). The retry in
+        // `run_with_wasm_aot_inner` matches on the `Code for function is
+        // too large` substring, which this only ever appends to.
+        if message.contains(WASM_CODE_TOO_LARGE_MESSAGE) {
+            if let Some(attribution) = describe_largest_wasm_code_body(bytes) {
+                return EngineError::new(format!("{message}; {attribution}"));
             }
-            EngineError::new(message)
-        })
+        }
+        EngineError::new(message)
+    })
 }
 
 fn memory_cached_wasm_module(
@@ -1717,7 +1742,8 @@ fn product_wasmtime_config(
     let mut config =
         wasmtime_config::base_config(mode, wasmtime::WasmBacktraceDetails::Environment);
     config.parallel_compilation(CompilationJobs::current().parallel());
-    config.cache(wasmtime_module_cache());
+    // Whole modules are cached by `compile_wasm_module`, not by Wasmtime.
+    config.cache(None);
     if let Some(function_cache) = cranelift_function_cache() {
         config
             .enable_incremental_compilation(function_cache)
@@ -4126,7 +4152,7 @@ impl Engine {
             .flatten()
             .map(|cache| cache.counters());
         let module_cache_before =
-            wasmtime_module_cache().map(|cache| (cache.cache_hits(), cache.cache_misses()));
+            native_module_cache().map(native_modules::NativeModuleCache::counters);
         // Agent workers share their group's engine, so their runtime module
         // must be compiled for the mode that engine was built for.
         let mut native_mode = agent_execution
@@ -4214,7 +4240,7 @@ impl Engine {
                 }
             }
             let module_cache_after =
-                wasmtime_module_cache().map(|cache| (cache.cache_hits(), cache.cache_misses()));
+                native_module_cache().map(native_modules::NativeModuleCache::counters);
             match (module_cache_before, module_cache_after) {
                 (Some(before), Some(after)) => eprintln!(
                     "scriptw wasm trace: module-cache hits={} misses={} during {:?}",

@@ -453,6 +453,32 @@ Test: `embedded_runtime::native_backing::tests` in `scriptw-engine` runs code
 and reads a data segment from a module mapped at a nonzero offset of a larger
 file, and checks the rejected ranges.
 
+## Type registry hashing
+
+`TypeRegistryInner::hash_consing_map` (`src/runtime/type_registry.rs`) is keyed
+by `RecGroupHasher`, a multiply-and-add word hasher in the style of
+`rustc-hash` 2, instead of the standard library's keyed SipHash-1-3, and
+`register_module_types` reserves the map for a module's rec groups before it
+inserts them. Every rec group of every loaded module is hashed by its complete
+structural definition when the module is registered, deserialized modules
+included, so this hashing is paid by every process start. Type identity is
+unchanged: the map still compares complete keys.
+
+The hasher is not keyed. A module whose type section is built to collide can
+make registering its own rec groups quadratic; upstream's SipHash prevents
+that. Scriptw only loads modules its own compiler emitted, so it gives this up.
+An embedder that loads untrusted Wasm through this vendored copy does not have
+that protection.
+
+Before the patch, registering the types of the runtime and program modules was
+10.1M of the 41.1M Callgrind instructions of a warm `scriptw run` of a
+print-only program (2026-11-24): 6.5M in SipHash and the derived `Hash`
+implementations feeding it, and 2.0M rehashing registered groups while the
+map grew. The measured result is in
+[current work](../../docs/rust-rewrite/current-inventory.md) under process
+startup. No test is added for the hasher: the engine suites register and
+canonicalize every module they load through it.
+
 Three upstream test feature guards are corrected so the collector control can
 compile with the product's narrow feature set plus `wat`: Linux copy-on-write
 tests in `src/runtime/vm/cow.rs` require `pooling-allocator`, and the hash-key

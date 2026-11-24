@@ -5,6 +5,12 @@
 //! No native constructor accepts a caller slice/path/cache blob, and no Module
 //! is retained here. Native code is mapped from the running executable only.
 
+// The producer's environment-selected opener is build-script-only; its
+// bounded opener is tested with the producer's compiler.
+#[cfg(test)]
+#[allow(dead_code)]
+#[path = "embedded_runtime/build_cache.rs"]
+mod build_cache;
 #[cfg(test)]
 #[path = "embedded_runtime/compile.rs"]
 mod build_compile;

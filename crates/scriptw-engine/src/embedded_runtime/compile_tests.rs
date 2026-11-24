@@ -168,3 +168,18 @@ fn native_dependency_identity_invalidates_modules_and_rejects_incompatible_image
     assert!(unsafe { Module::deserialize(&current_engine, &first) }.is_err());
     assert!(unsafe { Module::deserialize(&current_engine, &second) }.is_ok());
 }
+
+#[test]
+fn opening_the_build_module_cache_prunes_what_earlier_producers_left() {
+    let scratch = Scratch::new("startup-prune");
+    std::fs::create_dir_all(&scratch.0).unwrap();
+    std::fs::write(scratch.0.join("older"), [1; 60]).unwrap();
+    std::fs::write(scratch.0.join("newer"), [2; 60]).unwrap();
+
+    let _cache = super::super::build_cache::module_cache_at(scratch.0.clone(), 100).unwrap();
+    let retained: u64 = std::fs::read_dir(&scratch.0)
+        .unwrap()
+        .map(|entry| entry.unwrap().metadata().unwrap().len())
+        .sum();
+    assert!(retained <= 70, "cache retained {retained} bytes");
+}

@@ -165,8 +165,9 @@ clean pages are the executable's page-cache pages, shared with every process
 running the same file, so untouched code stays unfaulted and touched code is
 shared rather than private. Only the proved range is retained, at most once
 per two fixed Cargo source profiles; no Engine, Module, Store or JavaScript
-Realm is retained by this owner. The normal bounded module cache retains its
-existing policy.
+Realm is retained by this owner. Modules compiled at run time are a separate
+owner with a different trust rule: see
+[native module cache](#native-module-cache).
 
 Admission is by origin and pairing, not by re-hashing at every start:
 
@@ -214,6 +215,60 @@ per process and PSS splits it, so compare PSS or USS across processes.
 RSS, anonymous memory and reclaimable file-cache observations must remain
 separate. Native perf-map text hashing touches every code page, so map captures
 with that hashing enabled cannot establish ordinary lazy-page residency.
+
+
+## Native module cache
+
+A module compiled at run time (a program P, or a runtime that is not the Cargo
+image) is stored in `native-modules-v1` in the cache directory as the bytes
+`Module::serialize` produced, one file per key, and a later process maps that
+file with `Module::deserialize_open_file` instead of compiling
+(`cache::NativeModuleCache`, called only from `compile_wasm_module`). Product
+Engines configure no Wasmtime module cache. Wasmtime's zstd-compressed cache
+(`wasmtime-modules-v1`) is now opened only by the Cargo runtime-image producer.
+
+- **Key.** SHA-256 over a domain string, the SHA-256 of the exact Wasm bytes
+  and Wasmtime's precompile compatibility hash of the Engine: target, ISA and
+  compiler flags, tunables, features and the module version, which carries the
+  native compiler fingerprint. The key selects a file. It admits nothing.
+- **Admission.** Wasmtime checks the image's recorded target, flags, tunables,
+  features and module version against the loading Engine before using it. An
+  entry that is absent, empty, truncated, not an image or another Engine's
+  image is a miss: the module is compiled and the entry replaced. The bytes
+  after that header are not verified. Wasmtime's cache did not verify them
+  either, but a damaged zstd frame usually failed to decode, and a damaged
+  mapped image has no such accident to rely on.
+- **Trust.** The cache directory was already trusted native-code storage and
+  still is. What is new is that the file is the code's backing store while a
+  process runs it: the mapping is private and copy-on-write, and Linux shows
+  later writes to a file through the untouched pages of such a mapping. So an
+  entry is never written in place. A writer fills an exclusively created
+  temporary file and renames it over the key; pruning unlinks. Both leave
+  every existing mapping on the inode it opened, and a concurrent reader sees
+  the old complete file, the new complete file or no file. Anything else that
+  truncates or rewrites an entry in place can crash or corrupt processes
+  running it; `scriptw cache prune` only unlinks.
+- **Durability.** Entries are not synced before the rename. After a power loss
+  a filesystem may keep the name with missing data. An empty or short file is
+  a miss; a full-length file with a lost middle is not detected. Run
+  `scriptw cache prune` after an unclean shutdown if that matters.
+- **Bounds.** The tier keeps the module budget
+  (`SCRIPTW_MODULE_CACHE_LIMIT_BYTES`, by default half the total) and the
+  prune-to-70% policy, ordered by last use: a hit refreshes the entry's
+  modification time. Opening the cache and loading from it never list the
+  directory. A process lists it, and prunes it if it is over the limit, on its
+  first insert and again when its own inserts cross the limit, so a process
+  whose lookups all hit never pays for the directory's size and a directory
+  only read from is never pruned. The function and program tiers follow the
+  same rule.
+- **Sharing.** Clean pages of an entry are page-cache pages shared by every
+  process that maps it, and untouched code is never read. On a cache directory
+  mounted `noexec` the mapping cannot be made executable; the entry is then
+  read into private memory, as every hit was before.
+
+Unix file semantics are assumed. On a host where a mapped file cannot be
+renamed over or unlinked, replacing or pruning an entry that some process maps
+fails and the entry stays.
 
 ## Runtime string bootstrap
 

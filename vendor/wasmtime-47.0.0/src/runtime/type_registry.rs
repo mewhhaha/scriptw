@@ -15,7 +15,7 @@ use core::iter;
 use core::{
     borrow::Borrow,
     fmt::{self, Debug},
-    hash::{Hash, Hasher},
+    hash::{BuildHasherDefault, Hash, Hasher},
     ops::Range,
     sync::atomic::{
         AtomicBool, AtomicUsize,
@@ -630,6 +630,85 @@ impl RecGroupEntry {
     }
 }
 
+/// Scriptw patch: the hasher of the registry's hash-consing map.
+///
+/// Every rec group of every loaded module is hashed at least once when the
+/// module is registered, including a module deserialized from native code,
+/// and a rec group's key is its complete structural definition. With the
+/// standard library's keyed SipHash-1-3 that hashing was about a seventh of
+/// the instructions of a warm Scriptw process start. This is the
+/// multiply-and-add word hash of `rustc-hash` 2: each integer the derived
+/// `Hash` implementations write is one addition and one multiplication.
+///
+/// It is not keyed, so it does not resist chosen-collision input: a module
+/// whose type section is built to collide can make registering its own rec
+/// groups quadratic. Equality is unaffected (the map still compares complete
+/// keys), so the result is slower registration, never a wrong type identity.
+#[derive(Default)]
+struct RecGroupHasher {
+    hash: u64,
+}
+
+impl RecGroupHasher {
+    const MULTIPLIER: u64 = 0xf135_7aea_2e62_a9c5;
+
+    #[inline]
+    fn add(&mut self, word: u64) {
+        self.hash = self.hash.wrapping_add(word).wrapping_mul(Self::MULTIPLIER);
+    }
+}
+
+impl Hasher for RecGroupHasher {
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        // Length first, so that a prefix and its zero-padded extension differ.
+        self.add(bytes.len() as u64);
+        let mut chunks = bytes.chunks_exact(8);
+        for chunk in &mut chunks {
+            self.add(u64::from_le_bytes(chunk.try_into().unwrap()));
+        }
+        let rest = chunks.remainder();
+        if !rest.is_empty() {
+            let mut last = [0; 8];
+            last[..rest.len()].copy_from_slice(rest);
+            self.add(u64::from_le_bytes(last));
+        }
+    }
+
+    #[inline]
+    fn write_u8(&mut self, value: u8) {
+        self.add(u64::from(value));
+    }
+
+    #[inline]
+    fn write_u16(&mut self, value: u16) {
+        self.add(u64::from(value));
+    }
+
+    #[inline]
+    fn write_u32(&mut self, value: u32) {
+        self.add(u64::from(value));
+    }
+
+    #[inline]
+    fn write_u64(&mut self, value: u64) {
+        self.add(value);
+    }
+
+    #[inline]
+    fn write_usize(&mut self, value: usize) {
+        self.add(value as u64);
+    }
+
+    #[inline]
+    fn finish(&self) -> u64 {
+        // The multiplication leaves the low bits weakest, and the table
+        // takes its bucket index from them and its control byte from the top
+        // seven: rotate the strong high bits into both.
+        self.hash.rotate_left(26)
+    }
+}
+
 #[derive(Debug, Default)]
 struct TypeRegistryInner {
     // A hash map from a canonicalized-for-hash-consing rec group to its
@@ -639,7 +718,10 @@ struct TypeRegistryInner {
     // registered. Before registering new rec groups, we first check this map to
     // see if we've already registered an identical rec group that we should
     // reuse instead.
-    hash_consing_map: TryHashSet<RecGroupEntry>,
+    //
+    // Scriptw patch: keyed by `RecGroupHasher` instead of the standard
+    // library's SipHash. See its documentation for what that gives up.
+    hash_consing_map: TryHashSet<RecGroupEntry, BuildHasherDefault<RecGroupHasher>>,
 
     // A map from `VMSharedTypeIndex::bits()` to the type index's associated
     // Wasm type.
@@ -773,6 +855,10 @@ impl TypeRegistryInner {
         trace_info: &mut TryPrimaryMap<ModuleInternedTypeIndex, Option<TraceInfo>>,
     ) -> Result<(), OutOfMemory> {
         entries.reserve(types.rec_groups().len())?;
+        // Scriptw patch: one table growth for the module instead of a
+        // doubling, each rehashing every registered rec group, every time
+        // the map fills while this module's groups are inserted.
+        self.hash_consing_map.reserve(types.rec_groups().len())?;
         map.reserve(types.wasm_types().len())?;
         trace_info.reserve(types.wasm_types().len())?;
 

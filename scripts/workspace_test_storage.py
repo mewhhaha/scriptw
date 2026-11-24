@@ -9,7 +9,12 @@ from filesystem_probe import probe_filesystem
 
 BUILD_RESERVE_BYTES = 2 * 1024**3
 NATIVE_SCRATCH_BYTES = 256 * 1024**2
-CACHE_TIERS = ("cranelift-functions-v1", "wasmtime-modules-v1", "program-wasm-v1")
+CACHE_TIERS = (
+    "cranelift-functions-v1",
+    "native-modules-v1",
+    "wasmtime-modules-v1",
+    "program-wasm-v1",
+)
 
 
 def writable_paths(target_directory, output_directory, environment):

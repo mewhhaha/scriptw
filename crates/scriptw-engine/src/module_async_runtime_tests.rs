@@ -482,12 +482,14 @@ impl ModuleFixture {
         let (paused, root) = paused_before_entry_evaluation(&original.bytes);
         let bytes = with_private_exports(&paused, root);
         let engine = shared_wasm_engine().unwrap();
-        let runtime = WasmtimeModule::new(
+        // Through the product path, so the raw runtime is compiled once per
+        // native-module cache instead of once per fixture.
+        let runtime = crate::compile_wasm_module(
             &engine,
             original.runtime.as_ref().expect("linked runtime").0.bytes(),
         )
         .unwrap();
-        let module = WasmtimeModule::new(&engine, bytes).unwrap();
+        let module = crate::compile_wasm_module(&engine, &bytes).unwrap();
         Self {
             engine,
             runtime,
@@ -895,7 +897,7 @@ fn graphless_second_program_cannot_replace_a_queued_module_body_hook_owner() {
             artifact.runtime.as_ref().unwrap().key(),
             fixture.runtime_key
         );
-        let second = WasmtimeModule::new(&fixture.engine, &artifact.bytes).unwrap();
+        let second = crate::compile_wasm_module(&fixture.engine, &artifact.bytes).unwrap();
         for enter_main in [false, true] {
             let mut runtime = fixture.instantiate();
             runtime.store.data_mut().source_allowed = true;
@@ -962,7 +964,7 @@ fn rejected_module_body_retains_its_program_when_a_graphless_program_drains_jobs
             artifact.runtime.as_ref().unwrap().key(),
             fixture.runtime_key
         );
-        let second = WasmtimeModule::new(&fixture.engine, &artifact.bytes).unwrap();
+        let second = crate::compile_wasm_module(&fixture.engine, &artifact.bytes).unwrap();
         let mut runtime = fixture.instantiate();
         runtime.store.data_mut().source_allowed = true;
         let record = runtime.record;

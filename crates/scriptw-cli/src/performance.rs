@@ -549,6 +549,7 @@ fn capture_identity(options: &Options, root: &Path) -> Result<Identity, String> 
     let cache_paths_and_limits = [
         ("function", cache.function_cache),
         ("module", cache.module_cache),
+        ("build-module", cache.build_module_cache),
         ("program", cache.program_cache),
         ("legacy-wasmtime", cache.legacy_wasmtime_cache),
     ]

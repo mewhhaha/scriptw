@@ -70,7 +70,7 @@ class StorageAdmissionTests(unittest.TestCase):
         self.assertEqual(len(result['filesystems']), 2)
         self.assertTrue(all(row['required_bytes'] == storage.NATIVE_SCRATCH_BYTES
                             for row in result['filesystems']))
-        self.assertEqual(sum(len(row['paths']) for row in result['filesystems']), 7)
+        self.assertEqual(sum(len(row['paths']) for row in result['filesystems']), 8)
 
     def test_active_and_scheduled_processes_need_concurrent_scratch_headroom(self):
         self.assertFalse(self.snapshot(temporary_free=900 * 1024**2,

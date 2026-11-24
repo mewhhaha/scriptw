@@ -970,6 +970,7 @@ fn handle_cache_command(args: Vec<String>) -> Result<(), String> {
             let status = cache_status().map_err(|err| format!("cache status failed: {err}"))?;
             print_cache_directory("function-cache", &status.function_cache);
             print_cache_directory("module-cache", &status.module_cache);
+            print_cache_directory("build-module-cache", &status.build_module_cache);
             print_cache_directory("program-cache", &status.program_cache);
             print_cache_directory("legacy-wasmtime-cache", &status.legacy_wasmtime_cache);
             println!(
@@ -978,6 +979,7 @@ fn handle_cache_command(args: Vec<String>) -> Result<(), String> {
                     .function_cache
                     .bytes
                     .saturating_add(status.module_cache.bytes)
+                    .saturating_add(status.build_module_cache.bytes)
                     .saturating_add(status.program_cache.bytes)
             );
             // Derived from the reported per-tier limits rather than hardcoded,
@@ -988,6 +990,7 @@ fn handle_cache_command(args: Vec<String>) -> Result<(), String> {
                 [
                     &status.function_cache,
                     &status.module_cache,
+                    &status.build_module_cache,
                     &status.program_cache,
                 ]
                 .into_iter()

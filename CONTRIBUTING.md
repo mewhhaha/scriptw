@@ -790,6 +790,16 @@ compiler-identity`, Test262 and benchmark reports) hashes it, except benchmark
 host reports run with `SCRIPTW_BENCHMARK_REPORT_IDENTITY=build-source`, which
 carry a null `executable_sha256` and leave the executable check to the driver.
 
+Whole native modules compiled at run time are stored uncompressed in
+`native-modules-v1` under the cache root and mapped by later processes
+([contract](docs/rust-rewrite/contracts/runtime-byte-ownership.md#native-module-cache)).
+Never truncate or rewrite a cache entry in place: a running process may be
+executing from it. Remove entries with `scriptw cache prune` or by unlinking.
+No tier is listed when a process opens or reads it; a process that inserts
+lists the tier once and prunes it if it is over its limit. `scriptw cache
+status` reports the build-only Wasmtime module cache separately, as
+`build-module-cache`.
+
 Give an experimental source copy its own `CARGO_TARGET_DIR`, or keep the copy
 outside `target/`. Cargo identifies workspace packages by their path relative
 to the workspace root and records sources under the target directory relative
@@ -803,7 +813,9 @@ For footprint comparisons, record the native backing mode from the load trace
 (`SCRIPTW_WASM_TRACE=1`: `backing: executable-mapping` or `backing: copied`)
 alongside image digests. On Linux the Cargo runtime image is mapped from the
 running executable, whatever `SCRIPTW_CACHE_DIR` is; without procfs it is
-copied into anonymous memory, private to each process. An executable run from
+copied into anonymous memory, private to each process. A cached program
+module is mapped from its file in `SCRIPTW_CACHE_DIR`, or read into private
+memory when that directory is mounted `noexec`. An executable run from
 tmpfs keeps its pages in memory either way. Compare PSS or USS only across
 matching backing modes and executable filesystems.
 
