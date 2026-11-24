@@ -136,9 +136,25 @@ accepts `--case <file.js>`.
   275.4 MB (the host from 212.5 to 272.6 MB), because both native images are
   stored raw.
 
+  Since 2026-11-24 a warm start no longer lists any cache directory, maps the
+  cached program module from `native-modules-v1` instead of zstd-decoding it
+  ([contract](contracts/runtime-byte-ownership.md#native-module-cache)), and
+  hashes rec groups with an unkeyed word hasher in the vendored type registry.
+  Warm `scriptw run` of the print-only program, same binary pair and method
+  (51 interleaved processes each, pinned to one CPU while a Test262 run used
+  the others; median, quartiles): 10.5 ms (10.3 to 10.7) → 6.5 ms (6.3 to
+  6.6) with a 320-entry function cache, and 23.3 ms (22.8 to 24.0) → 6.5 ms
+  (6.4 to 6.8) with 7,800 function, 640 program and 560 module entries: the
+  cost no longer depends on what the cache holds. System calls 847 → 370 and
+  9,647 → 370 (`statx` 353 and 9,044 → 12, `getdents64` 10 and 33 → 0,
+  threads created 4 → 1); Callgrind instructions 41.1M → 24.8M and 56.3M →
+  24.8M. These rounds are not comparable with the 27 ms above, which was
+  taken under a different load.
+
   What remains: rerun the panel on a quiet machine with its own method (the
-  figures above are not the panel's). Engine construction is now the largest
-  part of a warm `scriptw run`, about 14 ms of 27. The two raw Wasm
+  figures above are not the panel's). Of the 24.8M instructions of a warm
+  start, 9.4M are SHA-256 as Valgrind runs it, without the CPU's SHA
+  extension, and 4.6M register the two modules' types. The two raw Wasm
   packages (38 MiB each) are the next candidates if the executable's size
   matters more than its page-cache sharing. Keep the rule that no
   pre-existing, cache-directory or digest-selected native file is admitted.

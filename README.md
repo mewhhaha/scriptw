@@ -133,7 +133,9 @@ image take about 290 ms before a 1 ms program. Timings ran under heavy machine l
 run both costs have left the product path: caches are keyed by the linker build ID, and the runtime
 image is mapped from the executable instead of being decoded and hashed in every process. On the
 same loaded machine a warm `scriptw run` went from 114 to 27 ms and the host takes 13 ms, against
-32 ms for Node 24 in the same rounds; the panel has not been rerun.
+32 ms for Node 24 in the same rounds; the panel has not been rerun. Since 2026-11-24 a warm start maps
+its cached program module and lists no cache directory: in separate rounds on one pinned CPU it went
+from 10.5 to 6.5 ms, and from 23.3 to 6.5 ms with a cache of 9,000 entries.
 [Method, kernels and limits](docs/rust-rewrite/benchmarks.md#process-density) ·
 [data](docs/rust-rewrite/process-density-current.json).
 
