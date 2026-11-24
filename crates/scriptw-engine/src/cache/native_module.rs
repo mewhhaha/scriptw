@@ -6,7 +6,7 @@
 //! image itself: a hit maps the file, and its clean pages are page-cache
 //! pages shared by every process that maps the same entry.
 
-use crate::cache::FunctionCache;
+use crate::cache::{EntryPublication, FunctionCache};
 use sha2::{Digest, Sha256};
 use std::hash::{Hash, Hasher};
 use std::io;
@@ -26,7 +26,8 @@ pub(crate) struct NativeModuleCache {
 impl NativeModuleCache {
     pub(crate) fn new(directory: PathBuf, limit_bytes: u64) -> io::Result<Self> {
         Ok(Self {
-            store: FunctionCache::new(directory, limit_bytes)?,
+            store: FunctionCache::new(directory, limit_bytes)?
+                .with_publication(EntryPublication::SyncedBeforeRename),
             hits: AtomicU64::new(0),
             misses: AtomicU64::new(0),
         })

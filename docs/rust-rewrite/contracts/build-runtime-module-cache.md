@@ -54,8 +54,9 @@ directory (`wasmtime-modules-v1`): product Engines map whole modules from
 directory keeps the module budget for itself, is listed and pruned when the
 producer opens it, is cleared by `scriptw cache prune` and is reported by
 `scriptw cache status` as `build-module-cache`. Entries that product
-processes wrote there before that date are never read again and age out under
-the same bound.
+processes wrote there before that date are never read again. Only the producer
+lists or prunes that directory, so on a machine that never builds Scriptw they
+stay, within that budget, until `scriptw cache prune`.
 
 Meaningful controls compare direct precompile with cold and warm cached images,
 check actual cache counters, execute both in a Fast product Engine, and require

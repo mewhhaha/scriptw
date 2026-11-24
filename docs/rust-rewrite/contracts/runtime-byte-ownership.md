@@ -248,10 +248,13 @@ Engines configure no Wasmtime module cache. Wasmtime's zstd-compressed cache
   the old complete file, the new complete file or no file. Anything else that
   truncates or rewrites an entry in place can crash or corrupt processes
   running it; `scriptw cache prune` only unlinks.
-- **Durability.** Entries are not synced before the rename. After a power loss
-  a filesystem may keep the name with missing data. An empty or short file is
-  a miss; a full-length file with a lost middle is not detected. Run
-  `scriptw cache prune` after an unclean shutdown if that matters.
+- **Durability.** An entry's bytes are synced before the rename that names
+  it, so a power loss leaves the old name, no name or a whole entry, never a
+  torn one. The image is mapped and executed without a digest: a full-length
+  entry whose middle was damaged after publication (by anything other than
+  Scriptw) is not detected, and every later run of that program fails until
+  `scriptw cache prune` removes it. An empty, short or foreign file is a miss
+  and is rewritten.
 - **Bounds.** The tier keeps the module budget
   (`SCRIPTW_MODULE_CACHE_LIMIT_BYTES`, by default half the total) and the
   prune-to-70% policy, ordered by last use: a hit refreshes the entry's

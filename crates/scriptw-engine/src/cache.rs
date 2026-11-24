@@ -101,7 +101,25 @@ const PROGRAM_CACHE_DIR: &str = "program-wasm-v1";
 // temporary-file identities must not restart at zero independently.
 static NEXT_CACHE_TEMP: AtomicU64 = AtomicU64::new(0);
 
-fn insert_atomic(path: &Path, value: &[u8], next: &AtomicU64) -> io::Result<()> {
+/// When an entry's bytes reach the disk relative to its name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EntryPublication {
+    /// The name may survive a power loss without the bytes. A torn entry
+    /// is at worst bad input to a reader that validates what it reads.
+    Unsynced,
+    /// The bytes are synced before the rename, so a name never points at
+    /// a torn file. Entries that are mapped and executed without a digest
+    /// (native modules) need this: a lost middle would otherwise fail every
+    /// later run of that program instead of once.
+    SyncedBeforeRename,
+}
+
+fn insert_atomic(
+    path: &Path,
+    value: &[u8],
+    publication: EntryPublication,
+    next: &AtomicU64,
+) -> io::Result<()> {
     let (temp, mut file) = loop {
         let suffix = next
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
@@ -123,10 +141,13 @@ fn insert_atomic(path: &Path, value: &[u8], next: &AtomicU64) -> io::Result<()> 
             Err(error) => return Err(error),
         }
     };
-    let written = file.write_all(value);
+    let written = file.write_all(value).and_then(|()| match publication {
+        EntryPublication::Unsynced => Ok(()),
+        EntryPublication::SyncedBeforeRename => file.sync_data(),
+    });
     // Close before rename/removal, including on Windows. Publication is one
     // rename only after every byte has been written to our exclusively owned
-    // temporary file. Cache entries do not promise power-loss durability.
+    // temporary file (and, when synced, has reached the disk).
     drop(file);
     let result = written.and_then(|()| fs::rename(&temp, path));
     if result.is_err() {
@@ -172,6 +193,7 @@ pub struct CachePruneReport {
 pub(crate) struct FunctionCache {
     directory: PathBuf,
     limit_bytes: u64,
+    publication: EntryPublication,
     /// Unset until this process has listed the directory.
     observed_bytes: OnceLock<AtomicU64>,
     hits: AtomicU64,
@@ -185,11 +207,18 @@ impl FunctionCache {
         Ok(Self {
             directory,
             limit_bytes,
+            publication: EntryPublication::Unsynced,
             observed_bytes: OnceLock::new(),
             hits: AtomicU64::new(0),
             misses: AtomicU64::new(0),
             prune_lock: Mutex::new(()),
         })
+    }
+
+    /// This store with `publication` for its later inserts.
+    pub(crate) fn with_publication(mut self, publication: EntryPublication) -> Self {
+        self.publication = publication;
+        self
     }
 
     fn entry_path(&self, key: &[u8]) -> PathBuf {
@@ -295,7 +324,7 @@ impl CacheStore for FunctionCache {
     fn insert(&self, key: &[u8], value: Vec<u8>) -> bool {
         let path = self.entry_path(key);
         let old_len = path.metadata().map(|metadata| metadata.len()).unwrap_or(0);
-        if insert_atomic(&path, &value, &NEXT_CACHE_TEMP).is_err() {
+        if insert_atomic(&path, &value, self.publication, &NEXT_CACHE_TEMP).is_err() {
             return false;
         }
         let Some(observed) = self.observed_bytes.get() else {
