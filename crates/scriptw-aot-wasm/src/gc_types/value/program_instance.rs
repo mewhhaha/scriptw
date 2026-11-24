@@ -84,49 +84,43 @@ impl ProgramLiteralCount {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ProgramLiteralIndex(u32);
 
-/// The producer hands over its sole table root. Publication verifies complete
-/// P-only coverage, and this wrapper exposes no mutable table capability.
+/// The producer hands over its sole table and descriptor roots. Every slot
+/// of the fresh table is null: a literal is published only by this P's
+/// resolver at its first use, and no capability writes the table otherwise.
 pub(crate) struct ProgramLiteralRoots<'image, 'pool> {
     image: &'image ProgramInstanceImage<'pool>,
     table: GcLocal<PooledStringTable>,
+    descriptors: ProgramStringDescriptorTable,
 }
 
 impl<'image, 'pool> ProgramLiteralRoots<'image, 'pool> {
-    pub(crate) fn admit_complete_table(
+    /// The table's length is the checked P literal count, which is also the
+    /// descriptor image's row count, so an ordinal bounded by one bounds both.
+    pub(crate) fn unresolved(
         schema: &RuntimeSchema,
         image: &'image ProgramInstanceImage<'pool>,
-        table: GcLocal<PooledStringTable>,
+        descriptors: ProgramStringDescriptorTable,
         function: &mut Function,
     ) -> Self {
-        schema
-            .array_type::<PooledStringTable>()
-            .length(&table, schema, function);
+        let length = schema.reserve_i32_local(function);
         function.program_literal_count(image.literal_count_operand());
-        function.instruction(&Instruction::I32Ne);
-        trap_if_true(function);
-        let row = schema.reserve_i32_local(function);
-        row.set_constant(0, function);
-        function.instruction(&Instruction::Block(BlockType::Empty));
-        function.instruction(&Instruction::Loop(BlockType::Empty));
-        row.load(function);
-        function.program_literal_count(image.literal_count_operand());
-        function.instruction(&Instruction::I32GeU);
-        function.instruction(&Instruction::BrIf(1));
-        schema
-            .array_type::<PooledStringTable>()
-            .read(&table, row, schema, function)
-            .reference()
-            .is_null(function);
-        trap_if_true(function);
-        row.load(function);
-        function.instruction(&Instruction::I32Const(1));
-        function.instruction(&Instruction::I32Add);
-        row.store(function);
-        function.instruction(&Instruction::Br(0));
-        function.instruction(&Instruction::End);
-        function.instruction(&Instruction::End);
-        schema.release_i32_local(row, function);
-        Self { image, table }
+        length.store(function);
+        let table = schema
+            .reserve_gc_local::<PooledStringTable, NonNullable>(function)
+            .initialize(
+                schema.array_type::<PooledStringTable>().filled(
+                    GcOperand::null(schema),
+                    length,
+                    function,
+                ),
+                function,
+            );
+        schema.release_i32_local(length, function);
+        Self {
+            image,
+            table,
+            descriptors,
+        }
     }
 }
 
@@ -168,6 +162,7 @@ pub(crate) struct ProgramInstanceHooks<'image, 'pool> {
     realm_module_import: FunctionLocal<RealmModuleImportHook, Nullable>,
     module_body_reaction: FunctionLocal<ModuleBodyReactionHook, Nullable>,
     regexp_candidate: FunctionLocal<RegExpProgramCandidateHook, Nullable>,
+    literal_resolve: FunctionLocal<ProgramLiteralResolveHook, Nullable>,
 }
 
 impl<'image, 'pool> ProgramInstanceHooks<'image, 'pool> {
@@ -186,6 +181,7 @@ impl<'image, 'pool> ProgramInstanceHooks<'image, 'pool> {
             realm_module_import: bind_hook(schema, provided, base, function),
             module_body_reaction: bind_hook(schema, provided, base, function),
             regexp_candidate: bind_hook(schema, provided, base, function),
+            literal_resolve: bind_hook(schema, provided, base, function),
         }
     }
 }
@@ -374,7 +370,9 @@ impl ProgramInstanceLocals {
                     GcOperand::nullable_function_reference(&hooks.realm_module_import),
                     GcOperand::nullable_function_reference(&hooks.module_body_reaction),
                     GcOperand::nullable_function_reference(&hooks.regexp_candidate),
+                    GcOperand::nullable_function_reference(&hooks.literal_resolve),
                     GcOperand::reference(&literals.table, schema),
+                    GcOperand::reference(literals.descriptors.bytes(), schema),
                     GcOperand::i32(image.literal_base as i32),
                     GcOperand::program_literal_count(image.literal_count_operand()),
                     GcOperand::reference(&metadata.bytes, schema),
@@ -393,7 +391,9 @@ impl ProgramInstanceLocals {
         hooks.realm_module_import.clear(function);
         hooks.module_body_reaction.clear(function);
         hooks.regexp_candidate.clear(function);
+        hooks.literal_resolve.clear(function);
         literals.table.clear(function);
+        literals.descriptors.clear(function);
         metadata.bytes.clear(function);
         Ok(Self { owner })
     }
@@ -566,12 +566,62 @@ impl ProgramInstanceLocals {
         )
     }
 
+    /// A checked literal of this P. A published slot is read in place; only
+    /// its first use calls this P's own resolver, which publishes it.
     pub(crate) fn literal(
         &self,
         schema: &RuntimeSchema,
         index: ProgramLiteralIndex,
+        base: RuntimeHelperFunctionBase,
         function: &mut Function,
     ) -> GcStackReference<StringValue> {
+        let output = schema.reference_type::<StringValue>(GcNullability::NonNullable);
+        // One relocated ordinal site serves both the read and the miss call.
+        let ordinal = schema.reserve_i32_local(function);
+        function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(output))));
+        // `array.get` traps on a null table itself; LITERAL_STRINGS is never null.
+        let _ = schema
+            .struct_type::<ProgramInstance>()
+            .field(ProgramInstanceSchema::LITERAL_STRINGS)
+            .read(&self.owner, schema, function);
+        function.program_literal_index(index);
+        function.instruction(&Instruction::LocalTee(ordinal.index));
+        function.instruction(&Instruction::ArrayGet(
+            schema.array_type::<PooledStringTable>().type_index().raw(),
+        ));
+        // Null only until the literal's first use in this P instance.
+        function.likely(&Instruction::BrOnNonNull(0));
+        let _ = self.resolve_literal(schema, GcIndex::Local(ordinal), base, function);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(ordinal, function);
+        GcStackReference::new()
+    }
+
+    /// Calls this P's resolver body directly. P code only: R reaches the same
+    /// body through the owner's LITERAL_RESOLVE field.
+    fn resolve_literal(
+        &self,
+        schema: &RuntimeSchema,
+        ordinal: GcIndex,
+        base: RuntimeHelperFunctionBase,
+        function: &mut Function,
+    ) -> GcStackReference<StringValue> {
+        let _ = self.owner.load(schema, function);
+        ordinal.emit(function);
+        function.instruction(&Instruction::Call(
+            crate::runtime_helpers::RuntimeHelperId::ProgramLiteralResolve.index(base),
+        ));
+        GcStackReference::new()
+    }
+
+    /// The published slot of a runtime ordinal, or null before its first use.
+    /// An ordinal outside this P's literal table traps.
+    pub(crate) fn cached_literal_at(
+        &self,
+        schema: &RuntimeSchema,
+        ordinal: I32Local,
+        function: &mut Function,
+    ) -> GcLocal<StringValue, Nullable> {
         let table = schema.reserve_gc_local(function).initialize(
             schema
                 .struct_type::<ProgramInstance>()
@@ -580,13 +630,91 @@ impl ProgramInstanceLocals {
                 .reference(),
             function,
         );
-        let string = schema
+        ordinal.load(function);
+        schema
             .array_type::<PooledStringTable>()
-            .read(&table, GcIndex::Literal(index), schema, function)
-            .reference()
-            .require_non_null(function);
+            .length(&table, schema, function);
+        function.instruction(&Instruction::I32GeU);
+        trap_if_true(function);
+        let cached = schema.reserve_gc_local(function).initialize(
+            schema
+                .array_type::<PooledStringTable>()
+                .read(&table, ordinal, schema, function)
+                .reference(),
+            function,
+        );
+        table.clear(function);
+        cached
+    }
+
+    /// The resolver's single write: build literal `ordinal` from this P's own
+    /// descriptor row and passive UTF-16 image and publish it in its slot.
+    /// The String cannot come from anywhere but that row.
+    pub(crate) fn publish_literal_from_descriptor(
+        &self,
+        schema: &RuntimeSchema,
+        ordinal: I32Local,
+        function: &mut Function,
+    ) -> GcLocal<StringValue> {
+        let descriptors = schema.reserve_gc_local(function).initialize(
+            schema
+                .struct_type::<ProgramInstance>()
+                .field(ProgramInstanceSchema::LITERAL_DESCRIPTORS)
+                .read(&self.owner, schema, function)
+                .reference(),
+            function,
+        );
+        let row = ProgramStringDescriptorRowLocals::read(schema, &descriptors, ordinal, function);
+        descriptors.clear(function);
+        let construction = StringConstruction::from_program_pooled_row(
+            schema,
+            schema.reserve_gc_local(function),
+            &row,
+            function,
+        );
+        row.release(schema, function);
+        let string = schema
+            .reserve_gc_local::<StringValue, NonNullable>(function)
+            .initialize(construction.publish(schema, function), function);
+        let table = schema.reserve_gc_local(function).initialize(
+            schema
+                .struct_type::<ProgramInstance>()
+                .field(ProgramInstanceSchema::LITERAL_STRINGS)
+                .read(&self.owner, schema, function)
+                .reference(),
+            function,
+        );
+        schema.array_type::<PooledStringTable>().write(
+            &table,
+            ordinal,
+            GcOperand::nullable_reference(&string, schema),
+            schema,
+            function,
+        );
         table.clear(function);
         string
+    }
+
+    /// A runtime ordinal of this P's literals, from P code.
+    pub(crate) fn literal_at(
+        &self,
+        schema: &RuntimeSchema,
+        ordinal: I32Local,
+        base: RuntimeHelperFunctionBase,
+        function: &mut Function,
+    ) -> GcStackReference<StringValue> {
+        let string = self.cached_literal_at(schema, ordinal, function);
+        string.load(schema, function).is_null(function);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        string.replace(
+            self.resolve_literal(schema, GcIndex::Local(ordinal), base, function)
+                .nullable(),
+            function,
+        );
+        function.instruction(&Instruction::End);
+        let result = string.load(schema, function).require_non_null(function);
+        string.clear(function);
+        result
     }
 
     pub(crate) fn metadata(

@@ -213,6 +213,14 @@ accepts `--case <file.js>`.
   instantiation and Linker registration outside the timer (about 2.3M
   instructions) ([measurement](benchmarks.md#fresh-entries-and-compile-time-2026-11-17)).
   Owner: AOT runtime bootstrap.
+- Lazy P literals (ABI 89) cut a React SSR fresh entry by about 4.7M
+  instructions but add about 10K (0.45%) to each retained RSC request: every P
+  literal read now has a cold resolver call, and Cranelift spills GC
+  references live across any call at their definition and reloads them at
+  each use (`js::ft` runs 17 more stack moves per call). Decide whether hot
+  literal reads should drop the call, for example by building the literals P
+  code reads at publication and keeping only source texts lazy. Owner: AOT
+  codegen.
 - Program size and compile time: program Wasm is about 68 bytes per source
   byte, the inference prepass lowers every body twice, and the lowering maps
   use `String` keys. Owner: AOT codegen and IR lowering.

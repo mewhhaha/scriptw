@@ -30,24 +30,40 @@ selector. The coordinated emit.rs consumers must route source literals and
 runtime/source diagnostic strings through this checked seam.
 
 Every P producer allocates a new P-only PooledStringTable of its exact literal
-count. ProgramStringDescriptorImage contains P-relative slot indexes and
-P-relative UTF-16 spans. Its compiler validation retains checked row lengths,
-aligned offsets and complete source spans. Descriptor serialization does not
-assume that the sorted string map is in insertion/ordinal order.
+count, with every slot null. ProgramStringDescriptorImage holds one row per
+P-local ordinal, in ordinal order, each a P-relative UTF-16 span. Its compiler
+validation retains checked row lengths, aligned offsets, complete source spans
+and one row per slot. Descriptor serialization does not assume that the sorted
+string map is in insertion/ordinal order.
 
 ProgramStringDescriptorTable copies the private passive descriptor image into
-the existing ImmutableByteArray GC owner. The wrapper offers reads and clear,
-with no mutable byte-array capability. Each descriptor builds an actual GC
+the existing ImmutableByteArray GC owner, which the ProgramInstance keeps as
+LITERAL_DESCRIPTORS. No String is built at publication. A literal is built at
+its first use by the P-owned `program_literal_resolve` hook body, the only
+writer of the table: it reads that ordinal's row, builds an actual GC
 CodeUnitArray from that P's passive UTF-16 segment and publishes the existing
-StringValue representation. Embedded NUL, astral pairs and lone surrogate code
-units retain their actual UTF-16 values; no text re-encoding or transient linear
-buffer supplies the persistent string bytes.
+StringValue representation in the slot, or returns the String a previous call
+published. Embedded NUL, astral pairs and lone surrogate code units retain their
+actual UTF-16 values; no text re-encoding or transient linear buffer supplies
+the persistent string bytes. Every reader of a P literal, whatever its route,
+gets the one String of its slot, so identity is per ProgramInstance as before.
 
-ProgramLiteralRoots::admit_complete_table consumes the sole construction table
-root and verifies exact length and non-null coverage before publication. The
-producer clears its descriptor and temporary roots and retains no table alias.
-An empty P suffix still publishes a real empty table and metadata owner; it
-does not return early or inherit an earlier P's roots.
+P code reads a slot in place and calls its own resolver body directly only on a
+null slot. R cannot reach P's passive segments; it calls the same body through
+the owner's LITERAL_RESOLVE hook field. R needs this only for a source
+function's text: a JavaScript FunctionObject whose text is one of its defining
+P's literals stores a null TO_STRING and that literal's ordinal in
+TO_STRING_LITERAL, and `Function.prototype.toString` resolves it through the
+context's DEFINING_PROGRAM, which is the P whose code allocated the function and
+owns the ordinal. Native callables and R-domain texts keep an eager TO_STRING.
+The resolver allocates but runs no JavaScript and polls no deadline before its
+write, and the new String is rooted by the table, so an interrupt or collection
+can only find a slot null or published.
+
+ProgramLiteralRoots::unresolved consumes the sole construction table and
+descriptor roots. The producer retains no table alias. An empty P suffix still
+publishes a real empty table, descriptor and metadata owner and installs no
+resolver; it does not return early or inherit an earlier P's roots.
 
 ProgramInstanceImage::require_pool checks that the producer uses its exact
 checked source pool. produce_program_literal_roots returns the literal wrapper

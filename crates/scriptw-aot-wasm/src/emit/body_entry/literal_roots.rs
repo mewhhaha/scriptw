@@ -67,9 +67,12 @@ impl FunctionBuilder<'_> {
                 self.runtime_helper_base()?,
                 function,
             )),
-            PooledLiteralDomain::Program(index) => {
-                Ok(self.current_program().literal(self.schema, index, function))
-            }
+            PooledLiteralDomain::Program(index) => Ok(self.current_program().literal(
+                self.schema,
+                index,
+                self.runtime_helper_base()?,
+                function,
+            )),
         }
     }
 }

@@ -42,7 +42,8 @@ descriptor; they do not embed program pool or linear-memory string addresses.
 Embedded source/flags and compact-array strings now encode a closed R/P domain
 in the high word and a table-relative ordinal in the low word. Runtime reads
 validate the domain and bounds, select R's stable prefix or the actual P's
-literal table, and require a non-null String. A P operand never indexes the old
+literal table, resolving an unpublished P slot through that P's own resolver,
+and require a non-null String. A P operand never indexes the old
 combined mutable R+P table. Compact-array recipes retain their Program-owned
 passive-to-GC path, complete pure-walk admission, exact scalar bits and source
 order. Their helper gains a required explicit caller ProgramInstance operand.

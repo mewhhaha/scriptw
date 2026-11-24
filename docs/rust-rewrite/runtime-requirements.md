@@ -82,7 +82,7 @@ states what admits that image.
 
 ## Runtime ABI
 
-The runtime ABI is **88**. Portable bundles and native images built under an
+The runtime ABI is **89**. Portable bundles and native images built under an
 earlier ABI must be rebuilt. ABIs 58 to 77 added per-site read, write,
 `instanceof` and global read records, a dictionary position hint on Strings,
 further native call entries, one JSON output accumulator, compact shape
@@ -110,7 +110,11 @@ each legacy `caller`/`arguments` state, so a sloppy activation checks the
 property without a lookup
 ([contract](contracts/active-legacy-function-reflection.md)). ABI 88 drops the
 unread WTF-8 copy of each pooled string from R's static image and P's metadata
-image, so every later static table and P metadata span moves.
+image, so every later static table and P metadata span moves. ABI 89 builds P
+literals on first use: a ProgramInstance starts with an all-null literal table
+and keeps its descriptor rows and a resolver hook, and a source function keeps
+its text as a literal ordinal until `Function.prototype.toString` asks for it
+([contract](contracts/program-literal-root-ownership.md)).
 `LAYOUT_VERSION` in
 `crates/scriptw-aot-wasm/src/runtime_artifact.rs` records each step.
 

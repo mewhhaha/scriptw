@@ -245,7 +245,7 @@ fn direct_array_program_helpers_preserve_runtime_bytes_types_imports_and_hook_ca
                         continue;
                     }
                     let mut hooks = BTreeMap::new();
-                    for (field_index, field) in owner.fields.iter().take(5).enumerate() {
+                    for (field_index, field) in owner.fields.iter().take(6).enumerate() {
                         let StorageType::Val(ValType::Ref(reference)) = field.element_type else {
                             break;
                         };
@@ -266,7 +266,7 @@ fn direct_array_program_helpers_preserve_runtime_bytes_types_imports_and_hook_ca
                         }
                         hooks.insert(field_index as u32, index);
                     }
-                    if hooks.len() == 5 {
+                    if hooks.len() == 6 {
                         owners.push((group_base + ordinal as u32, hooks));
                     }
                 }
@@ -275,7 +275,7 @@ fn direct_array_program_helpers_preserve_runtime_bytes_types_imports_and_hook_ca
             assert_eq!(
                 owners.len(),
                 1,
-                "one ProgramInstance owns all five typed nullable hook fields"
+                "one ProgramInstance owns all six typed nullable hook fields"
             );
             let (owner_type, hook_types) = owners.pop().unwrap();
             assert!(
@@ -283,7 +283,7 @@ fn direct_array_program_helpers_preserve_runtime_bytes_types_imports_and_hook_ca
                     && hook_types
                         .values()
                         .all(|index| recursive_types.contains(&(*index as usize))),
-                "the actual ProgramInstance and its five hook signatures remain in the GC group"
+                "the actual ProgramInstance and its six hook signatures remain in the GC group"
             );
             let CompositeInnerType::Struct(owner) =
                 &core_types[owner_type as usize].composite_type.inner
@@ -292,12 +292,12 @@ fn direct_array_program_helpers_preserve_runtime_bytes_types_imports_and_hook_ca
             };
             // The two mutable metadata roots select the shape sites' page
             // directory and the per-site records' flat table.
-            // Code/data and the original five hook fields remain immutable;
+            // Code/data and the six hook fields remain immutable;
             // selecting an owner by requiring every field immutable loses P.
             let immutable_fields = owner_field_count
                 .checked_sub(2)
                 .expect("ProgramInstance retains its two metadata roots");
-            assert!(immutable_fields >= 5);
+            assert!(immutable_fields >= 6);
             assert!(
                 owner.fields[..immutable_fields]
                     .iter()
@@ -402,7 +402,7 @@ fn direct_array_program_helpers_preserve_runtime_bytes_types_imports_and_hook_ca
             }
             assert_eq!(
                 called_fields,
-                BTreeSet::from([0, 1, 2, 3, 4]),
+                BTreeSet::from([0, 1, 2, 3, 4, 5]),
                 "R actually calls each typed hook through its selected P owner"
             );
             assert!(

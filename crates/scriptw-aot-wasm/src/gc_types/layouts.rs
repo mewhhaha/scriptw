@@ -572,7 +572,7 @@ impl GcFunctionRole for BinaryNumericCallback {
         GcFunctionSignature::Scalar(crate::module::StaticSignature::BinaryNumericCallback);
 }
 
-/// Only the five closed hook roles can select one ProgramInstance hook field.
+/// Only the six closed hook roles can select one ProgramInstance hook field.
 pub(crate) trait GcProgramHookRole: GcFunctionRole + Sized {
     const HOOK: crate::runtime_helpers::ProgramHook;
     fn field() -> GcField<ProgramInstance, GcFunctionRef<Self>, Immutable, Nullable>;
@@ -598,6 +598,7 @@ program_hook_roles! {
     RealmModuleImportHook => RealmModuleImport, REALM_MODULE_IMPORT;
     ModuleBodyReactionHook => ModuleBodyReaction, MODULE_BODY_REACTION;
     RegExpProgramCandidateHook => RegExpProgramCandidate, REGEXP_PROGRAM_CANDIDATE;
+    ProgramLiteralResolveHook => ProgramLiteralResolve, LITERAL_RESOLVE;
 }
 /// A constructor retains this P-owned initializer independently of its caller.
 pub(crate) enum InitializeInstanceElementsHook {}
@@ -1150,7 +1151,11 @@ gc_layout_registry! {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             CODE: GcRef<ExecutableCode>, Immutable, NonNullable;
             CONTEXT: GcRef<FunctionContext>, Immutable, NonNullable;
-            TO_STRING: GcRef<StringValue>, Immutable, NonNullable;
+            // Null only for a source function whose text is still its
+            // defining P's unresolved literal TO_STRING_LITERAL (a P-local
+            // ordinal, read only then); toString resolves it through that P.
+            TO_STRING: GcRef<StringValue>, Immutable, Nullable;
+            TO_STRING_LITERAL: I32Value, Immutable, NonNullable;
             PUBLIC_PROTOTYPE_CACHE: GcRef<StoredValue>, Mutable, NonNullable;
             STRICT: bool, Immutable, NonNullable;
             CLASS_HERITAGE: scriptw_ir::ClassHeritageKind, Immutable, NonNullable;
@@ -1185,7 +1190,11 @@ gc_layout_registry! {
             REALM_MODULE_IMPORT: GcFunctionRef<RealmModuleImportHook>, Immutable, Nullable;
             MODULE_BODY_REACTION: GcFunctionRef<ModuleBodyReactionHook>, Immutable, Nullable;
             REGEXP_PROGRAM_CANDIDATE: GcFunctionRef<RegExpProgramCandidateHook>, Immutable, Nullable;
+            LITERAL_RESOLVE: GcFunctionRef<ProgramLiteralResolveHook>, Immutable, Nullable;
+            // Each slot stays null until its literal's first use; only this
+            // P's LITERAL_RESOLVE publishes it, from LITERAL_DESCRIPTORS' row.
             LITERAL_STRINGS: GcRef<PooledStringTable>, Immutable, NonNullable;
+            LITERAL_DESCRIPTORS: GcRef<ImmutableByteArray>, Immutable, NonNullable;
             LITERAL_BASE: I32Value, Immutable, NonNullable;
             LITERAL_COUNT: I32Value, Immutable, NonNullable;
             METADATA: GcRef<ImmutableByteArray>, Immutable, NonNullable;

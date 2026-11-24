@@ -194,7 +194,9 @@ impl FunctionBuilder<'_> {
                     GcOperand::reference(&object, s),
                     GcOperand::reference(&code, s),
                     GcOperand::reference(&context, s),
-                    GcOperand::reference(&source, s),
+                    GcOperand::nullable_reference(&source, s),
+                    // An R-native text is always published eagerly.
+                    GcOperand::i32(-1),
                     GcOperand::reference(&undefined, s),
                     GcOperand::boolean(true),
                     GcOperand::constant(scriptw_ir::ClassHeritageKind::None),

@@ -40,15 +40,15 @@ export const unicode = "\u0100\u0001\u0000\u{{1F600}}\uD800";
     }
     assert!(data.len() >= 3);
     let utf16 = &data[0];
-    assert_eq!(data[2].len() % 12, 0);
+    // One row per literal slot, in slot order: the row index is the slot.
+    assert_eq!(data[2].len() % 8, 0);
     let mut values = BTreeSet::new();
     let mut slots = BTreeSet::new();
     let mut logical_bytes = 0;
-    for row in data[2].chunks_exact(12) {
-        let slot = u32::from_le_bytes(row[0..4].try_into().unwrap());
-        let start = u32::from_le_bytes(row[4..8].try_into().unwrap()) as usize;
-        let length = u32::from_le_bytes(row[8..12].try_into().unwrap()) as usize * 2;
-        assert!(slots.insert(slot));
+    for (slot, row) in data[2].chunks_exact(8).enumerate() {
+        let start = u32::from_le_bytes(row[0..4].try_into().unwrap()) as usize;
+        let length = u32::from_le_bytes(row[4..8].try_into().unwrap()) as usize * 2;
+        assert!(slots.insert(slot as u32));
         assert_eq!(start % 2, 0);
         let bytes = &utf16[start..start + length];
         values.insert(

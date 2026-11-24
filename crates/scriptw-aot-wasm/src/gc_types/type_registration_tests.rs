@@ -142,9 +142,9 @@ fn direct_program_signatures_follow_the_exact_core_graph_and_hooks_keep_core_typ
     let CompositeInnerType::Struct(instance) = &core[instance_index].composite_type.inner else {
         panic!("ProgramInstance must be an actual GC struct");
     };
-    assert_eq!(instance.fields.len(), 13);
+    assert_eq!(instance.fields.len(), 15);
     let payload_index = ProgramInstanceSchema::NATIVE_SOURCE_PAYLOAD.ordinal().raw() as usize;
-    assert_eq!(payload_index, 10);
+    assert_eq!(payload_index, 12);
     assert!(!instance.fields[payload_index].mutable);
     let payload_type = runtime
         .globals()
@@ -175,7 +175,7 @@ fn direct_program_signatures_follow_the_exact_core_graph_and_hooks_keep_core_typ
     let policy_index = ProgramInstanceSchema::LANGUAGE_FEATURE_POLICY
         .ordinal()
         .raw() as usize;
-    assert_eq!(policy_index, 9);
+    assert_eq!(policy_index, 11);
     assert_eq!(
         instance.fields[policy_index].element_type,
         wasmparser::StorageType::Val(wasmparser::ValType::I32)

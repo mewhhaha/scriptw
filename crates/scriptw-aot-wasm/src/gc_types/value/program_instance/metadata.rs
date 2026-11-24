@@ -49,6 +49,8 @@ impl ProgramInstanceLocals {
 
     /// Embedded recipe/candidate operands identify a closed domain and an
     /// ordinal relative to that domain, never the old combined mutable table.
+    /// P code only: a Program-domain ordinal resolves through this P's own
+    /// resolver body at its first use.
     pub(crate) fn literal_operand(
         &self,
         schema: &RuntimeSchema,
@@ -95,28 +97,10 @@ impl ProgramInstanceLocals {
         function.instruction(&Instruction::I32Const(POOLED_LITERAL_PROGRAM_DOMAIN as i32));
         function.instruction(&Instruction::I32Ne);
         trap_if_true(function);
-        let table = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<ProgramInstance>()
-                .field(ProgramInstanceSchema::LITERAL_STRINGS)
-                .read(&self.owner, schema, function)
-                .reference(),
-            function,
-        );
-        ordinal.load(function);
-        schema
-            .array_type::<PooledStringTable>()
-            .length(&table, schema, function);
-        function.instruction(&Instruction::I32GeU);
-        trap_if_true(function);
         string.replace(
-            schema
-                .array_type::<PooledStringTable>()
-                .read(&table, ordinal, schema, function)
-                .reference(),
+            self.literal_at(schema, ordinal, base, function).nullable(),
             function,
         );
-        table.clear(function);
         function.instruction(&Instruction::End);
         schema.release_i32_local(domain, function);
         schema.release_i32_local(ordinal, function);

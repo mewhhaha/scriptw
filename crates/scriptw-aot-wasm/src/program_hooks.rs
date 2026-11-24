@@ -32,6 +32,7 @@ impl ProvidedHooks {
                 ProgramHook::RealmModuleImport => functions.module_graph().is_some(),
                 ProgramHook::ModuleBodyReaction => functions.module_execution_record_count() > 0,
                 ProgramHook::RegExpProgramCandidate => strings.runtime_regexp_table().is_some(),
+                ProgramHook::ProgramLiteralResolve => strings.has_program_literals(),
             };
             if has_data {
                 provided |= 1 << hook as u32;
@@ -135,6 +136,7 @@ impl FunctionBuilder<'_> {
             ProgramHook::RealmModuleImport => self.compile_realm_module_import_hook(),
             ProgramHook::ModuleBodyReaction => self.compile_module_body_reaction_hook(),
             ProgramHook::RegExpProgramCandidate => self.compile_regexp_program_candidate_hook(),
+            ProgramHook::ProgramLiteralResolve => self.compile_program_literal_resolve_hook(),
         }
     }
 }

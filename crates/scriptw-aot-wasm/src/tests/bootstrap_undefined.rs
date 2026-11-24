@@ -132,23 +132,26 @@ fn native_bootstrap_uses_immutable_undefined_for_home_and_initial_prototype() {
         let Operator::StructNew { struct_type_index } = operator else {
             continue;
         };
-        let fields = if *struct_type_index == context {
+        // FunctionContext.HOME_OBJECT is field 4 and
+        // FunctionObject.PUBLIC_PROTOTYPE_CACHE field 5, after TO_STRING and
+        // TO_STRING_LITERAL.
+        let (fields, snapshot) = if *struct_type_index == context {
             contexts += 1;
-            FunctionContext::FIELD_COUNT
+            (FunctionContext::FIELD_COUNT, 4)
         } else if *struct_type_index == callable {
             callables += 1;
-            FunctionObject::FIELD_COUNT
+            (FunctionObject::FIELD_COUNT, 5)
         } else {
             continue;
         };
-        // Both layouts' fifth field is the snapshot under test. Constructor
-        // operands are scalar constants/local references; nullable refinements
-        // are stack-neutral and do not add an operand.
+        // The home and the initial prototype fields hold the snapshot under
+        // test. Constructor operands are scalar constants/local references;
+        // nullable refinements are stack-neutral and do not add an operand.
         let operand = operators[..position]
             .iter()
             .rev()
             .filter(|operator| !matches!(operator, Operator::RefAsNonNull))
-            .nth((fields - 1 - 4) as usize)
+            .nth((fields - 1 - snapshot) as usize)
             .unwrap();
         let Operator::LocalGet { local_index } = operand else {
             panic!("snapshot operand must be rooted")

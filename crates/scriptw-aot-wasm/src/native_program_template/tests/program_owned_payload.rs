@@ -4,10 +4,13 @@ use crate::native_program_contexts::{FunctionContext, ModuleContext, Schema};
 
 // A wire fixture checks malformed context witnesses independently of the emitter.
 fn fixture(value: i32, local: u32, ready: u32, initializer: u32) -> Vec<u8> {
+    // The payload keeps its actual ProgramInstance field ordinal; the fixture
+    // fills every earlier field with an i32.
+    let payload_field = crate::gc_types::ProgramInstanceLocals::native_payload_field();
     let schema = Schema {
         program_type: 1,
         payload_type: 0,
-        payload_field: 10,
+        payload_field,
     };
     let reference = |index, nullable| {
         ValType::Ref(RefType {
@@ -23,7 +26,7 @@ fn fixture(value: i32, local: u32, ready: u32, initializer: u32) -> Vec<u8> {
             element_type: StorageType::Val(ValType::I32),
             mutable: false
         };
-        10
+        payload_field as usize
     ];
     fields.push(wasm_encoder::FieldType {
         element_type: StorageType::Val(reference(0, false)),
@@ -49,7 +52,7 @@ fn fixture(value: i32, local: u32, ready: u32, initializer: u32) -> Vec<u8> {
     exports.export("read", ExportKind::Func, 2);
     module.section(&exports);
     let mut bootstrap = Function::new([]);
-    for _ in 0..10 {
+    for _ in 0..payload_field {
         bootstrap.instruction(&Instruction::I32Const(0));
     }
     bootstrap.instruction(&Instruction::ArrayNewFixed {
@@ -73,7 +76,7 @@ fn fixture(value: i32, local: u32, ready: u32, initializer: u32) -> Vec<u8> {
                 body: 0,
                 context: FunctionContext::Bootstrap {
                     schema,
-                    payload_operator: Some(10),
+                    payload_operator: Some(payload_field),
                 },
             },
             ModuleContext {

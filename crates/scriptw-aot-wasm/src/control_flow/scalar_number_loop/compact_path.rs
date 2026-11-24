@@ -12,7 +12,10 @@ use projection::RowProjection;
 #[derive(PartialEq, Eq)]
 pub(super) enum CachedReadName {
     Runtime(CachedRuntimeName),
-    Program(ProgramLiteralIndex),
+    Program(
+        ProgramLiteralIndex,
+        crate::runtime_helpers::RuntimeHelperFunctionBase,
+    ),
 }
 
 impl CachedReadName {
@@ -22,12 +25,15 @@ impl CachedReadName {
             PooledLiteralDomain::Runtime(_) => {
                 Self::Runtime(CachedRuntimeName::new(name, builder.strings)?)
             }
-            PooledLiteralDomain::Program(index) => Self::Program(index),
+            PooledLiteralDomain::Program(index) => {
+                Self::Program(index, builder.runtime_helper_base().ok()?)
+            }
         })
     }
 
-    /// P literals already exist. A missing R cache entry declines; this guard
-    /// never resolves a name or allocates a String merely to speculate.
+    /// A P literal is the source's own name and resolves at its first use,
+    /// as any read of it would. A missing R cache entry declines; this guard
+    /// never resolves an R name or allocates one merely to speculate.
     fn cached(
         &self,
         builder: &FunctionBuilder<'_>,
@@ -35,10 +41,10 @@ impl CachedReadName {
     ) -> GcLocal<StringValue, Nullable> {
         let s = builder.runtime_schema();
         match self {
-            Self::Program(index) => s.reserve_gc_local(function).initialize(
+            Self::Program(index, base) => s.reserve_gc_local(function).initialize(
                 builder
                     .current_program()
-                    .literal(s, *index, function)
+                    .literal(s, *index, *base, function)
                     .nullable(),
                 function,
             ),

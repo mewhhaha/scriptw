@@ -168,8 +168,18 @@ fn literal_length_grows_passive_data_without_expanding_bootstrap_code() {
                 }
                 let images = passive_program_images(&artifact.bytes);
                 let initializer = named_function_body(&artifact.bytes, "scriptw::program_init");
-                assert_eq!(array_data_initializers(&initializer), [1, 1, 1, 0],
-                    "P bootstrap initializes UTF-16 strings, metadata and descriptor GC arrays");
+                assert_eq!(array_data_initializers(&initializer), [0, 1, 1, 0],
+                    "P bootstrap copies metadata and descriptor GC arrays but builds no String");
+                let resolver = named_function_body(&artifact.bytes, "helper::program_literal_resolve");
+                assert_eq!(array_data_initializers(&resolver), [1, 0, 0, 0],
+                    "only a P literal's first use constructs its UTF-16 storage");
+                let body = wasmparser::FunctionBody::new(wasmparser::BinaryReader::new(&resolver, 0));
+                let operators = body.get_operators_reader().unwrap().into_iter()
+                    .map(Result::unwrap).collect::<Vec<_>>();
+                assert!(operators.iter().any(|op| matches!(op, Operator::RefIsNull)),
+                    "a published P literal bypasses allocation");
+                assert!(operators.iter().any(|op| matches!(op, Operator::I32GeU)),
+                    "the runtime ordinal is bounded by its own P table before descriptor access");
                 let main = named_function_body(&artifact.bytes, "scriptw::main");
                 assert_eq!(array_data_initializers(&main), [0; 4],
                     "JavaScript main consumes its completed P owner without image initialization");
@@ -346,12 +356,12 @@ fn literal_count_grows_descriptor_data_without_expanding_main_initialization() {
                 let initializer = named_function_body(&artifact.bytes, "scriptw::program_init");
                 assert_eq!(array_data_initializers(&body), [0; 4],
                     "main does not initialize the P passive images");
-                assert_eq!(array_data_initializers(&initializer), [1, 1, 1, 0],
-                    "one string-construction site and immutable metadata/descriptor arrays, independent of count");
+                assert_eq!(array_data_initializers(&initializer), [0, 1, 1, 0],
+                    "immutable metadata/descriptor arrays and no String, independent of count");
                 let segments = passive_program_images(&artifact.bytes);
                 assert!(segments[3].is_empty());
-                assert_eq!(segments[2].len() % 12, 0);
-                assert!(segments[2].len() >= count * 12,
+                assert_eq!(segments[2].len() % 8, 0);
+                assert!(segments[2].len() >= count * 8,
                     "every unique source literal needs its descriptor row");
                 (artifact, body.len(), initializer.len(), segments[2].len())
             };
@@ -361,7 +371,7 @@ fn literal_count_grows_descriptor_data_without_expanding_main_initialization() {
             assert_eq!(empty.runtime().unwrap().bytes(), small.runtime().unwrap().bytes());
             assert_eq!(small.runtime().unwrap().bytes(), large.runtime().unwrap().bytes(),
                 "program string count must preserve the complete shared runtime");
-            assert!(large_descriptors >= small_descriptors + (2048 - 16) * 12);
+            assert!(large_descriptors >= small_descriptors + (2048 - 16) * 8);
             assert!(small_initialize <= empty_initialize + 128
                 && large_initialize <= empty_initialize + 128,
                 "P initialization remains bounded independently of descriptor count");

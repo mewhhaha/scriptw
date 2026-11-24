@@ -186,7 +186,11 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 88 stops writing an unread WTF-8 copy of every pooled string into
 // R's static image and P's metadata image; strings keep only their UTF-16
 // slices. Every later static table and P metadata span moves.
-const LAYOUT_VERSION: u32 = 88;
+// Version 89 resolves P literals lazily: ProgramInstance gains the
+// LITERAL_RESOLVE hook and LITERAL_DESCRIPTORS, its literal table starts all
+// null, and FunctionObject.TO_STRING may be null beside a TO_STRING_LITERAL
+// ordinal that toString resolves through the defining P.
+const LAYOUT_VERSION: u32 = 89;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

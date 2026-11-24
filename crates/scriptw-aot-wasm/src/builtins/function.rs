@@ -1,5 +1,8 @@
 use super::super::*;
-use crate::gc_types::{FunctionObject, FunctionObjectSchema, GcNullability, ValueLocals};
+use crate::gc_types::{
+    FunctionObject, FunctionObjectSchema, GcLocal, GcNullability, Nullable, StringValue,
+    ValueLocals,
+};
 
 mod constructor;
 mod dynamic_constructor;
@@ -172,14 +175,26 @@ impl FunctionBuilder<'_> {
                     receiver.cast_reference::<FunctionObject>(schema, function),
                     function,
                 );
+                let lazy = schema
+                    .reserve_gc_local::<StringValue, Nullable>(function)
+                    .initialize(
+                        schema
+                            .struct_type::<FunctionObject>()
+                            .field(FunctionObjectSchema::TO_STRING)
+                            .read(&callable, schema, function)
+                            .reference(),
+                        function,
+                    );
+                lazy.load(schema, function).is_null(function);
+                self.open_frame(ControlFrameKind::If, function);
+                self.emit_resolve_function_source_text(&callable, &lazy, function)?;
+                self.pop_control(ControlFrameKind::If);
+                function.instruction(&Instruction::End);
                 let text = schema.reserve_gc_local(function).initialize(
-                    schema
-                        .struct_type::<FunctionObject>()
-                        .field(FunctionObjectSchema::TO_STRING)
-                        .read(&callable, schema, function)
-                        .reference(),
+                    lazy.load(schema, function).require_non_null(function),
                     function,
                 );
+                lazy.clear(function);
                 argument.set_reference(&text, schema, function);
                 result.set_normal(&argument, function);
                 text.clear(function);
@@ -210,6 +225,80 @@ impl FunctionBuilder<'_> {
         result.clear(function);
         argument.clear(function);
         receiver.clear(function);
+        Ok(())
+    }
+}
+
+impl FunctionBuilder<'_> {
+    /// A source function's text that its defining P has not published yet:
+    /// TO_STRING_LITERAL is an ordinal of that P, which the function's context
+    /// retains. The P's own resolver publishes it, so every later read of the
+    /// literal, through toString or source code, sees the same String.
+    fn emit_resolve_function_source_text(
+        &mut self,
+        callable: &GcLocal<FunctionObject>,
+        text: &GcLocal<StringValue, Nullable>,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        use crate::gc_types::{FunctionContext, FunctionContextSchema, ProgramInstanceLocals};
+        let schema = self.runtime_schema();
+        let ordinal = schema.reserve_i32_local(function);
+        schema
+            .struct_type::<FunctionObject>()
+            .field(FunctionObjectSchema::TO_STRING_LITERAL)
+            .read(callable, schema, function)
+            .store(ordinal, function);
+        let context = schema.reserve_gc_local(function).initialize(
+            schema
+                .struct_type::<FunctionObject>()
+                .field(FunctionObjectSchema::CONTEXT)
+                .read(callable, schema, function)
+                .reference(),
+            function,
+        );
+        // Only a JavaScript callable stores a lazy text, and its context
+        // always captures the defining P.
+        let owner = ProgramInstanceLocals::bind(
+            schema,
+            schema
+                .struct_type::<FunctionContext>()
+                .field(FunctionContextSchema::DEFINING_PROGRAM)
+                .read(&context, schema, function)
+                .reference()
+                .require_non_null(function),
+            function,
+        );
+        context.clear(function);
+        let cached = owner.cached_literal_at(schema, ordinal, function);
+        text.replace(cached.load(schema, function), function);
+        cached.clear(function);
+        text.load(schema, function).is_null(function);
+        self.open_frame(ControlFrameKind::If, function);
+        self.emit_owned_program_hook_dispatch::<crate::gc_types::ProgramLiteralResolveHook>(
+            &owner,
+            |_, hook, function| {
+                let resolved = schema.call_hook(
+                    hook,
+                    crate::runtime_helpers::ProgramLiteralResolveArguments::new(ordinal),
+                    function,
+                );
+                text.replace(
+                    schema.helper_reference_on_stack(resolved).nullable(),
+                    function,
+                );
+                Ok(())
+            },
+            // A P that stores a literal ordinal always installs its resolver.
+            |_, function| {
+                function.instruction(&Instruction::Unreachable);
+                Ok(())
+            },
+            function,
+        )?;
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        owner.clear(function);
+        schema.release_i32_local(ordinal, function);
         Ok(())
     }
 }

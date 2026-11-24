@@ -643,12 +643,31 @@ impl FunctionBuilder<'_> {
             function,
         );
         initializer.clear(function);
+        // A source function's text that is one of its defining P's literals
+        // stays that literal's ordinal until toString first asks for it. The
+        // defining P is this frame's current P, which owns the ordinal.
+        let lazy_source_text = match executable_kind {
+            crate::gc_types::ExecutableCodeKind::JavaScript if self.uses_heap => {
+                let index = self.strings.pooled_string_index(&meta.to_string_value)?;
+                match self.strings.pooled_string_domain(index)? {
+                    crate::data::PooledLiteralDomain::Program(literal) => Some(literal),
+                    crate::data::PooledLiteralDomain::Runtime(_) => None,
+                }
+            }
+            crate::gc_types::ExecutableCodeKind::JavaScript
+            | crate::gc_types::ExecutableCodeKind::StandardBuiltin
+            | crate::gc_types::ExecutableCodeKind::HostBuiltin => None,
+        };
         let source_text = schema
-            .reserve_gc_local::<StringValue, NonNullable>(function)
-            .initialize(
-                self.emit_interned_string_reference(&meta.to_string_value, function)?,
+            .reserve_gc_local::<StringValue, Nullable>(function)
+            .initialize_null(schema, function);
+        if lazy_source_text.is_none() {
+            source_text.replace(
+                self.emit_interned_string_reference(&meta.to_string_value, function)?
+                    .nullable(),
                 function,
             );
+        }
         // Publication replaces this field's edge when it creates a prototype;
         // the immutable undefined snapshot never acquires object identity.
         let stored_public_prototype = schema
@@ -661,6 +680,10 @@ impl FunctionBuilder<'_> {
                     GcOperand::reference(&code, schema),
                     GcOperand::reference(&context, schema),
                     GcOperand::reference(&source_text, schema),
+                    match lazy_source_text {
+                        Some(literal) => GcOperand::program_literal_index(literal),
+                        None => GcOperand::i32(-1),
+                    },
                     GcOperand::reference(&stored_public_prototype, schema),
                     GcOperand::boolean(meta.strict),
                     GcOperand::constant(meta.class_heritage_kind),

@@ -3247,7 +3247,9 @@ fn pooled_strings_are_encoded_only_as_utf16_in_both_modules() {
             .collect::<Vec<_>>()
     };
     let contains = |haystack: &[u8], needle: &[u8]| {
-        haystack.windows(needle.len()).any(|window| window == needle)
+        haystack
+            .windows(needle.len())
+            .any(|window| window == needle)
     };
     let program_utf16 = data_segment_at(&artifact.bytes, 0);
     let program_metadata = data_segment_at(&artifact.bytes, 1);

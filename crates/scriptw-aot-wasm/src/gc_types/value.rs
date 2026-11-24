@@ -34,7 +34,9 @@ pub(crate) use tag_set::{
 };
 mod program_string_descriptors;
 mod runtime_string_descriptors;
-pub(crate) use program_string_descriptors::ProgramStringDescriptorTable;
+pub(crate) use program_string_descriptors::{
+    ProgramStringDescriptorRowLocals, ProgramStringDescriptorTable,
+};
 pub(crate) use runtime_string_descriptors::RuntimeStringDescriptorRowLocals;
 mod weak_host;
 pub(crate) use weak_host::WeakEntryIdentities;
@@ -2852,6 +2854,7 @@ impl RuntimeSchema {
 enum OperandSource {
     I32(i32),
     ProgramLiteralCount(ProgramLiteralCount),
+    ProgramLiteralIndex(ProgramLiteralIndex),
     I64(i64),
     F64(f64),
     Local(u32),
@@ -2898,6 +2901,10 @@ impl<V: sealed::Sealed, N: GcFieldNullability> GcOperand<'_, V, N> {
             OperandSource::I32(value) => Instruction::I32Const(value),
             OperandSource::ProgramLiteralCount(value) => {
                 function.program_literal_count(value);
+                return;
+            }
+            OperandSource::ProgramLiteralIndex(value) => {
+                function.program_literal_index(value);
                 return;
             }
             OperandSource::I64(value) => Instruction::I64Const(value),
@@ -3281,6 +3288,13 @@ impl<V: GcNumericI32Field> GcOperand<'_, V, NonNullable> {
     pub(crate) fn program_literal_count(value: ProgramLiteralCount) -> Self {
         Self {
             source: OperandSource::ProgramLiteralCount(value),
+            shape: PhantomData,
+        }
+    }
+    /// A P literal ordinal stored as data, relocated like every literal site.
+    pub(crate) fn program_literal_index(value: ProgramLiteralIndex) -> Self {
+        Self {
+            source: OperandSource::ProgramLiteralIndex(value),
             shape: PhantomData,
         }
     }

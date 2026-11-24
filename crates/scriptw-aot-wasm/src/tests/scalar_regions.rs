@@ -541,6 +541,12 @@ fn compact_row_misses_exit_before_body_effects_and_release_roots_before_resume()
     let artifact = emit_script(source).expect("prefix continuation emits");
     let equality = compact_runtime_helper(&artifact, "helper::string_equality");
     let finder = compact_runtime_helper(&artifact, "helper::ordinary_property_find");
+    // The row keys are P literals. Their first use publishes the literal's
+    // one String in its slot, an idempotent cache fill no source can observe.
+    let literal = function_names(&artifact)
+        .into_iter()
+        .find_map(|(index, name)| (name == "helper::program_literal_resolve").then_some(index));
+    assert!(literal.is_some(), "a P with literals installs its resolver");
     with_source_artifact_variants(artifact, "varied", |name, operators| {
         let compact = compact_loop_ranges(operators, &types);
         assert_eq!(compact.len(), 1, "actual guarded row loop: {name}");
@@ -655,10 +661,12 @@ fn compact_row_misses_exit_before_body_effects_and_release_roots_before_resume()
         assert!(
             first_guard.iter().all(|op| match op {
                 Operator::Call { function_index } =>
-                    Some(*function_index) == equality || Some(*function_index) == finder,
+                    Some(*function_index) == equality
+                        || Some(*function_index) == finder
+                        || Some(*function_index) == literal,
                 _ => compact_readonly_operators(std::slice::from_ref(op), None),
             }),
-            "first-row setup only calls pure String equality or the concretely guarded dictionary finder"
+            "first-row setup only calls pure String equality, the concretely guarded dictionary finder or the P literal resolver"
         );
         assert!(
             next_guard.iter().all(|op| !matches!(op, Operator::F64Add)),

@@ -28,15 +28,16 @@ fn descriptor_rows_keep_only_program_local_slots_and_utf16_spans() {
     );
     let program = &pool.pooled_code_unit_bytes[runtime.len()..];
     let mut decoded = BTreeMap::new();
-    for row in image
+    for (ordinal, row) in image
         .bytes
         .chunks_exact(ProgramStringDescriptorWord::ROW_BYTES as usize)
+        .enumerate()
     {
         let read = |word: ProgramStringDescriptorWord| {
             let start = word.byte_offset() as usize;
             u32::from_le_bytes(row[start..start + 4].try_into().unwrap())
         };
-        let ordinal = read(ProgramStringDescriptorWord::LiteralIndex);
+        let ordinal = ordinal as u32;
         let start = read(ProgramStringDescriptorWord::Utf16ByteOffset) as usize;
         let end = start + read(ProgramStringDescriptorWord::UnitLength) as usize * 2;
         assert!(decoded.insert(ordinal, &program[start..end]).is_none());
@@ -93,7 +94,10 @@ fn independent_program_images_reuse_local_slots_without_sharing_bytes() {
             let start = word.byte_offset() as usize;
             u32::from_le_bytes(image.bytes[start..start + 4].try_into().unwrap())
         };
-        assert_eq!(word(ProgramStringDescriptorWord::LiteralIndex), 0);
+        assert_eq!(
+            image.bytes.len(),
+            ProgramStringDescriptorWord::ROW_BYTES as usize
+        );
         assert_eq!(word(ProgramStringDescriptorWord::Utf16ByteOffset), 0);
         let start = pool.compiler_owned_boundary().code_unit_bytes;
         let end = start + word(ProgramStringDescriptorWord::UnitLength) as usize * 2;

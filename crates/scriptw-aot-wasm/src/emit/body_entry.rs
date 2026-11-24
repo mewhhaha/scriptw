@@ -222,6 +222,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::RealmModuleImport
             | RuntimeHelperId::ModuleBodyReaction
             | RuntimeHelperId::RegExpProgramCandidate
+            | RuntimeHelperId::ProgramLiteralResolve
             | RuntimeHelperId::RuntimeErrorObject
             | RuntimeHelperId::RuntimeErrorForThrow
             | RuntimeHelperId::PooledStringResolve

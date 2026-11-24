@@ -4267,10 +4267,8 @@ impl StringPool {
             self.pooled_code_unit_bytes
                 .extend_from_slice(&unit.to_le_bytes());
         }
-        self.refs.insert(
-            value.to_string(),
-            StringRef { index, code_units },
-        );
+        self.refs
+            .insert(value.to_string(), StringRef { index, code_units });
     }
 
     fn queue_regexp_program(&mut self, program: &RegExpProgram) {
@@ -4777,10 +4775,15 @@ impl StringPool {
             return self.pooled_string_index(text);
         }
         // A collected source message carries the slot this pool interned for
-        // its text. The handle never becomes a JavaScript value.
+        // its text. A slot of another pool is rejected even when it is in
+        // range here. The handle never becomes a JavaScript value.
         message
             .collected_source_index()
-            .filter(|index| index.ordinal() < self.pooled_string_count())
+            .filter(|index| {
+                self.source_runtime_error_messages
+                    .values()
+                    .any(|collected| collected == index)
+            })
             .ok_or_else(|| {
                 EmitError::unsupported("runtime diagnostic does not belong to this string pool")
             })
@@ -5276,6 +5279,23 @@ mod pooled_string_index_tests {
                 pool.pooled_string_index(text).unwrap().ordinal()
             );
         }
+    }
+
+    #[test]
+    fn source_diagnostics_from_another_pool_are_rejected_even_in_range() {
+        let mut collected = StringPool::default();
+        let source = SourceRuntimeErrorMessage::IdentifierWrite(
+            scriptw_ir::IdentifierWriteErrorIr::ImmutableBinding,
+        );
+        collected.intern_source_runtime_error_message(source);
+        let message = collected.source_runtime_error_message(source).unwrap();
+        let index = collected.runtime_error_string_index(message).unwrap();
+        let mut other = StringPool::default();
+        for ordinal in 0..=index.ordinal() + 1 {
+            other.intern_string(&format!("unrelated {ordinal}"));
+        }
+        assert!(index.ordinal() < other.pooled_string_count());
+        assert!(other.runtime_error_string_index(message).is_err());
     }
 
     #[test]

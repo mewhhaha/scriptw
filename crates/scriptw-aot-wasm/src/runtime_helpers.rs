@@ -329,15 +329,19 @@ pub(crate) enum ProgramHook {
     ModuleBodyReaction,
     /// RegExp construction from a source/flags pair the program spelled out.
     RegExpProgramCandidate,
+    /// The first use of one of this P's literal Strings, from its own
+    /// passive UTF-16 image. R reaches it only for a lazy source text.
+    ProgramLiteralResolve,
 }
 
 impl ProgramHook {
-    pub(crate) const ALL: [Self; 5] = [
+    pub(crate) const ALL: [Self; 6] = [
         Self::PreparedDynamicFunction,
         Self::PreparedScript,
         Self::RealmModuleImport,
         Self::ModuleBodyReaction,
         Self::RegExpProgramCandidate,
+        Self::ProgramLiteralResolve,
     ];
     pub(crate) const fn helper(self) -> RuntimeHelperId {
         match self {
@@ -346,6 +350,7 @@ impl ProgramHook {
             Self::RealmModuleImport => RuntimeHelperId::RealmModuleImport,
             Self::ModuleBodyReaction => RuntimeHelperId::ModuleBodyReaction,
             Self::RegExpProgramCandidate => RuntimeHelperId::RegExpProgramCandidate,
+            Self::ProgramLiteralResolve => RuntimeHelperId::ProgramLiteralResolve,
         }
     }
 }
@@ -384,7 +389,7 @@ impl HelperOwner {
 
 /// The first index of each helper region. Only `FunctionIndexLayout` mints it
 /// and only this owner performs helper-index arithmetic; callers retain the plan.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct RuntimeHelperFunctionBase {
     runtime_first: u32,
     program_first: u32,
@@ -1329,6 +1334,7 @@ runtime_helper_domain! {
     RealmModuleImport / RealmModuleImportArguments / RealmModuleImportParameters / "realm_module_import" @ RealmModuleImportHook { realm:(Ref RealmRecord NonNullable),specifier:(Ref StringValue NonNullable),caller_environment:(Ref Environment Nullable) } => RealmImport;
     ModuleBodyReaction / ModuleBodyReactionArguments / ModuleBodyReactionParameters / "module_body_reaction" @ ModuleBodyReactionHook { module:(Ref ModuleRecord NonNullable),rejected:I32,argument:Value } => Void;
     RegExpProgramCandidate / RegExpProgramCandidateArguments / RegExpProgramCandidateParameters / "regexp_program_candidate" @ RegExpProgramCandidateHook { source:(Ref StringValue NonNullable),flags:(Ref StringValue NonNullable) } => RegExpCompile;
+    ProgramLiteralResolve / ProgramLiteralResolveArguments / ProgramLiteralResolveParameters / "program_literal_resolve" @ ProgramLiteralResolveHook { ordinal:I32 } => (Ref StringValue NonNullable);
     RuntimeErrorObject / RuntimeErrorObjectArguments / RuntimeErrorObjectParameters / "runtime_error_object" { prototype:Value,message:(Ref StringValue NonNullable) } => (Ref NativeErrorObject NonNullable);
     RuntimeErrorForThrow / RuntimeErrorForThrowArguments / RuntimeErrorForThrowParameters / "runtime_error_for_throw" { kind:NativeErrorKind,prototype:Value,message:(Ref StringValue NonNullable) } => (Ref NativeErrorObject NonNullable);
     PooledStringResolve / PooledStringResolveArguments / PooledStringResolveParameters / "pooled_string_resolve" { ordinal:I32 } => (Ref StringValue NonNullable);
@@ -1550,6 +1556,7 @@ impl RuntimeHelperId {
             Self::RealmModuleImport => HelperOwner::Hook(ProgramHook::RealmModuleImport),
             Self::ModuleBodyReaction => HelperOwner::Hook(ProgramHook::ModuleBodyReaction),
             Self::RegExpProgramCandidate => HelperOwner::Hook(ProgramHook::RegExpProgramCandidate),
+            Self::ProgramLiteralResolve => HelperOwner::Hook(ProgramHook::ProgramLiteralResolve),
             Self::RuntimeErrorObject => HelperOwner::Runtime,
             Self::RuntimeErrorForThrow => HelperOwner::Runtime,
             Self::PooledStringResolve => HelperOwner::Runtime,
@@ -1753,6 +1760,7 @@ impl RuntimeHelperId {
             Self::RealmModuleImport => true,
             Self::ModuleBodyReaction => true,
             Self::RegExpProgramCandidate => true,
+            Self::ProgramLiteralResolve => true,
             Self::RuntimeErrorObject => true,
             Self::RuntimeErrorForThrow => true,
             Self::PooledStringResolve => true,
@@ -1993,6 +2001,15 @@ mod tests {
         >(
             RuntimeHelperId::RegExpProgramCandidate,
             helper_field!(@result_abi RegExpCompile),
+        );
+        assert_hook_row::<
+            ProgramLiteralResolveArguments<'_>,
+            ProgramLiteralResolveParameters,
+            ProgramLiteralResolveHook,
+            ReferenceHelperResult<StringValue, NonNullable>,
+        >(
+            RuntimeHelperId::ProgramLiteralResolve,
+            helper_field!(@result_abi (Ref StringValue NonNullable)),
         );
     }
 

@@ -117,7 +117,6 @@ fn dynamic_formatter_uses_shortest_decimal_and_ecmascript_spelling_projections()
         "frac_scaled_local",
         "emit_fraction_width_local",
         "shortest_int_u_local",
-        "self.strings.payload(\"1e+21\")",
     ] {
         assert!(
             !NUMBER_TO_STRING_SOURCE.contains(removed_heuristic)

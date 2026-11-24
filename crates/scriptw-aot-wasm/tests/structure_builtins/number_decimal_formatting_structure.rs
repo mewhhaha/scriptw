@@ -181,22 +181,7 @@ fn decimal_formatting_has_no_value_table_empty_sentinel_or_magic_integer_case() 
         assert!(!source.contains("NUMBER_TO_PRECISION_CASES"));
         assert!(!source.contains("emit_number_precision_case"));
         assert!(!source.contains("1000000000000000128.0"));
-        assert!(!source.contains("strings.payload(\"1000000000000000128\")"));
     }
-    assert!(!DECIMAL_FORMAT_SOURCE.contains("strings.payload(\"\")"));
-
-    let fixed = bounded(
-        OPERATIONS_SOURCE,
-        "pub(crate) fn emit_number_to_fixed_payload(",
-        "pub(crate) fn emit_number_to_exponential_payload(",
-    );
-    let precision = bounded(
-        OPERATIONS_SOURCE,
-        "pub(crate) fn emit_number_to_precision_payload(",
-        "pub(crate) fn emit_count_decimal_digits_u64(",
-    );
-    assert!(!fixed.contains("strings.payload(\"\")"));
-    assert!(!precision.contains("strings.payload(\"\")"));
 }
 
 #[test]

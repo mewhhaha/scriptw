@@ -54,9 +54,10 @@ calls must still use their own registered HelperArguments/result path.
 
 `ProgramInstanceImage::from_program_pool` requires an actual ModuleKind::Program
 and checks that pool against its imported R boundary. `ProgramLiteralIndex`
-admits only ordinals in that P suffix. `ProgramLiteralRoots::admit_complete_table`
-consumes the producer's P-only table root and checks exact length and non-null
-coverage before publication. The producer must not retain a mutable alias.
+admits only ordinals in that P suffix. `ProgramLiteralRoots::unresolved`
+allocates the P-only table of the exact literal count with every slot null and
+takes the descriptor rows; only the P's resolver hook publishes a slot, at the
+literal's first use. The producer must not retain a mutable alias.
 `ProgramMetadataBytes::from_program_segment` uses ArrayNewData on the existing
 passive P metadata segment into ImmutableByteArray. It never copies P metadata
 to a shared linear static address or resets the transient byte allocator.
