@@ -43,8 +43,8 @@ fn checks(source: &str, options: ParseOptions, expected: &[(&str, usize)]) {
     let callable = runtime.witness_type(GcSnapshotLayout::Function);
     let stored = runtime.witness_type(GcSnapshotLayout::Stored);
     let descriptor = runtime.witness_type(GcSnapshotLayout::Descriptor);
-    let (find, _) = runtime.named("helper::ordinary_property_find");
-    let find = program.imported_runtime_function(&runtime, find);
+    // A program without a complete dictionary proof need not import `find`.
+    let (find_definition, _) = runtime.named("helper::ordinary_property_find");
     for (name, count) in expected {
         let variants = module_bodies(&artifact.bytes)
             .into_iter()
@@ -67,6 +67,7 @@ fn checks(source: &str, options: ParseOptions, expected: &[(&str, usize)]) {
             if *count == 0 {
                 continue;
             }
+            let find = program.imported_runtime_function(&runtime, find_definition);
             let region = closed[0];
             for ty in [storage, callable, stored] {
                 assert!(region.iter().any(|op|matches!(op,Operator::RefTestNonNull{hty:HeapType::Concrete(UnpackedIndex::Module(actual))} if *actual==ty)),"guard actual dictionary, callable and eager value layouts");
