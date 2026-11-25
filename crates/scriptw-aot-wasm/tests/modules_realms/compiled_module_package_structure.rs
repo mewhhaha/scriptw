@@ -365,12 +365,18 @@ fn emitter_consumes_the_package_through_the_reviewed_lifecycle() {
         "let bytes = module.finish();",
         "let artifact = WasmArtifact {",
     );
-    assert!(compact(finalization).contains(concat!(
-        "letbytes=matchkind{",
-        "ModuleKind::Program(_)=>crate::program_imports::compact(bytes,&mutfunction_table)?,",
-        "ModuleKind::Standalone(_)|ModuleKind::Runtime(_)=>bytes,",
-        "};"
-    )), "only linked P may rewrite its completed package; R and standalone bytes retain their owners");
+    let finalization_compact = compact(finalization);
+    for arm in [
+        "letbytes=matchkind{ModuleKind::Program(_)=>crate::program_imports::compact(bytes,&mutfunction_table)?,",
+        "ModuleKind::Runtime(_)ifuses_shared_memory=>{crate::runtime_private_memory::define(bytes,&mutfunction_table)?}",
+        "ModuleKind::Standalone(_)|ModuleKind::Runtime(_)=>bytes,};",
+    ] {
+        assert!(
+            finalization_compact.contains(arm),
+            "only linked P rewrites its imports and only a shared-memory R defines its private \
+             memory; other bytes retain their owners: {arm}"
+        );
+    }
     assert!(
         compact(finalization).contains(concat!(
             "ifletSome(budget)=FunctionBodyBudget::from_env(){",

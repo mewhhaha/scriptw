@@ -11,8 +11,10 @@ function entry and loop header.
 `InterruptHandle::interrupt` marks a request pending and removes access to the
 Store's GC heap and to each linear memory registered through
 `Store::interrupt_on_memory`. Engine registers the private linear memory:
-R defines it, so Engine registers R's exported memory once R is instantiated
-and before any code runs; a host-created one (a standalone module's) is
+R defines it, so Engine registers R's exported memory once R and P are
+instantiated, before the first call into either (neither has a start function;
+an interrupt requested earlier stays pending until compiled code runs). A
+host-created private memory, which only an older R layout imports, is
 registered when it is created.
 
 Compiled code faults at its next access to that memory. The fault handler

@@ -13,13 +13,16 @@ enum FrameKind {
     TryTable,
 }
 
+/// R defines its private memory after importing the shared one, so it is index 1.
+const RUNTIME_PRIVATE_MEMORY: u32 = 1;
+
 fn snapshot_load(ops: &[Operator<'_>], start: usize) -> Option<(u32, u64, u32)> {
     match ops.get(start..start + 4)? {
         [Operator::LocalGet {
             local_index: address,
         }, Operator::I32WrapI64, Operator::I64Load { memarg }, Operator::LocalSet {
             local_index: destination,
-        }] if memarg.memory == 0 && memarg.align == 0 => {
+        }] if memarg.memory == RUNTIME_PRIVATE_MEMORY && memarg.align == 0 => {
             Some((*address, memarg.offset, *destination))
         }
         _ => None,

@@ -123,7 +123,8 @@ impl PooledStores {
     /// every Scriptw configuration sets them. Store limits still cap each heap
     /// at 1 GiB, and the heaps never move, so execution deadlines are
     /// unchanged. Each warm slot keeps up to `keep_resident_bytes` resident
-    /// after its Store is dropped, so at most `max_concurrent ×
+    /// after its Store is dropped. A Store leaves two warm slots, its GC heap
+    /// and R's private linear memory, so at most `2 × max_concurrent ×
     /// keep_resident_bytes` stay resident; the pool's address space is
     /// reserved while the Engine lives.
     pub fn engine(
@@ -175,8 +176,9 @@ pub(crate) fn configure_with_pagemap(
         .max_tables_per_module(1)
         .total_stacks(stores)
         .max_memory_size(WASM_STORE_MEMORY_CAP_BYTES)
-        // Only the slots this many Stores leave behind stay warm (Wasmtime's
-        // default of 100 could keep 1.6 GiB resident).
+        // Prefer reusing the slots this many Stores leave behind (Wasmtime's
+        // default of 100 could keep 1.6 GiB resident). Every freed slot stays
+        // warm, and a Store frees two: its GC heap and R's private memory.
         .max_unused_warm_slots(stores);
     match reset {
         PooledStoreReset::KeepDirtyPagesResident { bytes } => {

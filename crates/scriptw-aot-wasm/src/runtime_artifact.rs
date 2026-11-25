@@ -190,7 +190,10 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // LITERAL_RESOLVE hook and LITERAL_DESCRIPTORS, its literal table starts all
 // null, and FunctionObject.TO_STRING may be null beside a TO_STRING_LITERAL
 // ordinal that toString resolves through the defining P.
-const LAYOUT_VERSION: u32 = 89;
+// Version 90 makes R define its private linear memory (index 1, after the
+// imported shared memory) instead of importing a host-created one, so its data
+// segments become a copy-on-write memory image.
+const LAYOUT_VERSION: u32 = 90;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.
