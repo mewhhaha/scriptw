@@ -99,7 +99,7 @@ fn present_shape_invalidation_owns_only_live_rows_and_preserves_fresh_returns() 
             .collect::<BTreeSet<_>>();
         assert!(live.len() < baseline.len());
         lowerer.function_signatures = function_signatures();
-        lowerer.visit_live_heap_shape_roots(|_, _, _| false);
+        lowerer.visit_live_heap_shape_roots(&DiscardHeapShapeFacts);
         assert_eq!(
             lowerer
                 .function_signatures

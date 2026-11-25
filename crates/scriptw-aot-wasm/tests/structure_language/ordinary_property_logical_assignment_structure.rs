@@ -234,18 +234,22 @@ fn lowering_intercepts_only_simple_property_logical_assignments() {
         "self.invalidate_unknown_user_code_effects();",
         "for receiver in &metadata.possible_receiver_values",
         "self.invalidate_ordinary_property_shape_aliases(receiver);",
-        "fn invalidate_nested_aliases(",
-        "for property in shape.properties.values_mut()",
-        "invalidate_value_alias(value, alias, canonical_targets);",
-        // Prototype links are cut by one owner, which reports whether the
+        "fn nested_aliases_edit(",
+        "data_values(&shape.properties)",
+        "value_alias_edit(value, alias, canonical_targets)",
+        // Prototype links are judged by one owner, which reports whether the
         // remaining chain is still described.
-        "fn invalidate_prototype_link(",
-        "if alias.heap_shape.as_deref() != Some(&*linked) {",
-        "return invalidate_nested_aliases(linked, alias, canonical_targets);",
-        "invalidate_prototype_link(&mut shape.prototype, alias, canonical_targets)",
-        "HeapShape::Array(shape) => {",
-        "invalidate_value_alias(element, alias, canonical_targets);",
-        "self.visit_live_heap_shape_roots(clear_if_alias_is_reachable);",
+        "fn prototype_link_edit(",
+        "if alias.heap_shape.as_deref() != Some(linked) {",
+        "nested_aliases_edit(linked, alias, canonical_targets)",
+        "prototype_link_edit(prototype.as_deref(), alias, canonical_targets);",
+        "HeapShape::Array(shape) => data_values(&shape.properties)",
+        ".chain(&shape.elements)",
+        // Only shapes on the path to a change are copied and refined.
+        "fn refine_nested_aliases(",
+        "data_values_mut(&mut shape.properties)",
+        ".chain(&mut shape.elements)",
+        "self.visit_live_heap_shape_roots(&OrdinaryPropertyAliases {",
     ] {
         assert!(
             possible_write.contains(marker),

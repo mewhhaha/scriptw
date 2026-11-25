@@ -796,81 +796,97 @@ impl<'a> ScriptLowerer<'a> {
             }
         }
 
-        /// Whether invalidation left a shape's prototype chain unknown.
+        fn data_values(
+            properties: &BTreeMap<String, ObjectShapeProperty>,
+        ) -> impl Iterator<Item = &ValueInfo> {
+            properties.values().filter_map(|property| match property {
+                ObjectShapeProperty::Data(value) => Some(value),
+                _ => None,
+            })
+        }
+
+        fn data_values_mut(
+            properties: &mut BTreeMap<String, ObjectShapeProperty>,
+        ) -> impl Iterator<Item = &mut ValueInfo> {
+            properties
+                .values_mut()
+                .filter_map(|property| match property {
+                    ObjectShapeProperty::Data(value) => Some(value),
+                    _ => None,
+                })
+        }
+
+        // Each edit is read from the shapes as they are, so that a shape the
+        // invalidation leaves unchanged is not copied; only shapes on the
+        // path to a change are made unique (`Arc::make_mut`) and refined.
+
+        /// What invalidation does to a shape: `Discard` where its prototype
+        /// chain becomes unknown, `Refine` where it changes otherwise.
+        fn nested_aliases_edit(
+            shape: &HeapShape,
+            alias: &ValueInfo,
+            canonical_targets: &BTreeMap<FunctionId, FunctionId>,
+        ) -> HeapShapeFactEdit {
+            let prototype = match shape {
+                HeapShape::Object(shape) => &shape.prototype,
+                HeapShape::Array(shape) => &shape.prototype,
+            };
+            let prototype_edit =
+                prototype_link_edit(prototype.as_deref(), alias, canonical_targets);
+            if prototype_edit != HeapShapeFactEdit::Keep {
+                return prototype_edit;
+            }
+            let value_changes =
+                |value: &ValueInfo| value_alias_edit(value, alias, canonical_targets).is_some();
+            let values_change = match shape {
+                HeapShape::Object(shape) => data_values(&shape.properties)
+                    .chain(shape.boxed_primitive.as_deref())
+                    .any(value_changes),
+                HeapShape::Array(shape) => data_values(&shape.properties)
+                    .chain(&shape.elements)
+                    .any(value_changes),
+            };
+            if values_change {
+                HeapShapeFactEdit::Refine
+            } else {
+                HeapShapeFactEdit::Keep
+            }
+        }
+
+        /// The edit of the shape linked as a prototype.
         ///
         /// A shape with `prototype: None` reads as inheriting
         /// `%Object.prototype%`, so cutting the link to the empty
-        /// `%Object.prototype%` placeholder keeps its meaning. Cutting any other
-        /// link would make the rest of the chain read as `%Object.prototype%`
-        /// too — a TypeError whose `%Error.prototype%` was written would then
-        /// resolve `toString` to `Object.prototype.toString` — so every shape
-        /// whose chain passes through that link has to be dropped instead.
-        #[must_use]
-        #[derive(Clone, Copy, PartialEq, Eq)]
-        enum PrototypeChain {
-            Described,
-            Unknown,
-        }
-
-        fn invalidate_prototype_link(
-            prototype: &mut Option<Arc<HeapShape>>,
+        /// `%Object.prototype%` placeholder keeps its meaning (`Refine`).
+        /// Cutting any other link would make the rest of the chain read as
+        /// `%Object.prototype%` too — a TypeError whose `%Error.prototype%`
+        /// was written would then resolve `toString` to
+        /// `Object.prototype.toString` — so every shape whose chain passes
+        /// through that link has to be dropped instead (`Discard`).
+        fn prototype_link_edit(
+            linked: Option<&HeapShape>,
             alias: &ValueInfo,
             canonical_targets: &BTreeMap<FunctionId, FunctionId>,
-        ) -> PrototypeChain {
-            let Some(linked) = prototype.as_mut().map(Arc::make_mut) else {
-                return PrototypeChain::Described;
+        ) -> HeapShapeFactEdit {
+            let Some(linked) = linked else {
+                return HeapShapeFactEdit::Keep;
             };
-            if alias.heap_shape.as_deref() != Some(&*linked) {
-                return invalidate_nested_aliases(linked, alias, canonical_targets);
-            }
-            let chain = if *linked == ScriptLowerer::empty_object_shape() {
-                PrototypeChain::Described
+            if alias.heap_shape.as_deref() != Some(linked) {
+                nested_aliases_edit(linked, alias, canonical_targets)
+            } else if *linked == ScriptLowerer::empty_object_shape() {
+                HeapShapeFactEdit::Refine
             } else {
-                PrototypeChain::Unknown
-            };
-            *prototype = None;
-            chain
-        }
-
-        fn invalidate_nested_aliases(
-            shape: &mut HeapShape,
-            alias: &ValueInfo,
-            canonical_targets: &BTreeMap<FunctionId, FunctionId>,
-        ) -> PrototypeChain {
-            match shape {
-                HeapShape::Object(shape) => {
-                    for property in shape.properties.values_mut() {
-                        if let ObjectShapeProperty::Data(value) = property {
-                            invalidate_value_alias(value, alias, canonical_targets);
-                        }
-                    }
-                    if let Some(boxed_primitive) = shape.boxed_primitive.as_deref_mut() {
-                        invalidate_value_alias(boxed_primitive, alias, canonical_targets);
-                    }
-                    invalidate_prototype_link(&mut shape.prototype, alias, canonical_targets)
-                }
-                HeapShape::Array(shape) => {
-                    for property in shape.properties.values_mut() {
-                        if let ObjectShapeProperty::Data(value) = property {
-                            invalidate_value_alias(value, alias, canonical_targets);
-                        }
-                    }
-                    for element in &mut shape.elements {
-                        invalidate_value_alias(element, alias, canonical_targets);
-                    }
-                    invalidate_prototype_link(&mut shape.prototype, alias, canonical_targets)
-                }
+                HeapShapeFactEdit::Discard
             }
         }
 
-        fn invalidate_value_alias(
-            value: &mut ValueInfo,
+        /// The edit of a value's present shape, or `None` where it keeps it.
+        fn value_alias_edit(
+            value: &ValueInfo,
             alias: &ValueInfo,
             canonical_targets: &BTreeMap<FunctionId, FunctionId>,
-        ) {
-            let Some(shape) = value.heap_shape.as_deref() else {
-                return;
-            };
+        ) -> Option<HeapShapeFactEdit> {
+            let shape = value.heap_shape.as_deref()?;
             let function_target_relation = exact_function_target_relation(
                 value.possible_kinds,
                 &value.function_targets,
@@ -882,17 +898,100 @@ impl<'a> ScriptLowerer<'a> {
                     || (function_target_relation == ExactFunctionTargetRelation::Unknown
                         && alias.heap_shape.as_deref() == Some(shape)));
             if direct_alias {
-                value.heap_shape = None;
-                return;
+                return Some(HeapShapeFactEdit::Discard);
             }
-            let shape = value
-                .heap_shape
-                .as_mut()
-                .map(Arc::make_mut)
-                .expect("checked nested alias shape must still exist");
-            match invalidate_nested_aliases(shape, alias, canonical_targets) {
-                PrototypeChain::Described => {}
-                PrototypeChain::Unknown => value.heap_shape = None,
+            match nested_aliases_edit(shape, alias, canonical_targets) {
+                HeapShapeFactEdit::Keep => None,
+                edit => Some(edit),
+            }
+        }
+
+        /// Applies the `Refine` [`nested_aliases_edit`] answered for `shape`.
+        fn refine_nested_aliases(
+            shape: &mut HeapShape,
+            alias: &ValueInfo,
+            canonical_targets: &BTreeMap<FunctionId, FunctionId>,
+        ) {
+            let refine_value =
+                |value: &mut ValueInfo| match value_alias_edit(value, alias, canonical_targets) {
+                    None => {}
+                    Some(HeapShapeFactEdit::Discard) => value.heap_shape = None,
+                    Some(HeapShapeFactEdit::Refine) => refine_nested_aliases(
+                        Arc::make_mut(
+                            value
+                                .heap_shape
+                                .as_mut()
+                                .expect("a refined shape is present"),
+                        ),
+                        alias,
+                        canonical_targets,
+                    ),
+                    Some(HeapShapeFactEdit::Keep) => unreachable!("a kept shape has no edit"),
+                };
+            let prototype = match shape {
+                HeapShape::Object(shape) => {
+                    data_values_mut(&mut shape.properties)
+                        .chain(shape.boxed_primitive.as_deref_mut())
+                        .for_each(refine_value);
+                    &mut shape.prototype
+                }
+                HeapShape::Array(shape) => {
+                    data_values_mut(&mut shape.properties)
+                        .chain(&mut shape.elements)
+                        .for_each(refine_value);
+                    &mut shape.prototype
+                }
+            };
+            let Some(linked) = prototype.as_mut() else {
+                return;
+            };
+            if alias.heap_shape.as_deref() == Some(&**linked) {
+                // Only the `%Object.prototype%` placeholder link is cut
+                // within a shape that is kept.
+                *prototype = None;
+            } else {
+                match nested_aliases_edit(linked, alias, canonical_targets) {
+                    HeapShapeFactEdit::Keep => {}
+                    HeapShapeFactEdit::Refine => {
+                        refine_nested_aliases(Arc::make_mut(linked), alias, canonical_targets)
+                    }
+                    HeapShapeFactEdit::Discard => {
+                        unreachable!("a shape whose prototype chain becomes unknown is discarded")
+                    }
+                }
+            }
+        }
+
+        struct OrdinaryPropertyAliases<'a> {
+            base: &'a ValueInfo,
+            canonical_targets: BTreeMap<FunctionId, FunctionId>,
+        }
+
+        impl HeapShapeFactVisitor for OrdinaryPropertyAliases<'_> {
+            fn assess(
+                &self,
+                possible_kinds: KindSet,
+                function_targets: &FunctionTargetKnowledge,
+                root_shape: &HeapShape,
+            ) -> HeapShapeFactEdit {
+                let function_target_relation = exact_function_target_relation(
+                    possible_kinds,
+                    function_targets,
+                    self.base,
+                    &self.canonical_targets,
+                );
+                let direct_alias = possible_kinds.intersects(self.base.possible_kinds)
+                    && (function_target_relation == ExactFunctionTargetRelation::Overlapping
+                        || (function_target_relation == ExactFunctionTargetRelation::Unknown
+                            && self.base.heap_shape.as_deref() == Some(root_shape)));
+                if direct_alias {
+                    return HeapShapeFactEdit::Discard;
+                }
+                nested_aliases_edit(root_shape, self.base, &self.canonical_targets)
+            }
+
+            fn refine(&self, shape: &mut HeapShape) {
+                refine_nested_aliases(shape, self.base, &self.canonical_targets);
             }
         }
 
@@ -901,29 +1000,10 @@ impl<'a> ScriptLowerer<'a> {
             .iter()
             .map(|(target, signature)| (target.clone(), signature.id.clone()))
             .collect::<BTreeMap<_, _>>();
-        let clear_if_alias_is_reachable =
-            |possible_kinds: KindSet,
-             function_targets: &FunctionTargetKnowledge,
-             root_shape: &mut HeapShape| {
-                let function_target_relation = exact_function_target_relation(
-                    possible_kinds,
-                    function_targets,
-                    base,
-                    &canonical_targets,
-                );
-                let direct_alias = possible_kinds.intersects(base.possible_kinds)
-                    && (function_target_relation == ExactFunctionTargetRelation::Overlapping
-                        || (function_target_relation == ExactFunctionTargetRelation::Unknown
-                            && base.heap_shape.as_deref() == Some(&*root_shape)));
-                if direct_alias {
-                    return false;
-                }
-                match invalidate_nested_aliases(root_shape, base, &canonical_targets) {
-                    PrototypeChain::Described => true,
-                    PrototypeChain::Unknown => false,
-                }
-            };
-        self.visit_live_heap_shape_roots(clear_if_alias_is_reachable);
+        self.visit_live_heap_shape_roots(&OrdinaryPropertyAliases {
+            base,
+            canonical_targets,
+        });
         self.static_to_string_regexp_object_bindings.clear();
     }
 

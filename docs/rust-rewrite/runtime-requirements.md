@@ -217,6 +217,11 @@ nearly all of it that tree. Lowering shares heap shapes between the facts
 that hold them, so a function's `this` fact no longer copies the global
 object's shape (about 1 MB with the builtins); 1,000 methods in one object
 literal (`staging/sm/class/methDefn.js`) fell from 2.2 GB to under 0.5 GB.
+A write, `delete` or call that invalidates shape facts decides each edit from
+the shared shape and copies only the shapes it changes: 200 bindings of one
+500-property object and a `delete` elsewhere peaked at 312 MiB above the
+start of lowering while each binding's shape was copied first, and at 27 MiB
+shared.
 
 ## Dynamic source: eval and Function constructors
 

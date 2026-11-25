@@ -193,4 +193,4 @@ the parser boxes each statement of a list, so Test262's
 `eval`) peaked at 2.2 GB, nearly all of it empty blocks. Matches that only
 borrow the loop are unchanged; a raw pointer used as the loop's identity is
 taken from the boxed loop, `&**for_of`. Test: IR `compile_memory`
-`an_empty_block_statement_costs_at_most_256_bytes_to_parse`.
+`an_empty_block_statement_is_a_224_byte_node`.

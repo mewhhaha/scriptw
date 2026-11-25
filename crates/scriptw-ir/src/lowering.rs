@@ -324,6 +324,46 @@ impl FunctionSignatureShapeEvidence {
     }
 }
 
+/// What a whole-flow edit of heap shape facts does to one present shape.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HeapShapeFactEdit {
+    Keep,
+    Refine,
+    Discard,
+}
+
+/// A whole-flow edit of heap shape facts (`visit_heap_shape_roots`).
+///
+/// Bindings, properties, signatures and saved flow states share shapes. The
+/// edit is decided from the shared shape, so a shape kept or discarded is
+/// never copied; only a shape to refine is made unique (`Arc::make_mut`)
+/// first, and a shared signature or row is copied only when it changes.
+trait HeapShapeFactVisitor {
+    fn assess(
+        &self,
+        possible_kinds: KindSet,
+        function_targets: &FunctionTargetKnowledge,
+        shape: &HeapShape,
+    ) -> HeapShapeFactEdit;
+
+    /// Called only with a shape `assess` answered [`HeapShapeFactEdit::Refine`]
+    /// for, as it was then.
+    fn refine(&self, shape: &mut HeapShape);
+}
+
+/// Discards every shape fact, as after a call to unknown user code.
+struct DiscardHeapShapeFacts;
+
+impl HeapShapeFactVisitor for DiscardHeapShapeFacts {
+    fn assess(&self, _: KindSet, _: &FunctionTargetKnowledge, _: &HeapShape) -> HeapShapeFactEdit {
+        HeapShapeFactEdit::Discard
+    }
+
+    fn refine(&self, _: &mut HeapShape) {
+        unreachable!("every shape fact is discarded, never refined")
+    }
+}
+
 /// Whether a function's result shape is a mutable heap summary or a recipe for
 /// a new result created by each invocation.
 ///
@@ -461,19 +501,35 @@ impl FunctionReturnShape {
         }
     }
 
+    fn flow_sensitive_edit(
+        &self,
+        possible_kinds: KindSet,
+        function_targets: &FunctionTargetKnowledge,
+        visitor: &impl HeapShapeFactVisitor,
+    ) -> HeapShapeFactEdit {
+        match self {
+            Self::FlowSensitive(shape) => visitor.assess(possible_kinds, function_targets, shape),
+            Self::Unobserved | Self::Absent | Self::RecreatedPerCall { .. } => {
+                HeapShapeFactEdit::Keep
+            }
+        }
+    }
+
     fn visit_flow_sensitive(
         &mut self,
         possible_kinds: KindSet,
         function_targets: &FunctionTargetKnowledge,
-        visit: &mut impl FnMut(KindSet, &FunctionTargetKnowledge, &mut HeapShape) -> bool,
+        visitor: &impl HeapShapeFactVisitor,
     ) {
-        match self {
-            Self::FlowSensitive(shape) => {
-                if !visit(possible_kinds, function_targets, Arc::make_mut(shape)) {
-                    *self = Self::Absent;
-                }
+        match self.flow_sensitive_edit(possible_kinds, function_targets, visitor) {
+            HeapShapeFactEdit::Keep => {}
+            HeapShapeFactEdit::Refine => {
+                let Self::FlowSensitive(shape) = self else {
+                    unreachable!("only a flow-sensitive return shape is refined")
+                };
+                visitor.refine(Arc::make_mut(shape));
             }
-            Self::Unobserved | Self::Absent | Self::RecreatedPerCall { .. } => {}
+            HeapShapeFactEdit::Discard => *self = Self::Absent,
         }
     }
 
@@ -5621,60 +5677,98 @@ impl<'a> ScriptLowerer<'a> {
     /// Keeping this transaction in one place prevents those implicit calls
     /// from preserving a cache or prototype guard which an explicit call could
     /// have changed.
-    fn visit_live_heap_shape_roots(
-        &mut self,
-        visit: impl FnMut(KindSet, &FunctionTargetKnowledge, &mut HeapShape) -> bool,
-    ) {
-        self.visit_heap_shape_roots(true, visit);
+    fn visit_live_heap_shape_roots(&mut self, visitor: &impl HeapShapeFactVisitor) {
+        self.visit_heap_shape_roots(true, visitor);
     }
 
     fn visit_heap_shape_roots(
         &mut self,
         visit_global_properties: bool,
-        mut visit: impl FnMut(KindSet, &FunctionTargetKnowledge, &mut HeapShape) -> bool,
+        visitor: &impl HeapShapeFactVisitor,
     ) {
         // This visitor can refine an existing shape or discard it. Its typed
         // input cannot manufacture a shape for an absent fact.
+        fn present_edit(
+            kinds: KindSet,
+            targets: &FunctionTargetKnowledge,
+            shape: Option<&HeapShape>,
+            visitor: &impl HeapShapeFactVisitor,
+        ) -> HeapShapeFactEdit {
+            shape.map_or(HeapShapeFactEdit::Keep, |shape| {
+                visitor.assess(kinds, targets, shape)
+            })
+        }
+
         fn visit_present(
             kinds: KindSet,
             targets: &FunctionTargetKnowledge,
             shape: &mut Option<Arc<HeapShape>>,
-            visit: &mut impl FnMut(KindSet, &FunctionTargetKnowledge, &mut HeapShape) -> bool,
+            visitor: &impl HeapShapeFactVisitor,
         ) {
-            if let Some(present) = shape.as_mut().map(Arc::make_mut) {
-                if !visit(kinds, targets, present) {
-                    *shape = None;
-                }
+            match present_edit(kinds, targets, shape.as_deref(), visitor) {
+                HeapShapeFactEdit::Keep => {}
+                HeapShapeFactEdit::Refine => visitor.refine(Arc::make_mut(
+                    shape.as_mut().expect("only a present shape is refined"),
+                )),
+                HeapShapeFactEdit::Discard => *shape = None,
             }
         }
 
-        fn visit_signature(
-            signature: &mut FunctionSignature,
-            visit: &mut impl FnMut(KindSet, &FunctionTargetKnowledge, &mut HeapShape) -> bool,
-        ) {
+        fn info_edits(info: &ValueInfo, visitor: &impl HeapShapeFactVisitor) -> bool {
+            present_edit(
+                info.possible_kinds,
+                &info.function_targets,
+                info.heap_shape.as_deref(),
+                visitor,
+            ) != HeapShapeFactEdit::Keep
+        }
+
+        fn visit_info(info: &mut ValueInfo, visitor: &impl HeapShapeFactVisitor) {
+            visit_present(
+                info.possible_kinds,
+                &info.function_targets,
+                &mut info.heap_shape,
+                visitor,
+            );
+        }
+
+        /// Whether the visit changes `signature`, so that a shared signature
+        /// it keeps whole is not copied.
+        fn signature_edits(
+            signature: &FunctionSignature,
+            visitor: &impl HeapShapeFactVisitor,
+        ) -> bool {
+            signature.return_shape.flow_sensitive_edit(
+                signature.return_possible_kinds,
+                &signature.return_targets,
+                visitor,
+            ) != HeapShapeFactEdit::Keep
+                || info_edits(&signature.constructor_instance, visitor)
+                || info_edits(&signature.this_info, visitor)
+                || signature.params.iter().any(|param| {
+                    present_edit(
+                        param.possible_kinds,
+                        &param.function_targets,
+                        param.heap_shape.as_deref(),
+                        visitor,
+                    ) != HeapShapeFactEdit::Keep
+                })
+        }
+
+        fn visit_signature(signature: &mut FunctionSignature, visitor: &impl HeapShapeFactVisitor) {
             signature.return_shape.visit_flow_sensitive(
                 signature.return_possible_kinds,
                 &signature.return_targets,
-                visit,
+                visitor,
             );
-            visit_present(
-                signature.constructor_instance.possible_kinds,
-                &signature.constructor_instance.function_targets,
-                &mut signature.constructor_instance.heap_shape,
-                visit,
-            );
-            visit_present(
-                signature.this_info.possible_kinds,
-                &signature.this_info.function_targets,
-                &mut signature.this_info.heap_shape,
-                visit,
-            );
+            visit_info(&mut signature.constructor_instance, visitor);
+            visit_info(&mut signature.this_info, visitor);
             for param in &mut signature.params {
                 visit_present(
                     param.possible_kinds,
                     &param.function_targets,
                     &mut param.heap_shape,
-                    visit,
+                    visitor,
                 );
             }
         }
@@ -5685,7 +5779,7 @@ impl<'a> ScriptLowerer<'a> {
                     binding.possible_kinds,
                     &binding.function_targets,
                     &mut binding.heap_shape,
-                    &mut visit,
+                    visitor,
                 );
             }
         }
@@ -5694,73 +5788,40 @@ impl<'a> ScriptLowerer<'a> {
                 binding.possible_kinds,
                 &binding.function_targets,
                 &mut binding.heap_shape,
-                &mut visit,
+                visitor,
             );
         }
         if visit_global_properties {
             self.global_properties.edit_matching(
-                |_, property| property.value_info.heap_shape.is_some(),
-                |_, property| {
-                    visit_present(
-                        property.value_info.possible_kinds,
-                        &property.value_info.function_targets,
-                        &mut property.value_info.heap_shape,
-                        &mut visit,
-                    )
-                },
+                |_, property| info_edits(&property.value_info, visitor),
+                |_, property| visit_info(&mut property.value_info, visitor),
             );
         }
         for info in self.well_known_symbol_prototype_properties.values_mut() {
-            visit_present(
-                info.possible_kinds,
-                &info.function_targets,
-                &mut info.heap_shape,
-                &mut visit,
-            );
+            visit_info(info, visitor);
         }
         for infos in [
             &mut self.nested_script_global_value_infos,
             &mut self.known_nested_script_global_value_infos,
         ] {
             for info in infos.values_mut() {
-                visit_present(
-                    info.possible_kinds,
-                    &info.function_targets,
-                    &mut info.heap_shape,
-                    &mut visit,
-                );
+                visit_info(info, visitor);
             }
         }
         if let CurrentThisBinding::Activation(info) = &mut self.current_this_binding {
-            if info.heap_shape.is_some() {
-                let info = std::sync::Arc::make_mut(info);
-                visit_present(
-                    info.possible_kinds,
-                    &info.function_targets,
-                    &mut info.heap_shape,
-                    &mut visit,
-                );
+            if info_edits(info, visitor) {
+                visit_info(std::sync::Arc::make_mut(info), visitor);
             }
         }
-        visit_present(
-            self.current_new_target_info.possible_kinds,
-            &self.current_new_target_info.function_targets,
-            &mut self.current_new_target_info.heap_shape,
-            &mut visit,
-        );
+        visit_info(&mut self.current_new_target_info, visitor);
         if let Some(info) = &mut self.current_construct_this_info {
-            visit_present(
-                info.possible_kinds,
-                &info.function_targets,
-                &mut info.heap_shape,
-                &mut visit,
-            );
+            visit_info(info, visitor);
         }
         if let Some(returned) = &mut self.current_return {
             returned.shape.visit_flow_sensitive(
                 returned.info.possible_kinds,
                 &returned.info.function_targets,
-                &mut visit,
+                visitor,
             );
             returned.info.heap_shape = returned.shape.cloned_shape();
         }
@@ -5769,7 +5830,7 @@ impl<'a> ScriptLowerer<'a> {
                 KindSet::from_kind(ValueKind::Object),
                 &FunctionTargetKnowledge::none(),
                 &mut context.super_base_shape,
-                &mut visit,
+                visitor,
             );
         }
         if !self.is_prepass {
@@ -5778,14 +5839,16 @@ impl<'a> ScriptLowerer<'a> {
                     FunctionSignatureShapeEvidence::Invalidated;
             } else {
                 self.function_signatures.edit_matching(
-                    |_, signature| signature.has_live_shape_roots(),
-                    |_, signature| visit_signature(signature, &mut visit),
+                    |_, signature| {
+                        signature.has_live_shape_roots() && signature_edits(signature, visitor)
+                    },
+                    |_, signature| visit_signature(signature, visitor),
                 );
                 for signature in self.exact_context_function_observations.values_mut() {
-                    visit_signature(signature, &mut visit);
+                    visit_signature(signature, visitor);
                 }
                 for signature in self.exact_context_callback_observations.values_mut() {
-                    visit_signature(signature, &mut visit);
+                    visit_signature(signature, visitor);
                 }
             }
         }
@@ -5794,7 +5857,7 @@ impl<'a> ScriptLowerer<'a> {
                 operand.possible_kinds,
                 &operand.function_targets,
                 &mut operand.heap_shape,
-                &mut visit,
+                visitor,
             );
         }
     }
@@ -5809,7 +5872,7 @@ impl<'a> ScriptLowerer<'a> {
             |_, property| property.without_heap_shape(),
         );
         // No global property fact has a shape left to visit.
-        self.visit_heap_shape_roots(false, |_, _, _| false);
+        self.visit_heap_shape_roots(false, &DiscardHeapShapeFacts);
     }
 
     fn invalidate_unknown_user_code_effects(&mut self) {
