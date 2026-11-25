@@ -12,6 +12,7 @@ mod async_operations;
 mod compact_records;
 mod execution_fiber_controls;
 mod execution_profile;
+mod pooled_private_memory;
 mod profiled_entry;
 mod reentrant_execution;
 mod retained_call_context;
