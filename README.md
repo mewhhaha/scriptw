@@ -107,37 +107,33 @@ on a retained call after 100 warmups. Speed is ahead of V8 in 9 of them and behi
 
 ### Porffor
 
-**Porffor 0.61.13 · 2026-11-23**, a separate panel. It compares a local Scriptw build of
-`6d6e0c5d4` on the 17 runtime kernels, with every actor on one CPU. Porffor prints wrong output
-for 3 kernels and throws on 1. On the 13 it runs correctly, Scriptw takes **0.394×** Porffor's time
+**Porffor 0.61.13 · 2026-11-25**, a separate panel. It compares a local release build of
+`5ed84a21a` on the 17 runtime kernels, with every actor on two CPUs. Porffor prints wrong output
+for 3 kernels and throws on 1. On the 13 it runs correctly, Scriptw takes **0.359×** Porffor's time
 when both run on Wasmtime (geometric mean; Scriptw is faster in 10/13 in both blocks), and
-**0.163×** with Porffor on Node's WebAssembly engine. Scriptw compiles all 17 faster, at
-**0.644×** Porffor's time. [Tables, engines and failures](docs/rust-rewrite/benchmarks.md#2026-11-23-comparison-with-porffor) ·
+**0.129×** with Porffor on Node's WebAssembly engine. Scriptw compiles all 17 faster, at
+**0.580×** Porffor's time. [Tables, engines and failures](docs/rust-rewrite/benchmarks.md#2026-11-25-comparison-with-porffor) ·
 [data](docs/rust-rewrite/wasm-peer-current.json).
 
 ![Scriptw time over Porffor time on the 17 runtime kernels](docs/rust-rewrite/assets/porffor-current/runtime.svg)
 
 ### Process density
 
-**Process density · 2026-11-23**, local build `1edd6d329`, in the shape of [Porffor's](https://porffor.dev)
+**Process density · 2026-11-25**, local release build `5ed84a21a`, in the shape of [Porffor's](https://porffor.dev)
 "apps per GB": N = 1–32 concurrent processes held after a print-only program, summed PSS.
 
 | Print-only program | Memory per added process | Processes in 16 GiB | Process wall |
 | --- | ---: | ---: | ---: |
-| Scriptw, precompiled image (benchmark host) | 4.9 MiB | 3,372 | 306 ms |
-| Node 24.22.1 | 8.4 MiB | 1,946 | 42 ms |
-| Node 22.23.4 | 6.7 MiB | 2,444 | 46 ms |
-| Porffor 0.61.13 native | 0.3 MiB | 58,545 | 5 ms |
+| Scriptw, precompiled image (benchmark host) | 1.7 MiB | 9,796 | 10 ms |
+| Node 24.22.1 | 8.6 MiB | 1,895 | 27 ms |
+| Node 22.23.4 | 6.7 MiB | 2,444 | 27 ms |
+| Porffor 0.61.13 native | 0.3 MiB | 58,996 | 3 ms |
 
-Scriptw fits 1.7× as many processes as Node 24, but Node 22 fits more on a kernel that keeps 8,192
-objects live. Scriptw's startup is its weak point: hashing its own executable and loading the runtime
-image take about 290 ms before a 1 ms program. Timings ran under heavy machine load. Since this
-run both costs have left the product path: caches are keyed by the linker build ID, and the runtime
-image is mapped from the executable instead of being decoded and hashed in every process. On the
-same loaded machine a warm `scriptw run` went from 114 to 27 ms and the host takes 13 ms, against
-32 ms for Node 24 in the same rounds; the panel has not been rerun. Since 2026-11-24 a warm start maps
-its cached program module and lists no cache directory: in separate rounds on one pinned CPU it went
-from 10.5 to 6.5 ms, and from 23.3 to 6.5 ms with a cache of 9,000 entries.
+Scriptw fits 5.2× as many processes as Node 24, and more than either Node on all six programs,
+including a kernel that keeps 8,192 objects live. A warm `scriptw run` of the program takes 7 ms.
+On 2026-11-23 a Scriptw process cost 4.9 MiB and 306 ms; the runtime image is now mapped from the
+executable instead of being decoded and hashed in every process, and caches are keyed by the
+linker build ID instead of an executable hash.
 [Method, kernels and limits](docs/rust-rewrite/benchmarks.md#process-density) ·
 [data](docs/rust-rewrite/process-density-current.json).
 

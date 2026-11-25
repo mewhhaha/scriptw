@@ -117,64 +117,21 @@ accepts `--case <file.js>`.
     republish.
 
   Owner: RSC compiler/runtime.
-- Process startup: the [density panel](benchmarks.md#process-density) fits
-  1.7× as many Scriptw processes as Node 24 in memory, but measured a Scriptw
-  process at about 306 ms against Node's 42 ms: about 194 ms hashing the
-  203 MiB executable and about 93 ms loading the runtime image. Both are gone
-  from the product path. Compiler caches are keyed by the loaded image's
-  linker build ID
-  ([contract](contracts/compiler-cache-image-identity.md)), and the native
-  runtime image is linked raw and page-aligned and mapped from the running
-  executable
-  ([contract](contracts/runtime-byte-ownership.md#native-backing-storage))
-  instead of zstd-decoded (about 43 ms), SHA-256-admitted (about 31 ms) and
-  written to a private unnamed file (about 14 ms) in every process. R now
-  loads in about 2 ms. On the loaded shared machine, one CPU, 21 interleaved
-  processes each, medians: warm `scriptw run` of the print-only program
-  114 → 27 ms and the host's `execute-scriptw` 13 ms (103 ms before, from the
-  previous measurement; that host was not rebuilt), against 32 ms for Node 24
-  in the same rounds. Eight concurrent `scriptw run` processes held in a loop
-  used 6.3 MiB of PSS per added process, from 9.9 MiB: the runtime's touched
-  code pages are now shared file pages. The executable grew from 215.5 to
-  275.4 MB (the host from 212.5 to 272.6 MB), because both native images are
-  stored raw.
-
-  Since 2026-11-24 a warm start no longer lists any cache directory, maps the
-  cached program module from `native-modules-v1` instead of zstd-decoding it
-  ([contract](contracts/runtime-byte-ownership.md#native-module-cache)), and
-  hashes rec groups with an unkeyed word hasher in the vendored type registry.
-  Warm `scriptw run` of the print-only program, same binary pair and method
-  (51 interleaved processes each, pinned to one CPU while a Test262 run used
-  the others; median, quartiles): 10.5 ms (10.3 to 10.7) → 6.5 ms (6.3 to
-  6.6) with a 320-entry function cache, and 23.3 ms (22.8 to 24.0) → 6.5 ms
-  (6.4 to 6.8) with 7,800 function, 640 program and 560 module entries: the
-  cost no longer depends on what the cache holds. System calls 847 → 370 and
-  9,647 → 370 (`statx` 353 and 9,044 → 12, `getdents64` 10 and 33 → 0,
-  threads created 4 → 1); Callgrind instructions 41.1M → 24.8M and 56.3M →
-  24.8M. These rounds are not comparable with the 27 ms above, which was
-  taken under a different load.
-
-  Private memory per process, also 2026-11-24 (the precompiled host held at
-  Store 1's `after_execution` barrier, pooled Stores, one pinned CPU): R
-  defines its private linear memory instead of importing a host-created one,
-  so Wasmtime maps R's data segments from the executable as a copy-on-write
-  image instead of copying 47 pages into every Store
-  ([contract](contracts/runtime-byte-ownership.md#native-backing-storage);
-  a [vendored Wasmtime patch](../../vendor/wasmtime-47.0.0/PATCHES.md#copy-on-write-image-beside-an-imported-memory)
-  gives a module that imports another memory its image), and the host's
-  execute commands run on one glibc malloc arena. Private dirty memory of
-  `startup.js` fell from 1,944 to 1,672 KiB (R's memory 192 → 4 KiB, malloc
-  arenas 88 KiB) and of `objects.js` from 2,112 to 1,848 KiB; the PSS added
-  per process between one and four held processes fell from 2.04 to 1.80 MiB
-  and from 2.21 to 1.98 MiB. A warm `scriptw run` did not slow down.
-
-  What remains: rerun the panel on a quiet machine with its own method (the
-  figures above are not the panel's). Of the 24.8M instructions of a warm
-  start, 9.4M are SHA-256 as Valgrind runs it, without the CPU's SHA
-  extension, and 4.6M register the two modules' types. The two raw Wasm
-  packages (38 MiB each) are the next candidates if the executable's size
-  matters more than its page-cache sharing. Keep the rule that no
-  pre-existing, cache-directory or digest-selected native file is admitted.
+- Process startup and density: the 2026-11-25
+  [density panel](benchmarks.md#process-density) adds 1.7 MiB of PSS per
+  print-only Scriptw process (5.2× as many processes as Node 24 in 16 GiB) and
+  measures a warm `scriptw run` at 7.1–8.2 ms against 24–29 ms for Node 24.
+  Porffor native stays at 0.3 MiB and 2.6–3.0 ms: it has no engine, runtime
+  library or collector, so per-process parity is not reachable here; many
+  Stores per process or a fork server would share the engine instead.
+  Remaining per-process private memory, largest first (2026-11-24, smaps and
+  massif of held host processes): Wasmtime module
+  metadata and type registry for R and P (about 0.75 MiB), P's native code
+  copied by the precompiled host (about 0.28 MiB; `scriptw run` maps it),
+  thread stacks, Store and instance structures. Of the 24.8M instructions of
+  a warm start, 9.4M are SHA-256 as Valgrind runs it and 4.6M register the two
+  modules' types. Keep the rule that no pre-existing, cache-directory or
+  digest-selected native file is admitted.
 
   Owner: CLI and engine embedding.
 - Retained RSC requests: the 1 ms goal is met, and against Node 24

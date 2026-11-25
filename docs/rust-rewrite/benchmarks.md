@@ -2825,13 +2825,12 @@ the write barrier's out-of-line old-slot test, which cost edge-json-api
 and +4.6% execution time. Opening the window only when the first nursery is
 full leaves those entries on the path they had.
 
-## 2026-11-23 comparison with Porffor
+## 2026-11-25 comparison with Porffor
 
 [Porffor](https://porffor.dev) 0.61.13 is another JavaScript-to-Wasm AOT compiler. It ran
-on the original17 runtime kernels against a local Scriptw build of `6d6e0c5d4` (source
-fingerprint `6bcd768386ac`; the performance batch's waves 1–3, not the requalified cohort of
-the panels above), with Node 24.22.1 (V8 13.6.233.17-node.58). This is a separate panel, not a
-republication of the runtime comparison.
+on the original17 runtime kernels against a local release build of `5ed84a21a` (main; source
+fingerprint `408c45ed3e29`, not the requalified cohort of the panels above), with Node 24.22.1
+(V8 13.6.233.17-node.58). This is a separate panel, not a republication of the runtime comparison.
 
 ![Scriptw time over Porffor time on the 17 runtime kernels](assets/porffor-current/runtime.svg)
 
@@ -2852,7 +2851,7 @@ on Wasmtime with the host's native tier: SpeedAndSize, backtracking allocation, 
 16 MiB per memory slot resident. Wasmtime implements only exnref exceptions, so this works only
 where Porffor emits no legacy `try`; all 17 kernels qualify. Its output import is a Wasm adapter
 function in the same Store, so entries make no host call. The Python `ctypes` entry call is
-inside the timer, and its empty-call floor (2.2–3.2 µs median) is retained per entry, not
+inside the timer, and its empty-call floor (1.8–2.5 µs median) is retained per entry, not
 subtracted.
 
 **Method.** The runtime panel's sampling is reused: per actor and kernel, eight fresh processes
@@ -2861,43 +2860,42 @@ Every entry gets a fresh instance (Store, Realm or `vm` context) outside the tim
 entry's output is checked. Times are medians of process medians. Porffor gets Scriptc's
 `print` adapter and its default `-O1`.
 
-**CPU.** An unrelated test process occupied CPU 3 for the whole session, so every actor ran on
-**CPU 2 alone**, with the other three vCPUs busy. V8's JIT and GC helper threads, and V8's
-Wasm tier-up, share that CPU with the measured thread. The V8 JavaScript column is therefore
-not comparable with the two-CPU 2026-11-17 panel (`integer.js`: 2.73 ms here against 1.29 ms
-there). An earlier run on CPUs 2–3, contended on CPU 3, is not published. Its per-kernel
-medians were 0.87–1.14× of these for Scriptw, 0.76–1.25× for Porffor on Wasmtime and
-0.71–1.45× for Porffor on Node/V8, so single kernels move by up to tens of percent under load.
+**CPU.** Every actor ran on **CPUs 2–3** of the shared four-vCPU cloud machine (Intel Xeon @
+2.30 GHz) with no other heavy work running. V8's JIT and GC helper threads, and V8's Wasm
+tier-up, share those two CPUs with the measured thread, as in the 2026-11-17 panels
+(`integer.js` on Node/V8: 1.31 ms here against 1.29 ms there). The previous run, on 2026-11-23
+against `6d6e0c5d4`, had every actor on one loaded CPU; its Node/V8 column (2.73 ms for
+`integer.js`) is not comparable with this one.
 
 | Kernel | Scriptw (ms) | Porffor on Wasmtime (ms) | Porffor on Node/V8 Wasm (ms) | Node/V8 JavaScript (ms) | Scriptw ÷ Porffor on Wasmtime |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `sort-reverse-128.js` | 0.051 | 0.115 | 0.201 | 0.034 | 0.44× |
-| `sort-reverse-512.js` | 0.060 | 1.518 | 2.332 | 0.182 | 0.04× |
-| `sort-sorted-512.js` | 0.065 | 0.032 | 0.041 | 0.152 | 2.01× |
-| `to-sorted-512.js` | 0.068 | 1.489 | 2.349 | 0.150 | 0.05× |
-| `join-1024.js` | 0.090 | wrong output | wrong output | 0.058 | — |
-| `join-4096.js` | 0.236 | wrong output | wrong output | 1.279 | — |
-| `join-mixed-1024.js` | 0.092 | 0.048 | 0.064 | 0.417 | 1.93× |
-| `numeric-loop-10000.js` | 0.040 | 0.023 | 0.024 | 1.074 | 1.74× |
-| `numeric-loop-50000.js` | 0.038 | 0.066 | 0.090 | 1.573 | 0.57× |
-| `folded-string-4096.js` | 0.074 | 0.147 | 0.185 | 1.153 | 0.51× |
-| `dynamic-string-4096.js` | 0.082 | 0.142 | 0.098 | 1.257 | 0.58× |
-| `integer.js` | 0.042 | wrong output | wrong output | 2.731 | — |
-| `objects.js` | 0.090 | 0.103 | 1.611 | 0.075 | 0.88× |
-| `retained-objects.js` | 2.731 | runtime failed | runtime failed | 4.518 | — |
-| `join-empty-1024.js` | 0.044 | 0.166 | 0.850 | 0.305 | 0.26× |
-| `join-singleton-1024.js` | 0.046 | 0.295 | 3.397 | 0.368 | 0.16× |
-| `join-small-1024.js` | 0.048 | 0.286 | 3.273 | 0.417 | 0.17× |
+| `sort-reverse-128.js` | 0.039 | 0.084 | 0.125 | 0.019 | 0.46× |
+| `sort-reverse-512.js` | 0.047 | 1.129 | 1.756 | 0.068 | 0.04× |
+| `sort-sorted-512.js` | 0.041 | 0.024 | 0.068 | 0.073 | 1.70× |
+| `to-sorted-512.js` | 0.050 | 1.143 | 1.775 | 0.066 | 0.04× |
+| `join-1024.js` | 0.069 | wrong output | wrong output | 0.043 | — |
+| `join-4096.js` | 0.158 | wrong output | wrong output | 0.212 | — |
+| `join-mixed-1024.js` | 0.072 | 0.032 | 0.077 | 0.082 | 2.21× |
+| `numeric-loop-10000.js` | 0.025 | 0.016 | 0.020 | 0.141 | 1.54× |
+| `numeric-loop-50000.js` | 0.022 | 0.050 | 0.048 | 0.464 | 0.45× |
+| `folded-string-4096.js` | 0.047 | 0.100 | 0.131 | 0.103 | 0.47× |
+| `dynamic-string-4096.js` | 0.055 | 0.092 | 0.071 | 0.164 | 0.60× |
+| `integer.js` | 0.026 | wrong output | wrong output | 1.308 | — |
+| `objects.js` | 0.064 | 0.091 | 1.364 | 0.047 | 0.70× |
+| `retained-objects.js` | 2.062 | runtime failed | runtime failed | 1.859 | — |
+| `join-empty-1024.js` | 0.030 | 0.125 | 0.759 | 0.060 | 0.24× |
+| `join-singleton-1024.js` | 0.029 | 0.223 | 3.137 | 0.087 | 0.13× |
+| `join-small-1024.js` | 0.025 | 0.205 | 3.224 | 0.129 | 0.12× |
 
 | Comparison | Kernels | Scriptw faster in both blocks | Scriptw time ÷ other, geomean | Range |
 | --- | ---: | ---: | ---: | --- |
-| Scriptw vs Porffor on Wasmtime | 13 | 10 | 0.394× | 0.04–2.01× |
-| Scriptw vs Porffor on Node/V8 Wasm | 13 | 10 | 0.163× | 0.01–1.67× |
-| Scriptw vs Node/V8 JavaScript | 17 | 14 | 0.190× | 0.02–1.56× |
+| Scriptw vs Porffor on Wasmtime | 13 | 10 | 0.359× | 0.04–2.21× |
+| Scriptw vs Porffor on Node/V8 Wasm | 13 | 12 | 0.129× | 0.01–1.25× |
+| Scriptw vs Node/V8 JavaScript | 17 | 13 | 0.437× | 0.02–2.00× |
 
 Porffor on Node/V8 Wasm is slow on `objects.js` and the small-join kernels. That is not
-warmup: `objects.js` stays at 1.49 ms after 100 warmups, against 0.10 ms for the same Wasm on
-Wasmtime. The cause was not profiled.
+warmup: in a 2026-11-23 probe `objects.js` stayed at 1.49 ms after 100 warmups, against 0.10 ms
+for the same Wasm on Wasmtime. The cause was not profiled.
 
 **Failed attempts.** Porffor fails 4 of 17 kernels. The result is the same on both engines and
 in the package's own CLI runner on the same adapted source, which rules out the harnesses.
@@ -2919,31 +2917,31 @@ The two join kernels, whose strings contain NUL and lone surrogates, give wrong 
 **Compilation.** Four fresh compiler processes per kernel (136 in all) ran on one CPU, in
 ABBA order across two reversed blocks. Scriptw `build wasm` writes P plus the shared 38 MB R
 sidecar. Porffor runs its JavaScript compiler on Node and writes standalone Wasm. Startup and
-output I/O are included. Scriptw is faster on **17/17** kernels, at **0.644×** Porffor's time
-by geometric mean. Median peak RSS is 77 MiB for Scriptw and 83 MiB for Porffor. Porffor
+output I/O are included. Scriptw is faster on **17/17** kernels, at **0.580×** Porffor's time
+by geometric mean. Median peak RSS is 74 MiB for Scriptw and 81 MiB for Porffor. Porffor
 compiles even the kernels it then runs wrongly.
 
 | Kernel | Scriptw build (ms) | Porffor build (ms) | Scriptw P Wasm (bytes) | Porffor Wasm (bytes) |
 | --- | ---: | ---: | ---: | ---: |
-| `sort-reverse-128.js` | 132.9 | 205.1 | 71,306 | 35,373 |
-| `sort-reverse-512.js` | 128.5 | 205.2 | 71,306 | 35,373 |
-| `sort-sorted-512.js` | 129.8 | 251.5 | 71,325 | 35,373 |
-| `to-sorted-512.js` | 130.8 | 208.2 | 72,625 | 35,522 |
-| `join-1024.js` | 132.2 | 215.0 | 68,482 | 35,287 |
-| `join-4096.js` | 130.0 | 236.1 | 68,482 | 35,287 |
-| `join-mixed-1024.js` | 127.2 | 207.6 | 63,381 | 34,116 |
-| `numeric-loop-10000.js` | 138.9 | 225.3 | 57,062 | 32,730 |
-| `numeric-loop-50000.js` | 177.1 | 217.0 | 57,062 | 32,730 |
-| `folded-string-4096.js` | 173.0 | 206.3 | 60,693 | 33,598 |
-| `dynamic-string-4096.js` | 167.1 | 228.1 | 58,733 | 32,993 |
-| `integer.js` | 147.5 | 227.9 | 67,135 | 32,788 |
-| `objects.js` | 130.4 | 216.9 | 75,081 | 34,506 |
-| `retained-objects.js` | 147.7 | 219.1 | 76,887 | 34,599 |
-| `join-empty-1024.js` | 130.9 | 208.0 | 64,471 | 33,884 |
-| `join-singleton-1024.js` | 132.0 | 202.7 | 64,871 | 33,926 |
-| `join-small-1024.js` | 133.8 | 216.5 | 65,257 | 34,019 |
+| `sort-reverse-128.js` | 97.8 | 162.7 | 70,293 | 35,373 |
+| `sort-reverse-512.js` | 93.3 | 158.3 | 70,293 | 35,373 |
+| `sort-sorted-512.js` | 92.0 | 160.8 | 70,311 | 35,373 |
+| `to-sorted-512.js` | 94.2 | 164.2 | 71,593 | 35,522 |
+| `join-1024.js` | 96.0 | 165.8 | 67,692 | 35,287 |
+| `join-4096.js` | 95.6 | 168.3 | 67,692 | 35,287 |
+| `join-mixed-1024.js` | 96.4 | 166.5 | 62,739 | 34,116 |
+| `numeric-loop-10000.js` | 92.9 | 165.0 | 67,943 | 32,730 |
+| `numeric-loop-50000.js` | 94.0 | 167.1 | 67,943 | 32,730 |
+| `folded-string-4096.js` | 95.0 | 167.6 | 72,139 | 33,598 |
+| `dynamic-string-4096.js` | 96.3 | 166.0 | 71,246 | 32,993 |
+| `integer.js` | 96.0 | 163.0 | 86,330 | 32,788 |
+| `objects.js` | 94.4 | 165.3 | 74,270 | 34,506 |
+| `retained-objects.js` | 98.1 | 157.1 | 76,069 | 34,599 |
+| `join-empty-1024.js` | 95.1 | 165.6 | 63,952 | 33,884 |
+| `join-singleton-1024.js` | 94.1 | 158.9 | 64,349 | 33,926 |
+| `join-small-1024.js` | 97.1 | 170.1 | 64,718 | 34,019 |
 
-**Other panels.** Porffor completes none of the six edge kernels:
+**Other panels (untimed probe, 2026-11-23, not rerun).** Porffor completes none of the six edge kernels:
 
 - `edge-router.js`, `edge-query.js` and `edge-html.js` print wrong output.
 - `edge-json-api.js`, `edge-middleware.js` and `edge-nested-result.js` throw a
@@ -2960,13 +2958,13 @@ only its `main`, so it has no matched consumer there. React SSR and RSC were not
 
 ## Process density
 
-**2026-11-23**, a separate panel: how many processes of one small JavaScript program fit in a
+**2026-11-25**, a separate panel: how many processes of one small JavaScript program fit in a
 machine's memory, in the shape of [Porffor's site](https://porffor.dev), plus process wall time and
 per-entry runtime. Porffor's page reports "apps per GB under load" (28 for Node containers, 45 for
 self-hosted workerd, 1,144 for Porffor processes) without workload, hardware or method; this panel
-publishes all three. Scriptw is a local build of `1edd6d329` (source fingerprint `b1a91d4ed476`).
-Node is 24.22.1 (V8 13.6.233.17-node.58) and 22.23.4 (V8 12.4.254.21-node.57). Porffor is 0.61.13,
-compiled `native` through its C backend with gcc 13.3 at its default `-O3`.
+publishes all three. Scriptw is a local release build of `5ed84a21a` (main; source fingerprint
+`408c45ed3e29`). Node is 24.22.1 (V8 13.6.233.17-node.58) and 22.23.4 (V8 12.4.254.21-node.57).
+Porffor is 0.61.13, compiled `native` through its C backend with gcc 13.3 at its default `-O3`.
 
 | Actor | Program | How it runs |
 | --- | --- | --- |
@@ -2992,27 +2990,27 @@ split between the processes that map it. It is linear in N, total(N) = fixed + N
 - processes in M bytes = ⌊(M − fixed) / marginal⌋, with M = 1 GiB and 16 GiB.
 
 The 16 GiB figure gives the whole 16 GiB to these processes: no kernel, page cache or OS reserve.
-It is an upper bound. The N = 8 marginal agrees with the N = 32 one within 0.03–0.64 MiB for every
-pair. RSS is not used: a 16.6 MiB Scriptw process and a 45.4 MiB Node process would suggest 987 and
-361 processes in 16 GiB, because RSS counts the shared executable once per process. USS (private
+It is an upper bound. The N = 8 marginal agrees with the N = 32 one within 0.04–0.81 MiB for every
+pair. RSS is not used: a 13.8 MiB Scriptw process and a 46.0 MiB Node process would suggest 1,186 and
+356 processes in 16 GiB, because RSS counts the shared executable once per process. USS (private
 clean + dirty) at N = 32 is shown beside the marginal as a check.
 
 **Process wall.** Ten fresh processes per actor and program, one after another, spawn to exit under
-GNU time, actor order rotated per round, every output checked. The Scriptw host first hashes its own
-203 MiB executable for its identity report and runs the program four times (3 samples + 1 warmup,
-its minimum); its report splits image load, first entry and the three extra entries. The host's
-`identity` command alone, which only hashes the executable, is timed beside it.
+GNU time, actor order rotated per round, every output checked. The Scriptw host reports a
+build-source identity, so it no longer hashes its own 261 MiB executable (the driver hashes it
+before and after the run); it runs the program four times (3 samples + 1 warmup, its minimum), and
+its report splits image load, first entry and the three extra entries. The host's `identity`
+command, which does hash the executable, is timed separately.
 
 **Steady state.** Per-entry wall in a fresh Store or `vm` context, through the Porffor panel's
 harnesses: 21 measured entries after 10 checked warmups, four processes per actor and program in
 two blocks (the second reversed), median of process medians. Porffor native has no per-entry
-harness; its Wasm per-entry times are in the [Porffor panel](#2026-11-23-comparison-with-porffor).
+harness; its Wasm per-entry times are in the [Porffor panel](#2026-11-25-comparison-with-porffor).
 
-**Machine and load.** The shared four-vCPU cloud machine (Intel Xeon @ 2.10 GHz, 15.7 GiB) ran every
-actor on CPUs 2–3 under `limited_verification.py --cloud`. Other sessions' Cargo builds and a
-Test262 run shared the machine: the one-minute load average was 11–23 for the whole run. The
-memory readings do not depend on CPU time. The wall and steady-state times do, and are noisier than
-the two-CPU panels above. No density group was skipped by the 6 GiB `MemAvailable` reserve.
+**Machine and load.** The shared four-vCPU cloud machine (Intel Xeon @ 2.30 GHz, 15.7 GiB) ran every
+actor on CPUs 2–3 under `limited_verification.py --cloud`, with no other heavy work running. The
+memory readings do not depend on CPU time; the wall and steady-state times do. No density group
+was skipped by the 6 GiB `MemAvailable` reserve.
 
 The tables below are the unedited `tables` output: startup-program capacity; marginal PSS and
 processes in 16 GiB per program; process wall medians; the Scriptw host's wall split; per-entry
@@ -3020,49 +3018,49 @@ steady state; failed attempts.
 
 | Runtime, `startup.js` | PSS alone (MiB) | Marginal PSS per process (MiB) | USS at N=32 (MiB) | Processes per GiB | Processes in 16 GiB |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Scriptw (precompiled image, shared host) | 14.6 | 4.9 | 4.7 | 208 | 3,372 |
-| Node 24.22.1 | 43.5 | 8.4 | 8.3 | 117 | 1,946 |
-| Node 24.22.1 lean flags | 43.4 | 8.4 | 8.3 | 118 | 1,954 |
-| Node 22.23.4 | 41.8 | 6.7 | 6.6 | 147 | 2,444 |
-| Porffor 0.61.13 native (gcc -O3) | 0.5 | 0.3 | 0.2 | 3,658 | 58,545 |
+| Scriptw (precompiled image, shared host) | 12.1 | 1.7 | 1.6 | 606 | 9,796 |
+| Node 24.22.1 | 44.4 | 8.6 | 8.6 | 114 | 1,895 |
+| Node 24.22.1 lean flags | 44.3 | 8.6 | 8.5 | 115 | 1,903 |
+| Node 22.23.4 | 47.9 | 6.7 | 6.6 | 147 | 2,444 |
+| Porffor 0.61.13 native (gcc -O3) | 0.7 | 0.3 | 0.2 | 3,685 | 58,996 |
 
 | Program | Scriptw | Node 24 | Node 24 lean | Node 22 | Porffor native |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `startup.js` | 4.9 MiB · 3,372 | 8.4 MiB · 1,946 | 8.4 MiB · 1,954 | 6.7 MiB · 2,444 | 0.3 MiB · 58,545 |
-| `numeric-loop-50000.js` | 5.0 MiB · 3,303 | 8.8 MiB · 1,856 | 8.7 MiB · 1,879 | 7.2 MiB · 2,276 | 1.4 MiB · 11,660 |
-| `sort-reverse-512.js` | 5.4 MiB · 3,041 | 8.5 MiB · 1,928 | 8.4 MiB · 1,937 | 6.7 MiB · 2,434 | wrong output |
-| `dynamic-string-4096.js` | 5.0 MiB · 3,300 | 8.7 MiB · 1,871 | 8.8 MiB · 1,866 | 6.8 MiB · 2,407 | 1.4 MiB · 11,663 |
-| `objects.js` | 5.5 MiB · 2,965 | 8.4 MiB · 1,937 | 8.4 MiB · 1,945 | 6.7 MiB · 2,428 | wrong output |
-| `retained-objects.js` | 11.2 MiB · 1,465 | 11.5 MiB · 1,422 | 11.5 MiB · 1,418 | 10.0 MiB · 1,639 | runtime failed |
+| `startup.js` | 1.7 MiB · 9,796 | 8.6 MiB · 1,895 | 8.6 MiB · 1,903 | 6.7 MiB · 2,444 | 0.3 MiB · 58,996 |
+| `numeric-loop-50000.js` | 1.8 MiB · 9,328 | 9.0 MiB · 1,824 | 8.9 MiB · 1,831 | 7.2 MiB · 2,279 | 1.4 MiB · 11,653 |
+| `sort-reverse-512.js` | 1.8 MiB · 9,197 | 8.7 MiB · 1,871 | 8.7 MiB · 1,880 | 6.7 MiB · 2,433 | wrong output |
+| `dynamic-string-4096.js` | 1.8 MiB · 9,287 | 8.9 MiB · 1,843 | 8.9 MiB · 1,832 | 6.8 MiB · 2,406 | 1.4 MiB · 11,651 |
+| `objects.js` | 1.9 MiB · 8,846 | 8.7 MiB · 1,885 | 8.6 MiB · 1,894 | 6.7 MiB · 2,426 | wrong output |
+| `retained-objects.js` | 6.1 MiB · 2,681 | 11.6 MiB · 1,408 | 11.6 MiB · 1,406 | 10.0 MiB · 1,637 | runtime failed |
 
 | Program | Scriptw (ms) | Node 24 (ms) | Node 24 lean (ms) | Node 22 (ms) | Porffor native (ms) | Scriptw run (ms) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `startup.js` | 306.0 | 41.9 | 50.5 | 46.4 | 5.4 | 212.0 |
-| `numeric-loop-50000.js` | 313.6 | 46.5 | 55.8 | 60.9 | 12.4 | 191.2 |
-| `sort-reverse-512.js` | 310.3 | 50.2 | 52.5 | 48.6 | wrong output | 190.5 |
-| `dynamic-string-4096.js` | 306.1 | 57.8 | 58.4 | 42.6 | 7.6 | 182.1 |
-| `objects.js` | 321.7 | 51.5 | 43.5 | 43.8 | wrong output | 179.6 |
-| `retained-objects.js` | 340.2 | 61.3 | 66.1 | 64.8 | runtime failed | 214.0 |
+| `startup.js` | 10.3 | 27.3 | 27.0 | 27.4 | 2.6 | 7.3 |
+| `numeric-loop-50000.js` | 10.7 | 28.1 | 25.3 | 25.5 | 2.9 | 7.5 |
+| `sort-reverse-512.js` | 10.4 | 24.4 | 25.5 | 24.3 | wrong output | 7.1 |
+| `dynamic-string-4096.js` | 10.3 | 25.5 | 26.0 | 23.7 | 3.0 | 7.4 |
+| `objects.js` | 10.9 | 25.1 | 24.7 | 25.7 | wrong output | 8.2 |
+| `retained-objects.js` | 22.7 | 29.3 | 34.3 | 30.1 | runtime failed | 12.2 |
 
 | Program | Scriptw host wall (ms) | of which: image load (ms) | first entry (ms) | 3 extra entries (ms) |
 | --- | ---: | ---: | ---: | ---: |
-| `startup.js` | 306.0 | 93.2 | 0.97 | 1.79 |
-| `numeric-loop-50000.js` | 313.6 | 94.1 | 1.00 | 1.93 |
-| `sort-reverse-512.js` | 310.3 | 100.8 | 1.11 | 2.15 |
-| `dynamic-string-4096.js` | 306.1 | 93.1 | 1.05 | 1.99 |
-| `objects.js` | 321.7 | 97.4 | 1.20 | 2.13 |
-| `retained-objects.js` | 340.2 | 95.1 | 6.79 | 10.66 |
+| `startup.js` | 10.3 | 3.8 | 0.72 | 1.09 |
+| `numeric-loop-50000.js` | 10.7 | 4.0 | 0.73 | 1.08 |
+| `sort-reverse-512.js` | 10.4 | 3.7 | 0.78 | 1.29 |
+| `dynamic-string-4096.js` | 10.3 | 3.8 | 0.70 | 1.14 |
+| `objects.js` | 10.9 | 4.1 | 0.82 | 1.32 |
+| `retained-objects.js` | 22.7 | 3.8 | 4.49 | 7.87 |
 
-Host `identity` command alone (executable hash, no program): 194.1 ms median over 10 processes.
+Host `identity` command alone (executable hash, no program): 193.8 ms median over 10 processes.
 
 | Program | Scriptw (µs) | Node 24 (µs) | Node 24 lean (µs) | Scriptw ÷ Node 24 |
 | --- | ---: | ---: | ---: | ---: |
-| `startup.js` | 37.8 | 6.6 | 6.1 | 5.74× |
-| `numeric-loop-50000.js` | 37.9 | 815.7 | 1357.0 | 0.05× |
-| `sort-reverse-512.js` | 61.0 | 136.3 | 161.9 | 0.45× |
-| `dynamic-string-4096.js` | 103.5 | 692.1 | 213.6 | 0.15× |
-| `objects.js` | 105.9 | 80.2 | 86.0 | 1.32× |
-| `retained-objects.js` | 2930.3 | 4260.7 | 6307.3 | 0.69× |
+| `startup.js` | 21.9 | 6.0 | 6.2 | 3.63× |
+| `numeric-loop-50000.js` | 25.3 | 516.3 | 528.9 | 0.05× |
+| `sort-reverse-512.js` | 53.6 | 68.2 | 71.4 | 0.79× |
+| `dynamic-string-4096.js` | 58.1 | 242.1 | 161.3 | 0.24× |
+| `objects.js` | 74.8 | 45.4 | 54.2 | 1.65× |
+| `retained-objects.js` | 1393.6 | 1671.3 | 3012.4 | 0.83× |
 
 | Program | Actor | Failed attempt | Detail |
 | --- | --- | --- | --- |
@@ -3072,32 +3070,32 @@ Host `identity` command alone (executable hash, no program): 194.1 ms median ove
 
 **Findings.**
 
-- On the startup program, one more Scriptw process costs **4.9 MiB** against **8.4 MiB** for Node 24
-  and **6.7 MiB** for Node 22: 3,372 processes in 16 GiB against 1,946 and 2,444, so 1.7× and 1.4×
-  as many. The shared part is 9.7 MiB for Scriptw and about 35 MiB for Node, so a lone process is
-  14.6 MiB of PSS against 43.5 MiB.
-- The kernels keep that order, 5.0–5.5 MiB against 8.4–8.8 MiB for Node 24, except
-  `retained-objects.js`, which keeps 8,192 objects live: 11.2 MiB for Scriptw, 11.5 MiB for
-  Node 24 and **10.0 MiB for Node 22**, which fits more processes than Scriptw there.
+- On the startup program, one more Scriptw process costs **1.7 MiB** against **8.6 MiB** for Node 24
+  and **6.7 MiB** for Node 22: 9,796 processes in 16 GiB against 1,895 and 2,444, so 5.2× and 4.0×
+  as many. The shared part is 10.5 MiB for Scriptw and 36–41 MiB for Node, so a lone process is
+  12.1 MiB of PSS against 44.4 MiB. The 2026-11-23 run of `1edd6d329` measured 4.9 MiB and 3,372
+  processes, before the runtime image was mapped from the executable instead of decoded into
+  private memory in every process.
+- The kernels keep that order, 1.8–1.9 MiB against 8.7–9.0 MiB for Node 24. On
+  `retained-objects.js`, which keeps 8,192 objects live, Scriptw takes 6.1 MiB against 11.6 MiB
+  for Node 24 and 10.0 MiB for Node 22, so it fits more processes than either Node on every program.
 - Porffor native is far smaller than both: **0.3 MiB** marginal on the startup program and 1.4 MiB
-  on the two kernels it runs correctly, 11,660–58,545 processes in 16 GiB. Each is a 75–79 KB
+  on the two kernels it runs correctly, 11,651–58,996 processes in 16 GiB. Each is a 75–79 KB
   executable with no garbage collector, runtime image or JIT. Its C backend prints wrong output for
   `sort-reverse-512.js` and `objects.js`, which its Wasm output computes correctly in the Porffor
   panel, and throws on `retained-objects.js` as its Wasm does.
 - Node's lean flags change nothing that matters: 7 threads become 4, marginal PSS moves by about 1%.
-- **Startup is Scriptw's weak point.** A Scriptw host process takes about 306 ms for the startup
-  program against 42 ms for Node 24 and 5 ms for Porffor native. About 194 ms of it is the host
-  hashing its own executable, which the `identity` command alone also takes, and 93 ms is loading
-  the native image, mostly native admission and deserialization, which decodes the shared runtime
-  image R. The program's own entry takes
-  1 ms. The product CLI on a warm program cache takes 180–214 ms; an untimed `strace` of it showed
-  about 150 ms reading `/proc/self/exe` (its cache-key identity) and another 90 ms reading the
-  executable again before the cached module loads. Neither cost depends on the program.
-- Once running, Scriptw's per-entry times match the Porffor panel: 0.04–0.11 ms for the small
-  kernels and 2.9 ms for `retained-objects.js`, ahead of Node 24 on four of six programs. Node is
-  ahead on `objects.js` and on the startup program, 7 µs against 38 µs, most of which is the
-  Realm bootstrap inside Scriptw's timer. Under this machine's load the Node columns are noisy: the lean flags look
-  1.7× slower or 3.2× faster on single kernels, which flags of this kind do not explain.
+- **Startup.** A Scriptw host process takes 10.3 ms for the startup program against 27.3 ms for
+  Node 24 and 2.6 ms for Porffor native; 3.8 ms of it is loading the native image and 0.7 ms the
+  program's first entry. The product CLI on a warm program cache takes 7.1–8.2 ms, and 12.2 ms for
+  `retained-objects.js`. On 2026-11-23 these were 306 ms and 180–214 ms, mostly hashing the
+  executable and decoding the runtime image; neither is on either path now. The host's `identity`
+  command still hashes the executable and takes 194 ms; nothing else measured here runs it.
+- Once running, Scriptw takes 0.02–0.07 ms per entry on the small kernels, close to the Porffor
+  panel, and 1.4 ms on `retained-objects.js` (2.1 ms there), ahead of Node 24 on four of six programs. Node is
+  ahead on `objects.js` and on the startup program, 6 µs against 22 µs, most of which is the
+  Realm bootstrap inside Scriptw's timer. The lean flags make `retained-objects.js` 1.8× slower
+  and `dynamic-string-4096.js` 1.5× faster on Node 24; the cause was not profiled.
 
 **Boundaries.**
 
@@ -3107,15 +3105,15 @@ Host `identity` command alone (executable hash, no program): 194.1 ms median ove
 - Compilation is ahead of time and untimed for Scriptw (precompiled image) and Porffor (native
   executable). Node parses and JIT-compiles inside the measured process, and that memory is
   part of its result.
-- Shared pages are charged once, to the fixed part: for Scriptw the touched pages of the 203 MiB
+- Shared pages are charged once, to the fixed part: for Scriptw the touched pages of the 261 MiB
   host executable (which also contains the compiler, never run here) and of the runtime image;
   for Node the `node` executable with its built-in snapshot. Page cache for the image and binary
   files on disk is not counted.
 - One program per process. Scriptw's embedding API can run many Stores, one per request, inside
   one process sharing one loaded image; that, Node's `vm` contexts or workers, forked Node servers
   sharing a heap snapshot, workerd isolates and containers were not measured.
-- The Scriptw host is a benchmark host, not a shipped runtime: its executable hash and four
-  executions inflate its wall time and are reported separately. No product command runs a
+- The Scriptw host is a benchmark host, not a shipped runtime: its four executions inflate its
+  wall time and are reported separately. No product command runs a
   precompiled image yet; `scriptw run` is the product path for source.
 - The hold points differ by runtime as described above. Scriptw's held process has run the program
   twice in fresh Stores; Node's and Porffor's once.

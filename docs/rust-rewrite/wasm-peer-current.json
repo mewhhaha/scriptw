@@ -1,15 +1,15 @@
 {
   "schema": "scriptw-wasm-peer-comparison-v1",
-  "date": "2026-11-23",
-  "run_started_at": "2026-11-23T10:06:49.801602+00:00",
-  "run_finished_at": "2026-11-23T10:08:20.251661+00:00",
-  "compile_finished_at": "2026-11-23T10:05:43.988361+00:00",
-  "measurement_commit": "1edd6d329317159daf0cc11b49ef1bf9f0f74a12",
+  "date": "2026-11-25",
+  "run_started_at": "2026-11-25T15:49:37.805790+00:00",
+  "run_finished_at": "2026-11-25T15:50:41.850696+00:00",
+  "compile_finished_at": "2026-11-25T15:51:42.836509+00:00",
+  "measurement_commit": "5ed84a21a60fd8d68b0bb66db3e8b2767579cfed",
   "scriptw": {
-    "source_commit": "6d6e0c5d4ab4ca9130f3f0266562033405f43d3b",
-    "source_fingerprint": "6bcd768386ac74fe972326d85380e759b68cfaff6554ff0f416ef8dc8acbbafb",
-    "host_sha256": "24a2f627d3a47cd7ed4c7cf93c148495607edcebcf27ab24c9c31d1149b87e8e",
-    "cli_sha256": "ecc4f5fa50edba20b0f32ed707f9ad03f4d026d8ce1a49e5d5e7cd978154d4b3",
+    "source_commit": "5ed84a21a60fd8d68b0bb66db3e8b2767579cfed",
+    "source_fingerprint": "408c45ed3e29676c2565684c3b6753fb4a83575717bbf9e97cfbb2bf14cb080a",
+    "host_sha256": "301229f577f98a14f5bec18a571193b2b41ae18adde60c95b2d76ed4d22e2631",
+    "cli_sha256": "c6a97c67fdb43cc1c799011d454206ad63317f002e3d11ef054dd3eb9322bfd0",
     "shared_configuration": {
       "collector": "copying",
       "consumer_compiler_enabled": false,
@@ -29,7 +29,7 @@
   "tools": {
     "node": {
       "bytes": 126879696,
-      "sha256": "0d89485e8dfafd67d79ec1da0b5154caf6640d0a0e86f1d2deaeddbf787d7e6d",
+      "sha256": "e32e2d16081cf644f88392934288086e7662529d0d43277c34f7aad2207cfafb",
       "versions": {
         "node": "24.22.1",
         "v8": "13.6.233.17-node.58"
@@ -95,23 +95,24 @@
   },
   "machine": {
     "run": {
-      "platform": "Linux-6.18.44-fc-v726-x86_64-with-glibc2.39",
+      "platform": "Linux-6.18.44-fc-v880-x86_64-with-glibc2.39",
       "affinity": [
-        2
+        2,
+        3
       ],
-      "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+      "cpu_model": "Intel(R) Xeon(R) Processor @ 2.30GHz",
       "cloud": {
-        "inherited_memory_cap_bytes": 14338744320
+        "inherited_memory_cap_bytes": 14338371584
       }
     },
     "compile": {
-      "platform": "Linux-6.18.44-fc-v726-x86_64-with-glibc2.39",
+      "platform": "Linux-6.18.44-fc-v880-x86_64-with-glibc2.39",
       "affinity": [
         2
       ],
-      "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+      "cpu_model": "Intel(R) Xeon(R) Processor @ 2.30GHz",
       "cloud": {
-        "inherited_memory_cap_bytes": 14338744320
+        "inherited_memory_cap_bytes": 14338371584
       }
     }
   },
@@ -152,44 +153,44 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 50934.0,
-          "mean_ns": 60119.13690476191,
+          "median_ns": 38545.0,
+          "mean_ns": 39071.13690476191,
           "block_median_ns": [
-            48072.5,
-            58906.5
+            37794.0,
+            39512.5
           ],
-          "peak_rss_bytes": 18798592.0
+          "peak_rss_bytes": 15157248.0
         },
         "porffor.wasmtime": {
           "processes": 8,
-          "median_ns": 114945.5,
-          "mean_ns": 149441.32142857142,
+          "median_ns": 83804.0,
+          "mean_ns": 94562.42857142858,
           "block_median_ns": [
-            114945.5,
-            124434.0
+            83548.5,
+            84146.0
           ],
-          "peak_rss_bytes": 46706688.0,
-          "empty_call_median_ns": 2265.5
+          "peak_rss_bytes": 46389248.0,
+          "empty_call_median_ns": 1956.0
         },
         "porffor.v8": {
           "processes": 8,
-          "median_ns": 201166.0,
-          "mean_ns": 258261.95833333334,
+          "median_ns": 124734.5,
+          "mean_ns": 131342.82142857142,
           "block_median_ns": [
-            198401.5,
-            204276.5
+            125268.0,
+            124560.5
           ],
-          "peak_rss_bytes": 55816192.0
+          "peak_rss_bytes": 57518080.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 33906.5,
-          "mean_ns": 36372.47023809524,
+          "median_ns": 19248.5,
+          "mean_ns": 38778.416666666664,
           "block_median_ns": [
-            27972.0,
-            37507.5
+            20224.0,
+            18369.0
           ],
-          "peak_rss_bytes": 58966016.0
+          "peak_rss_bytes": 58963968.0
         }
       }
     },
@@ -198,44 +199,44 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 60457.5,
-          "mean_ns": 78401.77976190476,
+          "median_ns": 47147.5,
+          "mean_ns": 49614.31547619047,
           "block_median_ns": [
-            98542.5,
-            60057.5
+            48551.5,
+            46487.5
           ],
-          "peak_rss_bytes": 18792448.0
+          "peak_rss_bytes": 15149056.0
         },
         "porffor.wasmtime": {
           "processes": 8,
-          "median_ns": 1518382.0,
-          "mean_ns": 1603145.2678571427,
+          "median_ns": 1129412.0,
+          "mean_ns": 1134560.357142857,
           "block_median_ns": [
-            1547770.5,
-            1518382.0
+            1129412.0,
+            1133675.5
           ],
-          "peak_rss_bytes": 46716928.0,
-          "empty_call_median_ns": 2300.5
+          "peak_rss_bytes": 46407680.0,
+          "empty_call_median_ns": 2171.5
         },
         "porffor.v8": {
           "processes": 8,
-          "median_ns": 2331607.0,
-          "mean_ns": 2481123.9404761903,
+          "median_ns": 1755980.5,
+          "mean_ns": 1798628.363095238,
           "block_median_ns": [
-            2332468.0,
-            2331607.0
+            1731053.5,
+            1756999.0
           ],
-          "peak_rss_bytes": 56182784.0
+          "peak_rss_bytes": 57790464.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 182393.5,
-          "mean_ns": 201114.68452380953,
+          "median_ns": 67927.0,
+          "mean_ns": 83287.86309523809,
           "block_median_ns": [
-            206018.0,
-            162101.5
+            69649.0,
+            65385.0
           ],
-          "peak_rss_bytes": 59097088.0
+          "peak_rss_bytes": 58957824.0
         }
       }
     },
@@ -244,44 +245,44 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 64503.5,
-          "mean_ns": 68060.61309523809,
+          "median_ns": 40888.5,
+          "mean_ns": 44326.55357142857,
           "block_median_ns": [
-            61021.5,
-            66708.5
+            40888.5,
+            42303.0
           ],
-          "peak_rss_bytes": 18886656.0
+          "peak_rss_bytes": 15157248.0
         },
         "porffor.wasmtime": {
           "processes": 8,
-          "median_ns": 32114.0,
-          "mean_ns": 37934.232142857145,
+          "median_ns": 24078.5,
+          "mean_ns": 28223.363095238095,
           "block_median_ns": [
-            31404.0,
-            40960.0
+            22803.0,
+            24483.0
           ],
-          "peak_rss_bytes": 46594048.0,
-          "empty_call_median_ns": 2248.0
+          "peak_rss_bytes": 46407680.0,
+          "empty_call_median_ns": 1816.0
         },
         "porffor.v8": {
           "processes": 8,
-          "median_ns": 41450.0,
-          "mean_ns": 148071.30357142858,
+          "median_ns": 67626.0,
+          "mean_ns": 119949.94047619047,
           "block_median_ns": [
-            40397.0,
-            43097.0
+            69903.0,
+            67626.0
           ],
-          "peak_rss_bytes": 56041472.0
+          "peak_rss_bytes": 57780224.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 152202.5,
-          "mean_ns": 157741.30952380953,
+          "median_ns": 72570.5,
+          "mean_ns": 90158.73809523809,
           "block_median_ns": [
-            148483.0,
-            173757.5
+            69057.0,
+            73365.5
           ],
-          "peak_rss_bytes": 59097088.0
+          "peak_rss_bytes": 58972160.0
         }
       }
     },
@@ -290,44 +291,44 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 68063.0,
-          "mean_ns": 80523.77976190476,
+          "median_ns": 50268.5,
+          "mean_ns": 53278.767857142855,
           "block_median_ns": [
-            64328.0,
-            77074.0
+            40673.0,
+            51554.0
           ],
-          "peak_rss_bytes": 18728960.0
+          "peak_rss_bytes": 15147008.0
         },
         "porffor.wasmtime": {
           "processes": 8,
-          "median_ns": 1488777.5,
-          "mean_ns": 1654433.2321428573,
+          "median_ns": 1143132.5,
+          "mean_ns": 1192616.517857143,
           "block_median_ns": [
-            1469593.5,
-            1492414.5
+            1152251.5,
+            1137019.5
           ],
-          "peak_rss_bytes": 46710784.0,
-          "empty_call_median_ns": 2301.0
+          "peak_rss_bytes": 46409728.0,
+          "empty_call_median_ns": 2052.0
         },
         "porffor.v8": {
           "processes": 8,
-          "median_ns": 2348875.0,
-          "mean_ns": 2489712.8333333335,
+          "median_ns": 1775376.5,
+          "mean_ns": 1784720.1011904762,
           "block_median_ns": [
-            2318990.0,
-            2381867.5
+            1767837.0,
+            1775690.0
           ],
-          "peak_rss_bytes": 56741888.0
+          "peak_rss_bytes": 58509312.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 149647.5,
-          "mean_ns": 232597.14880952382,
+          "median_ns": 66044.0,
+          "mean_ns": 90798.68452380953,
           "block_median_ns": [
-            147098.5,
-            187376.5
+            60305.0,
+            68998.5
           ],
-          "peak_rss_bytes": 58966016.0
+          "peak_rss_bytes": 58970112.0
         }
       }
     },
@@ -336,23 +337,23 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 90370.5,
-          "mean_ns": 95021.54166666667,
+          "median_ns": 68651.0,
+          "mean_ns": 76093.54761904762,
           "block_median_ns": [
-            90858.5,
-            90370.5
+            58949.5,
+            70611.5
           ],
-          "peak_rss_bytes": 18948096.0
+          "peak_rss_bytes": 15249408.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 58044.5,
-          "mean_ns": 137698.2619047619,
+          "median_ns": 42840.5,
+          "mean_ns": 99223.45238095238,
           "block_median_ns": [
-            57206.0,
-            58044.5
+            56751.0,
+            42840.5
           ],
-          "peak_rss_bytes": 59090944.0
+          "peak_rss_bytes": 58968064.0
         }
       }
     },
@@ -361,23 +362,23 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 235890.5,
-          "mean_ns": 273722.57738095237,
+          "median_ns": 158047.5,
+          "mean_ns": 165810.17261904763,
           "block_median_ns": [
-            222233.5,
-            252150.0
+            153409.5,
+            160556.5
           ],
-          "peak_rss_bytes": 19146752.0
+          "peak_rss_bytes": 15413248.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 1278619.0,
-          "mean_ns": 1223010.3154761905,
+          "median_ns": 212447.0,
+          "mean_ns": 263455.3988095238,
           "block_median_ns": [
-            1312092.5,
-            1244533.5
+            205078.0,
+            215414.0
           ],
-          "peak_rss_bytes": 68745216.0
+          "peak_rss_bytes": 61464576.0
         }
       }
     },
@@ -386,44 +387,44 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 92056.5,
-          "mean_ns": 99572.42261904762,
+          "median_ns": 71620.0,
+          "mean_ns": 72164.83333333333,
           "block_median_ns": [
-            92056.5,
-            91242.0
+            56017.0,
+            76006.0
           ],
-          "peak_rss_bytes": 18800640.0
+          "peak_rss_bytes": 15149056.0
         },
         "porffor.wasmtime": {
           "processes": 8,
-          "median_ns": 47630.0,
-          "mean_ns": 59677.857142857145,
+          "median_ns": 32396.5,
+          "mean_ns": 35224.19642857143,
           "block_median_ns": [
-            50333.0,
-            46815.0
+            31899.0,
+            32759.5
           ],
-          "peak_rss_bytes": 46622720.0,
-          "empty_call_median_ns": 2472.0
+          "peak_rss_bytes": 46297088.0,
+          "empty_call_median_ns": 1926.5
         },
         "porffor.v8": {
           "processes": 8,
-          "median_ns": 64160.0,
-          "mean_ns": 159591.94047619047,
+          "median_ns": 76537.5,
+          "mean_ns": 84697.36309523809,
           "block_median_ns": [
-            63746.5,
-            64605.0
+            74771.0,
+            77797.5
           ],
-          "peak_rss_bytes": 56815616.0
+          "peak_rss_bytes": 58382336.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 416722.0,
-          "mean_ns": 437632.23214285716,
+          "median_ns": 81889.5,
+          "mean_ns": 129097.79761904762,
           "block_median_ns": [
-            449679.0,
-            387074.5
+            71895.0,
+            92963.5
           ],
-          "peak_rss_bytes": 64991232.0
+          "peak_rss_bytes": 59498496.0
         }
       }
     },
@@ -432,44 +433,44 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 39712.0,
-          "mean_ns": 42023.017857142855,
+          "median_ns": 24879.5,
+          "mean_ns": 28074.10119047619,
           "block_median_ns": [
-            40140.0,
-            38620.5
+            23566.5,
+            33619.5
           ],
-          "peak_rss_bytes": 18114560.0
+          "peak_rss_bytes": 14708736.0
         },
         "porffor.wasmtime": {
           "processes": 8,
-          "median_ns": 22821.0,
-          "mean_ns": 25485.875,
+          "median_ns": 16138.0,
+          "mean_ns": 19341.720238095237,
           "block_median_ns": [
-            22750.0,
-            22821.0
+            15948.0,
+            18086.5
           ],
-          "peak_rss_bytes": 46643200.0,
-          "empty_call_median_ns": 2270.0
+          "peak_rss_bytes": 46303232.0,
+          "empty_call_median_ns": 1996.5
         },
         "porffor.v8": {
           "processes": 8,
-          "median_ns": 23834.5,
-          "mean_ns": 54052.05357142857,
+          "median_ns": 19825.5,
+          "mean_ns": 25298.607142857145,
           "block_median_ns": [
-            23323.0,
-            23834.5
+            19313.0,
+            20369.5
           ],
-          "peak_rss_bytes": 55296000.0
+          "peak_rss_bytes": 57083904.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 1074393.0,
-          "mean_ns": 815926.3214285715,
+          "median_ns": 141257.5,
+          "mean_ns": 172579.1607142857,
           "block_median_ns": [
-            1074393.0,
-            1062604.0
+            138425.0,
+            147880.0
           ],
-          "peak_rss_bytes": 65548288.0
+          "peak_rss_bytes": 65161216.0
         }
       }
     },
@@ -478,44 +479,44 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 37562.5,
-          "mean_ns": 42799.130952380954,
+          "median_ns": 22496.0,
+          "mean_ns": 35841.482142857145,
           "block_median_ns": [
-            38051.5,
-            37130.5
+            21123.0,
+            24220.0
           ],
-          "peak_rss_bytes": 18216960.0
+          "peak_rss_bytes": 14704640.0
         },
         "porffor.wasmtime": {
           "processes": 8,
-          "median_ns": 66210.5,
-          "mean_ns": 75172.23214285714,
+          "median_ns": 49689.0,
+          "mean_ns": 59096.25,
           "block_median_ns": [
-            72860.0,
-            65849.0
+            49496.0,
+            50140.5
           ],
-          "peak_rss_bytes": 46612480.0,
-          "empty_call_median_ns": 2244.0
+          "peak_rss_bytes": 46284800.0,
+          "empty_call_median_ns": 1861.0
         },
         "porffor.v8": {
           "processes": 8,
-          "median_ns": 90430.5,
-          "mean_ns": 117810.69047619047,
+          "median_ns": 48152.5,
+          "mean_ns": 51969.34523809524,
           "block_median_ns": [
-            90430.5,
-            84496.5
+            48446.0,
+            48069.5
           ],
-          "peak_rss_bytes": 55296000.0
+          "peak_rss_bytes": 57014272.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 1572771.0,
-          "mean_ns": 1617171.5357142857,
+          "median_ns": 464222.0,
+          "mean_ns": 542754.9880952381,
           "block_median_ns": [
-            1869354.5,
-            1495241.5
+            464222.0,
+            502942.5
           ],
-          "peak_rss_bytes": 67655680.0
+          "peak_rss_bytes": 67522560.0
         }
       }
     },
@@ -524,44 +525,44 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 74277.5,
-          "mean_ns": 93599.64880952382,
+          "median_ns": 46698.0,
+          "mean_ns": 50920.39880952381,
           "block_median_ns": [
-            117738.5,
-            70814.0
+            45800.0,
+            51023.5
           ],
-          "peak_rss_bytes": 18188288.0
+          "peak_rss_bytes": 14692352.0
         },
         "porffor.wasmtime": {
           "processes": 8,
-          "median_ns": 146576.0,
-          "mean_ns": 157873.57142857142,
+          "median_ns": 99633.0,
+          "mean_ns": 109372.41071428571,
           "block_median_ns": [
-            149326.0,
-            140291.0
+            98857.0,
+            100657.5
           ],
-          "peak_rss_bytes": 46663680.0,
-          "empty_call_median_ns": 2335.0
+          "peak_rss_bytes": 46428160.0,
+          "empty_call_median_ns": 1921.5
         },
         "porffor.v8": {
           "processes": 8,
-          "median_ns": 184818.0,
-          "mean_ns": 228394.98214285713,
+          "median_ns": 131002.0,
+          "mean_ns": 143921.35714285713,
           "block_median_ns": [
-            186227.0,
-            183131.5
+            128766.5,
+            134231.5
           ],
-          "peak_rss_bytes": 60039168.0
+          "peak_rss_bytes": 61595648.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 1152573.5,
-          "mean_ns": 868384.0,
+          "median_ns": 103248.5,
+          "mean_ns": 132289.89285714287,
           "block_median_ns": [
-            1158822.5,
-            768856.0
+            99490.0,
+            104200.5
           ],
-          "peak_rss_bytes": 65613824.0
+          "peak_rss_bytes": 65052672.0
         }
       }
     },
@@ -570,44 +571,44 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 81835.5,
-          "mean_ns": 91566.17261904762,
+          "median_ns": 55202.0,
+          "mean_ns": 59121.541666666664,
           "block_median_ns": [
-            81835.5,
-            82539.5
+            51906.5,
+            59148.5
           ],
-          "peak_rss_bytes": 18298880.0
+          "peak_rss_bytes": 14657536.0
         },
         "porffor.wasmtime": {
           "processes": 8,
-          "median_ns": 141918.5,
-          "mean_ns": 184830.26785714284,
+          "median_ns": 92058.5,
+          "mean_ns": 101040.53571428571,
           "block_median_ns": [
-            142305.5,
-            135921.0
+            92419.0,
+            91184.0
           ],
-          "peak_rss_bytes": 46571520.0,
-          "empty_call_median_ns": 2408.5
+          "peak_rss_bytes": 46276608.0,
+          "empty_call_median_ns": 2063.5
         },
         "porffor.v8": {
           "processes": 8,
-          "median_ns": 98385.5,
-          "mean_ns": 106935.02976190476,
+          "median_ns": 70910.0,
+          "mean_ns": 77883.64285714286,
           "block_median_ns": [
-            100211.5,
-            96672.5
+            68562.5,
+            72174.5
           ],
-          "peak_rss_bytes": 57257984.0
+          "peak_rss_bytes": 59092992.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 1257470.0,
-          "mean_ns": 1016283.7023809524,
+          "median_ns": 163912.0,
+          "mean_ns": 202579.57142857142,
           "block_median_ns": [
-            1257470.0,
-            1252633.5
+            152074.5,
+            175433.0
           ],
-          "peak_rss_bytes": 65421312.0
+          "peak_rss_bytes": 65959936.0
         }
       }
     },
@@ -616,23 +617,23 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 41704.0,
-          "mean_ns": 48550.755952380954,
+          "median_ns": 26293.5,
+          "mean_ns": 25698.035714285714,
           "block_median_ns": [
-            43111.0,
-            41704.0
+            25739.5,
+            26430.0
           ],
-          "peak_rss_bytes": 18507776.0
+          "peak_rss_bytes": 15056896.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 2731047.5,
-          "mean_ns": 2991467.648809524,
+          "median_ns": 1307580.0,
+          "mean_ns": 1398264.130952381,
           "block_median_ns": [
-            2679571.5,
-            3558666.5
+            1274818.5,
+            1360590.5
           ],
-          "peak_rss_bytes": 65419264.0
+          "peak_rss_bytes": 65611776.0
         }
       }
     },
@@ -641,44 +642,44 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 90114.0,
-          "mean_ns": 101410.70833333333,
+          "median_ns": 63671.0,
+          "mean_ns": 72712.78571428571,
           "block_median_ns": [
-            90114.0,
-            90429.0
+            58203.0,
+            77939.5
           ],
-          "peak_rss_bytes": 18810880.0
+          "peak_rss_bytes": 15153152.0
         },
         "porffor.wasmtime": {
           "processes": 8,
-          "median_ns": 102518.5,
-          "mean_ns": 124231.42857142857,
+          "median_ns": 90947.0,
+          "mean_ns": 99813.41666666667,
           "block_median_ns": [
-            107040.0,
-            102099.0
+            79773.5,
+            98682.5
           ],
-          "peak_rss_bytes": 53917696.0,
-          "empty_call_median_ns": 2580.0
+          "peak_rss_bytes": 53616640.0,
+          "empty_call_median_ns": 2515.5
         },
         "porffor.v8": {
           "processes": 8,
-          "median_ns": 1611289.0,
-          "mean_ns": 2399644.3035714286,
+          "median_ns": 1364262.0,
+          "mean_ns": 2480985.0535714286,
           "block_median_ns": [
-            1600978.0,
-            1637911.5
+            1302176.0,
+            1412916.5
           ],
-          "peak_rss_bytes": 75665408.0
+          "peak_rss_bytes": 76988416.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 75196.5,
-          "mean_ns": 118258.63095238095,
+          "median_ns": 47323.5,
+          "mean_ns": 88018.77976190476,
           "block_median_ns": [
-            79588.0,
-            75196.5
+            45538.5,
+            55073.5
           ],
-          "peak_rss_bytes": 59088896.0
+          "peak_rss_bytes": 58980352.0
         }
       }
     },
@@ -687,23 +688,23 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 2731165.0,
-          "mean_ns": 3090699.535714286,
+          "median_ns": 2062450.5,
+          "mean_ns": 2062495.1904761905,
           "block_median_ns": [
-            2761944.5,
-            2705797.5
+            2091873.5,
+            2047364.0
           ],
-          "peak_rss_bytes": 24971264.0
+          "peak_rss_bytes": 19597312.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 4518290.0,
-          "mean_ns": 4586375.851190476,
+          "median_ns": 1858908.0,
+          "mean_ns": 2035310.75,
           "block_median_ns": [
-            4446736.5,
-            4723525.5
+            1820035.5,
+            1924308.5
           ],
-          "peak_rss_bytes": 85010432.0
+          "peak_rss_bytes": 84180992.0
         }
       }
     },
@@ -712,44 +713,44 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 43970.5,
-          "mean_ns": 48728.07142857143,
+          "median_ns": 30048.0,
+          "mean_ns": 31186.136904761905,
           "block_median_ns": [
-            47673.5,
-            43927.5
+            26028.0,
+            33224.5
           ],
-          "peak_rss_bytes": 18479104.0
+          "peak_rss_bytes": 15024128.0
         },
         "porffor.wasmtime": {
           "processes": 8,
-          "median_ns": 166357.5,
-          "mean_ns": 186810.72023809524,
+          "median_ns": 124710.0,
+          "mean_ns": 150041.3333333333,
           "block_median_ns": [
-            167974.5,
-            164199.5
+            154358.0,
+            120071.0
           ],
-          "peak_rss_bytes": 62197760.0,
-          "empty_call_median_ns": 2414.5
+          "peak_rss_bytes": 61886464.0,
+          "empty_call_median_ns": 2155.5
         },
         "porffor.v8": {
           "processes": 8,
-          "median_ns": 850372.0,
-          "mean_ns": 2582996.464285714,
+          "median_ns": 759365.0,
+          "mean_ns": 986487.9583333334,
           "block_median_ns": [
-            838146.5,
-            850372.0
+            829912.0,
+            626781.5
           ],
-          "peak_rss_bytes": 55642112.0
+          "peak_rss_bytes": 57024512.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 304765.5,
-          "mean_ns": 294568.0357142857,
+          "median_ns": 60204.0,
+          "mean_ns": 67436.22023809524,
           "block_median_ns": [
-            293980.5,
-            313217.0
+            63418.5,
+            57233.5
           ],
-          "peak_rss_bytes": 64630784.0
+          "peak_rss_bytes": 59232256.0
         }
       }
     },
@@ -758,44 +759,44 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 46425.5,
-          "mean_ns": 54387.767857142855,
+          "median_ns": 29122.5,
+          "mean_ns": 29897.625,
           "block_median_ns": [
-            42282.5,
-            54722.0
+            27660.0,
+            32601.5
           ],
-          "peak_rss_bytes": 18526208.0
+          "peak_rss_bytes": 15032320.0
         },
         "porffor.wasmtime": {
           "processes": 8,
-          "median_ns": 295321.5,
-          "mean_ns": 306541.5,
+          "median_ns": 222705.5,
+          "mean_ns": 219514.75,
           "block_median_ns": [
-            251659.5,
-            365449.0
+            196390.0,
+            225320.0
           ],
-          "peak_rss_bytes": 62371840.0,
-          "empty_call_median_ns": 3247.5
+          "peak_rss_bytes": 62019584.0,
+          "empty_call_median_ns": 2501.5
         },
         "porffor.v8": {
           "processes": 8,
-          "median_ns": 3397378.5,
-          "mean_ns": 5167075.113095238,
+          "median_ns": 3136539.0,
+          "mean_ns": 5160602.821428571,
           "block_median_ns": [
-            3283544.0,
-            3557424.0
+            5073732.0,
+            2992418.0
           ],
-          "peak_rss_bytes": 76312576.0
+          "peak_rss_bytes": 79517696.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 367839.5,
-          "mean_ns": 349608.29761904763,
+          "median_ns": 86809.0,
+          "mean_ns": 104661.79761904762,
           "block_median_ns": [
-            334566.5,
-            388002.0
+            84525.5,
+            86809.0
           ],
-          "peak_rss_bytes": 64628736.0
+          "peak_rss_bytes": 59234304.0
         }
       }
     },
@@ -804,44 +805,44 @@
       "actors": {
         "scriptw": {
           "processes": 8,
-          "median_ns": 48234.0,
-          "mean_ns": 56850.916666666664,
+          "median_ns": 24512.5,
+          "mean_ns": 30840.92261904762,
           "block_median_ns": [
-            48234.0,
-            55011.0
+            24512.5,
+            30928.5
           ],
-          "peak_rss_bytes": 18558976.0
+          "peak_rss_bytes": 15022080.0
         },
         "porffor.wasmtime": {
           "processes": 8,
-          "median_ns": 285616.0,
-          "mean_ns": 376219.8035714286,
+          "median_ns": 204607.0,
+          "mean_ns": 227033.2380952381,
           "block_median_ns": [
-            296260.5,
-            284502.5
+            236617.5,
+            195942.0
           ],
-          "peak_rss_bytes": 62351360.0,
-          "empty_call_median_ns": 2653.5
+          "peak_rss_bytes": 62003200.0,
+          "empty_call_median_ns": 2124.5
         },
         "porffor.v8": {
           "processes": 8,
-          "median_ns": 3273373.5,
-          "mean_ns": 5023987.011904762,
+          "median_ns": 3224342.5,
+          "mean_ns": 4712957.636904762,
           "block_median_ns": [
-            3535681.0,
-            3196006.5
+            3279612.0,
+            3112906.5
           ],
-          "peak_rss_bytes": 75495424.0
+          "peak_rss_bytes": 79257600.0
         },
         "v8": {
           "processes": 8,
-          "median_ns": 417106.0,
-          "mean_ns": 509799.6904761905,
+          "median_ns": 128882.0,
+          "mean_ns": 148120.88095238095,
           "block_median_ns": [
-            411880.5,
-            485209.0
+            130875.0,
+            128845.5
           ],
-          "peak_rss_bytes": 64903168.0
+          "peak_rss_bytes": 59611136.0
         }
       }
     }
@@ -861,10 +862,10 @@
         "join-singleton-1024.js",
         "join-small-1024.js"
       ],
-      "scriptw_time_ratio_geomean": 0.39431634665279863,
+      "scriptw_time_ratio_geomean": 0.3589646767275785,
       "scriptw_time_ratio_range": [
-        0.039817055260138755,
-        2.008578812978763
+        0.0417451735947555,
+        2.210732640871699
       ]
     },
     "porffor.v8": {
@@ -872,7 +873,9 @@
       "scriptw_faster_in_both_blocks": [
         "sort-reverse-128.js",
         "sort-reverse-512.js",
+        "sort-sorted-512.js",
         "to-sorted-512.js",
+        "join-mixed-1024.js",
         "numeric-loop-50000.js",
         "folded-string-4096.js",
         "dynamic-string-4096.js",
@@ -881,10 +884,10 @@
         "join-singleton-1024.js",
         "join-small-1024.js"
       ],
-      "scriptw_time_ratio_geomean": 0.16297487815132425,
+      "scriptw_time_ratio_geomean": 0.12928391305299927,
       "scriptw_time_ratio_range": [
-        0.013665095013699533,
-        1.666156202143951
+        0.007602325125199944,
+        1.2549242137651004
       ]
     },
     "v8": {
@@ -900,15 +903,14 @@
         "folded-string-4096.js",
         "dynamic-string-4096.js",
         "integer.js",
-        "retained-objects.js",
         "join-empty-1024.js",
         "join-singleton-1024.js",
         "join-small-1024.js"
       ],
-      "scriptw_time_ratio_geomean": 0.1895244624532913,
+      "scriptw_time_ratio_geomean": 0.43697812418382254,
       "scriptw_time_ratio_range": [
-        0.0152703312556812,
-        1.5569175374066448
+        0.020108521084751984,
+        2.002493700807855
       ]
     }
   },
@@ -1002,22 +1004,22 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 132949910.5,
+            "median_ns": 97768216.0,
             "block_median_ns": [
-              133268345.5,
-              131321719.5
+              97768216.0,
+              99305404.5
             ],
-            "peak_rss_bytes": 80222208.0,
-            "wasm_bytes": 71306.0
+            "peak_rss_bytes": 77129728.0,
+            "wasm_bytes": 70293.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 205136521.5,
+            "median_ns": 162746661.0,
             "block_median_ns": [
-              197080652.5,
-              222563964.5
+              162746661.0,
+              179315752.5
             ],
-            "peak_rss_bytes": 89939968.0,
+            "peak_rss_bytes": 88887296.0,
             "wasm_bytes": 35373.0
           }
         }
@@ -1027,22 +1029,22 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 128488061.5,
+            "median_ns": 93345040.5,
             "block_median_ns": [
-              128488061.5,
-              140738803.0
+              94318112.0,
+              92538797.0
             ],
-            "peak_rss_bytes": 79982592.0,
-            "wasm_bytes": 71306.0
+            "peak_rss_bytes": 77121536.0,
+            "wasm_bytes": 70293.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 205159659.5,
+            "median_ns": 158318499.0,
             "block_median_ns": [
-              212416912.0,
-              197266032.5
+              161889673.5,
+              158318499.0
             ],
-            "peak_rss_bytes": 87834624.0,
+            "peak_rss_bytes": 85401600.0,
             "wasm_bytes": 35373.0
           }
         }
@@ -1052,22 +1054,22 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 129786471.0,
+            "median_ns": 91993120.0,
             "block_median_ns": [
-              128303967.5,
-              138257615.5
+              107338263.5,
+              90848468.0
             ],
-            "peak_rss_bytes": 80531456.0,
-            "wasm_bytes": 71325.0
+            "peak_rss_bytes": 77103104.0,
+            "wasm_bytes": 70311.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 251509369.5,
+            "median_ns": 160782210.5,
             "block_median_ns": [
-              232827435.5,
-              267668433.0
+              156997657.5,
+              166389504.0
             ],
-            "peak_rss_bytes": 89823232.0,
+            "peak_rss_bytes": 86220800.0,
             "wasm_bytes": 35373.0
           }
         }
@@ -1077,22 +1079,22 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 130791127.5,
+            "median_ns": 94197624.0,
             "block_median_ns": [
-              138546922.5,
-              130791127.5
+              93756068.5,
+              97863569.5
             ],
-            "peak_rss_bytes": 80003072.0,
-            "wasm_bytes": 72625.0
+            "peak_rss_bytes": 77213696.0,
+            "wasm_bytes": 71593.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 208189468.0,
+            "median_ns": 164165083.5,
             "block_median_ns": [
-              228087514.0,
-              208189468.0
+              163014942.5,
+              175219020.5
             ],
-            "peak_rss_bytes": 83920896.0,
+            "peak_rss_bytes": 88608768.0,
             "wasm_bytes": 35522.0
           }
         }
@@ -1102,22 +1104,22 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 132232828.5,
+            "median_ns": 95996627.0,
             "block_median_ns": [
-              132834915.5,
-              131911462.5
+              106139550.0,
+              95844474.5
             ],
-            "peak_rss_bytes": 79931392.0,
-            "wasm_bytes": 68482.0
+            "peak_rss_bytes": 76953600.0,
+            "wasm_bytes": 67692.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 214982126.0,
+            "median_ns": 165799269.5,
             "block_median_ns": [
-              234745522.0,
-              214982126.0
+              164742761.5,
+              180417760.0
             ],
-            "peak_rss_bytes": 88852480.0,
+            "peak_rss_bytes": 86636544.0,
             "wasm_bytes": 35287.0
           }
         }
@@ -1127,22 +1129,22 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 130020969.5,
+            "median_ns": 95600846.5,
             "block_median_ns": [
-              127044819.0,
-              132676941.5
+              95285571.0,
+              95976701.5
             ],
-            "peak_rss_bytes": 80480256.0,
-            "wasm_bytes": 68482.0
+            "peak_rss_bytes": 76967936.0,
+            "wasm_bytes": 67692.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 236108079.5,
+            "median_ns": 168305631.5,
             "block_median_ns": [
-              213276810.5,
-              247273902.5
+              173671452.5,
+              166680474.0
             ],
-            "peak_rss_bytes": 89724928.0,
+            "peak_rss_bytes": 85157888.0,
             "wasm_bytes": 35287.0
           }
         }
@@ -1152,22 +1154,22 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 127219597.0,
+            "median_ns": 96393297.0,
             "block_median_ns": [
-              126797855.5,
-              127768801.0
+              96616972.0,
+              96393297.0
             ],
-            "peak_rss_bytes": 79937536.0,
-            "wasm_bytes": 63381.0
+            "peak_rss_bytes": 76937216.0,
+            "wasm_bytes": 62739.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 207601182.0,
+            "median_ns": 166454617.0,
             "block_median_ns": [
-              191738621.5,
-              227348925.5
+              165836358.5,
+              173342138.5
             ],
-            "peak_rss_bytes": 88619008.0,
+            "peak_rss_bytes": 83673088.0,
             "wasm_bytes": 34116.0
           }
         }
@@ -1177,22 +1179,22 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 138899536.5,
+            "median_ns": 92914521.0,
             "block_median_ns": [
-              136959278.0,
-              140598219.5
+              93180332.5,
+              92739956.0
             ],
-            "peak_rss_bytes": 81385472.0,
-            "wasm_bytes": 57062.0
+            "peak_rss_bytes": 76728320.0,
+            "wasm_bytes": 67943.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 225301780.0,
+            "median_ns": 164979484.0,
             "block_median_ns": [
-              256606716.0,
-              225301780.0
+              164979484.0,
+              170043993.0
             ],
-            "peak_rss_bytes": 86179840.0,
+            "peak_rss_bytes": 88408064.0,
             "wasm_bytes": 32730.0
           }
         }
@@ -1202,22 +1204,22 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 177128652.5,
+            "median_ns": 94033556.5,
             "block_median_ns": [
-              156871253.0,
-              186617180.5
+              115392552.5,
+              93937991.0
             ],
-            "peak_rss_bytes": 80961536.0,
-            "wasm_bytes": 57062.0
+            "peak_rss_bytes": 76787712.0,
+            "wasm_bytes": 67943.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 216953640.0,
+            "median_ns": 167122048.0,
             "block_median_ns": [
-              224553184.0,
-              206157929.0
+              166187528.5,
+              169915587.0
             ],
-            "peak_rss_bytes": 84891648.0,
+            "peak_rss_bytes": 84817920.0,
             "wasm_bytes": 32730.0
           }
         }
@@ -1227,22 +1229,22 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 172970851.0,
+            "median_ns": 94950882.0,
             "block_median_ns": [
-              179912158.0,
-              170726759.0
+              100684194.0,
+              94229100.0
             ],
-            "peak_rss_bytes": 88031232.0,
-            "wasm_bytes": 60693.0
+            "peak_rss_bytes": 76818432.0,
+            "wasm_bytes": 72139.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 206286585.5,
+            "median_ns": 167584921.5,
             "block_median_ns": [
-              216632257.5,
-              193656653.0
+              177949103.0,
+              163315945.0
             ],
-            "peak_rss_bytes": 84858880.0,
+            "peak_rss_bytes": 82231296.0,
             "wasm_bytes": 33598.0
           }
         }
@@ -1252,22 +1254,22 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 167053986.5,
+            "median_ns": 96316098.0,
             "block_median_ns": [
-              163321647.5,
-              167053986.5
+              95234733.5,
+              98423047.0
             ],
-            "peak_rss_bytes": 81504256.0,
-            "wasm_bytes": 58733.0
+            "peak_rss_bytes": 77031424.0,
+            "wasm_bytes": 71246.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 228070561.0,
+            "median_ns": 166004625.0,
             "block_median_ns": [
-              207860694.0,
-              245431280.5
+              164838922.0,
+              185436734.5
             ],
-            "peak_rss_bytes": 87003136.0,
+            "peak_rss_bytes": 82626560.0,
             "wasm_bytes": 32993.0
           }
         }
@@ -1277,22 +1279,22 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 147490412.5,
+            "median_ns": 95996791.5,
             "block_median_ns": [
-              147490412.5,
-              139920899.0
+              96596566.0,
+              95945758.5
             ],
-            "peak_rss_bytes": 80011264.0,
-            "wasm_bytes": 67135.0
+            "peak_rss_bytes": 77297664.0,
+            "wasm_bytes": 86330.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 227921800.0,
+            "median_ns": 162981610.0,
             "block_median_ns": [
-              241815985.5,
-              215403082.0
+              171852079.5,
+              159633910.5
             ],
-            "peak_rss_bytes": 88494080.0,
+            "peak_rss_bytes": 83056640.0,
             "wasm_bytes": 32788.0
           }
         }
@@ -1302,22 +1304,22 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 130358529.0,
+            "median_ns": 94417864.5,
             "block_median_ns": [
-              128980988.5,
-              133247862.0
+              94417864.5,
+              93925704.5
             ],
-            "peak_rss_bytes": 80199680.0,
-            "wasm_bytes": 75081.0
+            "peak_rss_bytes": 77328384.0,
+            "wasm_bytes": 74270.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 216901915.5,
+            "median_ns": 165321521.0,
             "block_median_ns": [
-              201758964.0,
-              232517180.5
+              165624197.0,
+              165321521.0
             ],
-            "peak_rss_bytes": 86618112.0,
+            "peak_rss_bytes": 84275200.0,
             "wasm_bytes": 34506.0
           }
         }
@@ -1327,22 +1329,22 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 147733060.5,
+            "median_ns": 98111678.0,
             "block_median_ns": [
-              147733060.5,
-              152585717.5
+              94205944.5,
+              102544050.0
             ],
-            "peak_rss_bytes": 80560128.0,
-            "wasm_bytes": 76887.0
+            "peak_rss_bytes": 77297664.0,
+            "wasm_bytes": 76069.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 219113949.5,
+            "median_ns": 157094857.0,
             "block_median_ns": [
-              209873860.0,
-              232634218.5
+              157094857.0,
+              163067751.0
             ],
-            "peak_rss_bytes": 83886080.0,
+            "peak_rss_bytes": 84930560.0,
             "wasm_bytes": 34599.0
           }
         }
@@ -1352,22 +1354,22 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 130876083.0,
+            "median_ns": 95086789.5,
             "block_median_ns": [
-              126326717.5,
-              145078524.0
+              91552004.5,
+              97449493.5
             ],
-            "peak_rss_bytes": 80353280.0,
-            "wasm_bytes": 64471.0
+            "peak_rss_bytes": 77082624.0,
+            "wasm_bytes": 63952.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 207950493.5,
+            "median_ns": 165593309.0,
             "block_median_ns": [
-              210481913.0,
-              206201131.0
+              152799621.0,
+              191027407.5
             ],
-            "peak_rss_bytes": 84062208.0,
+            "peak_rss_bytes": 83982336.0,
             "wasm_bytes": 33884.0
           }
         }
@@ -1377,22 +1379,22 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 132006570.5,
+            "median_ns": 94067735.0,
             "block_median_ns": [
-              134139096.0,
-              130671985.5
+              90576845.0,
+              96004445.0
             ],
-            "peak_rss_bytes": 80521216.0,
-            "wasm_bytes": 64871.0
+            "peak_rss_bytes": 77111296.0,
+            "wasm_bytes": 64349.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 202656274.0,
+            "median_ns": 158943853.0,
             "block_median_ns": [
-              210337301.5,
-              199819205.5
+              148456205.5,
+              169340730.0
             ],
-            "peak_rss_bytes": 87310336.0,
+            "peak_rss_bytes": 84967424.0,
             "wasm_bytes": 33926.0
           }
         }
@@ -1402,28 +1404,28 @@
         "actors": {
           "scriptw": {
             "processes": 4,
-            "median_ns": 133810096.0,
+            "median_ns": 97143786.5,
             "block_median_ns": [
-              138928579.5,
-              127161240.5
+              95528125.0,
+              113472003.0
             ],
-            "peak_rss_bytes": 80216064.0,
-            "wasm_bytes": 65257.0
+            "peak_rss_bytes": 77103104.0,
+            "wasm_bytes": 64718.0
           },
           "porffor": {
             "processes": 4,
-            "median_ns": 216536569.5,
+            "median_ns": 170105786.0,
             "block_median_ns": [
-              242345908.5,
-              208991456.0
+              165502603.5,
+              185089304.0
             ],
-            "peak_rss_bytes": 90062848.0,
+            "peak_rss_bytes": 88352768.0,
             "wasm_bytes": 34019.0
           }
         }
       }
     ],
-    "scriptw_time_ratio_geomean": 0.6438096370757642,
+    "scriptw_time_ratio_geomean": 0.5796191691956168,
     "scriptw_faster": [
       "sort-reverse-128.js",
       "sort-reverse-512.js",
@@ -1446,9 +1448,9 @@
     "excluded": {}
   },
   "evidence": {
-    "analysis_sha256": "0f1e135d122dce223ca630d6965abde5ca8015fbabdb9a72a8ecb7cc3b376ddc",
-    "compile_sha256": "5e19b81892ae353c512e54ce30cd0d2d0df103a4705498c955642927b9d7ea5e",
-    "prepared_sha256": "46b15504c112d33a53681a005320626a01d2955376df78a92a32f431a0028dcc",
+    "analysis_sha256": "ce2a6aa9d73f543a9acd52762340838f78ff7f144a51c5256aee35eb84420929",
+    "compile_sha256": "f3da334293d0056a031b7f580c51d2a50fab1d087be6c94dc65a6f883345cecd",
+    "prepared_sha256": "20832efcfec20d4e1062cdd192ffe884ba9a9e5ca3b2d5ebe5b43417461d5839",
     "retained": "raw process reports stay in the measurement directories; this summary is their checked reduction"
   }
 }
