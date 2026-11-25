@@ -51,6 +51,10 @@ pub(crate) const HOST_IMPORT_PRINT_LINE_UTF8: &str = "print_line_utf8";
 pub(crate) const HOST_IMPORT_NUMBER_POW: &str = "number_pow";
 pub(crate) const HOST_IMPORT_PRIVATE_MEMORY: &str = "private_memory";
 pub(crate) const HOST_IMPORT_SHARED_MEMORY: &str = "shared_memory";
+/// The per-Store linear-memory cap (1 GiB) in Wasm pages: the shared memory's
+/// declared maximum and the maximum R gives the private memory it defines. The
+/// engine admits nothing above its own equal cap (`host_memory_imports`).
+pub(crate) const STORE_MEMORY_CAP_PAGES: u64 = 16_384;
 pub(crate) const HOST_IMPORT_WALL_CLOCK_MILLIS: &str = "wall_clock_millis";
 pub(crate) const HOST_IMPORT_MONOTONIC_CLOCK_NANOS: &str = "monotonic_clock_nanos";
 pub(crate) const HOST_IMPORT_SLEEP_NANOS: &str = "sleep_nanos";

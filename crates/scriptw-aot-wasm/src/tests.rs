@@ -2088,11 +2088,11 @@ fn runtime_virtual_static_image(bytes: &[u8]) -> Vec<u8> {
     for index in RUNTIME_STATIC_SEGMENT_ORDER {
         if index >= RUNTIME_STATIC_SEGMENT_ORDER[0] {
             let DataKind::Active {
-                memory_index: 0,
+                memory_index: crate::runtime_private_memory::RUNTIME_PRIVATE_MEMORY_INDEX,
                 offset_expr,
             } = &rows[index].kind
             else {
-                panic!("active fragments target private memory zero")
+                panic!("active fragments target the private memory R defines")
             };
             let mut ops = offset_expr.get_operators_reader();
             assert!(
@@ -3049,8 +3049,9 @@ fn string_script_emits_memory_and_data() {
     );
 }
 
-/// `(passive, active)` segment counts. Active fragments use increasing,
-/// nonoverlapping constant addresses in private memory zero; the first starts
+/// `(passive, active)` segment counts. Active fragments, which only R has, use
+/// increasing, nonoverlapping constant addresses in the private memory R
+/// defines; the first starts
 /// at the shared static base. R's gaps are checked by runtime_virtual_static_image.
 fn wire_data_segment_counts(bytes: &[u8]) -> (usize, usize) {
     let mut passive_segments = 0;
@@ -3069,7 +3070,10 @@ fn wire_data_segment_counts(bytes: &[u8]) -> (usize, usize) {
                     offset_expr,
                 } => {
                     active_segments += 1;
-                    assert_eq!(memory_index, 0);
+                    assert_eq!(
+                        memory_index,
+                        crate::runtime_private_memory::RUNTIME_PRIVATE_MEMORY_INDEX
+                    );
                     let mut offset = offset_expr.get_operators_reader();
                     let Operator::I32Const { value } = offset.read().expect("wire offset") else {
                         panic!("constant wire offset");
@@ -4091,7 +4095,7 @@ delete proxy[0];"#,
 }
 
 #[test]
-fn atomics_modules_import_private_and_capped_shared_memories() {
+fn atomics_modules_link_the_capped_shared_memory_and_one_private_memory() {
     /// The memory index of the integer atomics every width of
     /// `Atomics.load/store/add/compareExchange` compiles to.
     fn atomic_memory(operator: &Operator) -> Option<u32> {
@@ -4130,11 +4134,25 @@ fn atomics_modules_import_private_and_capped_shared_memories() {
         let artifact = emit_script(source).expect("Atomics script should emit");
         expect_valid_module(&artifact, 0);
 
-        // R and P import the same host memories: the private heap memory
-        // and the capped shared memory that backs SharedArrayBuffer.
+        // P imports the private heap memory and the capped shared memory that
+        // backs SharedArrayBuffer. R imports the shared memory and defines the
+        // private one, which renumbers its shared memory to 0.
         let runtime = artifact.runtime().expect("Atomics program links R");
-        let mut atomic_memory_indexes = Vec::new();
-        for bytes in [runtime.bytes(), artifact.bytes.as_slice()] {
+        let shared = ("shared_memory".to_string(), true, Some(16_384));
+        let mut atomic_operations = 0;
+        for (bytes, expected_imports, shared_index) in [
+            (
+                runtime.bytes(),
+                vec![shared.clone()],
+                crate::runtime_private_memory::RUNTIME_SHARED_MEMORY_INDEX,
+            ),
+            (
+                artifact.bytes.as_slice(),
+                vec![("private_memory".to_string(), false, None), shared.clone()],
+                1,
+            ),
+        ] {
+            let mut atomic_memory_indexes = Vec::new();
             let mut memory_imports = Vec::new();
             for payload in Parser::new(0).parse_all(bytes) {
                 match payload.expect("wasm parse should succeed") {
@@ -4191,20 +4209,16 @@ fn atomics_modules_import_private_and_capped_shared_memories() {
                 }
             }
 
-            assert_eq!(
-                memory_imports,
-                vec![
-                    ("private_memory".to_string(), false, None),
-                    ("shared_memory".to_string(), true, Some(16_384)),
-                ],
+            assert_eq!(memory_imports, expected_imports, "source: {source}");
+            assert!(
+                atomic_memory_indexes
+                    .iter()
+                    .all(|index| *index == shared_index),
                 "source: {source}"
             );
+            atomic_operations += atomic_memory_indexes.len();
         }
-        assert!(!atomic_memory_indexes.is_empty(), "source: {source}");
-        assert!(
-            atomic_memory_indexes.iter().all(|index| *index == 1),
-            "source: {source}"
-        );
+        assert!(atomic_operations > 0, "source: {source}");
     }
 }
 

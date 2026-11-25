@@ -1754,7 +1754,7 @@ fn emit_script_module_with_factory(
             HOST_IMPORT_SHARED_MEMORY,
             wasm_encoder::EntityType::Memory(MemoryType {
                 minimum: 1,
-                maximum: Some(16_384),
+                maximum: Some(STORE_MEMORY_CAP_PAGES),
                 memory64: false,
                 shared: true,
                 page_size_log2: None,
@@ -2065,7 +2065,15 @@ fn emit_script_module_with_factory(
             import.name()
         ));
     }
-    if uses_shared_memory {
+    if uses_shared_memory && matches!(kind, ModuleKind::Runtime(_)) {
+        debug_dump.push(format!(
+            "memory: defined private memory {}, its copy-on-write image R's active data",
+            crate::runtime_private_memory::RUNTIME_PRIVATE_MEMORY_INDEX
+        ));
+        debug_dump.push(format!(
+            "import memory: {HOST_IMPORT_MODULE}.{HOST_IMPORT_SHARED_MEMORY}"
+        ));
+    } else if uses_shared_memory {
         debug_dump.push(format!(
             "import memory: {HOST_IMPORT_MODULE}.{HOST_IMPORT_PRIVATE_MEMORY}"
         ));
@@ -2176,6 +2184,11 @@ fn emit_script_module_with_factory(
     let bytes = module.finish();
     let bytes = match kind {
         ModuleKind::Program(_) => crate::program_imports::compact(bytes, &mut function_table)?,
+        // R imports its shared memory and so, as emitted, its private one too;
+        // defining the private memory gives it a copy-on-write data image.
+        ModuleKind::Runtime(_) if uses_shared_memory => {
+            crate::runtime_private_memory::define(bytes, &mut function_table)?
+        }
         ModuleKind::Standalone(_) | ModuleKind::Runtime(_) => bytes,
     };
     // The hints follow compaction, so they name offsets of the final bodies.

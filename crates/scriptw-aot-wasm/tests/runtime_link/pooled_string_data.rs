@@ -5,6 +5,10 @@ use wasmparser::{
     DataKind, KnownCustom, Name, Operator, Parser, Payload, TypeRef, Validator, WasmFeatures,
 };
 
+/// R defines its private memory as memory 1, after the shared memory it
+/// imports (P keeps importing it as memory 0).
+const R_PRIVATE_MEMORY: u32 = 1;
+
 fn named_function_body(bytes: &[u8], name: &str) -> Vec<u8> {
     let mut imported_functions = 0u32;
     let mut function_index = None;
@@ -129,7 +133,7 @@ fn literal_length_grows_passive_data_without_expanding_bootstrap_code() {
                 let normalize = named_function_body(runtime.bytes(), "builtin::String.prototype.normalize");
                 let body = wasmparser::FunctionBody::new(wasmparser::BinaryReader::new(&normalize, 0));
                 let operators = body.get_operators_reader().unwrap().into_iter().map(Result::unwrap).collect::<Vec<_>>();
-                assert!(operators.iter().any(|op| matches!(op, Operator::MemoryInit { data_index: 1, mem: 0 })),
+                assert!(operators.iter().any(|op| matches!(op, Operator::MemoryInit { data_index: 1, mem: R_PRIVATE_MEMORY })),
                     "valid normalization resolves its own passive data role rather than UTF16 segment zero");
                 assert!(!operators.iter().any(|op| matches!(op, Operator::MemoryInit { data_index: 0, .. })),
                     "normalization cannot copy pooled literal bytes into its table range");
@@ -138,7 +142,7 @@ fn literal_length_grows_passive_data_without_expanding_bootstrap_code() {
                 let compiler = named_function_body(runtime.bytes(), "helper::regexp_compiler");
                 let body=wasmparser::FunctionBody::new(wasmparser::BinaryReader::new(&compiler,0));
                 let ops=body.get_operators_reader().unwrap().into_iter().map(Result::unwrap).collect::<Vec<_>>();
-                let installs=ops.iter().enumerate().filter_map(|(index,op)|matches!(op,Operator::MemoryInit{data_index:2,mem:0}).then_some(index)).collect::<Vec<_>>();
+                let installs=ops.iter().enumerate().filter_map(|(index,op)|matches!(op,Operator::MemoryInit{data_index:2,mem:R_PRIVATE_MEMORY}).then_some(index)).collect::<Vec<_>>();
                 assert!(!installs.is_empty(),"actual Unicode property parser installs its sealed passive image");
                 for index in installs {
                     assert!(matches!(ops[index-6],Operator::GlobalGet{..}),"instance-local readiness guards each property lookup owner");
@@ -249,7 +253,7 @@ fn calendar_rows_have_a_separate_lazy_passive_initializer() {
                             let segment = segment.unwrap();
                             let address = match segment.kind {
                                 DataKind::Passive => None,
-                                DataKind::Active { memory_index:0, offset_expr } => {
+                                DataKind::Active { memory_index: R_PRIVATE_MEMORY, offset_expr } => {
                                     let mut ops = offset_expr.get_operators_reader();
                                     let Operator::I32Const { value } = ops.read().unwrap() else {
                                         panic!("static fragment has a canonical constant address")
@@ -258,7 +262,7 @@ fn calendar_rows_have_a_separate_lazy_passive_initializer() {
                                     assert!(ops.eof());
                                     Some(value as u32)
                                 }
-                                DataKind::Active { .. } => panic!("runtime static data uses its sole memory"),
+                                DataKind::Active { .. } => panic!("runtime static data uses its private memory"),
                             };
                             segments.push((address, segment.data.len()));
                         }
@@ -269,7 +273,7 @@ fn calendar_rows_have_a_separate_lazy_passive_initializer() {
                         for (index, op) in ops.iter().enumerate() {
                             assert!(!matches!(op, Operator::DataDrop { data_index:3 }),
                                 "fresh R instances and late first reads retain the calendar segment");
-                            let Operator::MemoryInit { data_index, mem:0 } = op else { continue };
+                            let Operator::MemoryInit { data_index, mem: R_PRIVATE_MEMORY } = op else { continue };
                             if !(1..=3).contains(data_index) { continue; }
                             assert!(index >= 6 && index + 2 < ops.len());
                             let Operator::GlobalGet { global_index } = ops[index-6] else {

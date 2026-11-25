@@ -263,6 +263,7 @@ fn concurrent_cache_admission_rejects_invalid_bodies_and_rebuilds_checked_layout
 }
 
 fn fixture(defect: Defect) -> Arc<RuntimeArtifact> {
+    const PRIVATE: u32 = crate::runtime_private_memory::RUNTIME_PRIVATE_MEMORY_INDEX;
     let mut module = Module::new();
     let mut types = TypeSection::new();
     types.ty().function([], [ValType::I32]);
@@ -277,6 +278,18 @@ fn fixture(defect: Defect) -> Arc<RuntimeArtifact> {
         "fixture",
         wasm_encoder::EntityType::Function(0),
     );
+    // R imports the shared memory (0) and defines its private memory (1).
+    imports.import(
+        HOST_IMPORT_MODULE,
+        crate::module::HOST_IMPORT_SHARED_MEMORY,
+        wasm_encoder::EntityType::Memory(MemoryType {
+            minimum: 1,
+            maximum: Some(crate::module::STORE_MEMORY_CAP_PAGES),
+            memory64: false,
+            shared: true,
+            page_size_log2: None,
+        }),
+    );
     module.section(&imports);
     let mut functions = FunctionSection::new();
     functions.function(0);
@@ -284,7 +297,7 @@ fn fixture(defect: Defect) -> Arc<RuntimeArtifact> {
     let mut memories = MemorySection::new();
     memories.memory(MemoryType {
         minimum: 1,
-        maximum: None,
+        maximum: Some(crate::module::STORE_MEMORY_CAP_PAGES),
         memory64: false,
         shared: false,
         page_size_log2: None,
@@ -322,7 +335,7 @@ fn fixture(defect: Defect) -> Arc<RuntimeArtifact> {
     data.passive([21, 22, 23]); // Unicode property image
     if !matches!(defect, Defect::MissingCalendarImage) {
         if matches!(defect, Defect::ActiveCalendarImage) {
-            data.active(0, &ConstExpr::i32_const(0), [31, 32, 33, 34]);
+            data.active(PRIVATE, &ConstExpr::i32_const(0), [31, 32, 33, 34]);
         } else if matches!(defect, Defect::CalendarImageLength) {
             data.passive([31, 32, 33]);
         } else {
@@ -330,28 +343,28 @@ fn fixture(defect: Defect) -> Arc<RuntimeArtifact> {
         }
     }
     data.active(
-        0,
+        PRIVATE,
         &ConstExpr::i32_const(
             STATIC_DATA_OFFSET as i32 + i32::from(matches!(defect, Defect::DataOffset)),
         ),
         [0, 65],
     );
     data.active(
-        0,
+        PRIVATE,
         &ConstExpr::i32_const(
             STATIC_DATA_OFFSET as i32 + 5 + i32::from(matches!(defect, Defect::MiddleDataOffset)),
         ),
         [66],
     );
     data.active(
-        0,
+        PRIVATE,
         &ConstExpr::i32_const(
             STATIC_DATA_OFFSET as i32 + 8 + i32::from(matches!(defect, Defect::SuffixDataOffset)),
         ),
         [67],
     );
     data.active(
-        0,
+        PRIVATE,
         &ConstExpr::i32_const(
             STATIC_DATA_OFFSET as i32
                 + 13

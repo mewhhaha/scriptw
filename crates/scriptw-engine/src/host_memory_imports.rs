@@ -1,11 +1,14 @@
-//! The host-created memories a program's host module imports, admitted once.
+//! The memories a program's host module imports or defines, admitted once.
 //!
 //! Scriptw's host module (R when linked, the standalone module otherwise) may
 //! import a private memory and a shared memory, which the host creates per
-//! Store (private) or per agent group (shared) from the import's type. Neither
-//! is bounded by anything else: a shared memory ignores `StoreLimits`, and a
-//! private memory is bounded by a Store limiter only when the embedder
-//! installs one. So both are bounded here, by their types, at admission.
+//! Store (private) or per agent group (shared) from the import's type. R
+//! instead defines its private memory (so Wasmtime maps R's data into it as a
+//! copy-on-write image) and exports it as `memory`; instantiation then gives
+//! that memory to P's private-memory import (`wasm_runtime_link`). None of
+//! these is bounded by anything else: a shared memory ignores `StoreLimits`,
+//! and a private memory is bounded by a Store limiter only when the embedder
+//! installs one. So all are bounded here, by their types, at admission.
 
 use crate::wasmtime_config::WASM_STORE_MEMORY_CAP_BYTES;
 use crate::{EngineError, WASM_HOST_IMPORT_NAMESPACE};
@@ -17,34 +20,51 @@ const WASM_PAGE_BYTES: u64 = 64 * 1024;
 const CAP_PAGES: u64 = WASM_STORE_MEMORY_CAP_BYTES as u64 / WASM_PAGE_BYTES;
 const _: () = assert!(CAP_PAGES * WASM_PAGE_BYTES == WASM_STORE_MEMORY_CAP_BYTES as u64);
 
-/// The memory types to create for the host module's memory imports, each
-/// bounded by the per-Store cap.
+/// The export under which a host module that defines its private memory
+/// exports it.
+pub(crate) const HOST_MODULE_MEMORY_EXPORT: &str = "memory";
+
+/// Where each Store's private memory comes from.
+#[derive(Debug, Clone)]
+pub(crate) enum PrivateMemory {
+    /// The host module has none.
+    Absent,
+    /// The host module imports it: the host creates one of this type, bounded
+    /// by the per-Store cap, in every Store.
+    Imported(MemoryType),
+    /// The host module (R) defines it, bounded by the per-Store cap, and
+    /// exports it as [`HOST_MODULE_MEMORY_EXPORT`]; its instance provides the
+    /// memory P imports.
+    Defined,
+}
+
+/// The memories the host module imports or defines, each bounded by the
+/// per-Store cap.
 #[derive(Debug, Clone)]
 pub(crate) struct HostMemoryImports {
-    private: Option<MemoryType>,
+    private: PrivateMemory,
     shared: Option<MemoryType>,
 }
 
 impl HostMemoryImports {
     /// Refuses a shared-memory import whose maximum exceeds the cap (the
-    /// emitter declares exactly the cap), and gives the private memory the
-    /// cap as its maximum unless the import declares a smaller one.
+    /// emitter declares exactly the cap), gives an imported private memory
+    /// the cap as its maximum unless the import declares a smaller one, and
+    /// refuses a defined private memory that may grow past the cap.
     pub(crate) fn admit(host: &Module) -> Result<Self, EngineError> {
-        let mut admitted = Self {
-            private: None,
-            shared: None,
-        };
+        let mut private = None;
+        let mut shared = None;
         for import in host.imports() {
             if import.module() != WASM_HOST_IMPORT_NAMESPACE {
                 continue;
             }
             let (slot, admitted_type) = match import.name() {
                 WASM_HOST_IMPORT_PRIVATE_MEMORY => (
-                    &mut admitted.private,
+                    &mut private,
                     private_memory_type(&declared_memory(import.ty(), "private")?)?,
                 ),
                 WASM_HOST_IMPORT_SHARED_MEMORY => (
-                    &mut admitted.shared,
+                    &mut shared,
                     shared_memory_type(declared_memory(import.ty(), "shared")?)?,
                 ),
                 _ => continue,
@@ -56,12 +76,26 @@ impl HostMemoryImports {
                 )));
             }
         }
-        Ok(admitted)
+        let private = match private {
+            Some(imported) => PrivateMemory::Imported(imported),
+            // Only a module that shares memory with other agents (R) has its
+            // private memory linked into another module; a module without
+            // a shared memory keeps whatever memory it defines to itself.
+            None if shared.is_some() => match host.get_export(HOST_MODULE_MEMORY_EXPORT) {
+                Some(ExternType::Memory(defined)) => {
+                    defined_private_memory(&defined)?;
+                    PrivateMemory::Defined
+                }
+                _ => PrivateMemory::Absent,
+            },
+            None => PrivateMemory::Absent,
+        };
+        Ok(Self { private, shared })
     }
 
-    /// The private memory to create in each Store, if the module imports one.
-    pub(crate) fn private(&self) -> Option<&MemoryType> {
-        self.private.as_ref()
+    /// Where each Store's private memory comes from.
+    pub(crate) fn private(&self) -> &PrivateMemory {
+        &self.private
     }
 
     /// The shared memory to create per agent group, if the module imports one.
@@ -112,6 +146,24 @@ fn private_memory_type(declared: &MemoryType) -> Result<MemoryType, EngineError>
         u32::try_from(declared.minimum()).expect("checked against the cap"),
         Some(u32::try_from(maximum).expect("at most the cap")),
     ))
+}
+
+/// A defined private memory cannot be given another maximum, so its own must
+/// stay within the cap (R declares exactly the cap).
+fn defined_private_memory(defined: &MemoryType) -> Result<(), EngineError> {
+    checked_32_bit(defined, "private")?;
+    if defined.is_shared() {
+        return Err(EngineError::new(
+            "Scriptw private memory must not be shared",
+        ));
+    }
+    match defined.maximum() {
+        Some(maximum) if maximum <= CAP_PAGES => Ok(()),
+        maximum => Err(EngineError::new(format!(
+            "Scriptw defined private memory declares a maximum of {maximum:?} pages; \
+             at most the {CAP_PAGES}-page per-Store cap is admitted"
+        ))),
+    }
 }
 
 /// A shared memory must match its import's maximum exactly, so the import
@@ -206,7 +258,9 @@ mod tests {
     fn the_private_memory_gets_at_most_the_cap_as_its_maximum() {
         for (declared, maximum) in [(None, CAP_PAGES), (Some(7), 7), (Some(65536), CAP_PAGES)] {
             let admitted = private(1, declared).unwrap();
-            let private = admitted.private().unwrap();
+            let PrivateMemory::Imported(private) = admitted.private() else {
+                panic!("{declared:?}: the private memory is imported");
+            };
             assert_eq!(private.minimum(), 1, "{declared:?}");
             assert_eq!(private.maximum(), Some(maximum), "{declared:?}");
             assert!(!private.is_shared());
@@ -243,6 +297,58 @@ mod tests {
             false,
         ))
         .unwrap();
-        assert!(admitted.private().is_none() && admitted.shared().is_none());
+        assert!(matches!(admitted.private(), PrivateMemory::Absent) && admitted.shared().is_none());
+    }
+
+    /// A module importing the capped shared memory that defines and exports
+    /// a private memory of 1 to `maximum` pages, as R does.
+    fn defining_host(maximum: Option<u64>) -> Module {
+        let mut config = wasmtime::Config::new();
+        config.wasm_threads(true).shared_memory(true);
+        let engine = wasmtime::Engine::new(&config).unwrap();
+        let mut bytes = b"\0asm\x01\0\0\0".to_vec();
+        let mut section = |id: u8, contents: Vec<u8>| {
+            bytes.push(id);
+            leb(contents.len() as u64, &mut bytes);
+            bytes.extend_from_slice(&contents);
+        };
+        let mut import = vec![1];
+        for text in [WASM_HOST_IMPORT_NAMESPACE, WASM_HOST_IMPORT_SHARED_MEMORY] {
+            leb(text.len() as u64, &mut import);
+            import.extend_from_slice(text.as_bytes());
+        }
+        import.extend([0x02, 0x03, 0x01]);
+        leb(CAP_PAGES, &mut import);
+        section(2, import);
+        let mut memory = vec![1, u8::from(maximum.is_some()), 0x01];
+        if let Some(maximum) = maximum {
+            leb(maximum, &mut memory);
+        }
+        section(5, memory);
+        let mut export = vec![1];
+        leb(HOST_MODULE_MEMORY_EXPORT.len() as u64, &mut export);
+        export.extend_from_slice(HOST_MODULE_MEMORY_EXPORT.as_bytes());
+        export.extend([0x02, 0x01]);
+        section(7, export);
+        Module::new(&engine, bytes).unwrap()
+    }
+
+    #[test]
+    fn a_defined_private_memory_is_admitted_only_within_the_cap() {
+        for maximum in [7, CAP_PAGES] {
+            let admitted = HostMemoryImports::admit(&defining_host(Some(maximum))).unwrap();
+            assert!(
+                matches!(admitted.private(), PrivateMemory::Defined),
+                "{maximum}"
+            );
+            assert!(admitted.shared().is_some());
+        }
+        for maximum in [None, Some(CAP_PAGES + 1)] {
+            let error = HostMemoryImports::admit(&defining_host(maximum)).unwrap_err();
+            assert!(
+                error.message().contains("per-Store cap"),
+                "{maximum:?}: {error:?}"
+            );
+        }
     }
 }

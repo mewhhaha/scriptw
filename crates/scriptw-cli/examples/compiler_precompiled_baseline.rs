@@ -108,16 +108,25 @@ fn run() -> Result<Value, String> {
 }
 
 fn main() {
-    let result = std::thread::Builder::new()
-        .stack_size(WORKER_STACK_BYTES)
-        .spawn(run)
-        .map_err(|e| e.to_string())
-        .and_then(|thread| {
-            thread
-                .join()
-                .map_err(|_| "shared precompiled host panicked".to_owned())
-        })
-        .and_then(|result| result);
+    let one_arena =
+        !cfg!(feature = "jemalloc") && executes_only(std::env::args().nth(1).as_deref());
+    let result = (if one_arena {
+        use_one_malloc_arena()
+    } else {
+        Ok(())
+    })
+    .and_then(|()| {
+        std::thread::Builder::new()
+            .stack_size(WORKER_STACK_BYTES)
+            .spawn(run)
+            .map_err(|e| e.to_string())
+    })
+    .and_then(|thread| {
+        thread
+            .join()
+            .map_err(|_| "shared precompiled host panicked".to_owned())
+    })
+    .and_then(|result| result);
     match result {
         Ok(value) => println!("{value}"),
         Err(error) => {

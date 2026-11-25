@@ -620,6 +620,30 @@ impl ModuleFunctionTable {
         Ok(())
     }
 
+    /// R's re-encoding with its private memory defined keeps every body,
+    /// local and operator, but a renumbered memory immediate can change
+    /// length. Bind attribution and branch hints to the final bodies:
+    /// `branches` gives per body, in code-section order, each two-way
+    /// branch's offset before and after.
+    pub(crate) fn rebind_reencoded(
+        &mut self,
+        body_sizes: &[usize],
+        branches: &[Vec<(u32, u32)>],
+    ) -> Result<(), EmitError> {
+        if body_sizes.len() != self.records.len() || branches.len() != self.records.len() {
+            return Err(EmitError::unsupported(
+                "compiler function attribution: re-encoding changed the body count",
+            ));
+        }
+        for (record, size) in self.records.iter_mut().zip(body_sizes) {
+            record.body_bytes = FunctionBodySize(u32::try_from(*size).unwrap_or(u32::MAX));
+        }
+        for sites in &mut self.branch_hints {
+            sites.relocate(&branches[sites.body() as usize])?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn native_program_context_section(
         &self,
     ) -> Option<wasm_encoder::CustomSection<'static>> {

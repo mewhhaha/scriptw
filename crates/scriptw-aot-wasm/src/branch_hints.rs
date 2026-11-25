@@ -69,6 +69,26 @@ impl BodySites {
     }
 }
 
+impl BodySites {
+    /// Follow a re-encoding of this body that kept its operators but may
+    /// have changed operand lengths: `moved` gives, in body order, the old
+    /// and new offset of every two-way branch of the body.
+    pub(crate) fn relocate(&mut self, moved: &[(u32, u32)]) -> Result<(), EmitError> {
+        for site in &mut self.sites {
+            let at = moved
+                .binary_search_by_key(&site.offset, |&(old, _)| old)
+                .map_err(|_| {
+                    fail(format!(
+                        "offset {} of body {} names no two-way branch to relocate",
+                        site.offset, self.body
+                    ))
+                })?;
+            site.offset = moved[at].1;
+        }
+        Ok(())
+    }
+}
+
 /// Whether the operator at the start of `code` is a two-way branch.
 fn starts_two_way_branch(code: &[u8]) -> bool {
     match code {

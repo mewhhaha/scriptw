@@ -1326,6 +1326,69 @@ mod tests {
         assert!(matches!(init, MemoryInitialization::Static { .. }));
     }
 
+    /// Scriptw patch: a module that imports one memory and defines another
+    /// gets a copy-on-write image for the defined one, and every new instance
+    /// starts from the image, on demand and from a reused pooled slot alike.
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn a_defined_memory_beside_an_imported_one_gets_an_image() {
+        let wat = r#"
+            (module
+                (import "host" "imported" (memory 1))
+                (memory (export "defined") 2)
+                (data (memory 1) (i32.const 65536) "abcd")
+            )
+        "#;
+        let mut engines = vec![Engine::default()];
+        #[cfg(feature = "pooling-allocator")]
+        {
+            let mut pooling = crate::PoolingAllocationConfig::new();
+            pooling
+                .total_memories(2)
+                .total_core_instances(1)
+                .total_tables(1)
+                .total_stacks(1)
+                .max_memory_size(1 << 20)
+                .linear_memory_keep_resident(1 << 16);
+            #[cfg(feature = "gc")]
+            pooling.total_gc_heaps(1);
+            let mut config = crate::Config::new();
+            config.allocation_strategy(crate::InstanceAllocationStrategy::Pooling(pooling));
+            engines.push(Engine::new(&config).unwrap());
+        }
+        for engine in engines {
+            let module = Module::new(&engine, wat).unwrap();
+            let init = &module.env_module().memory_initialization;
+            assert!(matches!(init, MemoryInitialization::Static { .. }));
+            let images = module.memory_images().unwrap().expect("the module has images");
+            let defined = module
+                .env_module()
+                .defined_memory_index(wasmtime_environ::MemoryIndex::from_u32(1))
+                .unwrap();
+            assert!(images.get_memory_image(defined).is_some());
+            for _ in 0..3 {
+                let mut store = crate::Store::new(&engine, ());
+                let imported =
+                    crate::Memory::new(&mut store, crate::MemoryType::new(1, None)).unwrap();
+                imported.data_mut(&mut store)[..4].copy_from_slice(b"host");
+                let instance =
+                    crate::Instance::new(&mut store, &module, &[imported.into()]).unwrap();
+                let memory = instance.get_memory(&mut store, "defined").unwrap();
+                let data = memory.data(&store);
+                assert_eq!(&data[65536..65540], b"abcd");
+                assert!(data[..65536].iter().all(|byte| *byte == 0));
+                assert!(data[65540..].iter().all(|byte| *byte == 0));
+                // Dirty the image page, a page before it and the last page.
+                let data = memory.data_mut(&mut store);
+                data[65536] = b'x';
+                data[100] = 1;
+                let last = data.len() - 1;
+                data[last] = 1;
+                assert_eq!(&imported.data(&store)[..4], b"host");
+            }
+        }
+    }
+
     #[test]
     #[cfg_attr(miri, ignore)]
     fn image_range_is_whole_image() {

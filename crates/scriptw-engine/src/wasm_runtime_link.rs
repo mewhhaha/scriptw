@@ -457,6 +457,34 @@ pub(super) fn instantiate(
                         "wasmtime runtime instantiate failed",
                     )
                 })?;
+            // R defines the Store's private memory; P imports it from the
+            // host namespace, as it would a host-created one.
+            if let crate::host_memory_imports::PrivateMemory::Defined = modules.memories().private()
+            {
+                if modules.program.imports().any(|import| {
+                    import.module() == crate::WASM_HOST_IMPORT_NAMESPACE
+                        && import.name() == crate::WASM_HOST_IMPORT_PRIVATE_MEMORY
+                }) {
+                    let memory = runtime
+                        .get_memory(
+                            &mut *store,
+                            crate::host_memory_imports::HOST_MODULE_MEMORY_EXPORT,
+                        )
+                        .ok_or_else(|| {
+                            EngineError::new("wasmtime runtime exports no private memory")
+                        })?;
+                    linker
+                        .define(
+                            &*store,
+                            crate::WASM_HOST_IMPORT_NAMESPACE,
+                            crate::WASM_HOST_IMPORT_PRIVATE_MEMORY,
+                            memory,
+                        )
+                        .map_err(|err| {
+                            EngineError::new(format!("wasmtime linker setup failed: {err}"))
+                        })?;
+                }
+            }
             let namespace = scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE;
             let mut published = BTreeSet::new();
             for import in modules.program.imports() {

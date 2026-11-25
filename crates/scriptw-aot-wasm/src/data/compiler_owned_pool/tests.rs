@@ -191,12 +191,31 @@ fn shared_program_images_and_ordinals_match_fresh_collection_with_exact_utf16() 
     }
 }
 
-fn exact_bytes_for_corruption(prefix: &CompilerOwnedPool) -> Vec<u8> {
+/// A module of R's data section as R holds it: emitted for the emitter's
+/// private memory 0, then renumbered to the memory R defines.
+fn runtime_data_module(prefix: &CompilerOwnedPool) -> Vec<u8> {
+    use wasm_encoder::reencode::{Error, Reencode};
+    struct Defined;
+    impl Reencode for Defined {
+        type Error = ();
+        fn memory_index(&mut self, memory: u32) -> Result<u32, Error<()>> {
+            assert_eq!(memory, 0, "R's data targets its private memory");
+            Ok(crate::runtime_private_memory::RUNTIME_PRIVATE_MEMORY_INDEX)
+        }
+    }
     let mut data = DataSection::new();
     prefix.0.append_runtime_data(&mut data);
+    let mut emitted = Module::new();
+    emitted.section(&data);
     let mut module = Module::new();
-    module.section(&data);
+    Defined
+        .parse_core_module(&mut module, wasmparser::Parser::new(0), &emitted.finish())
+        .unwrap();
     module.finish()
+}
+
+fn exact_bytes_for_corruption(prefix: &CompilerOwnedPool) -> Vec<u8> {
+    runtime_data_module(prefix)
 }
 
 fn descriptor_payload_byte(bytes: &[u8], address: u32) -> usize {
@@ -207,7 +226,7 @@ fn descriptor_payload_byte(bytes: &[u8], address: u32) -> usize {
             for row in section {
                 let row = row.unwrap();
                 if let DataKind::Active {
-                    memory_index: 0,
+                    memory_index: crate::runtime_private_memory::RUNTIME_PRIVATE_MEMORY_INDEX,
                     offset_expr,
                 } = row.kind
                 {
@@ -237,11 +256,9 @@ fn descriptor_payload_byte(bytes: &[u8], address: u32) -> usize {
 #[test]
 fn canonical_prefix_admission_checks_actual_data_bytes_not_just_the_boundary() {
     let prefix = prefix();
-    let mut data = DataSection::new();
-    prefix.0.append_runtime_data(&mut data);
-    let mut exact = Module::new();
-    exact.section(&data);
-    prefix.require_runtime_data(&exact.finish()).unwrap();
+    prefix
+        .require_runtime_data(&runtime_data_module(&prefix))
+        .unwrap();
     let mut wrong_bytes = exact_bytes_for_corruption(&prefix);
     // Retain the exact descriptor-byte corruption control across segment layouts.
     // Locate its actual encoded payload instead of rebuilding a parallel layout.
@@ -274,11 +291,7 @@ fn normalization_region_is_passive_and_active_fragments_preserve_exact_virtual_a
             let region = prefix.0.normalization_image_region();
             let span = region.offsets();
             assert_eq!(region.length() > 0, normalization);
-            let mut data = DataSection::new();
-            prefix.0.append_runtime_data(&mut data);
-            let mut module = Module::new();
-            module.section(&data);
-            let bytes = module.finish();
+            let bytes = runtime_data_module(&prefix);
             let mut rows = Vec::new();
             for payload in Parser::new(0).parse_all(&bytes) {
                 if let Payload::DataSection(section) = payload.unwrap() {
@@ -313,7 +326,7 @@ fn normalization_region_is_passive_and_active_fragments_preserve_exact_virtual_a
             let mut active_bytes = 0;
             for row in &rows {
                 if let DataKind::Active {
-                    memory_index: 0,
+                    memory_index: crate::runtime_private_memory::RUNTIME_PRIVATE_MEMORY_INDEX,
                     offset_expr,
                 } = &row.kind
                 {

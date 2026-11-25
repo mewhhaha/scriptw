@@ -154,6 +154,20 @@ accepts `--case <file.js>`.
   24.8M. These rounds are not comparable with the 27 ms above, which was
   taken under a different load.
 
+  Private memory per process, also 2026-11-24 (the precompiled host held at
+  Store 1's `after_execution` barrier, pooled Stores, one pinned CPU): R
+  defines its private linear memory instead of importing a host-created one,
+  so Wasmtime maps R's data segments from the executable as a copy-on-write
+  image instead of copying 47 pages into every Store
+  ([contract](contracts/runtime-byte-ownership.md#native-backing-storage);
+  a [vendored Wasmtime patch](../../vendor/wasmtime-47.0.0/PATCHES.md#copy-on-write-image-beside-an-imported-memory)
+  gives a module that imports another memory its image), and the host's
+  execute commands run on one glibc malloc arena. Private dirty memory of
+  `startup.js` fell from 1,944 to 1,672 KiB (R's memory 192 → 4 KiB, malloc
+  arenas 88 KiB) and of `objects.js` from 2,112 to 1,848 KiB; the PSS added
+  per process between one and four held processes fell from 2.04 to 1.80 MiB
+  and from 2.21 to 1.98 MiB. A warm `scriptw run` did not slow down.
+
   What remains: rerun the panel on a quiet machine with its own method (the
   figures above are not the panel's). Of the 24.8M instructions of a warm
   start, 9.4M are SHA-256 as Valgrind runs it, without the CPU's SHA

@@ -10,7 +10,10 @@ function entry and loop header.
 `wasmtime::Store::interrupt_handle` returns a handle that any thread may use.
 `InterruptHandle::interrupt` marks a request pending and removes access to the
 Store's GC heap and to each linear memory registered through
-`Store::interrupt_on_memory`. Engine registers the private linear memory.
+`Store::interrupt_on_memory`. Engine registers the private linear memory:
+R defines it, so Engine registers R's exported memory once R is instantiated
+and before any code runs; a host-created one (a standalone module's) is
+registered when it is created.
 
 Compiled code faults at its next access to that memory. The fault handler
 restores access. When the faulting instruction is compiled code and a request

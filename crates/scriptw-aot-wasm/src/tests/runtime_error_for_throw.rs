@@ -288,7 +288,7 @@ fn runtime_names(bytes: &[u8], ordinals: &[u32]) -> Vec<String> {
                 .iter()
                 .find_map(|segment| {
                     let wasmparser::DataKind::Active {
-                        memory_index: 0,
+                        memory_index: crate::runtime_private_memory::RUNTIME_PRIVATE_MEMORY_INDEX,
                         offset_expr,
                     } = &segment.kind
                     else {

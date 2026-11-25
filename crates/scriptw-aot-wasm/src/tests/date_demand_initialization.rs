@@ -143,7 +143,7 @@ fn installation_rows(
             for entry in entries {
                 let entry = entry.unwrap();
                 if let wasmparser::DataKind::Active {
-                    memory_index: 0,
+                    memory_index: crate::runtime_private_memory::RUNTIME_PRIVATE_MEMORY_INDEX,
                     offset_expr,
                 } = entry.kind
                 {

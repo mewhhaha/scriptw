@@ -414,6 +414,7 @@ fn decode_layout(
     let mut data_layout: [(Option<u32>, usize); RUNTIME_DATA_SEGMENT_COUNT] =
         [(None, 0); RUNTIME_DATA_SEGMENT_COUNT];
     let mut source_admission = SourceCompilationProfileAdmission::default();
+    let mut defines_private_memory = false;
     for payload in parser.parse_all(bytes) {
         let payload = payload.ok()?;
         match validator.payload(&payload).ok()? {
@@ -454,6 +455,22 @@ fn decode_layout(
                     function_types.push(ty.ok()?);
                 }
             }
+            // R defines exactly its private memory, bounded by the per-Store
+            // cap (`runtime_private_memory`), and imports the shared one.
+            Payload::MemorySection(reader) => {
+                let mut memories = reader.into_iter();
+                let memory = memories.next()?.ok()?;
+                if memories.next().is_some()
+                    || memory.shared
+                    || memory.memory64
+                    || memory
+                        .maximum
+                        .is_none_or(|maximum| maximum > crate::module::STORE_MEMORY_CAP_PAGES)
+                {
+                    return None;
+                }
+                defines_private_memory = true;
+            }
             Payload::GlobalSection(reader) => {
                 for global in reader {
                     globals.push(wasm_encoder::GlobalType::try_from(global.ok()?.ty).ok()?);
@@ -479,7 +496,8 @@ fn decode_layout(
                         (
                             4..=7,
                             DataKind::Active {
-                                memory_index: 0,
+                                memory_index:
+                                    crate::runtime_private_memory::RUNTIME_PRIVATE_MEMORY_INDEX,
                                 offset_expr,
                             },
                         ) => {
@@ -527,6 +545,7 @@ fn decode_layout(
         next_address = next_address.checked_add(u32::try_from(bytes).ok()?)?;
     }
     if !validated_end
+        || !defines_private_memory
         || data_count != RUNTIME_DATA_SEGMENT_COUNT
         || next_address != STATIC_DATA_OFFSET.checked_add(u32::try_from(pool.static_len()).ok()?)?
         || !sections.is_empty()

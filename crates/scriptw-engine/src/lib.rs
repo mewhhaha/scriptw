@@ -4353,7 +4353,9 @@ impl Engine {
             "host import registration (within store + linker)",
             host_imports_started,
         );
-        if let Some(private_memory_type) = modules.memories().private().cloned() {
+        if let host_memory_imports::PrivateMemory::Imported(private_memory_type) =
+            modules.memories().private().clone()
+        {
             let private_memory =
                 WasmtimeMemory::new(&mut store, private_memory_type).map_err(|err| {
                     EngineError::new(format!("wasmtime private-memory setup failed: {err}"))
@@ -4401,6 +4403,18 @@ impl Engine {
         // module status of a module entry.
         let (instance, observed_instance) =
             wasm_runtime_link::instantiate(&mut linker, &mut store, &modules)?;
+        // R's own private memory exists only now; the regular-expression
+        // engine works in it as in a host-created one, so watch it too.
+        if let host_memory_imports::PrivateMemory::Defined = modules.memories().private() {
+            let private_memory = observed_instance
+                .get_memory(&mut store, host_memory_imports::HOST_MODULE_MEMORY_EXPORT)
+                .ok_or_else(|| EngineError::new("wasmtime runtime exports no private memory"))?;
+            store.interrupt_on_memory(&private_memory).map_err(|err| {
+                EngineError::new(format!(
+                    "wasmtime private-memory deadline setup failed: {err}"
+                ))
+            })?;
+        }
         trace_phase("instantiate", instantiate_started);
         let instantiate_elapsed = if profile.is_some() {
             instantiate_started.elapsed()

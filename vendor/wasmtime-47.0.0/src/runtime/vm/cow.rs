@@ -190,8 +190,16 @@ impl ModuleMemoryImages {
             // mmap-based-initialization only works for defined memories with a
             // known starting point of all zeros, so bail out if the mmeory is
             // imported.
+            //
+            // Scriptw patch: unless the imported memory has no initializer.
+            // Static initialization refuses a module with any data segment
+            // for an imported memory, so every imported memory's entry is
+            // empty; bailing on it gave a module that imports one memory and
+            // defines another no image at all, and its defined memory was
+            // then initialized by copying the whole dense image.
             let defined_memory = match module.defined_memory_index(memory_index) {
                 Some(idx) => idx,
+                None if init.is_none() => continue,
                 None => return Ok(None),
             };
 

@@ -75,7 +75,8 @@ impl CompilerOwnedPool {
                         (DataKind::Passive, None) => {}
                         (
                             DataKind::Active {
-                                memory_index: 0,
+                                memory_index:
+                                    crate::runtime_private_memory::RUNTIME_PRIVATE_MEMORY_INDEX,
                                 offset_expr,
                             },
                             Some(address),

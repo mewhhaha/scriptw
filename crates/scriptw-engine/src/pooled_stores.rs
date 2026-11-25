@@ -20,9 +20,13 @@ pub const MAX_POOLED_KEEP_RESIDENT_BYTES: usize = WASM_GC_HEAP_INITIAL_BYTES;
 const KEEP_RESIDENT_GRANULE_BYTES: usize = 64 * 1024;
 
 /// Memory slots one Store may use: its GC heap, and one memory each that R or
-/// P could define. Scriptw's own R and P define none (they import host-created
-/// memories, which Wasmtime always allocates on demand), so in practice a
-/// Store takes one slot; the rest are reserved address space only. A
+/// P could define. Scriptw's R defines its private memory, so a Store takes
+/// two slots; P imports R's and the third is reserved address space only (a
+/// profile-collecting P defines its profile memory there). The shared memory
+/// is host-created, which Wasmtime always allocates on demand. R's slot keeps
+/// R's copy-on-write data image mapped: Wasmtime's reset writes the image's
+/// bytes back into the kept-resident pages a Store dirtied and lets the rest
+/// fall back to the image, so the next Store starts from R's pristine data. A
 /// non-GC module that defines its memory (the benchmark WASI adapter's
 /// program) takes one slot for it, and the same keep-resident reset applies.
 const MEMORY_SLOTS_PER_STORE: u32 = 3;

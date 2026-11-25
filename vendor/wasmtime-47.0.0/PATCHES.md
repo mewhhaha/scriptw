@@ -521,6 +521,25 @@ Test: `embedded_runtime::native_backing::tests` in `scriptw-engine` runs code
 and reads a data segment from a module mapped at a nonzero offset of a larger
 file, and checks the rejected ranges.
 
+## Copy-on-write image beside an imported memory
+
+`ModuleMemoryImages::new` (`src/runtime/vm/cow.rs`) skips an imported
+memory whose static-initialization entry is empty instead of giving the
+whole module no image. Static initialization (wasmtime-environ's
+`try_static_init`) already refuses a module with any data segment for an
+imported memory, so every imported memory's entry is empty; a module with
+data for one keeps segmented initialization and no image, as before. Before
+the patch a module that imports one memory and defines another, as
+Scriptw's R imports its shared memory and defines its private one, got
+static initialization without an image, so every instantiation copied the
+defined memory's whole dense image (1.7 MiB for R) instead of mapping it.
+Instance initialization already skipped imported memories in the static map
+(`src/runtime/vm/instance.rs`), and an imported memory's contents are never
+touched. `module::tests::a_defined_memory_beside_an_imported_one_gets_an_image`
+instantiates such a module on demand and from a reused, kept-resident pooled
+slot, and checks the image's bytes, zeroes around them and the imported
+memory after the previous instance dirtied the image's page and others.
+
 ## Type registry hashing
 
 `TypeRegistryInner::hash_consing_map` (`src/runtime/type_registry.rs`) is keyed

@@ -471,7 +471,7 @@ fn actual_realm_bootstrap_installs_checked_rows_through_one_counted_loop() {
                 for entry in data {
                     let entry = entry.unwrap();
                     if let wasmparser::DataKind::Active {
-                        memory_index: 0,
+                        memory_index: crate::runtime_private_memory::RUNTIME_PRIVATE_MEMORY_INDEX,
                         offset_expr,
                     } = entry.kind
                     {

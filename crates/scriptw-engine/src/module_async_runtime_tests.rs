@@ -625,6 +625,21 @@ impl ModuleFixture {
             }
         }
         let runtime = linker.instantiate(&mut store, &self.runtime).unwrap();
+        // R defines the private memory that P imports from the host namespace.
+        let private_memory = runtime
+            .get_memory(
+                &mut store,
+                crate::host_memory_imports::HOST_MODULE_MEMORY_EXPORT,
+            )
+            .unwrap();
+        linker
+            .define(
+                &store,
+                WASM_HOST_IMPORT_NAMESPACE,
+                WASM_HOST_IMPORT_PRIVATE_MEMORY,
+                private_memory,
+            )
+            .unwrap();
         let drain = runtime.get_func(&mut store, &self.drain_export).unwrap();
         linker
             .instance(

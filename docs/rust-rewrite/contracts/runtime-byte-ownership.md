@@ -215,6 +215,17 @@ The raw images make the executable larger than the compressed containers did;
 the pages cost memory only when touched. RSS counts a shared mapped page once
 per process and PSS splits it, so compare PSS or USS across processes.
 
+R's linear-memory data comes from the same mapping. R defines its private
+memory (`scriptw-aot-wasm`'s `runtime_private_memory`; P imports it), so
+Wasmtime lays R's active data segments out as a page-aligned copy-on-write
+image inside the native image and maps that file range into every new private
+memory instead of copying the segments into it. A Store's untouched data pages
+are therefore the executable's page-cache pages too; a page becomes private
+only when the Store writes it. A pooled slot writes the image's bytes back into
+the pages its Store dirtied, or lets them fall back to the file, so each Store
+starts from R's pristine data. With `backing: copied` the image comes from the
+copied bytes and is private to the process, but still shared by its Stores.
+
 RSS, anonymous memory and reclaimable file-cache observations must remain
 separate. Native perf-map text hashing touches every code page, so map captures
 with that hashing enabled cannot establish ordinary lazy-page residency.

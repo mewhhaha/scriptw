@@ -5,6 +5,49 @@ use std::{fs, io::Write, path::Path};
 
 const WORKER_STACK_BYTES: usize = 64 * 1024 * 1024;
 
+/// Whether `command` runs precompiled images without compiling any.
+#[allow(dead_code, reason = "only hosts that spawn a sized worker call it")]
+fn executes_only(command: Option<&str>) -> bool {
+    command.is_some_and(|command| command.starts_with("execute-"))
+}
+
+/// Puts every thread of this process on glibc's main malloc arena. Call it
+/// before the first other thread exists: glibc picks a thread's arena at its
+/// first allocation.
+///
+/// An execute command allocates from one thread at a time: `main` waits for
+/// the sized worker that loads the images, and that worker waits for the
+/// engine's execution-stack thread. glibc still gave each its own arena (up to
+/// eight per CPU), and each arena kept its own free space and partly used
+/// pages: with one arena the shared host's `startup.js` process held 88 KiB
+/// less private dirty memory at Store 1's `after_execution` barrier
+/// (2026-11-24). Commands that compile run Cranelift on a pool of threads,
+/// which would contend for one arena, so they keep glibc's default, as does
+/// a host whose Rust allocations bypass glibc (`--features jemalloc`).
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+#[allow(dead_code, reason = "only hosts that spawn a sized worker call it")]
+fn use_one_malloc_arena() -> Result<(), String> {
+    use std::ffi::c_int;
+    // glibc's <malloc.h>.
+    const M_ARENA_MAX: c_int = -8;
+    unsafe extern "C" {
+        fn mallopt(param: c_int, value: c_int) -> c_int;
+    }
+    // SAFETY: mallopt only records an allocator parameter, under glibc's own
+    // lock; it touches no memory of the caller.
+    if unsafe { mallopt(M_ARENA_MAX, 1) } == 1 {
+        Ok(())
+    } else {
+        Err("glibc refused mallopt(M_ARENA_MAX, 1)".into())
+    }
+}
+
+#[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+#[allow(dead_code, reason = "only hosts that spawn a sized worker call it")]
+fn use_one_malloc_arena() -> Result<(), String> {
+    Ok(())
+}
+
 fn hash(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }

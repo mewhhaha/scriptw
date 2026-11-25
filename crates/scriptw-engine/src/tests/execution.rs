@@ -256,7 +256,6 @@ fn wasm_backend_characterization_matrix_locks_public_surface_and_outcomes() {
                 "scriptw_host::notify_async_waiters",
                 "scriptw_host::number_pow",
                 "scriptw_host::print_line_utf8",
-                "scriptw_host::private_memory",
                 "scriptw_host::random_f64",
                 "scriptw_host::register_async_waiter",
                 "scriptw_host::reject_runtime_semantics",
@@ -284,11 +283,18 @@ fn wasm_backend_characterization_matrix_locks_public_surface_and_outcomes() {
         );
         // P keeps only the host functions its own bodies call (final import
         // compaction drops the rest) and the host memories; each is one of
-        // R's, with the same exact boundary.
+        // R's, with the same exact boundary, except the private memory, which
+        // R defines and exports and instantiation links into P.
         assert!(!host_imports.is_empty(), "{label} P host imports");
+        assert!(
+            host_imports.contains(&"scriptw_host::private_memory")
+                && runtime_exports.iter().any(|export| export == "memory"),
+            "{label} P imports the private memory R exports"
+        );
         for import in &host_imports {
             assert!(
-                runtime_imports.iter().any(|runtime| runtime == import),
+                *import == "scriptw_host::private_memory"
+                    || runtime_imports.iter().any(|runtime| runtime == import),
                 "{label} P host import {import} is part of R's fixed boundary"
             );
         }

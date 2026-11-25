@@ -107,6 +107,7 @@ mod program_hooks;
 mod promise_rejection_policy;
 mod runtime_abi;
 mod runtime_artifact;
+mod runtime_private_memory;
 
 /// Program-local execution phase; this never extends the shared runtime layout.
 pub const GLOBAL_SCRIPT_PRELUDE_PHASE_EXPORT: &str = "scriptw.global_prelude_phase";

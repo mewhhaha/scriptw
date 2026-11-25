@@ -365,7 +365,10 @@ impl EmbeddedRuntime {
         self.check(store, linker, StorePhase::Fresh)?;
         store.data_mut().embedding.as_mut().unwrap().phase = StorePhase::Failed;
         host_imports::register(linker, self.modules.host())?;
-        if let Some(ty) = self.modules.memories().private() {
+        // R defines its own private memory; instantiation links it into P.
+        if let crate::host_memory_imports::PrivateMemory::Imported(ty) =
+            self.modules.memories().private()
+        {
             let memory = WasmtimeMemory::new(&mut *store, ty.clone()).map_err(|error| {
                 EngineError::new(format!("embedding private memory: {error:#}"))
             })?;
