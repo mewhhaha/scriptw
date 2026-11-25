@@ -860,7 +860,7 @@ fn heap_shape_property_read_follows_prototype_chain() {
         ..ObjectShape::default()
     });
     let shape = HeapShape::Object(ObjectShape {
-        prototype: Some(Box::new(proto)),
+        prototype: Some(std::sync::Arc::new(proto)),
         ..ObjectShape::default()
     });
     assert_eq!(

@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::ops::ControlFlow;
+use std::sync::Arc;
 
 use boa_ast::operations::{
     annex_b_function_declarations, contains, lexically_declared_names, ContainsSymbol,

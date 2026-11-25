@@ -84,7 +84,9 @@ fn mutable_global_shapes_cannot_escape_one_compilation() {
         let baseline = global_property_baseline(policy);
         let mut first = global_properties(policy);
         let reflect = first.get_mut(REFLECT_NAME).unwrap();
-        let Some(HeapShape::Object(shape)) = reflect.value_info.heap_shape.as_deref_mut() else {
+        let Some(HeapShape::Object(shape)) =
+            reflect.value_info.heap_shape.as_mut().map(Arc::make_mut)
+        else {
             panic!("Reflect must retain its builtin object recipe");
         };
         assert!(!shape.properties.is_empty());
@@ -106,7 +108,11 @@ fn mutable_signature_facts_cannot_escape_one_compilation() {
     signature.return_kind = ValueKind::Undefined;
     signature.return_shape = FunctionReturnShape::Absent;
     signature.this_observed = true;
-    let Some(HeapShape::Object(shape)) = signature.constructor_instance.heap_shape.as_deref_mut()
+    let Some(HeapShape::Object(shape)) = signature
+        .constructor_instance
+        .heap_shape
+        .as_mut()
+        .map(Arc::make_mut)
     else {
         panic!("Function constructor must retain its instance recipe");
     };

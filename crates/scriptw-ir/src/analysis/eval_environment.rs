@@ -254,7 +254,7 @@ impl<'ast> Visitor<'ast> for WithContinuationOwners {
                     .flatten();
                 if let Some(checked) = checked {
                     self.for_of_owners.insert(
-                        source as *const ForOfLoop as usize,
+                        &**source as *const ForOfLoop as usize,
                         CompleteResumableForOfOwner::from_checked_source(checked),
                     );
                 } else {
@@ -312,7 +312,7 @@ impl<'ast> Visitor<'ast> for WithContinuationOwners {
                     }
                 };
                 self.for_in_owners.insert(
-                    source as *const boa_ast::statement::iteration::ForInLoop as usize,
+                    &**source as *const boa_ast::statement::iteration::ForInLoop as usize,
                     owner,
                 );
                 if matches!(

@@ -813,11 +813,11 @@ impl<'a> ScriptLowerer<'a> {
         }
 
         fn invalidate_prototype_link(
-            prototype: &mut Option<Box<HeapShape>>,
+            prototype: &mut Option<Arc<HeapShape>>,
             alias: &ValueInfo,
             canonical_targets: &BTreeMap<FunctionId, FunctionId>,
         ) -> PrototypeChain {
-            let Some(linked) = prototype.as_deref_mut() else {
+            let Some(linked) = prototype.as_mut().map(Arc::make_mut) else {
                 return PrototypeChain::Described;
             };
             if alias.heap_shape.as_deref() != Some(&*linked) {
@@ -887,7 +887,8 @@ impl<'a> ScriptLowerer<'a> {
             }
             let shape = value
                 .heap_shape
-                .as_deref_mut()
+                .as_mut()
+                .map(Arc::make_mut)
                 .expect("checked nested alias shape must still exist");
             match invalidate_nested_aliases(shape, alias, canonical_targets) {
                 PrototypeChain::Described => {}
@@ -1117,8 +1118,10 @@ impl<'a> ScriptLowerer<'a> {
                 return None;
             }
             let mut constructor_value_info = constructor.value_info.clone();
-            let HeapShape::Object(constructor_shape) =
-                constructor_value_info.heap_shape.as_deref_mut()?
+            let HeapShape::Object(constructor_shape) = constructor_value_info
+                .heap_shape
+                .as_mut()
+                .map(Arc::make_mut)?
             else {
                 return None;
             };
@@ -1127,7 +1130,7 @@ impl<'a> ScriptLowerer<'a> {
             else {
                 return None;
             };
-            let prototype_properties = match prototype.heap_shape.as_deref_mut()? {
+            let prototype_properties = match prototype.heap_shape.as_mut().map(Arc::make_mut)? {
                 HeapShape::Object(shape) => &mut shape.properties,
                 HeapShape::Array(shape) => &mut shape.properties,
             };

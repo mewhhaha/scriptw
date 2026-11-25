@@ -28,7 +28,7 @@ impl<'a> ScriptLowerer<'a> {
         ValueInfo {
             kind: ValueKind::Object,
             possible_kinds: KindSet::from_kind(ValueKind::Object),
-            heap_shape: Some(Box::new(Self::empty_object_shape())),
+            heap_shape: Some(Arc::new(Self::empty_object_shape())),
             function_targets: FunctionTargetKnowledge::none(),
         }
     }
@@ -37,12 +37,12 @@ impl<'a> ScriptLowerer<'a> {
         ValueInfo {
             kind: ValueKind::Array,
             possible_kinds: KindSet::from_kind(ValueKind::Array),
-            heap_shape: Some(Box::new(HeapShape::Array(ArrayShape::default()))),
+            heap_shape: Some(Arc::new(HeapShape::Array(ArrayShape::default()))),
             function_targets: FunctionTargetKnowledge::none(),
         }
     }
 
-    pub(super) fn shadow_realm_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn shadow_realm_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, builtin) in SHADOW_REALM_PROTOTYPE_METHODS {
             properties.insert(
@@ -57,11 +57,11 @@ impl<'a> ScriptLowerer<'a> {
             shape_namespace_key(WellKnownSymbol::ToStringTag),
             ObjectShapeProperty::Data(ValueInfo::new(ValueKind::String)),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::ShadowRealmConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
@@ -75,18 +75,18 @@ impl<'a> ScriptLowerer<'a> {
         )
     }
 
-    pub(super) fn array_buffer_instance_shape() -> Box<HeapShape> {
+    pub(super) fn array_buffer_instance_shape() -> Arc<HeapShape> {
         Self::array_buffer_instance_shape_with_prototype(Self::array_buffer_prototype_shape())
     }
 
-    pub(super) fn shared_array_buffer_instance_shape() -> Box<HeapShape> {
+    pub(super) fn shared_array_buffer_instance_shape() -> Arc<HeapShape> {
         Self::array_buffer_instance_shape_with_prototype(Self::shared_array_buffer_prototype_shape())
     }
 
     pub(super) fn array_buffer_instance_shape_with_prototype(
-        prototype: Box<HeapShape>,
-    ) -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+        prototype: Arc<HeapShape>,
+    ) -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(prototype),
             properties: BTreeMap::new(),
@@ -95,7 +95,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn array_buffer_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn array_buffer_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         properties.insert(
             "byteLength".to_string(),
@@ -207,18 +207,18 @@ impl<'a> ScriptLowerer<'a> {
             shape_namespace_key(WellKnownSymbol::ToStringTag),
             ObjectShapeProperty::Data(Self::string_value_info("ArrayBuffer")),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::ArrayBufferConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn shared_array_buffer_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn shared_array_buffer_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         properties.insert(
             "byteLength".to_string(),
@@ -275,28 +275,28 @@ impl<'a> ScriptLowerer<'a> {
             shape_namespace_key(WellKnownSymbol::ToStringTag),
             ObjectShapeProperty::Data(Self::string_value_info("SharedArrayBuffer")),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::SharedArrayBufferConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn synthetic_realm_global_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn synthetic_realm_global_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties: BTreeMap::new(),
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn synthetic_realm_record_shape() -> Box<HeapShape> {
+    pub(super) fn synthetic_realm_record_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         properties.insert(
             "global".to_string(),
@@ -310,16 +310,16 @@ impl<'a> ScriptLowerer<'a> {
                 HostBuiltinId::RealmEvalScript,
             )),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn data_view_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn data_view_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         properties.insert(
             "buffer".to_string(),
@@ -506,19 +506,19 @@ impl<'a> ScriptLowerer<'a> {
             shape_namespace_key(WellKnownSymbol::ToStringTag),
             ObjectShapeProperty::Data(Self::string_value_info("DataView")),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::DataViewConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn data_view_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn data_view_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::data_view_prototype_shape()),
             properties: BTreeMap::new(),
@@ -527,7 +527,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn promise_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn promise_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         properties.insert(
             "constructor".to_string(),
@@ -557,19 +557,19 @@ impl<'a> ScriptLowerer<'a> {
                 false,
             )),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::PromiseConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn promise_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn promise_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::promise_prototype_shape()),
             properties: BTreeMap::new(),
@@ -578,7 +578,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn map_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn map_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, builtin) in [
             ("clear", StandardBuiltinId::MapPrototypeClear),
@@ -623,17 +623,17 @@ impl<'a> ScriptLowerer<'a> {
                 setter: None,
             },
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(StandardBuiltinId::MapConstructor),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn map_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn map_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::map_prototype_shape()),
             properties: BTreeMap::new(),
@@ -642,7 +642,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn weak_map_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn weak_map_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, builtin) in [
             ("delete", StandardBuiltinId::WeakMapPrototypeDelete),
@@ -666,19 +666,19 @@ impl<'a> ScriptLowerer<'a> {
                 )),
             );
         }
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::WeakMapConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn weak_map_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn weak_map_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::weak_map_prototype_shape()),
             properties: BTreeMap::new(),
@@ -687,7 +687,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn weak_set_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn weak_set_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         properties.insert(
             "constructor".to_string(),
@@ -713,19 +713,19 @@ impl<'a> ScriptLowerer<'a> {
             shape_namespace_key(WellKnownSymbol::ToStringTag),
             ObjectShapeProperty::Data(Self::string_value_info("WeakSet")),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::WeakSetConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn weak_set_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn weak_set_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::weak_set_prototype_shape()),
             properties: BTreeMap::new(),
@@ -734,7 +734,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn weak_ref_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn weak_ref_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         properties.insert(
             "constructor".to_string(),
@@ -754,19 +754,19 @@ impl<'a> ScriptLowerer<'a> {
             shape_namespace_key(WellKnownSymbol::ToStringTag),
             ObjectShapeProperty::Data(Self::string_value_info("WeakRef")),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::WeakRefConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn weak_ref_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn weak_ref_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::weak_ref_prototype_shape()),
             properties: BTreeMap::new(),
@@ -775,7 +775,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn finalization_registry_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn finalization_registry_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         properties.insert(
             "constructor".to_string(),
@@ -806,19 +806,19 @@ impl<'a> ScriptLowerer<'a> {
             shape_namespace_key(WellKnownSymbol::ToStringTag),
             ObjectShapeProperty::Data(Self::string_value_info("FinalizationRegistry")),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::FinalizationRegistryConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn finalization_registry_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn finalization_registry_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::finalization_registry_prototype_shape()),
             properties: BTreeMap::new(),
@@ -827,7 +827,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn map_iterator_instance_shape() -> Box<HeapShape> {
+    pub(super) fn map_iterator_instance_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         properties.insert(
             "next".to_string(),
@@ -835,7 +835,7 @@ impl<'a> ScriptLowerer<'a> {
                 StandardBuiltinId::MapIteratorNext,
             )),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::UntrackedIntrinsicPrototype,
             prototype: Some(Self::iterator_prototype_shape()),
             properties,
@@ -844,7 +844,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn set_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn set_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, builtin) in [
             ("add", StandardBuiltinId::SetPrototypeAdd),
@@ -896,17 +896,17 @@ impl<'a> ScriptLowerer<'a> {
                 setter: None,
             },
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(StandardBuiltinId::SetConstructor),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn set_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn set_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::set_prototype_shape()),
             properties: BTreeMap::new(),
@@ -915,7 +915,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn set_iterator_instance_shape() -> Box<HeapShape> {
+    pub(super) fn set_iterator_instance_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         properties.insert(
             "next".to_string(),
@@ -923,7 +923,7 @@ impl<'a> ScriptLowerer<'a> {
                 StandardBuiltinId::SetIteratorNext,
             )),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::UntrackedIntrinsicPrototype,
             prototype: Some(Self::iterator_prototype_shape()),
             properties,
@@ -932,7 +932,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn date_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn date_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, builtin) in [
             ("getTime", StandardBuiltinId::DatePrototypeGetTime),
@@ -1043,17 +1043,17 @@ impl<'a> ScriptLowerer<'a> {
                 false,
             )),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(StandardBuiltinId::DateConstructor),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn date_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn date_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::date_prototype_shape()),
             properties: BTreeMap::new(),
@@ -1062,7 +1062,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn temporal_instant_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn temporal_instant_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, getter) in [
             (
@@ -1146,19 +1146,19 @@ impl<'a> ScriptLowerer<'a> {
                 false,
             )),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::TemporalInstantConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn temporal_instant_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn temporal_instant_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::temporal_instant_prototype_shape()),
             properties: BTreeMap::new(),
@@ -1167,7 +1167,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn intl_locale_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn intl_locale_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, getter) in [
             (
@@ -1268,19 +1268,19 @@ impl<'a> ScriptLowerer<'a> {
             shape_namespace_key(WellKnownSymbol::ToStringTag),
             ObjectShapeProperty::Data(Self::string_value_info("Intl.Locale")),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::IntlLocaleConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn intl_locale_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn intl_locale_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::intl_locale_prototype_shape()),
             properties: BTreeMap::new(),
@@ -1289,7 +1289,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn temporal_zoned_date_time_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn temporal_zoned_date_time_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, getter) in [
             (
@@ -1452,19 +1452,19 @@ impl<'a> ScriptLowerer<'a> {
             shape_namespace_key(WellKnownSymbol::ToStringTag),
             ObjectShapeProperty::Data(Self::string_value_info("Temporal.ZonedDateTime")),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::TemporalZonedDateTimeConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn temporal_zoned_date_time_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn temporal_zoned_date_time_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::temporal_zoned_date_time_prototype_shape()),
             properties: BTreeMap::new(),
@@ -1476,7 +1476,7 @@ impl<'a> ScriptLowerer<'a> {
     /// Temporal proposal 3.3: the `Temporal.PlainDate.prototype` shape. The
     /// order here mirrors `install_temporal_plain_date_constructor_intrinsics`,
     /// because property order is observable through `Object.keys`.
-    pub(super) fn temporal_plain_date_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn temporal_plain_date_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, getter) in [
             (
@@ -1663,19 +1663,19 @@ impl<'a> ScriptLowerer<'a> {
             shape_namespace_key(WellKnownSymbol::ToStringTag),
             ObjectShapeProperty::Data(Self::string_value_info("Temporal.PlainDate")),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::TemporalPlainDateConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn temporal_plain_date_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn temporal_plain_date_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::temporal_plain_date_prototype_shape()),
             properties: BTreeMap::new(),
@@ -1687,7 +1687,7 @@ impl<'a> ScriptLowerer<'a> {
     /// Temporal proposal 9.3: the `Temporal.PlainYearMonth.prototype` shape.
     /// The order mirrors `install_temporal_plain_year_month_constructor_intrinsics`,
     /// because property order is observable through `Object.keys`.
-    pub(super) fn temporal_plain_year_month_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn temporal_plain_year_month_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, getter) in [
             (
@@ -1796,19 +1796,19 @@ impl<'a> ScriptLowerer<'a> {
             shape_namespace_key(WellKnownSymbol::ToStringTag),
             ObjectShapeProperty::Data(Self::string_value_info("Temporal.PlainYearMonth")),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::TemporalPlainYearMonthConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn temporal_plain_year_month_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn temporal_plain_year_month_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::temporal_plain_year_month_prototype_shape()),
             properties: BTreeMap::new(),
@@ -1818,7 +1818,7 @@ impl<'a> ScriptLowerer<'a> {
     }
 
     /// Temporal proposal 10.3: the `Temporal.PlainMonthDay.prototype` shape.
-    pub(super) fn temporal_plain_month_day_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn temporal_plain_month_day_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, getter) in [
             (
@@ -1886,19 +1886,19 @@ impl<'a> ScriptLowerer<'a> {
             shape_namespace_key(WellKnownSymbol::ToStringTag),
             ObjectShapeProperty::Data(Self::string_value_info("Temporal.PlainMonthDay")),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::TemporalPlainMonthDayConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn temporal_plain_month_day_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn temporal_plain_month_day_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::temporal_plain_month_day_prototype_shape()),
             properties: BTreeMap::new(),
@@ -1910,7 +1910,7 @@ impl<'a> ScriptLowerer<'a> {
     /// Temporal proposal 4.3: the `Temporal.PlainTime.prototype` shape. The
     /// order here mirrors `install_temporal_plain_time_constructor_intrinsics`,
     /// because property order is observable through `Object.keys`.
-    pub(super) fn temporal_plain_time_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn temporal_plain_time_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, getter) in [
             (
@@ -1991,19 +1991,19 @@ impl<'a> ScriptLowerer<'a> {
             shape_namespace_key(WellKnownSymbol::ToStringTag),
             ObjectShapeProperty::Data(Self::string_value_info("Temporal.PlainTime")),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::TemporalPlainTimeConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn temporal_plain_time_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn temporal_plain_time_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::temporal_plain_time_prototype_shape()),
             properties: BTreeMap::new(),
@@ -2015,7 +2015,7 @@ impl<'a> ScriptLowerer<'a> {
     /// Temporal proposal 5.3: the `Temporal.PlainDateTime.prototype` shape. The
     /// order here mirrors `install_temporal_plain_date_time_constructor_intrinsics`,
     /// because property order is observable through `Object.keys`.
-    pub(super) fn temporal_plain_date_time_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn temporal_plain_date_time_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, getter) in [
             (
@@ -2192,19 +2192,19 @@ impl<'a> ScriptLowerer<'a> {
             shape_namespace_key(WellKnownSymbol::ToStringTag),
             ObjectShapeProperty::Data(Self::string_value_info("Temporal.PlainDateTime")),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::TemporalPlainDateTimeConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn temporal_plain_date_time_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn temporal_plain_date_time_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::temporal_plain_date_time_prototype_shape()),
             properties: BTreeMap::new(),
@@ -2216,7 +2216,7 @@ impl<'a> ScriptLowerer<'a> {
     /// Temporal proposal 7.3: the `Temporal.Duration.prototype` shape. The
     /// order here mirrors `install_temporal_duration_constructor_intrinsics`,
     /// because property order is observable through `Object.keys`.
-    pub(super) fn temporal_duration_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn temporal_duration_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, getter) in [
             (
@@ -2359,19 +2359,19 @@ impl<'a> ScriptLowerer<'a> {
             shape_namespace_key(WellKnownSymbol::ToStringTag),
             ObjectShapeProperty::Data(Self::string_value_info("Temporal.Duration")),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::TemporalDurationConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn temporal_duration_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn temporal_duration_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::temporal_duration_prototype_shape()),
             properties: BTreeMap::new(),
@@ -2380,8 +2380,8 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn regexp_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn regexp_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::regexp_prototype_shape()),
             properties: BTreeMap::from([(
@@ -2393,7 +2393,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn regexp_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn regexp_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         properties.insert(
             "flags".to_string(),
@@ -2500,25 +2500,25 @@ impl<'a> ScriptLowerer<'a> {
                 false,
             )),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::RegExpConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn typed_array_instance_shape() -> Box<HeapShape> {
+    pub(super) fn typed_array_instance_shape() -> Arc<HeapShape> {
         Self::typed_array_instance_shape_with_prototype(Self::typed_array_prototype_shape())
     }
 
-    pub(super) fn uint8_array_codec_result_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn uint8_array_codec_result_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties: ["read", "written"]
                 .into_iter()
                 .map(|name| {
@@ -2535,16 +2535,16 @@ impl<'a> ScriptLowerer<'a> {
 
     pub(super) fn typed_array_instance_shape_for_constructor(
         builtin: StandardBuiltinId,
-    ) -> Box<HeapShape> {
+    ) -> Arc<HeapShape> {
         Self::typed_array_instance_shape_with_prototype(
             Self::typed_array_constructor_prototype_shape(builtin),
         )
     }
 
     pub(super) fn typed_array_instance_shape_with_prototype(
-        prototype: Box<HeapShape>,
-    ) -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+        prototype: Arc<HeapShape>,
+    ) -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(prototype),
             properties: BTreeMap::new(),
@@ -2553,7 +2553,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn typed_array_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn typed_array_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         properties.insert(
             "constructor".to_string(),
@@ -2665,11 +2665,11 @@ impl<'a> ScriptLowerer<'a> {
                 StandardBuiltinId::TypedArrayPrototypeValues,
             )),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::TypedArrayConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
@@ -2678,7 +2678,7 @@ impl<'a> ScriptLowerer<'a> {
 
     pub(super) fn typed_array_constructor_prototype_shape(
         builtin: StandardBuiltinId,
-    ) -> Box<HeapShape> {
+    ) -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         properties.insert(
             "constructor".to_string(),
@@ -2698,7 +2698,7 @@ impl<'a> ScriptLowerer<'a> {
                 );
             }
         }
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(builtin),
             prototype: Some(Self::typed_array_prototype_shape()),
             properties,
@@ -2707,7 +2707,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn array_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn array_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for builtin in [
             StandardBuiltinId::ArrayPrototypeConcat,
@@ -2762,11 +2762,11 @@ impl<'a> ScriptLowerer<'a> {
                 StandardBuiltinId::ArrayPrototypeValues,
             )),
         );
-        Box::new(HeapShape::Array(ArrayShape {
+        Arc::new(HeapShape::Array(ArrayShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::ArrayConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             elements: Vec::new(),
         }))
@@ -2796,7 +2796,7 @@ impl<'a> ScriptLowerer<'a> {
         ValueInfo {
             kind: ValueKind::Object,
             possible_kinds: KindSet::from_kind(ValueKind::Object),
-            heap_shape: Some(Box::new(HeapShape::Object(ObjectShape {
+            heap_shape: Some(Arc::new(HeapShape::Object(ObjectShape {
                 provenance: HeapShapeProvenance::Program,
                 prototype: None,
                 properties: BTreeMap::new(),
@@ -2807,7 +2807,7 @@ impl<'a> ScriptLowerer<'a> {
         }
     }
 
-    pub(super) fn function_heap_shape(constructable: bool) -> Box<HeapShape> {
+    pub(super) fn function_heap_shape(constructable: bool) -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         if constructable {
             properties.insert(
@@ -2815,7 +2815,7 @@ impl<'a> ScriptLowerer<'a> {
                 ObjectShapeProperty::Data(Self::fresh_constructed_instance_info()),
             );
         }
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: None,
             properties,
@@ -2830,7 +2830,7 @@ impl<'a> ScriptLowerer<'a> {
     /// dynamic-source diagnostic.
     pub(super) fn derived_function_intrinsic_prototype_shape(
         kind: DynamicFunctionKind,
-    ) -> Box<HeapShape> {
+    ) -> Arc<HeapShape> {
         let intrinsic = DynamicSourceIntrinsic::Function(kind);
         debug_assert_ne!(kind, DynamicFunctionKind::Ordinary);
         let properties = BTreeMap::from([(
@@ -2840,7 +2840,7 @@ impl<'a> ScriptLowerer<'a> {
                 intrinsic.constructable(),
             )),
         )]);
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::UntrackedIntrinsicPrototype,
             prototype: Some(Self::function_heap_shape(false)),
             properties,
@@ -2870,7 +2870,7 @@ impl<'a> ScriptLowerer<'a> {
         else {
             return info;
         };
-        let Some(HeapShape::Object(shape)) = info.heap_shape.as_mut().map(Box::as_mut) else {
+        let Some(HeapShape::Object(shape)) = info.heap_shape.as_mut().map(Arc::make_mut) else {
             return info;
         };
         shape.prototype = Some(Self::derived_function_intrinsic_prototype_shape(kind));
@@ -2961,7 +2961,7 @@ impl<'a> ScriptLowerer<'a> {
             .union(KindSet::from_kind(ValueKind::BigInt))
     }
 
-    pub(super) fn standard_boxed_prototype_shape(kind: BoxedPrimitiveKind) -> Box<HeapShape> {
+    pub(super) fn standard_boxed_prototype_shape(kind: BoxedPrimitiveKind) -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         if kind == BoxedPrimitiveKind::String {
             for builtin in [
@@ -3079,7 +3079,7 @@ impl<'a> ScriptLowerer<'a> {
                 },
             );
         }
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(match kind {
                 BoxedPrimitiveKind::Number => StandardBuiltinId::NumberConstructor,
                 BoxedPrimitiveKind::String => StandardBuiltinId::StringConstructor,
@@ -3087,7 +3087,7 @@ impl<'a> ScriptLowerer<'a> {
                 BoxedPrimitiveKind::Symbol => StandardBuiltinId::SymbolConstructor,
                 BoxedPrimitiveKind::BigInt => StandardBuiltinId::BigIntConstructor,
             }),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
@@ -3105,7 +3105,7 @@ impl<'a> ScriptLowerer<'a> {
         ValueInfo {
             kind: ValueKind::Object,
             possible_kinds: KindSet::from_kind(ValueKind::Object),
-            heap_shape: Some(Box::new(HeapShape::Object(ObjectShape {
+            heap_shape: Some(Arc::new(HeapShape::Object(ObjectShape {
                 provenance: HeapShapeProvenance::Program,
                 prototype: Self::boxed_primitive_kind_for_value_kind(primitive.kind)
                     .map(Self::standard_boxed_prototype_shape),
@@ -3127,9 +3127,9 @@ impl<'a> ScriptLowerer<'a> {
         )
     }
 
-    pub(super) fn standard_error_prototype_shape(builtin: StandardBuiltinId) -> Box<HeapShape> {
+    pub(super) fn standard_error_prototype_shape(builtin: StandardBuiltinId) -> Arc<HeapShape> {
         let prototype = match builtin {
-            StandardBuiltinId::ErrorConstructor => Some(Box::new(Self::empty_object_shape())),
+            StandardBuiltinId::ErrorConstructor => Some(Arc::new(Self::empty_object_shape())),
             StandardBuiltinId::EvalErrorConstructor
             | StandardBuiltinId::AggregateErrorConstructor
             | StandardBuiltinId::SuppressedErrorConstructor
@@ -3140,7 +3140,7 @@ impl<'a> ScriptLowerer<'a> {
             | StandardBuiltinId::ReferenceErrorConstructor => Some(
                 Self::standard_error_prototype_shape(StandardBuiltinId::ErrorConstructor),
             ),
-            _ => Some(Box::new(Self::empty_object_shape())),
+            _ => Some(Arc::new(Self::empty_object_shape())),
         };
         let mut properties = BTreeMap::new();
         properties.insert(
@@ -3170,7 +3170,7 @@ impl<'a> ScriptLowerer<'a> {
                 },
             );
         }
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(builtin),
             prototype,
             properties,
@@ -3218,7 +3218,7 @@ impl<'a> ScriptLowerer<'a> {
                 ObjectShapeProperty::Data(ValueInfo {
                     kind: ValueKind::Array,
                     possible_kinds: KindSet::from_kind(ValueKind::Array),
-                    heap_shape: Some(Box::new(HeapShape::Array(ArrayShape::default()))),
+                    heap_shape: Some(Arc::new(HeapShape::Array(ArrayShape::default()))),
                     function_targets: FunctionTargetKnowledge::none(),
                 }),
             );
@@ -3236,7 +3236,7 @@ impl<'a> ScriptLowerer<'a> {
         ValueInfo {
             kind: ValueKind::Object,
             possible_kinds: KindSet::from_kind(ValueKind::Object),
-            heap_shape: Some(Box::new(HeapShape::Object(ObjectShape {
+            heap_shape: Some(Arc::new(HeapShape::Object(ObjectShape {
                 provenance: HeapShapeProvenance::Program,
                 prototype: Some(prototype),
                 properties,
@@ -3247,9 +3247,9 @@ impl<'a> ScriptLowerer<'a> {
         }
     }
 
-    pub(super) fn standard_builtin_function_shape(builtin: StandardBuiltinId) -> Box<HeapShape> {
+    pub(super) fn standard_builtin_function_shape(builtin: StandardBuiltinId) -> Arc<HeapShape> {
         let mut shape = Self::function_heap_shape(builtin.constructable());
-        if let HeapShape::Object(object) = shape.as_mut() {
+        if let HeapShape::Object(object) = Arc::make_mut(&mut shape) {
             match builtin {
                 StandardBuiltinId::ShadowRealmConstructor => {
                     object.properties.insert(
@@ -4311,7 +4311,7 @@ impl<'a> ScriptLowerer<'a> {
         }
     }
 
-    pub(crate) fn iterator_prototype_shape() -> Box<HeapShape> {
+    pub(crate) fn iterator_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         properties.insert(
             "constructor".to_string(),
@@ -4438,18 +4438,18 @@ impl<'a> ScriptLowerer<'a> {
                 StandardBuiltinId::IteratorPrototypeWindows,
             )),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::IntrinsicPrototype(
                 StandardBuiltinId::IteratorConstructor,
             ),
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn iterator_helper_prototype_shape() -> Box<HeapShape> {
+    pub(super) fn iterator_helper_prototype_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         properties.insert(
             "next".to_string(),
@@ -4467,7 +4467,7 @@ impl<'a> ScriptLowerer<'a> {
             shape_namespace_key(WellKnownSymbol::ToStringTag),
             ObjectShapeProperty::Data(ValueInfo::new(ValueKind::String)),
         );
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::UntrackedIntrinsicPrototype,
             prototype: Some(Self::iterator_prototype_shape()),
             properties,
@@ -4476,8 +4476,8 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn iterator_take_helper_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn iterator_take_helper_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::iterator_helper_prototype_shape()),
             properties: BTreeMap::new(),
@@ -4486,8 +4486,8 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn iterator_zip_helper_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn iterator_zip_helper_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::iterator_helper_prototype_shape()),
             properties: BTreeMap::new(),
@@ -4496,8 +4496,8 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn iterator_concat_helper_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn iterator_concat_helper_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::iterator_helper_prototype_shape()),
             properties: BTreeMap::new(),
@@ -4506,8 +4506,8 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn iterator_drop_helper_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn iterator_drop_helper_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::iterator_helper_prototype_shape()),
             properties: BTreeMap::new(),
@@ -4525,8 +4525,8 @@ impl<'a> ScriptLowerer<'a> {
         }
     }
 
-    pub(super) fn iterator_helper_instance_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn iterator_helper_instance_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::iterator_helper_prototype_shape()),
             properties: BTreeMap::new(),
@@ -4535,8 +4535,8 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn iterator_map_helper_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn iterator_map_helper_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::iterator_helper_prototype_shape()),
             properties: BTreeMap::new(),
@@ -4545,8 +4545,8 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn iterator_filter_helper_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn iterator_filter_helper_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::iterator_helper_prototype_shape()),
             properties: BTreeMap::new(),
@@ -4555,8 +4555,8 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn iterator_flat_map_helper_shape() -> Box<HeapShape> {
-        Box::new(HeapShape::Object(ObjectShape {
+    pub(super) fn iterator_flat_map_helper_shape() -> Arc<HeapShape> {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
             prototype: Some(Self::iterator_helper_prototype_shape()),
             properties: BTreeMap::new(),
@@ -4565,7 +4565,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn regexp_string_iterator_instance_shape() -> Box<HeapShape> {
+    pub(super) fn regexp_string_iterator_instance_shape() -> Arc<HeapShape> {
         let prototype = HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::UntrackedIntrinsicPrototype,
             prototype: Some(Self::iterator_prototype_shape()),
@@ -4578,16 +4578,16 @@ impl<'a> ScriptLowerer<'a> {
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         });
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
-            prototype: Some(Box::new(prototype)),
+            prototype: Some(Arc::new(prototype)),
             properties: BTreeMap::new(),
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    pub(super) fn generator_instance_shape() -> Box<HeapShape> {
+    pub(super) fn generator_instance_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, builtin) in [
             ("next", StandardBuiltinId::GeneratorPrototypeNext),
@@ -4599,9 +4599,9 @@ impl<'a> ScriptLowerer<'a> {
                 ObjectShapeProperty::Data(Self::standard_builtin_value_info(builtin)),
             );
         }
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
-            prototype: Some(Box::new(HeapShape::Object(ObjectShape {
+            prototype: Some(Arc::new(HeapShape::Object(ObjectShape {
                 provenance: HeapShapeProvenance::UntrackedIntrinsicPrototype,
                 prototype: Some(Self::iterator_prototype_shape()),
                 properties,
@@ -4614,7 +4614,7 @@ impl<'a> ScriptLowerer<'a> {
         }))
     }
 
-    pub(super) fn async_generator_instance_shape() -> Box<HeapShape> {
+    pub(super) fn async_generator_instance_shape() -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, builtin) in [
             ("next", StandardBuiltinId::AsyncGeneratorPrototypeNext),
@@ -4626,9 +4626,9 @@ impl<'a> ScriptLowerer<'a> {
                 ObjectShapeProperty::Data(Self::standard_builtin_value_info(builtin)),
             );
         }
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
-            prototype: Some(Box::new(HeapShape::Object(ObjectShape {
+            prototype: Some(Arc::new(HeapShape::Object(ObjectShape {
                 provenance: HeapShapeProvenance::UntrackedIntrinsicPrototype,
                 prototype: None,
                 properties,
@@ -4734,9 +4734,9 @@ impl<'a> ScriptLowerer<'a> {
                 false,
             )),
         );
-        Self::value_info_from_shape(Some(Box::new(HeapShape::Object(ObjectShape {
+        Self::value_info_from_shape(Some(Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
@@ -4797,9 +4797,9 @@ impl<'a> ScriptLowerer<'a> {
                 ObjectShapeProperty::Data(Self::standard_builtin_value_info(builtin)),
             );
         }
-        Self::value_info_from_shape(Some(Box::new(HeapShape::Object(ObjectShape {
+        Self::value_info_from_shape(Some(Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
@@ -4826,9 +4826,9 @@ impl<'a> ScriptLowerer<'a> {
                 )),
             );
         }
-        Self::value_info_from_shape(Some(Box::new(HeapShape::Object(ObjectShape {
+        Self::value_info_from_shape(Some(Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
@@ -4852,9 +4852,9 @@ impl<'a> ScriptLowerer<'a> {
                 )),
             );
         }
-        Self::value_info_from_shape(Some(Box::new(HeapShape::Object(ObjectShape {
+        Self::value_info_from_shape(Some(Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
@@ -4878,9 +4878,9 @@ impl<'a> ScriptLowerer<'a> {
                 ObjectShapeProperty::Data(Self::standard_builtin_value_info(*builtin)),
             );
         }
-        Self::value_info_from_shape(Some(Box::new(HeapShape::Object(ObjectShape {
+        Self::value_info_from_shape(Some(Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
@@ -4910,9 +4910,9 @@ impl<'a> ScriptLowerer<'a> {
                 ObjectShapeProperty::Data(Self::standard_builtin_value_info(*builtin)),
             );
         }
-        Self::value_info_from_shape(Some(Box::new(HeapShape::Object(ObjectShape {
+        Self::value_info_from_shape(Some(Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
@@ -5023,9 +5023,9 @@ impl<'a> ScriptLowerer<'a> {
                 false,
             )),
         );
-        Self::value_info_from_shape(Some(Box::new(HeapShape::Object(ObjectShape {
+        Self::value_info_from_shape(Some(Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
@@ -5225,7 +5225,7 @@ impl<'a> ScriptLowerer<'a> {
             StandardBuiltinId::ObjectConstructor => (
                 ValueKind::Object,
                 KindSet::from_kind(ValueKind::Object),
-                Some(Box::new(Self::empty_object_shape())),
+                Some(Arc::new(Self::empty_object_shape())),
                 Self::fresh_constructed_instance_info(),
             ),
             StandardBuiltinId::ObjectGroupBy | StandardBuiltinId::ObjectFromEntries => (
@@ -5243,7 +5243,7 @@ impl<'a> ScriptLowerer<'a> {
             StandardBuiltinId::ObjectCreate => (
                 ValueKind::Object,
                 KindSet::from_kind(ValueKind::Object),
-                Some(Box::new(Self::empty_object_shape())),
+                Some(Arc::new(Self::empty_object_shape())),
                 ValueInfo::undefined(),
             ),
             StandardBuiltinId::ObjectGetPrototypeOf => (
@@ -5262,7 +5262,7 @@ impl<'a> ScriptLowerer<'a> {
                 (
                     ValueKind::Object,
                     KindSet::from_kind(ValueKind::Object),
-                    Some(Box::new(Self::empty_object_shape())),
+                    Some(Arc::new(Self::empty_object_shape())),
                     ValueInfo::undefined(),
                 )
             }
@@ -5277,7 +5277,7 @@ impl<'a> ScriptLowerer<'a> {
             StandardBuiltinId::ObjectGetOwnPropertyDescriptors => (
                 ValueKind::Object,
                 KindSet::from_kind(ValueKind::Object),
-                Some(Box::new(Self::empty_object_shape())),
+                Some(Arc::new(Self::empty_object_shape())),
                 ValueInfo::undefined(),
             ),
             StandardBuiltinId::ObjectPrototypeLookupGetter
@@ -5309,7 +5309,7 @@ impl<'a> ScriptLowerer<'a> {
             | StandardBuiltinId::ObjectEntries => (
                 ValueKind::Array,
                 KindSet::from_kind(ValueKind::Array),
-                Some(Box::new(HeapShape::Array(ArrayShape::default()))),
+                Some(Arc::new(HeapShape::Array(ArrayShape::default()))),
                 ValueInfo::undefined(),
             ),
             StandardBuiltinId::ObjectIs
@@ -5373,9 +5373,9 @@ impl<'a> ScriptLowerer<'a> {
                 ValueKind::Object,
                 KindSet::from_kind(ValueKind::Object),
                 if builtin == StandardBuiltinId::AtomicsWaitAsync {
-                    Some(Box::new(HeapShape::Object(ObjectShape {
+                    Some(Arc::new(HeapShape::Object(ObjectShape {
                         provenance: HeapShapeProvenance::Program,
-                        prototype: Some(Box::new(Self::empty_object_shape())),
+                        prototype: Some(Arc::new(Self::empty_object_shape())),
                         properties: BTreeMap::from([
                             (
                                 "async".to_string(),
@@ -5425,7 +5425,7 @@ impl<'a> ScriptLowerer<'a> {
             StandardBuiltinId::JsonRawJson => (
                 ValueKind::Object,
                 KindSet::from_kind(ValueKind::Object),
-                Some(Box::new(Self::raw_json_object_shape())),
+                Some(Arc::new(Self::raw_json_object_shape())),
                 ValueInfo::undefined(),
             ),
             StandardBuiltinId::ObjectPrototypeToString => (
@@ -5451,7 +5451,7 @@ impl<'a> ScriptLowerer<'a> {
             | StandardBuiltinId::ObjectPreventExtensions => (
                 ValueKind::Object,
                 Self::object_like_kind_set(),
-                Some(Box::new(Self::empty_object_shape())),
+                Some(Arc::new(Self::empty_object_shape())),
                 ValueInfo::undefined(),
             ),
             StandardBuiltinId::ProxyConstructor => (
@@ -5541,13 +5541,13 @@ impl<'a> ScriptLowerer<'a> {
             StandardBuiltinId::ReflectOwnKeys => (
                 ValueKind::Array,
                 KindSet::from_kind(ValueKind::Array),
-                Some(Box::new(HeapShape::Array(ArrayShape::default()))),
+                Some(Arc::new(HeapShape::Array(ArrayShape::default()))),
                 ValueInfo::undefined(),
             ),
             StandardBuiltinId::ArrayConstructor => (
                 ValueKind::Array,
                 KindSet::from_kind(ValueKind::Array),
-                Some(Box::new(HeapShape::Array(ArrayShape::default()))),
+                Some(Arc::new(HeapShape::Array(ArrayShape::default()))),
                 Self::fresh_constructed_array_instance_info(),
             ),
             StandardBuiltinId::ArrayFrom => (
@@ -6239,13 +6239,13 @@ impl<'a> ScriptLowerer<'a> {
             StandardBuiltinId::IteratorFromWrapperNext => (
                 ValueKind::Object,
                 KindSet::from_kind(ValueKind::Object),
-                Some(Box::new(Self::empty_object_shape())),
+                Some(Arc::new(Self::empty_object_shape())),
                 ValueInfo::undefined(),
             ),
             StandardBuiltinId::IteratorFromWrapperReturn => (
                 ValueKind::Object,
                 KindSet::from_kind(ValueKind::Object),
-                Some(Box::new(Self::empty_object_shape())),
+                Some(Arc::new(Self::empty_object_shape())),
                 ValueInfo::undefined(),
             ),
             StandardBuiltinId::ArrayIteratorNext
@@ -6256,7 +6256,7 @@ impl<'a> ScriptLowerer<'a> {
             | StandardBuiltinId::GeneratorPrototypeThrow => (
                 ValueKind::Object,
                 KindSet::from_kind(ValueKind::Object),
-                Some(Box::new(Self::empty_object_shape())),
+                Some(Arc::new(Self::empty_object_shape())),
                 ValueInfo::undefined(),
             ),
             StandardBuiltinId::AsyncGeneratorPrototypeNext
@@ -6278,7 +6278,7 @@ impl<'a> ScriptLowerer<'a> {
                 (
                     ValueKind::Object,
                     KindSet::from_kind(ValueKind::Object),
-                    Some(Box::new(Self::empty_object_shape())),
+                    Some(Arc::new(Self::empty_object_shape())),
                     ValueInfo::undefined(),
                 )
             }
@@ -7810,7 +7810,7 @@ impl<'a> ScriptLowerer<'a> {
             StandardBuiltinId::MapIteratorNext => (
                 ValueKind::Object,
                 KindSet::from_kind(ValueKind::Object),
-                Some(Box::new(Self::empty_object_shape())),
+                Some(Arc::new(Self::empty_object_shape())),
                 ValueInfo::undefined(),
             ),
             StandardBuiltinId::MapPrototypeDelete | StandardBuiltinId::MapPrototypeHas => (
@@ -8038,7 +8038,7 @@ impl<'a> ScriptLowerer<'a> {
             StandardBuiltinId::SetIteratorNext => (
                 ValueKind::Object,
                 KindSet::from_kind(ValueKind::Object),
-                Some(Box::new(Self::empty_object_shape())),
+                Some(Arc::new(Self::empty_object_shape())),
                 ValueInfo::undefined(),
             ),
             StandardBuiltinId::SetPrototypeDelete | StandardBuiltinId::SetPrototypeHas => (

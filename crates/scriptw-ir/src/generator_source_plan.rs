@@ -252,7 +252,7 @@ pub(crate) fn append_generator_region_suspensions(
                     append_generator_for_of_suspensions(for_of, current_state, suspension_points)?
                 }
                 GeneratorSuspensionRegion::IteratorBody
-                    if contains(for_of, ContainsSymbol::YieldExpression) =>
+                    if contains(&**for_of, ContainsSymbol::YieldExpression) =>
                 {
                     return None
                 }

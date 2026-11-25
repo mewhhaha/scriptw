@@ -763,6 +763,15 @@ accepts `--case <file.js>`.
   (`rsc_baseline` was rebuilt with default features on 2026-11-21): check
   for `_rjem_malloc` and rebuild with default features before a
   measurement. Owner: release engineering (dist recipe).
+- `staging/sm/regress/regress-610026.js` still peaks at 1.2 GB (down from
+  2.2 GB): its `eval` of four million `{}` blocks builds a 224-byte boxed
+  `Statement` per block. `Expression` (192 bytes) bounds `Statement` from
+  below unless statement variants box their expressions. Full runs share a
+  4 GiB cap among three case workers, so this case can still crash beside
+  two other large ones; a runner that admits a case against the remaining
+  budget, or retries a crashed case alone before recording Crash, would make
+  the outcome independent of its neighbours. Owner: front end (Boa AST
+  layout) with Test262 tooling (case scheduling).
 
 ## Conformance boundaries
 

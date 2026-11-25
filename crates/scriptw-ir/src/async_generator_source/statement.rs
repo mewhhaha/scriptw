@@ -179,7 +179,7 @@ impl<'ast> Visitor<'ast> for StatementStates<'_> {
             Statement::ForInLoop(source) if for_in::admits(source) => {
                 control(for_in::append(source, self.states))
             }
-            Statement::ForInLoop(source) if has_suspension(source) => {
+            Statement::ForInLoop(source) if has_suspension(&**source) => {
                 ControlFlow::Break(AsyncGeneratorSourceError::ForeignContinuation)
             }
             Statement::ForInLoop(_) => {

@@ -4677,8 +4677,10 @@ impl<'a> AnalysisBuilder<'a> {
                     )
                 });
                 if let Some(cursor) = &tdz_head_cursor {
-                    self.for_in_of_tdz_environment_ids
-                        .insert(for_of as *const ForOfLoop as usize, cursor.environment_id);
+                    self.for_in_of_tdz_environment_ids.insert(
+                        &**for_of as *const ForOfLoop as usize,
+                        cursor.environment_id,
+                    );
                 }
                 if let Some(cursor) = &tdz_head_cursor {
                     self.environment_cursor_stack.push(cursor.clone());
@@ -4783,8 +4785,10 @@ impl<'a> AnalysisBuilder<'a> {
                                 | IterableLoopInitializer::Const(Binding::Pattern(_))
                         );
                 if let Some(cursor) = &iteration_cursor {
-                    self.for_in_of_iteration_environment_ids
-                        .insert(for_of as *const ForOfLoop as usize, cursor.environment_id);
+                    self.for_in_of_iteration_environment_ids.insert(
+                        &**for_of as *const ForOfLoop as usize,
+                        cursor.environment_id,
+                    );
                     if complete_resumable_iteration_environment {
                         self.complete_resumable_for_of_iteration_environment_ids
                             .insert(cursor.environment_id);
@@ -4863,7 +4867,7 @@ impl<'a> AnalysisBuilder<'a> {
             Statement::ForInLoop(for_in) => {
                 let outer_cursor = self.current_environment_cursor();
                 self.for_in_continuation_owners.insert(
-                    for_in as *const boa_ast::statement::iteration::ForInLoop as usize,
+                    &**for_in as *const boa_ast::statement::iteration::ForInLoop as usize,
                     ForInContinuationOwner::ImmediateOrLinear,
                 );
                 let mut head_aliases = capture_aliases.clone();
@@ -4882,7 +4886,7 @@ impl<'a> AnalysisBuilder<'a> {
                 });
                 if let Some(cursor) = &tdz_head_cursor {
                     self.for_in_of_tdz_environment_ids.insert(
-                        for_in as *const boa_ast::statement::iteration::ForInLoop as usize,
+                        &**for_in as *const boa_ast::statement::iteration::ForInLoop as usize,
                         cursor.environment_id,
                     );
                 }
@@ -4973,7 +4977,7 @@ impl<'a> AnalysisBuilder<'a> {
                 });
                 if let Some(cursor) = &iteration_cursor {
                     self.for_in_of_iteration_environment_ids.insert(
-                        for_in as *const boa_ast::statement::iteration::ForInLoop as usize,
+                        &**for_in as *const boa_ast::statement::iteration::ForInLoop as usize,
                         cursor.environment_id,
                     );
                 }

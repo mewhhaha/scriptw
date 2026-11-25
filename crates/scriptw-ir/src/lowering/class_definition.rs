@@ -578,7 +578,7 @@ impl<'a> ScriptLowerer<'a> {
             );
         }
 
-        let prototype_heap = Some(Box::new(HeapShape::Object(prototype_shape.clone())));
+        let prototype_heap = Some(Arc::new(HeapShape::Object(prototype_shape.clone())));
         // A synthetic derived constructor delegates construction to its heritage
         // constructor. Preserve that constructor's statically known instance
         // kind/shape (notably Array) while layering this class's prototype.
@@ -605,7 +605,8 @@ impl<'a> ScriptLowerer<'a> {
         // ArrayShape has no dedicated private-brand set; represent brands as
         // hidden properties so shape propagation remains intact for Array
         // subclasses while constructor prefix writes still refine the shape.
-        if let Some(HeapShape::Array(array)) = instance_info.heap_shape.as_mut().map(Box::as_mut) {
+        if let Some(HeapShape::Array(array)) = instance_info.heap_shape.as_mut().map(Arc::make_mut)
+        {
             for private_name_id in &instance_private_method_brands {
                 array.properties.insert(
                     private_brand_key(*private_name_id),
@@ -672,7 +673,7 @@ impl<'a> ScriptLowerer<'a> {
         let mut class_info = ValueInfo {
             kind: ValueKind::Function,
             possible_kinds: KindSet::from_kind(ValueKind::Function),
-            heap_shape: Some(Box::new(HeapShape::Object(ObjectShape {
+            heap_shape: Some(Arc::new(HeapShape::Object(ObjectShape {
                 provenance: HeapShapeProvenance::Program,
                 prototype: heritage.as_ref().and_then(|info| info.heap_shape.clone()),
                 properties: class_properties,
@@ -737,7 +738,7 @@ impl<'a> ScriptLowerer<'a> {
                     };
                     if let (Some(key), Some(HeapShape::Object(shape))) = (
                         field.key.static_name(),
-                        class_info.heap_shape.as_mut().map(Box::as_mut),
+                        class_info.heap_shape.as_mut().map(Arc::make_mut),
                     ) {
                         shape
                             .properties
@@ -783,7 +784,7 @@ impl<'a> ScriptLowerer<'a> {
                         ValueInfo::undefined()
                     };
                     if let Some(HeapShape::Object(shape)) =
-                        class_info.heap_shape.as_mut().map(Box::as_mut)
+                        class_info.heap_shape.as_mut().map(Arc::make_mut)
                     {
                         shape
                             .properties
@@ -829,7 +830,7 @@ impl<'a> ScriptLowerer<'a> {
                         ValueInfo::undefined()
                     };
                     if let Some(HeapShape::Object(shape)) =
-                        class_info.heap_shape.as_mut().map(Box::as_mut)
+                        class_info.heap_shape.as_mut().map(Arc::make_mut)
                     {
                         shape
                             .properties
@@ -920,7 +921,7 @@ impl<'a> ScriptLowerer<'a> {
                     let Some(key) = field.key.static_name() else {
                         continue;
                     };
-                    match instance_info.heap_shape.as_mut().map(Box::as_mut) {
+                    match instance_info.heap_shape.as_mut().map(Arc::make_mut) {
                         Some(HeapShape::Object(shape)) => {
                             shape
                                 .properties
@@ -969,7 +970,7 @@ impl<'a> ScriptLowerer<'a> {
                     } else {
                         ValueInfo::undefined()
                     };
-                    match instance_info.heap_shape.as_mut().map(Box::as_mut) {
+                    match instance_info.heap_shape.as_mut().map(Arc::make_mut) {
                         Some(HeapShape::Object(shape)) => {
                             shape
                                 .properties
@@ -1022,7 +1023,7 @@ impl<'a> ScriptLowerer<'a> {
                     } else {
                         ValueInfo::undefined()
                     };
-                    match instance_info.heap_shape.as_mut().map(Box::as_mut) {
+                    match instance_info.heap_shape.as_mut().map(Arc::make_mut) {
                         Some(HeapShape::Object(shape)) => {
                             shape
                                 .properties
@@ -1047,7 +1048,7 @@ impl<'a> ScriptLowerer<'a> {
             }
         }
 
-        if let Some(HeapShape::Object(shape)) = class_info.heap_shape.as_mut().map(Box::as_mut) {
+        if let Some(HeapShape::Object(shape)) = class_info.heap_shape.as_mut().map(Arc::make_mut) {
             shape.properties.insert(
                 "prototype".to_string(),
                 ObjectShapeProperty::Data(prototype_info.clone()),
@@ -1072,7 +1073,7 @@ impl<'a> ScriptLowerer<'a> {
                 ClassMethodPlacementIr::Instance => &mut callable_instance_info,
                 ClassMethodPlacementIr::Static => &mut callable_class_info,
             };
-            let properties = match receiver.heap_shape.as_deref_mut() {
+            let properties = match receiver.heap_shape.as_mut().map(Arc::make_mut) {
                 Some(HeapShape::Object(shape)) => &mut shape.properties,
                 Some(HeapShape::Array(array)) => &mut array.properties,
                 None => continue,
@@ -1355,7 +1356,8 @@ impl<'a> ScriptLowerer<'a> {
         }
 
         if constructor_output.construct_this_info.is_some() {
-            if let Some(HeapShape::Object(shape)) = class_info.heap_shape.as_mut().map(Box::as_mut)
+            if let Some(HeapShape::Object(shape)) =
+                class_info.heap_shape.as_mut().map(Arc::make_mut)
             {
                 shape.properties.insert(
                     "prototype".to_string(),

@@ -4,6 +4,7 @@ use crate::{
     FunctionTargetKnowledge, HeapShape, KindSet, ObjectShape, PrivateNameId, SpecOperationIr,
     Strictness,
 };
+use std::sync::Arc;
 
 fn binding(name: &str, slot: u32) -> OwnedEnvBindingIr {
     OwnedEnvBindingIr {
@@ -37,7 +38,7 @@ fn prepared_source(owned: &[OwnedEnvBindingIr]) -> ObjectDestructuringSourceIr {
 fn source_factory_publishes_raw_once_before_real_to_object_with_exact_boxed_union() {
     let owned = [binding("raw", 0), binding("boxed", 1)];
     let mut info = ValueInfo::new(ValueKind::Function);
-    info.heap_shape = Some(Box::new(HeapShape::Object(ObjectShape::default())));
+    info.heap_shape = Some(Arc::new(HeapShape::Object(ObjectShape::default())));
     info.function_targets = FunctionTargetKnowledge::exact("original callable".into());
     let raw = TypedExpr::from_info(info, ExprIr::FunctionValue("original callable".into()));
     let (prefix, source) = ObjectDestructuringSourceIr::prepare(
@@ -347,7 +348,7 @@ fn target_factory_requires_retained_member_operands_and_refuses_var_targets() {
 fn operation_keeps_value_identity_and_visits_value_before_nested_target_operands() {
     let owned = [binding("member", 0), binding("member key", 1)];
     let mut info = ValueInfo::new(ValueKind::Function);
-    info.heap_shape = Some(Box::new(HeapShape::Object(ObjectShape::default())));
+    info.heap_shape = Some(Arc::new(HeapShape::Object(ObjectShape::default())));
     info.function_targets = FunctionTargetKnowledge::exact("returned callable".into());
     let value = TypedExpr::from_info(info, ExprIr::Identifier("assigned".into()));
     let nested = DestructuringTargetIr::NestedArray(Box::new(ArrayDestructuringPatternIr {

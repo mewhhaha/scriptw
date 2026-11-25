@@ -209,6 +209,15 @@ separate functions compile concurrently and their peaks add up (two separate
 900-call functions peaked at 1.2 GB with one job, since part of one body's
 memory outlives its compilation).
 
+Parsing costs about 256 bytes per statement: a boxed 224-byte `Statement`
+(464 before the for-in/of loops were boxed), its list entry and its span. A
+script of four million `{}` blocks (Test262's
+`staging/sm/regress/regress-610026.js`, through `eval`) peaks at 1.2 GB,
+nearly all of it that tree. Lowering shares heap shapes between the facts
+that hold them, so a function's `this` fact no longer copies the global
+object's shape (about 1 MB with the builtins); 1,000 methods in one object
+literal (`staging/sm/class/methDefn.js`) fell from 2.2 GB to under 0.5 GB.
+
 ## Dynamic source: eval and Function constructors
 
 Dynamic code generation is **limited**, rather than wholly absent:

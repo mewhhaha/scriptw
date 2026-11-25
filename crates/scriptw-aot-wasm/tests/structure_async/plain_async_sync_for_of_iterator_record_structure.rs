@@ -672,7 +672,7 @@ fn shared_identifier_head_and_generator_plan_are_validated_before_backend_use() 
         "if let Statement::ForOfLoop(for_of) = statement.as_ref()",
         "if let Statement::Try(try_statement)",
     );
-    assert!(compact(nested_iterator).contains("GeneratorSuspensionRegion::IteratorBodyifcontains(for_of,ContainsSymbol::YieldExpression)=>{returnNone}"));
+    assert!(compact(nested_iterator).contains("GeneratorSuspensionRegion::IteratorBodyifcontains(&**for_of,ContainsSymbol::YieldExpression)=>{returnNone}"));
     assert!(nested_iterator.contains("GeneratorSuspensionRegion::IteratorBody => {}"));
     assert!(GENERATOR_SOURCE_PLAN_SOURCE.contains(
         "GeneratorSuspensionRegion::IteratorBody => GeneratorValueBranchAdmission::LinearOnly"

@@ -95,7 +95,7 @@ impl ScriptLowerer<'_> {
             ValueInfo {
                 kind: ValueKind::Array,
                 possible_kinds: KindSet::from_kind(ValueKind::Array),
-                heap_shape: Some(Box::new(HeapShape::Array(shape))),
+                heap_shape: Some(Arc::new(HeapShape::Array(shape))),
                 function_targets: FunctionTargetKnowledge::none(),
             },
             ExprIr::ArrayLiteral(elements),

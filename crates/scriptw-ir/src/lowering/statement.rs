@@ -51,7 +51,7 @@ impl<'a> ScriptLowerer<'a> {
                 if !self
                     .analysis
                     .complete_for_of_owners
-                    .contains_key(&(for_of as *const ForOfLoop as usize))
+                    .contains_key(&(&**for_of as *const ForOfLoop as usize))
                     && self.head_await_is_stageable(for_of.iterable(), [Some(for_of.body())])
                     && !contains(for_of.initializer(), ContainsSymbol::AwaitExpression) =>
             {
@@ -86,7 +86,7 @@ impl<'a> ScriptLowerer<'a> {
             Statement::ForInLoop(for_in)
                 if !matches!(
                     self.analysis.for_in_continuation_owners
-                        [&(for_in as *const boa_ast::statement::iteration::ForInLoop as usize)],
+                        [&(&**for_in as *const boa_ast::statement::iteration::ForInLoop as usize)],
                     crate::analysis::ForInContinuationOwner::CompleteWhole(_)
                 ) && self.head_await_is_stageable(for_in.target(), [Some(for_in.body())])
                     && !contains(for_in.initializer(), ContainsSymbol::AwaitExpression) =>

@@ -282,7 +282,7 @@ pub(crate) fn append_protocol(
                 || matches!(source.initializer(), IterableLoopInitializer::AwaitUsing(_))
                 || contains(source.iterable(), ContainsSymbol::AwaitExpression)
                 || contains(source.initializer(), ContainsSymbol::AwaitExpression)
-                || contains(source, ContainsSymbol::YieldExpression)
+                || contains(&**source, ContainsSymbol::YieldExpression)
             {
                 return None;
             }

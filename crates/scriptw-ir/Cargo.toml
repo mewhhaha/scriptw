@@ -26,5 +26,10 @@ path = "src/lib.rs"
 name = "scriptw_ir_integration"
 path = "tests/integration.rs"
 
+# Its own process: a test reads the peak resident set of the whole process.
+[[test]]
+name = "compile_memory"
+path = "tests/compile_memory.rs"
+
 [lints]
 workspace = true

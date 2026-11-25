@@ -97,7 +97,7 @@ impl<'a> ScriptLowerer<'a> {
                 kind: ValueKind::Object,
                 possible_kinds: KindSet::from_kind(ValueKind::Object),
                 heap_shape: (!has_spread && !has_unknown_key)
-                    .then(|| Box::new(HeapShape::Object(shape))),
+                    .then(|| Arc::new(HeapShape::Object(shape))),
                 function_targets: FunctionTargetKnowledge::none(),
             },
             ExprIr::ObjectLiteral(properties),

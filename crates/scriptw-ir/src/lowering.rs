@@ -189,7 +189,7 @@ pub(crate) struct BindingInfo {
     pub(crate) storage_name: String,
     pub(crate) kind: ValueKind,
     pub(crate) possible_kinds: KindSet,
-    pub(crate) heap_shape: Option<Box<HeapShape>>,
+    pub(crate) heap_shape: Option<Arc<HeapShape>>,
     pub(crate) function_targets: FunctionTargetKnowledge,
     /// ECMA-262 9.1.1.1: whether InitializeBinding (9.1.1.1.4) has run for this
     /// binding. Mandatory and undefaulted — see `binding_lifecycle::Initialization`.
@@ -200,7 +200,7 @@ pub(crate) struct BindingInfo {
 pub(crate) struct VarBindingInfo {
     pub(crate) kind: ValueKind,
     pub(crate) possible_kinds: KindSet,
-    pub(crate) heap_shape: Option<Box<HeapShape>>,
+    pub(crate) heap_shape: Option<Arc<HeapShape>>,
     pub(crate) function_targets: FunctionTargetKnowledge,
     pub(crate) is_script_global: bool,
     pub(crate) is_lexical_metadata: bool,
@@ -335,9 +335,9 @@ impl FunctionSignatureShapeEvidence {
 enum FunctionReturnShape {
     Unobserved,
     Absent,
-    FlowSensitive(Box<HeapShape>),
+    FlowSensitive(Arc<HeapShape>),
     RecreatedPerCall {
-        shape: Box<HeapShape>,
+        shape: Arc<HeapShape>,
         dependencies: FunctionReturnDependencies,
     },
 }
@@ -374,11 +374,11 @@ impl FunctionReturnDependencies {
 }
 
 impl FunctionReturnShape {
-    fn flow_sensitive(shape: Option<Box<HeapShape>>) -> Self {
+    fn flow_sensitive(shape: Option<Arc<HeapShape>>) -> Self {
         shape.map_or(Self::Absent, Self::FlowSensitive)
     }
 
-    fn recreated_per_call(shape: Box<HeapShape>) -> Self {
+    fn recreated_per_call(shape: Arc<HeapShape>) -> Self {
         Self::RecreatedPerCall {
             shape,
             dependencies: FunctionReturnDependencies::default(),
@@ -386,7 +386,7 @@ impl FunctionReturnShape {
     }
 
     fn recreated_per_call_with_dependencies(
-        shape: Box<HeapShape>,
+        shape: Arc<HeapShape>,
         dependencies: FunctionReturnDependencies,
     ) -> Self {
         Self::RecreatedPerCall {
@@ -395,7 +395,7 @@ impl FunctionReturnShape {
         }
     }
 
-    fn cloned_shape(&self) -> Option<Box<HeapShape>> {
+    fn cloned_shape(&self) -> Option<Arc<HeapShape>> {
         match self {
             Self::Unobserved | Self::Absent => None,
             Self::FlowSensitive(shape) | Self::RecreatedPerCall { shape, .. } => {
@@ -404,7 +404,7 @@ impl FunctionReturnShape {
         }
     }
 
-    fn with_shape(&self, shape: Option<Box<HeapShape>>) -> Self {
+    fn with_shape(&self, shape: Option<Arc<HeapShape>>) -> Self {
         let Some(shape) = shape else {
             return Self::Absent;
         };
@@ -416,7 +416,7 @@ impl FunctionReturnShape {
         }
     }
 
-    fn merged(left: &Self, right: &Self, shape: Option<Box<HeapShape>>) -> Self {
+    fn merged(left: &Self, right: &Self, shape: Option<Arc<HeapShape>>) -> Self {
         if matches!((left, right), (Self::Unobserved, Self::Unobserved)) {
             return Self::Unobserved;
         }
@@ -469,7 +469,7 @@ impl FunctionReturnShape {
     ) {
         match self {
             Self::FlowSensitive(shape) => {
-                if !visit(possible_kinds, function_targets, shape) {
+                if !visit(possible_kinds, function_targets, Arc::make_mut(shape)) {
                     *self = Self::Absent;
                 }
             }
@@ -867,7 +867,7 @@ pub(crate) struct LoweredScript {
 pub(crate) struct ClassLoweringContext {
     pub(crate) private_name_ids: BTreeMap<String, PrivateNameId>,
     pub(crate) heritage_kind: ClassHeritageKind,
-    pub(crate) super_base_shape: Option<Box<HeapShape>>,
+    pub(crate) super_base_shape: Option<Arc<HeapShape>>,
     pub(crate) super_constructor_target: Option<FunctionId>,
     pub(crate) is_static: bool,
     pub(crate) is_derived_constructor: bool,
@@ -926,10 +926,10 @@ enum OptionalPropertyReadAnalysis {
 
 enum PreArgumentHeapShapeSnapshots<'a> {
     NoHeapShapes,
-    OneHeapShape(&'a mut Option<Box<HeapShape>>),
+    OneHeapShape(&'a mut Option<Arc<HeapShape>>),
     TwoHeapShapes {
-        first: &'a mut Option<Box<HeapShape>>,
-        second: &'a mut Option<Box<HeapShape>>,
+        first: &'a mut Option<Arc<HeapShape>>,
+        second: &'a mut Option<Arc<HeapShape>>,
     },
 }
 
@@ -1093,7 +1093,7 @@ impl FunctionSignature {
 pub(crate) struct FunctionParamSignature {
     pub(crate) kind: ValueKind,
     pub(crate) possible_kinds: KindSet,
-    pub(crate) heap_shape: Option<Box<HeapShape>>,
+    pub(crate) heap_shape: Option<Arc<HeapShape>>,
     pub(crate) function_targets: FunctionTargetKnowledge,
     pub(crate) observed: bool,
     pub(crate) has_default: bool,
@@ -1561,10 +1561,10 @@ impl<'a> ScriptLowerer<'a> {
 
     fn with_instance_prototype(
         mut info: ValueInfo,
-        prototype: Option<Box<HeapShape>>,
+        prototype: Option<Arc<HeapShape>>,
     ) -> ValueInfo {
         if let Some(shape) = info.heap_shape.as_mut() {
-            match shape.as_mut() {
+            match Arc::make_mut(shape) {
                 HeapShape::Object(object) => object.prototype = prototype,
                 HeapShape::Array(array) => array.prototype = prototype,
             }
@@ -4388,7 +4388,7 @@ impl<'a> ScriptLowerer<'a> {
         let object_info = ValueInfo {
             kind: ValueKind::Object,
             possible_kinds: KindSet::from_kind(ValueKind::Object),
-            heap_shape: Some(Box::new(HeapShape::Object(ObjectShape::default()))),
+            heap_shape: Some(Arc::new(HeapShape::Object(ObjectShape::default()))),
             function_targets: FunctionTargetKnowledge::none(),
         };
         let accumulator_name = self.alloc_temp_binding_name("object.spread.");
@@ -5226,7 +5226,7 @@ impl<'a> ScriptLowerer<'a> {
         ValueInfo {
             kind: ValueKind::Object,
             possible_kinds: KindSet::from_kind(ValueKind::Object),
-            heap_shape: Some(Box::new(HeapShape::Object(ObjectShape {
+            heap_shape: Some(Arc::new(HeapShape::Object(ObjectShape {
                 provenance: HeapShapeProvenance::Program,
                 prototype: None,
                 properties,
@@ -5638,10 +5638,10 @@ impl<'a> ScriptLowerer<'a> {
         fn visit_present(
             kinds: KindSet,
             targets: &FunctionTargetKnowledge,
-            shape: &mut Option<Box<HeapShape>>,
+            shape: &mut Option<Arc<HeapShape>>,
             visit: &mut impl FnMut(KindSet, &FunctionTargetKnowledge, &mut HeapShape) -> bool,
         ) {
-            if let Some(present) = shape.as_deref_mut() {
+            if let Some(present) = shape.as_mut().map(Arc::make_mut) {
                 if !visit(kinds, targets, present) {
                     *shape = None;
                 }
@@ -6672,7 +6672,7 @@ impl<'a> ScriptLowerer<'a> {
         let template_info = ValueInfo {
             kind: ValueKind::Array,
             possible_kinds: KindSet::from_kind(ValueKind::Array),
-            heap_shape: Some(Box::new(HeapShape::Array(ArrayShape::default()))),
+            heap_shape: Some(Arc::new(HeapShape::Array(ArrayShape::default()))),
             function_targets: FunctionTargetKnowledge::none(),
         };
         TypedExpr::from_info(
@@ -7262,8 +7262,10 @@ impl<'a> ScriptLowerer<'a> {
                     function_targets: FunctionTargetKnowledge::unknown(),
                 })
                 .unwrap_or_else(Self::fresh_constructed_instance_info);
-            if let Some(HeapShape::Object(shape)) =
-                current_new_target_info.heap_shape.as_mut().map(Box::as_mut)
+            if let Some(HeapShape::Object(shape)) = current_new_target_info
+                .heap_shape
+                .as_mut()
+                .map(Arc::make_mut)
             {
                 shape.properties.insert(
                     "prototype".to_string(),
@@ -9144,7 +9146,7 @@ impl<'a> ScriptLowerer<'a> {
         }
     }
 
-    fn value_info_from_shape(shape: Option<Box<HeapShape>>) -> ValueInfo {
+    fn value_info_from_shape(shape: Option<Arc<HeapShape>>) -> ValueInfo {
         let kind = match shape.as_deref() {
             Some(HeapShape::Array(_)) => ValueKind::Array,
             _ => ValueKind::Object,
@@ -9157,21 +9159,21 @@ impl<'a> ScriptLowerer<'a> {
         }
     }
 
-    fn property_descriptor_shape(fields: Vec<(&'static str, ValueInfo)>) -> Box<HeapShape> {
+    fn property_descriptor_shape(fields: Vec<(&'static str, ValueInfo)>) -> Arc<HeapShape> {
         let mut properties = BTreeMap::new();
         for (name, info) in fields {
             properties.insert(name.to_string(), ObjectShapeProperty::Data(info));
         }
-        Box::new(HeapShape::Object(ObjectShape {
+        Arc::new(HeapShape::Object(ObjectShape {
             provenance: HeapShapeProvenance::Program,
-            prototype: Some(Box::new(Self::empty_object_shape())),
+            prototype: Some(Arc::new(Self::empty_object_shape())),
             properties,
             private_brands: BTreeSet::new(),
             boxed_primitive: None,
         }))
     }
 
-    fn generic_property_descriptor_shape() -> Box<HeapShape> {
+    fn generic_property_descriptor_shape() -> Arc<HeapShape> {
         let dynamic = ValueInfo {
             kind: ValueKind::Dynamic,
             possible_kinds: KindSet::all_runtime_tags(),
@@ -9579,7 +9581,7 @@ impl<'a> ScriptLowerer<'a> {
             ValueInfo {
                 kind: ValueKind::Array,
                 possible_kinds: KindSet::from_kind(ValueKind::Array),
-                heap_shape: Some(Box::new(HeapShape::Array(shape))),
+                heap_shape: Some(Arc::new(HeapShape::Array(shape))),
                 function_targets: FunctionTargetKnowledge::none(),
             },
             ExprIr::ArrayLiteral(elements),
@@ -9592,7 +9594,7 @@ impl<'a> ScriptLowerer<'a> {
         ValueInfo {
             kind: ValueKind::Array,
             possible_kinds: KindSet::from_kind(ValueKind::Array),
-            heap_shape: Some(Box::new(HeapShape::Array(shape))),
+            heap_shape: Some(Arc::new(HeapShape::Array(shape))),
             function_targets: FunctionTargetKnowledge::none(),
         }
     }
@@ -14834,7 +14836,7 @@ impl<'a> ScriptLowerer<'a> {
                 return target;
             }
         }
-        match (shape.as_mut(), &path[0]) {
+        match (Arc::make_mut(shape), &path[0]) {
             (HeapShape::Object(object), PropertyKeyIr::StaticString(key)) => {
                 if path.len() == 1 {
                     match object.properties.get(key).cloned() {
@@ -15679,7 +15681,7 @@ impl<'a> ScriptLowerer<'a> {
         let prototype_info = ValueInfo {
             kind: ValueKind::Object,
             possible_kinds: KindSet::from_kind(ValueKind::Object),
-            heap_shape: Some(Box::new(HeapShape::Object(ObjectShape {
+            heap_shape: Some(Arc::new(HeapShape::Object(ObjectShape {
                 provenance: HeapShapeProvenance::Program,
                 prototype: heritage_prototype,
                 properties: BTreeMap::new(),
@@ -15696,7 +15698,7 @@ impl<'a> ScriptLowerer<'a> {
         ValueInfo {
             kind: ValueKind::Function,
             possible_kinds: KindSet::from_kind(ValueKind::Function),
-            heap_shape: Some(Box::new(HeapShape::Object(ObjectShape {
+            heap_shape: Some(Arc::new(HeapShape::Object(ObjectShape {
                 provenance: HeapShapeProvenance::Program,
                 prototype: heritage_info.and_then(|info| info.heap_shape),
                 properties,
@@ -15777,7 +15779,7 @@ impl<'a> ScriptLowerer<'a> {
                 Some(ValueInfo {
                     kind: ValueKind::Array,
                     possible_kinds: KindSet::from_kind(ValueKind::Array),
-                    heap_shape: Some(Box::new(HeapShape::Array(shape))),
+                    heap_shape: Some(Arc::new(HeapShape::Array(shape))),
                     function_targets: FunctionTargetKnowledge::none(),
                 })
             }

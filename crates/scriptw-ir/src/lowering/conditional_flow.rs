@@ -397,9 +397,9 @@ impl<'a> ScriptLowerer<'a> {
     fn merge_heap_shapes(
         &self,
         kind: ValueKind,
-        left: &Option<Box<HeapShape>>,
-        right: &Option<Box<HeapShape>>,
-    ) -> Option<Box<HeapShape>> {
+        left: &Option<Arc<HeapShape>>,
+        right: &Option<Arc<HeapShape>>,
+    ) -> Option<Arc<HeapShape>> {
         match kind {
             ValueKind::Object | ValueKind::Array | ValueKind::Function if left == right => {
                 left.clone()

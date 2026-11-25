@@ -182,3 +182,15 @@ reserves only `async [no LineTerminator here] function`; any other `async`
 starts the AssignmentExpression. It now uses the same lookahead as the
 statement-level detector. Test: front
 `export_default_async_is_a_declaration_only_before_function_on_the_same_line`.
+
+## Boxed for-in and for-of statements
+
+`Statement::ForInLoop` and `Statement::ForOfLoop` (`src/statement/mod.rs`)
+now box their loops, as `Declaration::ClassDeclaration` already did. Inline,
+the two 456-byte loops made every `Statement` 464 bytes instead of 224, and
+the parser boxes each statement of a list, so Test262's
+`staging/sm/regress/regress-610026.js` (about four million `{}` blocks in one
+`eval`) peaked at 2.2 GB, nearly all of it empty blocks. Matches that only
+borrow the loop are unchanged; a raw pointer used as the loop's identity is
+taken from the boxed loop, `&**for_of`. Test: IR `compile_memory`
+`an_empty_block_statement_costs_at_most_256_bytes_to_parse`.

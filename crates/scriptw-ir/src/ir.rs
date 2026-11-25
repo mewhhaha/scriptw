@@ -5,6 +5,7 @@ pub use async_for_of_iterator::{
 };
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use num_bigint::{BigInt, BigUint, Sign};
 use num_traits::{One, ToPrimitive, Zero};
@@ -448,7 +449,10 @@ impl KindSet {
 pub struct ValueInfo {
     pub kind: ValueKind,
     pub possible_kinds: KindSet,
-    pub heap_shape: Option<Box<HeapShape>>,
+    /// Shared, and copied on write (`Arc::make_mut`): facts are cloned into
+    /// every signature and flow state, and a deep copy of the global object's
+    /// shape (the receiver of every plain call) cost about 1 MB a function.
+    pub heap_shape: Option<Arc<HeapShape>>,
     pub function_targets: FunctionTargetKnowledge,
 }
 
@@ -597,7 +601,7 @@ pub enum ObjectShapeProperty {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ObjectShape {
     pub provenance: HeapShapeProvenance,
-    pub prototype: Option<Box<HeapShape>>,
+    pub prototype: Option<Arc<HeapShape>>,
     pub properties: BTreeMap<String, ObjectShapeProperty>,
     pub private_brands: BTreeSet<PrivateNameId>,
     pub boxed_primitive: Option<Box<ValueInfo>>,
@@ -606,7 +610,7 @@ pub struct ObjectShape {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ArrayShape {
     pub provenance: HeapShapeProvenance,
-    pub prototype: Option<Box<HeapShape>>,
+    pub prototype: Option<Arc<HeapShape>>,
     pub properties: BTreeMap<String, ObjectShapeProperty>,
     pub elements: Vec<ValueInfo>,
 }
@@ -1670,7 +1674,7 @@ impl PropertyKeyIr {
 pub struct TypedExpr {
     pub kind: ValueKind,
     pub possible_kinds: KindSet,
-    pub heap_shape: Option<Box<HeapShape>>,
+    pub heap_shape: Option<Arc<HeapShape>>,
     pub function_targets: FunctionTargetKnowledge,
     pub expr: ExprIr,
 }
@@ -3585,7 +3589,7 @@ pub struct FunctionIr {
     pub params: Vec<FunctionParamIr>,
     pub body: BlockIr,
     pub return_kind: ValueKind,
-    pub return_shape: Option<Box<HeapShape>>,
+    pub return_shape: Option<Arc<HeapShape>>,
     pub return_targets: FunctionTargetKnowledge,
     pub constructor_instance: ValueInfo,
     pub owned_env_bindings: Vec<OwnedEnvBindingIr>,

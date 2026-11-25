@@ -215,7 +215,7 @@ impl<'a> ScriptLowerer<'a> {
             StandardBuiltinId::MapIteratorNext => Some(ValueInfo {
                 kind: ValueKind::Object,
                 possible_kinds: KindSet::from_kind(ValueKind::Object),
-                heap_shape: Some(Box::new(Self::empty_object_shape())),
+                heap_shape: Some(Arc::new(Self::empty_object_shape())),
                 function_targets: FunctionTargetKnowledge::none(),
             }),
             StandardBuiltinId::MapPrototypeDelete | StandardBuiltinId::MapPrototypeHas => {
@@ -357,7 +357,7 @@ impl<'a> ScriptLowerer<'a> {
             StandardBuiltinId::SetIteratorNext => Some(ValueInfo {
                 kind: ValueKind::Object,
                 possible_kinds: KindSet::from_kind(ValueKind::Object),
-                heap_shape: Some(Box::new(Self::empty_object_shape())),
+                heap_shape: Some(Arc::new(Self::empty_object_shape())),
                 function_targets: FunctionTargetKnowledge::none(),
             }),
             StandardBuiltinId::SetPrototypeDelete | StandardBuiltinId::SetPrototypeHas => {
@@ -452,7 +452,7 @@ impl<'a> ScriptLowerer<'a> {
                     });
                 }
                 if proto.possible_kinds == null_kind {
-                    return_analysis!(Self::value_info_from_shape(Some(Box::new(
+                    return_analysis!(Self::value_info_from_shape(Some(Arc::new(
                         HeapShape::Object(ObjectShape {
                             provenance: HeapShapeProvenance::Program,
                             prototype: None,
@@ -478,7 +478,7 @@ impl<'a> ScriptLowerer<'a> {
                         function_targets: FunctionTargetKnowledge::none(),
                     });
                 };
-                Some(Self::value_info_from_shape(Some(Box::new(
+                Some(Self::value_info_from_shape(Some(Arc::new(
                     HeapShape::Object(ObjectShape {
                         provenance: HeapShapeProvenance::Program,
                         prototype: Some(prototype),
@@ -688,7 +688,7 @@ impl<'a> ScriptLowerer<'a> {
             StandardBuiltinId::ObjectGetOwnPropertyDescriptors => Some(ValueInfo {
                 kind: ValueKind::Object,
                 possible_kinds: KindSet::from_kind(ValueKind::Object),
-                heap_shape: Some(Box::new(Self::empty_object_shape())),
+                heap_shape: Some(Arc::new(Self::empty_object_shape())),
                 function_targets: FunctionTargetKnowledge::none(),
             }),
             StandardBuiltinId::ObjectKeys => {
@@ -750,7 +750,7 @@ impl<'a> ScriptLowerer<'a> {
             }
             StandardBuiltinId::ObjectEntries => {
                 let shape = ArrayShape::default();
-                Some(Self::value_info_from_shape(Some(Box::new(
+                Some(Self::value_info_from_shape(Some(Arc::new(
                     HeapShape::Array(shape),
                 ))))
             }
@@ -946,7 +946,7 @@ impl<'a> ScriptLowerer<'a> {
             }
             StandardBuiltinId::ReflectOwnKeys => {
                 let shape = ArrayShape::default();
-                Some(Self::value_info_from_shape(Some(Box::new(
+                Some(Self::value_info_from_shape(Some(Arc::new(
                     HeapShape::Array(shape),
                 ))))
             }
@@ -962,7 +962,7 @@ impl<'a> ScriptLowerer<'a> {
                 Some(ValueInfo {
                     kind: ValueKind::Array,
                     possible_kinds: KindSet::from_kind(ValueKind::Array),
-                    heap_shape: Some(Box::new(HeapShape::Array(shape))),
+                    heap_shape: Some(Arc::new(HeapShape::Array(shape))),
                     function_targets: FunctionTargetKnowledge::none(),
                 })
             }
@@ -1282,14 +1282,14 @@ impl<'a> ScriptLowerer<'a> {
             | StandardBuiltinId::IteratorBufferedReturn => Some(ValueInfo {
                 kind: ValueKind::Object,
                 possible_kinds: KindSet::from_kind(ValueKind::Object),
-                heap_shape: Some(Box::new(Self::empty_object_shape())),
+                heap_shape: Some(Arc::new(Self::empty_object_shape())),
                 function_targets: FunctionTargetKnowledge::none(),
             }),
             StandardBuiltinId::IteratorHelperNext | StandardBuiltinId::IteratorHelperReturn => {
                 Some(ValueInfo {
                     kind: ValueKind::Object,
                     possible_kinds: KindSet::from_kind(ValueKind::Object),
-                    heap_shape: Some(Box::new(Self::empty_object_shape())),
+                    heap_shape: Some(Arc::new(Self::empty_object_shape())),
                     function_targets: FunctionTargetKnowledge::none(),
                 })
             }
@@ -1323,7 +1323,7 @@ impl<'a> ScriptLowerer<'a> {
                 Some(ValueInfo {
                     kind: ValueKind::Object,
                     possible_kinds: KindSet::from_kind(ValueKind::Object),
-                    heap_shape: Some(Box::new(Self::empty_object_shape())),
+                    heap_shape: Some(Arc::new(Self::empty_object_shape())),
                     function_targets: FunctionTargetKnowledge::none(),
                 })
             }
@@ -1331,7 +1331,7 @@ impl<'a> ScriptLowerer<'a> {
                 Some(ValueInfo {
                     kind: ValueKind::Object,
                     possible_kinds: KindSet::from_kind(ValueKind::Object),
-                    heap_shape: Some(Box::new(Self::empty_object_shape())),
+                    heap_shape: Some(Arc::new(Self::empty_object_shape())),
                     function_targets: FunctionTargetKnowledge::none(),
                 })
             }
@@ -1339,7 +1339,7 @@ impl<'a> ScriptLowerer<'a> {
                 Some(ValueInfo {
                     kind: ValueKind::Object,
                     possible_kinds: KindSet::from_kind(ValueKind::Object),
-                    heap_shape: Some(Box::new(Self::empty_object_shape())),
+                    heap_shape: Some(Arc::new(Self::empty_object_shape())),
                     function_targets: FunctionTargetKnowledge::none(),
                 })
             }
@@ -1347,7 +1347,7 @@ impl<'a> ScriptLowerer<'a> {
                 Some(ValueInfo {
                     kind: ValueKind::Object,
                     possible_kinds: KindSet::from_kind(ValueKind::Object),
-                    heap_shape: Some(Box::new(Self::empty_object_shape())),
+                    heap_shape: Some(Arc::new(Self::empty_object_shape())),
                     function_targets: FunctionTargetKnowledge::none(),
                 })
             }
@@ -1355,7 +1355,7 @@ impl<'a> ScriptLowerer<'a> {
                 Some(ValueInfo {
                     kind: ValueKind::Object,
                     possible_kinds: KindSet::from_kind(ValueKind::Object),
-                    heap_shape: Some(Box::new(Self::empty_object_shape())),
+                    heap_shape: Some(Arc::new(Self::empty_object_shape())),
                     function_targets: FunctionTargetKnowledge::none(),
                 })
             }
@@ -1398,7 +1398,7 @@ impl<'a> ScriptLowerer<'a> {
             | StandardBuiltinId::GeneratorPrototypeThrow => Some(ValueInfo {
                 kind: ValueKind::Object,
                 possible_kinds: KindSet::from_kind(ValueKind::Object),
-                heap_shape: Some(Box::new(Self::empty_object_shape())),
+                heap_shape: Some(Arc::new(Self::empty_object_shape())),
                 function_targets: FunctionTargetKnowledge::none(),
             }),
             StandardBuiltinId::AsyncGeneratorPrototypeNext
@@ -1414,7 +1414,7 @@ impl<'a> ScriptLowerer<'a> {
                 Some(ValueInfo {
                     kind: ValueKind::Object,
                     possible_kinds: KindSet::from_kind(ValueKind::Object),
-                    heap_shape: Some(Box::new(Self::empty_object_shape())),
+                    heap_shape: Some(Arc::new(Self::empty_object_shape())),
                     function_targets: FunctionTargetKnowledge::unknown(),
                 })
             }
@@ -2312,9 +2312,9 @@ impl<'a> ScriptLowerer<'a> {
             StandardBuiltinId::AtomicsWait => Some(ValueInfo::new(ValueKind::String)),
             StandardBuiltinId::AtomicsPause => Some(ValueInfo::new(ValueKind::Undefined)),
             StandardBuiltinId::AtomicsWaitAsync => Some(Self::value_info_from_shape(Some(
-                Box::new(HeapShape::Object(ObjectShape {
+                Arc::new(HeapShape::Object(ObjectShape {
                     provenance: HeapShapeProvenance::Program,
-                    prototype: Some(Box::new(Self::empty_object_shape())),
+                    prototype: Some(Arc::new(Self::empty_object_shape())),
                     properties: BTreeMap::from([
                         (
                             "async".to_string(),
@@ -2355,7 +2355,7 @@ impl<'a> ScriptLowerer<'a> {
             }),
             StandardBuiltinId::ObjectGetOwnPropertyNames
             | StandardBuiltinId::ObjectGetOwnPropertySymbols => Some(Self::value_info_from_shape(
-                Some(Box::new(HeapShape::Array(ArrayShape::default()))),
+                Some(Arc::new(HeapShape::Array(ArrayShape::default()))),
             )),
             StandardBuiltinId::JsonParse => Some(ValueInfo {
                 kind: ValueKind::Dynamic,
@@ -2370,7 +2370,7 @@ impl<'a> ScriptLowerer<'a> {
                 heap_shape: None,
                 function_targets: FunctionTargetKnowledge::none(),
             }),
-            StandardBuiltinId::JsonRawJson => Some(Self::value_info_from_shape(Some(Box::new(
+            StandardBuiltinId::JsonRawJson => Some(Self::value_info_from_shape(Some(Arc::new(
                 Self::raw_json_object_shape(),
             )))),
             StandardBuiltinId::RegExpPrototypeFlagsGetter => {
