@@ -567,16 +567,15 @@ struct ProgramWasmCacheEntry {
 struct ProgramWasmArtifact {
     /// The program module; standalone when `runtime` is `None`.
     bytes: Arc<[u8]>,
-    runtime: Option<Arc<scriptw_aot_wasm::RuntimeArtifact>>,
+    runtime: Option<wasm_runtime_link::ProgramRuntime>,
     cached_entry: Option<ProgramWasmCacheEntry>,
     compilation_policy: WasmCompilationPolicy,
 }
 
 impl ProgramWasmArtifact {
     fn program(&self) -> WasmProgramRef<'_> {
-        WasmProgramRef::new(&self.bytes, self.runtime.as_ref())
+        WasmProgramRef::admitted(&self.bytes, self.runtime.as_ref())
             .with_compilation_policy(&self.compilation_policy)
-            .with_profile_verified()
     }
 
     fn evict_if_invalid(&self, error: &EngineError) -> bool {
@@ -914,25 +913,22 @@ enum AmbientModuleLoaderPolicy {
 fn configured_module_loader(
     options: &CompileOptions,
     policy: AmbientModuleLoaderPolicy,
-) -> Result<Box<dyn HostModuleLoader + 'static>, EngineError> {
+) -> Box<dyn HostModuleLoader> {
     let fallback: Box<dyn HostModuleLoader> = match policy {
-        AmbientModuleLoaderPolicy::Filesystem => Box::new(
-            FilesystemModuleLoader::new(
-                options.module_root.as_deref(),
-                options.filename.as_deref(),
-            )
-            .map_err(|error| EngineError::new(error.to_string()))?,
-        ),
+        AmbientModuleLoaderPolicy::Filesystem => Box::new(FilesystemModuleLoader::deferred(
+            options.module_root.clone(),
+            options.filename.clone(),
+        )),
         AmbientModuleLoaderPolicy::RejectAll => Box::new(module_loader::RejectAllModuleLoader),
     };
-    Ok(if options.foreign_modules.is_empty() {
+    if options.foreign_modules.is_empty() {
         fallback
     } else {
         Box::new(module_loader::ForeignModuleLoader::new(
             options.foreign_modules.clone(),
             fallback,
         ))
-    })
+    }
 }
 
 /// Loads the module graph rooted at `source`, using the loader policy selected
@@ -1005,7 +1001,7 @@ fn parse_ambient_entry(
     if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
         eprintln!("scriptw wasm trace: parse: {:?}", parse_started.elapsed());
     }
-    let loader = configured_module_loader(options, policy)?;
+    let loader = configured_module_loader(options, policy);
     let graph = match &source {
         ParsedSource::Script(source) => script_entry_graph(source, options, loader.as_ref()),
         ParsedSource::Module(source) => module_entry_graph(source, options, loader.as_ref()),
@@ -1540,6 +1536,10 @@ enum WasmModuleSource<'a> {
     ProgramWithDigest(&'a [u8], [u8; 32]),
     Runtime(&'a scriptw_aot_wasm::RuntimeArtifact),
     DiagnosticRuntime(&'a scriptw_aot_wasm::RuntimeArtifact),
+    CargoRuntime(
+        &'static embedded_runtime::CargoExecutionRuntime,
+        WasmRuntimeImagePolicy,
+    ),
 }
 
 impl<'a> WasmModuleSource<'a> {
@@ -1547,6 +1547,7 @@ impl<'a> WasmModuleSource<'a> {
         match self {
             Self::Program(bytes) | Self::ProgramWithDigest(bytes, _) => bytes,
             Self::Runtime(runtime) | Self::DiagnosticRuntime(runtime) => runtime.bytes(),
+            Self::CargoRuntime(runtime, _) => runtime.bytes(),
         }
     }
 
@@ -1566,6 +1567,7 @@ impl<'a> WasmModuleSource<'a> {
                 WasmRuntimeImagePolicy::EmbeddedBuild
             }
             Self::DiagnosticRuntime(_) => WasmRuntimeImagePolicy::MatchedDiagnostic,
+            Self::CargoRuntime(_, policy) => policy,
         }
     }
 }
@@ -1583,6 +1585,7 @@ fn wasm_module_memory_cache_key(
             WasmModuleSource::Runtime(runtime) | WasmModuleSource::DiagnosticRuntime(runtime) => {
                 runtime.wasm_sha256()
             }
+            WasmModuleSource::CargoRuntime(runtime, _) => runtime.wasm_sha256(),
         },
     }
 }
@@ -1698,6 +1701,7 @@ fn wasm_module_for_execution_with_factory(
     match (memory_cache_policy, source) {
         (WasmModuleMemoryCachePolicy::Retain, _)
         | (WasmModuleMemoryCachePolicy::RetainRuntime, WasmModuleSource::Runtime(_))
+        | (WasmModuleMemoryCachePolicy::RetainRuntime, WasmModuleSource::CargoRuntime(..))
         | (WasmModuleMemoryCachePolicy::RetainRuntime, WasmModuleSource::DiagnosticRuntime(_)) => {
             memory_cached_wasm_module(engine, source, native_compilation_mode, runtime, create)
         }
@@ -3202,7 +3206,7 @@ impl Engine {
         timeout_ms: Option<u64>,
         can_block: bool,
     ) -> Result<RunOutcome, EngineError> {
-        run_on_sized_stack(|| {
+        run_on_execution_stack(|| {
             self.execute_source_with_cached_wasm_on_current_thread(
                 source,
                 goal,
@@ -3224,7 +3228,7 @@ impl Engine {
         timeout_ms: Option<u64>,
         can_block: bool,
     ) -> Result<ObservedRunOutcome, EngineError> {
-        run_on_sized_stack(|| {
+        run_on_execution_stack(|| {
             self.execute_source_with_cached_wasm_on_current_thread(
                 source,
                 goal,
@@ -3458,7 +3462,9 @@ impl Engine {
         }
         Ok(ProgramWasmArtifact {
             bytes: Arc::from(artifact.bytes),
-            runtime: artifact.runtime.map(|runtime| runtime.0),
+            runtime: artifact
+                .runtime
+                .map(|runtime| wasm_runtime_link::ProgramRuntime::Raw(runtime.0)),
             cached_entry: None,
             compilation_policy: WasmCompilationPolicy::from_unit(&unit),
         })
@@ -4103,7 +4109,10 @@ impl Engine {
             if let Some(runtime) = program.runtime {
                 eprintln!(
                     "scriptw wasm trace: runtime bytes: {}",
-                    runtime.bytes().len()
+                    runtime
+                        .module_source(WasmRuntimeImagePolicy::EmbeddedBuild)
+                        .bytes()
+                        .len()
                 );
             }
             eprintln!(
@@ -4357,12 +4366,16 @@ impl Engine {
         store.limiter(|state| &mut state.limits);
         let host_imports_started = std::time::Instant::now();
         let host_source = match program.runtime {
-            Some(runtime) => WasmModuleSource::runtime(runtime, runtime_image_policy),
+            Some(runtime) => runtime.module_source(runtime_image_policy),
             None => WasmModuleSource::Program(program.bytes),
         };
         let host_key = wasm_module_memory_cache_key(host_source, native_mode);
-        let (mut linker, host_import_cache) =
-            host_imports::linker(&engine, modules.host(), host_key)?;
+        let (mut linker, host_import_cache) = host_imports::linker(
+            &engine,
+            modules.host(),
+            modules.additional_host_imports(),
+            host_key,
+        )?;
         let host_imports_elapsed = if profile.is_some() {
             host_imports_started.elapsed()
         } else {
@@ -4468,13 +4481,11 @@ impl Engine {
         }
         #[cfg(feature = "native-source-compiler")]
         if let (Some(runtime), Some(policy)) = (program.runtime, program.compilation_policy) {
-            if runtime.source_compilation_profile()
-                == scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost
-            {
+            if runtime.source_compilation_profile() == scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost {
                 let context = wasm_native_source_compiler::NativeSourceCompilerContext::new(
-                    &linker,
+                    linker,
                     observed_instance,
-                    Arc::clone(runtime),
+                    runtime,
                     policy.clone(),
                     Arc::clone(&execution_control),
                     native_mode,

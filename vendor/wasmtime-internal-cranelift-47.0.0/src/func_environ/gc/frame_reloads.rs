@@ -4,12 +4,13 @@
 //! often than the value can change:
 //!
 //! * **Stack-map slots.** `cranelift-frontend` gives every GC reference that
-//!   is live across a call a slot: it stores the value there where the value
-//!   is defined, lists the slot in the stack map of each call the value is
-//!   live across, and replaces *every* use of the value, the ones before the
-//!   first call included, by a load from the slot. The collector moves
-//!   objects, so a reference has to be read again after a call. It does not
-//!   have to be read again otherwise.
+//!   is live across a call a slot: it stores the value there before a live
+//!   safepoint, lists the slot in the stack map of each call the value is live
+//!   across, keeps the original SSA value before the first call in its block,
+//!   and reloads once per safepoint-separated segment inside each block. The
+//!   collector moves objects, so a reference has to be read again after a
+//!   call. It does not have to be read again across blocks or loops without a
+//!   call.
 //! * **Home slots** (`base_home`): the GC heap base and the `vmctx`, each
 //!   stored once by the entry block and loaded at every use.
 //!
@@ -1069,9 +1070,10 @@ mod tests {
         let last = body.sum(first, later);
         let result = body.sum(before, last);
         body.finish(result);
-        // The frontend loaded at each of the eight uses.
-        assert_eq!(harness.reloads(), 8);
-        assert_eq!(harness.forward(), 6);
+        // The frontend keeps the original SSA value before the first call and
+        // reloads once per safepoint-separated segment inside the block.
+        assert_eq!(harness.reloads(), 2);
+        assert_eq!(harness.forward(), 0);
         assert_eq!(harness.reloads(), 2);
         assert_eq!(harness.operands(before), [first, first]);
         let [reloaded, same] = harness.operands(after)[..] else {
@@ -1143,7 +1145,7 @@ mod tests {
         let after = body.sum(first, second);
         let result = body.sum(before, after);
         body.finish(result);
-        assert_eq!(harness.forward(), 4);
+        assert_eq!(harness.forward(), 3);
         assert_eq!(harness.reloads(), 2);
         assert_eq!(harness.operands(after), harness.operands(before));
         assert_eq!(harness.operands(in_then)[0], harness.operands(before)[0]);
@@ -1172,7 +1174,7 @@ mod tests {
         let after = body.sum(first, first);
         let result = body.sum(before, after);
         body.finish(result);
-        assert_eq!(harness.forward(), 3);
+        assert_eq!(harness.forward(), 0);
         let loaded = [before, in_slow, after].map(|sum| {
             let [left, right] = harness.operands(sum)[..] else {
                 unreachable!()
@@ -1215,7 +1217,7 @@ mod tests {
         body.switch_to(exit);
         let after = body.sum(first, before);
         body.finish(after);
-        assert_eq!(harness.forward(), 3);
+        assert_eq!(harness.forward(), 2);
         assert_eq!(harness.reloads(), 1);
         let loaded = harness.operands(before)[0];
         assert_eq!(harness.operands(in_loop)[0], loaded);
@@ -1487,9 +1489,13 @@ mod tests {
         let mut harness = Harness::new();
         let mut body = harness.body();
         let first = body.first;
+        let next = body.block();
         body.call();
         let one = body.sum(first, first);
         body.check(one);
+        body.builder.ins().jump(next, &[]);
+
+        body.switch_to(next);
         let two = body.sum(first, one);
         body.finish(two);
         // Hand the slot's address to an instruction that is no load or store.
@@ -1505,6 +1511,7 @@ mod tests {
         let address = pos.ins().stack_addr(I64, slot, 0);
         pos.ins().iadd_imm_s(address, 1);
         let before = harness.reloads();
+        assert_eq!(before, 2);
         assert_eq!(harness.forward(), 0);
         assert_eq!(harness.reloads(), before);
     }

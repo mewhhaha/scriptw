@@ -1,5 +1,5 @@
-//! Pure numeric callbacks consume an independent unboxed snapshot. The live
-//! receiver is borrowed only during snapshot and revalidated at publication.
+//! A guarded subtraction comparator can sort a monotonic run in place.
+//! Other pure numeric callbacks use an independent unboxed snapshot.
 use super::*;
 use crate::gc_types::{BinaryNumericCallback, FunctionLocal, NumberBitsI64Array};
 
@@ -21,13 +21,19 @@ impl FunctionBuilder<'_> {
         entry.load(f).is_null(f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
-        let snapshot = self.emit_try_packed_number_sort_snapshot(receiver, length, f)?;
-        snapshot.load(s, f).is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, f);
         let callable = s
             .reserve_function_local(f)
             .initialize(entry.load(f).require_non_null(f), f);
+        let completed = self.open_frame(ControlFrameKind::Block, f);
+        if matches!(output, ArraySortOutput::Receiver) {
+            self.emit_packed_number_monotonic_sort_or_fall_through(
+                receiver, length, &callable, handled, completed, f,
+            );
+        }
+        let snapshot = self.emit_try_packed_number_sort_snapshot(receiver, length, f);
+        snapshot.load(s, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
         let list = s
             .reserve_gc_local(f)
             .initialize(snapshot.load(s, f).require_non_null(f), f);
@@ -36,7 +42,6 @@ impl FunctionBuilder<'_> {
         let list = self.emit_array_private_number_sort(
             list, length, &callable, comparator, mutated, pending, f,
         )?;
-        callable.clear(f);
         let written = self.open_frame(ControlFrameKind::Block, f);
         if matches!(output, ArraySortOutput::Receiver) {
             // An already-sorted pure numeric pass ran no mutating user code;
@@ -44,7 +49,7 @@ impl FunctionBuilder<'_> {
             mutated.load(f);
             f.instruction(&Instruction::I32Eqz);
             self.emit_branch_if_to_target(written, f);
-            let done = self.emit_try_packed_number_sort_writeback(target, length, &list, f)?;
+            let done = self.emit_try_packed_number_sort_writeback(target, length, &list, f);
             done.load(f);
             s.release_i32_local(done, f);
             self.emit_branch_if_to_target(written, f);
@@ -104,6 +109,9 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         snapshot.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        callable.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         entry.clear(f);
@@ -216,48 +224,10 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, f);
         // Only strictly descending runs reverse; equality/NaN must keep order.
         mutated.set_constant(1, f);
-        l.set_constant(0, f);
         count.load(f);
-        f.instruction(&Instruction::I64Const(1));
-        f.instruction(&Instruction::I64Sub);
-        r.store(f);
-        let reversed = self.open_frame(ControlFrameKind::Block, f);
-        let reverse = self.open_frame(ControlFrameKind::Loop, f);
-        l.load(f);
-        r.load(f);
-        f.instruction(&Instruction::I64GeU);
-        self.emit_branch_if_to_target(reversed, f);
-        l.load(f);
         f.instruction(&Instruction::I32WrapI64);
         slot.store(f);
-        s.array_type::<NumberBitsI64Array>()
-            .read(&list, slot, s, f)
-            .store_i64(bits, f);
-        r.load(f);
-        f.instruction(&Instruction::I32WrapI64);
-        slot.store(f);
-        s.array_type::<NumberBitsI64Array>()
-            .read(&list, slot, s, f)
-            .store_i64(right.scalar(), f);
-        s.array_type::<NumberBitsI64Array>()
-            .write(&list, slot, GcOperand::i64_local(bits), s, f);
-        l.load(f);
-        f.instruction(&Instruction::I32WrapI64);
-        slot.store(f);
-        s.array_type::<NumberBitsI64Array>().write(
-            &list,
-            slot,
-            GcOperand::i64_local(right.scalar()),
-            s,
-            f,
-        );
-        self.emit_increment_local(l, 1, f);
-        self.emit_increment_local(r, -1, f);
-        self.emit_branch_to_target(reverse, f);
-        self.pop_control(ControlFrameKind::Loop);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
+        self.emit_reverse_number_sort_prefix(&list, slot, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.emit_branch_to_target(sorted, f);

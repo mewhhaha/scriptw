@@ -67,17 +67,27 @@ impl RegExpLegacySlot {
 }
 
 impl FunctionBuilder<'_> {
-    pub(crate) fn emit_alloc_regexp_legacy_state(
+    fn emit_realm_regexp_legacy_state(
         &self,
+        realm: &GcLocal<RealmRecord>,
         f: &mut Function,
     ) -> GcStackReference<RegExpLegacyState> {
         let s = self.runtime_schema();
-        // CreateRealm precedes pooled-string bootstrap. Allocate a real empty
-        // UTF-16 String directly rather than reading an uninitialized table.
-        let empty = s
+        let field = s.field(RealmRecordSchema::REGEXP_LEGACY);
+        let state = s
             .reserve_gc_local(f)
-            .initialize(self.emit_native_string_static("", f), f);
-        let result = s.struct_type::<RegExpLegacyState>().construct(
+            .initialize(field.read(realm, s, f).reference(), f);
+        state.load(s, f).is_null(f);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        // A materialized state can itself contain null slots after a match
+        // on a legacy-disabled RegExp. A null Realm field means every slot
+        // still has its initial empty String value.
+        let empty = s.reserve_gc_local(f).initialize(
+            self.emit_interned_string_reference("", f)
+                .expect("Realm bootstrap owns the canonical empty string"),
+            f,
+        );
+        let initial = s.struct_type::<RegExpLegacyState>().construct(
             (
                 GcOperand::nullable_reference(&empty, s),
                 GcOperand::nullable_reference(&empty, s),
@@ -96,7 +106,12 @@ impl FunctionBuilder<'_> {
             ),
             f,
         );
+        state.replace(initial.nullable(), f);
         empty.clear(f);
+        field.write(realm, GcOperand::reference(&state, s), s, f);
+        f.instruction(&Instruction::End);
+        let result = state.load(s, f).require_non_null(f);
+        state.clear(f);
         result
     }
 
@@ -222,12 +237,6 @@ impl FunctionBuilder<'_> {
             exit,
             f,
         )?;
-        let state = s.reserve_gc_local(f).initialize(
-            s.field(RealmRecordSchema::REGEXP_LEGACY)
-                .read(&realm, s, f)
-                .reference(),
-            f,
-        );
         match access {
             RegExpLegacyAccessorKind::InputSetter => {
                 // Receiver validation precedes ToString. A failed conversion
@@ -239,16 +248,23 @@ impl FunctionBuilder<'_> {
                 let text = s
                     .reserve_gc_local(f)
                     .initialize(pending.value().cast_reference::<StringValue>(s, f), f);
+                let state = s
+                    .reserve_gc_local(f)
+                    .initialize(self.emit_realm_regexp_legacy_state(&realm, f), f);
                 s.field(RegExpLegacyStateSchema::INPUT).write(
                     &state,
                     GcOperand::nullable_reference(&text, s),
                     s,
                     f,
                 );
+                state.clear(f);
                 text.clear(f);
                 argument.clear(f);
             }
             RegExpLegacyAccessorKind::Getter => {
+                let state = s
+                    .reserve_gc_local(f)
+                    .initialize(self.emit_realm_regexp_legacy_state(&realm, f), f);
                 let context = self
                     .body_entry_locals()
                     .expect("legacy accessor entry")
@@ -315,9 +331,9 @@ impl FunctionBuilder<'_> {
                 owner.clear(f);
                 s.release_i32_local(actual_kind, f);
                 capture.clear(f);
+                state.clear(f);
             }
         }
-        state.clear(f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         self.completion().copy_from(&result, f);
@@ -390,12 +406,9 @@ impl FunctionBuilder<'_> {
         defining.load(s, f);
         f.instruction(&Instruction::RefEq);
         self.open_frame(ControlFrameKind::If, f);
-        let state = s.reserve_gc_local(f).initialize(
-            s.field(RealmRecordSchema::REGEXP_LEGACY)
-                .read(&executing, s, f)
-                .reference(),
-            f,
-        );
+        let state = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_realm_regexp_legacy_state(&defining, f), f);
         let enabled = s.reserve_i32_local(f);
         s.field(RegExpObjectSchema::LEGACY_FEATURES_ENABLED)
             .read(object, s, f)

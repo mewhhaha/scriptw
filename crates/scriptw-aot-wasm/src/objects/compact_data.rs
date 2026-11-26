@@ -3,7 +3,7 @@
 //! slots or tag/scalar/reference arrays. Every structural mutation publishes a
 //! new storage record: a plain data add moves to the canonical child shape, any
 //! other one replaces the complete storage once; no PropertyEntry is fabricated.
-use super::property_storage::PreparedOrdinaryPropertyKey;
+use super::property_storage::DictionaryInsertKey;
 use super::*;
 use crate::gc_types::*;
 
@@ -177,9 +177,9 @@ impl FunctionBuilder<'_> {
         self.emit_property_key_hash(&key, hash, &mut f);
         self.emit_ordinary_insert_in_dictionary(
             &dictionary,
-            &PreparedOrdinaryPropertyKey { key: &key, hash },
+            hash,
+            DictionaryInsertKey::Absent(&key),
             &descriptor,
-            None,
             &mut f,
         );
         schema.release_i64_local(hash, &mut f);
@@ -1472,7 +1472,7 @@ impl FunctionBuilder<'_> {
     /// ForIn observes these scalars before any callback. Compact shapes and
     /// intrinsic rows already own the attributes; neither needs a descriptor
     /// record or a materialized property value for this observation.
-    pub(super) fn emit_ordinary_own_property_enumerability(
+    pub(crate) fn emit_ordinary_own_property_enumerability(
         &mut self,
         object: &GcLocal<OrdinaryObject>,
         key: &PropertyKeyLocals,

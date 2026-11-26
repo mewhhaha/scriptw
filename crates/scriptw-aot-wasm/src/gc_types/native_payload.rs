@@ -11,6 +11,9 @@ pub(crate) fn load(
         struct_type_index: schema.program_type,
         field_index: schema.payload_field,
     });
+    // Only template bodies contain rewritten source operands. Their checked
+    // initializer publishes the required non-null payload argument.
+    function.instruction(&Instruction::RefAsNonNull);
 }
 
 pub(crate) fn append_literal_helper(

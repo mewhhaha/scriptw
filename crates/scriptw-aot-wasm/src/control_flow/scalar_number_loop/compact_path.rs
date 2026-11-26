@@ -322,6 +322,7 @@ impl<'a> CompactPathBorrow<'a> {
         scratch.load_row(&self.values, slot, builder, function);
         match setup {
             RowSetup::First => {
+                scratch.load_row_value(builder, function);
                 scratch.load_function_or_ordinary_storage(builder, declined, function);
                 scratch.base.load(s, function);
                 function.instruction(&Instruction::RefTestNonNull(
@@ -364,28 +365,7 @@ impl<'a> CompactPathBorrow<'a> {
                 function.instruction(&Instruction::End);
             }
             RowSetup::Established(RowStorageKind::Inline) => {
-                scratch.value.tag().load(function);
-                function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Object.tag()));
-                function.instruction(&Instruction::I32Ne);
-                builder.emit_branch_if_to_target(declined, function);
-                scratch.value.reference().load(function);
-                function.instruction(&Instruction::RefTestNonNull(
-                    s.reference_type::<OrdinaryObject>(crate::gc_types::GcNullability::NonNullable)
-                        .heap_type,
-                ));
-                function.instruction(&Instruction::I32Eqz);
-                builder.emit_branch_if_to_target(declined, function);
-                scratch.load_storage(builder, function);
-                scratch.base.load(s, function);
-                function.instruction(&Instruction::RefTestNonNull(
-                    s.reference_type::<InlineCompactDataStorage>(
-                        crate::gc_types::GcNullability::NonNullable,
-                    )
-                    .heap_type,
-                ));
-                function.instruction(&Instruction::I32Eqz);
-                builder.emit_branch_if_to_target(declined, function);
-                scratch.cast_inline(builder, function);
+                scratch.load_inline_storage(builder, declined, function);
                 s.field(InlineCompactDataStorageSchema::SHAPE)
                     .read(&scratch.inline, s, function);
                 self.shape.load(s, function);
@@ -394,6 +374,7 @@ impl<'a> CompactPathBorrow<'a> {
                 builder.emit_branch_if_to_target(declined, function);
             }
             RowSetup::Established(RowStorageKind::Dictionary) => {
+                scratch.load_row_value(builder, function);
                 scratch.load_function_or_ordinary_storage(builder, declined, function);
                 dictionary
                     .as_ref()
@@ -418,12 +399,12 @@ impl<'a> CompactPathBorrow<'a> {
                         .expect("first-row dictionary scratch")
                         .read_slot(&scratch, *slot, name, builder, declined, function);
                     function.instruction(&Instruction::Else);
-                    scratch.read_slot(*slot, builder, function);
+                    scratch.read_inline_slot(path, *slot, builder, function);
                     builder.pop_control(ControlFrameKind::If);
                     function.instruction(&Instruction::End);
                 }
                 RowSetup::Established(RowStorageKind::Inline) => {
-                    scratch.read_slot(*slot, builder, function)
+                    scratch.read_inline_slot(path, *slot, builder, function)
                 }
                 RowSetup::Established(RowStorageKind::Dictionary) => dictionary
                     .as_ref()
@@ -813,8 +794,6 @@ struct RowScratch {
 impl RowScratch {
     fn new(builder: &FunctionBuilder<'_>, function: &mut Function) -> Self {
         let s = builder.runtime_schema();
-        let value = s.reserve_value_local(function);
-        value.set_undefined(function);
         Self {
             stored: s.reserve_gc_local(function).initialize_null(s, function),
             header: s.reserve_gc_local(function).initialize_null(s, function),
@@ -823,7 +802,7 @@ impl RowScratch {
             array: s.reserve_gc_local(function).initialize_null(s, function),
             numbers: s.reserve_gc_local(function).initialize_null(s, function),
             length: s.reserve_i64_local(function),
-            value,
+            value: s.reserve_value_local(function),
         }
     }
 
@@ -841,6 +820,10 @@ impl RowScratch {
                 .reference(),
             function,
         );
+    }
+
+    fn load_row_value(&self, builder: &FunctionBuilder<'_>, function: &mut Function) {
+        let s = builder.runtime_schema();
         // Dense canonical PackedValues proves this own slot is nonnull.
         s.field(StoredValueSchema::TAG)
             .read(&self.stored, s, function)
@@ -850,18 +833,36 @@ impl RowScratch {
             .store_eq(self.value.reference(), function);
     }
 
-    fn load_storage(&self, builder: &FunctionBuilder<'_>, function: &mut Function) {
+    fn load_inline_storage(
+        &self,
+        builder: &mut FunctionBuilder<'_>,
+        declined: ControlTarget,
+        function: &mut Function,
+    ) {
         let s = builder.runtime_schema();
-        self.header.replace(
-            self.value
-                .cast_reference::<OrdinaryObject>(s, function)
+        s.field(StoredValueSchema::TAG).read(&self.stored, s, function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Object.tag()));
+        function.instruction(&Instruction::I32Ne);
+        builder.emit_branch_if_to_target(declined, function);
+        s.field(StoredValueSchema::REFERENCE)
+            .read(&self.stored, s, function)
+            .store_eq(self.value.reference(), function);
+        let miss = builder.local_branch_label(declined);
+        let header = self
+            .value
+            .sealed_reference_or_branch::<OrdinaryObject>(s, miss, function);
+        self.base.replace(
+            s.field(OrdinaryObjectSchema::PROPERTIES)
+                .read_top(header, function)
+                .reference()
                 .nullable(),
             function,
         );
-        self.base.replace(
-            s.field(OrdinaryObjectSchema::PROPERTIES)
-                .read(&self.header, s, function)
-                .reference()
+        self.inline.replace(
+            self.base
+                .sealed_nested_subtype_or_branch::<CompactDataStorage, InlineCompactDataStorage>(
+                    s, miss, function,
+                )
                 .nullable(),
             function,
         );
@@ -878,8 +879,9 @@ impl RowScratch {
         );
     }
 
-    fn read_slot(
+    fn read_inline_slot(
         &self,
+        path: &CompactReadPath,
         slot: I32Local,
         builder: &mut FunctionBuilder<'_>,
         function: &mut Function,
@@ -894,48 +896,34 @@ impl RowScratch {
         function.instruction(&Instruction::I32Const(255));
         function.instruction(&Instruction::I32And);
         self.value.tag().store(function);
-        slot.load(function);
-        function.instruction(&Instruction::I32Const(2));
-        function.instruction(&Instruction::I32LtU);
-        builder.open_frame(ControlFrameKind::If, function);
+        // FirstRowKeys resolves at most two keys. Established rows have the
+        // very same shape, so only slots 0 and 1 can reach this read.
+        let read_lane = |scalar, reference, function: &mut Function| match path {
+            CompactReadPath::Number(_) | CompactReadPath::CyclicNumber(_) => {
+                s.field(scalar)
+                    .read(&self.inline, s, function)
+                    .store_i64(self.value.scalar(), function);
+            }
+            CompactReadPath::StringLength(_) | CompactReadPath::ArrayNumber(_, _) => {
+                s.field(reference)
+                    .read(&self.inline, s, function)
+                    .store_eq(self.value.reference(), function);
+            }
+        };
         slot.load(function);
         function.instruction(&Instruction::I32Eqz);
         builder.open_frame(ControlFrameKind::If, function);
-        s.field(InlineCompactDataStorageSchema::SCALAR0)
-            .read(&self.inline, s, function)
-            .store_i64(self.value.scalar(), function);
-        s.field(InlineCompactDataStorageSchema::REFERENCE0)
-            .read(&self.inline, s, function)
-            .store_eq(self.value.reference(), function);
+        read_lane(
+            InlineCompactDataStorageSchema::SCALAR0,
+            InlineCompactDataStorageSchema::REFERENCE0,
+            function,
+        );
         function.instruction(&Instruction::Else);
-        s.field(InlineCompactDataStorageSchema::SCALAR1)
-            .read(&self.inline, s, function)
-            .store_i64(self.value.scalar(), function);
-        s.field(InlineCompactDataStorageSchema::REFERENCE1)
-            .read(&self.inline, s, function)
-            .store_eq(self.value.reference(), function);
-        builder.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        function.instruction(&Instruction::Else);
-        slot.load(function);
-        function.instruction(&Instruction::I32Const(2));
-        function.instruction(&Instruction::I32Eq);
-        builder.open_frame(ControlFrameKind::If, function);
-        s.field(InlineCompactDataStorageSchema::SCALAR2)
-            .read(&self.inline, s, function)
-            .store_i64(self.value.scalar(), function);
-        s.field(InlineCompactDataStorageSchema::REFERENCE2)
-            .read(&self.inline, s, function)
-            .store_eq(self.value.reference(), function);
-        function.instruction(&Instruction::Else);
-        s.field(InlineCompactDataStorageSchema::SCALAR3)
-            .read(&self.inline, s, function)
-            .store_i64(self.value.scalar(), function);
-        s.field(InlineCompactDataStorageSchema::REFERENCE3)
-            .read(&self.inline, s, function)
-            .store_eq(self.value.reference(), function);
-        builder.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
+        read_lane(
+            InlineCompactDataStorageSchema::SCALAR1,
+            InlineCompactDataStorageSchema::REFERENCE1,
+            function,
+        );
         builder.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
     }

@@ -1488,7 +1488,9 @@ impl<'a> FunctionBuilder<'a> {
         symbol: scriptw_ir::WellKnownSymbol,
         function: &mut Function,
     ) -> Result<GcStackReference<SymbolValue>, EmitError> {
-        Ok(self.schema.well_known_symbol_reference(symbol, function))
+        Ok(self
+            .schema
+            .well_known_symbol_reference(symbol, self.runtime_helper_base()?, function))
     }
     pub(crate) fn current_private_environment(&self) -> &GcLocal<PrivateEnvironment, Nullable> {
         &self.current_private_environment
@@ -2213,6 +2215,26 @@ impl<'a> FunctionBuilder<'a> {
         self.require_genuine_source_site()?;
         let position = self.functions.next_site_record(T::KIND)?;
         self.runtime_schema().site_record_global(position)
+    }
+
+    /// The per-P global holding the shared immutable `ExecutableCode` for a
+    /// user entry in this compiled program, or `None` for runtime/non-source code.
+    pub(crate) fn cached_executable_code_global(
+        &mut self,
+        meta: &WasmFunctionMeta,
+    ) -> Result<Option<crate::gc_types::SiteRecordGlobal<crate::gc_types::ExecutableCode>>, EmitError>
+    {
+        if !self.functions.allows_cached_executable_code_globals()
+            || self.require_genuine_source_site().is_err()
+            || meta.entry.executable_kind()? != crate::gc_types::ExecutableCodeKind::JavaScript
+        {
+            return Ok(None);
+        }
+        let position = self.functions.cached_executable_code_site(
+            meta.entry.source_id(),
+            meta.class_element_execution_kind,
+        )?;
+        Ok(Some(self.runtime_schema().site_record_global(position)?))
     }
 
     /// The global that holds a new static property site's record, and the

@@ -1,7 +1,8 @@
 //! Native R authority is limited to this Cargo build's embedded output.
 //!
 //! Safe raw packages retain complete identity, metadata, data and layout
-//! admission. Immutable Cargo output reuses its producer's bounded receipt.
+//! admission. Immutable Cargo execution can defer compiler layout and Intl
+//! catalogues using its producer's bounded receipt.
 //! No native constructor accepts a caller slice/path/cache blob, and no Module
 //! is retained here. Native code is mapped from the running executable only.
 
@@ -16,6 +17,7 @@ mod build_cache;
 mod build_compile;
 mod digests;
 mod execution;
+mod execution_metadata;
 pub(super) use execution::CargoExecutionRuntime;
 mod images;
 mod load;
@@ -30,8 +32,6 @@ use scriptw_aot_wasm::{
 use std::sync::OnceLock;
 use wasmtime::{Engine, Module};
 
-// The leaf crate owns the large initializers. Only non-inline accessor calls
-// enter Engine metadata; source and native admission remain local here.
 use images::Images;
 
 fn expected_source() -> &'static [u8; 32] {

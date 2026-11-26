@@ -557,6 +557,42 @@ impl FunctionBuilder<'_> {
         Ok(result)
     }
 
+    fn emit_function_executable_code(
+        &mut self,
+        meta: &WasmFunctionMeta,
+        function: &mut Function,
+    ) -> Result<GcStackReference<ExecutableCode>, EmitError> {
+        let schema = self.runtime_schema();
+        if let Some(cached_global) = self.cached_executable_code_global(meta)? {
+            let slot = schema
+                .reserve_gc_local::<ExecutableCode, Nullable>(function)
+                .initialize(cached_global.load(schema, function), function);
+            slot.load(schema, function).is_null(function);
+            self.open_frame(ControlFrameKind::If, function);
+            let built = schema
+                .reserve_gc_local::<ExecutableCode, NonNullable>(function)
+                .initialize(
+                    meta.entry.emit_executable_code(
+                        meta.class_element_execution_kind,
+                        schema,
+                        function,
+                    )?,
+                    function,
+                );
+            cached_global.store(built.load(schema, function), function);
+            slot.replace(built.load(schema, function).nullable(), function);
+            built.clear(function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+            let resolved = slot.load(schema, function).require_non_null(function);
+            slot.clear(function);
+            Ok(resolved)
+        } else {
+            meta.entry
+                .emit_executable_code(meta.class_element_execution_kind, schema, function)
+        }
+    }
+
     pub(super) fn emit_complete_function_record(
         &mut self,
         meta: &WasmFunctionMeta,
@@ -599,14 +635,7 @@ impl FunctionBuilder<'_> {
         );
         let code = schema
             .reserve_gc_local::<ExecutableCode, NonNullable>(function)
-            .initialize(
-                meta.entry.emit_executable_code(
-                    meta.class_element_execution_kind,
-                    schema,
-                    function,
-                )?,
-                function,
-            );
+            .initialize(self.emit_function_executable_code(meta, function)?, function);
         let stored_home = schema.reserve_gc_local(function).initialize(
             match executable_kind {
                 crate::gc_types::ExecutableCodeKind::JavaScript

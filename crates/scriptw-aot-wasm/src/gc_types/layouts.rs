@@ -566,6 +566,10 @@ callable_roles!(OrdinaryCallable => JavaScriptFunction, GeneratorCallable => Gen
 
 /// A scalar attempt has no Completion ABI and cannot pass through call_entry.
 pub(crate) enum BinaryNumericCallback {}
+impl BinaryNumericCallback {
+    /// Source-depth admitted, with a proved first-parameter minus second-parameter body.
+    pub(crate) const SUBTRACTION_ADMITTED: i32 = 2;
+}
 impl sealed::Sealed for BinaryNumericCallback {}
 impl GcFunctionRole for BinaryNumericCallback {
     const SIGNATURE: GcFunctionSignature =
@@ -800,7 +804,7 @@ macro_rules! gc_layout_registry {
     };
     (@construct StringValue; $($field:ident: $value:ty, $mutability:ident, $nullability:ty;)+) => {
         #[allow(non_snake_case)]
-        pub(super) fn construct(self, fields: ($(GcOperand<'_, $value, $nullability>,)+), function: &mut Function) -> GcStackReference<StringValue> {
+        pub(super) fn construct_hash_first(self, fields: ($(GcOperand<'_, $value, $nullability>,)+), function: &mut Function) -> GcStackReference<StringValue> {
             let ($($field,)+) = fields;
             $($field.emit(function);)+ self.emit_new(function); self.construction_result()
         }
@@ -1217,7 +1221,7 @@ gc_layout_registry! {
             LITERAL_COUNT: I32Value, Immutable, NonNullable;
             METADATA: GcRef<ImmutableByteArray>, Immutable, NonNullable;
             LANGUAGE_FEATURE_POLICY: scriptw_ir::LanguageFeaturePolicy, Immutable, NonNullable;
-            NATIVE_SOURCE_PAYLOAD: GcRef<NativeSourcePayloadArray>, Immutable, NonNullable;
+            NATIVE_SOURCE_PAYLOAD: GcRef<NativeSourcePayloadArray>, Immutable, Nullable;
             COMPACT_SHAPES: GcRef<CompactShapePageTable>, Mutable, Nullable;
             OWN_DATA_READ_CACHES: GcRef<OwnDataReadCacheTable>, Mutable, Nullable;
         }
@@ -1468,10 +1472,11 @@ gc_layout_registry! {
             NAMES: GcRef<PrivateNameTable>, Immutable, NonNullable;
         }
         struct StringValue => StringValueSchema {
-            CODE_UNITS: GcRef<CodeUnitArray>, Immutable, NonNullable;
             // Raw UTF-16 hash, before the property/collection key tag mix.
             // Zero is unprepared; a real zero hash is safely recomputed.
+            // Keep the 8-byte field first to avoid copying-GC padding.
             RAW_KEY_HASH: I64Value, Mutable, NonNullable;
+            CODE_UNITS: GcRef<CodeUnitArray>, Immutable, NonNullable;
             // Where a dictionary last held an entry keyed by this very String
             // object. Only a guess: a lookup uses it after finding this
             // object as the key of the live entry at that position.
@@ -1483,7 +1488,7 @@ gc_layout_registry! {
             LIMBS: GcRef<BigIntLimbArray>, Immutable, NonNullable;
         }
         array PooledStringTable => PooledStringTableSchema { ELEMENT: GcRef<StringValue>, Mutable, Nullable; }
-        array WellKnownSymbolTable => WellKnownSymbolTableSchema { ELEMENT: GcRef<SymbolValue>, Immutable, NonNullable; }
+        array WellKnownSymbolTable => WellKnownSymbolTableSchema { ELEMENT: GcRef<SymbolValue>, Mutable, Nullable; }
         array RegisteredSymbolTable => RegisteredSymbolTableSchema { ELEMENT: GcRef<SymbolValue>, Mutable, NonNullable; }
         array BigIntLimbArray => BigIntLimbArraySchema { ELEMENT: I64Value, Mutable, NonNullable; }
         struct SymbolValue => SymbolValueSchema {
@@ -1710,7 +1715,7 @@ gc_layout_registry! {
             HOST_HOOKS: GcRef<HostResource>, Immutable, Nullable;
             MODULES: GcRef<ModuleGraph>, Mutable, Nullable;
             TEMPLATE_REGISTRY: GcRef<TemplateSource>, Mutable, Nullable;
-            REGEXP_LEGACY: GcRef<RegExpLegacyState>, Immutable, NonNullable;
+            REGEXP_LEGACY: GcRef<RegExpLegacyState>, Mutable, Nullable;
             TEMPORAL_STATE: crate::heap::TemporalInitializationState, Mutable, NonNullable;
             TEMPORAL_NAMESPACE: GcRef<StoredValue>, Mutable, Nullable;
             INTL_STATE: crate::heap::IntlInitializationState, Mutable, NonNullable;

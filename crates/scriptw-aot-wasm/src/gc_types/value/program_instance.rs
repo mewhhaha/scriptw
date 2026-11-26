@@ -129,7 +129,7 @@ impl<'image, 'pool> ProgramLiteralRoots<'image, 'pool> {
 /// allocation does not turn old absolute-pointer records into safe readers.
 pub(crate) struct ProgramMetadataBytes<'image, 'pool> {
     image: &'image ProgramInstanceImage<'pool>,
-    bytes: GcLocal<ImmutableByteArray>,
+    bytes: Option<GcLocal<ImmutableByteArray>>,
 }
 
 impl<'image, 'pool> ProgramMetadataBytes<'image, 'pool> {
@@ -138,6 +138,11 @@ impl<'image, 'pool> ProgramMetadataBytes<'image, 'pool> {
         image: &'image ProgramInstanceImage<'pool>,
         function: &mut Function,
     ) -> Self {
+        // Both fields can retain the same read-only byte array when there are
+        // no metadata bytes and no literal descriptor rows.
+        if image.metadata_bytes == 0 && image.literal_count() == 0 {
+            return Self { image, bytes: None };
+        }
         function.instruction(&Instruction::I32Const(0));
         function.instruction(&Instruction::I32Const(image.metadata_bytes as i32));
         function.instruction(&Instruction::ArrayNewData {
@@ -146,9 +151,11 @@ impl<'image, 'pool> ProgramMetadataBytes<'image, 'pool> {
         });
         Self {
             image,
-            bytes: schema
-                .reserve_gc_local(function)
-                .initialize(GcStackReference::new(), function),
+            bytes: Some(
+                schema
+                    .reserve_gc_local(function)
+                    .initialize(GcStackReference::new(), function),
+            ),
         }
     }
 }
@@ -361,7 +368,11 @@ impl ProgramInstanceLocals {
                 "ProgramInstance resources belong to different P images",
             ));
         }
-        let source_payload = Self::fresh_native_payload_slot(schema, function);
+        let source_payload = Self::absent_native_payload_slot(schema, function);
+        let metadata_bytes = metadata
+            .bytes
+            .as_ref()
+            .unwrap_or_else(|| literals.descriptors.bytes());
         let owner = schema.reserve_gc_local(function).initialize(
             schema.struct_type::<ProgramInstance>().construct(
                 (
@@ -375,7 +386,7 @@ impl ProgramInstanceLocals {
                     GcOperand::reference(literals.descriptors.bytes(), schema),
                     GcOperand::i32(image.literal_base as i32),
                     GcOperand::program_literal_count(image.literal_count_operand()),
-                    GcOperand::reference(&metadata.bytes, schema),
+                    GcOperand::reference(metadata_bytes, schema),
                     GcOperand::constant(image.language_features),
                     GcOperand::reference(&source_payload, schema),
                     GcOperand::null(schema),
@@ -394,7 +405,9 @@ impl ProgramInstanceLocals {
         hooks.literal_resolve.clear(function);
         literals.table.clear(function);
         literals.descriptors.clear(function);
-        metadata.bytes.clear(function);
+        if let Some(bytes) = metadata.bytes {
+            bytes.clear(function);
+        }
         Ok(Self { owner })
     }
 

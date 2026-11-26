@@ -1,3 +1,4 @@
+use super::buffer_source::TextDecoderInput;
 use super::*;
 
 impl FunctionBuilder<'_> {
@@ -354,7 +355,7 @@ impl FunctionBuilder<'_> {
         stream.store(f);
         let input = self.emit_text_decoder_input(&argument, &output, exit, f)?;
         self.emit_text_decoder_utf8(&decoder, &input, stream, &output, exit, f)?;
-        input.clear(f);
+        input.clear(s, f);
         decoder.clear(f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
@@ -370,7 +371,7 @@ impl FunctionBuilder<'_> {
     fn emit_text_decoder_utf8(
         &mut self,
         decoder: &GcLocal<TextDecoderObject>,
-        input: &GcLocal<ByteArray>,
+        input: &TextDecoderInput,
         stream: I32Local,
         output: &CompletionLocals,
         exit: ControlTarget,
@@ -383,7 +384,6 @@ impl FunctionBuilder<'_> {
         let ignore_bom = s.reserve_i32_local(f);
         let bom_seen = s.reserve_i32_local(f);
         let prior_count = s.reserve_i32_local(f);
-        let input_count = s.reserve_i32_local(f);
         let total = s.reserve_i32_local(f);
         let index = s.reserve_i32_local(f);
         let at = s.reserve_i32_local(f);
@@ -434,13 +434,11 @@ impl FunctionBuilder<'_> {
             s,
             f,
         );
-        s.array_type::<ByteArray>().length(input, s, f);
-        input_count.store(f);
-        // An immutable snapshot and the decoder I/O queue. Normal chunk boundaries
-        // retain at most three bytes; fatal streaming errors retain unread input.
+        // Normal chunk boundaries retain at most three bytes. Fatal streaming
+        // errors can retain the rest of the input in the decoder I/O queue.
         prior_count.load(f);
         f.instruction(&Instruction::I64ExtendI32U);
-        input_count.load(f);
+        input.length.load(f);
         f.instruction(&Instruction::I64ExtendI32U);
         f.instruction(&Instruction::I64Add);
         f.instruction(&Instruction::I64Const(i32::MAX as i64));
@@ -450,12 +448,14 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         prior_count.load(f);
-        input_count.load(f);
+        input.length.load(f);
         f.instruction(&Instruction::I32Add);
         total.store(f);
-        // The input snapshot is already private; only a retained prefix
-        // needs a joined copy.
-        let bytes = s.reserve_gc_local(f).initialize(input.load(s, f), f);
+        // No JavaScript runs while these bytes are borrowed. A retained prefix
+        // needs a joined copy; otherwise the cursor starts at the live offset.
+        let bytes = s.reserve_gc_local(f).initialize(input.bytes.load(s, f), f);
+        input.start.load(f);
+        index.store(f);
         prior_count.load(f);
         self.open_frame(ControlFrameKind::If, f);
         let joined = s.reserve_gc_local(f).initialize(
@@ -464,32 +464,29 @@ impl FunctionBuilder<'_> {
             f,
         );
         f.instruction(&Instruction::I32Const(0));
-        index.store(f);
-        s.array_type::<ByteArray>().copy_range_from(
-            &joined,
-            index,
-            &prior,
-            index,
-            prior_count,
-            s,
-            f,
-        );
+        at.store(f);
+        s.array_type::<ByteArray>()
+            .copy_range_from(&joined, at, &prior, at, prior_count, s, f);
         s.array_type::<ByteArray>().copy_range_from(
             &joined,
             prior_count,
-            input,
-            index,
-            input_count,
+            &input.bytes,
+            input.start,
+            input.length,
             s,
             f,
         );
         bytes.replace(joined.load(s, f), f);
+        at.load(f);
+        index.store(f);
         joined.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         let construction = StringConstruction::allocate(s, s.reserve_gc_local(f), total, f);
-        f.instruction(&Instruction::I32Const(0));
-        index.store(f);
+        total.load(f);
+        index.load(f);
+        f.instruction(&Instruction::I32Add);
+        total.store(f);
         f.instruction(&Instruction::I32Const(0));
         written.store(f);
         f.instruction(&Instruction::I32Const(0));
@@ -622,25 +619,9 @@ impl FunctionBuilder<'_> {
                 .filled(GcOperand::i32(0), prior_count, f),
             f,
         );
-        for delta in 0..3 {
-            prior_count.load(f);
-            f.instruction(&Instruction::I32Const(delta));
-            f.instruction(&Instruction::I32GtU);
-            self.open_frame(ControlFrameKind::If, f);
-            start.load(f);
-            f.instruction(&Instruction::I32Const(delta));
-            f.instruction(&Instruction::I32Add);
-            at.store(f);
-            s.array_type::<ByteArray>()
-                .read(&bytes, at, s, f)
-                .store(byte, f);
-            f.instruction(&Instruction::I32Const(delta));
-            at.store(f);
-            s.array_type::<ByteArray>()
-                .write(&tail, at, GcOperand::i32_local(byte), s, f);
-            self.pop_control(ControlFrameKind::If);
-            f.instruction(&Instruction::End);
-        }
+        at.set_constant(0, f);
+        s.array_type::<ByteArray>()
+            .copy_range_from(&tail, at, &bytes, start, prior_count, s, f);
         s.field(TextDecoderObjectSchema::PENDING).write(
             decoder,
             GcOperand::reference(&tail, s),
@@ -715,28 +696,8 @@ impl FunctionBuilder<'_> {
         );
         f.instruction(&Instruction::I32Const(0));
         at.store(f);
-        let retained = self.open_frame(ControlFrameKind::Block, f);
-        let retain = self.open_frame(ControlFrameKind::Loop, f);
-        at.load(f);
-        prior_count.load(f);
-        f.instruction(&Instruction::I32GeU);
-        self.emit_branch_if_to_target(retained, f);
         s.array_type::<ByteArray>()
-            .read(&bytes, index, s, f)
-            .store(byte, f);
-        s.array_type::<ByteArray>()
-            .write(&tail, at, GcOperand::i32_local(byte), s, f);
-        for local in [at, index] {
-            local.load(f);
-            f.instruction(&Instruction::I32Const(1));
-            f.instruction(&Instruction::I32Add);
-            local.store(f);
-        }
-        self.emit_branch_to_target(retain, f);
-        self.pop_control(ControlFrameKind::Loop);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
+            .copy_range_from(&tail, at, &bytes, index, prior_count, s, f);
         s.field(TextDecoderObjectSchema::PENDING).write(
             decoder,
             GcOperand::reference(&tail, s),
@@ -838,7 +799,6 @@ impl FunctionBuilder<'_> {
             at,
             index,
             total,
-            input_count,
             prior_count,
             bom_seen,
             ignore_bom,

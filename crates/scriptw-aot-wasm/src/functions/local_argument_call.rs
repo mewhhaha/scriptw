@@ -237,44 +237,36 @@ impl FunctionBuilder<'_> {
                 .filter(|entry| entry.is_source() && entry.arity() == R::ARITY)
                 .map(|planned| (meta, planned))
         }) {
-            // Cross-P source IDs can collide. The actual code and its defining
-            // program must both agree before a source hint becomes a direct
-            // call. That pair also proves this code record published the
-            // planned local entry, so the matched branch reads no typed entry.
+            // Cross-P source IDs can collide. When this P owns a single cached
+            // immutable ExecutableCode global for the planned entry, ref.eq
+            // against that P-private global proves source identity, JS kind,
+            // and defining program in one check; otherwise check all three.
             Some((meta, planned)) => {
-                let owner = schema.reserve_gc_local(function).initialize(
+                if let Some(cached_global) = self.cached_executable_code_global(meta)? {
+                    code.load(schema, function);
+                    cached_global.load(schema, function);
+                    function.instruction(&Instruction::RefEq);
+                } else {
+                    schema
+                        .field(ExecutableCodeSchema::SOURCE_ID)
+                        .read(&code, schema, function);
+                    function.instruction(&Instruction::I64Const(meta.entry.source_id()));
+                    function.instruction(&Instruction::I64Eq);
+                    schema
+                        .field(ExecutableCodeSchema::KIND)
+                        .read(&code, schema, function);
+                    function.instruction(&Instruction::I32Const(
+                        ExecutableCodeKind::JavaScript.encode(),
+                    ));
+                    function.instruction(&Instruction::I32Eq);
+                    function.instruction(&Instruction::I32And);
                     schema
                         .field(FunctionContextSchema::DEFINING_PROGRAM)
-                        .read(&context, schema, function)
-                        .reference(),
-                    function,
-                );
-                let source = schema.reserve_i64_local(function);
-                let kind = schema.reserve_i32_local(function);
-                schema
-                    .field(ExecutableCodeSchema::SOURCE_ID)
-                    .read(&code, schema, function)
-                    .store_i64(source, function);
-                schema
-                    .field(ExecutableCodeSchema::KIND)
-                    .read(&code, schema, function)
-                    .store(kind, function);
-                source.load(function);
-                function.instruction(&Instruction::I64Const(meta.entry.source_id()));
-                function.instruction(&Instruction::I64Eq);
-                kind.load(function);
-                function.instruction(&Instruction::I32Const(
-                    ExecutableCodeKind::JavaScript.encode(),
-                ));
-                function.instruction(&Instruction::I32Eq);
-                function.instruction(&Instruction::I32And);
-                owner.load(schema, function);
-                self.current_program().reference(schema, function);
-                function.instruction(&Instruction::RefEq);
-                function.instruction(&Instruction::I32And);
-                schema.release_i32_local(kind, function);
-                schema.release_i64_local(source, function);
-                owner.clear(function);
+                        .read(&context, schema, function);
+                    self.current_program().reference(schema, function);
+                    function.instruction(&Instruction::RefEq);
+                    function.instruction(&Instruction::I32And);
+                }
                 self.open_frame(ControlFrameKind::If, function);
                 self.emit_entered_local_argument_call::<R>(
                     &target,

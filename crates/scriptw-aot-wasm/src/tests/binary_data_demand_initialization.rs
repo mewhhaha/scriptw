@@ -219,13 +219,13 @@ fn canonical_runtime_defers_the_complete_binary_data_graph_with_a_void_realm_abi
         if builtin == StandardBuiltinId::TypedArrayPrototypeToString {
             assert_eq!(
                 references(&initial),
-                1,
-                "Array.prototype.toString owns the shared eager callable"
+                0,
+                "Array.prototype.toString remains deferred at Realm birth"
             );
             assert_eq!(
                 references(&ensure),
                 0,
-                "binary initialization reuses Array's canonical callable"
+                "binary initialization publishes a recipe for Array's canonical callable"
             );
             continue;
         }

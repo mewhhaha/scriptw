@@ -260,17 +260,20 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, f);
         match scope {
             StringLiteralReplacementScope::AllOccurrences => {
+                let chain = s.reserve_gc_local(f).initialize_null(s, f);
                 let fused = s
                     .call_helper(
                         crate::runtime_helpers::StringSplitJoinArguments::new(
                             input,
                             needle,
                             replacement_string,
+                            &chain,
                         ),
                         self.runtime_helper_base()?,
                         f,
                     )
                     .bind(s, s.reserve_gc_local(f), f);
+                chain.clear(f);
                 fused.load(s, f).is_null(f);
                 f.instruction(&Instruction::I32Eqz);
                 self.open_frame(ControlFrameKind::If, f);
@@ -1110,12 +1113,338 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    /// Fused `input.split(separator).join(replacement)` for proven primitive
-    /// Strings with a non-empty separator under unchanged Realm protectors.
-    /// Returns `input` directly with zero allocations when `separator` does
-    /// not occur, builds one exact-size String when it does, or returns null
-    /// if the output exceeds `MAX_STRING_LENGTH` so the caller runs the
-    /// general path and throws its exact RangeError.
+    pub(crate) fn emit_split_prefix(
+        &mut self,
+        input: &GcLocal<StringValue>,
+        separator: u16,
+        output: &ValueLocals,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let units = s.reserve_gc_local(f).initialize(
+            s.field(StringValueSchema::CODE_UNITS)
+                .read(input, s, f)
+                .reference(),
+            f,
+        );
+        let zero = s.reserve_i32_local(f);
+        let length = s.reserve_i32_local(f);
+        let unit = s.reserve_i32_local(f);
+        let end = s.reserve_i32_local(f);
+        zero.set_constant(0, f);
+        unit.set_constant(i32::from(separator), f);
+        s.array_type::<CodeUnitArray>().length(&units, s, f);
+        length.store(f);
+        s.call_helper(
+            crate::runtime_helpers::CodeUnitFindArguments::new(&units, zero, length, unit),
+            self.runtime_helper_base()?,
+            f,
+        )
+        .store(end, f);
+        end.load(f);
+        length.load(f);
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        output.set_reference(input, s, f);
+        f.instruction(&Instruction::Else);
+        end.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let empty = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_interned_string_reference("", f)?, f);
+        output.set_reference(&empty, s, f);
+        empty.clear(f);
+        f.instruction(&Instruction::Else);
+        let prefix = StringConstruction::allocate(s, s.reserve_gc_local(f), end, f);
+        self.emit_split_copy_units(&prefix, &units, end, zero, f);
+        let prefix = s.reserve_gc_local(f).initialize(prefix.publish(s, f), f);
+        output.set_reference(&prefix, s, f);
+        prefix.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        for local in [end, unit, length, zero] {
+            s.release_i32_local(local, f);
+        }
+        units.clear(f);
+        Ok(())
+    }
+
+    /// The compiler supplies 2–6 pairs, each with a distinct one-unit
+    /// separator. A replacement never contains a later pair's separator.
+    /// Counts of the original units therefore suffice to check the length
+    /// at every intermediate stage, including a stage followed by deletion.
+    fn emit_split_join_chain(
+        &mut self,
+        input: &GcLocal<StringValue>,
+        units: &GcLocal<CodeUnitArray>,
+        chain: &GcLocal<PooledStringTable>,
+        result: &GcLocal<StringValue, Nullable>,
+        done: crate::emit::ControlTarget,
+        f: &mut Function,
+    ) {
+        use crate::runtime_helpers::SPLIT_JOIN_CHAIN_LIMIT;
+        let s = self.runtime_schema();
+        let plan = s.array_type::<PooledStringTable>();
+        let code_units = s.array_type::<CodeUnitArray>();
+        let counts = s.array_type::<OrdinaryPropertyIndex>();
+        let length = s.reserve_i32_local(f);
+        let plan_length = s.reserve_i32_local(f);
+        let pos = s.reserve_i32_local(f);
+        let unit = s.reserve_i32_local(f);
+        let arm = s.reserve_i32_local(f);
+        let field = s.reserve_i32_local(f);
+        let count = s.reserve_i32_local(f);
+        let total = s.reserve_i64_local(f);
+        let separators: [_; SPLIT_JOIN_CHAIN_LIMIT] =
+            std::array::from_fn(|_| s.reserve_i32_local(f));
+        let increment = |local: I32Local, f: &mut Function| {
+            local.load(f);
+            f.instruction(&Instruction::I32Const(1));
+            f.instruction(&Instruction::I32Add);
+            local.store(f);
+        };
+        code_units.length(units, s, f);
+        length.store(f);
+        plan.length(chain, s, f);
+        plan_length.store(f);
+        for (index, separator) in separators.iter().enumerate() {
+            let field = 2 * index as u32;
+            separator.set_constant(-1, f);
+            plan_length.load(f);
+            f.instruction(&Instruction::I32Const(field as i32));
+            f.instruction(&Instruction::I32GtU);
+            self.open_frame(ControlFrameKind::If, f);
+            let text = plan
+                .read(chain, crate::gc_types::GcIndex::Constant(field), s, f)
+                .reference()
+                .require_non_null(f);
+            let data = s
+                .field(StringValueSchema::CODE_UNITS)
+                .read_top(text, f)
+                .reference();
+            code_units
+                .read_top(data, crate::gc_types::GcIndex::Constant(0), f)
+                .store(*separator, f);
+            self.pop_control(ControlFrameKind::If);
+            f.instruction(&Instruction::End);
+        }
+        let matches = s.reserve_gc_local(f).initialize(
+            counts.fixed([(); SPLIT_JOIN_CHAIN_LIMIT].map(|()| GcOperand::i32(0)), f),
+            f,
+        );
+        let emit_match = |builder: &mut Self, f: &mut Function| {
+            let selected = builder.open_frame(ControlFrameKind::Block, f);
+            for (index, separator) in separators.iter().enumerate() {
+                unit.load(f);
+                separator.load(f);
+                f.instruction(&Instruction::I32Eq);
+                builder.open_frame(ControlFrameKind::If, f);
+                arm.set_constant(index as i32, f);
+                builder.emit_branch_to_target(selected, f);
+                builder.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+            }
+            arm.set_constant(-1, f);
+            builder.pop_control(ControlFrameKind::Block);
+            f.instruction(&Instruction::End);
+        };
+        let matched = s.reserve_i32_local(f);
+        matched.set_constant(0, f);
+        pos.set_constant(0, f);
+        let counted = self.open_frame(ControlFrameKind::Block, f);
+        let scan = self.open_frame(ControlFrameKind::Loop, f);
+        pos.load(f);
+        length.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(counted, f);
+        code_units.read(units, pos, s, f).store(unit, f);
+        emit_match(self, f);
+        arm.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32GeS);
+        self.open_frame(ControlFrameKind::If, f);
+        counts.read(&matches, arm, s, f).store(count, f);
+        increment(count, f);
+        counts.write(&matches, arm, GcOperand::i32_local(count), s, f);
+        matched.set_constant(1, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        increment(pos, f);
+        self.emit_branch_to_target(scan, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        matched.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        length.load(f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
+        f.instruction(&Instruction::I64GtU);
+        self.emit_branch_if_to_target(done, f);
+        result.replace(input.load(s, f).nullable(), f);
+        self.emit_branch_to_target(done, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(matched, f);
+
+        let replacement_units = |field: I32Local, f: &mut Function| {
+            let text = plan
+                .read(chain, field, s, f)
+                .reference()
+                .require_non_null(f);
+            s.field(StringValueSchema::CODE_UNITS)
+                .read_top(text, f)
+                .reference()
+        };
+        length.load(f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        total.store(f);
+        arm.set_constant(0, f);
+        field.set_constant(1, f);
+        let sized = self.open_frame(ControlFrameKind::Block, f);
+        let size = self.open_frame(ControlFrameKind::Loop, f);
+        field.load(f);
+        plan_length.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(sized, f);
+        total.load(f);
+        code_units.length_top(replacement_units(field, f), f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Sub);
+        counts.read(&matches, arm, s, f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        f.instruction(&Instruction::I64Mul);
+        f.instruction(&Instruction::I64Add);
+        total.store(f);
+        total.load(f);
+        f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
+        f.instruction(&Instruction::I64GtU);
+        self.emit_branch_if_to_target(done, f);
+        increment(arm, f);
+        field.load(f);
+        f.instruction(&Instruction::I32Const(2));
+        f.instruction(&Instruction::I32Add);
+        field.store(f);
+        self.emit_branch_to_target(size, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        matches.clear(f);
+
+        total.load(f);
+        f.instruction(&Instruction::I32WrapI64);
+        count.store(f);
+        let construction = StringConstruction::allocate(s, s.reserve_gc_local(f), count, f);
+        let dest = s.reserve_i32_local(f);
+        pos.set_constant(0, f);
+        dest.set_constant(0, f);
+        let written = self.open_frame(ControlFrameKind::Block, f);
+        let write = self.open_frame(ControlFrameKind::Loop, f);
+        pos.load(f);
+        length.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(written, f);
+        code_units.read(units, pos, s, f).store(unit, f);
+        emit_match(self, f);
+        arm.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32LtS);
+        self.open_frame(ControlFrameKind::If, f);
+        construction.write(dest, unit, s, f);
+        increment(dest, f);
+        f.instruction(&Instruction::Else);
+        arm.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Shl);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        field.store(f);
+        let replacement = s
+            .reserve_gc_local(f)
+            .initialize(replacement_units(field, f), f);
+        code_units.length(&replacement, s, f);
+        count.store(f);
+        self.emit_split_copy_units(&construction, &replacement, count, dest, f);
+        replacement.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        increment(pos, f);
+        self.emit_branch_to_target(write, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        result.replace(construction.publish(s, f).nullable(), f);
+        s.release_i64_local(total, f);
+        for local in
+            separators
+                .into_iter()
+                .chain([dest, count, field, arm, unit, pos, plan_length, length])
+        {
+            s.release_i32_local(local, f);
+        }
+    }
+
+    /// Append a source prefix, keeping small copies in Wasm.
+    fn emit_split_copy_units(
+        &mut self,
+        construction: &StringConstruction,
+        units: &GcLocal<CodeUnitArray>,
+        count: I32Local,
+        dest: I32Local,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        count.load(f);
+        f.instruction(&Instruction::I32Const(16));
+        f.instruction(&Instruction::I32GeU);
+        self.open_frame(ControlFrameKind::If, f);
+        construction.copy_units_from(dest, units, count, s, f);
+        dest.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32Add);
+        dest.store(f);
+        f.instruction(&Instruction::Else);
+        let offset = s.reserve_i32_local(f);
+        let unit = s.reserve_i32_local(f);
+        offset.set_constant(0, f);
+        let replaced = self.open_frame(ControlFrameKind::Block, f);
+        let replace = self.open_frame(ControlFrameKind::Loop, f);
+        offset.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(replaced, f);
+        s.array_type::<CodeUnitArray>()
+            .read(units, offset, s, f)
+            .store(unit, f);
+        construction.write(dest, unit, s, f);
+        for local in [offset, dest] {
+            local.load(f);
+            f.instruction(&Instruction::I32Const(1));
+            f.instruction(&Instruction::I32Add);
+            local.store(f);
+        }
+        self.emit_branch_to_target(replace, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(unit, f);
+        s.release_i32_local(offset, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+    }
+
+    /// Fused literal split/join for protected primitive Strings. A nullable
+    /// chain selects the single replacement or a checked multi-stage plan.
+    /// Returns null when any stage exceeds the String length limit.
     pub(crate) fn compile_string_split_join_helper(&mut self) -> Result<Function, EmitError> {
         use crate::runtime_helpers::{HelperParameters, StringSplitJoinParameters};
         let mut f = self.begin_helper_body(RuntimeHelperId::StringSplitJoin);
@@ -1130,6 +1459,18 @@ impl FunctionBuilder<'_> {
                 .reference(),
             &mut f,
         );
+        let whole = self.open_frame(ControlFrameKind::Block, &mut f);
+        p.chain.load(s, &mut f).is_null(&mut f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let chain = s
+            .reserve_gc_local(&mut f)
+            .initialize(p.chain.load(s, &mut f).require_non_null(&mut f), &mut f);
+        self.emit_split_join_chain(&p.input, &input_units, &chain, &result, whole, &mut f);
+        chain.clear(&mut f);
+        self.emit_branch_to_target(whole, &mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         let sep_units = s.reserve_gc_local(&mut f).initialize(
             s.field(StringValueSchema::CODE_UNITS)
                 .read(&p.separator, s, &mut f)
@@ -1513,7 +1854,6 @@ impl FunctionBuilder<'_> {
         result.replace(construction.publish(s, &mut f).nullable(), &mut f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        result.load(s, &mut f);
         s.release_i32_local(input_len32, &mut f);
         s.release_i32_local(rep_len32, &mut f);
         s.release_i32_local(span, &mut f);
@@ -1526,7 +1866,10 @@ impl FunctionBuilder<'_> {
         }
         rep_units.clear(&mut f);
         sep_units.clear(&mut f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         input_units.clear(&mut f);
+        result.load(s, &mut f);
         result.clear(&mut f);
         p.release(&mut f);
         f.instruction(&Instruction::End);

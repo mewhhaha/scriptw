@@ -53,8 +53,8 @@ fn fresh_intrinsic_bootstrap_allocates_layout_records_not_per_property_records()
             .iter()
             .filter(|operator| matches!(operator, Operator::StructNew { struct_type_index } if *struct_type_index == type_index::<IntrinsicPropertyStorage>(schema)))
             .count(),
-        5,
-        "Object.prototype, Function.prototype, Array.prototype, String.prototype and Array constructor are born with complete storage; namespaces, boxed Number/Boolean prototypes, demand constructors, demand prototypes and nested Array unscopables remain unmaterialized"
+        4,
+        "Object.prototype, Function.prototype, Array.prototype and String.prototype are born with complete storage"
     );
     for (position, operator) in operators.iter().enumerate() {
         if !matches!(operator, Operator::StructNew { struct_type_index }

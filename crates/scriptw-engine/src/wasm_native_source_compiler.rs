@@ -1,6 +1,8 @@
 //! One execution's shared authority for real native source compilation.
 use super::*;
-use scriptw_aot_wasm::{RuntimeArtifact, ValidatedRuntimeArtifact};
+#[cfg(test)]
+use scriptw_aot_wasm::RuntimeArtifact;
+use scriptw_aot_wasm::ValidatedRuntimeArtifact;
 mod trace;
 use trace::TraceState;
 pub(super) use trace::{CallbackTrace, Family, Phase};
@@ -11,7 +13,7 @@ use wasmtime::{AsContextMut, Extern, Instance};
 pub(super) struct NativeSourceCompilerContext {
     pub(super) linker: WasmtimeLinker<WasmHostState>,
     runtime_instance: Instance,
-    validated_runtime: ValidatedRuntimeArtifact,
+    runtime: CompilerRuntime,
     pub(super) policy: WasmCompilationPolicy,
     execution: Arc<WasmAgentExecutionControl>,
     trace: Option<TraceState>,
@@ -34,8 +36,17 @@ pub(super) struct NativeSourceCompilerContext {
         Option<Arc<wasm_native_direct_eval_compiler::NativeDirectEvalCompilationObserver>>,
 }
 
+enum CompilerRuntime {
+    Raw(ValidatedRuntimeArtifact),
+    Cargo {
+        owner: &'static embedded_runtime::CargoExecutionRuntime,
+        validated: OnceLock<Result<ValidatedRuntimeArtifact, String>>,
+    },
+}
+
 impl NativeSourceCompilerContext {
-    pub(super) fn new(
+    #[cfg(test)]
+    pub(super) fn new_raw(
         linker: &WasmtimeLinker<WasmHostState>,
         runtime_instance: Instance,
         runtime: Arc<RuntimeArtifact>,
@@ -43,24 +54,56 @@ impl NativeSourceCompilerContext {
         execution: Arc<WasmAgentExecutionControl>,
         native_compilation_mode: WasmNativeCompilationMode,
     ) -> Result<Self, EngineError> {
-        if runtime.source_compilation_profile()
-            != scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost
-        {
+        Self::new(
+            linker.clone(),
+            runtime_instance,
+            wasm_runtime_link::ProgramRuntimeRef::Raw(&runtime),
+            policy,
+            execution,
+            native_compilation_mode,
+        )
+    }
+
+    pub(super) fn new(
+        linker: WasmtimeLinker<WasmHostState>,
+        runtime_instance: Instance,
+        runtime: wasm_runtime_link::ProgramRuntimeRef<'_>,
+        policy: WasmCompilationPolicy,
+        execution: Arc<WasmAgentExecutionControl>,
+        native_compilation_mode: WasmNativeCompilationMode,
+    ) -> Result<Self, EngineError> {
+        use wasm_runtime_link::ProgramRuntimeRef;
+        if runtime.source_compilation_profile() != scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost {
             return Err(EngineError::new("native source runtime admission requires the NativeHost source-compilation profile"));
         }
         execution.remaining()?;
-        let validated_runtime =
-            ValidatedRuntimeArtifact::new(runtime, policy.intl_profile().clone());
-        // Validation shares the already-armed execution deadline. Neither
-        // admission nor callbacks acquire a fresh compilation budget.
-        execution.remaining()?;
-        let validated_runtime = validated_runtime.map_err(|error| {
-            EngineError::new(format!("native source runtime admission failed: {error}"))
-        })?;
+        let runtime = match runtime {
+            ProgramRuntimeRef::Raw(runtime) => {
+                let validated = ValidatedRuntimeArtifact::new(
+                    Arc::clone(runtime),
+                    policy.intl_profile().clone(),
+                );
+                execution.remaining()?;
+                CompilerRuntime::Raw(validated.map_err(|error| {
+                    EngineError::new(format!("native source runtime admission failed: {error}"))
+                })?)
+            }
+            ProgramRuntimeRef::Cargo(owner) => {
+                if *policy.intl_profile() != IntlCompilationProfile::Minimal {
+                    return Err(EngineError::new(
+                        "Cargo execution receipt requires Minimal Intl",
+                    ));
+                }
+                CompilerRuntime::Cargo {
+                    owner,
+                    validated: OnceLock::new(),
+                }
+            }
+        };
         Ok(Self {
-            linker: linker.clone(),
+            linker,
             runtime_instance,
-            validated_runtime,
+            runtime,
             policy,
             execution,
             native_compilation_mode,
@@ -108,12 +151,31 @@ impl NativeSourceCompilerContext {
         Ok(export)
     }
 
-    pub(super) fn validated_runtime(&self) -> &ValidatedRuntimeArtifact {
-        &self.validated_runtime
-    }
-
-    pub(super) fn runtime(&self) -> &Arc<RuntimeArtifact> {
-        self.validated_runtime.runtime()
+    pub(super) fn validated_runtime(&self) -> wasmtime::Result<&ValidatedRuntimeArtifact> {
+        match &self.runtime {
+            CompilerRuntime::Raw(runtime) => Ok(runtime),
+            CompilerRuntime::Cargo { owner, validated } => {
+                let result = if let Some(result) = validated.get() {
+                    result
+                } else {
+                    // Lazy admission shares the already-armed execution
+                    // deadline, including the first compiler-layout decode.
+                    self.check_budget()?;
+                    let result = validated.get_or_init(|| {
+                        let runtime = owner
+                            .compiler_runtime()
+                            .map_err(|error| error.to_string())?;
+                        ValidatedRuntimeArtifact::new(runtime, self.policy.intl_profile().clone())
+                            .map_err(|error| error.to_string())
+                    });
+                    self.check_budget()?;
+                    result
+                };
+                result.as_ref().map_err(|error| {
+                    wasmtime::Error::msg(format!("native source runtime admission failed: {error}"))
+                })
+            }
+        }
     }
 
     #[cfg(test)]

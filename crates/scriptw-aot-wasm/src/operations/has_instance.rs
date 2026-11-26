@@ -996,14 +996,7 @@ impl FunctionBuilder<'_> {
     /// dictionary holds it.
     fn emit_has_instance_never_hashed_or_branch(&mut self, miss: ControlTarget, f: &mut Function) {
         let s = self.runtime_schema();
-        let symbol = s.reserve_gc_local::<SymbolValue, Nullable>(f).initialize(
-            s.well_known_symbol_reference(scriptw_ir::WellKnownSymbol::HasInstance, f)
-                .nullable(),
-            f,
-        );
-        s.field(SymbolValueSchema::KEY_HASH_ID).read(&symbol, s, f);
-        symbol.clear(f);
-        f.instruction(&Instruction::I64Eqz);
+        s.emit_well_known_symbol_never_hashed(scriptw_ir::WellKnownSymbol::HasInstance, f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(miss, f);
     }

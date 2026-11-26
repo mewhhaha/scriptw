@@ -312,9 +312,9 @@ impl FunctionBuilder<'_> {
                 single_sep.load(f);
                 f.instruction(&Instruction::I32And);
                 builder.open_frame(ControlFrameKind::If, f);
-                // Fast branch-free loop for all-String arrays joined by a 1-unit
+                // Fast loop for all-String arrays joined by a 1-unit
                 // separator: hoist element 0 before the loop so every iteration
-                // writes sep_unit + bulk-copies element without tag/index tests.
+                // writes sep_unit and copies the element without tag/index tests.
                 slot.set_constant(0, f);
                 let first_stored = s.reserve_gc_local(f).initialize(
                     s.array_type::<PackedValueTable>()

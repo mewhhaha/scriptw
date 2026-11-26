@@ -61,7 +61,7 @@ fn ordinary_inline_operators_match_published_baseline_and_dictionary_has_a_separ
         assert_eq!(loops.len(), 2, "one inline and one dictionary body, sharing the original continuation");
         let expected = include_str!("fixtures/compact_inline_metadata.ops").lines()
             .filter(|line| !line.starts_with('#')).map(str::to_owned).collect::<Vec<_>>();
-        assert_eq!(expected.len(), 225, "published P receipt without its open compact-base cast, repeated null checks or release clears, after the deadline poll");
+        assert_eq!(expected.len(), 155, "published P receipt with fused BrOnCast storage checks, specialized scalar/reference inline slot lanes, and 32 B StringValue layout");
         let stored = runtime.witness_type(GcSnapshotLayout::Stored);
         let normalized = loops.iter().map(|region| normalize(body, region.clone(), stored, &runtime.types)).collect::<Vec<_>>();
         let inline = loops.iter().zip(&normalized).filter_map(|(region, actual)| (actual == &expected).then_some(region)).collect::<Vec<_>>();

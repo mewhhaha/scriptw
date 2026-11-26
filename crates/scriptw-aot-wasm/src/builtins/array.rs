@@ -2,8 +2,10 @@
 use super::super::*;
 use crate::control_flow::SyncIteratorConsumer;
 use crate::gc_types::{
-    ArrayObject, ArrayObjectSchema, BindingCell, BindingCellSchema, CompletionLocals, GcLocal,
-    GcOperand, I32Local, I64Local, ScalarValue, StoredValue, ValueLocals,
+    ArrayObject, ArrayObjectSchema, BindingCell, BindingCellSchema, CompactDataShapeSchema,
+    CompactDataStorage, CompletionLocals, GcLocal, GcOperand, I32Local, I64Local,
+    InlineCompactDataStorage, InlineCompactDataStorageSchema, OrdinaryObject, OrdinaryObjectSchema,
+    ScalarValue, StoredValue, ValueLocals,
 };
 use scriptw_ir::{ArrayAccumulationElementIr, ArrayAccumulationIr, ArrayAccumulationTargetIr};
 
@@ -582,9 +584,22 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I64ReinterpretF64);
         number.scalar().store(f);
         number.set_number(number.scalar(), f);
+        let handled = self.emit_local_argument_call_from_values(
+            mapper,
+            this_arg,
+            &[value, &number],
+            pending,
+            f,
+        )?;
+        handled.load(f);
+        s.release_i32_local(handled, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
         let argv = self.emit_pre_evaluated_arg_vector(&[value, &number], f);
         self.emit_function_or_proxy_call_with_argv(mapper, this_arg, &argv, pending, f)?;
         argv.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         number.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -675,7 +690,15 @@ impl FunctionBuilder<'_> {
                 .write(&array, GcOperand::i64_local(length), s, f);
             s.release_i64_local(length, f);
         }
+        let published = self.open_frame(ControlFrameKind::Block, f);
+        let fallback = self.open_frame(ControlFrameKind::Block, f);
+        self.emit_dense_packed_value_append_or_branch(&array, index, value, fallback, f);
+        self.emit_branch_to_target(published, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         self.emit_array_indexed_publish_default_data(&array, index, value, f)?;
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         array.clear(f);
         f.instruction(&Instruction::Else);
         let key = self.emit_array_native_index_key(index, f)?;
@@ -685,6 +708,61 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         Ok(())
     }
+    /// A compact shape in insertion order has no Array-index keys. Check
+    /// both the live storage and the live prototype on every iteration:
+    /// the constructor or an earlier mapper call may have added an index.
+    fn emit_array_from_index_absent_or_branch(
+        &mut self,
+        source: &ValueLocals,
+        index: I64Local,
+        lookup: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        index.load(f);
+        f.instruction(&Instruction::I64Const(i64::from(u32::MAX)));
+        f.instruction(&Instruction::I64GeU);
+        self.emit_branch_if_to_target(lookup, f);
+        let object = s.reserve_gc_local(f).initialize(
+            source.sealed_reference_or_branch::<OrdinaryObject>(
+                s,
+                self.local_branch_label(lookup),
+                f,
+            ),
+            f,
+        );
+        let base = s.reserve_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROPERTIES)
+                .read(&object, s, f)
+                .reference(),
+            f,
+        );
+        let storage = base
+            .sealed_nested_subtype_or_branch::<CompactDataStorage, InlineCompactDataStorage>(
+                s,
+                self.local_branch_label(lookup),
+                f,
+            );
+        s.field(CompactDataShapeSchema::OWN_KEYS_ORDERED).read_top(
+            s.field(InlineCompactDataStorageSchema::SHAPE)
+                .read_top(storage, f)
+                .reference(),
+            f,
+        );
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(lookup, f);
+        base.clear(f);
+        let prototype = s.reserve_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(&object, s, f)
+                .reference(),
+            f,
+        );
+        self.emit_unchanged_object_prototype_or_branch(&prototype, lookup, f);
+        prototype.clear(f);
+        object.clear(f);
+    }
+
     pub(crate) fn emit_array_from_builtin(&mut self, f: &mut Function) -> Result<(), EmitError> {
         let s = self.runtime_schema();
         let constructor = s.reserve_value_local(f);
@@ -834,9 +912,18 @@ impl FunctionBuilder<'_> {
         length.load(f);
         f.instruction(&Instruction::I64GeU);
         self.emit_branch_if_to_target(finished, f);
+        let read = self.open_frame(ControlFrameKind::Block, f);
+        let lookup = self.open_frame(ControlFrameKind::Block, f);
+        self.emit_array_from_index_absent_or_branch(&source, index, lookup, f);
+        value.set_undefined(f);
+        self.emit_branch_to_target(read, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         self.emit_typed_array_or_object_index_read_from_locals(&source, index, &pending, f)?;
         self.emit_array_native_propagate(&pending, f);
         value.copy_from(pending.value(), f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         self.emit_array_from_mapper(mapping, &mapper, &this_arg, index, &value, &pending, f)?;
         self.emit_array_native_propagate(&pending, f);
         value.copy_from(pending.value(), f);

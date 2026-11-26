@@ -70,7 +70,7 @@ impl PropertyKeyLocals {
         f.instruction(&Instruction::If(BlockType::Empty));
         let symbol = schema
             .reserve_gc_local(f)
-            .initialize(schema.installation_symbol_reference(key, f), f);
+            .initialize(schema.installation_symbol_reference(key, base, f), f);
         value.set_reference(&symbol, schema, f);
         symbol.clear(f);
         f.instruction(&Instruction::Else);

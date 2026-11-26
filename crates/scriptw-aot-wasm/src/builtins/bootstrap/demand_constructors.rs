@@ -5,7 +5,7 @@
 
 use super::*;
 use crate::heap::{
-    DemandBoxedPrototype, DemandConstructor, DemandDynamicFunction, DemandGlobalRecipe,
+    DemandBoxedPrototype, DemandCallable, DemandConstructor, DemandDynamicFunction, DemandGlobalRecipe,
     DemandHostFunction, DemandNamespace, DemandPrototype,
 };
 use crate::intrinsics::property_layouts::IntrinsicPropertyRecipe;
@@ -38,11 +38,13 @@ impl FunctionBuilder<'_> {
             // is an accessor whose native getter performs a canonical read.
             return Ok(());
         }
-        let layout = IntrinsicPropertyLayoutId::for_prototype(demand.prototype_slot())
-            .ok_or_else(|| {
+        let layout = match demand.prototype_slot() {
+            Some(slot) => IntrinsicPropertyLayoutId::for_prototype(slot).ok_or_else(|| {
                 EmitError::unsupported("demand constructor prototype requires a complete layout")
-            })?
-            .layout()?;
+            })?,
+            None => IntrinsicPropertyLayoutId::ArrayPrototype,
+        }
+        .layout()?;
         let named = layout.properties().iter().any(|property| {
             matches!(property.key, IntrinsicKey::Name("constructor"))
                 && matches!(property.recipe, IntrinsicPropertyRecipe::ReadyRealmSlot(slot)
@@ -81,12 +83,41 @@ impl FunctionBuilder<'_> {
             function.instruction(&Instruction::I32Const(demand.slot().gc_index() as i32));
             function.instruction(&Instruction::I32Eq);
             self.open_frame(ControlFrameKind::If, &mut function);
-            self.emit_bootstrap_constructor_from_slot(
-                demand.builtin(),
-                &context,
-                demand.prototype_slot(),
+            match demand.prototype_slot() {
+                Some(slot) => self.emit_bootstrap_constructor_from_slot(
+                    demand.builtin(),
+                    &context,
+                    slot,
+                    &mut function,
+                )?,
+                None => self.emit_initialize_array_constructor(&context, &mut function)?,
+            }
+            function.instruction(&Instruction::Return);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        }
+        for demand in DemandCallable::ALL {
+            let Some(meta) = self.functions.get(&demand.builtin().function_id()).cloned() else {
+                continue;
+            };
+            parameters.slot.load(&mut function);
+            function.instruction(&Instruction::I32Const(demand.slot().gc_index() as i32));
+            function.instruction(&Instruction::I32Eq);
+            self.open_frame(ControlFrameKind::If, &mut function);
+            let callable = schema.reserve_gc_local(&mut function).initialize(
+                self.emit_function_value_payload_in_realm(&meta, &context, &mut function)?,
                 &mut function,
-            )?;
+            );
+            let value = schema.reserve_value_local(&mut function);
+            value.set_reference(&callable, schema, &mut function);
+            self.emit_store_non_array_realm_intrinsic(
+                &parameters.realm,
+                demand.slot(),
+                &value,
+                &mut function,
+            );
+            value.clear(&mut function);
+            callable.clear(&mut function);
             function.instruction(&Instruction::Return);
             self.pop_control(ControlFrameKind::If);
             function.instruction(&Instruction::End);
@@ -130,13 +161,19 @@ impl FunctionBuilder<'_> {
                     primitive.set_scalar(ScalarValue::Boolean(false), &mut function);
                 }
             }
-            self.emit_bootstrap_boxed_prototype(
+            let prototype = self.emit_bootstrap_boxed_prototype(
                 &context,
                 demand.slot(),
                 &parent,
                 &primitive,
                 &mut function,
             )?;
+            self.emit_publish_bootstrap_boxed_prototype(
+                &parameters.realm,
+                demand.slot(),
+                prototype,
+                &mut function,
+            );
             primitive.clear(&mut function);
             parent.clear(&mut function);
             function.instruction(&Instruction::Return);
@@ -239,7 +276,7 @@ impl FunctionBuilder<'_> {
         Ok(self.finish_function(function))
     }
 
-    /// The recipe a global binding publishes at its original position and
+    /// The recipe a property publishes at its original position and
     /// attributes. Its first semantic read performs the canonical read.
     pub(super) fn emit_deferred_demand_recipe_value(
         &mut self,

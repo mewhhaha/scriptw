@@ -359,7 +359,7 @@ fn compact_payload_loop(operators: &[Operator<'_>], types: &CompactRegionTypes) 
     compact_readonly_operators(operators, None)
         && operators.iter().any(|op| {
             matches!(op,
-        Operator::StructGet { struct_type_index, field_index: 2..=5 }
+        Operator::StructGet { struct_type_index, field_index: 2..=3 | 6..=7 }
             if *struct_type_index == types.inline)
         })
         && operators.iter().any(|op| {
@@ -678,7 +678,11 @@ fn compact_row_misses_exit_before_body_effects_and_release_roots_before_resume()
                 let heap = wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(index));
                 assert!(
                     guard.iter().any(|op| matches!(op,
-                    Operator::RefTestNonNull { hty } if *hty == heap)),
+                        Operator::RefTestNonNull { hty } if *hty == heap)
+                        || matches!(op,
+                        Operator::BrOnCast { to_ref_type, .. }
+                        | Operator::BrOnCastFail { to_ref_type, .. }
+                            if !to_ref_type.is_nullable() && to_ref_type.heap_type() == heap)),
                     "both guards check actual own storage and nested Array identity"
                 );
             }

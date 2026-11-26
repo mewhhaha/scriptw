@@ -79,19 +79,22 @@ fn native_bootstrap_uses_complete_constructor_layouts_and_compact_remaining_nati
         .iter()
         .filter(|op| matches!(op, Operator::Call { function_index } if *function_index == allocate))
         .count();
-    assert!(inline_callables > 0 && native_headers > 0);
     assert_eq!(
         shared_accessors, 0,
         "layout accessors remain unobserved at Realm birth"
     );
     assert_eq!(
-        shared_constructors, 1,
-        "every eager constructor shares the typed allocation tail; Error, Date, RegExp, binary-data, dynamic-function and demand constructors (including Object, Function and String) are built on first read"
+        shared_constructors, 0,
+        "constructor allocation belongs to demand initialization"
     );
     assert_eq!(
         inline_callables,
-        native_headers + 1,
-        "Function.prototype has its complete layout; the other eager native callables keep compact metadata headers"
+        1,
+        "Function.prototype is the only callable allocated at Realm birth"
+    );
+    assert_eq!(
+        native_headers, 0,
+        "Function.prototype has its complete layout"
     );
     assert_eq!(
         bootstrap
@@ -99,7 +102,7 @@ fn native_bootstrap_uses_complete_constructor_layouts_and_compact_remaining_nati
             .filter(|op| matches!(op, Operator::Call { function_index } if *function_index == constructor_header))
             .count(),
         0,
-        "the covered eager Array constructor birth never allocates a transient dictionary header"
+        "Realm birth never allocates a transient constructor dictionary header"
     );
     let allocator = named_body(runtime.bytes(), allocate);
     assert_eq!(
@@ -194,7 +197,7 @@ fn native_bootstrap_uses_complete_constructor_layouts_and_compact_remaining_nati
 }
 
 #[test]
-fn native_bootstrap_omits_empty_metadata_but_retains_thrower_and_source_publication() {
+fn native_bootstrap_defers_thrower_metadata_and_retains_source_publication() {
     let artifact = emit_script(
         "'use strict'; function Source(a) {} const arrow = (a, b) => a + b; print(Source.prototype.constructor === Source, arrow.name);",
     )
@@ -219,8 +222,19 @@ fn native_bootstrap_omits_empty_metadata_but_retains_thrower_and_source_publicat
                 |op| matches!(op, Operator::Call { function_index } if *function_index == metadata)
             )
             .count(),
+        0,
+        "Realm birth needs no native metadata publication"
+    );
+    let demand = named_body(runtime.bytes(), index("helper::realm_ensure_constructor"));
+    assert_eq!(
+        demand
+            .iter()
+            .filter(
+                |op| matches!(op, Operator::Call { function_index } if *function_index == metadata)
+            )
+            .count(),
         1,
-        "ThrowTypeError retains publication; ordinary native headers are already complete"
+        "ThrowTypeError still publishes its non-extensible metadata on demand"
     );
 
     // Resolve the actual R export and P import; their function ordinals are

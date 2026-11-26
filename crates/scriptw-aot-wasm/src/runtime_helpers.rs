@@ -1016,6 +1016,9 @@ macro_rules! helper_arguments {
     };
 }
 
+/// Maximum number of separator/replacement pairs in a guarded plan.
+pub(crate) const SPLIT_JOIN_CHAIN_LIMIT: usize = 6;
+
 /// One row owns helper identity, exact operand projection, result shape and
 /// registration order. There is no general seven-word helper signature.
 macro_rules! runtime_helper_domain {
@@ -1203,7 +1206,7 @@ runtime_helper_domain! {
     CompactObjectAllocate / CompactObjectAllocateArguments / CompactObjectAllocateParameters / "compact_object_allocate" { prototype:Value } => (Ref OrdinaryObject NonNullable);
     CompactShapeIndex / CompactShapeIndexArguments / CompactShapeIndexParameters / "compact_shape_index" { shape:(Ref CompactDataShape NonNullable) } => (Ref OrdinaryPropertyIndex NonNullable);
     IntrinsicDataPublish / IntrinsicDataPublishArguments / IntrinsicDataPublishParameters / "intrinsic_data_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,value:(Ref PropertyValue NonNullable),writable:I32,enumerable:I32,configurable:I32 } => Void;
-    FreshDataPropertiesPublish / FreshDataPropertiesPublishArguments / FreshDataPropertiesPublishParameters / "fresh_data_properties_publish" { object:(Ref OrdinaryObject NonNullable),keys:(Ref PooledStringTable NonNullable),values:(Ref IntrinsicPropertyValueCache NonNullable),flags:(Ref OrdinaryPropertyIndex NonNullable),hashes:(Ref NumberBitsI64Array NonNullable) } => Void;
+    FreshDataPropertiesPublish / FreshDataPropertiesPublishArguments / FreshDataPropertiesPublishParameters / "fresh_data_properties_publish" { storage:(Ref OrdinaryPropertyStorage NonNullable),key:(Ref StringValue NonNullable),descriptor:(Ref PropertyDescriptor NonNullable),position:I32,capacity:I32,final_length:I32,hash:I64,bucket:I32 } => Void;
     IntrinsicAccessorPublish / IntrinsicAccessorPublishArguments / IntrinsicAccessorPublishParameters / "intrinsic_accessor_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,getter:(Ref StoredValue NonNullable),setter:(Ref StoredValue NonNullable),enumerable:I32,configurable:I32 } => Void;
     PropertyValueResolve / PropertyValueResolveArguments / PropertyValueResolveParameters / "property_value_resolve" { value:(Ref PropertyValue NonNullable) } => (Ref StoredValue NonNullable);
     IntrinsicAccessorAllocate / IntrinsicAccessorAllocateArguments / IntrinsicAccessorAllocateParameters / "intrinsic_accessor_allocate" { header:(Ref OrdinaryObject NonNullable),code:(Ref ExecutableCode NonNullable),realm:(Ref RealmRecord NonNullable),source_ordinal:I32 } => (Ref FunctionObject NonNullable);
@@ -1358,8 +1361,9 @@ runtime_helper_domain! {
     AsciiNarrow / AsciiNarrowArguments / AsciiNarrowParameters / "ascii_narrow" { units:(Ref CodeUnitArray NonNullable),start:I32,end:I32,bytes:(Ref ByteArray NonNullable),at:I32 } => I32;
     AsciiWiden / AsciiWidenArguments / AsciiWidenParameters / "ascii_widen" { bytes:(Ref ByteArray NonNullable),start:I32,end:I32,units:(Ref CodeUnitArray NonNullable),at:I32 } => I32;
     CodeUnitFind / CodeUnitFindArguments / CodeUnitFindParameters / "code_unit_find" { units:(Ref CodeUnitArray NonNullable),start:I32,end:I32,unit:I32 } => I32;
-    StringSplitJoin / StringSplitJoinArguments / StringSplitJoinParameters / "string_split_join" { input:(Ref StringValue NonNullable),separator:(Ref StringValue NonNullable),replacement:(Ref StringValue NonNullable) } => (Ref StringValue Nullable);
+    StringSplitJoin / StringSplitJoinArguments / StringSplitJoinParameters / "string_split_join" { input:(Ref StringValue NonNullable),separator:(Ref StringValue NonNullable),replacement:(Ref StringValue NonNullable),chain:(Ref PooledStringTable Nullable) } => (Ref StringValue Nullable);
     JsonPlainRun / JsonPlainRunArguments / JsonPlainRunParameters / "json_plain_run" { source:(Ref CodeUnitArray NonNullable),start:I32,end:I32,target:(Ref CodeUnitArray NonNullable),at:I32 } => I32;
+    WellKnownSymbolResolve / WellKnownSymbolResolveArguments / WellKnownSymbolResolveParameters / "well_known_symbol_resolve" { ordinal:I32 } => (Ref SymbolValue NonNullable);
     JsonStringifyValue / JsonStringifyValueArguments / JsonStringifyValueParameters / "json_stringify_value" { holder:Value,key:Value,fetched:I32,context:(Ref JsonStringifyContext NonNullable),indent:I64,caller_program:Program } => Completion;
     JsonStringifyPlainValue / JsonStringifyPlainValueArguments / JsonStringifyPlainValueParameters / "json_stringify_plain_value" { value:Value,key:Value,context:(Ref JsonStringifyContext NonNullable),indent:I64,caller_program:Program } => Completion;
 }
@@ -1533,7 +1537,7 @@ impl RuntimeHelperId {
             Self::ProgramLiteralResolve => HelperOwner::Hook(ProgramHook::ProgramLiteralResolve),
             Self::RuntimeErrorObject => HelperOwner::Runtime,
             Self::RuntimeErrorForThrow => HelperOwner::Runtime,
-            Self::PooledStringResolve => HelperOwner::Runtime,
+            Self::PooledStringResolve | Self::WellKnownSymbolResolve => HelperOwner::Runtime,
             Self::PooledStringsInitialize => HelperOwner::Runtime,
             Self::ObjectSetPrototypeOf => HelperOwner::Runtime,
             Self::ObjectDelete => HelperOwner::Runtime,
@@ -1742,7 +1746,7 @@ impl RuntimeHelperId {
             Self::ProgramLiteralResolve => true,
             Self::RuntimeErrorObject => true,
             Self::RuntimeErrorForThrow => true,
-            Self::PooledStringResolve => true,
+            Self::PooledStringResolve | Self::WellKnownSymbolResolve => true,
             Self::PooledStringsInitialize => true,
             Self::ObjectSetPrototypeOf => true,
             Self::ObjectDelete => true,

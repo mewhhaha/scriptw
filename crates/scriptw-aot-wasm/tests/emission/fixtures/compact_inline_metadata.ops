@@ -21,6 +21,12 @@
 # A released typed GC local is no longer overwritten with null (eight
 # ref.null/local.set pairs fewer: two after the length read, six at the
 # backedge; the exit branch destination moves down by four).
+# Layout 93 (Wave 7A): removes dead `value.set_undefined()` setup, fuses
+# `OrdinaryObject` and `InlineCompactDataStorage` guards into `BrOnCast`,
+# specializes inline slot reads to only the 2 first-row slots and only the
+# scalar or reference lane needed by each path, and reads `StringValue.CODE_UNITS`
+# at field_index 1 (32 B layout); total drops from 225 to 155 operators
+# (exit operator219 becomes operator149).
 I32Const { value: 8 }
 I32Const { value: 0 }
 I32Store8 { memarg: MemArg { align: 0, max_align: 0, offset: 0, memory: 0 } }
@@ -56,120 +62,80 @@ I32And
 LocalSet local8
 I32Const { value: 0 }
 LocalSet local9
-I32Const { value: 0 }
-LocalSet local10
-I64Const { value: 0 }
-LocalSet local11
-RefNull { hty: Abstract { shared: false, ty: Eq } }
-LocalSet local12
 RefNull { hty: Concrete(Module(63)) }
-LocalSet local13
+LocalSet local10
 RefNull { hty: Concrete(Module(73)) }
-LocalSet local14
+LocalSet local11
 RefNull { hty: Concrete(Module(80)) }
-LocalSet local15
+LocalSet local12
 RefNull { hty: Concrete(Module(85)) }
-LocalSet local16
+LocalSet local13
 RefNull { hty: Concrete(Module(158)) }
-LocalSet local17
+LocalSet local14
 RefNull { hty: Concrete(Module(100)) }
-LocalSet local18
+LocalSet local15
 Block { blockty: Empty }
-LocalGet local19
+LocalGet local16
 LocalGet local8
 ArrayGet { array_type_index: 99 }
-LocalSet local13
-LocalGet local13
-StructGet { struct_type_index: 63, field_index: 1 }
 LocalSet local10
-LocalGet local13
-StructGet { struct_type_index: 63, field_index: 2 }
-LocalSet local12
 LocalGet local10
+StructGet { struct_type_index: 63, field_index: 1 }
 I32Const { value: 6 }
 I32Ne
-BrIf operator219
-LocalGet local12
-RefTestNonNull { hty: Concrete(Module(73)) }
-I32Eqz
-BrIf operator219
-LocalGet local12
-RefCastNonNull { hty: Concrete(Module(73)) }
-LocalSet local14
-LocalGet local14
+BrIf operator149
+LocalGet local10
+StructGet { struct_type_index: 63, field_index: 2 }
+LocalSet local17
+Block { blockty: Type(Ref((ref (module 73)))) }
+LocalGet local17
+BrOnCast { relative_depth: 0, from_ref_type: eqref, to_ref_type: (ref (module 73)) }
+Drop
+Br operator149
+End
 StructGet { struct_type_index: 73, field_index: 1 }
-LocalSet local15
-LocalGet local15
-RefTestNonNull { hty: Concrete(Module(85)) }
-I32Eqz
-BrIf operator219
-LocalGet local15
-RefCastNonNull { hty: Concrete(Module(85)) }
-LocalSet local16
-LocalGet local16
+LocalSet local12
+Block { blockty: Type(Ref((ref (module 85)))) }
+LocalGet local12
+BrOnCast { relative_depth: 0, from_ref_type: (ref null (module 80)), to_ref_type: (ref (module 85)) }
+Drop
+Br operator149
+End
+LocalSet local13
+LocalGet local13
 StructGet { struct_type_index: 85, field_index: 0 }
-LocalGet local20
+LocalGet local18
 RefEq
 I32Eqz
-BrIf operator219
-LocalGet local16
+BrIf operator149
+LocalGet local13
 StructGet { struct_type_index: 85, field_index: 1 }
-LocalGet local21
+LocalGet local19
 I32Const { value: 8 }
 I32Mul
 I32ShrU
 I32Const { value: 255 }
 I32And
-LocalSet local10
-LocalGet local21
-I32Const { value: 2 }
-I32LtU
-If { blockty: Empty }
-LocalGet local21
+LocalSet local20
+LocalGet local19
 I32Eqz
 If { blockty: Empty }
-LocalGet local16
+LocalGet local13
 StructGet { struct_type_index: 85, field_index: 2 }
-LocalSet local11
-LocalGet local16
-StructGet { struct_type_index: 85, field_index: 6 }
-LocalSet local12
+LocalSet local21
 Else
-LocalGet local16
+LocalGet local13
 StructGet { struct_type_index: 85, field_index: 3 }
-LocalSet local11
-LocalGet local16
-StructGet { struct_type_index: 85, field_index: 7 }
-LocalSet local12
+LocalSet local21
 End
-Else
-LocalGet local21
-I32Const { value: 2 }
-I32Eq
-If { blockty: Empty }
-LocalGet local16
-StructGet { struct_type_index: 85, field_index: 4 }
-LocalSet local11
-LocalGet local16
-StructGet { struct_type_index: 85, field_index: 8 }
-LocalSet local12
-Else
-LocalGet local16
-StructGet { struct_type_index: 85, field_index: 5 }
-LocalSet local11
-LocalGet local16
-StructGet { struct_type_index: 85, field_index: 9 }
-LocalSet local12
-End
-End
-LocalGet local10
+LocalGet local20
 I32Const { value: 3 }
 I32Ne
-BrIf operator219
-LocalGet local11
+BrIf operator149
+LocalGet local21
 F64ReinterpretI64
 LocalSet local1
-LocalGet local16
+LocalGet local13
 StructGet { struct_type_index: 85, field_index: 1 }
 LocalGet local22
 I32Const { value: 8 }
@@ -177,61 +143,31 @@ I32Mul
 I32ShrU
 I32Const { value: 255 }
 I32And
-LocalSet local10
-LocalGet local22
-I32Const { value: 2 }
-I32LtU
-If { blockty: Empty }
+LocalSet local20
 LocalGet local22
 I32Eqz
 If { blockty: Empty }
-LocalGet local16
-StructGet { struct_type_index: 85, field_index: 2 }
-LocalSet local11
-LocalGet local16
+LocalGet local13
 StructGet { struct_type_index: 85, field_index: 6 }
-LocalSet local12
+LocalSet local17
 Else
-LocalGet local16
-StructGet { struct_type_index: 85, field_index: 3 }
-LocalSet local11
-LocalGet local16
+LocalGet local13
 StructGet { struct_type_index: 85, field_index: 7 }
-LocalSet local12
+LocalSet local17
 End
-Else
-LocalGet local22
-I32Const { value: 2 }
-I32Eq
-If { blockty: Empty }
-LocalGet local16
-StructGet { struct_type_index: 85, field_index: 4 }
-LocalSet local11
-LocalGet local16
-StructGet { struct_type_index: 85, field_index: 8 }
-LocalSet local12
-Else
-LocalGet local16
-StructGet { struct_type_index: 85, field_index: 5 }
-LocalSet local11
-LocalGet local16
-StructGet { struct_type_index: 85, field_index: 9 }
-LocalSet local12
-End
-End
-LocalGet local10
+LocalGet local20
 I32Const { value: 4 }
 I32Ne
-BrIf operator219
-LocalGet local12
+BrIf operator149
+LocalGet local17
 RefTestNonNull { hty: Concrete(Module(150)) }
 I32Eqz
-BrIf operator219
-LocalGet local12
+BrIf operator149
+LocalGet local17
 RefCastNonNull { hty: Concrete(Module(150)) }
 LocalSet local23
 LocalGet local23
-StructGet { struct_type_index: 150, field_index: 0 }
+StructGet { struct_type_index: 150, field_index: 1 }
 LocalSet local24
 LocalGet local24
 ArrayLen
@@ -241,7 +177,7 @@ I32Const { value: 1 }
 LocalSet local9
 End
 RefNull { hty: Abstract { shared: false, ty: Eq } }
-LocalSet local12
+LocalSet local17
 LocalGet local9
 I32Eqz
 BrIf exit0

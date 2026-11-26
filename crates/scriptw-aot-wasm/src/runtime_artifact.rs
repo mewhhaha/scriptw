@@ -205,7 +205,10 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // precomputes 64-bit property key hashes for FreshDataPropertiesPublish, and
 // optimizes JSON.parse, String replaceAll/replace/split, Array push/join/sort,
 // and decimal integer formatting.
-const LAYOUT_VERSION: u32 = 92;
+// Version 93 precomputes bucket positions for fresh global dictionaries.
+// Version 94 publishes global dictionary rows directly and makes well-known
+// symbols, Array callables, RegExp legacy state and native payloads demand-owned.
+const LAYOUT_VERSION: u32 = 94;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

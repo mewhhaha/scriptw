@@ -125,14 +125,31 @@ fn layout_accessors_are_deferred_and_demand_accessors_keep_the_shared_typed_tail
         0,
         "complete layouts do not allocate accessor functions at Realm birth"
     );
-    assert!(
-        calls(header) > 0,
-        "canonical ordinary native callables retain compact headers"
+    assert_eq!(
+        calls(header),
+        0,
+        "Realm birth defers canonical native callables until first observation"
     );
     assert_eq!(
         calls(metadata),
+        0,
+        "the thrower's non-extensibility is deferred with %ThrowTypeError% to demand init"
+    );
+
+    let demand_constructors = body(bytes, named("helper::realm_ensure_constructor"));
+    assert!(
+        demand_constructors.iter().any(|op| matches!(op,
+            Operator::Call { function_index } if *function_index == header)),
+        "demand constructors and callables retain compact native headers"
+    );
+    assert_eq!(
+        demand_constructors
+            .iter()
+            .filter(|op| matches!(op,
+                Operator::Call { function_index } if *function_index == metadata))
+            .count(),
         1,
-        "only the thrower's non-extensibility still needs metadata publication"
+        "only the demand thrower's non-extensibility still needs metadata publication"
     );
 
     let binary = body(bytes, named("helper::realm_ensure_binary_data"));

@@ -1,5 +1,6 @@
 //! Per-Store collector handles and kept roots, without a second JS heap.
 use super::*;
+use crate::host_imports::FixedHostFunctions;
 use scriptw_aot_wasm::GcHostImport;
 use wasmtime::{AnyRef, EqRef, ExternRef, GcEphemeron, OwnedRooted, Rooted, WeakAnyRef};
 
@@ -58,7 +59,7 @@ fn keep(
     Ok(())
 }
 
-pub(super) fn link(linker: &mut WasmtimeLinker<WasmHostState>) -> Result<(), EngineError> {
+pub(super) fn link(linker: &mut FixedHostFunctions<'_, '_>) -> Result<(), EngineError> {
     collections::link(linker)?;
     references::link(linker)?;
     finalization::link(linker)?;

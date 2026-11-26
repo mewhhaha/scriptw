@@ -83,7 +83,8 @@ fn every_binary_data_identity_has_one_demand_owner_and_shared_array_to_string_st
         );
     }
     assert!(BINARY.contains("for kind in TypedArrayElementKind::ALL"));
-    assert!(BINARY.contains("NonArrayRealmIntrinsicSlot::TypedArrayPrototypeToString"));
+    assert!(BINARY.contains("DemandGlobalRecipe::ArrayPrototypeToString,"));
+    assert!(HEAP.contains("Self::ArrayPrototypeToString => S::TypedArrayPrototypeToString,"));
     assert!(!BINARY.contains("StandardBuiltinId::TypedArrayPrototypeToString,"));
 }
 
@@ -155,15 +156,14 @@ fn ordinary_global_properties_retain_closed_defining_realm_recipes_and_never_res
             < global.find("emit_load_non_array_realm_intrinsic").unwrap()
     );
     assert!(global.contains("Some(self.emit_deferred_binary_data_constructor_value("));
-    // The recipe joins the batch that publishes every binding in its plan
-    // order with the binding's own attributes.
-    let batch = bounded(
+    // The recipe is published in plan order with the binding's own attributes.
+    let row = bounded(
         BOOTSTRAP,
         "let property_value = match deferred {",
-        "publication.publish(",
+        "publication.finish(",
     );
-    assert!(batch.contains("publication.push("));
-    assert!(batch.contains("writable: binding.initializer.writable()"));
+    assert!(row.contains("publication.push("));
+    assert!(row.contains("writable: binding.initializer.writable()"));
     let publication = bounded(
         BINARY,
         "pub(super) fn emit_deferred_binary_data_constructor_value(",

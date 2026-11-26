@@ -71,8 +71,80 @@ impl FunctionBuilder<'_> {
         Ok(self.finish_function(function))
     }
 
-    /// R owns exactly its stable prefix, the well-known symbols and registry.
-    /// There is no parameter through which a P can resize the shared table.
+    /// The first access publishes a well-known Symbol in its Store-wide slot.
+    pub(crate) fn compile_well_known_symbol_resolve_helper(&mut self) -> Result<Function, EmitError> {
+        self.strings.require_runtime_only()?;
+        let base = self.runtime_helper_base()?;
+        let mut f = self.begin_helper_body(RuntimeHelperId::WellKnownSymbolResolve);
+        let parameters = self
+            .helper_parameters::<crate::runtime_helpers::WellKnownSymbolResolveParameters>(&mut f);
+        let s = self.schema;
+        let table = s.reserve_gc_local(&mut f).initialize(
+            s.well_known_symbol_table_reference(&mut f),
+            &mut f,
+        );
+        let output = s.reference_type::<SymbolValue>(GcNullability::NonNullable);
+        f.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(output))));
+        let array = s.array_type::<WellKnownSymbolTable>();
+        array.read(&table, parameters.ordinal, s, &mut f);
+        f.likely(&Instruction::BrOnNonNull(0));
+
+        // Branch to the R string ordinal that belongs to this symbol ordinal.
+        // Keep this mapping independent of pooled-string deduplication.
+        let symbols = scriptw_ir::WellKnownSymbol::ALL;
+        let count = symbols.len() as u32;
+        f.instruction(&Instruction::Block(BlockType::Result(ValType::I32)));
+        for _ in 0..=count {
+            f.instruction(&Instruction::Block(BlockType::Empty));
+        }
+        parameters.ordinal.load(&mut f);
+        f.instruction(&Instruction::BrTable((0..count).collect::<Vec<_>>().into(), count));
+        for (ordinal, symbol) in symbols.into_iter().enumerate() {
+            f.instruction(&Instruction::End);
+            let description = self.strings.pooled_string_index(symbol.description())?;
+            f.instruction(&Instruction::I32Const(description.ordinal() as i32));
+            f.instruction(&Instruction::Br(count - ordinal as u32));
+        }
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::Unreachable);
+        f.instruction(&Instruction::End);
+        let description_ordinal = s.reserve_i32_local(&mut f);
+        description_ordinal.store(&mut f);
+        let description = s.reserve_gc_local(&mut f).initialize(
+            s.resolve_pooled_string_reference(description_ordinal, base, &mut f),
+            &mut f,
+        );
+        let symbol = s.reserve_gc_local(&mut f).initialize(
+            s.struct_type::<SymbolValue>().construct(
+                (
+                    GcOperand::nullable_reference(&description, s),
+                    GcOperand::null(s),
+                    GcOperand::i64(0),
+                ),
+                &mut f,
+            ),
+            &mut f,
+        );
+        array.write(
+            &table,
+            parameters.ordinal,
+            GcOperand::nullable_reference(&symbol, s),
+            s,
+            &mut f,
+        );
+        symbol.load(s, &mut f);
+        symbol.clear(&mut f);
+        description.clear(&mut f);
+        s.release_i32_local(description_ordinal, &mut f);
+        f.instruction(&Instruction::End);
+        table.clear(&mut f);
+        crate::runtime_helpers::HelperParameters::release(parameters, &mut f);
+        f.instruction(&Instruction::End);
+        Ok(self.finish_function(f))
+    }
+
+    /// R owns the canonical string and well-known Symbol caches. The
+    /// registered Symbol table stays null until the first insertion.
     pub(crate) fn compile_pooled_strings_initialize_helper(
         &mut self,
     ) -> Result<Function, EmitError> {
@@ -85,7 +157,6 @@ impl FunctionBuilder<'_> {
         let schema = self.schema;
         let function_body = &mut function;
         let length = schema.reserve_i32_local(function_body);
-        let index = schema.reserve_i32_local(function_body);
         length.set_constant(
             self.strings.compiler_owned_boundary().strings() as i32,
             function_body,
@@ -99,70 +170,21 @@ impl FunctionBuilder<'_> {
             ),
             function_body,
         );
-        // Publish the fixed R-only nullable cache before resolving symbol
-        // descriptions. Unused canonical strings never allocate GC objects.
         schema.publish_pooled_strings(&table, function_body);
-        let mut symbols = Vec::new();
-        for symbol in scriptw_ir::WellKnownSymbol::ALL {
-            let description_slot =
-                schema.reserve_gc_local::<StringValue, NonNullable>(function_body);
-            function_body.instruction(&Instruction::I32Const(
-                self.strings
-                    .pooled_string_index(symbol.description())?
-                    .ordinal() as i32,
-            ));
-            index.store(function_body);
-            let description = description_slot.initialize(
-                schema.resolve_pooled_string_reference(
-                    index,
-                    self.runtime_helper_base()?,
-                    function_body,
-                ),
-                function_body,
-            );
-            let symbol_slot = schema.reserve_gc_local::<SymbolValue, NonNullable>(function_body);
-            let value = symbol_slot.initialize(
-                schema.struct_type::<SymbolValue>().construct(
-                    (
-                        GcOperand::nullable_reference(&description, schema),
-                        GcOperand::null(schema),
-                        GcOperand::i64(0),
-                    ),
-                    function_body,
-                ),
-                function_body,
-            );
-            description.clear(function_body);
-            symbols.push(value);
-        }
+        table.clear(function_body);
+        length.set_constant(scriptw_ir::WellKnownSymbol::ALL.len() as i32, function_body);
         let symbols_slot =
             schema.reserve_gc_local::<WellKnownSymbolTable, NonNullable>(function_body);
         let symbol_table = symbols_slot.initialize(
-            schema.array_type::<WellKnownSymbolTable>().fixed(
-                symbols
-                    .iter()
-                    .map(|symbol| GcOperand::reference(symbol, schema)),
+            schema.array_type::<WellKnownSymbolTable>().filled(
+                GcOperand::null(schema),
+                length,
                 function_body,
             ),
             function_body,
         );
         schema.publish_well_known_symbols(&symbol_table, function_body);
-        let registry = schema
-            .reserve_gc_local::<RegisteredSymbolTable, NonNullable>(function_body)
-            .initialize(
-                schema
-                    .array_type::<RegisteredSymbolTable>()
-                    .fixed([], function_body),
-                function_body,
-            );
-        schema.replace_symbol_registry(&registry, function_body);
-        registry.clear(function_body);
         symbol_table.clear(function_body);
-        for symbol in symbols.into_iter().rev() {
-            symbol.clear(function_body);
-        }
-        table.clear(function_body);
-        schema.release_i32_local(index, function_body);
         schema.release_i32_local(length, function_body);
         crate::runtime_helpers::HelperParameters::release(parameters, function_body);
         function.instruction(&Instruction::End);

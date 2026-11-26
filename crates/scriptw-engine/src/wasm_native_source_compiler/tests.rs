@@ -98,7 +98,7 @@ fn native_context_retains_original_runtime_execution_and_armed_deadline() {
     linker
         .func_wrap("context-control", "value", || 29i32)
         .unwrap();
-    let context = NativeSourceCompilerContext::new(
+    let context = NativeSourceCompilerContext::new_raw(
         &linker,
         instance,
         Arc::clone(&runtime),
@@ -107,7 +107,10 @@ fn native_context_retains_original_runtime_execution_and_armed_deadline() {
         WasmNativeCompilationMode::Fast,
     )
     .unwrap();
-    assert!(Arc::ptr_eq(context.runtime(), &runtime));
+    assert!(Arc::ptr_eq(
+        context.validated_runtime().unwrap().runtime(),
+        &runtime
+    ));
     assert!(Arc::ptr_eq(&context.execution, &execution));
     assert_eq!(context.execution().remaining().unwrap(), None);
     assert!(context.check_budget().is_ok());
@@ -153,7 +156,7 @@ fn native_context_does_not_arm_unarmed_or_refresh_expired_execution() {
         if expired {
             execution.arm(Instant::now() - Duration::from_secs(1), Some(1));
         }
-        let result = NativeSourceCompilerContext::new(
+        let result = NativeSourceCompilerContext::new_raw(
             &linker,
             instance,
             Arc::clone(&runtime),
@@ -183,7 +186,7 @@ fn native_context_profile_mismatch_is_an_admission_error_without_syntax_reclassi
     execution.arm(Instant::now(), None);
     let runtime = runtime();
     let (_store, linker, instance) = owner(&engine, &runtime);
-    let error = NativeSourceCompilerContext::new(
+    let error = NativeSourceCompilerContext::new_raw(
         &linker,
         instance,
         runtime,

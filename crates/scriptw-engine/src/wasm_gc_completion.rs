@@ -403,6 +403,7 @@ mod tests {
         let structure_ty = StructType::new(
             &engine,
             [
+                FieldType::new(Mutability::Var, StorageType::ValType(ValType::I64)),
                 FieldType::new(
                     Mutability::Const,
                     StorageType::ValType(ValType::Ref(RefType::new(
@@ -410,7 +411,6 @@ mod tests {
                         HeapType::ConcreteArray(array_ty),
                     ))),
                 ),
-                FieldType::new(Mutability::Var, StorageType::ValType(ValType::I64)),
                 FieldType::new(Mutability::Var, StorageType::ValType(ValType::I32)),
             ],
         )
@@ -420,8 +420,8 @@ mod tests {
             &mut *store,
             &pre,
             &[
-                WasmtimeVal::from(array),
                 WasmtimeVal::I64(0),
+                WasmtimeVal::from(array),
                 WasmtimeVal::I32(-1),
             ],
         )

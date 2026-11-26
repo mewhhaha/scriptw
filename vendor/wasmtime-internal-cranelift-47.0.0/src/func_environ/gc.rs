@@ -602,6 +602,39 @@ pub fn write_field_at_addr(
     field_addr: ir::Value,
     null_trap: Option<ir::TrapCode>,
     new_val: ir::Value,
+    value_ty: Option<WasmRefType>,
+) -> WasmResult<()> {
+    write_or_init_moving_field_at_addr(
+        func_env, builder, field_ty, field_addr, null_trap, new_val, value_ty, false,
+    )
+}
+
+/// Initialize an uninitialized slot in a moving GC object that may already have
+/// been promoted to old space by an earlier poll. Stores the payload before
+/// publishing the copying-GC remembered-set edge so a fault between the two
+/// never exposes uninitialized bytes to minor collection.
+pub fn init_moving_field_at_addr(
+    func_env: &mut FuncEnvironment<'_>,
+    builder: &mut FunctionBuilder<'_>,
+    field_ty: WasmStorageType,
+    field_addr: ir::Value,
+    new_val: ir::Value,
+    value_ty: Option<WasmRefType>,
+) -> WasmResult<()> {
+    write_or_init_moving_field_at_addr(
+        func_env, builder, field_ty, field_addr, None, new_val, value_ty, true,
+    )
+}
+
+fn write_or_init_moving_field_at_addr(
+    func_env: &mut FuncEnvironment<'_>,
+    builder: &mut FunctionBuilder<'_>,
+    field_ty: WasmStorageType,
+    field_addr: ir::Value,
+    null_trap: Option<ir::TrapCode>,
+    new_val: ir::Value,
+    value_ty: Option<WasmRefType>,
+    store_before_barrier: bool,
 ) -> WasmResult<()> {
     // Data inside GC objects is always little endian. An access that is its
     // reference's null check carries that check's trap code; a `funcref` is
@@ -626,12 +659,27 @@ pub fn write_field_at_addr(
                 write_func_ref_at_addr(func_env, builder, r, flags, field_addr, new_val)?
             }
             WasmHeapTopType::Extern | WasmHeapTopType::Any | WasmHeapTopType::Exn => {
-                if func_env.tunables.collector == Some(Collector::Copying) {
-                    copying::emit_old_to_young_barrier(func_env, builder, r, field_addr, new_val)?;
+                if store_before_barrier {
+                    gc_compiler(func_env)?.translate_write_gc_reference(
+                        func_env, builder, r, field_addr, new_val, flags,
+                    )?;
                 }
-                gc_compiler(func_env)?.translate_write_gc_reference(
-                    func_env, builder, r, field_addr, new_val, flags,
-                )?;
+                if func_env.tunables.collector == Some(Collector::Copying) {
+                    // The validator may know more about the operand than the
+                    // destination field requires. Use it only for the barrier.
+                    copying::emit_old_to_young_barrier(
+                        func_env,
+                        builder,
+                        value_ty.unwrap_or(r),
+                        field_addr,
+                        new_val,
+                    )?;
+                }
+                if !store_before_barrier {
+                    gc_compiler(func_env)?.translate_write_gc_reference(
+                        func_env, builder, r, field_addr, new_val, flags,
+                    )?;
+                }
             }
             WasmHeapTopType::Cont => return stack_switching_unsupported(),
         },
@@ -757,6 +805,7 @@ pub fn translate_struct_set(
     struct_ref: ir::Value,
     non_null: bool,
     new_val: ir::Value,
+    value_ty: Option<WasmRefType>,
 ) -> WasmResult<()> {
     log::trace!(
         "translate_struct_set({struct_type_index:?}, {field_index:?}, struct_ref: {struct_ref:?}, new_val: {new_val:?})"
@@ -794,7 +843,9 @@ pub fn translate_struct_set(
         },
     );
 
-    write_field_at_addr(func_env, builder, field_ty, field_addr, null_trap, new_val)?;
+    write_field_at_addr(
+        func_env, builder, field_ty, field_addr, null_trap, new_val, value_ty,
+    )?;
 
     log::trace!("translate_struct_set: finished");
     Ok(())
@@ -1220,6 +1271,7 @@ pub fn translate_array_set(
     non_null: bool,
     index: ir::Value,
     value: ir::Value,
+    value_ty: Option<WasmRefType>,
 ) -> WasmResult<()> {
     log::trace!("translate_array_set({array_type_index:?}, {array_ref:?}, {index:?}, {value:?})");
 
@@ -1232,7 +1284,7 @@ pub fn translate_array_set(
     let array_ty = func_env.types.unwrap_array(array_type_index)?;
     let elem_ty = array_ty.0.element_type;
 
-    write_field_at_addr(func_env, builder, elem_ty, elem_addr, None, value)?;
+    write_field_at_addr(func_env, builder, elem_ty, elem_addr, None, value, value_ty)?;
 
     log::trace!("translate_array_set: finished");
     Ok(())
@@ -2017,6 +2069,50 @@ impl FuncEnvironment<'_> {
     }
 }
 
+/// Whether a GC reference type uses the immediate i31 representation.
+/// Callers handle (ref i31) and non-GC types separately.
+fn gc_heap_type_might_be_i31(heap_type: WasmHeapType) -> bool {
+    match heap_type {
+        // If we are definitely dealing with an i31, we shouldn't be
+        // emitting dynamic checks for it, and the caller shouldn't call
+        // this function. Should have been caught by the assertion at the
+        // start of the function.
+        WasmHeapType::I31 => unreachable!(),
+
+        // Could potentially be an i31.
+        WasmHeapType::Any | WasmHeapType::Eq => true,
+
+        // If it is definitely a struct, array, or uninhabited type, then it
+        // is definitely not an i31.
+        WasmHeapType::Array
+        | WasmHeapType::ConcreteArray(_)
+        | WasmHeapType::Struct
+        | WasmHeapType::ConcreteStruct(_)
+        | WasmHeapType::None => false,
+
+        // Despite being a different type hierarchy, this *could* be an
+        // `i31` if it is the result of
+        //
+        //     (extern.convert_any (ref.i31 ...))
+        WasmHeapType::Extern => true,
+
+        // Can only ever be `null`.
+        WasmHeapType::NoExtern => false,
+
+        WasmHeapType::Exn | WasmHeapType::ConcreteExn(_) | WasmHeapType::NoExn => false,
+
+        // Wrong type hierarchy, and also funcrefs are not GC-managed
+        // types. Should have been caught by the assertion at the start of
+        // the function.
+        WasmHeapType::Func | WasmHeapType::ConcreteFunc(_) | WasmHeapType::NoFunc => {
+            unreachable!()
+        }
+        WasmHeapType::Cont | WasmHeapType::ConcreteCont(_) | WasmHeapType::NoCont => {
+            unreachable!()
+        }
+    }
+}
+
 fn uextend_i32_to_pointer_type(
     builder: &mut FunctionBuilder,
     pointer_type: ir::Type,
@@ -2040,6 +2136,13 @@ fn emit_array_size(
     array_layout: &GcArrayLayout,
     len: ir::Value,
 ) -> ir::Value {
+    debug_assert_eq!(builder.func.dfg.value_type(len), ir::types::I32);
+    if let Some(size) = FuncEnvironment::value_as_const_int(builder, len)
+        .and_then(|len| array_layout.size_for_len(len as u32))
+    {
+        return builder.ins().iconst(ir::types::I32, i64::from(size));
+    }
+
     let base_size = builder
         .ins()
         .iconst(ir::types::I32, i64::from(array_layout.base_size));
@@ -2055,7 +2158,6 @@ fn emit_array_size(
     // i64 values, doing a 64-bit multiplication, and then checking the high
     // 32 bits of the multiplication's result. If the high 32 bits are not
     // all zeros, then the multiplication overflowed.
-    debug_assert_eq!(builder.func.dfg.value_type(len), ir::types::I32);
     let len = builder.ins().uextend(ir::types::I64, len);
     let elems_size_64 = builder
         .ins()
@@ -2119,7 +2221,7 @@ impl FuncEnvironment<'_> {
     /// retain internal assertion metadata to report if such a trap happens. This
     /// is here to ensure that in the face of heap corruption that there's no
     /// possible UB within Cranelift and/or the runtime.
-    fn gc_memflags(&mut self, func: &mut ir::Function) -> ir::MemFlagsData {
+    pub(super) fn gc_memflags(&mut self, func: &mut ir::Function) -> ir::MemFlagsData {
         let region = self.alias_regions.gc_heap_region(func);
         ir::MemFlagsData::new()
             .with_trap_code(Some(crate::TRAP_GC_HEAP_CORRUPT))
@@ -2372,45 +2474,7 @@ impl FuncEnvironment<'_> {
         assert_eq!(builder.func.dfg.value_type(gc_ref), ir::types::I32);
         assert!(ty.is_vmgcref_type_and_not_i31());
 
-        let might_be_i31 = match ty.heap_type {
-            // If we are definitely dealing with an i31, we shouldn't be
-            // emitting dynamic checks for it, and the caller shouldn't call
-            // this function. Should have been caught by the assertion at the
-            // start of the function.
-            WasmHeapType::I31 => unreachable!(),
-
-            // Could potentially be an i31.
-            WasmHeapType::Any | WasmHeapType::Eq => true,
-
-            // If it is definitely a struct, array, or uninhabited type, then it
-            // is definitely not an i31.
-            WasmHeapType::Array
-            | WasmHeapType::ConcreteArray(_)
-            | WasmHeapType::Struct
-            | WasmHeapType::ConcreteStruct(_)
-            | WasmHeapType::None => false,
-
-            // Despite being a different type hierarchy, this *could* be an
-            // `i31` if it is the result of
-            //
-            //     (extern.convert_any (ref.i31 ...))
-            WasmHeapType::Extern => true,
-
-            // Can only ever be `null`.
-            WasmHeapType::NoExtern => false,
-
-            WasmHeapType::Exn | WasmHeapType::ConcreteExn(_) | WasmHeapType::NoExn => false,
-
-            // Wrong type hierarchy, and also funcrefs are not GC-managed
-            // types. Should have been caught by the assertion at the start of
-            // the function.
-            WasmHeapType::Func | WasmHeapType::ConcreteFunc(_) | WasmHeapType::NoFunc => {
-                unreachable!()
-            }
-            WasmHeapType::Cont | WasmHeapType::ConcreteCont(_) | WasmHeapType::NoCont => {
-                unreachable!()
-            }
-        };
+        let might_be_i31 = gc_heap_type_might_be_i31(ty.heap_type);
 
         match (ty.nullable, might_be_i31) {
             // This GC reference statically cannot be null nor an i31. (Let

@@ -3,7 +3,7 @@ use crate::ssa::{SSABuilder, SideEffects};
 use crate::variable::Variable;
 use alloc::{boxed::Box, vec, vec::Vec};
 use core::fmt::{self, Debug};
-use cranelift_codegen::cursor::{Cursor, CursorPosition, FuncCursor};
+use cranelift_codegen::cursor::{Cursor, FuncCursor};
 use cranelift_codegen::entity::{EntityRef, EntitySet, PrimaryMap, SecondaryMap};
 use cranelift_codegen::ir;
 use cranelift_codegen::ir::condcodes::IntCC;
@@ -733,16 +733,14 @@ impl<'a> FunctionBuilder<'a> {
 
         // If we have any values that need inclusion in stack maps, then we need
         // to run our pass to spill those values to the stack at safepoints and
-        // generate stack maps.
+        // generate stack maps. Keep the flags on canonical definitions so
+        // the liveness walk can find them through SSA aliases.
         // Scriptw patch: a needs-stack-map value defined by `iconst 0` is a
         // null reference. The collector never traces or moves it, so it needs
         // no stack slot, spill or stack-map entry; lowering rematerializes the
         // constant at each use. Block parameters that merge a null with a
         // pointer are separate values and keep their slots.
-        exclude_null_constants_from_stack_maps(
-            &self.func,
-            self.func_ctx.ssa.stack_map_values_mut(),
-        );
+        canonicalize_stack_map_values(&self.func, self.func_ctx.ssa.stack_map_values_mut());
         if !self.func_ctx.ssa.stack_map_values().is_empty() {
             self.func_ctx.safepoints.run(
                 &mut self.func,
@@ -1228,18 +1226,29 @@ impl<'a> FunctionBuilder<'a> {
 /// and its stack-map entries buy nothing. Values are removed only when they are
 /// themselves the constant; block parameters and other values that may hold a
 /// null at run time are left in the set.
-fn exclude_null_constants_from_stack_maps(func: &Function, values: &mut EntitySet<Value>) {
-    let nulls: SmallVec<[Value; 16]> = values
+fn canonicalize_stack_map_values(func: &Function, values: &mut EntitySet<Value>) {
+    let rewrites: SmallVec<[(Value, Option<Value>); 16]> = values
         .iter()
-        .filter(|&value| is_zero_constant(func, value))
+        .filter_map(|value| {
+            let resolved = func.dfg.resolve_aliases(value);
+            if is_zero_constant(func, resolved) {
+                Some((value, None))
+            } else if value != resolved {
+                Some((value, Some(resolved)))
+            } else {
+                None
+            }
+        })
         .collect();
-    for value in nulls {
+    for (value, resolved) in rewrites {
         values.remove(value);
+        if let Some(resolved) = resolved {
+            values.insert(resolved);
+        }
     }
 }
 
 fn is_zero_constant(func: &Function, value: Value) -> bool {
-    let value = func.dfg.resolve_aliases(value);
     let ir::ValueDef::Result(inst, _) = func.dfg.value_def(value) else {
         return false;
     };

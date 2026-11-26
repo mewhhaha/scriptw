@@ -51,7 +51,7 @@ impl Facts {
             .is_some_and(|field| {
                 !field.mutable
                     && matches!(field.element_type,
-                    StorageType::Val(ValType::Ref(reference)) if !reference.is_nullable()
+                    StorageType::Val(ValType::Ref(reference)) if reference.is_nullable()
                     && matches!(reference.heap_type(), wasmparser::HeapType::Concrete(index)
                         if index.as_module_index() == Some(schema.payload_type)))
             })

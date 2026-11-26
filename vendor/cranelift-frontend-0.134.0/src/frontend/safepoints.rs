@@ -35,6 +35,81 @@ fn for_each_inst_use(dfg: &DataFlowGraph, inst: Inst, mut f: impl FnMut(Value)) 
     }
 }
 
+/// Put uses that happen after a throwing call in real successor blocks.
+/// A plain SSA argument on either edge would otherwise be copied from
+/// a pre-call register, even when GC updated the corresponding stack slot.
+fn split_gc_try_call_edges(func: &mut Function, stack_map_values: &EntitySet<Value>) {
+    let mut next_block = func.layout.entry_block();
+    while let Some(block) = next_block {
+        next_block = func.layout.next_block(block);
+        let Some(inst) = func.layout.last_inst(block) else {
+            continue;
+        };
+        let Some(table) = func.dfg.insts[inst].exception_table() else {
+            continue;
+        };
+        let needs_stack_map =
+            |dfg: &DataFlowGraph, value| stack_map_values.contains(dfg.resolve_aliases(value));
+        for item in func.dfg.exception_tables[table].items() {
+            if let ir::ExceptionTableItem::Context(value) = item {
+                // Wasmtime uses a native VMContext pointer here. The unwinder
+                // reads a separate ABI spill that this pass cannot relocate.
+                assert!(
+                    !needs_stack_map(&func.dfg, value),
+                    "a moving GC reference cannot serve as an exception context"
+                );
+            }
+        }
+
+        let branch_count = func.dfg.exception_tables[table].all_branches().len();
+        let mut insert_after = block;
+        for index in 0..branch_count {
+            let branch = func.dfg.exception_tables[table].all_branches()[index];
+            let has_gc_arg = branch.args(&func.dfg.value_lists).any(|arg| {
+                arg.as_value()
+                    .is_some_and(|value| needs_stack_map(&func.dfg, value))
+            });
+            if !has_gc_arg {
+                continue;
+            }
+            let target = branch.block(&func.dfg.value_lists);
+            let args: SmallVec<[_; 8]> = branch.args(&func.dfg.value_lists).collect();
+            let bridge = func.dfg.make_block();
+            func.layout.insert_block_after(bridge, insert_after);
+            insert_after = bridge;
+            if index + 1 < branch_count {
+                func.layout.set_cold(bridge);
+            }
+
+            let mut call_args: SmallVec<[_; 8]> = SmallVec::new();
+            let mut jump_args: SmallVec<[_; 8]> = SmallVec::new();
+            for (index, arg) in args.into_iter().enumerate() {
+                if arg
+                    .as_value()
+                    .is_some_and(|value| needs_stack_map(&func.dfg, value))
+                {
+                    jump_args.push(arg);
+                } else {
+                    let param = func.dfg.block_params(target)[index];
+                    let ty = func.dfg.value_type(param);
+                    let param = func.dfg.append_block_param(bridge, ty);
+                    call_args.push(arg);
+                    jump_args.push(param.into());
+                }
+            }
+            let dfg = &mut func.dfg;
+            let branch = &mut dfg.exception_tables[table].all_branches_mut()[index];
+            branch.set_block(bridge, &mut dfg.value_lists);
+            branch.clear(&mut dfg.value_lists);
+            branch.extend(call_args, &mut dfg.value_lists);
+            FuncCursor::new(func)
+                .at_first_insertion_point(bridge)
+                .ins()
+                .jump(target, &jump_args);
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 #[repr(u8)]
 enum SlotSize {
@@ -960,6 +1035,9 @@ impl StackSlots {
 pub(super) struct SafepointSpiller {
     liveness: LivenessAnalysis,
     stack_slots: StackSlots,
+    // The current SSA value for a root, valid only in the tagged block segment.
+    available: SecondaryMap<Value, (u32, PackedOption<Value>)>,
+    block_insts: Vec<Inst>,
 
     /// Optional embedder callback used to assign an alias region to the loads
     /// and stores emitted when spilling and reloading values that are live
@@ -980,10 +1058,14 @@ impl SafepointSpiller {
         let SafepointSpiller {
             liveness,
             stack_slots,
+            available,
+            block_insts,
             make_alias_region: _,
         } = self;
         liveness.clear();
         stack_slots.clear();
+        available.clear();
+        block_insts.clear();
     }
 
     /// Identify needs-stack-map values that are live across safepoints, and
@@ -1002,8 +1084,12 @@ impl SafepointSpiller {
         );
 
         self.clear();
+        split_gc_try_call_edges(func, stack_map_values);
         self.liveness.run(func, stack_map_values);
-        self.rewrite(func, pointer_type);
+        if !self.liveness.live_across_any_safepoint.is_empty() {
+            self.available.resize(func.dfg.num_values());
+            self.rewrite(func, pointer_type);
+        }
 
         log::trace!(
             "after inserting safepoint spills and reloads:\n{}",
@@ -1014,27 +1100,46 @@ impl SafepointSpiller {
     /// Spill this value to a stack slot if it has been declared that it must be
     /// included in stack maps and is live across any safepoints.
     ///
-    /// The given cursor must point just after this value's definition.
-    fn rewrite_def(&mut self, pos: &mut FuncCursor<'_>, val: ir::Value, pointer_type: ir::Type) {
+    /// The cursor points just after the definition. A local spill can be sunk
+    /// as far as the first following safepoint if the root is live there.
+    fn rewrite_def(
+        &mut self,
+        pos: &mut FuncCursor<'_>,
+        val: ir::Value,
+        pointer_type: ir::Type,
+        spill_before: Option<Inst>,
+    ) {
         debug_assert!(!pos.func.dfg.value_is_alias(val));
         if let Some(slot) = self.stack_slots.get(val) {
             let ty = pos.func.dfg.value_type(val);
+            let def_position = pos.position();
+            let mut spill = if let Some(inst) = spill_before.filter(|&inst| {
+                self.liveness
+                    .safepoint_live(inst)
+                    .unwrap()
+                    .binary_search(&val)
+                    .is_ok()
+            }) {
+                FuncCursor::new(pos.func).at_inst(inst)
+            } else {
+                FuncCursor::new(pos.func).at_position(def_position)
+            };
 
             let mut flags = ir::MemFlagsData::trusted();
             flags.set_notrap();
             if let Some(make_alias_region) = &self.make_alias_region {
                 if let Some(region) =
-                    make_alias_region(&mut pos.func.dfg.alias_regions, ty, slot, 0)
+                    make_alias_region(&mut spill.func.dfg.alias_regions, ty, slot, 0)
                 {
                     flags.set_alias_region(Some(region));
                 }
             }
 
-            let addr = pos.ins().stack_addr(pointer_type, slot, 0);
-            let inst = pos.ins().store(flags, val, addr, 0);
+            let addr = spill.ins().stack_addr(pointer_type, slot, 0);
+            let inst = spill.ins().store(flags, val, addr, 0);
             log::trace!(
                 "rewriting:   spilling {val:?} to {slot:?}: {}",
-                pos.func.dfg.display_inst(inst)
+                spill.func.dfg.display_inst(inst)
             );
 
             // Now that we've defined this value, there cannot be any more uses
@@ -1095,6 +1200,7 @@ impl SafepointSpiller {
         pos: &mut FuncCursor<'_>,
         val: &mut ir::Value,
         pointer_type: ir::Type,
+        segment: u32,
     ) -> bool {
         debug_assert!(!pos.func.dfg.value_is_alias(*val));
         if !self.liveness.live_across_any_safepoint.contains(*val) {
@@ -1102,10 +1208,14 @@ impl SafepointSpiller {
         }
 
         let old_val = *val;
-        log::trace!("rewriting:     found use of {old_val:?}");
+        let (cached_segment, cached) = self.available[old_val];
+        if cached_segment == segment {
+            *val = cached.unwrap();
+            return true;
+        }
 
-        let ty = pos.func.dfg.value_type(*val);
-        let slot = self.stack_slots.get_or_create_stack_slot(pos.func, *val);
+        let ty = pos.func.dfg.value_type(old_val);
+        let slot = self.stack_slots.get(old_val).unwrap();
 
         let mut flags = ir::MemFlagsData::trusted();
         flags.set_notrap();
@@ -1117,6 +1227,7 @@ impl SafepointSpiller {
 
         let addr = pos.ins().stack_addr(pointer_type, slot, 0);
         *val = pos.ins().load(ty, flags, addr, 0);
+        self.available[old_val] = (segment, (*val).into());
 
         log::trace!(
             "rewriting:     reloading {old_val:?}: {}",
@@ -1143,6 +1254,7 @@ impl SafepointSpiller {
     fn rewrite(&mut self, func: &mut Function, pointer_type: ir::Type) {
         // Shared temporary storage for operand and result lists.
         let mut vals: SmallVec<[_; 8]> = Default::default();
+        let mut segment = 0u32;
 
         // Rewrite the function's instructions in post-order. This ensures that
         // we rewrite uses before defs, and therefore once we see a def we know
@@ -1173,58 +1285,72 @@ impl SafepointSpiller {
                 self.stack_slots.get_or_create_stack_slot(func, val);
             }
 
+            let mut first_safepoint = None;
             let mut option_inst = func.layout.last_inst(block);
             while let Some(inst) = option_inst {
-                // If this instruction defines a needs-stack-map value that is
-                // live across a safepoint, then spill the value to its stack
-                // slot.
+                option_inst = func.layout.prev_inst(inst);
+                self.block_insts.push(inst);
                 let mut pos = FuncCursor::new(func).after_inst(inst);
                 vals.extend_from_slice(pos.func.dfg.inst_results(inst));
                 for val in vals.drain(..) {
-                    self.rewrite_def(&mut pos, val, pointer_type);
+                    self.rewrite_def(&mut pos, val, pointer_type, first_safepoint);
                 }
 
-                // If this instruction is a safepoint, then we must add stack
-                // map entries for the needs-stack-map values that are live
-                // across it.
                 if self.liveness.safepoint_live(inst).is_some() {
                     self.rewrite_safepoint(func, inst);
+                    first_safepoint = Some(inst);
                 }
 
-                // Replace all uses of needs-stack-map values with loads from
-                // the value's associated stack slot.
-                let mut pos = FuncCursor::new(func).at_inst(inst);
-                if uses_beyond_arguments(&pos.func.dfg, inst) {
-                    vals.extend(pos.func.dfg.inst_values(inst));
-                } else {
-                    vals.extend_from_slice(pos.func.dfg.inst_args(inst));
+                // Assign slots in reverse use order, before any definition
+                // can release one for a different value. Insert reloads in
+                // forward order below.
+                for_each_inst_use(&func.dfg, inst, |val| vals.push(val));
+                for val in vals.drain(..) {
+                    let val = func.dfg.resolve_aliases(val);
+                    if self.liveness.live_across_any_safepoint.contains(val) {
+                        self.stack_slots.get_or_create_stack_slot(func, val);
+                    }
                 }
+            }
+
+            let mut pos = FuncCursor::new(func).at_first_insertion_point(block);
+            vals.extend_from_slice(pos.func.dfg.block_params(block));
+            segment += 1;
+            for val in vals.drain(..) {
+                self.rewrite_def(&mut pos, val, pointer_type, first_safepoint);
+                if self.stack_slots.get(val).is_some() {
+                    self.available[val] = (segment, val.into());
+                }
+            }
+
+            // Each block starts with only its parameters in registers. An
+            // incoming value defined elsewhere is read from its root slot,
+            // where all paths (including both outcomes of a try_call) agree.
+            // Within the block reuse the defining SSA value or the first load
+            // until the next safepoint. A call's operands precede that
+            // boundary, and its results are available on the other side.
+            while let Some(inst) = self.block_insts.pop() {
+                let mut pos = FuncCursor::new(func).at_inst(inst);
+                for_each_inst_use(&pos.func.dfg, inst, |val| vals.push(val));
                 let mut replaced_any = false;
                 for val in &mut vals {
                     *val = pos.func.dfg.resolve_aliases(*val);
-                    replaced_any |= self.rewrite_use(&mut pos, val, pointer_type);
+                    replaced_any |= self.rewrite_use(&mut pos, val, pointer_type, segment);
                 }
                 if replaced_any {
                     pos.func.dfg.overwrite_inst_values(inst, vals.drain(..));
-                    log::trace!(
-                        "rewriting:     updated {inst:?} operands with reloaded values: {}",
-                        pos.func.dfg.display_inst(inst)
-                    );
                 } else {
                     vals.clear();
                 }
 
-                option_inst = func.layout.prev_inst(inst);
-            }
-
-            // Spill needs-stack-map values defined by block parameters to their
-            // associated stack slots.
-            let mut pos = FuncCursor::new(func).at_position(CursorPosition::Before(block));
-            pos.next_inst(); // Advance to the first instruction in the block.
-            vals.clear();
-            vals.extend_from_slice(pos.func.dfg.block_params(block));
-            for val in vals.drain(..) {
-                self.rewrite_def(&mut pos, val, pointer_type);
+                if self.liveness.safepoint_live(inst).is_some() {
+                    segment += 1;
+                }
+                for &val in pos.func.dfg.inst_results(inst) {
+                    if self.stack_slots.get(val).is_some() {
+                        self.available[val] = (segment, val.into());
+                    }
+                }
             }
         }
     }
@@ -1300,18 +1426,16 @@ function %sample(i32, i32) system_v {
     fn0 = colocated u0:0 sig0
 
 block0(v0: i32, v1: i32):
-    v8 = stack_addr.i64 ss0
-    store notrap aligned v0, v8
-    v9 = stack_addr.i64 ss1
-    store notrap aligned v1, v9
-    v6 = stack_addr.i64 ss0
-    v7 = load.i32 notrap aligned v6
-    call fn0(v7), stack_map=[i32 @ ss0+0, i32 @ ss1+0]
     v2 = stack_addr.i64 ss0
-    v3 = load.i32 notrap aligned v2
-    v4 = stack_addr.i64 ss1
+    store notrap aligned v0, v2
+    v3 = stack_addr.i64 ss1
+    store notrap aligned v1, v3
+    call fn0(v0), stack_map=[i32 @ ss0+0, i32 @ ss1+0]
+    v4 = stack_addr.i64 ss0
     v5 = load.i32 notrap aligned v4
-    jump block0(v3, v5)
+    v6 = stack_addr.i64 ss1
+    v7 = load.i32 notrap aligned v6
+    jump block0(v5, v7)
 }
             "#
         );
@@ -1368,15 +1492,13 @@ function %sample(i32) system_v {
     fn0 = colocated u0:0 sig0
 
 block0(v0: i32):
-    v6 = stack_addr.i64 ss0
-    store notrap aligned v0, v6
     v1 = iconst.i32 0
-    v4 = stack_addr.i64 ss0
-    v5 = load.i32 notrap aligned v4
-    call fn0(v5, v1), stack_map=[i32 @ ss0+0]  ; v1 = 0
     v2 = stack_addr.i64 ss0
-    v3 = load.i32 notrap aligned v2
-    call fn0(v3, v1)  ; v1 = 0
+    store notrap aligned v0, v2
+    call fn0(v0, v1), stack_map=[i32 @ ss0+0]  ; v1 = 0
+    v3 = stack_addr.i64 ss0
+    v4 = load.i32 notrap aligned v3
+    call fn0(v4, v1)  ; v1 = 0
     return
 }
             "#
@@ -1460,25 +1582,25 @@ function %sample() system_v {
 
 block0:
     v0 = iconst.i32 4
-    v12 = stack_addr.i64 ss2
-    store notrap aligned v0, v12  ; v0 = 4
     v1 = iconst.i32 1
-    v11 = stack_addr.i64 ss1
-    store notrap aligned v1, v11  ; v1 = 1
     v2 = iconst.i32 2
-    v10 = stack_addr.i64 ss0
-    store notrap aligned v2, v10  ; v2 = 2
     v3 = iconst.i32 3
-    call fn0(v3), stack_map=[i32 @ ss2+0, i32 @ ss1+0, i32 @ ss0+0]  ; v3 = 3
-    v8 = stack_addr.i64 ss2
-    v9 = load.i32 notrap aligned v8
-    call fn0(v9), stack_map=[i32 @ ss1+0, i32 @ ss0+0]
-    v6 = stack_addr.i64 ss1
-    v7 = load.i32 notrap aligned v6
-    call fn0(v7), stack_map=[i32 @ ss0+0]
     v4 = stack_addr.i64 ss0
-    v5 = load.i32 notrap aligned v4
-    call fn0(v5)
+    store notrap aligned v2, v4  ; v2 = 2
+    v5 = stack_addr.i64 ss1
+    store notrap aligned v1, v5  ; v1 = 1
+    v6 = stack_addr.i64 ss2
+    store notrap aligned v0, v6  ; v0 = 4
+    call fn0(v3), stack_map=[i32 @ ss2+0, i32 @ ss1+0, i32 @ ss0+0]  ; v3 = 3
+    v7 = stack_addr.i64 ss2
+    v8 = load.i32 notrap aligned v7
+    call fn0(v8), stack_map=[i32 @ ss1+0, i32 @ ss0+0]
+    v9 = stack_addr.i64 ss1
+    v10 = load.i32 notrap aligned v9
+    call fn0(v10), stack_map=[i32 @ ss0+0]
+    v11 = stack_addr.i64 ss0
+    v12 = load.i32 notrap aligned v11
+    call fn0(v12)
     return
 }
             "#
@@ -2009,29 +2131,27 @@ block0(v0: i32):
 
 block1:
     v1 = iconst.i64 1
-    v16 = stack_addr.i64 ss0
-    store notrap aligned v1, v16  ; v1 = 1
     v2 = iconst.i64 2
-    v15 = stack_addr.i64 ss1
-    store notrap aligned v2, v15  ; v2 = 2
+    v11 = stack_addr.i64 ss1
+    store notrap aligned v2, v11  ; v2 = 2
+    v12 = stack_addr.i64 ss0
+    store notrap aligned v1, v12  ; v1 = 1
     call fn0(), stack_map=[i64 @ ss0+0, i64 @ ss1+0]
-    v11 = stack_addr.i64 ss0
-    v12 = load.i64 notrap aligned v11
-    v13 = stack_addr.i64 ss1
+    v13 = stack_addr.i64 ss0
     v14 = load.i64 notrap aligned v13
-    jump block3(v12, v14)
+    v15 = stack_addr.i64 ss1
+    v16 = load.i64 notrap aligned v15
+    jump block3(v14, v16)
 
 block2:
     v3 = iconst.i64 3
-    v21 = stack_addr.i64 ss0
-    store notrap aligned v3, v21  ; v3 = 3
     v4 = iconst.i64 4
-    call fn0(), stack_map=[i64 @ ss0+0, i64 @ ss0+0]
     v17 = stack_addr.i64 ss0
-    v18 = load.i64 notrap aligned v17
-    v19 = stack_addr.i64 ss0
-    v20 = load.i64 notrap aligned v19
-    jump block3(v18, v20)
+    store notrap aligned v3, v17  ; v3 = 3
+    call fn0(), stack_map=[i64 @ ss0+0, i64 @ ss0+0]
+    v18 = stack_addr.i64 ss0
+    v19 = load.i64 notrap aligned v18
+    jump block3(v19, v19)
 
 block3(v5: i64, v6: i64):
     call fn0(), stack_map=[i64 @ ss0+0]
@@ -2122,44 +2242,44 @@ function %sample(i8, i16, i32, i64, i128, f32, f64, i8x16, i16x8) -> i8, i16, i3
     fn0 = colocated u0:0 sig0
 
 block0(v0: i8, v1: i16, v2: i32, v3: i64, v4: i128, v5: f32, v6: f64, v7: i8x16, v8: i16x8):
-    v27 = stack_addr.i64 ss0
-    store notrap aligned v0, v27
-    v28 = stack_addr.i64 ss1
-    store notrap aligned v1, v28
-    v29 = stack_addr.i64 ss2
-    store notrap aligned v2, v29
-    v30 = stack_addr.i64 ss3
-    store notrap aligned v3, v30
-    v31 = stack_addr.i64 ss4
-    store notrap aligned v4, v31
-    v32 = stack_addr.i64 ss5
-    store notrap aligned v5, v32
-    v33 = stack_addr.i64 ss6
-    store notrap aligned v6, v33
-    v34 = stack_addr.i64 ss7
-    store notrap aligned v7, v34
-    v35 = stack_addr.i64 ss8
-    store notrap aligned v8, v35
-    call fn0(), stack_map=[i8 @ ss0+0, i16 @ ss1+0, i32 @ ss2+0, i64 @ ss3+0, i128 @ ss4+0, f32 @ ss5+0, f64 @ ss6+0, i8x16 @ ss7+0, i16x8 @ ss8+0]
     v9 = stack_addr.i64 ss0
-    v10 = load.i8 notrap aligned v9
-    v11 = stack_addr.i64 ss1
-    v12 = load.i16 notrap aligned v11
-    v13 = stack_addr.i64 ss2
-    v14 = load.i32 notrap aligned v13
-    v15 = stack_addr.i64 ss3
-    v16 = load.i64 notrap aligned v15
-    v17 = stack_addr.i64 ss4
-    v18 = load.i128 notrap aligned v17
-    v19 = stack_addr.i64 ss5
-    v20 = load.f32 notrap aligned v19
-    v21 = stack_addr.i64 ss6
-    v22 = load.f64 notrap aligned v21
-    v23 = stack_addr.i64 ss7
-    v24 = load.i8x16 notrap aligned v23
-    v25 = stack_addr.i64 ss8
-    v26 = load.i16x8 notrap aligned v25
-    return v10, v12, v14, v16, v18, v20, v22, v24, v26
+    store notrap aligned v0, v9
+    v10 = stack_addr.i64 ss1
+    store notrap aligned v1, v10
+    v11 = stack_addr.i64 ss2
+    store notrap aligned v2, v11
+    v12 = stack_addr.i64 ss3
+    store notrap aligned v3, v12
+    v13 = stack_addr.i64 ss4
+    store notrap aligned v4, v13
+    v14 = stack_addr.i64 ss5
+    store notrap aligned v5, v14
+    v15 = stack_addr.i64 ss6
+    store notrap aligned v6, v15
+    v16 = stack_addr.i64 ss7
+    store notrap aligned v7, v16
+    v17 = stack_addr.i64 ss8
+    store notrap aligned v8, v17
+    call fn0(), stack_map=[i8 @ ss0+0, i16 @ ss1+0, i32 @ ss2+0, i64 @ ss3+0, i128 @ ss4+0, f32 @ ss5+0, f64 @ ss6+0, i8x16 @ ss7+0, i16x8 @ ss8+0]
+    v18 = stack_addr.i64 ss0
+    v19 = load.i8 notrap aligned v18
+    v20 = stack_addr.i64 ss1
+    v21 = load.i16 notrap aligned v20
+    v22 = stack_addr.i64 ss2
+    v23 = load.i32 notrap aligned v22
+    v24 = stack_addr.i64 ss3
+    v25 = load.i64 notrap aligned v24
+    v26 = stack_addr.i64 ss4
+    v27 = load.i128 notrap aligned v26
+    v28 = stack_addr.i64 ss5
+    v29 = load.f32 notrap aligned v28
+    v30 = stack_addr.i64 ss6
+    v31 = load.f64 notrap aligned v30
+    v32 = stack_addr.i64 ss7
+    v33 = load.i8x16 notrap aligned v32
+    v34 = stack_addr.i64 ss8
+    v35 = load.i16x8 notrap aligned v34
+    return v19, v21, v23, v25, v27, v29, v31, v33, v35
 }
             "#
         );
@@ -2260,33 +2380,33 @@ function %sample() system_v {
 
 block0:
     v0 = iconst.i32 4
-    v15 = stack_addr.i64 ss0
-    store notrap aligned v0, v15  ; v0 = 4
+    v7 = stack_addr.i64 ss0
+    store notrap aligned v0, v7  ; v0 = 4
     call fn0(), stack_map=[i32 @ ss0+0]
-    v13 = stack_addr.i64 ss0
-    v14 = load.i32 notrap aligned v13
-    call fn1(v14)
+    v8 = stack_addr.i64 ss0
+    v9 = load.i32 notrap aligned v8
+    call fn1(v9)
     v1 = iconst.i32 1
-    v12 = stack_addr.i64 ss0
-    store notrap aligned v1, v12  ; v1 = 1
+    v6 = stack_addr.i64 ss0
+    store notrap aligned v1, v6  ; v1 = 1
     call fn0(), stack_map=[i32 @ ss0+0]
     v10 = stack_addr.i64 ss0
     v11 = load.i32 notrap aligned v10
     call fn1(v11)
     v2 = iconst.i32 2
-    v9 = stack_addr.i64 ss0
-    store notrap aligned v2, v9  ; v2 = 2
+    v5 = stack_addr.i64 ss0
+    store notrap aligned v2, v5  ; v2 = 2
     call fn0(), stack_map=[i32 @ ss0+0]
-    v7 = stack_addr.i64 ss0
-    v8 = load.i32 notrap aligned v7
-    call fn1(v8)
+    v12 = stack_addr.i64 ss0
+    v13 = load.i32 notrap aligned v12
+    call fn1(v13)
     v3 = iconst.i32 3
-    v6 = stack_addr.i64 ss0
-    store notrap aligned v3, v6  ; v3 = 3
-    call fn0(), stack_map=[i32 @ ss0+0]
     v4 = stack_addr.i64 ss0
-    v5 = load.i32 notrap aligned v4
-    call fn1(v5)
+    store notrap aligned v3, v4  ; v3 = 3
+    call fn0(), stack_map=[i32 @ ss0+0]
+    v14 = stack_addr.i64 ss0
+    v15 = load.i32 notrap aligned v14
+    call fn1(v15)
     return
 }
             "#
@@ -2413,56 +2533,48 @@ block0(v0: i32):
     v1 = iconst.i32 42
     v2 -> v1
     v4 -> v1
-    v32 = stack_addr.i64 ss0
-    store notrap aligned v1, v32  ; v1 = 42
-    v30 = stack_addr.i64 ss0
-    v31 = load.i32 notrap aligned v30
-    call fn0(v31), stack_map=[i32 @ ss0+0]
+    v24 = stack_addr.i64 ss0
+    store notrap aligned v1, v24  ; v1 = 42
+    call fn0(v1), stack_map=[i32 @ ss0+0]  ; v1 = 42
     brif v0, block1, block2
 
 block1:
-    v19 = stack_addr.i64 ss0
-    v20 = load.i32 notrap aligned v19
-    call fn0(v20), stack_map=[i32 @ ss0+0]
-    v17 = stack_addr.i64 ss0
-    v18 = load.i32 notrap aligned v17
-    call fn0(v18)
+    v11 = stack_addr.i64 ss0
+    v12 = load.i32 notrap aligned v11
+    call fn0(v12), stack_map=[i32 @ ss0+0]
+    v13 = stack_addr.i64 ss0
+    v14 = load.i32 notrap aligned v13
+    call fn0(v14)
     v3 = iconst.i32 36
-    v16 = stack_addr.i64 ss0
-    store notrap aligned v3, v16  ; v3 = 36
-    v14 = stack_addr.i64 ss0
-    v15 = load.i32 notrap aligned v14
-    call fn0(v15), stack_map=[i32 @ ss0+0]
-    v12 = stack_addr.i64 ss0
-    v13 = load.i32 notrap aligned v12
-    jump block3(v13)
+    v10 = stack_addr.i64 ss0
+    store notrap aligned v3, v10  ; v3 = 36
+    call fn0(v3), stack_map=[i32 @ ss0+0]  ; v3 = 36
+    v15 = stack_addr.i64 ss0
+    v16 = load.i32 notrap aligned v15
+    jump block3(v16)
 
 block2:
-    v28 = stack_addr.i64 ss0
-    v29 = load.i32 notrap aligned v28
-    call fn0(v29), stack_map=[i32 @ ss0+0]
-    v26 = stack_addr.i64 ss0
-    v27 = load.i32 notrap aligned v26
-    call fn0(v27)
+    v18 = stack_addr.i64 ss0
+    v19 = load.i32 notrap aligned v18
+    call fn0(v19), stack_map=[i32 @ ss0+0]
+    v20 = stack_addr.i64 ss0
+    v21 = load.i32 notrap aligned v20
+    call fn0(v21)
     v5 = iconst.i32 36
-    v25 = stack_addr.i64 ss1
-    store notrap aligned v5, v25  ; v5 = 36
-    v23 = stack_addr.i64 ss1
-    v24 = load.i32 notrap aligned v23
-    call fn0(v24), stack_map=[i32 @ ss1+0]
-    v21 = stack_addr.i64 ss1
-    v22 = load.i32 notrap aligned v21
-    jump block3(v22)
+    v17 = stack_addr.i64 ss1
+    store notrap aligned v5, v17  ; v5 = 36
+    call fn0(v5), stack_map=[i32 @ ss1+0]  ; v5 = 36
+    v22 = stack_addr.i64 ss1
+    v23 = load.i32 notrap aligned v22
+    jump block3(v23)
 
 block3(v6: i32):
-    v11 = stack_addr.i64 ss0
-    store notrap aligned v6, v11
-    v9 = stack_addr.i64 ss0
-    v10 = load.i32 notrap aligned v9
-    call fn0(v10), stack_map=[i32 @ ss0+0]
     v7 = stack_addr.i64 ss0
-    v8 = load.i32 notrap aligned v7
-    return v8
+    store notrap aligned v6, v7
+    call fn0(v6), stack_map=[i32 @ ss0+0]
+    v8 = stack_addr.i64 ss0
+    v9 = load.i32 notrap aligned v8
+    return v9
 }
             "#
         );
@@ -2523,12 +2635,12 @@ function %sample(i32) -> i32 system_v {
     fn0 = colocated u0:0 sig0
 
 block0(v0: i32):
-    v3 = stack_addr.i64 ss0
-    store notrap aligned v0, v3
-    call fn0(), stack_map=[i32 @ ss0+0]
     v1 = stack_addr.i64 ss0
-    v2 = load.i32 notrap aligned v1
-    return v2
+    store notrap aligned v0, v1
+    call fn0(), stack_map=[i32 @ ss0+0]
+    v2 = stack_addr.i64 ss0
+    v3 = load.i32 notrap aligned v2
+    return v3
 }
             "#
         );
@@ -2602,17 +2714,17 @@ function %sample(i32) -> i32, i32 system_v {
     fn0 = colocated u0:0 sig0
 
 block0(v0: i32):
-    v7 = stack_addr.i64 ss0
-    store notrap aligned v0, v7
     v1 = iconst.i32 42
-    v6 = stack_addr.i64 ss1
-    store notrap aligned v1, v6  ; v1 = 42
+    v2 = stack_addr.i64 ss1
+    store notrap aligned v1, v2  ; v1 = 42
+    v3 = stack_addr.i64 ss0
+    store notrap aligned v0, v3
     call fn0(), stack_map=[i32 @ ss0+0, i32 @ ss1+0]
-    v2 = stack_addr.i64 ss0
-    v3 = load.i32 notrap aligned v2
-    v4 = stack_addr.i64 ss1
+    v4 = stack_addr.i64 ss0
     v5 = load.i32 notrap aligned v4
-    return v3, v5
+    v6 = stack_addr.i64 ss1
+    v7 = load.i32 notrap aligned v6
+    return v5, v7
 }
             "#
         );
@@ -3345,12 +3457,12 @@ block4:
 
 block5(v20: i32):
     v19 -> v20
-    v40 = stack_addr.i64 ss2
-    store notrap aligned v20, v40
+    v38 = stack_addr.i64 ss2
+    store notrap aligned v20, v38
     v9 = iconst.i32 0
-    v38 = stack_addr.i64 ss0
-    v39 = load.i32 notrap aligned v38
-    v10 = icmp eq v39, v9  ; v9 = 0
+    v39 = stack_addr.i64 ss0
+    v40 = load.i32 notrap aligned v39
+    v10 = icmp eq v40, v9  ; v9 = 0
     brif v10, block8(v9), block6  ; v9 = 0
 
 block6:
@@ -3370,22 +3482,22 @@ block7:
 
 block8(v16: i32):
     trapz v16, user1
-    v32 = stack_addr.i64 ss0
-    v33 = load.i32 notrap aligned v32
-    call fn5(v33), stack_map=[i32 @ ss0+0, i32 @ ss2+0]
-    v17 = call fn6(), stack_map=[i32 @ ss0+0, i32 @ ss2+0]
-    v30 = stack_addr.i64 ss2
+    v30 = stack_addr.i64 ss0
     v31 = load.i32 notrap aligned v30
-    brif v17, block5(v31), block9
+    call fn5(v31), stack_map=[i32 @ ss0+0, i32 @ ss2+0]
+    v17 = call fn6(), stack_map=[i32 @ ss0+0, i32 @ ss2+0]
+    v32 = stack_addr.i64 ss2
+    v33 = load.i32 notrap aligned v32
+    brif v17, block5(v33), block9
 
 block9:
-    v28 = stack_addr.i64 ss2
-    v29 = load.i32 notrap aligned v28
-    call fn7(v29), stack_map=[i32 @ ss2+0]
-    v23 = call fn8(), stack_map=[i32 @ ss2+0]
     v26 = stack_addr.i64 ss2
     v27 = load.i32 notrap aligned v26
-    brif v23, block10, block1(v27)
+    call fn7(v27), stack_map=[i32 @ ss2+0]
+    v23 = call fn8(), stack_map=[i32 @ ss2+0]
+    v28 = stack_addr.i64 ss2
+    v29 = load.i32 notrap aligned v28
+    brif v23, block10, block1(v29)
 
 block10:
     return
@@ -3501,6 +3613,141 @@ block10:
     }
 
     #[test]
+    fn reuses_a_root_within_each_safepoint_segment() {
+        let mut sig = Signature::new(CallConv::SystemV);
+        sig.params.push(AbiParam::new(ir::types::I32));
+        sig.returns.push(AbiParam::new(ir::types::I32));
+        let mut func = Function::with_name_signature(ir::UserFuncName::testcase("segments"), sig);
+        let mut context = FunctionBuilderContext::new();
+        let mut builder = FunctionBuilder::new(&mut func, &mut context);
+        let block = builder.create_block();
+        builder.append_block_params_for_function_params(block);
+        let root = builder.block_params(block)[0];
+        builder.declare_value_needs_stack_map(root);
+        let callee = import_func(&mut builder, [], []);
+        builder.switch_to_block(block);
+        let before = builder.ins().iadd(root, root);
+        let first_safepoint = builder.ins().call(callee, &[]);
+        let first_use = builder.ins().iadd(root, before);
+        let second_use = builder.ins().iadd(root, first_use);
+        let second_safepoint = builder.ins().call(callee, &[]);
+        let last_use = builder.ins().iadd(root, second_use);
+        builder.ins().return_(&[last_use]);
+        builder.seal_all_blocks();
+        builder.finalize(systemv_frontend_config());
+
+        let dfg = &func.dfg;
+        assert_eq!(
+            dfg.inst_args(dfg.value_def(before).unwrap_inst()),
+            &[root, root]
+        );
+        let first_root = dfg.inst_args(dfg.value_def(first_use).unwrap_inst())[0];
+        assert_eq!(
+            dfg.inst_args(dfg.value_def(second_use).unwrap_inst())[0],
+            first_root
+        );
+        let last_root = dfg.inst_args(dfg.value_def(last_use).unwrap_inst())[0];
+        assert_ne!(last_root, first_root);
+        assert_ne!(last_root, root);
+        for (safepoint, value) in [(first_safepoint, first_root), (second_safepoint, last_root)] {
+            let entries = dfg.user_stack_map_entries(safepoint).unwrap();
+            assert_eq!(entries.len(), 1);
+            let load = dfg.value_def(value).unwrap_inst();
+            assert_eq!(dfg.insts[load].opcode(), ir::Opcode::Load);
+            let addr = dfg.value_def(dfg.inst_args(load)[0]).unwrap_inst();
+            assert_eq!(func.layout.next_inst(safepoint), Some(addr));
+        }
+    }
+
+    #[test]
+    fn try_call_edges_reload_roots_and_forward_call_payloads() {
+        use ir::{BlockArg, ExceptionTableItem, types};
+
+        for indirect in [false, true] {
+            let mut sig = Signature::new(CallConv::SystemV);
+            sig.params.push(AbiParam::new(types::I32));
+            sig.returns.push(AbiParam::new(types::I32));
+            let mut func = Function::with_name_signature(ir::UserFuncName::testcase("edges"), sig);
+            let mut context = FunctionBuilderContext::new();
+            let mut builder = FunctionBuilder::new(&mut func, &mut context);
+            let entry = builder.create_block();
+            let normal = builder.create_block();
+            let exceptional = builder.create_block();
+            builder.append_block_params_for_function_params(entry);
+            let root = builder.block_params(entry)[0];
+            builder.declare_value_needs_stack_map(root);
+            let normal_root = builder.append_block_param(normal, types::I32);
+            builder.append_block_param(normal, types::I32);
+            let exceptional_root = builder.append_block_param(exceptional, types::I32);
+            builder.append_block_param(exceptional, types::I64);
+
+            let callee = import_func(&mut builder, [], [types::I32]);
+            let callee_sig = builder.func.dfg.ext_funcs[callee].signature;
+            builder.switch_to_block(entry);
+            let normal_args = [root.into(), BlockArg::TryCallRet(0)];
+            let exceptional_args = [root.into(), BlockArg::TryCallExn(0)];
+            let normal_edge = builder.func.dfg.block_call(normal, &normal_args);
+            let exceptional_edge = builder.func.dfg.block_call(exceptional, &exceptional_args);
+            let table = builder
+                .func
+                .dfg
+                .exception_tables
+                .push(ExceptionTableData::new(
+                    callee_sig,
+                    normal_edge,
+                    [ExceptionTableItem::Default(exceptional_edge)],
+                ));
+            let inst = if indirect {
+                let addr = builder.ins().func_addr(types::I64, callee);
+                builder.ins().try_call_indirect(addr, &[], table)
+            } else {
+                builder.ins().try_call(callee, &[], table)
+            };
+            builder.switch_to_block(normal);
+            builder.ins().return_(&[normal_root]);
+            builder.switch_to_block(exceptional);
+            builder.ins().return_(&[exceptional_root]);
+            builder.seal_all_blocks();
+            builder.finalize(systemv_frontend_config());
+
+            let dfg = &func.dfg;
+            let entries = dfg.user_stack_map_entries(inst).unwrap();
+            assert_eq!(entries.len(), 1);
+            for (edge, target, payload) in [
+                (
+                    dfg.exception_tables[table].normal_return(),
+                    normal,
+                    BlockArg::TryCallRet(0),
+                ),
+                (
+                    &dfg.exception_tables[table].all_branches()[0],
+                    exceptional,
+                    BlockArg::TryCallExn(0),
+                ),
+            ] {
+                let bridge = edge.block(&dfg.value_lists);
+                assert_ne!(bridge, target);
+                assert!(edge.args(&dfg.value_lists).eq([payload]));
+                let jump = func.layout.last_inst(bridge).unwrap();
+                let branch =
+                    dfg.insts[jump].branch_destination(&dfg.jump_tables, &dfg.exception_tables)[0];
+                assert_eq!(branch.block(&dfg.value_lists), target);
+                let mut args = branch.args(&dfg.value_lists);
+                let reloaded = args.next().unwrap().as_value().unwrap();
+                assert_eq!(args.next(), Some(dfg.block_params(bridge)[0].into()));
+                let load = dfg.value_def(reloaded).unwrap_inst();
+                assert_eq!(func.layout.inst_block(load), Some(bridge));
+                assert_eq!(dfg.insts[load].opcode(), ir::Opcode::Load);
+                let addr = dfg.value_def(dfg.inst_args(load)[0]).unwrap_inst();
+                assert!(matches!(
+                    dfg.insts[addr],
+                    ir::InstructionData::StackAddr { stack_slot, .. } if stack_slot == entries[0].slot
+                ));
+            }
+        }
+    }
+
+    #[test]
     fn rewrite_uses_of_alias_values() {
         let _ = env_logger::try_init();
 
@@ -3601,12 +3848,12 @@ block1:
     jump block2
 
 block2:
-    v5 = stack_addr.i64 ss0
-    v6 = load.i32 notrap aligned v5
-    call fn1(v6), stack_map=[i32 @ ss0+0]
     v3 = stack_addr.i64 ss0
     v4 = load.i32 notrap aligned v3
-    call fn1(v4)
+    call fn1(v4), stack_map=[i32 @ ss0+0]
+    v5 = stack_addr.i64 ss0
+    v6 = load.i32 notrap aligned v5
+    call fn1(v6)
     return
 }
             "#,
@@ -3692,17 +3939,17 @@ function %sample() -> i32, i32 system_v {
 
 block0:
     v0 = iconst.i32 11
-    v7 = stack_addr.i64 ss0
-    store notrap aligned v0, v7  ; v0 = 11
     v1 = iconst.i32 22
-    v6 = stack_addr.i64 ss1
-    store notrap aligned v1, v6  ; v1 = 22
+    v2 = stack_addr.i64 ss1
+    store notrap aligned v1, v2  ; v1 = 22
+    v3 = stack_addr.i64 ss0
+    store notrap aligned v0, v3  ; v0 = 11
     call fn0(), stack_map=[i32 @ ss0+0, i32 @ ss1+0]
-    v2 = stack_addr.i64 ss0
-    v3 = load.i32 notrap aligned v2
-    v4 = stack_addr.i64 ss1
+    v4 = stack_addr.i64 ss0
     v5 = load.i32 notrap aligned v4
-    return v3, v5
+    v6 = stack_addr.i64 ss1
+    v7 = load.i32 notrap aligned v6
+    return v5, v7
 }
             "#
         );
@@ -3797,31 +4044,29 @@ function %sample() system_v {
 
 block0:
     v0 = call fn0()
-    v13 = stack_addr.i64 ss1
-    store notrap aligned v0, v13
+    v11 = stack_addr.i64 ss1
+    store notrap aligned v0, v11
     jump block1
 
 block1:
-    v11 = stack_addr.i64 ss1
-    v12 = load.i32 notrap aligned v11
-    call fn1(v12), stack_map=[i32 @ ss1+0]
+    v7 = stack_addr.i64 ss1
+    v8 = load.i32 notrap aligned v7
+    call fn1(v8), stack_map=[i32 @ ss1+0]
     v1 = call fn0(), stack_map=[i32 @ ss1+0]
-    v10 = stack_addr.i64 ss0
-    store notrap aligned v1, v10
-    v8 = stack_addr.i64 ss0
-    v9 = load.i32 notrap aligned v8
-    call fn1(v9), stack_map=[i32 @ ss1+0, i32 @ ss0+0]
     v6 = stack_addr.i64 ss0
-    v7 = load.i32 notrap aligned v6
-    brif v7, block2, block1
+    store notrap aligned v1, v6
+    call fn1(v1), stack_map=[i32 @ ss1+0, i32 @ ss0+0]
+    v9 = stack_addr.i64 ss0
+    v10 = load.i32 notrap aligned v9
+    brif v10, block2, block1
 
 block2:
-    v4 = stack_addr.i64 ss0
-    v5 = load.i32 notrap aligned v4
-    call fn1(v5), stack_map=[i32 @ ss0+0]
     v2 = stack_addr.i64 ss0
     v3 = load.i32 notrap aligned v2
-    call fn1(v3)
+    call fn1(v3), stack_map=[i32 @ ss0+0]
+    v4 = stack_addr.i64 ss0
+    v5 = load.i32 notrap aligned v4
+    call fn1(v5)
     return
 }
             "#
@@ -3895,14 +4140,12 @@ function %sample() system_v {
 
 block0:
     v0 = iconst.i32 42
-    v5 = stack_addr.i64 ss0
-    store notrap aligned region0 v0, v5  ; v0 = 42
-    v3 = stack_addr.i64 ss0
-    v4 = load.i32 notrap aligned region0 v3
-    call fn0(v4), stack_map=[i32 @ ss0+0]
     v1 = stack_addr.i64 ss0
-    v2 = load.i32 notrap aligned region0 v1
-    call fn0(v2)
+    store notrap aligned region0 v0, v1  ; v0 = 42
+    call fn0(v0), stack_map=[i32 @ ss0+0]  ; v0 = 42
+    v2 = stack_addr.i64 ss0
+    v3 = load.i32 notrap aligned region0 v2
+    call fn0(v3)
     return
 }
             "#

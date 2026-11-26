@@ -30,21 +30,21 @@ CI releases and Test262 publication use `--release`.
 Compare engines within one cohort only. Full numbers, methods and limits live in
 [benchmark details](docs/rust-rewrite/benchmarks.md).
 
-### Cold start & edge workloads (2026-11-26, Runtime ABI 92)
+### Cold start & edge workloads (2026-11-26, Runtime ABI 93)
 
-Local `--release` build (`ed27e234152d`) vs **Node 24.19.0** (`V8 13.6.233.17-node.51`)
-on AMD Ryzen 7 7800X3D (CPUs 0–1, 4 GiB cap, exact stdout verified;
+Local `--release` build (`3ac71dbb5761`) vs **Node 24.19.0** (`V8 13.6.233.17-node.51`)
+on AMD Ryzen 7 7800X3D (CPUs 6–7, 4 GiB cap, exact stdout verified;
 [full tables](docs/rust-rewrite/benchmarks.md#2026-11-26-local-benchmarks-edge-cold-start-and-porffor)).
 
 ![CLI cold start: Scriptw vs Node 24.19.0](docs/rust-rewrite/assets/local-20261126/cli-cold-start.svg)
 
 ![Edge workloads: Scriptw vs V8 (80w)](docs/rust-rewrite/assets/local-20261126/edge-kernels.svg)
 
-### Runtime kernels vs V8 (2026-11-26, Runtime ABI 92)
+### Runtime kernels vs V8 (2026-11-26, Runtime ABI 93)
 
 ![Runtime kernels: Scriptw speedup over Node 24 / V8 (80w)](docs/rust-rewrite/assets/local-20261126/runtime-kernels-v8.svg)
 
-### Scriptw vs Porffor 0.61.13 (2026-11-26, Runtime ABI 92)
+### Scriptw vs Porffor 0.61.13 (2026-11-26, Runtime ABI 93)
 
 ![Scriptw vs Porffor 0.61.13 runtime kernels](docs/rust-rewrite/assets/local-20261126/porffor-comparison.svg)
 
@@ -57,9 +57,9 @@ on AMD Ryzen 7 7800X3D (CPUs 0–1, 4 GiB cap, exact stdout verified;
 [Method and limits](docs/rust-rewrite/benchmarks.md#process-density) ·
 [data](docs/rust-rewrite/process-density-current.json).
 
-### React Server Components (2026-11-26, Runtime ABI 92)
+### React Server Components (2026-11-26, Runtime ABI 93)
 
-![React 19.3.1 Server Components: Scriptw ABI 92 vs Node 24 / V8](docs/rust-rewrite/assets/local-20261126/rsc-runtime.svg)
+![React 19.3.1 Server Components: Scriptw ABI 93 vs Node 24 / V8](docs/rust-rewrite/assets/local-20261126/rsc-runtime.svg)
 
 [Full 2026-11-26 RSC table](docs/rust-rewrite/benchmarks.md#react-1931-server-components-retained-flight-vs-node-24190) ·
 [earlier 2026-11-17 cloud RSC panel](docs/rust-rewrite/benchmarks.md#react-server-components) ·
@@ -144,7 +144,7 @@ affected Rust suites and pinned Test262 subtrees ([current work](docs/rust-rewri
   itself has no internal memory limit or deadline — compile untrusted input under
   an OS memory cap and timeout
   ([limits](docs/rust-rewrite/runtime-requirements.md#implementation-limits)).
-- **Runtime ABI 92:** Rebuild Portable bundles and native images built under an
+- **Runtime ABI 93:** Rebuild Portable bundles and native images built under an
   earlier ABI ([details](docs/rust-rewrite/runtime-requirements.md#runtime-abi)).
 
 [Development and verification](CONTRIBUTING.md) ·

@@ -2724,8 +2724,8 @@ mod generational_tests {
     use super::YoungAllocation;
     use crate::prelude::*;
     use crate::{
-        AsContext, Collector, Config, Engine, GcEphemeron, Instance, Module, RootScope, Store,
-        StructRef, StructRefPre, Val, WeakAnyRef,
+        AsContext, Collector, Config, Engine, GcEphemeron, GcEphemeronUpdate, Instance, Module,
+        RootScope, Store, StructRef, StructRefPre, Val, WeakAnyRef,
     };
 
     /// A 2 MiB initial heap: a 256 KiB nursery and two 896 KiB semi-spaces.
@@ -3291,6 +3291,60 @@ mod generational_tests {
         f.churn();
         let mut scope = RootScope::new(&mut f.store);
         let value = ephemeron.value(&mut scope).unwrap().unwrap();
+        let value = value.unwrap_struct(&scope).unwrap();
+        assert_eq!(value.field(&mut scope, 1).unwrap().unwrap_i32(), 7);
+    }
+
+    #[test]
+    fn fused_raw_ephemeron_update_remembers_young_values() {
+        let mut f = Fixture::new(2 << 20);
+        f.call("make_old", &[Val::I32(1)], 0);
+        f.churn();
+        let old = f.call("old", &[], 1).remove(0);
+        let owner = *old.unwrap_anyref().unwrap();
+        let ephemeron = GcEphemeron::new(&mut f.store, &owner, &owner, None).unwrap();
+        f.churn(); // Clears the insertion's touched bit.
+        let nursery_end = f.heap().nursery_end;
+
+        {
+            let mut scope = RootScope::new(&mut f.store);
+            let old = owner.unwrap_struct(&scope).unwrap();
+            let young = young_struct(&mut scope, &old, 7).to_anyref();
+            let owner = owner.to_raw(&mut scope).unwrap();
+            let value = young.to_raw(&mut scope).unwrap();
+            assert!(owner >= nursery_end && value < nursery_end);
+            GcEphemeron::with_raw_access(&mut scope, |_, edges| {
+                assert_eq!(
+                    edges.value_if_matches_raw(ephemeron, owner, owner).unwrap(),
+                    Some(0)
+                );
+                // SAFETY: The value is rooted in this Store and has not moved.
+                let result = unsafe { edges.set_value_if_matches_raw(ephemeron, owner, 0, value) };
+                assert_eq!(result.unwrap(), GcEphemeronUpdate::Mismatch);
+                assert_eq!(
+                    edges.value_if_matches_raw(ephemeron, owner, owner).unwrap(),
+                    Some(0)
+                );
+                // SAFETY: The value is still rooted and the access cannot collect.
+                let result =
+                    unsafe { edges.set_value_if_matches_raw(ephemeron, owner, owner, value) };
+                assert_eq!(result.unwrap(), GcEphemeronUpdate::Updated);
+            });
+        } // The young value is reachable only through the ephemeron.
+
+        f.churn();
+        let mut scope = RootScope::new(&mut f.store);
+        let raw_owner = owner.to_raw(&mut scope).unwrap();
+        let value = ephemeron.value(&mut scope).unwrap().unwrap();
+        let raw_value = value.to_raw(&mut scope).unwrap();
+        GcEphemeron::with_raw_access(&mut scope, |_, edges| {
+            assert_eq!(
+                edges
+                    .value_if_matches_raw(ephemeron, raw_owner, raw_owner)
+                    .unwrap(),
+                Some(raw_value)
+            );
+        });
         let value = value.unwrap_struct(&scope).unwrap();
         assert_eq!(value.field(&mut scope, 1).unwrap().unwrap_i32(), 7);
     }

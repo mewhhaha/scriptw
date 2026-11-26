@@ -2,9 +2,8 @@
 //!
 //! Allocation is performed inline with a bump pointer when possible, falling
 //! back to the `gc_alloc_raw` libcall when the active semi-space is full.
-//! Read and write barriers are unnecessary (e.g. no reference counting and
-//! no concurrent mutation during collection) but we do need stack maps so the
-//! collector can find and update roots when it relocates objects.
+//! Reads need no barriers. Stores into old objects record nursery edges when
+//! the nursery is enabled. Stack maps let the collector relocate roots.
 
 use super::*;
 use crate::TRAP_INTERNAL_ASSERT;
@@ -140,7 +139,10 @@ pub(super) fn emit_old_to_young_barrier(
     value: ir::Value,
 ) -> WasmResult<()> {
     let nursery_end = crate::copying_heap_data::nursery_end(func_env.tunables.gc_heap_initial_size);
-    if nursery_end == 0 || !ty.heap_type.is_vmgcref_type_and_not_i31() || ty.heap_type.is_bottom()
+    if nursery_end == 0
+        || !ty.heap_type.is_vmgcref_type_and_not_i31()
+        || ty.heap_type.is_bottom()
+        || FuncEnvironment::value_as_const_int(builder, value).is_some_and(|v| v as u32 == 0)
     {
         return Ok(());
     }
@@ -166,13 +168,23 @@ pub(super) fn emit_old_to_young_barrier(
     // An old slot: is the value a nursery object?
     builder.switch_to_block(old_block);
     builder.seal_block(old_block);
-    let below = builder.ins().iadd_imm_s(value, -1);
+    let (index, limit) = if !ty.nullable || func_env.is_proven(value, Proven::NonNull) {
+        (value, nursery_end)
+    } else {
+        // One unsigned comparison rejects both zero (which wraps) and old
+        // space references.
+        (builder.ins().iadd_imm_s(value, -1), nursery_end - 1)
+    };
     let in_nursery = builder
         .ins()
-        .icmp_imm_u(IntCC::UnsignedLessThan, below, i64::from(nursery_end - 1));
-    let low_bit = builder.ins().band_imm_u(value, 1);
-    let not_i31 = builder.ins().icmp_imm_u(IntCC::Equal, low_bit, 0);
-    let young = builder.ins().band(in_nursery, not_i31);
+        .icmp_imm_u(IntCC::UnsignedLessThan, index, i64::from(limit));
+    let young = if gc_heap_type_might_be_i31(ty.heap_type) {
+        let low_bit = builder.ins().band_imm_u(value, 1);
+        let not_i31 = builder.ins().icmp_imm_u(IntCC::Equal, low_bit, 0);
+        builder.ins().band(in_nursery, not_i31)
+    } else {
+        in_nursery
+    };
     builder
         .ins()
         .brif(young, record_block, &[], continue_block, &[]);
@@ -435,18 +447,37 @@ impl CopyingCompiler {
         let ptr_to_heap_data = Self::load_vmcopying_heap_data_ptr(func_env, builder);
         let (bump_ptr, active_space_end) =
             Self::load_bump_state(func_env, builder, ptr_to_heap_data);
-        let aligned_size_64 = Self::aligned_size(builder, size);
+        let constant_size = FuncEnvironment::value_as_const_int(builder, size)
+            .and_then(|size| (size as u32).checked_next_multiple_of(ALIGN));
 
-        // Compute `end_of_object = bump_ptr + aligned_size` (in i64) and check
-        // whether it fits within the active semi-space.
-        let bump_ptr_64 = builder.ins().uextend(ir::types::I64, bump_ptr);
-        let end_64 = builder.ins().iadd(bump_ptr_64, aligned_size_64);
-        let active_space_end_64 = builder.ins().uextend(ir::types::I64, active_space_end);
-        let fits = builder.ins().icmp(
-            ir::condcodes::IntCC::UnsignedLessThanOrEqual,
-            end_64,
-            active_space_end_64,
-        );
+        let (fits, end_of_object, object_size) = if let Some(size) = constant_size {
+            // The runtime publishes bump <= limit and inline allocation
+            // preserves it. Checking the remaining capacity first makes the
+            // subsequent i32 addition non-wrapping on the fast edge.
+            let remaining = builder.ins().isub(active_space_end, bump_ptr);
+            let fits = builder.ins().icmp_imm_u(
+                ir::condcodes::IntCC::UnsignedGreaterThanOrEqual,
+                remaining,
+                i64::from(size),
+            );
+            let end = builder.ins().iadd_imm_u(bump_ptr, i64::from(size));
+            let size = builder.ins().iconst(ir::types::I32, i64::from(size));
+            (fits, end, size)
+        } else {
+            // Keep dynamic rounding and addition wide enough to detect any
+            // object end that cannot be represented as a heap index.
+            let aligned_size = Self::aligned_size(builder, size);
+            let bump = builder.ins().uextend(ir::types::I64, bump_ptr);
+            let end = builder.ins().iadd(bump, aligned_size);
+            let limit = builder.ins().uextend(ir::types::I64, active_space_end);
+            let fits =
+                builder
+                    .ins()
+                    .icmp(ir::condcodes::IntCC::UnsignedLessThanOrEqual, end, limit);
+            let end = builder.ins().ireduce(ir::types::I32, end);
+            let size = builder.ins().ireduce(ir::types::I32, aligned_size);
+            (fits, end, size)
+        };
         builder.ins().brif(fits, fast_block, &[], slow_block, &[]);
 
         // Slow path: when there isn't enough room in the bump region, call the
@@ -476,7 +507,6 @@ impl CopyingCompiler {
             let gc_ref = bump_ptr;
 
             // Update the bump pointer.
-            let end_of_object = builder.ins().ireduce(ir::types::I32, end_64);
             Self::store_bump_pointer(func_env, builder, ptr_to_heap_data, end_of_object);
 
             // Compute the raw pointer to the new object.
@@ -509,9 +539,9 @@ impl CopyingCompiler {
             );
 
             // Write `VMCopyingHeader::object_size`.
-            builder.ins().istore32(
+            builder.ins().store(
                 header_flags,
-                aligned_size_64,
+                object_size,
                 obj_ptr,
                 i32::try_from(wasmtime_environ::VM_GC_HEADER_SIZE).unwrap(),
             );
@@ -568,9 +598,10 @@ impl GcCompiler for CopyingCompiler {
             size,
             reserved_bits,
         )?;
-        let len_addr = builder.ins().iadd_imm_s(object_addr, i64::from(len_offset));
         let flags = func_env.gc_memflags(&mut builder.func);
-        builder.ins().store(flags, len, len_addr, 0);
+        builder
+            .ins()
+            .store(flags, len, object_addr, i32::try_from(len_offset).unwrap());
 
         Ok(array_ref)
     }
@@ -718,7 +749,8 @@ impl GcCompiler for CopyingCompiler {
         new_val: ir::Value,
         flags: ir::MemFlagsData,
     ) -> WasmResult<()> {
-        // No write barrier needed for the copying collector.
+        // Heap fields record nursery edges in write_field_at_addr. Globals
+        // and tables are scanned as roots.
         unbarriered_store_gc_ref(builder, ty.heap_type, dst, new_val, flags)
     }
 

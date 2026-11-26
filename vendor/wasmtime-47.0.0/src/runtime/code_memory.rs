@@ -149,9 +149,8 @@ impl CodeMemory {
         let strings = header
             .section_strings(endian, mmap_data, section_headers)
             .context("failed to parse strings table")?;
-        let sections = header
-            .sections(endian, mmap_data)
-            .context("failed to parse sections table")?;
+        let sections: SectionTable<'_, FileHeader64<Endianness>> =
+            SectionTable::new(section_headers, strings);
 
         let mut text = 0..0;
         let mut unwind = 0..0;
@@ -460,19 +459,18 @@ impl CodeMemory {
             // we aren't able to make it readonly, but this is just a
             // defense-in-depth measure and isn't required for correctness.
             //
-            // Scriptw patch: when publishing a page-aligned `.text` section
-            // through native virtual memory, freeze only the small non-text
-            // prefix/suffix as readonly and transition `.text` directly from RW
-            // to RX in one pass instead of walking the full multi-megabyte
-            // `.text` page tables twice.
+            // When page-aligned text abuts one end of the mapping, the
+            // remaining metadata needs at most one read-only transition.
+            // For interior text, freeze the whole image in one call before
+            // making the text executable.
             #[cfg(has_virtual_memory)]
             let split_text_publish = self.needs_executable
                 && self.custom_code_memory.is_none()
                 && self.mmap.supports_virtual_memory()
                 && {
                     let page_size = crate::runtime::vm::host_page_size();
-                    self.text.start % page_size == 0
-                        && (self.text.end % page_size == 0 || self.text.end == self.mmap.len())
+                    (self.text.start == 0 && self.text.end % page_size == 0)
+                        || (self.text.end == self.mmap.len() && self.text.start % page_size == 0)
                 };
 
             #[cfg(has_virtual_memory)]

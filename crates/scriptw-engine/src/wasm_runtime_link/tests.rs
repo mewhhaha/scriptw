@@ -88,7 +88,7 @@ fn program_cache_decoder_reattaches_only_the_recorded_runtime() {
     let entry = encode_cache_entry(WasmProgramRef::new(&native_program, Some(&runtime)));
     let (decoded, linked) = decode_cache_entry(&entry, &profile, &cache).unwrap();
     assert_eq!(decoded.as_ref(), native_program.as_slice());
-    assert_eq!(linked.unwrap().key(), runtime.key());
+    assert_eq!(linked.unwrap().as_ref().key(), runtime.key());
     assert!(decode_standalone_cache_entry(&entry).is_none());
 
     let mut different_runtime = entry.clone();

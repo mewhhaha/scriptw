@@ -298,6 +298,7 @@ fn nested_array_requests_share_bounded_async_generator_scheduling_helpers() {
             .0
     };
     let initialize = helper_index("helper::realm_initialize_intrinsics");
+    let demand_constructors = helper_index("helper::realm_ensure_constructor");
     let metadata = helper_index("helper::function_metadata_publish");
     let append = helper_index("helper::ordinary_property_append");
     let projection = helper_index("helper::object_header_projection");
@@ -319,12 +320,12 @@ fn nested_array_requests_share_bounded_async_generator_scheduling_helpers() {
         "metadata must use the original shared property append algorithm"
     );
     assert!(
-        bodies[&initialize].calls.contains(&metadata),
-        "shared Realm bootstrap must publish metadata through the same owner"
+        bodies[&demand_constructors].calls.contains(&metadata),
+        "demand intrinsic initialization must publish metadata through the same owner"
     );
     assert!(
-        bodies[&initialize].calls.contains(&projection),
-        "shared Realm bootstrap installation must call the actual header projection"
+        bodies[&demand_constructors].calls.contains(&projection),
+        "demand intrinsic constructor installation must call the actual header projection"
     );
 
     let mut run_bodies = 0;

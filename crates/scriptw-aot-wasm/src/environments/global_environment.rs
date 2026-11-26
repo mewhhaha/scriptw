@@ -229,10 +229,13 @@ impl FunctionBuilder<'_> {
         if !self.is_main() {
             return Ok(());
         }
-        self.emit_validate_main_global_lexical_declarations(function)?;
         let plan = self
             .script_global_bindings
             .expect("main global binding plan");
+        if plan.lexical_bindings().is_empty() {
+            return Ok(());
+        }
+        self.emit_validate_main_global_lexical_declarations(function)?;
         let schema = self.runtime_schema();
         let global = self.emit_source_global_environment_to_local(function);
         let cells = self.resolve_env_handle_local(0, function);

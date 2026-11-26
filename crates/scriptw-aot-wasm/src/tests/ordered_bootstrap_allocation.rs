@@ -30,6 +30,32 @@ fn body(bytes: &[u8], index: u32) -> Vec<Operator<'_>> {
 }
 
 #[test]
+fn fresh_global_publication_allocates_only_final_dictionary_arrays() {
+    let artifact = emit_script("this;").unwrap();
+    expect_valid_module(&artifact, 0);
+    let bytes = artifact.runtime().unwrap().bytes();
+    let publisher = function_names_in_bytes(bytes)
+        .into_iter()
+        .find_map(|(index, name)| {
+            (name == "helper::fresh_data_properties_publish").then_some(index)
+        })
+        .expect("the runtime owns the fresh global publication kernel");
+    let publisher = body(bytes, publisher);
+    assert_eq!(
+        publisher
+            .iter()
+            .filter(|op| matches!(op, Operator::ArrayNew { .. } | Operator::ArrayNewDefault { .. }))
+            .count(),
+        2,
+        "the first row allocates the final ordered table and bucket index"
+    );
+    assert!(
+        !publisher.iter().any(|op| matches!(op, Operator::Loop { .. })),
+        "each row writes its precomputed bucket directly"
+    );
+}
+
+#[test]
 fn eager_layout_births_keep_demand_recipe_and_constructor_allocation_owners() {
     let artifact = emit_script("new Uint16Array(1); Set.prototype.keys;").unwrap();
     expect_valid_module(&artifact, 1);
@@ -87,22 +113,19 @@ fn eager_layout_births_keep_demand_recipe_and_constructor_allocation_owners() {
         calls(&bootstrap, constructor_header).is_empty(),
         "eager constructors never allocate dictionary metadata headers"
     );
-    let constructor_calls = calls(&bootstrap, constructor);
-    assert_eq!(
-        constructor_calls.len(),
-        1,
-        "the eager Array constructor retains the shared Context/FunctionObject cycle; dynamic-function and other demand constructors are built on first read"
+    assert!(
+        calls(&bootstrap, constructor).is_empty(),
+        "Realm birth leaves all constructor allocation to demand owners"
     );
-    let layouts = allocations(&bootstrap, type_index::<IntrinsicPropertyStorage>(schema));
+    let demand = body(bytes, named("helper::realm_ensure_constructor"));
+    let constructor_calls = calls(&demand, constructor);
+    let layouts = allocations(&demand, type_index::<IntrinsicPropertyStorage>(schema));
+    assert!(!constructor_calls.is_empty());
     for (position, &callable) in constructor_calls.iter().enumerate() {
-        let header = *layouts
-            .iter()
-            .rev()
-            .find(|&&index| index < callable)
-            .expect("constructor has a birth layout");
         assert!(
-            header < callable && (position == 0 || constructor_calls[position - 1] < header),
-            "each eager constructor allocates its own sealed storage before the shared context/callable tail"
+            layouts.iter().any(|&header|
+                header < callable && (position == 0 || constructor_calls[position - 1] < header)),
+            "each covered demand constructor allocates its sealed storage before the shared context/callable tail"
         );
     }
     assert!(

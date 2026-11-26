@@ -2,6 +2,7 @@
 //! callbacks and Engine-canonical types. Private/shared memory, runtime instances,
 //! native-source contexts and all mutable JavaScript state are added to clones.
 use super::*;
+use std::collections::HashSet;
 
 struct Template {
     key: WasmModuleMemoryCacheKey,
@@ -13,9 +14,18 @@ struct Template {
 /// Exact Engine ownership is checked even for identical host bytes/configuration.
 const RETAINED_TEMPLATES: usize = 2;
 
-pub(super) fn linker(
+#[derive(Default)]
+struct Templates {
+    ready: VecDeque<Template>,
+    // A first use goes directly to execution. Retain only weak Engine
+    // identities here so one-shot use leaves no host functions or Engine.
+    seen: [Option<(WasmModuleMemoryCacheKey, wasmtime::EngineWeak)>; RETAINED_TEMPLATES],
+}
+
+pub(super) fn linker<'module>(
     engine: &WasmtimeEngine,
-    module: &WasmtimeModule,
+    module: &'module WasmtimeModule,
+    mut additional_names: impl Iterator<Item = &'module str>,
     key: WasmModuleMemoryCacheKey,
 ) -> Result<
     (
@@ -29,26 +39,50 @@ pub(super) fn linker(
             "host import template module belongs to another Engine",
         ));
     }
-    static TEMPLATES: OnceLock<Mutex<VecDeque<Template>>> = OnceLock::new();
+    static TEMPLATES: OnceLock<Mutex<Templates>> = OnceLock::new();
     let templates = TEMPLATES.get_or_init(Default::default);
-    {
+    let seen_before = {
         let mut templates = templates
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if let Some(position) = templates.iter().position(|entry| {
+        if let Some(position) = templates.ready.iter().position(|entry| {
             entry.key == key && WasmtimeEngine::same(entry.linker.engine(), engine)
         }) {
-            let entry = templates.remove(position).expect("template key exists");
+            let entry = templates
+                .ready
+                .remove(position)
+                .expect("template key exists");
             let linker = entry.linker.clone();
-            templates.push_back(entry);
+            templates.ready.push_back(entry);
             return Ok((linker, WasmRuntimeHostImportCacheOutcome::Hit));
         }
+        let seen = &mut templates.seen;
+        let seen_before = seen.iter().flatten().any(|(seen_key, seen_engine)| {
+            *seen_key == key
+                && seen_engine
+                    .upgrade()
+                    .is_some_and(|seen_engine| WasmtimeEngine::same(&seen_engine, engine))
+        });
+        if !seen_before {
+            seen.rotate_right(1);
+            seen[0] = Some((key, engine.weak()));
+        }
+        seen_before
+    };
+    if !seen_before {
+        // This linker belongs to this execution. R owns the concrete callback
+        // signatures and supplies the host boundary for later native programs.
+        // P can additionally request fixed-signature callbacks.
+        let mut linker = WasmtimeLinker::new(engine);
+        register_imports(&mut linker, module, Some(&mut additional_names))?;
+        return Ok((linker, WasmRuntimeHostImportCacheOutcome::Miss));
     }
     // Validation and host trampoline construction do not hold the cache mutex.
     let linker = build(engine, module)?;
     let mut templates = templates
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let templates = &mut templates.ready;
     if let Some(position) = templates.iter().position(|entry| entry.key == key) {
         let entry = templates.remove(position).expect("template key exists");
         if WasmtimeEngine::same(entry.linker.engine(), engine) {
@@ -82,6 +116,70 @@ pub(super) fn register(
     linker: &mut WasmtimeLinker<WasmHostState>,
     module: &WasmtimeModule,
 ) -> Result<(), EngineError> {
+    register_imports(linker, module, None)
+}
+
+/// Fixed callbacks use our own signatures. The selection of names never
+/// derives a signature from the importing module.
+pub(super) struct FixedHostFunctions<'linker, 'module> {
+    pub(super) linker: &'linker mut WasmtimeLinker<WasmHostState>,
+    names: Option<&'linker HashSet<&'module str>>,
+}
+
+impl FixedHostFunctions<'_, '_> {
+    pub(super) fn includes(&self, name: &str) -> bool {
+        self.names.is_none_or(|names| names.contains(name))
+    }
+
+    pub(super) fn func_wrap<Params, Results>(
+        &mut self,
+        namespace: &str,
+        name: &str,
+        func: impl wasmtime::IntoFunc<WasmHostState, Params, Results>,
+    ) -> wasmtime::Result<()> {
+        debug_assert_eq!(namespace, WASM_HOST_IMPORT_NAMESPACE);
+        if self.includes(name) {
+            self.linker.func_wrap(namespace, name, func)?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+impl<'linker> FixedHostFunctions<'linker, '_> {
+    pub(super) fn all(linker: &'linker mut WasmtimeLinker<WasmHostState>) -> Self {
+        Self {
+            linker,
+            names: None,
+        }
+    }
+}
+
+fn register_imports<'module>(
+    linker: &mut WasmtimeLinker<WasmHostState>,
+    module: &'module WasmtimeModule,
+    additional_names: Option<&mut dyn Iterator<Item = &'module str>>,
+) -> Result<(), EngineError> {
+    let mut names = additional_names.is_some().then(HashSet::new);
+    let mut record_name = |name: &'module str| {
+        if let Some(names) = &mut names {
+            names.try_reserve(1).map_err(|error| {
+                EngineError::new(format!("wasmtime host import selection failed: {error}"))
+            })?;
+            names.insert(name);
+        }
+        Ok(())
+    };
+    let scanned = wasm_gc_host::ScannedGcHostImports::scan(module, &mut record_name)?;
+    if let Some(additional_names) = additional_names {
+        for name in additional_names {
+            record_name(name)?;
+        }
+    }
+    let mut linker = FixedHostFunctions {
+        linker,
+        names: names.as_ref(),
+    };
     linker
         .func_wrap(
             WASM_HOST_IMPORT_NAMESPACE,
@@ -98,7 +196,7 @@ pub(super) fn register(
             },
         )
         .map_err(|err| EngineError::new(format!("wasmtime linker setup failed: {err}")))?;
-    wasm_gc_host::link(linker, module)?;
+    wasm_gc_host::link_scanned(&mut linker, scanned)?;
     linker
         .func_wrap(
             WASM_HOST_IMPORT_NAMESPACE,
@@ -158,7 +256,10 @@ pub(super) fn register(
     // export's index once instead of looking it up by name per line. Any
     // other module's caller (the index names another module) keeps the name
     // lookup, which yields the same export.
-    let memory_export = module.get_export_index("memory");
+    let memory_export = linker
+        .includes(WASM_HOST_IMPORT_PRINT_LINE_UTF8)
+        .then(|| module.get_export_index("memory"))
+        .flatten();
     linker
         .func_wrap(
             WASM_HOST_IMPORT_NAMESPACE,
@@ -287,7 +388,10 @@ mod tests {
             WasmModuleSource::Program(bytes),
             WasmNativeCompilationMode::Fast,
         );
-        let (mut first, _) = linker(&engine, &module, key).unwrap();
+        let additional_names = || [WASM_HOST_IMPORT_AGENT_CAN_SUSPEND].into_iter();
+        let (mut first, outcome) = linker(&engine, &module, additional_names(), key).unwrap();
+        assert_eq!(outcome, WasmRuntimeHostImportCacheOutcome::Miss);
+        assert!(!first.has_definition(WASM_HOST_IMPORT_NAMESPACE, WASM_HOST_IMPORT_AGENT_CALL));
         let mut first_store = WasmtimeStore::new(&engine, state(true));
         let memory =
             WasmtimeMemory::new(&mut first_store, wasmtime::MemoryType::new(1, None)).unwrap();
@@ -295,7 +399,9 @@ mod tests {
             .define(&first_store, "fresh", "memory", memory)
             .unwrap();
         first.instantiate(&mut first_store, &module).unwrap();
-        let (mut second, outcome) = linker(&engine, &module, key).unwrap();
+        let (_, outcome) = linker(&engine, &module, additional_names(), key).unwrap();
+        assert_eq!(outcome, WasmRuntimeHostImportCacheOutcome::Miss);
+        let (mut second, outcome) = linker(&engine, &module, additional_names(), key).unwrap();
         assert_eq!(outcome, WasmRuntimeHostImportCacheOutcome::Hit);
         let mut second_store = WasmtimeStore::new(&engine, state(false));
         assert!(second.get(&mut second_store, "fresh", "memory").is_err());
@@ -339,12 +445,13 @@ mod tests {
         let key = wasm_module_memory_cache_key(WasmModuleSource::Program(bytes), mode);
         let first_module = compile_wasm_module(&first, bytes).unwrap();
         let second_module = compile_wasm_module(&second, bytes).unwrap();
-        let (a, _) = linker(&first, &first_module, key).unwrap();
-        let (b, outcome) = linker(&second, &second_module, key).unwrap();
+        let _ = linker(&first, &first_module, std::iter::empty(), key).unwrap();
+        let (a, _) = linker(&first, &first_module, std::iter::empty(), key).unwrap();
+        let (b, outcome) = linker(&second, &second_module, std::iter::empty(), key).unwrap();
         assert_eq!(outcome, WasmRuntimeHostImportCacheOutcome::Miss);
         assert!(WasmtimeEngine::same(a.engine(), &first));
         assert!(WasmtimeEngine::same(b.engine(), &second));
-        assert!(linker(&first, &second_module, key).is_err());
+        assert!(linker(&first, &second_module, std::iter::empty(), key).is_err());
     }
 
     /// `(module (import "scriptw_host" "print_line_utf8" (func (param i32 i32)))

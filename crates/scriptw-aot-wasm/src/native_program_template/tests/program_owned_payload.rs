@@ -29,7 +29,7 @@ fn fixture(value: i32, local: u32, ready: u32, initializer: u32) -> Vec<u8> {
         payload_field as usize
     ];
     fields.push(wasm_encoder::FieldType {
-        element_type: StorageType::Val(reference(0, false)),
+        element_type: StorageType::Val(reference(0, true)),
         mutable: false,
     });
     types.ty().struct_(fields);
@@ -55,10 +55,7 @@ fn fixture(value: i32, local: u32, ready: u32, initializer: u32) -> Vec<u8> {
     for _ in 0..payload_field {
         bootstrap.instruction(&Instruction::I32Const(0));
     }
-    bootstrap.instruction(&Instruction::ArrayNewFixed {
-        array_type_index: 0,
-        array_size: 0,
-    });
+    bootstrap.instruction(&Instruction::RefNull(HeapType::Concrete(0)));
     bootstrap.instruction(&Instruction::StructNew(1));
     bootstrap.instruction(&Instruction::End);
     let mut body = Function::new([(1, reference(1, true))]);

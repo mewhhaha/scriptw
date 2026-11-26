@@ -43,6 +43,7 @@ pub(super) fn signature(engine: &WasmtimeEngine) -> NativeGlobalScriptSignature 
     let string = StructType::new(
         engine,
         [
+            FieldType::new(Mutability::Var, StorageType::ValType(ValType::I64)),
             FieldType::new(
                 Mutability::Const,
                 StorageType::ValType(ValType::Ref(RefType::new(
@@ -50,7 +51,6 @@ pub(super) fn signature(engine: &WasmtimeEngine) -> NativeGlobalScriptSignature 
                     HeapType::ConcreteArray(units),
                 ))),
             ),
-            FieldType::new(Mutability::Var, StorageType::ValType(ValType::I64)),
             FieldType::new(Mutability::Var, StorageType::ValType(ValType::I32)),
         ],
     )

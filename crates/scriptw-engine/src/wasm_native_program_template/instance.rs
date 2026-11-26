@@ -8,7 +8,7 @@ pub(crate) fn instantiate(
 ) -> wasmtime::Result<Instance> {
     context.check_budget()?;
     if !WasmtimeEngine::same(engine, context.linker.engine())
-        || !Arc::ptr_eq(template.runtime(), context.runtime())
+        || !Arc::ptr_eq(template.runtime(), context.validated_runtime()?.runtime())
     {
         return Err(wasmtime::Error::msg(
             "native template has a different actual Engine or R owner",

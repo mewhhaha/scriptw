@@ -156,7 +156,7 @@ fn direct_program_signatures_follow_the_exact_core_graph_and_hooks_keep_core_typ
         instance.fields[payload_index].element_type,
         wasmparser::StorageType::Val(wasmparser::ValType::Ref(
             wasmparser::RefType::new(
-                false,
+                true,
                 wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(payload_type))
             )
             .unwrap()

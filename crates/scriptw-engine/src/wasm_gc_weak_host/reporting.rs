@@ -10,7 +10,7 @@ fn text(
         .map_err(|e| wasmtime::Error::msg(e.to_string()))
 }
 
-pub(super) fn link(linker: &mut WasmtimeLinker<WasmHostState>) -> Result<(), EngineError> {
+pub(super) fn link(linker: &mut FixedHostFunctions<'_, '_>) -> Result<(), EngineError> {
     let row = GcHostImport::ReportCleanupException;
     linker
         .func_wrap(

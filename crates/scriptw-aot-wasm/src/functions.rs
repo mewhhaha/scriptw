@@ -772,16 +772,11 @@ impl FunctionBuilder<'_> {
         agent_id: u64,
         function: &mut Function,
     ) -> Result<crate::gc_types::GcStackReference<crate::gc_types::RealmRecord>, EmitError> {
-        use crate::gc_types::{GcOperand, IntrinsicTable, RealmRecord, StoredValue};
+        use crate::gc_types::{GcOperand, IntrinsicTable, RealmRecord};
         let schema = self.runtime_schema();
-        let undefined = schema.reserve_value_local(function);
-        undefined.set_undefined(function);
-        let empty = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<StoredValue>()
-                .from_value(&undefined, function),
-            function,
-        );
+        let empty = schema
+            .reserve_gc_local(function)
+            .initialize(schema.stored_undefined(function), function);
         let count = schema.reserve_i32_local(function);
         function.instruction(&Instruction::I32Const(
             (NonArrayRealmIntrinsicSlot::TABLE_LENGTH
@@ -796,9 +791,6 @@ impl FunctionBuilder<'_> {
             ),
             function,
         );
-        let regexp_legacy = schema
-            .reserve_gc_local(function)
-            .initialize(self.emit_alloc_regexp_legacy_state(function), function);
         let realm = schema.struct_type::<RealmRecord>().construct(
             (
                 GcOperand::i64(realm_id as i64),
@@ -810,7 +802,7 @@ impl FunctionBuilder<'_> {
                 GcOperand::null(schema),
                 GcOperand::null(schema),
                 GcOperand::null(schema),
-                GcOperand::reference(&regexp_legacy, schema),
+                GcOperand::null(schema),
                 GcOperand::constant(crate::heap::TemporalInitializationState::Dormant),
                 GcOperand::null(schema),
                 GcOperand::constant(crate::heap::IntlInitializationState::Dormant),
@@ -823,11 +815,9 @@ impl FunctionBuilder<'_> {
             ),
             function,
         );
-        regexp_legacy.clear(function);
         intrinsics.clear(function);
         schema.release_i32_local(count, function);
         empty.clear(function);
-        undefined.clear(function);
         Ok(schema.retain_snapshot_realm(realm, function))
     }
 

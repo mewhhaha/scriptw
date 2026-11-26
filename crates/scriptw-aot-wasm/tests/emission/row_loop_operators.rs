@@ -25,9 +25,36 @@ fn gc_ordinal(index: &mut u32, stored: u32, runtime_types: &[SubType]) {
         .expect("closed-loop GC type rebases relative to the actual StoredValue witness");
 }
 
+fn rebase_ref_type(ty: &mut wasmparser::RefType, stored: u32, runtime_types: &[SubType]) {
+    if let HeapType::Concrete(UnpackedIndex::Module(mut index)) = ty.heap_type() {
+        gc_ordinal(&mut index, stored, runtime_types);
+        *ty = wasmparser::RefType::new(
+            ty.is_nullable(),
+            HeapType::Concrete(UnpackedIndex::Module(index)),
+        )
+        .expect("rebased GC reference type");
+    }
+}
+
 fn gc_operator(op: &Operator<'_>, stored: u32, runtime_types: &[SubType]) -> String {
     let mut op = op.clone();
     match &mut op {
+        Operator::Block {
+            blockty: wasmparser::BlockType::Type(wasmparser::ValType::Ref(ty)),
+        } => rebase_ref_type(ty, stored, runtime_types),
+        Operator::BrOnCast {
+            from_ref_type,
+            to_ref_type,
+            ..
+        }
+        | Operator::BrOnCastFail {
+            from_ref_type,
+            to_ref_type,
+            ..
+        } => {
+            rebase_ref_type(from_ref_type, stored, runtime_types);
+            rebase_ref_type(to_ref_type, stored, runtime_types);
+        }
         Operator::RefNull { hty }
         | Operator::RefTestNonNull { hty }
         | Operator::RefCastNonNull { hty } => {

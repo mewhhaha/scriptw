@@ -236,9 +236,14 @@ impl FunctionBuilder<'_> {
                 let registry = schema.load_symbol_registry(function);
                 let index = schema.reserve_i32_local(function);
                 let length = schema.reserve_i32_local(function);
+                registry.load(schema, function).is_null(function);
+                function.instruction(&Instruction::If(BlockType::Result(ValType::I32)));
+                function.instruction(&Instruction::I32Const(0));
+                function.instruction(&Instruction::Else);
                 schema
                     .array_type::<RegisteredSymbolTable>()
                     .length(&registry, schema, function);
+                function.instruction(&Instruction::End);
                 length.store(function);
                 function.instruction(&Instruction::I32Const(0));
                 index.store(function);

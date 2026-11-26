@@ -7,9 +7,9 @@ use crate::Engine;
 use crate::error::OutOfMemory;
 use crate::hash_map::HashMap;
 use crate::prelude::*;
-use crate::sync::RwLock;
+use crate::sync::{OnceLock, RwLock};
 use crate::vm::{GcRuntime, TraceInfo};
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use core::cell::Cell;
 use core::iter;
 use core::{
@@ -26,7 +26,7 @@ use wasmtime_core::slab::{Id as SlabId, Slab};
 use wasmtime_environ::{
     EngineOrModuleTypeIndex, EntityRef, GcLayout, ModuleInternedTypeIndex, ModuleTypes,
     RecGroupRelativeTypeIndex, TypeTrace, Undo, VMSharedTypeIndex, WasmCompositeInnerType,
-    WasmCompositeType, WasmExnType, WasmRecGroup, WasmStructType, WasmSubType,
+    WasmCompositeType, WasmExnType, WasmStructType, WasmSubType,
     collections::TryCow,
     iter_entity_range,
     packed_option::{PackedOption, ReservedValue},
@@ -90,10 +90,10 @@ use wasmtime_environ::{
 /// when dropped.
 pub struct TypeCollection {
     engine: Engine,
-    rec_groups: TryVec<RecGroupEntry>,
+    rec_groups: Arc<TryVec<RecGroupEntry>>,
     types: TryPrimaryMap<ModuleInternedTypeIndex, VMSharedTypeIndex>,
     trampolines: TrySecondaryMap<VMSharedTypeIndex, PackedOption<ModuleInternedTypeIndex>>,
-    trace_info: TryPrimaryMap<ModuleInternedTypeIndex, Option<TraceInfo>>,
+    trace_info: TryPrimaryMap<ModuleInternedTypeIndex, Option<OnceLock<TraceInfo>>>,
     types_with_trace_info: HashMap<VMSharedTypeIndex, ModuleInternedTypeIndex>,
 }
 
@@ -104,14 +104,13 @@ impl Debug for TypeCollection {
             rec_groups,
             types,
             trampolines,
-            trace_info,
+            trace_info: _,
             types_with_trace_info: _,
         } = self;
         f.debug_struct("TypeCollection")
             .field("rec_groups", rec_groups)
             .field("types", types)
             .field("trampolines", trampolines)
-            .field("trace_info", trace_info)
             .finish_non_exhaustive()
     }
 }
@@ -155,7 +154,7 @@ impl Engine {
         // TypeCollection, we properly decref the registered types.
         let rec_groups = Undo::new(rec_groups, |rec_groups| {
             let mut inner = registry.0.write();
-            for entry in &rec_groups {
+            for entry in rec_groups.iter() {
                 if entry.decref("register_and_canonicalize_types cleanup") {
                     inner.unregister_entry(entry.clone());
                 }
@@ -252,7 +251,12 @@ impl TypeCollection {
     #[inline]
     #[cfg(feature = "gc")]
     pub fn trace_info(&self, index: ModuleInternedTypeIndex) -> Option<&TraceInfo> {
-        self.trace_info.get(index).and_then(|s| s.as_ref())
+        let info = self.trace_info.get(index)?.as_ref()?;
+        Some(info.get_or_init(|| {
+            // The collection holds the registration for this shared type.
+            let layout = self.engine.signatures().layout(self.types[index]).unwrap();
+            TraceInfo::new(&layout)
+        }))
     }
 
     /// If `index` has `TraceInfo` associated with it then the corresponding
@@ -409,8 +413,6 @@ impl RegisteredType {
             // ever get non-canonical types here. Furthermore, this is only
             // called internally to Wasmtime, so we shouldn't ever have an
             // engine mismatch; those should be caught earlier.
-            inner.assert_canonicalized_for_runtime_usage_in_this_registry(&ty);
-
             let entry = inner.register_singleton_rec_group(gc_runtime, ty)?;
 
             let index = entry.0.shared_type_indices[0];
@@ -539,10 +541,11 @@ impl Debug for RecGroupEntry {
 
 struct RecGroupEntryInner {
     /// The Wasm rec group, canonicalized for hash consing.
-    hash_consing_key: WasmRecGroup,
+    hash_consing_key: RecGroupKeyTypes,
+    hash: u64,
 
     /// The shared type indices for each type in this rec group.
-    shared_type_indices: Box<[VMSharedTypeIndex]>,
+    shared_type_indices: RecGroupIndices,
 
     /// The number of times that this entry has been registered in the
     /// `TypeRegistryInner`.
@@ -561,17 +564,63 @@ struct RecGroupEntryInner {
     unregistered: AtomicBool,
 }
 
+/// Singleton keys can share their type allocation with the runtime slab.
+enum RecGroupKeyTypes {
+    One(Arc<WasmSubType>),
+    Many(Box<[WasmSubType]>),
+}
+
+impl Default for RecGroupKeyTypes {
+    fn default() -> Self {
+        Self::Many(Box::default())
+    }
+}
+
+impl core::ops::Deref for RecGroupKeyTypes {
+    type Target = [WasmSubType];
+
+    fn deref(&self) -> &[WasmSubType] {
+        match self {
+            Self::One(ty) => core::slice::from_ref(ty.as_ref()),
+            Self::Many(types) => types,
+        }
+    }
+}
+
+/// Keep singleton indices inline in the entry.
+enum RecGroupIndices {
+    One(VMSharedTypeIndex),
+    Many(Box<[VMSharedTypeIndex]>),
+}
+
+impl Default for RecGroupIndices {
+    fn default() -> Self {
+        Self::Many(Box::default())
+    }
+}
+
+impl core::ops::Deref for RecGroupIndices {
+    type Target = [VMSharedTypeIndex];
+
+    fn deref(&self) -> &[VMSharedTypeIndex] {
+        match self {
+            Self::One(index) => core::slice::from_ref(index),
+            Self::Many(indices) => indices,
+        }
+    }
+}
+
 /// Scriptw patch: zero-allocation hash-consing probe key.
 ///
 /// Both stored `RecGroupEntry` values and on-the-fly module/singleton probes
-/// hash and compare through `RecGroupKeyView` using the exact same
-/// `hash_sub_type` and `sub_type_eq` implementations. Probing `hash_consing_map`
-/// with a `ModuleRecGroupKey` or `SliceRecGroupKey` therefore requires zero
-/// `WasmSubType` clones and zero heap allocations on cache hits.
+/// compare through `RecGroupKeyView` and use the same structural hash.
+/// A probe computes this hash once and passes it to a new entry on a miss.
 trait RecGroupKey {
     fn rec_group_key_view(&self) -> RecGroupKeyView<'_>;
+    fn rec_group_hash(&self) -> u64;
 }
 
+#[derive(Clone)]
 enum RecGroupKeyView<'a> {
     Canonical(&'a [WasmSubType]),
     Module {
@@ -581,29 +630,29 @@ enum RecGroupKeyView<'a> {
     },
 }
 
-struct SliceRecGroupKey<'a>(&'a [WasmSubType]);
+struct RecGroupProbe<'a> {
+    view: RecGroupKeyView<'a>,
+    hash: u64,
+}
 
-impl RecGroupKey for SliceRecGroupKey<'_> {
-    #[inline]
-    fn rec_group_key_view(&self) -> RecGroupKeyView<'_> {
-        RecGroupKeyView::Canonical(self.0)
+impl<'a> RecGroupProbe<'a> {
+    fn new(view: RecGroupKeyView<'a>) -> Self {
+        let mut hasher = RecGroupHasher::default();
+        view.hash(&mut hasher);
+        Self {
+            view,
+            hash: hasher.finish(),
+        }
     }
 }
 
-struct ModuleRecGroupKey<'a> {
-    module_types: &'a ModuleTypes,
-    map: &'a TryPrimaryMap<ModuleInternedTypeIndex, VMSharedTypeIndex>,
-    range: Range<ModuleInternedTypeIndex>,
-}
-
-impl RecGroupKey for ModuleRecGroupKey<'_> {
-    #[inline]
+impl RecGroupKey for RecGroupProbe<'_> {
     fn rec_group_key_view(&self) -> RecGroupKeyView<'_> {
-        RecGroupKeyView::Module {
-            module_types: self.module_types,
-            map: self.map,
-            range: self.range.clone(),
-        }
+        self.view.clone()
+    }
+
+    fn rec_group_hash(&self) -> u64 {
+        self.hash
     }
 }
 
@@ -672,11 +721,7 @@ impl SubTypeCanonicalizer for ModuleCanonicalizer<'_> {
 }
 
 #[inline]
-fn hash_sub_type<C: SubTypeCanonicalizer, H: Hasher>(
-    ty: &WasmSubType,
-    canon: &C,
-    state: &mut H,
-) {
+fn hash_sub_type<C: SubTypeCanonicalizer, H: Hasher>(ty: &WasmSubType, canon: &C, state: &mut H) {
     let WasmSubType {
         is_final,
         supertype,
@@ -877,7 +922,12 @@ impl PartialEq for RecGroupKeyView<'_> {
                     map,
                 };
                 canonical.iter().zip(iter).all(|(a, module_index)| {
-                    sub_type_eq(a, &IdentityCanonicalizer, &module_types[module_index], &canon)
+                    sub_type_eq(
+                        a,
+                        &IdentityCanonicalizer,
+                        &module_types[module_index],
+                        &canon,
+                    )
                 })
             }
             (
@@ -918,7 +968,7 @@ impl Eq for RecGroupKeyView<'_> {}
 impl Hash for dyn RecGroupKey + '_ {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.rec_group_key_view().hash(state);
+        self.rec_group_hash().hash(state);
     }
 }
 
@@ -934,13 +984,17 @@ impl Eq for dyn RecGroupKey + '_ {}
 impl RecGroupKey for RecGroupEntry {
     #[inline]
     fn rec_group_key_view(&self) -> RecGroupKeyView<'_> {
-        RecGroupKeyView::Canonical(&self.0.hash_consing_key.types)
+        RecGroupKeyView::Canonical(&self.0.hash_consing_key)
+    }
+
+    fn rec_group_hash(&self) -> u64 {
+        self.0.hash
     }
 }
 
 impl PartialEq for RecGroupEntry {
     fn eq(&self, other: &Self) -> bool {
-        self.0.hash_consing_key == other.0.hash_consing_key
+        self.0.hash_consing_key[..] == other.0.hash_consing_key[..]
     }
 }
 
@@ -948,7 +1002,7 @@ impl Eq for RecGroupEntry {}
 
 impl Hash for RecGroupEntry {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        RecGroupKeyView::Canonical(&self.0.hash_consing_key.types).hash(state);
+        self.0.hash.hash(state);
     }
 }
 
@@ -966,6 +1020,7 @@ impl RecGroupEntry {
     fn new_inner() -> Result<Arc<RecGroupEntryInner>, OutOfMemory> {
         try_new(RecGroupEntryInner {
             hash_consing_key: Default::default(),
+            hash: 0,
             shared_type_indices: Default::default(),
             registrations: AtomicUsize::new(0),
             unregistered: AtomicBool::new(false),
@@ -976,13 +1031,15 @@ impl RecGroupEntry {
     /// `RecGroupEntry::new_inner`) and wrap it into a `RecGroupEntry`.
     fn init(
         mut inner: Arc<RecGroupEntryInner>,
-        key: WasmRecGroup,
-        shared_types: Box<[VMSharedTypeIndex]>,
+        key: RecGroupKeyTypes,
+        key_hash: u64,
+        shared_types: RecGroupIndices,
     ) -> Self {
-        debug_assert!(key.is_canonicalized_for_hash_consing());
+        debug_assert!(key.iter().all(|ty| ty.is_canonicalized_for_hash_consing()));
 
         let RecGroupEntryInner {
             hash_consing_key,
+            hash,
             shared_type_indices,
             registrations: _,
             unregistered: _,
@@ -991,8 +1048,9 @@ impl RecGroupEntry {
         debug_assert!(shared_type_indices.is_empty());
         *shared_type_indices = shared_types;
 
-        debug_assert!(hash_consing_key.types.is_empty());
+        debug_assert!(hash_consing_key.is_empty());
         *hash_consing_key = key;
+        *hash = key_hash;
 
         RecGroupEntry(inner)
     }
@@ -1107,6 +1165,10 @@ struct TypeRegistryInner {
     // library's SipHash. See its documentation for what that gives up.
     hash_consing_map: TryHashSet<RecGroupEntry, BuildHasherDefault<RecGroupHasher>>,
 
+    // Try a recent large module's group sequence before hashing each group
+    // of a new module. The weak reference does not keep any types registered.
+    module_prefix: Weak<TryVec<RecGroupEntry>>,
+
     // A map from `VMSharedTypeIndex::bits()` to the type index's associated
     // Wasm type.
     //
@@ -1182,7 +1244,7 @@ impl TypeRegistryInner {
     #[track_caller]
     fn debug_assert_all_registered(&self, entry: &RecGroupEntry) {
         if cfg!(debug_assertions) {
-            for &ty in &entry.0.shared_type_indices {
+            for &ty in entry.0.shared_type_indices.iter() {
                 self.debug_assert_registered(ty);
             }
         }
@@ -1194,16 +1256,18 @@ impl TypeRegistryInner {
         types: &ModuleTypes,
     ) -> Result<
         (
-            TryVec<RecGroupEntry>,
+            Arc<TryVec<RecGroupEntry>>,
             TryPrimaryMap<ModuleInternedTypeIndex, VMSharedTypeIndex>,
-            TryPrimaryMap<ModuleInternedTypeIndex, Option<TraceInfo>>,
+            TryPrimaryMap<ModuleInternedTypeIndex, Option<OnceLock<TraceInfo>>>,
         ),
         OutOfMemory,
     > {
         log::trace!("Start registering module types");
 
         // The engine's type registry entries for these module types.
-        let mut entries = TryVec::new();
+        let mut entries = try_new::<Arc<_>>(TryVec::with_capacity(types.rec_groups().len())?)?;
+        let prefix = self.module_prefix.upgrade();
+        let entries_mut = Arc::get_mut(&mut entries).expect("new arc");
 
         // The map from a module type index to an engine type index for these
         // module types.
@@ -1213,18 +1277,22 @@ impl TypeRegistryInner {
         if let Err(e) = self.register_module_types_impl(
             gc_runtime,
             types,
-            &mut entries,
+            entries_mut,
+            prefix.as_deref().map(|entries| &entries[..]).unwrap_or(&[]),
             &mut map,
             &mut trace_info,
         ) {
-            for entry in entries {
+            for entry in entries_mut.iter() {
                 if entry.decref("register_module_types cleanup") {
-                    self.unregister_entry(entry);
+                    self.unregister_entry(entry.clone());
                 }
             }
             return Err(e);
         }
 
+        if !entries.is_empty() && prefix.as_ref().is_none_or(|p| p.len() <= entries.len()) {
+            self.module_prefix = Arc::downgrade(&entries);
+        }
         log::trace!("End registering module types");
 
         Ok((entries, map, trace_info))
@@ -1235,27 +1303,29 @@ impl TypeRegistryInner {
         gc_runtime: Option<&dyn GcRuntime>,
         types: &ModuleTypes,
         entries: &mut TryVec<RecGroupEntry>,
+        mut prefix: &[RecGroupEntry],
         map: &mut TryPrimaryMap<ModuleInternedTypeIndex, VMSharedTypeIndex>,
-        trace_info: &mut TryPrimaryMap<ModuleInternedTypeIndex, Option<TraceInfo>>,
+        trace_info: &mut TryPrimaryMap<ModuleInternedTypeIndex, Option<OnceLock<TraceInfo>>>,
     ) -> Result<(), OutOfMemory> {
-        entries.reserve(types.rec_groups().len())?;
-        // Scriptw patch: one table growth for the module instead of a
-        // doubling, each rehashing every registered rec group, every time
-        // the map fills while this module's groups are inserted.
-        self.hash_consing_map.reserve(types.rec_groups().len())?;
-        map.reserve(types.wasm_types().len())?;
-        trace_info.reserve(types.wasm_types().len())?;
+        let num_types = types.len_types();
+        map.reserve(num_types)?;
+        trace_info.reserve(num_types)?;
+
+        // On a fresh registry, reserve for the whole module before the first
+        // insertion. Other modules may share every type, so grow those arenas
+        // on misses only.
+        if self.hash_consing_map.is_empty() {
+            self.hash_consing_map.reserve(types.rec_groups().len())?;
+            self.reserve_type_capacity(num_types)?;
+        }
 
         for (_rec_group_index, module_group) in types.rec_groups() {
-            // Scriptw patch: probe the hash-consing map before cloning
-            // `non_canon_types`. Program modules P re-register R's shared GC
-            // rec groups and hit on every shared group, avoiding a second full
-            // clone of all `WasmSubType`s on every P load.
             let entry = self.register_module_rec_group(
                 gc_runtime,
                 map,
                 module_group.clone(),
                 types,
+                &mut prefix,
             )?;
 
             // Update the module-to-engine map with this rec group's
@@ -1270,7 +1340,7 @@ impl TypeRegistryInner {
                     .type_to_gc_layout
                     .get(*engine_ty)
                     .and_then(|l| l.as_ref())
-                    .map(TraceInfo::new);
+                    .map(|_| OnceLock::new());
                 let module_ty3 = trace_info.push(info).expect("reserved capacity");
                 assert_eq!(module_ty, module_ty3);
             }
@@ -1292,6 +1362,7 @@ impl TypeRegistryInner {
         map: &TryPrimaryMap<ModuleInternedTypeIndex, VMSharedTypeIndex>,
         range: Range<ModuleInternedTypeIndex>,
         module_types: &ModuleTypes,
+        prefix: &mut &[RecGroupEntry],
     ) -> Result<RecGroupEntry, OutOfMemory> {
         // Any references in this rec group to types outside of this rec group
         // may only be to fully-registered types.
@@ -1310,15 +1381,24 @@ impl TypeRegistryInner {
             }
         }
 
-        // Scriptw patch: probe the hash-consing map on the fly without cloning
-        // any `WasmSubType`s or allocating a `WasmRecGroup`. On cache hits
-        // (such as every shared GC rec group re-registered by P modules), this
-        // avoids all per-type clones and heap allocations.
-        let probe = ModuleRecGroupKey {
+        let view = RecGroupKeyView::Module {
             module_types,
             map,
             range: range.clone(),
         };
+        if let Some((candidate, tail)) = prefix.split_first() {
+            // A candidate can outlive its registration while the originating
+            // collection is being dropped. Compare the full structural key,
+            // with references resolved through this module's map.
+            if !candidate.0.unregistered.load(Acquire) && view == candidate.rec_group_key_view() {
+                *prefix = tail;
+                candidate.incref("module type prefix");
+                return Ok(candidate.clone());
+            }
+            *prefix = &[];
+        }
+
+        let probe = RecGroupProbe::new(view);
         if let Some(entry) = self.get_rec_group(&probe) {
             log::trace!("hash-consing map hit: reusing {entry:?}");
             assert_eq!(entry.0.unregistered.load(Acquire), false);
@@ -1328,69 +1408,47 @@ impl TypeRegistryInner {
         }
 
         log::trace!("hash-consing map miss: making new registration");
-        let len = iter_entity_range(range.clone()).len();
-        let mut non_canon_types = TryVec::with_capacity(len)?;
-        let hash_consing_key = WasmRecGroup {
-            types: iter_entity_range(range.clone())
-                .map(|module_index| {
-                    let orig = &module_types[module_index];
-                    non_canon_types
-                        .push((module_index, orig.try_clone()?))
-                        .expect("reserved capacity");
-                    let mut ty = orig.try_clone()?;
-                    ty.canonicalize_for_hash_consing(range.clone(), &mut |idx| {
-                        debug_assert!(idx < range.start);
-                        map[idx]
-                    });
-                    Ok(ty)
-                })
-                .try_collect::<Box<[_]>, OutOfMemory>()?,
+        let mut key_types = iter_entity_range(range.clone()).map(|module_index| {
+            let mut ty = module_types[module_index].try_clone()?;
+            ty.canonicalize_for_hash_consing(range.clone(), &mut |idx| {
+                debug_assert!(idx < range.start);
+                map[idx]
+            });
+            Ok::<_, OutOfMemory>(ty)
+        });
+        let key = if key_types.len() == 1 {
+            RecGroupKeyTypes::One(try_new(key_types.next().unwrap()?)?)
+        } else {
+            RecGroupKeyTypes::Many(key_types.try_collect::<Box<[_]>, OutOfMemory>()?)
         };
 
-        if cfg!(debug_assertions) {
-            let mut probe_hasher = RecGroupHasher::default();
-            probe.rec_group_key_view().hash(&mut probe_hasher);
-            let mut canon_hasher = RecGroupHasher::default();
-            RecGroupKeyView::Canonical(&hash_consing_key.types).hash(&mut canon_hasher);
-            debug_assert_eq!(probe_hasher.finish(), canon_hasher.finish());
-            debug_assert!(
-                probe.rec_group_key_view() == RecGroupKeyView::Canonical(&hash_consing_key.types)
-            );
-        }
-
-        self.register_new_rec_group(gc_runtime, map, range, hash_consing_key, non_canon_types)
+        debug_assert_eq!(
+            probe.hash,
+            RecGroupProbe::new(RecGroupKeyView::Canonical(&key)).hash
+        );
+        debug_assert!(probe.view == RecGroupKeyView::Canonical(&key));
+        self.register_new_rec_group(gc_runtime, key, probe.hash)
     }
 
     /// Register a new rec group that is not already in this registry.
     fn register_new_rec_group(
         &mut self,
         gc_runtime: Option<&(dyn GcRuntime + 'static)>,
-        map: &TryPrimaryMap<ModuleInternedTypeIndex, VMSharedTypeIndex>,
-        range: Range<ModuleInternedTypeIndex>,
-        hash_consing_key: WasmRecGroup,
-        mut non_canon_types: TryVec<(ModuleInternedTypeIndex, WasmSubType)>,
+        key: RecGroupKeyTypes,
+        hash: u64,
     ) -> Result<RecGroupEntry, OutOfMemory> {
-        debug_assert!(hash_consing_key.is_canonicalized_for_hash_consing());
-        debug_assert!(self.get_rec_group(&SliceRecGroupKey(&hash_consing_key.types)).is_none());
+        debug_assert!(
+            self.get_rec_group(&RecGroupProbe {
+                view: RecGroupKeyView::Canonical(&key),
+                hash,
+            })
+            .is_none()
+        );
 
-        // XXX: Do not write new entries to `self` or its arenas in this block
-        // of code, as we will not rollback those changes on OOM.
-        let entry = {
-            // First, pre-allocate capacity in our arenas for this rec group, as
-            // much as possible.
-            let num_types = non_canon_types.len();
-            self.reserve_capacity_for_rec_group(num_types)?;
-            let mut shared_type_indices = TryVec::new();
-            shared_type_indices.reserve_exact(num_types)?;
-            let entry_inner = RecGroupEntry::new_inner()?;
-
-            // Assign a `VMSharedTypeIndex` to each type.
-            let shared_type_indices =
-                self.assign_shared_type_indices(&non_canon_types, shared_type_indices);
-
-            // Initialize the rec group entry, now that we have all its parts.
-            RecGroupEntry::init(entry_inner, hash_consing_key, shared_type_indices)
-        };
+        self.reserve_type_capacity(key.len())?;
+        let entry_inner = RecGroupEntry::new_inner()?;
+        let shared_type_indices = self.assign_shared_type_indices(key.len())?;
+        let entry = RecGroupEntry::init(entry_inner, key, hash, shared_type_indices);
 
         // XXX: From the creation of the `Undo` and afterwards, we can write to
         // `self` and its arenas. We must, however, always ensure that the
@@ -1403,20 +1461,13 @@ impl TypeRegistryInner {
             registry.drain_drop_stack();
         });
 
-        registry.canonicalize_entry_types_for_runtime_usage(
-            map,
-            &entry,
-            non_canon_types.iter_mut().map(|(_, ty)| ty),
-            range.clone(),
-        );
-
         // Inter-group edges: increment the referenced group's ref
         // count, because these other rec groups shouldn't be dropped
         // while this new rec group is still alive.
         registry.incref_outgoing_edges(&entry);
         did_incref.set(true);
 
-        registry.insert_entry_types(&entry, non_canon_types.into_iter().map(|(_, ty)| ty))?;
+        registry.insert_entry_types(&entry)?;
         registry.insert_entry_rec_groups(&entry);
         registry.insert_entry_supertypes(&entry)?;
         registry.insert_entry_trampolines(gc_runtime, &entry)?;
@@ -1465,30 +1516,39 @@ impl TypeRegistryInner {
     }
 
     /// Insert the rec group entry's types into the `self.types` arena.
-    fn insert_entry_types(
-        &mut self,
-        entry: &RecGroupEntry,
-        sub_types: impl ExactSizeIterator<Item = WasmSubType>,
-    ) -> Result<(), OutOfMemory> {
-        debug_assert_eq!(entry.0.shared_type_indices.len(), sub_types.len());
-        for (ty_idx, sub_ty) in entry.0.shared_type_indices.iter().copied().zip(sub_types) {
-            // NB: Do not use
-            // `assert_canonicalized_for_runtime_usage_in_this_registry` because
-            // the types this type references may not be fully registered yet,
-            // as we are in the middle of a rec group's registration.
-            debug_assert!(sub_ty.is_canonicalized_for_runtime_usage());
-
-            let id = shared_type_index_to_slab_id(ty_idx);
-            debug_assert!(self.types.contains(id));
+    fn insert_entry_types(&mut self, entry: &RecGroupEntry) -> Result<(), OutOfMemory> {
+        let indices = &entry.0.shared_type_indices;
+        let key = &entry.0.hash_consing_key;
+        if let RecGroupKeyTypes::One(ty) = key
+            && ty.is_canonicalized_for_runtime_usage()
+        {
+            let id = shared_type_index_to_slab_id(indices[0]);
             debug_assert!(self.types[id].is_none());
-            self.types[id] = Some(try_new(sub_ty)?);
+            self.types[id] = Some(ty.clone());
+            return Ok(());
+        }
+
+        for (&idx, ty) in indices.iter().zip(key.iter()) {
+            let mut ty = ty.try_clone()?;
+            ty.trace_mut::<_, core::convert::Infallible>(&mut |index| {
+                if let EngineOrModuleTypeIndex::RecGroup(relative) = *index {
+                    let offset = usize::try_from(relative.as_u32()).unwrap();
+                    *index = EngineOrModuleTypeIndex::Engine(indices[offset]);
+                }
+                Ok(())
+            })
+            .unwrap();
+            debug_assert!(ty.is_canonicalized_for_runtime_usage());
+            let id = shared_type_index_to_slab_id(idx);
+            debug_assert!(self.types[id].is_none());
+            self.types[id] = Some(try_new(ty)?);
         }
         Ok(())
     }
 
     /// Remove the rec group entry's types into the `self.types` arena.
     fn remove_entry_types(&mut self, entry: &RecGroupEntry) {
-        for &ty in &entry.0.shared_type_indices {
+        for &ty in entry.0.shared_type_indices.iter() {
             let id = shared_type_index_to_slab_id(ty);
             debug_assert!(self.types.contains(id));
             self.types.dealloc(id);
@@ -1498,7 +1558,7 @@ impl TypeRegistryInner {
     /// Insert the rec group backlink for each type in this rec group.
     fn insert_entry_rec_groups(&mut self, entry: &RecGroupEntry) {
         debug_assert!(self.type_to_rec_group.capacity() >= self.types.len());
-        for &ty in &entry.0.shared_type_indices {
+        for &ty in entry.0.shared_type_indices.iter() {
             debug_assert!(self.type_to_rec_group[ty].is_none());
             debug_assert!(ty.index() < self.type_to_rec_group.capacity());
             self.type_to_rec_group
@@ -1509,7 +1569,7 @@ impl TypeRegistryInner {
 
     /// Remove the rec group's type's backlinks to the rec group.
     fn remove_entry_rec_groups(&mut self, entry: &RecGroupEntry) {
-        for &ty in &entry.0.shared_type_indices {
+        for &ty in entry.0.shared_type_indices.iter() {
             debug_assert!(ty.index() < self.type_to_rec_group.capacity());
             self.type_to_rec_group.remove(ty);
         }
@@ -1517,7 +1577,7 @@ impl TypeRegistryInner {
 
     /// Insert the supertype information for this rec group's types.
     fn insert_entry_supertypes(&mut self, entry: &RecGroupEntry) -> Result<(), OutOfMemory> {
-        for &ty in &entry.0.shared_type_indices {
+        for &ty in entry.0.shared_type_indices.iter() {
             let id = shared_type_index_to_slab_id(ty);
             if let Some(supertype) = self.types[id].as_ref().unwrap().supertype {
                 debug_assert!(self.type_to_supertypes.capacity() <= self.types.capacity());
@@ -1550,7 +1610,7 @@ impl TypeRegistryInner {
             return;
         }
 
-        for &ty in &entry.0.shared_type_indices {
+        for &ty in entry.0.shared_type_indices.iter() {
             self.type_to_supertypes.remove(ty);
         }
     }
@@ -1561,7 +1621,7 @@ impl TypeRegistryInner {
         gc_runtime: Option<&(dyn GcRuntime + 'static)>,
         entry: &RecGroupEntry,
     ) -> Result<(), OutOfMemory> {
-        for &ty_idx in &entry.0.shared_type_indices {
+        for &ty_idx in entry.0.shared_type_indices.iter() {
             let id = shared_type_index_to_slab_id(ty_idx);
             debug_assert!(self.types.contains(id));
             debug_assert!(self.types[id].is_some());
@@ -1630,7 +1690,7 @@ impl TypeRegistryInner {
             return;
         }
 
-        for &ty in &entry.0.shared_type_indices {
+        for &ty in entry.0.shared_type_indices.iter() {
             if let Some(tramp_ty) = self.type_to_trampoline.remove(ty).and_then(|x| x.expand()) {
                 self.debug_assert_registered(tramp_ty);
                 let tramp_entry = self.type_to_rec_group[tramp_ty].as_ref().unwrap();
@@ -1662,7 +1722,7 @@ impl TypeRegistryInner {
             return Ok(());
         };
 
-        for &ty_idx in &entry.0.shared_type_indices {
+        for &ty_idx in entry.0.shared_type_indices.iter() {
             let id = shared_type_index_to_slab_id(ty_idx);
             let sub_ty = self.types[id].as_ref().unwrap();
             assert!(!sub_ty.composite_type.shared);
@@ -1703,7 +1763,7 @@ impl TypeRegistryInner {
             return;
         }
 
-        for ty in &entry.0.shared_type_indices {
+        for ty in entry.0.shared_type_indices.iter() {
             self.type_to_gc_layout.remove(*ty);
         }
     }
@@ -1711,81 +1771,66 @@ impl TypeRegistryInner {
     /// Assign a `VMSharedTypeIndex` to each type in a rec group.
     fn assign_shared_type_indices(
         &mut self,
-        non_canon_types: &[(ModuleInternedTypeIndex, WasmSubType)],
-        mut shared_type_indices: TryVec<VMSharedTypeIndex>,
-    ) -> Box<[VMSharedTypeIndex]> {
-        debug_assert_eq!(non_canon_types.len(), shared_type_indices.capacity());
-        debug_assert!(shared_type_indices.is_empty());
-        debug_assert!(
-            self.types.capacity() - self.types.len() >= non_canon_types.len(),
-            "should have reserved capacity"
-        );
-        for (module_index, ty) in non_canon_types.iter() {
-            let engine_index =
-                slab_id_to_shared_type_index(self.types.alloc(None).expect("have capacity"));
-            log::trace!("reserved {engine_index:?} for {module_index:?} = non-canonical {ty:?}");
-            shared_type_indices
-                .push(engine_index)
-                .expect("reserved capacity");
+        num_types: usize,
+    ) -> Result<RecGroupIndices, OutOfMemory> {
+        debug_assert!(self.types.capacity() - self.types.len() >= num_types);
+        let mut alloc_index =
+            || slab_id_to_shared_type_index(self.types.alloc(None).expect("reserved capacity"));
+        if num_types == 1 {
+            return Ok(RecGroupIndices::One(alloc_index()));
         }
 
-        debug_assert_eq!(shared_type_indices.len(), shared_type_indices.capacity());
-        shared_type_indices
-            .into_boxed_slice()
-            .expect("capacity should be exact")
+        let mut indices = TryVec::new();
+        indices.reserve_exact(num_types)?;
+        for _ in 0..num_types {
+            indices.push(alloc_index()).expect("reserved capacity");
+        }
+        Ok(RecGroupIndices::Many(
+            indices.into_boxed_slice().expect("reserved exact capacity"),
+        ))
     }
 
     /// For each cross-rec group type reference inside `entry`, increment the
     /// referenced rec group's registration count.
     fn incref_outgoing_edges(&mut self, entry: &RecGroupEntry) {
         let key = &entry.0.hash_consing_key;
-        debug_assert!(key.is_canonicalized_for_hash_consing());
-        key.trace_engine_indices::<_, ()>(&mut |index| {
-            self.debug_assert_registered(index);
-            let other_entry = self.type_to_rec_group[index].as_ref().unwrap();
-            assert_eq!(other_entry.0.unregistered.load(Acquire), false);
-            other_entry.incref("new rec group's type references");
-            Ok(())
-        })
-        .unwrap();
+        for ty in key.iter() {
+            ty.trace_engine_indices::<_, ()>(&mut |index| {
+                self.debug_assert_registered(index);
+                let other_entry = self.type_to_rec_group[index].as_ref().unwrap();
+                assert_eq!(other_entry.0.unregistered.load(Acquire), false);
+                other_entry.incref("new rec group's type references");
+                Ok(())
+            })
+            .unwrap();
+        }
     }
 
     /// For each cross-rec group type reference inside `entry`, decrement the
     /// referenced rec group's registration count.
     fn decref_outgoing_edges(&mut self, entry: &RecGroupEntry) {
         let key = &entry.0.hash_consing_key;
-        debug_assert!(key.is_canonicalized_for_hash_consing());
-        key.trace_engine_indices::<_, ()>(&mut |other_index| {
-            self.debug_assert_registered(other_index);
-            let other_entry = self.type_to_rec_group[other_index].as_ref().unwrap();
-            assert_eq!(other_entry.0.unregistered.load(Acquire), false);
-            if other_entry.decref("dropping rec group's type references") {
-                self.push_to_drop_stack(other_entry.clone());
-            }
-            Ok(())
-        })
-        .unwrap();
+        for ty in key.iter() {
+            ty.trace_engine_indices::<_, ()>(&mut |other_index| {
+                self.debug_assert_registered(other_index);
+                let other_entry = self.type_to_rec_group[other_index].as_ref().unwrap();
+                assert_eq!(other_entry.0.unregistered.load(Acquire), false);
+                if other_entry.decref("dropping rec group's type references") {
+                    self.push_to_drop_stack(other_entry.clone());
+                }
+                Ok(())
+            })
+            .unwrap();
+        }
     }
 
-    /// Pre-allocate capacity for a rec group of size `num_types` in our various
-    /// arenas.
-    fn reserve_capacity_for_rec_group(&mut self, num_types: usize) -> Result<(), OutOfMemory> {
-        log::trace!("Reserving capacity for rec group of {num_types} types");
-
-        // NB: Destructure to make sure we are considering every field in
-        // `self`.
+    /// Pre-allocate capacity for types in our arenas.
+    fn reserve_type_capacity(&mut self, num_types: usize) -> Result<(), OutOfMemory> {
         let TypeRegistryInner {
-            hash_consing_map,
             types,
             type_to_rec_group,
             drop_stack,
-
-            // We only insert entries into these `SecondaryMap`s if/when we
-            // encounter GC types (which is rare, even when GC types are
-            // enabled).
-            type_to_supertypes: _,
-            type_to_trampoline: _,
-            type_to_gc_layout: _,
+            ..
         } = self;
 
         // Reserve `drop_stack` against the maximum number of live entries that
@@ -1793,72 +1838,23 @@ impl TypeRegistryInner {
         // an allocation failure cannot leave spare slab capacity that would
         // violate cleanup invariants.
         debug_assert!(drop_stack.is_empty());
-        let max_live_entries = types.len().checked_add(num_types).ok_or(OutOfMemory::new(
-            core::mem::size_of::<RecGroupEntry>(),
-        ))?;
+        let max_live_entries = types
+            .len()
+            .checked_add(num_types)
+            .ok_or(OutOfMemory::new(core::mem::size_of::<RecGroupEntry>()))?;
         log::trace!("    drop_stack.reserve({max_live_entries})");
         drop_stack.reserve(max_live_entries)?;
-
-        // This map contains rec groups, not types, so only reserve space for
-        // one additional entry.
-        log::trace!("    hash_consing_map.reserve(1)");
-        hash_consing_map.reserve(1)?;
 
         log::trace!("    types.reserve({num_types})");
         types.reserve(num_types)?;
         let types_capacity = types.capacity();
 
-        log::trace!("    type_to_rec_group.resize({types_capacity})");
-        type_to_rec_group.resize(types_capacity)?;
+        if type_to_rec_group.capacity() < types_capacity {
+            log::trace!("    type_to_rec_group.resize({types_capacity})");
+            type_to_rec_group.resize(types_capacity)?;
+        }
 
         Ok(())
-    }
-
-    /// Canonicalize all the types inside a rec group for runtime usage within
-    /// this registry.
-    fn canonicalize_entry_types_for_runtime_usage<'a>(
-        &self,
-        map: &TryPrimaryMap<ModuleInternedTypeIndex, VMSharedTypeIndex>,
-        entry: &RecGroupEntry,
-        sub_tys: impl ExactSizeIterator<Item = &'a mut WasmSubType>,
-        range: Range<ModuleInternedTypeIndex>,
-    ) {
-        debug_assert_eq!(sub_tys.len(), entry.0.shared_type_indices.len());
-        for (engine_index, ty) in entry.0.shared_type_indices.iter().copied().zip(sub_tys) {
-            self.canonicalize_type_for_runtime_usage(map, &entry, engine_index, ty, range.clone());
-        }
-    }
-
-    /// Canonicalize one type for runtime usage within this registry.
-    fn canonicalize_type_for_runtime_usage(
-        &self,
-        map: &TryPrimaryMap<ModuleInternedTypeIndex, VMSharedTypeIndex>,
-        entry: &RecGroupEntry,
-        engine_index: VMSharedTypeIndex,
-        ty: &mut WasmSubType,
-        range: Range<ModuleInternedTypeIndex>,
-    ) {
-        log::trace!("canonicalizing {engine_index:?} for runtime usage");
-        ty.canonicalize_for_runtime_usage(&mut |module_index| {
-            if module_index < range.start {
-                let engine_index = map[module_index];
-                log::trace!("    cross-group {module_index:?} becomes {engine_index:?}");
-                self.debug_assert_registered(engine_index);
-                engine_index
-            } else {
-                assert!(module_index < range.end);
-                let rec_group_offset = module_index.as_u32() - range.start.as_u32();
-                let rec_group_offset = usize::try_from(rec_group_offset).unwrap();
-                let engine_index = entry.0.shared_type_indices[rec_group_offset];
-                log::trace!("    intra-group {module_index:?} becomes {engine_index:?}");
-                assert!(!engine_index.is_reserved_value());
-                assert!(
-                    self.types
-                        .contains(shared_type_index_to_slab_id(engine_index))
-                );
-                engine_index
-            }
-        });
     }
 
     /// Assert that the given type is canonicalized for runtime usage this
@@ -1907,7 +1903,8 @@ impl TypeRegistryInner {
         // already-canonicalized type before cloning or allocating a
         // `WasmRecGroup`. Host import registrations and trampoline lookups hit
         // existing signatures on nearly every call.
-        if let Some(entry) = self.get_rec_group(&SliceRecGroupKey(core::slice::from_ref(&ty))) {
+        let probe = RecGroupProbe::new(RecGroupKeyView::Canonical(core::slice::from_ref(&ty)));
+        if let Some(entry) = self.get_rec_group(&probe) {
             log::trace!("hash-consing map hit: reusing {entry:?}");
             assert_eq!(entry.0.unregistered.load(Acquire), false);
             self.debug_assert_all_registered(entry);
@@ -1915,28 +1912,10 @@ impl TypeRegistryInner {
             return Ok(entry.clone());
         }
 
-        // This type doesn't have any module-level type references, since it is
-        // already canonicalized for runtime usage in this registry, so an empty
-        // map suffices.
-        let map = TryPrimaryMap::default();
-
-        // This must have `range.len() == 1`, even though we know this type
-        // doesn't have any intra-group type references, to satisfy
-        // `register_new_rec_group`'s preconditions.
-        let range = ModuleInternedTypeIndex::from_bits(u32::MAX - 1)
-            ..ModuleInternedTypeIndex::from_bits(u32::MAX);
-
         log::trace!("hash-consing map miss: making new registration");
-        let mut key_types = TryVec::with_capacity(1)?;
-        key_types.push(ty.try_clone()?).expect("reserved capacity");
-        let hash_consing_key = WasmRecGroup {
-            types: key_types.into_boxed_slice()?,
-        };
-        let mut non_canon_types = TryVec::with_capacity(1)?;
-        non_canon_types
-            .push((range.start, ty))
-            .expect("reserved capacity");
-        self.register_new_rec_group(gc_runtime, &map, range, hash_consing_key, non_canon_types)
+        let hash = probe.hash;
+        let key = RecGroupKeyTypes::One(try_new(ty)?);
+        self.register_new_rec_group(gc_runtime, key, hash)
     }
 
     fn trampoline_type(&self, index: VMSharedTypeIndex) -> VMSharedTypeIndex {
@@ -1961,7 +1940,7 @@ impl TypeRegistryInner {
     /// Unregister all of a type collection's rec groups.
     fn unregister_type_collection(&mut self, collection: &TypeCollection) {
         log::trace!("Begin unregistering `TypeCollection`");
-        for entry in &collection.rec_groups {
+        for entry in collection.rec_groups.iter() {
             self.debug_assert_all_registered(entry);
             if entry.decref("TypeRegistryInner::unregister_type_collection") {
                 self.unregister_entry(entry.clone());
@@ -2130,6 +2109,7 @@ impl Drop for TypeRegistryInner {
     fn drop(&mut self) {
         let TypeRegistryInner {
             hash_consing_map,
+            module_prefix: _,
             types,
             type_to_rec_group,
             type_to_supertypes,
@@ -2277,5 +2257,60 @@ impl TypeRegistry {
         let sub_supertypes = inner.supertypes(sub);
         let sup_supertypes = inner.supertypes(sup);
         sub_supertypes.get(sup_supertypes.len()) == Some(&sup)
+    }
+}
+
+#[cfg(all(
+    test,
+    feature = "cranelift",
+    any(feature = "gc-copying", feature = "gc-drc", feature = "gc-null"),
+    feature = "wat",
+    not(miri)
+))]
+mod tests {
+    use crate::{Config, Engine, Module};
+    use wasmtime_environ::TypeIndex;
+
+    #[test]
+    fn deserialized_modules_share_recursive_prefix_until_the_last_drop() {
+        let mut config = Config::new();
+        config.wasm_gc(true);
+        let engine = Engine::new(&config).unwrap();
+        let load = |leaf| {
+            let wasm = alloc::format!(
+                "(module
+                    (rec
+                        (type $node (struct (field (ref null $link))))
+                        (type $link (struct (field i32) (field (ref null $node)))))
+                    (type (array (mut {leaf}))))"
+            );
+            let bytes = engine.precompile_module(wasm.as_bytes()).unwrap();
+            // SAFETY: These bytes were just precompiled by this engine.
+            unsafe { Module::deserialize(&engine, &bytes).unwrap() }
+        };
+        let runtime = load("i32");
+        let program = load("i64");
+        let shared = |module: &Module, idx| {
+            module.env_module().types[TypeIndex::from_u32(idx)].unwrap_engine_type_index()
+        };
+        let node = shared(&runtime, 0);
+        let link = shared(&runtime, 1);
+        assert_eq!(node, shared(&program, 0));
+        assert_eq!(link, shared(&program, 1));
+        let runtime_leaf = shared(&runtime, 2);
+        let program_leaf = shared(&program, 2);
+        assert_ne!(runtime_leaf, program_leaf);
+
+        let registry = engine.signatures();
+        drop(runtime);
+        assert!(registry.borrow(runtime_leaf).is_none());
+        assert!(registry.borrow(node).is_some());
+        assert!(registry.borrow(link).is_some());
+        assert!(registry.borrow(program_leaf).is_some());
+
+        drop(program);
+        assert!(registry.borrow(node).is_none());
+        assert!(registry.borrow(link).is_none());
+        assert!(registry.borrow(program_leaf).is_none());
     }
 }

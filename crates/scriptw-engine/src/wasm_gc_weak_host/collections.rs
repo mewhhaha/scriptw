@@ -30,13 +30,6 @@ unsafe fn operands(arguments: &Arguments, identities: usize) -> wasmtime::Result
     }
 }
 
-fn find(
-    caller: &WasmtimeCaller<'_, WasmHostState>,
-    at: Operands,
-) -> wasmtime::Result<Option<GcEphemeron>> {
-    Ok(caller.data().weak.index.find(caller, at)?.entry())
-}
-
 /// Defines `row` with exactly the type the emitter declares for it, which
 /// instantiation checks against the module's import.
 ///
@@ -45,7 +38,7 @@ fn find(
 /// `operation` reads its parameters and writes its results as `parameters`
 /// and `results` type them.
 unsafe fn define(
-    linker: &mut WasmtimeLinker<WasmHostState>,
+    linker: &mut FixedHostFunctions<'_, '_>,
     row: GcHostImport,
     parameters: &[ValType],
     results: &[ValType],
@@ -54,6 +47,10 @@ unsafe fn define(
         + Sync
         + 'static,
 ) -> Result<(), EngineError> {
+    if !linker.includes(row.name()) {
+        return Ok(());
+    }
+    let linker = &mut *linker.linker;
     let ty = FuncType::new(
         linker.engine(),
         parameters.iter().cloned(),
@@ -88,11 +85,7 @@ fn get(
 ) -> wasmtime::Result<()> {
     // SAFETY: the import's type.
     let at = unsafe { operands(arguments, 2)? };
-    let value = match find(&caller, at)? {
-        // Returned to compiled code at once, before anything can collect.
-        Some(entry) => entry.value_raw(&mut caller)?,
-        None => 0,
-    };
+    let value = Entries::get(&mut caller, at)?;
     arguments[0].write(ValRaw::anyref(value));
     Ok(())
 }
@@ -105,7 +98,7 @@ fn has(
 ) -> wasmtime::Result<()> {
     // SAFETY: the import's type.
     let at = unsafe { operands(arguments, 2)? };
-    let present = find(&caller, at)?.is_some();
+    let present = caller.data().weak.index.find(&caller, at)?.is_some();
     arguments[0].write(ValRaw::i32(i32::from(present)));
     Ok(())
 }
@@ -118,7 +111,7 @@ fn delete(
 ) -> wasmtime::Result<()> {
     // SAFETY: the import's type.
     let at = unsafe { operands(arguments, 2)? };
-    let entry = find(&caller, at)?;
+    let entry = caller.data().weak.index.find(&caller, at)?;
     if let Some(entry) = entry {
         // The index keeps the retired handle until it next rebuilds; it can
         // match nothing.
@@ -128,7 +121,7 @@ fn delete(
     Ok(())
 }
 
-pub(super) fn link(linker: &mut WasmtimeLinker<WasmHostState>) -> Result<(), EngineError> {
+pub(super) fn link(linker: &mut FixedHostFunctions<'_, '_>) -> Result<(), EngineError> {
     const EQ: ValType = ValType::EQREF;
     const LOOKUP: [ValType; 4] = [EQ, EQ, ValType::I64, ValType::I64];
     // SAFETY: each operation reads the parameters and writes the result its

@@ -228,6 +228,14 @@ impl BinaryNumericLeafPlan {
     pub(crate) fn source(&self) -> &FunctionId {
         &self.0.source
     }
+    fn is_exact_subtraction(&self) -> bool {
+        matches!(
+            &self.0.expression,
+            NumericLeafExpression::Binary(NumericLeafBinaryOp::Sub, lhs, rhs)
+                if matches!(lhs.as_ref(), NumericLeafExpression::Parameter(0))
+                    && matches!(rhs.as_ref(), NumericLeafExpression::Parameter(1))
+        )
+    }
     pub(crate) fn compile_body(&self, schema: &crate::gc_types::RuntimeSchema) -> Function {
         let signature = schema.signature(crate::module::StaticSignature::BinaryNumericCallback);
         let mut function = Function::with_parameters(
@@ -236,7 +244,12 @@ impl BinaryNumericLeafPlan {
         );
         schema.emit_source_activation_admission_test(&mut function);
         function.instruction(&Instruction::If(BlockType::Empty));
-        function.instruction(&Instruction::I32Const(1));
+        let admitted = if self.is_exact_subtraction() {
+            crate::gc_types::BinaryNumericCallback::SUBTRACTION_ADMITTED
+        } else {
+            1
+        };
+        function.instruction(&Instruction::I32Const(admitted));
         self.0.expression.emit_parameters(
             schema,
             &|index, function| {

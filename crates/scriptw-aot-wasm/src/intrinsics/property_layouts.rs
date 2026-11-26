@@ -561,7 +561,7 @@ impl IntrinsicPropertyLayoutId {
     }
 }
 
-/// Only eagerly completed canonical slots can be cached without a demand gate.
+/// Canonical slots whose layout readers use the shared demand gate.
 #[derive(Clone, Copy)]
 pub(crate) struct ReadyRealmSlot(NonArrayRealmIntrinsicSlot);
 impl ReadyRealmSlot {
@@ -651,7 +651,7 @@ impl ReadyRealmSlot {
             | Slot::ParseInt
             | Slot::ParseFloat => Ok(Self(slot)),
             _ => Err(EmitError::unsupported(
-                "intrinsic layout requires an eagerly completed Realm slot",
+                "intrinsic layout requires a supported canonical Realm slot",
             )),
         }
     }
@@ -784,7 +784,7 @@ impl ReadyRealmCallableSlot {
             | Slot::ParseInt
             | Slot::ParseFloat => Ok(Self(ReadyRealmSlot::new(slot)?)),
             _ => Err(EmitError::unsupported(
-                "intrinsic accessor requires an eagerly completed callable slot",
+                "intrinsic accessor requires a canonical callable slot",
             )),
         }
     }

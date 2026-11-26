@@ -38,8 +38,8 @@ use super::*;
 use crate::emit::ControlTarget;
 use crate::functions::NonArrayRealmIntrinsicSlot;
 use crate::gc_types::{
-    ArrayObject, ArrayObjectSchema, FunctionObject, FunctionObjectSchema, JavaScriptObject,
-    MapObject, MapObjectSchema, PrimitiveBox, PrimitiveBoxSchema, PromiseObject,
+    ArrayObject, ArrayObjectSchema, FunctionObject, FunctionObjectSchema, GcStackReference,
+    JavaScriptObject, MapObject, MapObjectSchema, PrimitiveBox, PrimitiveBoxSchema, PromiseObject,
     PromiseObjectSchema, RealmRecord, ReferenceResultBlock, SetObject, SetObjectSchema,
     WeakMapObject, WeakMapObjectSchema, WeakSetObject, WeakSetObjectSchema,
 };
@@ -381,6 +381,13 @@ impl FunctionBuilder<'_> {
         let head = s
             .reserve_non_null_gc_local(f)
             .initialize(record.load(s, f), f);
+        let miss = self.open_frame(ControlFrameKind::Block, f);
+        // The miss kernel registers a site's first record on its first use.
+        s.field(OwnDataReadCacheSchema::SLOT).read(&head, s, f);
+        f.instruction(&Instruction::I32Const(super::UNVISITED_SLOT));
+        f.instruction(&Instruction::I32Eq);
+        self.emit_branch_if_to_target(miss, f);
+        self.emit_ordinary_compact_read_entry(target, &head, f)?;
         let name = s.reserve_non_null_gc_local(f).initialize(
             s.field(OwnDataReadCacheSchema::KEY)
                 .read(&head, s, f)
@@ -390,12 +397,6 @@ impl FunctionBuilder<'_> {
         let key = PropertyKeyLocals::from_string(s, &name, f);
         let value = s.reserve_value_local(f);
         let found = s.reserve_i32_local(f);
-        let miss = self.open_frame(ControlFrameKind::Block, f);
-        // The miss kernel registers a site's first record on its first use.
-        s.field(OwnDataReadCacheSchema::SLOT).read(&head, s, f);
-        f.instruction(&Instruction::I32Const(super::UNVISITED_SLOT));
-        f.instruction(&Instruction::I32Eq);
-        self.emit_branch_if_to_target(miss, f);
         // No record of the site answers this receiver.
         let exhausted = self.open_frame(ControlFrameKind::Block, f);
         let primitives = PRIMITIVE_RECEIVERS.map(|receiver| {
@@ -460,6 +461,244 @@ impl FunctionBuilder<'_> {
         name.clear(f);
         head.clear(f);
         Ok(())
+    }
+
+    /// Try the head and its first three successors before preparing a key.
+    /// Each candidate uses the same live header, storage and immutable shape.
+    fn emit_ordinary_compact_read_entry(
+        &mut self,
+        target: &ValueLocals,
+        head: &GcLocal<OwnDataReadCache>,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let decline = self.open_frame(ControlFrameKind::Block, f);
+        target.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Object.tag()));
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(decline, f);
+        let object = s.reserve_non_null_gc_local(f).initialize(
+            target.sealed_reference_or_branch::<OrdinaryObject>(
+                s,
+                self.local_branch_label(decline),
+                f,
+            ),
+            f,
+        );
+        let result_storage = s
+            .reserve_non_null_gc_local(f)
+            .initialize(self.emit_read_entry_compact_storage(&object, decline, f), f);
+        let shape = s.reserve_non_null_gc_local(f).initialize(
+            s.field(CompactDataStorageSchema::SHAPE)
+                .read(&result_storage, s, f)
+                .reference(),
+            f,
+        );
+        let slot = s.reserve_i32_local(f);
+        let value = s.reserve_value_local(f);
+        let record = s
+            .reserve_non_null_gc_local(f)
+            .initialize(head.load(s, f), f);
+        let remaining = s.reserve_i32_local(f);
+        remaining.set_constant(3, f);
+
+        let compact_hit = self.open_frame(ControlFrameKind::Block, f);
+        let scan = self.open_frame(ControlFrameKind::Loop, f);
+        let next = self.open_frame(ControlFrameKind::Block, f);
+        let _ = shape.load(s, f);
+        s.field(OwnDataReadCacheSchema::SHAPE).read(&record, s, f);
+        f.instruction(&Instruction::RefEq);
+        self.open_frame(ControlFrameKind::If, f);
+        s.field(OwnDataReadCacheSchema::SLOT)
+            .read(&record, s, f)
+            .store(slot, f);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32GeS);
+        self.emit_branch_if_to_target(compact_hit, f);
+        let holder_rule = self.open_frame(ControlFrameKind::Block, f);
+        self.emit_recorded_closed_tail_hit(
+            &object,
+            slot,
+            &value,
+            holder_rule,
+            ReadAnswer::Return,
+            f,
+        )?;
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+
+        self.emit_receiver_rule_or_branch(
+            &record,
+            HolderReceiverKind::Object,
+            Some(&shape),
+            next,
+            f,
+        );
+        s.field(OwnDataReadCacheSchema::HOLDER_SLOT)
+            .read(&record, s, f)
+            .store(slot, f);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32LtS);
+        self.emit_branch_if_to_target(next, f);
+        let prototype = s.reserve_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(&object, s, f)
+                .reference(),
+            f,
+        );
+        s.field(OwnDataReadCacheSchema::HOLDER_SHAPE)
+            .read(&record, s, f);
+        f.instruction(&Instruction::RefIsNull);
+        self.open_frame(ControlFrameKind::If, f);
+        let holder = self.emit_protected_prototype_holder_or_branch(
+            &crate::objects::ProtectedPrototype::HOLDER_ORDER,
+            &prototype,
+            next,
+            f,
+        );
+        s.field(IntrinsicPropertyStorageSchema::ADDRESS)
+            .read(&holder.rows, s, f);
+        s.field(OwnDataReadCacheSchema::HOLDER_LAYOUT)
+            .read(&record, s, f);
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(next, f);
+        let found = s.reserve_i32_local(f);
+        found.set_constant(0, f);
+        self.emit_materialized_intrinsic_group(&holder.rows, slot, &value, found, f);
+        found.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(next, f);
+        s.release_i32_local(found, f);
+        holder.clear(f);
+        emit_return_normal(&value, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        let holder = s.reserve_non_null_gc_local(f).initialize(
+            prototype.sealed_subtype_or_branch::<OrdinaryObject>(
+                s,
+                self.local_branch_label(next),
+                f,
+            ),
+            f,
+        );
+        let storage = s
+            .reserve_non_null_gc_local(f)
+            .initialize(self.emit_read_entry_compact_storage(&holder, next, f), f);
+        holder.clear(f);
+        s.field(CompactDataStorageSchema::SHAPE)
+            .read(&storage, s, f);
+        s.field(OwnDataReadCacheSchema::HOLDER_SHAPE)
+            .read(&record, s, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(next, f);
+        result_storage.replace(storage.load(s, f), f);
+        storage.clear(f);
+        prototype.clear(f);
+        self.emit_branch_to_target(compact_hit, f);
+
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        remaining.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(decline, f);
+        remaining.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Sub);
+        remaining.store(f);
+        record.replace(
+            s.field(OwnDataReadCacheSchema::NEXT)
+                .read(&record, s, f)
+                .reference()
+                .non_null_or_branch(self.local_branch_label(decline), f),
+            f,
+        );
+        self.emit_branch_to_target(scan, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.emit_branch_to_target(decline, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+
+        // An own or direct-prototype shape match proves the slot's bounds.
+        let array_path = self.open_frame(ControlFrameKind::Block, f);
+        let inline = s.reserve_gc_local(f).initialize(
+            result_storage.sealed_subtype_or_branch::<InlineCompactDataStorage>(
+                s,
+                self.local_branch_label(array_path),
+                f,
+            ),
+            f,
+        );
+        self.emit_inline_compact_recorded_value_at(&inline, slot, &value, f);
+        emit_return_normal(&value, f);
+        inline.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let array = s.reserve_gc_local(f).initialize(
+            result_storage
+                .load(s, f)
+                .cast_subtype::<ArrayCompactDataStorage>(s, f),
+            f,
+        );
+        self.emit_array_compact_value_at(&array, slot, &value, f);
+        emit_return_normal(&value, f);
+        array.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(remaining, f);
+        record.clear(f);
+        value.clear(f);
+        s.release_i32_local(slot, f);
+        shape.clear(f);
+        result_storage.clear(f);
+        object.clear(f);
+        Ok(())
+    }
+
+    fn emit_read_entry_compact_storage(
+        &mut self,
+        header: &GcLocal<OrdinaryObject>,
+        scan: ControlTarget,
+        f: &mut Function,
+    ) -> GcStackReference<CompactDataStorage> {
+        let s = self.runtime_schema();
+        let base = s.reserve_non_null_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROPERTIES)
+                .read(header, s, f)
+                .reference(),
+            f,
+        );
+        let compact = self.open_reference_block(s, f);
+        let array = self.open_frame(ControlFrameKind::Block, f);
+        compact.branch_with(
+            base.sealed_nested_subtype_or_branch::<CompactDataStorage, InlineCompactDataStorage>(
+                s,
+                self.local_branch_label(array),
+                f,
+            )
+            .upcast(),
+            f,
+        );
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        compact.branch_with(
+            base.sealed_nested_subtype_or_branch::<CompactDataStorage, ArrayCompactDataStorage>(
+                s,
+                self.local_branch_label(scan),
+                f,
+            )
+            .upcast(),
+            f,
+        );
+        let storage = compact.close(f);
+        self.pop_control(ControlFrameKind::Block);
+        base.clear(f);
+        storage
     }
 
     /// The read from a receiver with one of the sealed header layouts: its

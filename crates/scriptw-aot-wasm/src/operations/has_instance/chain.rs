@@ -8,16 +8,19 @@
 //! A later site is then reached only from the previous site's false answer:
 //! S leaves the list, no other statement runs between the sites, and a
 //! site's record path reads x, G's records and C's edges without observing
-//! anything. The run's first site, once its record's proof holds, walks V's
+//! anything. The sites share the proof that their Global Environment
+//! Record has no declarative names and that @@hasInstance has no hash.
+//! The run's first site, once its record's proof holds, walks V's
 //! [[Prototype]] chain into the run's slots; a later site, after its own
 //! record's proof, answers from those slots when it meets that very V.
 //! [[GetPrototypeOf]] of the ordinary, function and Array objects the walk
 //! admits observes nothing and their edges change only through code that
-//! no fast path runs: every site's slow path, the only code between two
-//! sites that may run user code, forgets the slots first. The run starts
-//! with none, on every entry to its statement list.
+//! no fast path runs. Every site's slow path invalidates both the shared
+//! proof and the slots before it may run user code. The run starts with
+//! neither on every entry to its statement list.
 use super::*;
 use crate::emit::BindingStorage;
+use crate::gc_types::{Environment, EnvironmentSchema};
 
 /// The prefix of V's chain the first site keeps: an ordinary object, a
 /// class instance and a subclass instance end within it at %Object.prototype%.
@@ -101,12 +104,14 @@ pub(crate) struct WalkedChain {
     owner: ValueLocals,
     slots: [GcLocal<JavaScriptObject, Nullable>; CHAIN_SLOTS],
     complete: I32Local,
+    shared_proof: I32Local,
 }
 
 impl WalkedChain {
-    /// Keeps nothing: the next site walks.
+    /// The next site must prove the shared facts again and walk its chain.
     pub(super) fn forget(&self, f: &mut Function) {
         self.owner.set_undefined(f);
+        self.shared_proof.set_constant(0, f);
     }
 }
 
@@ -184,12 +189,15 @@ impl FunctionBuilder<'_> {
         });
         let complete = s.reserve_i32_local(f);
         complete.set_constant(0, f);
+        let shared_proof = s.reserve_i32_local(f);
+        shared_proof.set_constant(0, f);
         let previous = self.instanceof_run.replace(ActiveInstanceofRun {
             sites: run.sites,
             chain: WalkedChain {
                 owner,
                 slots,
                 complete,
+                shared_proof,
             },
         });
         let mut result = Ok(());
@@ -204,14 +212,45 @@ impl FunctionBuilder<'_> {
                 owner,
                 slots,
                 complete,
+                shared_proof,
             } = active.chain;
             for slot in slots {
                 slot.clear(f);
             }
             s.release_i32_local(complete, f);
+            s.release_i32_local(shared_proof, f);
             owner.clear(f);
         }
         result.map(|()| Some(run.statements.len()))
+    }
+
+    /// The source activation uses one Global Environment Record and one
+    /// Agent-wide @@hasInstance throughout the run. Between fast answers
+    /// no code can introduce a declarative name or hash that symbol.
+    pub(super) fn emit_run_shared_proof_or_branch(
+        &mut self,
+        site: RunSite<'_>,
+        global: &GcLocal<Environment, Nullable>,
+        slow: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let proved = self.open_frame(ControlFrameKind::Block, f);
+        if matches!(site.role, RunRole::Reuse) {
+            site.chain.shared_proof.load(f);
+            self.emit_branch_if_to_target(proved, f);
+        }
+        s.field(EnvironmentSchema::NAMED_BINDINGS)
+            .read(global, s, f)
+            .reference()
+            .is_null(f);
+        s.emit_well_known_symbol_never_hashed(scriptw_ir::WellKnownSymbol::HasInstance, f);
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(slow, f);
+        site.chain.shared_proof.set_constant(1, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
     }
 
     /// The candidates of a run site's walk: the first site walks V's chain

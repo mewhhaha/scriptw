@@ -3,7 +3,7 @@ use crate::functions::{NonArrayRealmIntrinsicSlot, RealmFunctionMaterializationC
 use crate::gc_types::*;
 use crate::intrinsics::IntrinsicKey;
 use crate::intrinsics::IntrinsicPropertyLayoutId;
-use crate::objects::{AccessorDescriptor, AccessorGetter, FreshDataAttributes};
+use crate::objects::{AccessorDescriptor, AccessorGetter};
 use scriptw_ir::StandardBuiltinInstaller;
 
 mod error_initialization;
@@ -400,17 +400,6 @@ impl<'a> FunctionBuilder<'a> {
         Ok(value)
     }
 
-    pub(crate) fn init_throw_type_error_intrinsic(
-        &mut self,
-        realm: &RealmFunctionMaterializationContext,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let thrower =
-            self.emit_intrinsic_callable(StandardBuiltinId::ThrowTypeError, realm, function)?;
-        thrower.clear(function);
-        Ok(())
-    }
-
     fn emit_bootstrap_intrinsic_namespace(
         &mut self,
         layout: IntrinsicPropertyLayoutId,
@@ -615,7 +604,7 @@ impl<'a> FunctionBuilder<'a> {
         parent: &ValueLocals,
         primitive: &ValueLocals,
         function: &mut Function,
-    ) -> Result<(), EmitError> {
+    ) -> Result<GcLocal<PrimitiveBox>, EmitError> {
         let schema = self.runtime_schema();
         let layout = IntrinsicPropertyLayoutId::for_prototype(slot);
         let layout = match layout {
@@ -655,22 +644,35 @@ impl<'a> FunctionBuilder<'a> {
                 ),
                 function,
             );
-        let value = schema.reserve_value_local(function);
-        value.set_reference(&object, schema, function);
         // Narrow pools retain String's standalone virtual length.
         if slot.gc_index() == NonArrayRealmIntrinsicSlot::StringPrototype.gc_index()
             && layout.is_none()
         {
+            let value = schema.reserve_value_local(function);
+            value.set_reference(&object, schema, function);
             self.emit_install_intrinsic_number(
                 &value, "length", 0.0, false, false, false, function,
             )?;
+            value.clear(function);
         }
-        self.emit_store_non_array_realm_intrinsic(realm.realm(), slot, &value, function);
-        value.clear(function);
-        object.clear(function);
         stored.clear(function);
         header.clear(function);
-        Ok(())
+        Ok(object)
+    }
+
+    pub(super) fn emit_publish_bootstrap_boxed_prototype(
+        &mut self,
+        realm: &GcLocal<RealmRecord>,
+        slot: NonArrayRealmIntrinsicSlot,
+        object: GcLocal<PrimitiveBox>,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        let value = schema.reserve_value_local(function);
+        value.set_reference(&object, schema, function);
+        self.emit_store_non_array_realm_intrinsic(realm, slot, &value, function);
+        value.clear(function);
+        object.clear(function);
     }
 
     pub(super) fn emit_bootstrap_constructor_from_slot(
@@ -703,7 +705,6 @@ impl<'a> FunctionBuilder<'a> {
             );
         let object_prototype = schema.reserve_value_local(function);
         object_prototype.set_reference(&object, schema, function);
-        object.clear(function);
         self.emit_store_non_array_realm_intrinsic(
             realm,
             NonArrayRealmIntrinsicSlot::ObjectPrototype,
@@ -724,12 +725,12 @@ impl<'a> FunctionBuilder<'a> {
             function,
         )?;
         self.emit_store_realm_array_prototype(realm, array.array(), function);
-        self.release_realm_array_prototype_local(array, function);
         // Demand prototypes (Iterator*, Generator*, Async*, Promise, Map, Set,
         // Weak*, Disposable*, Abort*, Event*, Text*, Symbol, BigInt, Number,
         // Boolean, ShadowRealm, AbstractModuleSource, ModuleSource,
         // ReadableStream*), dynamic function constructors, DemandConstructors
-        // (including Object, Function, String), parseInt/parseFloat,
+        // (including Array, Object, Function, String), canonical callables,
+        // parseInt/parseFloat,
         // Reflect/Math/JSON/Atomics namespaces, Error/DOMException, Date,
         // RegExp, BinaryData, Temporal and Intl are built on their first
         // canonical read (see demand_constructors). %String.prototype% stays
@@ -739,7 +740,7 @@ impl<'a> FunctionBuilder<'a> {
             .reserve_gc_local::<StringValue, NonNullable>(function)
             .initialize(self.emit_interned_string_reference("", function)?, function);
         primitive.set_reference(&empty_string, schema, function);
-        self.emit_bootstrap_boxed_prototype(
+        let string = self.emit_bootstrap_boxed_prototype(
             &context,
             NonArrayRealmIntrinsicSlot::StringPrototype,
             &object_prototype,
@@ -748,36 +749,22 @@ impl<'a> FunctionBuilder<'a> {
         )?;
         empty_string.clear(function);
         primitive.clear(function);
-        self.init_throw_type_error_intrinsic(&context, function)?;
-        if self
-            .runtime_bootstrap_plan
-            .should_initialize_standard_builtin(StandardBuiltinId::ArrayConstructor)
-        {
-            let array = schema
-                .reserve_gc_local::<ArrayObject, NonNullable>(function)
-                .initialize(
-                    self.emit_load_realm_array_prototype(realm, function),
-                    function,
-                );
-            let prototype = schema.reserve_value_local(function);
-            prototype.set_reference(&array, schema, function);
-            let constructor = self.init_builtin_constructor_object(
-                StandardBuiltinId::ArrayConstructor,
-                &context,
-                &prototype,
-                function,
-            )?;
-            self.emit_initialize_array_canonical_callables(&context, function)?;
-            constructor.clear(function);
-            prototype.clear(function);
-            array.clear(function);
-        }
         self.emit_arm_realm_protectors(
             realm,
-            &object_prototype,
+            &object,
             context.function_prototype(),
+            array.array(),
+            &string,
             function,
         )?;
+        self.emit_publish_bootstrap_boxed_prototype(
+            realm,
+            NonArrayRealmIntrinsicSlot::StringPrototype,
+            string,
+            function,
+        );
+        object.clear(function);
+        self.release_realm_array_prototype_local(array, function);
         Ok(BootstrapRealm {
             realm: context,
             object_prototype,
@@ -852,13 +839,21 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<GcLocal<OrdinaryObject>, EmitError> {
         let schema = self.runtime_schema();
-        let object = self.emit_bootstrap_namespace(&bootstrap.object_prototype, function)?;
+        let object = schema.reserve_gc_local(function).initialize(
+            self.emit_alloc_plain_object_with_prototype(
+                Some(&bootstrap.object_prototype),
+                function,
+            )?,
+            function,
+        );
+        let value = schema.reserve_value_local(function);
+        value.set_reference(&object, schema, function);
         let stored = schema
             .reserve_gc_local::<StoredValue, NonNullable>(function)
             .initialize(
                 schema
                     .struct_type::<StoredValue>()
-                    .from_value(&object, function),
+                    .from_value(&value, function),
                 function,
             );
         schema
@@ -881,7 +876,6 @@ impl<'a> FunctionBuilder<'a> {
             );
         // A Realm's global object and `globalThis` are written here alone.
         schema.emit_advance_builtin_fact_epoch(function);
-        stored.clear(function);
         let eval_meta = self
             .functions
             .get(&StandardBuiltinId::EvalFunction.function_id())
@@ -897,23 +891,22 @@ impl<'a> FunctionBuilder<'a> {
             );
         self.emit_initialize_realm_eval_intrinsic(bootstrap.realm.realm(), &eval, function);
         eval.clear(function);
-        // Every binding's value exists before the global object receives its
-        // first property; computing one runs no JavaScript and reads no
-        // global property, so publishing them together is unobservable.
+        // The initializers run no JavaScript and read no global properties.
         let mut publication = GlobalBindingPublication::new(
+            &object,
             self,
             bindings.iter().map(|binding| binding.name.as_str()),
             function,
         )?;
-        let value = schema.reserve_value_local(function);
-        for binding in bindings {
+        for binding in &bindings {
             // Deferred recipes keep the binding's original position and data
             // attributes; a read resolves them in their defining Realm.
             let deferred = match &binding.initializer {
-                GlobalPropertyInitializerIr::Intrinsic => {
-                    value.copy_from(&object, function);
-                    None
-                }
+                GlobalPropertyInitializerIr::Intrinsic => Some(
+                    schema
+                        .reserve_gc_local(function)
+                        .initialize(stored.load(schema, function).upcast(), function),
+                ),
                 GlobalPropertyInitializerIr::Infinity => {
                     value.set_scalar(
                         ScalarValue::NumberBits(f64::INFINITY.to_bits() as i64),
@@ -926,10 +919,11 @@ impl<'a> FunctionBuilder<'a> {
                     None
                 }
                 GlobalPropertyInitializerIr::Undefined
-                | GlobalPropertyInitializerIr::FreshUndefined => {
-                    value.set_undefined(function);
-                    None
-                }
+                | GlobalPropertyInitializerIr::FreshUndefined => Some(
+                    schema
+                        .reserve_gc_local(function)
+                        .initialize(schema.stored_undefined(function).upcast(), function),
+                ),
                 GlobalPropertyInitializerIr::SourceFunction(id) => {
                     let meta = self.functions.get(id).cloned().ok_or_else(|| {
                         EmitError::unsupported(format!("missing global source function {id}"))
@@ -1053,27 +1047,26 @@ impl<'a> FunctionBuilder<'a> {
                             &bootstrap.realm,
                             function,
                         ))
+                    } else if let Some(slot) = if *builtin == StandardBuiltinId::EvalFunction {
+                        Some(NonArrayRealmIntrinsicSlot::EvalFunction)
                     } else {
-                        if *builtin == StandardBuiltinId::EvalFunction {
-                            self.emit_load_realm_eval_intrinsic_to_local(
-                                bootstrap.realm.realm(),
-                                &value,
-                                function,
-                            );
-                        } else if let Some(slot) = standard_builtin_constructor_realm_slot(*builtin)
-                        {
-                            self.emit_load_non_array_realm_intrinsic(
-                                bootstrap.realm.realm(),
-                                slot,
-                                &value,
-                                function,
-                            );
-                        } else {
-                            let callable =
-                                self.emit_intrinsic_callable(*builtin, &bootstrap.realm, function)?;
-                            value.set_reference(&callable, schema, function);
-                            callable.clear(function);
-                        }
+                        standard_builtin_constructor_realm_slot(*builtin)
+                    } {
+                        let canonical = self.emit_load_non_array_realm_intrinsic_stored(
+                            bootstrap.realm.realm(),
+                            slot,
+                            function,
+                        );
+                        let property = schema
+                            .reserve_gc_local(function)
+                            .initialize(canonical.load(schema, function).upcast(), function);
+                        canonical.clear(function);
+                        Some(property)
+                    } else {
+                        let callable =
+                            self.emit_intrinsic_callable(*builtin, &bootstrap.realm, function)?;
+                        value.set_reference(&callable, schema, function);
+                        callable.clear(function);
                         None
                     }
                 }
@@ -1131,7 +1124,7 @@ impl<'a> FunctionBuilder<'a> {
                 self,
                 &binding.name,
                 &property_value,
-                FreshDataAttributes {
+                crate::heap::StoredPropertyAttributes::Data {
                     writable: binding.initializer.writable(),
                     enumerable: binding.initializer.enumerable(),
                     configurable: binding.initializer.configurable(),
@@ -1140,14 +1133,10 @@ impl<'a> FunctionBuilder<'a> {
             )?;
             property_value.clear(function);
         }
-        publication.publish(self, &object, function)?;
-        let global = schema.reserve_gc_local(function).initialize(
-            self.emit_object_header_projection(&object, function),
-            function,
-        );
+        publication.finish(function)?;
+        stored.clear(function);
         value.clear(function);
-        object.clear(function);
         bootstrap.clear(self, function);
-        Ok(global)
+        Ok(object)
     }
 }

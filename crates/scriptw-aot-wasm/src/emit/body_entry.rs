@@ -226,6 +226,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::RuntimeErrorObject
             | RuntimeHelperId::RuntimeErrorForThrow
             | RuntimeHelperId::PooledStringResolve
+            | RuntimeHelperId::WellKnownSymbolResolve
             | RuntimeHelperId::IntegerDecimalString
             | RuntimeHelperId::StringConcat
             | RuntimeHelperId::StringConcatThree

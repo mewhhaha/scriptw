@@ -11,11 +11,9 @@ pub(super) fn execute(
     signature: &NativeDirectEvalSignature,
     trace: Option<&CallbackTrace<'_>>,
 ) -> wasmtime::Result<[Val; 6]> {
+    let runtime = context.validated_runtime()?;
     let template = context.empty_direct_eval_template.get_or_init(|| {
-        scriptw_aot_wasm::NativeProgramTemplate::for_empty_direct_eval(
-            proof,
-            context.validated_runtime(),
-        )
+        scriptw_aot_wasm::NativeProgramTemplate::for_empty_direct_eval(proof, runtime)
     });
     let instance = crate::wasm_native_program_template::instantiate(
         &mut *store,

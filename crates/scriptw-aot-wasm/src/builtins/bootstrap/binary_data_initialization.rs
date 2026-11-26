@@ -2,8 +2,10 @@
 //! Allocation and intrinsic installation call no JavaScript or host code.
 
 use super::*;
-use crate::heap::{BinaryDataConstructor, BinaryDataInitializationState};
-use crate::runtime_helpers::{HelperParameters, RealmEnsureBinaryDataParameters};
+use crate::heap::{BinaryDataConstructor, BinaryDataInitializationState, DemandGlobalRecipe};
+use crate::runtime_helpers::{
+    HelperParameters, IntrinsicDataPublishArguments, RealmEnsureBinaryDataParameters,
+};
 
 /// Only this module can authorize reads of completed binary-data slots while
 /// Building. Ordinary consumers always cross the defining-Realm ensure boundary.
@@ -284,24 +286,31 @@ impl FunctionBuilder<'_> {
             realm,
             function,
         )?;
-        // Array.prototype owns this eager callable. Read the canonical slot
-        // directly instead of emitting another allocation fallback in this graph.
-        let to_string = schema.reserve_value_local(function);
-        self.emit_load_non_array_realm_intrinsic(
-            realm.realm(),
-            NonArrayRealmIntrinsicSlot::TypedArrayPrototypeToString,
-            &to_string,
-            function,
-        );
-        self.emit_install_intrinsic_data(
-            &prototype,
-            IntrinsicKey::Name("toString"),
-            &to_string,
-            true,
-            false,
-            true,
+        // Both prototypes resolve this alias through the same canonical
+        // callable slot, even if one of their own properties changes.
+        let to_string = self.emit_deferred_demand_recipe_value(
+            DemandGlobalRecipe::ArrayPrototypeToString,
+            realm,
             function,
         )?;
+        let header = schema.reserve_gc_local(function).initialize(
+            self.emit_object_header_projection(&prototype, function),
+            function,
+        );
+        let key = self.intrinsic_key(IntrinsicKey::Name("toString"), function)?;
+        let yes = schema.reserve_i32_local(function);
+        let no = schema.reserve_i32_local(function);
+        yes.set_constant(1, function);
+        no.set_constant(0, function);
+        schema.call_helper(
+            IntrinsicDataPublishArguments::new(&header, &key, &to_string, yes, no, yes),
+            self.runtime_helper_base()?,
+            function,
+        );
+        schema.release_i32_local(no, function);
+        schema.release_i32_local(yes, function);
+        key.clear(function);
+        header.clear(function);
         to_string.clear(function);
         self.emit_install_intrinsic_methods(
             &prototype,

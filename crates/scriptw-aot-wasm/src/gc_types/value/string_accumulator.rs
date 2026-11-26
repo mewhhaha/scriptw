@@ -156,6 +156,31 @@ impl StringAccumulatorCursor {
         self.length.store(function);
     }
 
+    /// Bulk-copy `count` units from `source[source_index..]` into room already
+    /// secured by `reserve`, advancing `length` by `count`.
+    pub(crate) fn append_reserved_units_range(
+        &self,
+        source: &GcLocal<CodeUnitArray>,
+        source_index: I32Local,
+        count: I32Local,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) {
+        emit_bulk_code_unit_copy(
+            &self.units,
+            self.length,
+            source,
+            source_index,
+            count,
+            schema,
+            function,
+        );
+        self.length.load(function);
+        count.load(function);
+        function.instruction(&Instruction::I32Add);
+        self.length.store(function);
+    }
+
     /// Append compiler punctuation such as JSON brackets without a String.
     pub(crate) fn push_literal(
         &self,

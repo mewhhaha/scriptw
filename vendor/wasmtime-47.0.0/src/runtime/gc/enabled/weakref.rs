@@ -1,7 +1,7 @@
 //! Store-scoped handles into collector-owned weak edges.
 use crate::prelude::*;
 use crate::store::{AutoAssertNoGc, StoreId, StoreOpaque};
-use crate::vm::{VMGcRef, WeakGcEdge, WeakGcSlotId};
+use crate::vm::{GcStore, VMGcRef, WeakGcEdge, WeakGcSlotId};
 use crate::{AnyRef, AsContext, AsContextMut, Rooted};
 use core::hash::{Hash, Hasher};
 
@@ -14,10 +14,12 @@ struct WeakHandle {
 impl WeakHandle {
     #[inline]
     fn check(&self, store: &StoreOpaque) -> Result<()> {
-        ensure!(
-            self.store == store.id(),
-            "weak handle used with wrong Store"
-        );
+        self.check_store_id(store.id())
+    }
+
+    #[inline]
+    fn check_store_id(&self, store: StoreId) -> Result<()> {
+        ensure!(self.store == store, "weak handle used with wrong Store");
         Ok(())
     }
 
@@ -61,15 +63,35 @@ fn raw_heap_reference(raw: u32) -> Result<VMGcRef> {
 /// Registration allocates no GC object and cannot collect.
 fn insert(store: &mut StoreOpaque, edge: WeakGcEdge) -> Result<WeakHandle> {
     let id = store.id();
-    let gc = store.unwrap_gc_store_mut();
+    insert_in_gc(id, store.unwrap_gc_store_mut(), edge)
+}
+
+fn insert_in_gc(store: StoreId, gc: &mut GcStore, edge: WeakGcEdge) -> Result<WeakHandle> {
     ensure!(
         gc.gc_heap.supports_weak_refs(),
         "selected collector has no weak/ephemeron facility"
     );
     Ok(WeakHandle {
-        store: id,
+        store,
         slot: gc.weak_gc.insert(edge)?,
     })
+}
+
+fn raw_ephemeron(owner: u32, key: u32, value: u32) -> Result<WeakGcEdge> {
+    Ok(WeakGcEdge::Ephemeron {
+        owner: raw_heap_reference(owner)?,
+        key: Some(raw_heap_reference(key)?),
+        value: VMGcRef::from_raw_u32(value),
+    })
+}
+
+#[inline]
+fn expose_ephemeron_value(gc: &mut GcStore, value: Option<VMGcRef>) -> Result<u32> {
+    let Some(value) = value else {
+        return Ok(0);
+    };
+    let value = gc.clone_gc_ref(&value);
+    Ok(gc.expose_gc_ref_to_wasm(value)?.get())
 }
 
 /// A weak target whose entry is retired when its owner dies.
@@ -140,6 +162,20 @@ pub struct GcEphemeron {
 }
 
 impl GcEphemeron {
+    /// Borrow the Store's host data and raw ephemeron operations together.
+    ///
+    /// The ephemeron access cannot collect or reenter Wasm. This lets a host
+    /// index probe, read, or update an edge while the raw references stay valid.
+    #[inline]
+    pub fn with_raw_access<T: 'static, R>(
+        mut store: impl AsContextMut<Data = T>,
+        f: impl FnOnce(&mut T, &mut RawGcEphemerons<'_>) -> R,
+    ) -> R {
+        let mut store = store.as_context_mut();
+        let (data, store, gc) = store.data_and_gc_store();
+        f(data, &mut RawGcEphemerons { store, gc })
+    }
+
     /// Whether the entry still has a surviving owner and key after collection.
     #[inline]
     pub fn is_live(&self, store: impl AsContext) -> Result<bool> {
@@ -289,17 +325,8 @@ impl GcEphemeron {
 
     /// Not generic, so that the registry's small accessors inline here.
     fn register_raw(store: &mut StoreOpaque, owner: u32, key: u32, value: u32) -> Result<Self> {
-        let owner = raw_heap_reference(owner)?;
-        let key = raw_heap_reference(key)?;
         Ok(Self {
-            handle: insert(
-                store,
-                WeakGcEdge::Ephemeron {
-                    owner,
-                    key: Some(key),
-                    value: VMGcRef::from_raw_u32(value),
-                },
-            )?,
+            handle: insert(store, raw_ephemeron(owner, key, value)?)?,
         })
     }
 
@@ -308,17 +335,10 @@ impl GcEphemeron {
     /// reference is followed.
     #[inline]
     pub fn matches_raw(&self, store: impl AsContext, owner: u32, key: u32) -> Result<bool> {
-        match self.handle.live(store.as_context().0)? {
-            None | Some(WeakGcEdge::Ephemeron { key: None, .. }) => Ok(false),
-            Some(WeakGcEdge::Ephemeron {
-                owner: edge_owner,
-                key: Some(edge_key),
-                ..
-            }) => Ok(edge_owner.as_raw_u32() == owner && edge_key.as_raw_u32() == key),
-            Some(WeakGcEdge::Target { .. }) => {
-                unreachable!("typed ephemeron handle cannot name target")
-            }
-        }
+        Ok(self
+            .handle
+            .live(store.as_context().0)?
+            .is_some_and(|edge| edge.matches_ephemeron_raw(owner, key)))
     }
 
     /// The surviving value as a raw reference a host function may return to
@@ -329,7 +349,9 @@ impl GcEphemeron {
 
     /// Not generic, for the same reason as `register_raw`.
     fn exposed_value(&self, store: &mut StoreOpaque) -> Result<u32> {
-        let value = match self.handle.live(store)? {
+        self.handle.check(store)?;
+        let gc = store.unwrap_gc_store_mut();
+        let value = match gc.weak_gc.live(self.handle.slot) {
             Some(WeakGcEdge::Ephemeron {
                 key: Some(_),
                 value: Some(value),
@@ -340,9 +362,7 @@ impl GcEphemeron {
                 unreachable!("typed ephemeron handle cannot name target")
             }
         };
-        let gc = store.unwrap_gc_store_mut();
-        let value = gc.clone_gc_ref(&value);
-        Ok(gc.expose_gc_ref_to_wasm(value)?.get())
+        expose_ephemeron_value(gc, Some(value))
     }
 
     /// [`GcEphemeron::set_value`] for a raw operand; zero clears the value.
@@ -363,6 +383,114 @@ impl GcEphemeron {
             WeakGcEdge::Target { .. } => unreachable!("typed ephemeron handle cannot name target"),
         }
         Ok(())
+    }
+}
+
+/// Raw ephemeron operations during a disjoint borrow of a Store's host data.
+///
+/// Obtain this through [`GcEphemeron::with_raw_access`].
+pub struct RawGcEphemerons<'a> {
+    store: StoreId,
+    gc: Option<&'a mut GcStore>,
+}
+
+/// The result of trying to update an ephemeron by raw owner and key identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GcEphemeronUpdate {
+    /// Both operands matched and the value was replaced.
+    Updated,
+    /// The live slot belongs to a different owner or key, or its key is cleared.
+    Mismatch,
+    /// The slot has been retired or now belongs to another generation.
+    Retired,
+}
+
+impl RawGcEphemerons<'_> {
+    /// Check whether an entry still has a live slot.
+    #[inline]
+    pub fn is_live(&self, entry: GcEphemeron) -> Result<bool> {
+        entry.handle.check_store_id(self.store)?;
+        Ok(self
+            .gc
+            .as_deref()
+            .is_some_and(|gc| gc.weak_gc.contains(entry.handle.slot)))
+    }
+
+    /// Return the value to pass directly to Wasm if the live owner and key
+    /// match. `Some(0)` is a matching entry with a null value.
+    ///
+    /// The result is unrooted and valid only until the Store next collects.
+    /// The operands are only compared, never dereferenced.
+    #[inline]
+    pub fn value_if_matches_raw(
+        &mut self,
+        entry: GcEphemeron,
+        owner: u32,
+        key: u32,
+    ) -> Result<Option<u32>> {
+        entry.handle.check_store_id(self.store)?;
+        let Some(gc) = self.gc.as_deref_mut() else {
+            return Ok(None);
+        };
+        let Some(edge) = gc.weak_gc.live(entry.handle.slot) else {
+            return Ok(None);
+        };
+        if !edge.matches_ephemeron_raw(owner, key) {
+            return Ok(None);
+        }
+        let WeakGcEdge::Ephemeron { value, .. } = edge else {
+            unreachable!("matched edge is an ephemeron")
+        };
+        let value = value.as_ref().map(VMGcRef::unchecked_copy);
+        Ok(Some(expose_ephemeron_value(gc, value)?))
+    }
+
+    /// Replace a conditional value if the live owner and key match. A zero
+    /// value clears the entry's value while retaining membership.
+    ///
+    /// # Safety
+    ///
+    /// A nonzero value must be a valid GC reference in the Store that owns
+    /// this access, taken since its last collection. Owner and key are only
+    /// compared and are never dereferenced.
+    #[inline]
+    pub unsafe fn set_value_if_matches_raw(
+        &mut self,
+        entry: GcEphemeron,
+        owner: u32,
+        key: u32,
+        value: u32,
+    ) -> Result<GcEphemeronUpdate> {
+        entry.handle.check_store_id(self.store)?;
+        let Some(gc) = self.gc.as_deref_mut() else {
+            return Ok(GcEphemeronUpdate::Retired);
+        };
+        let registry = &mut gc.weak_gc;
+        let updated =
+            registry.set_ephemeron_value_if_matches_raw(entry.handle.slot, owner, key, value)?;
+        Ok(match updated {
+            Some(true) => GcEphemeronUpdate::Updated,
+            Some(false) => GcEphemeronUpdate::Mismatch,
+            None => GcEphemeronUpdate::Retired,
+        })
+    }
+
+    /// Register an ephemeron without rooting its operands. Null and i31 are
+    /// invalid as owners or keys. A zero value registers membership alone.
+    ///
+    /// # Safety
+    ///
+    /// As for [`GcEphemeron::new_raw`].
+    #[inline]
+    pub unsafe fn insert_raw(&mut self, owner: u32, key: u32, value: u32) -> Result<GcEphemeron> {
+        let edge = raw_ephemeron(owner, key, value)?;
+        let gc = self
+            .gc
+            .as_deref_mut()
+            .ok_or_else(|| format_err!("weak registration requires an initialized GC heap"))?;
+        Ok(GcEphemeron {
+            handle: insert_in_gc(self.store, gc, edge)?,
+        })
     }
 }
 

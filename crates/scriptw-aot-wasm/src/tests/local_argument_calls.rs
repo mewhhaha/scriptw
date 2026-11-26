@@ -381,37 +381,52 @@ fn inspect_known_source_call(tail: bool, wide: bool) {
                     _ => false,
                 })
                 .expect("known run to frame call directly invokes the existing canonical body");
-            assert!(
-                operators[..direct]
-                    .iter()
-                    .any(|op| matches!(op, Operator::I64Eq)),
-                "actual source identity guards the direct arm"
-            );
-            // The encoded ExecutableCode ABI starts with immutable SOURCE_ID
-            // and KIND. Inspect that prefix without exposing private field ordinals.
-            let mut types = Vec::new();
-            for payload in Parser::new(0).parse_all(&artifact.bytes) {
-                if let Payload::TypeSection(groups) = payload.expect("P types decode") {
-                    for group in groups {
-                        types.extend(group.unwrap().types().cloned());
+            // Direct source calls guard against either the P-private cached
+            // ExecutableCode global (GlobalGet + RefEq) or explicit SOURCE_ID,
+            // KIND, and DEFINING_PROGRAM checks.
+            let uses_cached_code = operators[..direct].windows(4).any(|window| {
+                matches!(
+                    window,
+                    [
+                        Operator::LocalGet { .. },
+                        Operator::RefAsNonNull,
+                        Operator::GlobalGet { .. },
+                        Operator::RefEq
+                    ]
+                )
+            });
+            if !uses_cached_code {
+                assert!(
+                    operators[..direct]
+                        .iter()
+                        .any(|op| matches!(op, Operator::I64Eq)),
+                    "actual source identity guards the direct arm"
+                );
+                let mut types = Vec::new();
+                for payload in Parser::new(0).parse_all(&artifact.bytes) {
+                    if let Payload::TypeSection(groups) = payload.expect("P types decode") {
+                        for group in groups {
+                            types.extend(group.unwrap().types().cloned());
+                        }
                     }
                 }
-            }
-            let wasmparser::CompositeInnerType::Struct(code) =
-                &types[code_type as usize].composite_type.inner
-            else {
-                panic!("actual ExecutableCode struct");
-            };
-            for (field, storage) in [(0, wasmparser::ValType::I64), (1, wasmparser::ValType::I32)] {
-                assert!(!code.fields[field].mutable);
-                assert_eq!(code.fields[field].element_type.unpack(), storage);
-                let field = field as u32;
-                assert!(
-                    operators[..direct].iter().any(|op| matches!(op,
-                    Operator::StructGet { struct_type_index, field_index }
-                        if *struct_type_index == code_type && *field_index == field)),
-                    "actual code metadata is read before a direct source call"
-                );
+                let wasmparser::CompositeInnerType::Struct(code) =
+                    &types[code_type as usize].composite_type.inner
+                else {
+                    panic!("actual ExecutableCode struct");
+                };
+                for (field, storage) in [(0, wasmparser::ValType::I64), (1, wasmparser::ValType::I32)]
+                {
+                    assert!(!code.fields[field].mutable);
+                    assert_eq!(code.fields[field].element_type.unpack(), storage);
+                    let field = field as u32;
+                    assert!(
+                        operators[..direct].iter().any(|op| matches!(op,
+                        Operator::StructGet { struct_type_index, field_index }
+                            if *struct_type_index == code_type && *field_index == field)),
+                        "actual code metadata is read before a direct source call"
+                    );
+                }
             }
             assert!(
                 operators[..direct]

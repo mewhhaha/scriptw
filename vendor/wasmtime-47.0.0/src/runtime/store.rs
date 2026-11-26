@@ -1340,6 +1340,14 @@ impl<'a, T> StoreContextMut<'a, T> {
         self.0.data_mut()
     }
 
+    #[cfg(feature = "gc")]
+    #[inline]
+    pub(crate) fn data_and_gc_store(&mut self) -> (&mut T, StoreId, Option<&mut GcStore>) {
+        // Preserve the host-data provenance used for direct Wasm intrinsics.
+        let (data, _, store) = self.0.data_limiter_and_opaque();
+        (data, store.id(), store.gc_store.as_mut())
+    }
+
     /// Returns the underlying [`Engine`] this store is connected to.
     pub fn engine(&self) -> &Engine {
         self.0.engine()

@@ -92,20 +92,6 @@ impl FunctionBuilder<'_> {
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
         let declined = self.open_frame(ControlFrameKind::Block, f);
-        s.field(ForInEnumerationRecordSchema::VISITED_SET)
-            .read(record, s, f)
-            .reference()
-            .is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(declined, f);
-        // A published generic snapshot fixes this cursor's initial strategy,
-        // even while its small first phase has not needed a visited Set yet.
-        s.field(ForInEnumerationRecordSchema::REMAINING_KEYS)
-            .read(record, s, f)
-            .reference()
-            .is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(declined, f);
         let stored = s.reserve_gc_local(f).initialize(
             s.field(ForInEnumerationRecordSchema::CURRENT)
                 .read(record, s, f)
@@ -113,22 +99,17 @@ impl FunctionBuilder<'_> {
             f,
         );
         let current = s.reserve_value_local(f);
-        s.struct_type::<StoredValue>()
-            .read_into(&stored, &current, s, f);
-        current.tag().load(f);
-        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Null.tag()));
-        f.instruction(&Instruction::I32Eq);
-        self.emit_branch_if_to_target(complete, f);
-        current.reference().load(f);
-        f.instruction(&Instruction::RefTestNonNull(
-            s.reference_type::<OrdinaryObject>(GcNullability::NonNullable)
-                .heap_type,
-        ));
-        f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(declined, f);
-        let object = s
-            .reserve_gc_local(f)
-            .initialize(current.cast_reference::<OrdinaryObject>(s, f), f);
+        s.field(StoredValueSchema::REFERENCE)
+            .read(&stored, s, f)
+            .store_eq(current.reference(), f);
+        let object = s.reserve_gc_local(f).initialize(
+            current.sealed_reference_or_branch::<OrdinaryObject>(
+                s,
+                self.local_branch_label(declined),
+                f,
+            ),
+            f,
+        );
         let base = s.reserve_gc_local(f).initialize(
             s.field(OrdinaryObjectSchema::PROPERTIES)
                 .read(&object, s, f)
@@ -145,6 +126,20 @@ impl FunctionBuilder<'_> {
             );
         captured.load(s, f).is_null(f);
         self.open_frame(ControlFrameKind::If, f);
+        s.field(ForInEnumerationRecordSchema::VISITED_SET)
+            .read(record, s, f)
+            .reference()
+            .is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(declined, f);
+        // A published generic snapshot fixes this cursor's initial strategy,
+        // even while its small first phase has not needed a visited Set yet.
+        s.field(ForInEnumerationRecordSchema::REMAINING_KEYS)
+            .read(record, s, f)
+            .reference()
+            .is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(declined, f);
         base.is_subtype::<CompactDataStorage>(s, f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(declined, f);
@@ -206,9 +201,8 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
-        let value = s.reserve_value_local(f);
-        value.set_reference(&name, s, f);
-        output.set_normal(&value, f);
+        output.value().set_reference(&name, s, f);
+        output.set_kind(CompletionKind::Normal, f);
         index.load(f);
         f.instruction(&Instruction::I32Const(1));
         f.instruction(&Instruction::I32Add);
@@ -219,11 +213,11 @@ impl FunctionBuilder<'_> {
             s,
             f,
         );
-        value.clear(f);
         name.clear(f);
         self.emit_branch_to_target(complete, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        // The tail check only uses the reference already admitted above.
         self.emit_for_in_finish_closed_tail(record, &current, &object, complete, f)?;
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);

@@ -335,6 +335,7 @@ impl GcCompiler for NullCompiler {
             instance_id_addr,
             None,
             instance_id,
+            None,
         )?;
         let tag_addr = builder
             .ins()
@@ -346,6 +347,7 @@ impl GcCompiler for NullCompiler {
             tag_addr,
             None,
             tag,
+            None,
         )?;
 
         Ok(exn_ref)
@@ -396,6 +398,6 @@ impl GcCompiler for NullCompiler {
         field_addr: ir::Value,
         val: ir::Value,
     ) -> WasmResult<()> {
-        write_field_at_addr(func_env, builder, ty, field_addr, None, val)
+        write_field_at_addr(func_env, builder, ty, field_addr, None, val, None)
     }
 }

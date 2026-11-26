@@ -127,6 +127,13 @@ fn first_operand_is_non_null_ref(operand_types: &[WasmValType]) -> bool {
     )
 }
 
+fn last_operand_ref_type(operand_types: &[WasmValType]) -> Option<WasmRefType> {
+    match operand_types.last() {
+        Some(WasmValType::Ref(ty)) => Some(*ty),
+        _ => None,
+    }
+}
+
 /// Translates wasm operators into Cranelift IR instructions.
 pub fn translate_operator(
     validator: &mut FuncValidator<impl WasmModuleResources>,
@@ -2831,6 +2838,7 @@ pub fn translate_operator(
                 struct_ref,
                 first_operand_is_non_null_ref(operand_types),
                 val,
+                last_operand_ref_type(operand_types),
             )?;
         }
 
@@ -3055,6 +3063,7 @@ pub fn translate_operator(
                 first_operand_is_non_null_ref(operand_types),
                 index,
                 elem,
+                last_operand_ref_type(operand_types),
             )?;
         }
         Operator::RefEq => {

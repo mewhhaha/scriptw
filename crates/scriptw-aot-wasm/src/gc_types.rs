@@ -394,6 +394,9 @@ impl GlobalLedger {
                 SiteRecordKind::BuiltinEntryProof => {
                     schema.reference_type::<BuiltinEntryProof>(GcNullability::Nullable)
                 }
+                SiteRecordKind::ExecutableCode => {
+                    schema.reference_type::<ExecutableCode>(GcNullability::Nullable)
+                }
             };
             section.global(
                 GlobalType {
@@ -422,6 +425,8 @@ pub(crate) enum SiteRecordKind {
     GlobalLexicalNames,
     /// What a builtin entry guard last proved of all its facts at once.
     BuiltinEntryProof,
+    /// Shared immutable `ExecutableCode` for one P-local planned entry.
+    ExecutableCode,
 }
 
 /// A record type a site global may hold, tied to its global's declared kind.
@@ -445,6 +450,9 @@ impl SiteRecordType for NamedBindingTable {
 }
 impl SiteRecordType for BuiltinEntryProof {
     const KIND: SiteRecordKind = SiteRecordKind::BuiltinEntryProof;
+}
+impl SiteRecordType for ExecutableCode {
+    const KIND: SiteRecordKind = SiteRecordKind::ExecutableCode;
 }
 
 /// The global that holds one site's record: null until the site's first

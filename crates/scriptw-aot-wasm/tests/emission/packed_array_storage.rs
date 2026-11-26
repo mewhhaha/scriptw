@@ -510,10 +510,10 @@ fn real_array_sort_snapshots_packed_values_and_revalidates_after_all_comparisons
                         "the generic private-snapshot path retains each packed source representation"
                     );
                 }
-                assert!(body[..first_comparison].iter().any(|op| matches!(op,
+                assert!(body[..last_comparison].iter().any(|op| matches!(op,
                     Operator::ArrayCopy { array_type_index_dst, array_type_index_src }
                         if *array_type_index_dst == numbers && *array_type_index_src == numbers)),
-                    "the earlier pure numeric branch copies its unboxed snapshot before comparison");
+                    "the pure numeric snapshot branch copies its unboxed snapshot before general comparison");
                 let publication = body
                     .iter()
                     .rposition(|op| {

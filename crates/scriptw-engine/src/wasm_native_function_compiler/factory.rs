@@ -13,10 +13,8 @@ pub(super) fn instantiate_and_create(
     trace: Option<&CallbackTrace<'_>>,
 ) -> wasmtime::Result<[Val; 5]> {
     let emit = trace.map(|trace| trace.phase(Phase::Emit));
-    let artifact = scriptw_aot_wasm::emit_runtime_function_with_validated_runtime(
-        program,
-        context.validated_runtime(),
-    );
+    let runtime = context.validated_runtime()?;
+    let artifact = scriptw_aot_wasm::emit_runtime_function_with_validated_runtime(program, runtime);
     context.check_budget()?;
     let artifact = artifact.map_err(|error| {
         wasmtime::Error::new(EngineError::from_wasm_emit_error(program.program(), error))
@@ -25,7 +23,7 @@ pub(super) fn instantiate_and_create(
     let checks = trace.map(|trace| trace.phase(Phase::ArtifactChecks));
     // The artifact producer retains this exact immutable runtime owner. Identity
     // proves the same key, layout and bytes without rescanning R on every call.
-    if !Arc::ptr_eq(artifact.runtime(), context.runtime()) {
+    if !Arc::ptr_eq(artifact.runtime(), runtime.runtime()) {
         return Err(abi_error(
             "fresh P was emitted against a different actual runtime",
         ));

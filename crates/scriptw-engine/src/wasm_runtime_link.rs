@@ -11,6 +11,7 @@
 //! ordinary fallback compilation always use that execution Engine's mode.
 
 use super::*;
+use embedded_runtime::CargoExecutionRuntime;
 use scriptw_aot_wasm::{
     RuntimeArtifact, RuntimeArtifactCache, RuntimeArtifactCacheKey, RuntimeArtifactKey,
 };
@@ -71,9 +72,53 @@ impl RuntimeArtifactCache for RuntimeWasmCache<'_> {
 #[derive(Clone, Copy)]
 pub(super) struct WasmProgramRef<'a> {
     pub(super) bytes: &'a [u8],
-    pub(super) runtime: Option<&'a Arc<RuntimeArtifact>>,
+    pub(super) runtime: Option<ProgramRuntimeRef<'a>>,
     pub(super) compilation_policy: Option<&'a WasmCompilationPolicy>,
-    pub(super) profile_verified: bool,
+    profile_verified: bool,
+}
+
+#[derive(Clone)]
+pub(super) enum ProgramRuntime {
+    Raw(Arc<RuntimeArtifact>),
+    Cargo(&'static Arc<CargoExecutionRuntime>),
+}
+
+impl ProgramRuntime {
+    pub(super) fn as_ref(&self) -> ProgramRuntimeRef<'_> {
+        match self {
+            Self::Raw(runtime) => ProgramRuntimeRef::Raw(runtime),
+            Self::Cargo(runtime) => ProgramRuntimeRef::Cargo(runtime),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum ProgramRuntimeRef<'a> {
+    Raw(&'a Arc<RuntimeArtifact>),
+    Cargo(&'static Arc<CargoExecutionRuntime>),
+}
+
+impl<'a> ProgramRuntimeRef<'a> {
+    pub(super) fn key(self) -> RuntimeArtifactKey {
+        match self {
+            Self::Raw(runtime) => runtime.key(),
+            Self::Cargo(runtime) => runtime.key(),
+        }
+    }
+
+    pub(super) fn source_compilation_profile(self) -> scriptw_aot_wasm::RuntimeSourceCompilationProfile {
+        match self {
+            Self::Raw(runtime) => runtime.source_compilation_profile(),
+            Self::Cargo(runtime) => runtime.profile(),
+        }
+    }
+
+    pub(super) fn module_source(self, policy: WasmRuntimeImagePolicy) -> WasmModuleSource<'a> {
+        match self {
+            Self::Raw(runtime) => WasmModuleSource::runtime(runtime, policy),
+            Self::Cargo(runtime) => WasmModuleSource::CargoRuntime(runtime, policy),
+        }
+    }
 }
 
 impl<'a> WasmProgramRef<'a> {
@@ -90,7 +135,7 @@ impl<'a> WasmProgramRef<'a> {
     pub(super) fn new(bytes: &'a [u8], runtime: Option<&'a Arc<RuntimeArtifact>>) -> Self {
         Self {
             bytes,
-            runtime,
+            runtime: runtime.map(ProgramRuntimeRef::Raw),
             compilation_policy: None,
             profile_verified: false,
         }
@@ -101,9 +146,15 @@ impl<'a> WasmProgramRef<'a> {
         self
     }
 
-    pub(super) fn with_profile_verified(mut self) -> Self {
-        self.profile_verified = true;
-        self
+    // Only compiler output and cache entries whose physical profile was
+    // inspected during decode can enter through this constructor.
+    pub(super) fn admitted(bytes: &'a [u8], runtime: Option<&'a ProgramRuntime>) -> Self {
+        Self {
+            bytes,
+            runtime: runtime.map(ProgramRuntime::as_ref),
+            compilation_policy: None,
+            profile_verified: true,
+        }
     }
 }
 
@@ -175,7 +226,7 @@ pub(super) fn decode_cache_entry(
     entry: &[u8],
     intl_profile: &IntlCompilationProfile,
     cache: &cache::FunctionCache,
-) -> Option<(Arc<[u8]>, Option<Arc<RuntimeArtifact>>)> {
+) -> Option<(Arc<[u8]>, Option<ProgramRuntime>)> {
     decode_cache_entry_with_foreign(entry, intl_profile, cache)
         .map(|(bytes, runtime, _)| (bytes, runtime))
 }
@@ -188,7 +239,7 @@ pub(super) fn decode_cache_entry_with_foreign(
     cache: &cache::FunctionCache,
 ) -> Option<(
     Arc<[u8]>,
-    Option<Arc<RuntimeArtifact>>,
+    Option<ProgramRuntime>,
     scriptw_ir::foreign::ForeignModuleRegistry,
 )> {
     match entry.split_first()? {
@@ -200,20 +251,28 @@ pub(super) fn decode_cache_entry_with_foreign(
         }
         (&ENTRY_LINKED, rest) => {
             let (recorded, program) = rest.split_at_checked(KEY_BYTES)?;
-            let runtime_cache = RuntimeWasmCache::new(cache);
-            let inputs = embedded_runtime::inputs(
-                Some(&runtime_cache),
-                scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost,
-            );
-            let selection = inputs.intl_selection(intl_profile).ok()?;
-            let runtime =
-                scriptw_aot_wasm::runtime_artifact_with_inputs(&selection, inputs).ok()?;
-            if runtime.key().as_bytes().as_slice() != recorded {
-                return None;
-            }
             let (profile, foreign) =
                 scriptw_aot_wasm::inspect_linked_program_metadata(program).ok()?;
-            (profile == runtime.source_compilation_profile())
+            if profile != scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost {
+                return None;
+            }
+            let cargo = if *intl_profile == IntlCompilationProfile::Minimal {
+                CargoExecutionRuntime::native_host()
+            } else {
+                None
+            };
+            let runtime = match cargo {
+                Some(owner) => ProgramRuntime::Cargo(owner.ok()?),
+                None => {
+                    let runtime_cache = RuntimeWasmCache::new(cache);
+                    let inputs = embedded_runtime::inputs(Some(&runtime_cache), profile);
+                    let selection = inputs.intl_selection(intl_profile).ok()?;
+                    ProgramRuntime::Raw(
+                        scriptw_aot_wasm::runtime_artifact_with_inputs(&selection, inputs).ok()?,
+                    )
+                }
+            };
+            (runtime.as_ref().key().as_bytes().as_slice() == recorded)
                 .then(|| (Arc::from(program), Some(runtime), foreign))
         }
         _ => None,
@@ -253,9 +312,13 @@ fn runtime_native_compilation_mode(runtime: &RuntimeArtifact) -> WasmNativeCompi
 /// the program's own plan, raised to size-optimized when the runtime needs it.
 /// An embedded R image's independent optimization never changes this decision.
 pub(super) fn plan_native_compilation(program: WasmProgramRef<'_>) -> WasmNativeCompilationPlan {
-    let runtime_forces_size_optimized = program
-        .runtime
-        .is_some_and(|runtime| runtime_native_compilation_mode(runtime) == WasmNativeCompilationMode::SizeOptimized);
+    let runtime_forces_size_optimized = program.runtime.is_some_and(|runtime| {
+        let mode = match runtime {
+            ProgramRuntimeRef::Raw(runtime) => runtime_native_compilation_mode(runtime),
+            ProgramRuntimeRef::Cargo(runtime) => runtime.native_mode(),
+        };
+        mode == WasmNativeCompilationMode::SizeOptimized
+    });
     if runtime_forces_size_optimized && std::env::var_os("SCRIPTW_WASM_TRACE").is_none() {
         return WasmNativeCompilationPlan {
             mode: WasmNativeCompilationMode::SizeOptimized,
@@ -276,6 +339,14 @@ pub(super) fn intl_kernel_for(
 ) -> Result<intl_data_images::WasmIntlKernel, EngineError> {
     let Some(runtime) = program.runtime else {
         return intl_data_images::deferred_kernel_for_artifact(program.bytes);
+    };
+    let runtime = match runtime {
+        ProgramRuntimeRef::Raw(runtime) => runtime,
+        ProgramRuntimeRef::Cargo(owner) => {
+            return Ok(intl_data_images::WasmIntlKernel::cargo_minimal(Arc::clone(
+                owner,
+            )));
+        }
     };
     static KERNELS: OnceLock<
         Mutex<VecDeque<(RuntimeArtifactKey, intl_data_images::WasmIntlKernel)>>,
@@ -485,6 +556,18 @@ impl WasmModules {
         self.runtime.as_ref().unwrap_or(&self.program)
     }
 
+    /// P may request fixed host callbacks beyond those directly used by R.
+    pub(super) fn additional_host_imports(&self) -> impl Iterator<Item = &str> {
+        self.plan.entries.iter().filter_map(|entry| match entry {
+            ProgramImportSource::Linker { module, name }
+                if module.as_ref() == WASM_HOST_IMPORT_NAMESPACE =>
+            {
+                Some(name.as_ref())
+            }
+            _ => None,
+        })
+    }
+
     /// The memory types to create for the host module's memory imports.
     pub(super) fn memories(&self) -> &crate::host_memory_imports::HostMemoryImports {
         &self.memories
@@ -563,10 +646,7 @@ pub(super) fn compile_modules(
     let mut matched_runtime_image_cache = WasmRuntimeMatchedImageCacheOutcome::NotAccessed;
     let mut loading = WasmRuntimeModuleLoading::default();
     let runtime_key = program.runtime.map(|runtime| {
-        wasm_module_memory_cache_key(
-            WasmModuleSource::runtime(runtime, runtime_image_policy),
-            mode,
-        )
+        wasm_module_memory_cache_key(runtime.module_source(runtime_image_policy), mode)
     });
     let mut module_for_execution = |label: &str,
                                     source: WasmModuleSource<'_>|
@@ -585,24 +665,52 @@ pub(super) fn compile_modules(
             memory_cache_policy
         };
         let result = match source {
-            WasmModuleSource::Runtime(runtime) | WasmModuleSource::DiagnosticRuntime(runtime) => {
+            WasmModuleSource::Runtime(_)
+            | WasmModuleSource::DiagnosticRuntime(_)
+            | WasmModuleSource::CargoRuntime(..) => {
                 wasm_module_for_execution_with_factory(engine, source, policy, mode, None, || {
                     match source.runtime_image_policy() {
                         WasmRuntimeImagePolicy::MatchedDiagnostic => {
-                            let (module, outcome) =
-                                embedded_runtime::load_capacity_matched_native(engine, runtime)?;
+                            let (module, outcome) = match source {
+                                WasmModuleSource::DiagnosticRuntime(runtime) => {
+                                    embedded_runtime::load_capacity_matched_native(engine, runtime)?
+                                }
+                                WasmModuleSource::CargoRuntime(runtime, _) => {
+                                    let artifact = runtime.compiler_runtime()?;
+                                    embedded_runtime::load_capacity_matched_native(
+                                        engine,
+                                        artifact.as_ref(),
+                                    )?
+                                }
+                                _ => unreachable!("matched diagnostic runtime source"),
+                            };
                             matched_runtime_image_cache = outcome;
                             Ok(module)
                         }
                         WasmRuntimeImagePolicy::EmbeddedBuild => {
                             let timings =
                                 loading.embedded_image.get_or_insert_with(Default::default);
-                            if let Some(module) =
-                                embedded_runtime::load_native(engine, runtime, mode, timings)
-                            {
-                                return Ok(module);
+                            match source {
+                                WasmModuleSource::Runtime(runtime) => {
+                                    match embedded_runtime::load_native(
+                                        engine, runtime, mode, timings,
+                                    ) {
+                                        Some(module) => Ok(module),
+                                        None => compile_wasm_module(engine, bytes),
+                                    }
+                                }
+                                WasmModuleSource::CargoRuntime(runtime, _) => {
+                                    match runtime.load_native(engine, mode, timings) {
+                                        Some(module) => Ok(module),
+                                        None => compile_wasm_module_with_digest(
+                                            engine,
+                                            bytes,
+                                            Some(runtime.wasm_sha256()),
+                                        ),
+                                    }
+                                }
+                                _ => unreachable!("embedded runtime source"),
                             }
-                            compile_wasm_module(engine, bytes)
                         }
                     }
                 })?
@@ -618,7 +726,9 @@ pub(super) fn compile_modules(
             );
         }
         match source {
-            WasmModuleSource::Runtime(_) | WasmModuleSource::DiagnosticRuntime(_) => {
+            WasmModuleSource::Runtime(_)
+            | WasmModuleSource::DiagnosticRuntime(_)
+            | WasmModuleSource::CargoRuntime(..) => {
                 loading.runtime = started.elapsed();
                 loading.runtime_cache = Some(result.1.into());
             }
@@ -631,11 +741,8 @@ pub(super) fn compile_modules(
     let runtime = program
         .runtime
         .map(|runtime| {
-            module_for_execution(
-                "runtime",
-                WasmModuleSource::runtime(runtime, runtime_image_policy),
-            )
-            .map(|(module, _)| module)
+            module_for_execution("runtime", runtime.module_source(runtime_image_policy))
+                .map(|(module, _)| module)
         })
         .transpose()?;
     let (module, memory_cache_outcome) =

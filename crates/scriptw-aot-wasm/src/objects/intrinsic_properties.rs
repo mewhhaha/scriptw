@@ -1,6 +1,6 @@
 //! Complete intrinsic property recipes share immutable R metadata. Observation
 //! caches identity in the defining Realm; mutation publishes an ordinary table.
-use super::property_storage::PreparedOrdinaryPropertyKey;
+use super::property_storage::DictionaryInsertKey;
 use super::*;
 use crate::gc_types::*;
 use crate::runtime_helpers::*;
@@ -465,9 +465,9 @@ impl FunctionBuilder<'_> {
         self.emit_property_key_hash(&key, hash, f);
         self.emit_ordinary_insert_in_dictionary(
             &dictionary,
-            &PreparedOrdinaryPropertyKey { key: &key, hash },
+            hash,
+            DictionaryInsertKey::Absent(&key),
             &descriptor,
-            None,
             f,
         );
         s.release_i64_local(hash, f);

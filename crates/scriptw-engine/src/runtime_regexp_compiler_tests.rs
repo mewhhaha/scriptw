@@ -201,16 +201,17 @@ impl RuntimeCompiler {
             .collect();
         let units = ArrayRef::new_fixed(&mut self.store, &self.units_allocator, &values)
             .expect("actual compiler CodeUnitArray");
-        StructRef::new(
-            &mut self.store,
-            &self.string_allocator,
-            &[
-                WasmtimeVal::from(units),
-                WasmtimeVal::I64(0),
-                WasmtimeVal::I32(-1),
-            ],
-        )
-        .expect("actual compiler StringValue")
+        let mut fields = [
+            WasmtimeVal::I32(0),
+            WasmtimeVal::I32(0),
+            WasmtimeVal::I32(0),
+        ];
+        fields[GcHostField::StringRawKeyHash.definition().index() as usize] = WasmtimeVal::I64(0);
+        fields[GcHostField::StringCodeUnits.definition().index() as usize] =
+            WasmtimeVal::from(units);
+        fields[GcHostField::StringEntryHint.definition().index() as usize] = WasmtimeVal::I32(-1);
+        StructRef::new(&mut self.store, &self.string_allocator, &fields)
+            .expect("actual compiler StringValue")
     }
 
     fn heap_pointer(&mut self) -> i64 {

@@ -124,9 +124,14 @@ impl FunctionBuilder<'_> {
                             array.clear(f);
                         }
                         IntrinsicPropertyRecipeKind::WellKnownSymbol => {
-                            let symbol = s
-                                .reserve_gc_local(f)
-                                .initialize(s.property_layout_symbol_reference(row, f), f);
+                            let symbol = s.reserve_gc_local(f).initialize(
+                                s.property_layout_symbol_reference(
+                                    row,
+                                    self.runtime_helper_base()?,
+                                    f,
+                                ),
+                                f,
+                            );
                             value.set_reference(&symbol, s, f);
                             symbol.clear(f);
                         }
@@ -195,8 +200,8 @@ impl FunctionBuilder<'_> {
         value
     }
 
-    /// The sealed row admits only ready producers. Reject an incomplete slot
-    /// before its Undefined placeholder can poison a property identity cache.
+    /// A sealed row names a canonical slot. Initialize a demand slot before
+    /// its value can enter a property identity cache.
     fn emit_layout_ready_slot(
         &mut self,
         realm: &GcLocal<RealmRecord>,
@@ -217,7 +222,7 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
-        // A row may name a demand constructor that no read has built yet.
+        // A row may name a demand intrinsic that no read has built yet.
         // Every other ready slot is complete, which the check below enforces.
         self.emit_ensure_demand_constructor(realm, &stored, Some(index), 0, f);
         let value = s.reserve_value_local(f);

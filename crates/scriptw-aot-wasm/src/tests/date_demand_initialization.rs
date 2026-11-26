@@ -6,8 +6,8 @@ use super::*;
 use crate::functions::NonArrayRealmIntrinsicSlot as Slot;
 use crate::gc_types::{
     DeferredDateConstructor, DeferredIntrinsicValue, FinalizedRuntimeModule, GcNullability,
-    GcSnapshotField, GlobalLedger, IntrinsicPropertyValueCache, IntrinsicTable, NonNullable,
-    OrdinaryPropertyIndex, RealmRecord, RealmRecordSchema, RuntimeModuleTypes, StoredValue,
+    GcSnapshotField, GlobalLedger, IntrinsicTable, NonNullable, PropertyDescriptor, RealmRecord,
+    RealmRecordSchema, RuntimeModuleTypes, StoredValue,
 };
 use crate::heap::DateInitializationState;
 
@@ -511,12 +511,10 @@ fn date_global_and_resolver_use_the_defining_realm_recipe_and_utc_alias_keeps_on
     let schema = registered.globals().schema();
     let recipe_type = type_index::<DeferredDateConstructor>(schema);
     let publish = named(&names, "helper::intrinsic_data_publish");
-    let batch = named(&names, "helper::fresh_data_properties_publish");
-    let values_type = type_index::<IntrinsicPropertyValueCache>(schema);
-    let flags_type = type_index::<OrdinaryPropertyIndex>(schema);
-    // Intrinsic initialization and global publication have separate physical
-    // owners. Both runtime Realm producers publish their own unread Date recipe
-    // as one row of the batch that publishes the new global object's bindings.
+    let publish_row = named(&names, "helper::fresh_data_properties_publish");
+    let descriptor_type = type_index::<PropertyDescriptor>(schema);
+    // Both runtime Realm producers publish an unread Date recipe in a fresh
+    // descriptor, with its original ordered row and data attributes.
     for publisher in [
         format!("host::{}", scriptw_ir::HostBuiltinId::CreateRealm.as_str()),
         format!(
@@ -532,53 +530,31 @@ fn date_global_and_resolver_use_the_defining_realm_recipe_and_utc_alias_keeps_on
             1,
             "{publisher} publishes one ordinary Date data recipe"
         );
-        let rows: Vec<_> = initial
-            .iter()
-            .enumerate()
-            .filter(|(_, op)| matches!(op, Operator::ArraySet { array_type_index } if *array_type_index == values_type))
-            .map(|(position, _)| position)
-            .filter(|&position| {
-                let args = arguments(&initial, position, 3);
-                origin(&initial, position, local(args[2])) == Origin::Operation(markers[0])
+        let descriptors: Vec<_> = calls(&initial, publish_row)
+            .into_iter()
+            .filter_map(|position| {
+                let args = arguments(&initial, position, 8);
+                let Origin::Operation(descriptor) = origin(&initial, position, local(args[2]))
+                else {
+                    return None;
+                };
+                assert!(matches!(initial[descriptor], Operator::StructNew { struct_type_index }
+                    if struct_type_index == descriptor_type));
+                let value = arguments(&initial, descriptor, 4)[1];
+                (origin(&initial, descriptor, local(value)) == Origin::Operation(markers[0]))
+                    .then_some(descriptor)
             })
             .collect();
+        assert_eq!(descriptors.len(), 1, "{publisher} publishes one Date descriptor");
         assert_eq!(
-            rows.len(),
-            1,
-            "{publisher} stores the recipe in one value row"
-        );
-        let row = constant(&initial, rows[0], arguments(&initial, rows[0], 3)[1]);
-        let publications = calls(&initial, batch);
-        assert_eq!(
-            publications.len(),
-            1,
-            "{publisher} publishes its bindings once"
-        );
-        assert!(rows[0] < publications[0]);
-        let (flags_at, size) = initial[..publications[0]]
-            .iter()
-            .enumerate()
-            .rev()
-            .find_map(|(position, op)| match op {
-                Operator::ArrayNewFixed {
-                    array_type_index,
-                    array_size,
-                } if *array_type_index == flags_type => Some((position, *array_size as usize)),
-                _ => None,
-            })
-            .expect("the batch carries one flag word per binding");
-        let flags: Vec<_> = initial[flags_at - size..flags_at]
-            .iter()
-            .map(|op| constant(&initial, flags_at, op))
-            .collect();
-        assert_eq!(
-            flags[usize::try_from(row).unwrap()],
-            crate::objects::FreshDataAttributes {
+            constant(&initial, descriptors[0], arguments(&initial, descriptors[0], 4)[0]),
+            crate::heap::StoredPropertyAttributes::Data {
                 writable: true,
                 enumerable: false,
                 configurable: true,
             }
-            .word(),
+            .descriptor_word()
+            .as_i32(),
             "Date stays writable, non-enumerable and configurable"
         );
         assert!(

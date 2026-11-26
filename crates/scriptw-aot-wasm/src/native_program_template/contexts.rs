@@ -103,11 +103,10 @@ impl<'a> Check<'a> {
             match operators.get(self.payload_operator as usize) {
                 Some((
                     offset,
-                    Operator::ArrayNewFixed {
-                        array_type_index,
-                        array_size: 0,
+                    Operator::RefNull {
+                        hty: wasmparser::HeapType::Concrete(index),
                     },
-                )) if *array_type_index == self.schema.payload_type => {
+                )) if index.as_module_index() == Some(self.schema.payload_type) => {
                     self.payload_site = Some(*offset)
                 }
                 _ => {

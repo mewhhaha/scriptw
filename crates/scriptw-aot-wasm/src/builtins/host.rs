@@ -28,16 +28,41 @@ impl FunctionBuilder<'_> {
         let pending = schema.reserve_completion(f);
         let argument = schema.reserve_value_local(f);
         let text = schema
-            .reserve_gc_local::<StringValue, NonNullable>(f)
-            .initialize(self.emit_interned_string_reference("", f)?, f);
+            .reserve_gc_local::<StringValue, Nullable>(f)
+            .initialize_null(schema, f);
+        let index = schema.reserve_i32_local(f);
+        output.initialize(f);
+        let done = self.open_frame(ControlFrameKind::Block, f);
+
+        argc.load(f);
+        f.instruction(&Instruction::I64Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        text.replace(self.emit_interned_string_reference("", f)?.nullable(), f);
+        self.emit_branch_to_target(done, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+
+        index.set_constant(0, f);
+        self.emit_argument_vector_entry_to_value(&arguments, index, &argument, f);
+        self.emit_value_to_string_payload(&argument, &pending, f)?;
+        self.emit_host_abrupt_exit(&pending, &output, done, f);
+        text.replace(
+            pending
+                .value()
+                .cast_reference::<StringValue>(schema, f)
+                .nullable(),
+            f,
+        );
+        // With one argument the converted String goes straight to the encoder.
+        argc.load(f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Eq);
+        self.emit_branch_if_to_target(done, f);
+
         let space = schema
             .reserve_gc_local::<StringValue, NonNullable>(f)
             .initialize(self.emit_interned_string_reference(" ", f)?, f);
-        let index = schema.reserve_i32_local(f);
-        f.instruction(&Instruction::I32Const(0));
-        index.store(f);
-        output.initialize(f);
-        let done = self.open_frame(ControlFrameKind::Block, f);
+        index.set_constant(1, f);
         let next = self.open_frame(ControlFrameKind::Loop, f);
         index.load(f);
         f.instruction(&Instruction::I64ExtendI32U);
@@ -53,14 +78,16 @@ impl FunctionBuilder<'_> {
         let converted = schema
             .reserve_gc_local(f)
             .initialize(pending.value().cast_reference::<StringValue>(schema, f), f);
-        index.load(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, f);
-        f.instruction(&Instruction::Else);
-        text.replace(self.emit_concat_gc_strings(&text, &space, f), f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        text.replace(self.emit_concat_gc_strings(&text, &converted, f), f);
+        let prefix = schema
+            .reserve_gc_local(f)
+            .initialize(text.load(schema, f).require_non_null(f), f);
+        prefix.replace(self.emit_concat_gc_strings(&prefix, &space, f), f);
+        text.replace(
+            self.emit_concat_gc_strings(&prefix, &converted, f)
+                .nullable(),
+            f,
+        );
+        prefix.clear(f);
         converted.clear(f);
         index.load(f);
         f.instruction(&Instruction::I32Const(1));
@@ -69,18 +96,22 @@ impl FunctionBuilder<'_> {
         self.emit_branch_to_target(next, f);
         self.pop_control(ControlFrameKind::Loop);
         f.instruction(&Instruction::End);
+        space.clear(f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         output.kind().load(f);
         f.instruction(&Instruction::I32Const(CompletionKind::Normal.code() as i32));
         f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
-        self.emit_host_print_string(&text, f)?;
+        let printable = schema
+            .reserve_gc_local(f)
+            .initialize(text.load(schema, f).require_non_null(f), f);
+        self.emit_host_print_string(&printable, f)?;
+        printable.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.completion().copy_from(&output, f);
         schema.release_i32_local(index, f);
-        space.clear(f);
         text.clear(f);
         argument.clear(f);
         pending.clear(f);

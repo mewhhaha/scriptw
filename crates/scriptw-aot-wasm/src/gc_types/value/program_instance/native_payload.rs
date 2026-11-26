@@ -1,19 +1,19 @@
 use super::*;
 impl ProgramInstanceLocals {
-    pub(super) fn fresh_native_payload_slot(
+    pub(super) fn absent_native_payload_slot(
         schema: &RuntimeSchema,
         function: &mut Function,
-    ) -> GcLocal<NativeSourcePayloadArray, NonNullable> {
+    ) -> GcLocal<NativeSourcePayloadArray, Nullable> {
+        // Native templates replace this typed null with their payload argument.
+        // A raw ProgramInstance never needs the template's source image.
         function.native_program_payload_slot();
-        function.instruction(&Instruction::ArrayNewFixed {
-            array_type_index: schema
-                .array_type::<NativeSourcePayloadArray>()
-                .type_index()
-                .raw(),
-            array_size: 0,
-        });
+        function.instruction(&Instruction::RefNull(
+            schema
+                .reference_type::<NativeSourcePayloadArray>(GcNullability::Nullable)
+                .heap_type,
+        ));
         schema
-            .reserve_gc_local::<NativeSourcePayloadArray, NonNullable>(function)
+            .reserve_gc_local(function)
             .initialize(GcStackReference::new(), function)
     }
 

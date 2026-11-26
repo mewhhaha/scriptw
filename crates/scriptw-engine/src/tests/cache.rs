@@ -1570,7 +1570,10 @@ fn persisted_programs_still_request_executable_bound_identity_and_hit_checked_ca
             "the actual persisted P was admitted"
         );
         assert_eq!(first.bytes, second.bytes);
-        assert_eq!(first.runtime.unwrap().key(), second.runtime.unwrap().key());
+        assert_eq!(
+            first.runtime.unwrap().as_ref().key(),
+            second.runtime.unwrap().as_ref().key()
+        );
         std::fs::remove_dir_all(root).unwrap();
     });
 }

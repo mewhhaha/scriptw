@@ -1,17 +1,46 @@
 //! Synchronous caller-thread Wasmtime fibers for the bounded Engine entry stack.
 //!
-//! FiberStack is cached per OS thread. A nested public Engine entry cannot resume
-//! another Wasmtime Fiber on the same thread, so reentry retains the existing
-//! scoped 64 MiB thread path and receives an independent guarded stack.
+//! Idle `FiberStack`s are cached per OS thread up to a small process-wide cap
+//! (`MAX_CACHED_EXECUTION_STACKS`) so repeated callers avoid OS thread spawns
+//! without unbounded virtual stack retention across large caller thread pools.
+//! A nested public Engine entry cannot resume another Wasmtime Fiber on the
+//! same thread, so reentry retains the existing scoped 64 MiB thread path and
+//! receives an independent guarded stack.
 use super::{EngineWorkerStackGuard, ENGINE_WORKER_STACK_ACTIVE, ENGINE_WORKER_STACK_SIZE};
 use std::{
     cell::RefCell,
     panic::{self, AssertUnwindSafe},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 use wasmtime_fiber::{Fiber, FiberStack};
 
+const MAX_CACHED_EXECUTION_STACKS: usize = 2;
+
+/// Reserve frame headroom for the Wasmtime fiber trampoline and entry wrapper so
+/// the callee inside `run_on_execution_stack` always receives at least the full
+/// `ENGINE_WORKER_STACK_SIZE` usable stack.
+const FIBER_FRAME_HEADROOM: usize = 256 * 1024;
+
+static CACHED_EXECUTION_STACK_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+struct CachedExecutionStack(Option<FiberStack>);
+
+impl CachedExecutionStack {
+    fn into_inner(mut self) -> FiberStack {
+        // The Drop impl decrements the process-wide cached count when this
+        // wrapper leaves TLS, either when taken for execution or on thread exit.
+        self.0.take().expect("cached FiberStack present")
+    }
+}
+
+impl Drop for CachedExecutionStack {
+    fn drop(&mut self) {
+        CACHED_EXECUTION_STACK_COUNT.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
 thread_local! {
-    static EXECUTION_STACK: RefCell<Option<FiberStack>> = const { RefCell::new(None) };
+    static EXECUTION_STACK: RefCell<Option<CachedExecutionStack>> = const { RefCell::new(None) };
 }
 
 #[cfg(test)]
@@ -38,16 +67,29 @@ impl Drop for ActiveStackTopGuard {
 }
 
 fn take_execution_stack() -> FiberStack {
-    if let Some(stack) = EXECUTION_STACK.with(|slot| slot.borrow_mut().take()) {
-        return stack;
+    if let Some(cached) = EXECUTION_STACK.with(|slot| slot.borrow_mut().take()) {
+        return cached.into_inner();
     }
-    FiberStack::new(ENGINE_WORKER_STACK_SIZE, false)
+    FiberStack::new(ENGINE_WORKER_STACK_SIZE + FIBER_FRAME_HEADROOM, false)
         .unwrap_or_else(|error| panic!("scriptw execution FiberStack allocation failed: {error}"))
 }
 
+fn try_reserve_cached_slot() -> bool {
+    CACHED_EXECUTION_STACK_COUNT
+        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+            (count < MAX_CACHED_EXECUTION_STACKS).then_some(count + 1)
+        })
+        .is_ok()
+}
+
 fn cache_execution_stack(stack: FiberStack) {
+    if !try_reserve_cached_slot() {
+        drop(stack);
+        return;
+    }
+    let cached = CachedExecutionStack(Some(stack));
     EXECUTION_STACK.with(|slot| {
-        let previous = slot.replace(Some(stack));
+        let previous = slot.replace(Some(cached));
         assert!(
             previous.is_none(),
             "execution FiberStack cache occupied during call"
@@ -106,10 +148,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::thread;
+    use std::{sync::Mutex, thread};
+
+    static CACHE_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn cached_fiber_uses_caller_thread_and_reuses_guarded_stack() {
+        let _guard = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         assert_eq!(ENGINE_WORKER_STACK_SIZE, 64 * 1024 * 1024);
         assert_eq!(crate::WASM_MAX_STACK_SIZE, 32 * 1024 * 1024);
         let caller = thread::current().id();
@@ -117,13 +162,26 @@ mod tests {
             assert!(ENGINE_WORKER_STACK_ACTIVE.get());
             thread::current().id()
         });
-        let first_stack = EXECUTION_STACK.with(|slot| slot.borrow().as_ref().unwrap().top());
+        let first_stack = EXECUTION_STACK.with(|slot| {
+            slot.borrow()
+                .as_ref()
+                .and_then(|cached| cached.0.as_ref())
+                .unwrap()
+                .top()
+        });
         let second = run_on_execution_stack(|| thread::current().id());
-        let second_stack = EXECUTION_STACK.with(|slot| slot.borrow().as_ref().unwrap().top());
+        let second_stack = EXECUTION_STACK.with(|slot| {
+            slot.borrow()
+                .as_ref()
+                .and_then(|cached| cached.0.as_ref())
+                .unwrap()
+                .top()
+        });
         assert_eq!(first, caller);
         assert_eq!(second, caller);
         assert_eq!(first_stack, second_stack);
         assert!(!ENGINE_WORKER_STACK_ACTIVE.get());
+        EXECUTION_STACK.with(|slot| slot.borrow_mut().take());
     }
 
     #[test]
@@ -171,6 +229,7 @@ mod tests {
 
     #[test]
     fn panic_returns_fiber_stack_to_cache_and_preserves_worker_admission() {
+        let _guard = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let panic = panic::catch_unwind(|| {
             run_on_execution_stack(|| panic!("fiber unwind control"));
         });
@@ -178,10 +237,12 @@ mod tests {
         assert!(!ENGINE_WORKER_STACK_ACTIVE.get());
         assert!(EXECUTION_STACK.with(|slot| slot.borrow().is_some()));
         assert_eq!(run_on_execution_stack(|| 29), 29);
+        EXECUTION_STACK.with(|slot| slot.borrow_mut().take());
     }
 
     #[test]
     fn wasmtime_stack_overflow_traps_and_same_store_call_recovers() {
+        let _guard = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let engine = crate::shared_wasm_engine().unwrap();
         let module = wasmtime::Module::new(
             &engine,
@@ -214,6 +275,7 @@ mod tests {
             29
         );
         assert!(EXECUTION_STACK.with(|slot| slot.borrow().is_some()));
+        EXECUTION_STACK.with(|slot| slot.borrow_mut().take());
     }
 
     #[test]
@@ -238,5 +300,45 @@ mod tests {
             .expect("Rayon reentry must complete without queueing behind itself");
         caller.join().unwrap();
         assert_ne!(outer, nested);
+    }
+
+    #[test]
+    fn idle_fiber_stack_cache_is_bounded_across_caller_threads() {
+        let _guard = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        EXECUTION_STACK.with(|slot| slot.borrow_mut().take());
+        let workers = 6;
+        for _wave in 0..2 {
+            let done = std::sync::Arc::new(std::sync::Barrier::new(workers + 1));
+            let release = std::sync::Arc::new(std::sync::Barrier::new(workers + 1));
+            let occupied = std::sync::Arc::new(AtomicUsize::new(0));
+            let mut handles = Vec::with_capacity(workers);
+            for _ in 0..workers {
+                let done = done.clone();
+                let release = release.clone();
+                let occupied = occupied.clone();
+                handles.push(thread::spawn(move || {
+                    let value = run_on_execution_stack(|| 7);
+                    assert_eq!(value, 7);
+                    if EXECUTION_STACK.with(|slot| slot.borrow().is_some()) {
+                        occupied.fetch_add(1, Ordering::AcqRel);
+                    }
+                    done.wait();
+                    release.wait();
+                }));
+            }
+            done.wait();
+            let tls_cached = occupied.load(Ordering::Acquire);
+            assert!(
+                tls_cached >= 1 && tls_cached <= MAX_CACHED_EXECUTION_STACKS,
+                "wave retained {tls_cached} TLS FiberStacks (expected 1..={MAX_CACHED_EXECUTION_STACKS})"
+            );
+            assert!(
+                CACHED_EXECUTION_STACK_COUNT.load(Ordering::Acquire) <= MAX_CACHED_EXECUTION_STACKS
+            );
+            release.wait();
+            for handle in handles {
+                handle.join().unwrap();
+            }
+        }
     }
 }

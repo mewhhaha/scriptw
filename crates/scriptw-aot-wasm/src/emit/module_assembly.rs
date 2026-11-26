@@ -24,6 +24,7 @@ pub(crate) use program_entries::emit_runtime_function_module;
 pub(super) use program_entries::emit_script_module;
 use program_entries::ProgramExports;
 
+#[allow(clippy::too_many_arguments)]
 fn emit_script_module_with_factory(
     script: &ScriptIr,
     kind: ModuleKind<'_>,
@@ -375,6 +376,7 @@ fn emit_script_module_with_factory(
         crate::planning::ModuleGraphPlan::from_script(script)?,
     )
     .with_module_import_bindings(script.declares_module_import_bindings())
+    .with_cached_executable_code_globals(factory.is_none())
     .with_foreign_imports(foreign_imports)
     .with_profile(
         profile,
@@ -1543,6 +1545,7 @@ fn emit_script_module_with_factory(
         register_runtime_helper!(
             IntegerDecimalString, compile_integer_decimal_string_helper;
             PooledStringResolve, compile_pooled_string_resolve_helper;
+            WellKnownSymbolResolve, compile_well_known_symbol_resolve_helper;
             PooledStringsInitialize, compile_pooled_strings_initialize_helper
         );
         register_runtime_helper!(

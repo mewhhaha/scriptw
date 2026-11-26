@@ -1,6 +1,7 @@
 use super::*;
 use crate::gc_types::{
-    GcLocal, GcOperand, I32Local, NonNullable, Nullable, ScalarValue, StringValue, ValueLocals,
+    GcLocal, GcOperand, I32Local, NonNullable, Nullable, PooledStringTable, ScalarValue,
+    StringValue, ValueLocals,
 };
 use crate::operations::PropertyKeyLocals;
 use scriptw_ir::{NativeErrorKind, StaticRegExpCompilation};
@@ -1107,12 +1108,14 @@ impl<'a> FunctionBuilder<'a> {
                 let meta = self.functions.get(id).cloned().ok_or_else(|| {
                     EmitError::unsupported(format!("unknown compiled function `{id}`"))
                 })?;
-                if let Some(slot) = meta
-                    .standard_builtin
-                    .and_then(crate::module::standard_builtin_constructor_realm_slot)
-                {
-                    // Trusted references use the Realm's installed constructor,
-                    // including its semantic prototype, independent of globals.
+                if let Some(slot) = meta.standard_builtin.and_then(|builtin| {
+                    crate::module::standard_builtin_constructor_realm_slot(builtin).or_else(|| {
+                        crate::heap::DemandCallable::from_builtin(builtin)
+                            .map(crate::heap::DemandCallable::slot)
+                    })
+                }) {
+                    // Trusted references to these native identities use the
+                    // Realm's canonical slot independently of public properties.
                     let realm = self.load_current_realm(function);
                     self.emit_load_non_array_realm_intrinsic(&realm, slot, output, function);
                     realm.clear(function);
@@ -1360,7 +1363,17 @@ impl<'a> FunctionBuilder<'a> {
             ExprIr::SpecOperation {
                 operation,
                 operands,
-            } => self.compile_spec_operation_to_locals(*operation, operands, output, function)?,
+            } => {
+                if let (SpecOperationIr::GetV, [target, key]) = (operation, operands.as_slice()) {
+                    if is_zero_property_key(key) {
+                        let key = PropertyKeyIr::StringExpr(Box::new(key.clone()));
+                        if self.try_compile_split_prefix(target, &key, output, function)? {
+                            return Ok(());
+                        }
+                    }
+                }
+                self.compile_spec_operation_to_locals(*operation, operands, output, function)?;
+            }
             ExprIr::BinaryNumber { op, lhs, rhs } => {
                 if expr.kind == ValueKind::BigInt {
                     self.compile_bigint_arithmetic_to_locals(
@@ -1590,7 +1603,9 @@ impl<'a> FunctionBuilder<'a> {
                 schema.release_i32_local(result, function);
             }
             ExprIr::PropertyRead { target, key } => {
-                self.compile_property_read_to_locals(target, key, output, function)?
+                if !self.try_compile_split_prefix(target, key, output, function)? {
+                    self.compile_property_read_to_locals(target, key, output, function)?;
+                }
             }
             ExprIr::OptionalPropertyChain { target, chain } => self
                 .compile_optional_property_chain_to_value(
@@ -1900,12 +1915,8 @@ impl<'a> FunctionBuilder<'a> {
         result
     }
 
-    /// Fuses `recv.split("sep").join("rep")` (for non-empty constant string
-    /// `sep` and constant string `rep`) under unchanged Realm protectors for
-    /// `%String.prototype%`, `%Array.prototype%` and `%Object.prototype%`.
-    /// `recv` is evaluated exactly once (linear code size on chained calls);
-    /// any guard failure or length overflow falls back to the exact original
-    /// `.split(...)` and `.join(...)` call bodies with `continuation` preserved.
+    /// Guard once after the innermost receiver, keeping the original calls
+    /// in evaluation order on a miss.
     pub(crate) fn try_compile_split_join_materialized_binding(
         &mut self,
         join_name: &str,
@@ -1915,174 +1926,366 @@ impl<'a> FunctionBuilder<'a> {
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<bool, EmitError> {
-        let is_named_get = |callee: &TypedExpr, binding: &str, method: &str| match &callee.expr {
-            ExprIr::PropertyRead {
-                target,
-                key: PropertyKeyIr::StaticString(key),
-            } => key == method && matches!(&target.expr, ExprIr::Identifier(id) if id == binding),
-            ExprIr::SpecOperation {
-                operation: SpecOperationIr::GetV,
-                operands,
-            } => matches!(
-                operands.as_slice(),
-                [
-                    TypedExpr {
-                        expr: ExprIr::Identifier(id),
-                        ..
-                    },
-                    TypedExpr {
-                        expr: ExprIr::String(key),
-                        ..
-                    }
-                ] if id == binding && key == method
-            ),
-            _ => false,
-        };
-        let ExprIr::CallIndirect {
-            direct_eval: None,
-            static_regexp_compilation: None,
-            callee: join_callee,
-            this_arg: Some(join_this),
-            args: join_args,
-        } = &join_body.expr
-        else {
+        let Some(outer) = SplitJoinStage::of(join_name, split_expr, join_body) else {
             return Ok(false);
         };
-        if !matches!(&join_this.expr, ExprIr::Identifier(id) if id == join_name)
-            || !is_named_get(join_callee, join_name, "join")
-        {
-            return Ok(false);
+        let mut receiver_expr = outer.split.receiver;
+        let mut stages = vec![outer];
+        while stages.len() < crate::runtime_helpers::SPLIT_JOIN_CHAIN_LIMIT {
+            let ExprIr::MaterializeBinding { name, value, body } = &receiver_expr.expr else {
+                break;
+            };
+            let Some(inner) = SplitJoinStage::of(name, value, body) else {
+                break;
+            };
+            let Some(unit) = one_code_unit(inner.split.separator) else {
+                break;
+            };
+            let replacement = StringPool::runtime_code_units_for_string(inner.replacement);
+            if stages.iter().any(|later| {
+                one_code_unit(later.split.separator).is_none_or(|later_unit| {
+                    unit == later_unit || replacement.contains(&later_unit)
+                })
+            }) {
+                break;
+            }
+            receiver_expr = inner.split.receiver;
+            stages.push(inner);
         }
-        let [TypedExpr {
-            expr: ExprIr::String(rep_literal),
-            ..
-        }] = join_args.as_slice()
-        else {
-            return Ok(false);
-        };
-        let ExprIr::MaterializeBinding {
-            name: split_name,
-            value: recv_expr,
-            body: split_body,
-        } = &split_expr.expr
-        else {
-            return Ok(false);
-        };
-        let ExprIr::CallIndirect {
-            direct_eval: None,
-            static_regexp_compilation: None,
-            callee: split_callee,
-            this_arg: Some(split_this),
-            args: split_args,
-        } = &split_body.expr
-        else {
-            return Ok(false);
-        };
-        if !matches!(&split_this.expr, ExprIr::Identifier(id) if id == split_name)
-            || !is_named_get(split_callee, split_name, "split")
-        {
-            return Ok(false);
-        }
-        let [TypedExpr {
-            expr: ExprIr::String(sep_literal),
-            ..
-        }] = split_args.as_slice()
-        else {
-            return Ok(false);
-        };
-        if sep_literal.is_empty() {
-            return Ok(false);
-        }
+        stages.reverse();
         let schema = self.runtime_schema();
-        // Evaluate `recv_expr` exactly once so nested chains stay O(N) in size.
-        let recv_val = schema.reserve_value_local(function);
-        self.compile_expr_to_value(recv_expr, &recv_val, function)?;
+        let receiver = schema.reserve_value_local(function);
+        self.compile_expr_to_value(receiver_expr, &receiver, function)?;
         self.emit_propagate_current_throw_if_needed(function);
         let done = self.open_frame(ControlFrameKind::Block, function);
         let fallback = self.open_frame(ControlFrameKind::Block, function);
-        recv_val.tag().load(function);
-        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
-        function.instruction(&Instruction::I32Ne);
-        self.emit_branch_if_to_target(fallback, function);
-        self.emit_string_split_join_protectors_or_branch(fallback, function);
-        let input_str = schema
-            .reserve_gc_local(function)
-            .initialize(recv_val.cast_reference::<StringValue>(schema, function), function);
-        let sep_str = schema.reserve_gc_local(function).initialize(
-            self.emit_interned_string_reference(sep_literal, function)?,
+        self.emit_primitive_split_guard(&receiver, fallback, function);
+        let input = schema.reserve_gc_local(function).initialize(
+            receiver.cast_reference::<StringValue>(schema, function),
             function,
         );
-        let rep_str = schema.reserve_gc_local(function).initialize(
-            self.emit_interned_string_reference(rep_literal, function)?,
-            function,
-        );
+        let literals = stages
+            .iter()
+            .map(|stage| {
+                let separator = schema.reserve_gc_local(function).initialize(
+                    self.emit_interned_string_reference(stage.split.separator, function)?,
+                    function,
+                );
+                let replacement = schema.reserve_gc_local(function).initialize(
+                    self.emit_interned_string_reference(stage.replacement, function)?,
+                    function,
+                );
+                Ok((separator, replacement))
+            })
+            .collect::<Result<Vec<_>, EmitError>>()?;
+        let plan_slot = schema.reserve_gc_local::<PooledStringTable, Nullable>(function);
+        let plan = if literals.len() > 1 {
+            let table = schema.array_type::<PooledStringTable>().fixed(
+                literals.iter().flat_map(|(separator, replacement)| {
+                    [
+                        GcOperand::nullable_reference(separator, schema),
+                        GcOperand::nullable_reference(replacement, schema),
+                    ]
+                }),
+                function,
+            );
+            plan_slot.initialize(table.nullable(), function)
+        } else {
+            plan_slot.initialize_null(schema, function)
+        };
+        let (separator, replacement) = &literals[0];
         let fused = schema
             .call_helper(
                 crate::runtime_helpers::StringSplitJoinArguments::new(
-                    &input_str, &sep_str, &rep_str,
+                    &input,
+                    separator,
+                    replacement,
+                    &plan,
                 ),
                 self.runtime_helper_base()?,
                 function,
             )
             .bind(schema, schema.reserve_gc_local(function), function);
-        rep_str.clear(function);
-        sep_str.clear(function);
-        input_str.clear(function);
-        let is_null = schema.reserve_i32_local(function);
-        fused.load(schema, function).is_null(function);
-        is_null.store(function);
-        is_null.load(function);
-        function.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, function);
-        let present = schema
-            .reserve_gc_local(function)
-            .initialize(fused.load(schema, function).require_non_null(function), function);
+        plan.clear(function);
+        for (separator, replacement) in literals {
+            separator.clear(function);
+            replacement.clear(function);
+        }
+        input.clear(function);
+        if stages.len() > 1 {
+            // The guard chose the current Realm's original join. No user
+            // code runs during these stages, and null means one of their
+            // results exceeded the implementation's String limit.
+            fused.load(schema, function).is_null(function);
+            self.open_frame(ControlFrameKind::If, function);
+            receiver.reference().clear(function);
+            let pending = schema.reserve_completion(function);
+            let realm = self.load_current_realm(function);
+            let prototype = schema.reserve_value_local(function);
+            self.emit_load_non_array_realm_intrinsic(
+                &realm,
+                NonArrayRealmIntrinsicSlot::RangeErrorPrototype,
+                &prototype,
+                function,
+            );
+            realm.clear(function);
+            self.emit_throw_runtime_error_with_prototype(
+                NativeErrorKind::RangeError,
+                RuntimeErrorMessage::STRING_LENGTH_EXCEEDS_IMPLEMENTATION_LIMIT,
+                &prototype,
+                &pending,
+                function,
+            )?;
+            prototype.clear(function);
+            self.completion().copy_from(&pending, function);
+            pending.clear(function);
+            self.emit_propagate_current_throw(function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        }
+        let present = schema.reserve_gc_local(function).initialize(
+            fused.non_null_or_branch(self.local_branch_label(fallback), function),
+            function,
+        );
+        fused.clear(function);
+        if stages.len() == 1 {
+            // Single-stage fusion shares the helper with literal replaceAll,
+            // whose no-match branch returns the receiver unchanged. `join`
+            // still enforces MAX_STRING_LENGTH even on a singleton array.
+            let present_units = schema
+                .field(crate::gc_types::StringValueSchema::CODE_UNITS)
+                .read(&present, schema, function)
+                .reference();
+            schema
+                .array_type::<crate::gc_types::CodeUnitArray>()
+                .length_top(present_units, function);
+            function.instruction(&Instruction::I64ExtendI32U);
+            function.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
+            function.instruction(&Instruction::I64GtU);
+            self.emit_branch_if_to_target(fallback, function);
+        }
         output.set_reference(&present, schema, function);
         present.clear(function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        fused.clear(function);
-        is_null.load(function);
-        schema.release_i32_local(is_null, function);
-        self.emit_branch_if_to_target(fallback, function);
         self.emit_branch_to_target(done, function);
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
-        // Fallback: run the exact original split and join bodies with the
-        // already-evaluated `recv_val`.
+
         let split_result = schema.reserve_value_local(function);
-        self.push_scope();
-        let (_, split_id) = self.retain_expression_operand(split_name, &recv_val, function);
-        let split_res = self.compile_expr_to_value(split_body, &split_result, function);
-        self.pop_scope();
-        self.release_local_binding(split_id, function);
-        split_res?;
-        self.push_scope();
-        let (_, join_id) = self.retain_expression_operand(join_name, &split_result, function);
-        let join_res = match continuation {
-            crate::functions::CallContinuation::Continue => {
-                self.compile_expr_to_value(join_body, output, function)
-            }
-            crate::functions::CallContinuation::Return => {
-                self.emit_indirect_call(
-                    join_callee,
-                    Some(join_this),
-                    join_args,
-                    None,
-                    None,
-                    continuation,
-                    output,
-                    function,
-                )
-            }
-        };
-        self.pop_scope();
-        self.release_local_binding(join_id, function);
+        for (index, stage) in stages.iter().enumerate() {
+            self.emit_original_split(&stage.split, &receiver, &split_result, function)?;
+            let last = index + 1 == stages.len();
+            self.push_scope();
+            let (_, join_id) =
+                self.retain_expression_operand(stage.binding, &split_result, function);
+            let joined =
+                if last && matches!(continuation, crate::functions::CallContinuation::Return) {
+                    self.emit_indirect_call(
+                        stage.callee,
+                        Some(stage.this_arg),
+                        stage.args,
+                        None,
+                        None,
+                        continuation,
+                        output,
+                        function,
+                    )
+                } else {
+                    self.compile_expr_to_value(
+                        stage.body,
+                        if last { output } else { &receiver },
+                        function,
+                    )
+                };
+            self.pop_scope();
+            self.release_local_binding(join_id, function);
+            joined?;
+        }
         split_result.clear(function);
-        join_res?;
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
-        recv_val.clear(function);
+        receiver.clear(function);
         Ok(true)
     }
+
+    fn emit_primitive_split_guard(
+        &mut self,
+        receiver: &ValueLocals,
+        fallback: crate::emit::ControlTarget,
+        function: &mut Function,
+    ) {
+        receiver.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+        function.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(fallback, function);
+        self.emit_string_split_join_protectors_or_branch(fallback, function);
+    }
+
+    fn emit_original_split(
+        &mut self,
+        split: &LiteralSplit<'_>,
+        receiver: &ValueLocals,
+        output: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        self.push_scope();
+        let (_, id) = self.retain_expression_operand(split.binding, receiver, function);
+        let result = self.compile_expr_to_value(split.body, output, function);
+        self.pop_scope();
+        self.release_local_binding(id, function);
+        result
+    }
+
+    fn try_compile_split_prefix(
+        &mut self,
+        target: &TypedExpr,
+        key: &PropertyKeyIr,
+        output: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<bool, EmitError> {
+        let is_zero = match key {
+            PropertyKeyIr::StaticString(key) => key == "0",
+            PropertyKeyIr::ArrayIndex(key) | PropertyKeyIr::StringExpr(key) => {
+                is_zero_property_key(key)
+            }
+            PropertyKeyIr::ArrayLength => false,
+        };
+        if !is_zero {
+            return Ok(false);
+        }
+        let Some(split) = LiteralSplit::of(target) else {
+            return Ok(false);
+        };
+        let Some(unit) = one_code_unit(split.separator) else {
+            return Ok(false);
+        };
+        let schema = self.runtime_schema();
+        let receiver = schema.reserve_value_local(function);
+        self.compile_expr_to_value(split.receiver, &receiver, function)?;
+        self.emit_propagate_current_throw_if_needed(function);
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        let fallback = self.open_frame(ControlFrameKind::Block, function);
+        self.emit_primitive_split_guard(&receiver, fallback, function);
+        // A primitive String is already coercible, and ToString is identity.
+        // Object receivers can observe both method lookup and coercion.
+        let input = schema.reserve_gc_local(function).initialize(
+            receiver.cast_reference::<StringValue>(schema, function),
+            function,
+        );
+        self.emit_split_prefix(&input, unit, output, function)?;
+        input.clear(function);
+        self.emit_branch_to_target(done, function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        let array = schema.reserve_value_local(function);
+        self.emit_original_split(&split, &receiver, &array, function)?;
+        self.compile_property_read_from_locals(target, key, &array, output, function)?;
+        array.clear(function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        receiver.clear(function);
+        Ok(true)
+    }
+}
+
+fn one_code_unit(text: &str) -> Option<u16> {
+    match StringPool::runtime_code_units_for_string(text).as_slice() {
+        [unit] => Some(*unit),
+        _ => None,
+    }
+}
+
+fn is_zero_property_key(key: &TypedExpr) -> bool {
+    match &key.expr {
+        ExprIr::Number(bits) => f64::from_bits(*bits) == 0.0,
+        ExprIr::String(text) => text == "0",
+        _ => false,
+    }
+}
+
+struct LiteralSplit<'a> {
+    receiver: &'a TypedExpr,
+    binding: &'a str,
+    body: &'a TypedExpr,
+    separator: &'a str,
+}
+
+impl<'a> LiteralSplit<'a> {
+    fn of(expr: &'a TypedExpr) -> Option<Self> {
+        let ExprIr::MaterializeBinding { name, value, body } = &expr.expr else {
+            return None;
+        };
+        let (_, _, _, separator) = literal_method_call(body, name, "split")?;
+        (!separator.is_empty()).then_some(Self {
+            receiver: value,
+            binding: name,
+            body,
+            separator,
+        })
+    }
+}
+
+struct SplitJoinStage<'a> {
+    split: LiteralSplit<'a>,
+    binding: &'a str,
+    body: &'a TypedExpr,
+    callee: &'a TypedExpr,
+    this_arg: &'a TypedExpr,
+    args: &'a [TypedExpr],
+    replacement: &'a str,
+}
+
+impl<'a> SplitJoinStage<'a> {
+    fn of(binding: &'a str, split: &'a TypedExpr, body: &'a TypedExpr) -> Option<Self> {
+        let (callee, this_arg, args, replacement) = literal_method_call(body, binding, "join")?;
+        Some(Self {
+            split: LiteralSplit::of(split)?,
+            binding,
+            body,
+            callee,
+            this_arg,
+            args,
+            replacement,
+        })
+    }
+}
+
+fn literal_method_call<'a>(
+    body: &'a TypedExpr,
+    binding: &str,
+    method: &str,
+) -> Option<(&'a TypedExpr, &'a TypedExpr, &'a [TypedExpr], &'a str)> {
+    let ExprIr::CallIndirect {
+        direct_eval: None,
+        static_regexp_compilation: None,
+        callee,
+        this_arg: Some(this_arg),
+        args,
+    } = &body.expr
+    else {
+        return None;
+    };
+    let is_receiver =
+        |expr: &TypedExpr| matches!(&expr.expr, ExprIr::Identifier(id) if id == binding);
+    let is_method = match &callee.expr {
+        ExprIr::PropertyRead {
+            target,
+            key: PropertyKeyIr::StaticString(key),
+        } => key == method && is_receiver(target),
+        ExprIr::SpecOperation {
+            operation: SpecOperationIr::GetV,
+            operands,
+        } => {
+            matches!(operands.as_slice(), [target, key] if is_receiver(target)
+                && matches!(&key.expr, ExprIr::String(key) if key == method))
+        }
+        _ => false,
+    };
+    let [TypedExpr {
+        expr: ExprIr::String(literal),
+        ..
+    }] = args.as_slice()
+    else {
+        return None;
+    };
+    (is_receiver(this_arg) && is_method).then_some((callee, this_arg, args, literal))
 }

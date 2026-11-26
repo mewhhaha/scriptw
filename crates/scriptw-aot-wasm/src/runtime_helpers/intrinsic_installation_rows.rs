@@ -229,7 +229,7 @@ impl RuntimeHelperPropertyLayoutRow {
         f.instruction(&Instruction::I32And);
     }
 
-    pub(crate) fn emit_well_known_symbol_ordinal(&self, f: &mut Function) {
+    pub(crate) fn well_known_symbol_ordinal(&self, f: &mut Function) -> I32Local {
         self.kind.load(f);
         f.instruction(&Instruction::I32Const(
             crate::intrinsics::property_layouts::IntrinsicPropertyRecipeKind::WellKnownSymbol
@@ -239,7 +239,7 @@ impl RuntimeHelperPropertyLayoutRow {
         f.instruction(&Instruction::If(BlockType::Empty));
         f.instruction(&Instruction::Unreachable);
         f.instruction(&Instruction::End);
-        self.payload[0].load(f);
+        self.payload[0]
     }
 
     /// Kind checking prevents a numeric payload from becoming builtin authority.

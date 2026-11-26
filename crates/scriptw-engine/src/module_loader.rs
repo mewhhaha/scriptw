@@ -10,6 +10,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 use scriptw_front::{ParseGoal, ParsedModule, ParsedScript, ParsedSource};
 use scriptw_ir::{ModuleGraphSources, ModuleSourceIr};
@@ -586,6 +587,16 @@ impl FilesystemModuleLoader {
     /// Returns an error when neither a root nor a usable working directory is
     /// available.
     pub fn new(root: Option<&str>, entry: Option<&str>) -> Result<Self, ModuleLoadError> {
+        Ok(Self::from_paths(root, entry))
+    }
+
+    /// Ambient compilation owns the raw options. Resolve the directories once
+    /// when graph discovery first needs to resolve or read a filesystem module.
+    pub(super) fn deferred(root: Option<String>, entry: Option<String>) -> impl HostModuleLoader {
+        LazyLock::new(move || Self::from_paths(root.as_deref(), entry.as_deref()))
+    }
+
+    fn from_paths(root: Option<&str>, entry: Option<&str>) -> Self {
         let entry_dir = entry
             .map(Path::new)
             .and_then(Path::parent)
@@ -596,7 +607,17 @@ impl FilesystemModuleLoader {
         let root = root.map(PathBuf::from).unwrap_or_else(|| entry_dir.clone());
         let root = root.canonicalize().unwrap_or(root);
         let entry_dir = entry_dir.canonicalize().unwrap_or(entry_dir);
-        Ok(Self { root, entry_dir })
+        Self { root, entry_dir }
+    }
+
+    fn canonical_entry_key(key: &str) -> ModuleKey {
+        // Exactly what `resolve` produces, so an entry the graph reaches again
+        // through a relative specifier lands on the key it already holds.
+        // A key naming nothing on disk (an in-memory entry) stays as written.
+        normalize(Path::new(key)).canonicalize().map_or_else(
+            |_| ModuleKey::from_host(key),
+            |resolved| ModuleKey::from_host(resolved.to_string_lossy().into_owned()),
+        )
     }
 
     /// Rejects any path that escapes the root, before it is ever read.
@@ -673,13 +694,7 @@ impl HostModuleLoader for FilesystemModuleLoader {
     }
 
     fn canonical_key(&self, key: &str) -> ModuleKey {
-        // Exactly what `resolve` produces, so an entry the graph reaches again
-        // through a relative specifier lands on the key it already holds.
-        // A key naming nothing on disk (an in-memory entry) stays as written.
-        normalize(Path::new(key)).canonicalize().map_or_else(
-            |_| ModuleKey::from_host(key),
-            |resolved| ModuleKey::from_host(resolved.to_string_lossy().into_owned()),
-        )
+        Self::canonical_entry_key(key)
     }
 
     fn load(&self, key: &ModuleRecordKey) -> Result<LoadedModule, ModuleLoadError> {
@@ -723,6 +738,27 @@ impl HostModuleLoader for FilesystemModuleLoader {
             kind,
             key: locator.clone(),
         })
+    }
+}
+
+impl<F> HostModuleLoader for LazyLock<FilesystemModuleLoader, F>
+where
+    F: FnOnce() -> FilesystemModuleLoader + Send + Sync,
+{
+    fn resolve(
+        &self,
+        referrer: Option<&ModuleKey>,
+        request: &ModuleRequestKeyIr,
+    ) -> Result<ModuleKey, ModuleLoadError> {
+        LazyLock::force(self).resolve(referrer, request)
+    }
+
+    fn load(&self, key: &ModuleRecordKey) -> Result<LoadedModule, ModuleLoadError> {
+        LazyLock::force(self).load(key)
+    }
+
+    fn canonical_key(&self, key: &str) -> ModuleKey {
+        FilesystemModuleLoader::canonical_entry_key(key)
     }
 }
 

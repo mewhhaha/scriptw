@@ -8,17 +8,18 @@
 //! permanent; and C's [[Prototype]] was a Realm's %Function.prototype%,
 //! whose own @@hasInstance is the immutable default method, or a function
 //! object, such as %TypedArray% or a parent class, whose [[Prototype]] was.
-//! At each use the site re-proves that C is the record's function, that
-//! those [[Prototype]] edges are unchanged and that @@hasInstance has never
-//! been hashed, so that no dictionary, C's and the edge's included, holds
-//! it; GetMethod(C, @@hasInstance) then finds the default method and the
-//! result is OrdinaryHasInstance(C, V). The site
+//! At each use the site re-proves that C is the record's function and that
+//! those [[Prototype]] edges are unchanged. A single site or an entire run
+//! also proves that @@hasInstance has never been hashed, so no dictionary
+//! holds it. GetMethod(C, @@hasInstance) then finds the default method and
+//! the result is OrdinaryHasInstance(C, V). The site
 //! answers a primitive V and walks an ordinary, function or Array V's chain
 //! inline. Everything else, a Proxy on the chain, another right-hand side, a
 //! writable "prototype", a bound or non-callable C, goes on to the entry and
 //! the HasInstance helper having observed nothing: every step only reads.
 use super::chain::{ChainWalk, RunSite};
 use super::*;
+use crate::environments::GlobalDeclarativeNames;
 use crate::gc_types::{
     Environment, GlobalReadSiteRecord, InstanceofSiteRecord, InstanceofSiteRecordSchema,
     SiteRecordGlobal,
@@ -126,13 +127,13 @@ impl FunctionBuilder<'_> {
             .initialize(read.load(s, f), f);
         record.load(s, f).is_null(f);
         self.emit_branch_if_to_target(slow, f);
-        let data = self.emit_global_read_record_data_or_branch(
-            &record,
-            global,
-            crate::environments::GlobalDeclarativeNames::Unknown,
-            slow,
-            f,
-        );
+        let names = if let Some(site) = chain {
+            self.emit_run_shared_proof_or_branch(site, global, slow, f);
+            GlobalDeclarativeNames::ProvedOther
+        } else {
+            GlobalDeclarativeNames::Unknown
+        };
+        let data = self.emit_global_read_record_data_or_branch(&record, global, names, slow, f);
         record.clear(f);
         let _ = data.load(s, f);
         let _ = stored.load(s, f);
@@ -185,7 +186,7 @@ impl FunctionBuilder<'_> {
         let data = self.emit_global_read_record_data_or_branch(
             &record,
             global,
-            crate::environments::GlobalDeclarativeNames::Unknown,
+            GlobalDeclarativeNames::Unknown,
             skip,
             f,
         );
@@ -223,54 +224,37 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) {
         let s = self.runtime_schema();
-        // A usable record holds everything below, so the three facts that
-        // keep GetMethod(C, @@hasInstance) the default method are read
-        // without a test between them and decide one branch: C's
-        // [[Prototype]] edge, the edge from the function object it may name
-        // to the recorded %Function.prototype% (C's own edge again when
-        // there is none between), and @@hasInstance never hashed.
+        // Each constructor must still reach its recorded %Function.prototype%
+        // through the recorded edges. A run site already proved that no
+        // dictionary holds @@hasInstance.
         let header = s
-            .reserve_gc_local::<OrdinaryObject, Nullable>(f)
-            .initialize(
-                s.field(InstanceofSiteRecordSchema::HEADER)
-                    .read(record, s, f)
-                    .reference(),
-                f,
-            );
-        s.field(OrdinaryObjectSchema::PROTOTYPE).read(&header, s, f);
+            .field(InstanceofSiteRecordSchema::HEADER)
+            .read(record, s, f)
+            .reference();
+        s.field(OrdinaryObjectSchema::PROTOTYPE).read_top(header, f);
         s.field(InstanceofSiteRecordSchema::EDGE).read(record, s, f);
         f.instruction(&Instruction::RefEq);
-        f.instruction(&Instruction::I32Eqz);
-        header.clear(f);
         let edge = s
-            .reserve_gc_local::<OrdinaryObject, Nullable>(f)
-            .initialize(
-                s.field(InstanceofSiteRecordSchema::EDGE_HEADER)
-                    .read(record, s, f)
-                    .reference(),
-                f,
-            );
-        s.field(OrdinaryObjectSchema::PROTOTYPE).read(&edge, s, f);
+            .field(InstanceofSiteRecordSchema::EDGE_HEADER)
+            .read(record, s, f)
+            .reference();
+        s.field(OrdinaryObjectSchema::PROTOTYPE).read_top(edge, f);
         s.field(InstanceofSiteRecordSchema::FUNCTION_PROTOTYPE)
             .read(record, s, f);
         f.instruction(&Instruction::RefEq);
-        f.instruction(&Instruction::I32Eqz);
-        f.instruction(&Instruction::I32Or);
-        edge.clear(f);
-        // Every dictionary entry stores its key's hash, and a Symbol is
-        // given its hash identity the first time it is hashed, so until
-        // then no dictionary holds it.
-        let symbol = s.reserve_gc_local::<SymbolValue, Nullable>(f).initialize(
-            s.field(InstanceofSiteRecordSchema::HAS_INSTANCE)
+        f.instruction(&Instruction::I32And);
+        if chain.is_none() {
+            // Until the Symbol has a hash identity, no dictionary can hold
+            // it as a key.
+            let symbol = s
+                .field(InstanceofSiteRecordSchema::HAS_INSTANCE)
                 .read(record, s, f)
-                .reference(),
-            f,
-        );
-        s.field(SymbolValueSchema::KEY_HASH_ID).read(&symbol, s, f);
-        symbol.clear(f);
-        f.instruction(&Instruction::I64Const(0));
-        f.instruction(&Instruction::I64Ne);
-        f.instruction(&Instruction::I32Or);
+                .reference();
+            s.field(SymbolValueSchema::KEY_HASH_ID).read_top(symbol, f);
+            f.instruction(&Instruction::I64Eqz);
+            f.instruction(&Instruction::I32And);
+        }
+        f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(slow, f);
         let answered = self.open_frame(ControlFrameKind::Block, f);
         answer.set_constant(0, f);
@@ -502,7 +486,7 @@ impl FunctionBuilder<'_> {
             .initialize(s.prototype_reference(&value, f), f);
         value.clear(f);
         let symbol = s.reserve_gc_local::<SymbolValue, Nullable>(f).initialize(
-            s.well_known_symbol_reference(scriptw_ir::WellKnownSymbol::HasInstance, f)
+            self.emit_well_known_symbol_reference(scriptw_ir::WellKnownSymbol::HasInstance, f)?
                 .nullable(),
             f,
         );

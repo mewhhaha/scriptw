@@ -2960,6 +2960,7 @@ impl FuncEnvironment<'_> {
         struct_ref: ir::Value,
         non_null: bool,
         value: ir::Value,
+        value_ty: Option<WasmRefType>,
     ) -> WasmResult<()> {
         gc::translate_struct_set(
             self,
@@ -2969,6 +2970,7 @@ impl FuncEnvironment<'_> {
             struct_ref,
             non_null,
             value,
+            value_ty,
         )
     }
 
@@ -3212,8 +3214,18 @@ impl FuncEnvironment<'_> {
         non_null: bool,
         index: ir::Value,
         value: ir::Value,
+        value_ty: Option<WasmRefType>,
     ) -> WasmResult<()> {
-        gc::translate_array_set(self, builder, array_type_index, array, non_null, index, value)
+        gc::translate_array_set(
+            self,
+            builder,
+            array_type_index,
+            array,
+            non_null,
+            index,
+            value,
+            value_ty,
+        )
     }
 
     pub fn translate_ref_test(
@@ -3719,6 +3731,102 @@ impl FuncEnvironment<'_> {
         self.translate_entity_copy(builder, dst_index, src_index, dst, src, len)
     }
 
+    fn moving_array_for_bulk_poll(&self, entity: CheckedEntity) -> Option<ir::Value> {
+        match entity {
+            CheckedEntity::Array { array, .. }
+                if self.tunables.collector == Some(wasmtime_environ::Collector::Copying)
+                    && (self.tunables.epoch_interruption || self.tunables.consume_fuel) =>
+            {
+                Some(array)
+            }
+            _ => None,
+        }
+    }
+
+    fn bulk_array_base(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        array: ir::Value,
+    ) -> ir::Value {
+        let base = self.gc_heap_base(builder);
+        let index = self.unchecked_cast_wasm_addr_to_native_addr(
+            &mut builder.cursor(),
+            array,
+            IndexType::I32,
+        );
+        builder.ins().iadd(base, index)
+    }
+
+    /// Convert a checked address to an object-relative offset when polling
+    /// can move its array. Other entities keep their native addresses.
+    fn bulk_array_offset(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        array: Option<ir::Value>,
+        addr: ir::Value,
+    ) -> ir::Value {
+        if let Some(array) = array {
+            let base = self.bulk_array_base(builder, array);
+            builder.ins().isub(addr, base)
+        } else {
+            addr
+        }
+    }
+
+    fn bulk_array_address(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        array: Option<ir::Value>,
+        offset: ir::Value,
+    ) -> ir::Value {
+        if let Some(array) = array {
+            let base = self.bulk_array_base(builder, array);
+            builder.ins().iadd(base, offset)
+        } else {
+            offset
+        }
+    }
+
+    /// A fresh moving reference array whose uninitialized elements could be
+    /// exposed to GC at an intra-operation fuel or epoch poll.
+    fn uninit_moving_gc_ref_array(&mut self, entity: CheckedEntity) -> WasmResult<Option<ir::Value>> {
+        if let CheckedEntity::Array {
+            ty,
+            array,
+            initialized: false,
+        } = entity
+        {
+            if self.moving_array_for_bulk_poll(entity).is_some()
+                && self.array_layout(ty)?.elems_are_gc_refs
+            {
+                return Ok(Some(array));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Update a moving GC array's length header field so the copying collector
+    /// scans only the initialized prefix while copying the full object size.
+    fn store_moving_array_length(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        array: ir::Value,
+        len: ir::Value,
+    ) -> WasmResult<()> {
+        let len_i32 = if builder.func.dfg.value_type(len) == I32 {
+            len
+        } else {
+            builder.ins().ireduce(I32, len)
+        };
+        let len_offset = gc::gc_compiler(self)?.layouts().array_length_field_offset();
+        let base = self.bulk_array_base(builder, array);
+        let flags = self.gc_memflags(&mut builder.func);
+        builder
+            .ins()
+            .store(flags, len_i32, base, i32::try_from(len_offset).unwrap());
+        Ok(())
+    }
+
     /// Perform a raw bulk-memory-like libcall.
     ///
     /// The main purpose of this helper is to handle situations when fuel and
@@ -3765,6 +3873,28 @@ impl FuncEnvironment<'_> {
         let vmctx = self.vmctx_val(&mut pos);
         let pointer_type = self.pointer_type();
 
+        // Carry byte offsets for moving arrays through the chunk loop. Fuel
+        // and epoch callbacks can move both the arrays and the heap base.
+        let (dst_array, src_array) = match &mut op {
+            BulkOp::MemoryCopy {
+                dst,
+                src,
+                dst_entity,
+                src_entity,
+                ..
+            } => {
+                let dst_array = self.moving_array_for_bulk_poll(*dst_entity);
+                let src_array = self.moving_array_for_bulk_poll(*src_entity);
+                *dst = self.bulk_array_offset(builder, dst_array, *dst);
+                *src = self.bulk_array_offset(builder, src_array, *src);
+                (dst_array, src_array)
+            }
+            BulkOp::MemoryFill { dst, array, .. } => {
+                *dst = self.bulk_array_offset(builder, *array, *dst);
+                (*array, None)
+            }
+        };
+
         // Performs a raw call to the actual libcall, as dictated by the
         // provided `op`. This unconditionally inserts epoch/fuel checks for all
         // calls.
@@ -3784,10 +3914,12 @@ impl FuncEnvironment<'_> {
                             };
                             env.manual_fuel_check(builder, fuel_consumed);
                         }
+                        let dst = env.bulk_array_address(builder, dst_array, dst);
+                        let src = env.bulk_array_address(builder, src_array, src);
                         let memory_copy = env.builtin_functions.memory_copy(&mut builder.func);
                         builder.ins().call(memory_copy, &[vmctx, dst, src, len]);
                     }
-                    BulkOp::MemoryFill { dst, val, len } => {
+                    BulkOp::MemoryFill { dst, val, len, .. } => {
                         if env.tunables.consume_fuel {
                             let fuel_consumed = match env.pointer_type() {
                                 ir::types::I32 => builder.ins().uextend(ir::types::I64, len),
@@ -3796,6 +3928,7 @@ impl FuncEnvironment<'_> {
                             };
                             env.manual_fuel_check(builder, fuel_consumed);
                         }
+                        let dst = env.bulk_array_address(builder, dst_array, dst);
                         let memory_fill = env.builtin_functions.memory_fill(&mut builder.func);
                         builder.ins().call(memory_fill, &[vmctx, dst, val, len]);
                     }
@@ -3830,7 +3963,8 @@ impl FuncEnvironment<'_> {
 
         // For `memcpy` when chunking this up we might need to do a backwards
         // copy or a forwards copy. Determine that here and jump to the
-        // backwards copy if needed.
+        // backwards copy if needed. Offsets are comparable when both belong
+        // to the same array. Distinct arrays and array/data pairs cannot overlap.
         let backwards_block = if let BulkOp::MemoryCopy { dst, src, .. } = op {
             let forwards = builder.ins().icmp(IntCC::UnsignedGreaterThan, src, dst);
             let forwards_block = builder.create_block();
@@ -4029,6 +4163,7 @@ impl FuncEnvironment<'_> {
                         dst: raw_dst_addr,
                         val,
                         len: len_ptr,
+                        array: None,
                     },
                 );
             }
@@ -4099,9 +4234,18 @@ impl FuncEnvironment<'_> {
         } else {
             None
         };
+        let uninit_moving_ref_array = self.uninit_moving_gc_ref_array(entity)?;
+        let moving_array = self.moving_array_for_bulk_poll(entity);
         if let Some(value) = memset_value {
             if let CheckedEntity::Array { .. } = entity {
-                self.emit_array_memset(builder, dst_elem_addr, value, copy_byte_len);
+                self.emit_array_memset(
+                    builder,
+                    dst_elem_addr,
+                    value,
+                    copy_byte_len,
+                    moving_array,
+                    uninit_moving_ref_array.map(|array| (array, copy_len)),
+                )?;
             } else {
                 self.raw_bulk_memory_operation(
                     builder,
@@ -4109,6 +4253,7 @@ impl FuncEnvironment<'_> {
                         dst: dst_elem_addr,
                         val: value,
                         len: copy_byte_len,
+                        array: None,
                     },
                 );
             }
@@ -4161,26 +4306,41 @@ impl FuncEnvironment<'_> {
 
         // Current block: test to see if this is actually an empty copy. If it
         // is then skip over the entire loop, otherwise enter the loop and
-        // perform the first ieration.
+        // perform the first iteration.
+        let dst_elem_addr = self.bulk_array_offset(builder, moving_array, dst_elem_addr);
         let end_addr = builder.ins().iadd(dst_elem_addr, copy_byte_len);
         let empty = builder.ins().icmp_imm_s(IntCC::Equal, copy_len, 0);
-        builder.ins().brif(
-            empty,
-            continue_block,
-            &[],
-            loop_block,
-            &[dst_elem_addr.into()],
-        );
+        if let Some(array) = uninit_moving_ref_array {
+            let zero = builder.ins().iconst(I32, 0);
+            self.store_moving_array_length(builder, array, zero)?;
+            builder.ins().brif(
+                empty,
+                continue_block,
+                &[],
+                loop_block,
+                &[dst_elem_addr.into(), zero.into()],
+            );
+        } else {
+            builder.ins().brif(
+                empty,
+                continue_block,
+                &[],
+                loop_block,
+                &[dst_elem_addr.into()],
+            );
+        }
 
         // Loop block: write a single element, increment our destination pointer
         // by the element size, then see if we turn again or exit.
         builder.switch_to_block(loop_block);
         let elem_addr = builder.append_block_param(loop_block, pointer_ty);
+        let init_count = uninit_moving_ref_array.map(|_| builder.append_block_param(loop_block, I32));
         // Consume one unit of fuel per loop iteration.
         if self.tunables.consume_fuel {
             self.fuel_consumed += 1;
         }
         self.translate_loop_header(builder)?;
+        let write_addr = self.bulk_array_address(builder, moving_array, elem_addr);
         match entity {
             CheckedEntity::Table { table, initialized } => {
                 assert!(!is_pre_interned_funcref);
@@ -4188,7 +4348,7 @@ impl FuncEnvironment<'_> {
                 self.emit_table_set(
                     builder,
                     table,
-                    elem_addr,
+                    write_addr,
                     ir::MemFlagsData::trusted().with_alias_region(Some(region)),
                     value,
                     initialized,
@@ -4202,26 +4362,43 @@ impl FuncEnvironment<'_> {
                             .with_endianness(Endianness::Little)
                             .with_alias_region(Some(region)),
                         value,
-                        elem_addr,
+                        write_addr,
                         0,
                     );
                 } else if initialized {
-                    gc::write_field_at_addr(self, builder, elem_ty, elem_addr, None, value)?
+                    gc::write_field_at_addr(self, builder, elem_ty, write_addr, None, value, None)?
+                } else if uninit_moving_ref_array.is_some() {
+                    // An earlier poll may have promoted the array into the old
+                    // generation; store the payload before publishing the
+                    // copying-GC remembered edge and advancing the prefix.
+                    gc::init_moving_field_at_addr(self, builder, elem_ty, write_addr, value, None)?
                 } else {
-                    gc::init_field_at_addr(self, builder, elem_ty, elem_addr, value)?
+                    gc::init_field_at_addr(self, builder, elem_ty, write_addr, value)?
                 }
             }
             _ => unreachable!(),
         }
         let next_elem_addr = builder.ins().iadd_imm_s(elem_addr, i64::from(elem_size));
         let done = builder.ins().icmp(IntCC::Equal, next_elem_addr, end_addr);
-        builder.ins().brif(
-            done,
-            continue_block,
-            &[],
-            loop_block,
-            &[next_elem_addr.into()],
-        );
+        if let (Some(array), Some(count)) = (uninit_moving_ref_array, init_count) {
+            let next_count = builder.ins().iadd_imm_s(count, 1);
+            self.store_moving_array_length(builder, array, next_count)?;
+            builder.ins().brif(
+                done,
+                continue_block,
+                &[],
+                loop_block,
+                &[next_elem_addr.into(), next_count.into()],
+            );
+        } else {
+            builder.ins().brif(
+                done,
+                continue_block,
+                &[],
+                loop_block,
+                &[next_elem_addr.into()],
+            );
+        }
 
         // Continue...
         builder.switch_to_block(continue_block);
@@ -4242,7 +4419,9 @@ impl FuncEnvironment<'_> {
         dst: ir::Value,
         val: ir::Value,
         len: ir::Value,
-    ) {
+        array: Option<ir::Value>,
+        uninit_ref_array: Option<(ir::Value, ir::Value)>,
+    ) -> WasmResult<()> {
         const INLINE_ARRAY_FILL_MAX_BYTES: i64 = 64;
         let pointer_ty = self.pointer_type();
         let region = self.alias_regions.gc_heap_region(builder.func);
@@ -4270,7 +4449,25 @@ impl FuncEnvironment<'_> {
 
         builder.switch_to_block(call_block);
         builder.seal_block(call_block);
-        self.raw_bulk_memory_operation(builder, BulkOp::MemoryFill { dst, val, len });
+        if let Some((ref_array, _)) = uninit_ref_array {
+            // Hide the uninitialized null-to-be elements from GC across any
+            // fuel or epoch poll during the chunked fill; the copying collector
+            // still evacuates the full `object_size()` bytes.
+            let zero = builder.ins().iconst(I32, 0);
+            self.store_moving_array_length(builder, ref_array, zero)?;
+        }
+        self.raw_bulk_memory_operation(
+            builder,
+            BulkOp::MemoryFill {
+                dst,
+                val,
+                len,
+                array,
+            },
+        );
+        if let Some((ref_array, full_len)) = uninit_ref_array {
+            self.store_moving_array_length(builder, ref_array, full_len)?;
+        }
         builder.ins().jump(join_block, &[]);
 
         // Short fill: splat the byte into a word, store whole words, then the
@@ -4324,6 +4521,7 @@ impl FuncEnvironment<'_> {
 
         builder.switch_to_block(join_block);
         builder.seal_block(join_block);
+        Ok(())
     }
 
     /// Tests to see whether `value`, stored as `ty`, can be extracted to a single
@@ -4905,6 +5103,8 @@ impl FuncEnvironment<'_> {
             return Ok(());
         }
 
+        let uninit_moving_ref_dst = self.uninit_moving_gc_ref_array(dst_entity)?.is_some();
+
         // For other copies, this is a per-element loop. Use the helper to
         // setup the general structure, and then the per-element closures is
         // used to dispatch `other` further.
@@ -4970,8 +5170,21 @@ impl FuncEnvironment<'_> {
                         )?;
                     }
                     CheckedEntity::Array { initialized, .. } => {
+                        let value_ty = match src_entity {
+                            CheckedEntity::Array { .. } => match src_entity.storage_type(this) {
+                                WasmStorageType::Val(WasmValType::Ref(ty)) => Some(ty),
+                                _ => None,
+                            },
+                            _ => None,
+                        };
                         if initialized {
-                            gc::write_field_at_addr(this, builder, write_ty, dst, None, val)?
+                            gc::write_field_at_addr(
+                                this, builder, write_ty, dst, None, val, value_ty,
+                            )?
+                        } else if uninit_moving_ref_dst {
+                            gc::init_moving_field_at_addr(
+                                this, builder, write_ty, dst, val, value_ty,
+                            )?
                         } else {
                             gc::init_field_at_addr(this, builder, write_ty, dst, val)?
                         }
@@ -5021,9 +5234,8 @@ impl FuncEnvironment<'_> {
         src_region: ir::AliasRegion,
         dst_region: ir::AliasRegion,
     ) {
-        // `trusted()` (notrap + aligned) is sound: the range is already
-        // bounds-checked, and each load feeds only its paired store, so the
-        // backend selects unaligned moves regardless of the `aligned` flag.
+        // The whole range is checked, but individual accesses may be
+        // unaligned (e.g. an i64 load from an i8 array).
         // Endianness is pinned to `Little` because Pulley's `v128` load/store
         // only encode the little-endian variant, and matching load/store
         // endianness preserves the destination bytes either way.
@@ -5033,10 +5245,12 @@ impl FuncEnvironment<'_> {
         // the entity's other (region-tagged) accesses; otherwise a region-less
         // load here could be forwarded a stale value across an intervening
         // region-tagged store to the same address.
-        let load_flags = ir::MemFlagsData::trusted()
+        let load_flags = ir::MemFlagsData::new()
+            .with_notrap()
             .with_endianness(Endianness::Little)
             .with_alias_region(Some(src_region));
-        let store_flags = ir::MemFlagsData::trusted()
+        let store_flags = ir::MemFlagsData::new()
+            .with_notrap()
             .with_endianness(Endianness::Little)
             .with_alias_region(Some(dst_region));
         const WIDTHS: &[(u64, ir::Type)] = &[
@@ -5046,6 +5260,25 @@ impl FuncEnvironment<'_> {
             (2, ir::types::I16),
             (1, ir::types::I8),
         ];
+        // A short copy is covered by one access, or two overlapping accesses
+        // at its head and tail. Snapshot both before either store so even
+        // overlapping array.copy ranges have memmove semantics.
+        if let Some(&(width, ty)) = WIDTHS.iter().find(|&&(width, _)| width <= bytes) {
+            if bytes <= 16 {
+                let head = builder.ins().load(ty, load_flags, src_addr, 0);
+                if bytes == width {
+                    builder.ins().store(store_flags, head, dst_addr, 0);
+                } else {
+                    let tail_offset = i32::try_from(bytes - width).unwrap();
+                    let tail = builder.ins().load(ty, load_flags, src_addr, tail_offset);
+                    builder.ins().store(store_flags, head, dst_addr, 0);
+                    builder
+                        .ins()
+                        .store(store_flags, tail, dst_addr, tail_offset);
+                }
+                return;
+            }
+        }
         // 12 covers the worst case under the 128-byte cap: n=127 decomposes into
         // 7×i8x16 + i64 + i32 + i16 + i8 = 11 chunks. Sized so both `SmallVec`s
         // stay inline.
@@ -5161,6 +5394,14 @@ impl FuncEnvironment<'_> {
         //
         //  done_block:
         //      ...
+        let uninit_dst_array = self.uninit_moving_gc_ref_array(dst_entity)?;
+        let dst_array = self.moving_array_for_bulk_poll(dst_entity);
+        let src_array = self.moving_array_for_bulk_poll(src_entity);
+        // As in the bulk libcall loop, compare and advance offsets for moving
+        // arrays, then materialize native addresses after each poll.
+        let dst_elem_addr = self.bulk_array_offset(builder, dst_array, dst_elem_addr);
+        let src_elem_addr = self.bulk_array_offset(builder, src_array, src_elem_addr);
+
         let current_block = builder.current_block().unwrap();
         let nonempty_block = builder.create_block();
         let forward_block = builder.create_block();
@@ -5187,11 +5428,16 @@ impl FuncEnvironment<'_> {
             .brif(copy_len, nonempty_block, &[], done_block, &[]);
 
         // In the nonempty_block test to see if this is a forward or backwards
-        // copy.
+        // copy. A freshly allocated uninitialized array never overlaps its
+        // source, so it always initializes forward from index 0.
         builder.switch_to_block(nonempty_block);
-        let dst_first = builder
-            .ins()
-            .icmp(IntCC::UnsignedLessThan, dst_elem_addr, src_elem_addr);
+        let dst_first = if uninit_dst_array.is_some() {
+            builder.ins().iconst(I8, 1)
+        } else {
+            builder
+                .ins()
+                .icmp(IntCC::UnsignedLessThan, dst_elem_addr, src_elem_addr)
+        };
         let src_index_ty = builder.func.dfg.value_type(src_index);
         let dst_element_size = dst_entity.element_size(self, builder.func)?;
         let src_element_size = src_entity.element_size(self, builder.func)?;
@@ -5232,7 +5478,7 @@ impl FuncEnvironment<'_> {
             .collect();
 
         // Build a brif args list of `fixed` followed by the keepalive values.
-        let with_keepalives = |fixed: &[ir::Value]| -> SmallVec<[ir::BlockArg; 5]> {
+        let with_keepalives = |fixed: &[ir::Value]| -> SmallVec<[ir::BlockArg; 6]> {
             fixed
                 .iter()
                 .chain(&keepalives[..])
@@ -5254,10 +5500,18 @@ impl FuncEnvironment<'_> {
                     .collect()
             };
 
+        let forward_init_args = if let Some(array) = uninit_dst_array {
+            let zero = builder.ins().iconst(I32, 0);
+            self.store_moving_array_length(builder, array, zero)?;
+            with_keepalives(&[dst_elem_addr, src_elem_addr, src_index, zero])
+        } else {
+            with_keepalives(&[dst_elem_addr, src_elem_addr, src_index])
+        };
+
         builder.ins().brif(
             dst_first,
             forward_block,
-            &with_keepalives(&[dst_elem_addr, src_elem_addr, src_index])[..],
+            &forward_init_args[..],
             backwards_block,
             &with_keepalives(&[dst_end_addr, src_end_addr, end_index])[..],
         );
@@ -5268,13 +5522,26 @@ impl FuncEnvironment<'_> {
         let dst_cur = builder.append_block_param(forward_block, self.pointer_type());
         let src_cur = builder.append_block_param(forward_block, self.pointer_type());
         let src_index = builder.append_block_param(forward_block, src_index_ty);
+        let forward_init_count =
+            uninit_dst_array.map(|_| builder.append_block_param(forward_block, I32));
         let forward_keepalives = append_keepalive_params(builder, forward_block);
         // Consume a single unit of fuel on each iteration of the loop.
         if self.tunables.consume_fuel {
             self.fuel_consumed += 1;
         }
         self.translate_loop_header(builder)?;
-        copy_one(self, builder, dst_cur, src_cur, src_index)?;
+        let dst_addr = self.bulk_array_address(builder, dst_array, dst_cur);
+        let src_addr = self.bulk_array_address(builder, src_array, src_cur);
+        copy_one(self, builder, dst_addr, src_addr, src_index)?;
+        let next_init_count = if let (Some(array), Some(count)) =
+            (uninit_dst_array, forward_init_count)
+        {
+            let next_count = builder.ins().iadd_imm_s(count, 1);
+            self.store_moving_array_length(builder, array, next_count)?;
+            Some(next_count)
+        } else {
+            None
+        };
         let dst_next = builder
             .ins()
             .iadd_imm_s(dst_cur, i64::from(dst_element_size));
@@ -5283,11 +5550,12 @@ impl FuncEnvironment<'_> {
             .iadd_imm_s(src_cur, i64::from(src_element_size));
         let src_index_next = builder.ins().iadd_imm_s(src_index, 1);
         let done = builder.ins().icmp(IntCC::Equal, src_next, src_end_addr);
-        let forward_next_args: SmallVec<[ir::BlockArg; 5]> = [dst_next, src_next, src_index_next]
-            .iter()
-            .chain(&forward_keepalives[..])
-            .map(|v| (*v).into())
-            .collect();
+        let mut forward_next_args: SmallVec<[ir::BlockArg; 6]> =
+            SmallVec::from_slice(&[dst_next.into(), src_next.into(), src_index_next.into()]);
+        if let Some(next_count) = next_init_count {
+            forward_next_args.push(next_count.into());
+        }
+        forward_next_args.extend(forward_keepalives.iter().map(|v| (*v).into()));
         builder
             .ins()
             .brif(done, done_block, &[], forward_block, &forward_next_args[..]);
@@ -5319,7 +5587,9 @@ impl FuncEnvironment<'_> {
             let one = builder.ins().iconst(src_index_ty, 1);
             builder.ins().isub(src_index, one)
         };
-        copy_one(self, builder, dst_cur, src_cur, src_index)?;
+        let dst_addr = self.bulk_array_address(builder, dst_array, dst_cur);
+        let src_addr = self.bulk_array_address(builder, src_array, src_cur);
+        copy_one(self, builder, dst_addr, src_addr, src_index)?;
         let done = builder.ins().icmp(IntCC::Equal, src_cur, src_elem_addr);
         let backward_next_args: SmallVec<[ir::BlockArg; 5]> = [dst_cur, src_cur, src_index]
             .iter()
@@ -6532,8 +6802,8 @@ enum BulkOp {
     /// carried so that the inline fast path can tag its loads/stores with each
     /// entity's alias region (the per-memory or GC-heap region); otherwise a
     /// region-less inline load could be forwarded a stale value across an
-    /// intervening region-tagged store to the same address. They are unused on
-    /// the libcall path.
+    /// intervening region-tagged store to the same address. They also let
+    /// the libcall path recover moving arrays' addresses after polls.
     MemoryCopy {
         dst: ir::Value,
         src: ir::Value,
@@ -6553,6 +6823,8 @@ enum BulkOp {
         dst: ir::Value,
         val: ir::Value,
         len: ir::Value,
+        /// A moving destination array, when this operation can poll.
+        array: Option<ir::Value>,
     },
 }
 

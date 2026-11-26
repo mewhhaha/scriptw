@@ -47,8 +47,8 @@ pub(super) fn signature(engine: &WasmtimeEngine) -> NativeFunctionSignature {
     let string = StructType::new(
         engine,
         [
-            FieldType::new(Mutability::Const, StorageType::ValType(units_reference)),
             FieldType::new(Mutability::Var, StorageType::ValType(ValType::I64)),
+            FieldType::new(Mutability::Const, StorageType::ValType(units_reference)),
             FieldType::new(Mutability::Var, StorageType::ValType(ValType::I32)),
         ],
     )

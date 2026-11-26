@@ -1,9 +1,10 @@
 //! Cargo producer: checked R/package/manifest and bounded exact-Wasm native compilation.
-
 #[path = "build_cache.rs"]
 mod build_cache;
 #[path = "compile.rs"]
 mod compile;
+#[path = "execution_metadata.rs"]
+mod execution_metadata;
 #[path = "manifest.rs"]
 mod manifest;
 #[path = "publication.rs"]
@@ -14,7 +15,6 @@ use scriptw_aot_wasm::RuntimeSourceCompilationProfile;
 use sha2::{Digest, Sha256};
 use std::{path::Path, sync::Arc};
 use wasmtime::WasmBacktraceDetails;
-
 pub(crate) fn write_bundle(
     out: &Path,
     compiler_source: &str,
@@ -63,8 +63,7 @@ pub(crate) fn write_bundle(
                     .target(target)
                     .expect("supported target has a native compiler");
                 config.parallel_compilation(false);
-                // Cranelift's bounded function store also warms module misses.
-                // Native caches remain independent of current source identity in the package.
+                // Native caches warm compilation independently of the package's source identity.
                 let function_cache = crate::cache::FunctionCache::new(
                     crate::cache::function_cache_directory(),
                     crate::cache::function_cache_limit_bytes(),
@@ -82,8 +81,6 @@ pub(crate) fn write_bundle(
                         .enable_incremental_compilation(cache.clone())
                         .expect("Cranelift supports the shared function cache");
                 }
-                // Module::new requires a native-host mapping. Cross-target
-                // builds preserve precompile_module and never open this cache.
                 let module_cache = if host == target {
                     build_cache::module_cache()
                         .map_err(|error| {
@@ -149,6 +146,9 @@ pub(crate) fn write_bundle(
                     let execution_metadata = runtime
                         .immutable_execution_metadata(&selection, &source, &metadata, &encoded)
                         .expect("checked producer emits compact execution receipt");
+                    let execution_metadata =
+                        execution_metadata::encode(execution_metadata, runtime.wasm())
+                            .expect("checked runtime code section has function bodies");
                     publication::publish(
                         out,
                         profile,

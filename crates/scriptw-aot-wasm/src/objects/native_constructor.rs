@@ -1,7 +1,7 @@
 //! Eager intrinsic constructors start in their final ordinary dictionary state.
 //! Bootstrap adds public prototype/family properties immediately afterwards;
 //! ordinary native methods retain their separate compact metadata allocator.
-use super::property_storage::PreparedOrdinaryPropertyKey;
+use super::property_storage::DictionaryInsertKey;
 use super::*;
 use crate::runtime_helpers::{NativeConstructorHeaderAllocateParameters, RuntimeHelperId};
 
@@ -61,9 +61,9 @@ impl FunctionBuilder<'_> {
             // dictionary has no user callbacks. No absence probe is needed.
             self.emit_ordinary_insert_in_dictionary(
                 &dictionary,
-                &PreparedOrdinaryPropertyKey { key: &key, hash },
+                hash,
+                DictionaryInsertKey::Absent(&key),
                 &descriptor,
-                None,
                 &mut f,
             );
             s.release_i64_local(hash, &mut f);

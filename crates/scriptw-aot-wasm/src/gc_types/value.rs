@@ -2248,11 +2248,9 @@ impl RuntimeSchema {
     pub(crate) fn load_symbol_registry(
         &self,
         function: &mut Function,
-    ) -> GcLocal<RegisteredSymbolTable> {
-        let slot = self.reserve_gc_local::<RegisteredSymbolTable, NonNullable>(function);
+    ) -> GcLocal<RegisteredSymbolTable, Nullable> {
+        let slot = self.reserve_gc_local::<RegisteredSymbolTable, Nullable>(function);
         emit_root_get(function, self.registered_symbols);
-        // Installed with the realm: null only by a bug.
-        function.refine_non_null();
         slot.initialize(GcStackReference::new(), function)
     }
     pub(crate) fn replace_symbol_registry(
@@ -2397,47 +2395,166 @@ impl RuntimeSchema {
             function,
         ))
     }
+    /// A fresh Realm usually sees an empty pool slot for each global name.
+    /// Publish short names through the same cache and descriptor hash, but
+    /// build the known code units directly instead of copying passive data.
+    pub(crate) fn try_bootstrap_pooled_name(
+        &self,
+        table: &GcLocal<PooledStringTable>,
+        pool: &crate::data::StringPool,
+        name: &str,
+        position: u32,
+        function: &mut Function,
+    ) -> Result<Option<GcStackReference<StringValue>>, crate::EmitError> {
+        let index = pool.pooled_string_index(name)?;
+        let crate::data::PooledLiteralDomain::Runtime(index) = pool.pooled_string_domain(index)?
+        else {
+            return Ok(None);
+        };
+        let units = scriptw_ir::decode_js_string_utf16(name);
+        // Bound the emitted cold path independently of source identifier length.
+        if units.len() > 24 {
+            return Ok(None);
+        }
+        let descriptors = pool.runtime_string_descriptors()?;
+        assert!(index.ordinal() < descriptors.count());
+        let slot = GcIndex::Constant(index.ordinal());
+        let strings = self.array_type::<PooledStringTable>();
+        let output = self.reference_type::<StringValue>(GcNullability::NonNullable);
+        function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(output))));
+        let _ = strings.read(table, slot, self, function);
+        function.instruction(&Instruction::BrOnNonNull(0));
+
+        let units = self.reserve_gc_local(function).initialize(
+            self.array_type::<CodeUnitArray>().fixed(
+                units
+                    .into_iter()
+                    .map(|unit| GcOperand::i32(i32::from(unit))),
+                function,
+            ),
+            function,
+        );
+        let raw_hash = self.reserve_i64_local(function);
+        function.instruction(&Instruction::I32Const(descriptors.address() as i32));
+        function.instruction(&Instruction::I64Load(wasm_encoder::MemArg {
+            offset: u64::from(index.ordinal())
+                * u64::from(crate::data::RuntimeStringDescriptors::ROW_BYTES),
+            align: 0,
+            memory_index: 0,
+        }));
+        raw_hash.store(function);
+        let name = self.reserve_gc_local(function).initialize(
+            self.struct_type::<StringValue>().construct(
+                (
+                    GcOperand::reference(&units, self),
+                    GcOperand::i64_local(raw_hash),
+                    // Lookup checks this hint against the live entry and key.
+                    GcOperand::i32(position as i32),
+                ),
+                function,
+            ),
+            function,
+        );
+        self.release_i64_local(raw_hash, function);
+        units.clear(function);
+        strings.write(
+            table,
+            slot,
+            GcOperand::nullable_reference(&name, self),
+            self,
+            function,
+        );
+        let result = name.load(self, function);
+        name.clear(function);
+        function.instruction(&Instruction::End);
+        Ok(Some(result))
+    }
     pub(crate) fn well_known_symbol_reference(
         &self,
         symbol: scriptw_ir::WellKnownSymbol,
+        base: crate::runtime_helpers::RuntimeHelperFunctionBase,
         function: &mut Function,
     ) -> GcStackReference<SymbolValue> {
-        let ordinal = scriptw_ir::WellKnownSymbol::ALL
-            .iter()
-            .position(|candidate| *candidate == symbol)
-            .expect("closed symbol row");
+        self.resolve_well_known_symbol_reference(GcIndex::Constant(symbol as u32), base, function)
+    }
+    /// The table is published by R before any Realm is initialized.
+    pub(crate) fn well_known_symbol_table_reference(
+        &self,
+        function: &mut Function,
+    ) -> GcStackReference<WellKnownSymbolTable, Nullable> {
         emit_root_get(function, self.well_known_symbols);
-        // `array.get` traps on a null table itself, and the index push
-        // between them has no effect: a `ref.as_non_null` would repeat it.
-        function.instruction(&Instruction::I32Const(ordinal as i32));
-        self.array_type::<WellKnownSymbolTable>().emit_get(function);
         GcStackReference::new()
     }
-    /// Used only after the closed installation key has selected its Symbol arm.
-    /// Its ordinal comes from WellKnownSymbol::ALL, never a JavaScript integer.
+    /// Used after the checked installation key has selected its Symbol arm.
     pub(crate) fn installation_symbol_reference(
         &self,
         key: &crate::runtime_helpers::RuntimeHelperIntrinsicKeyParameter,
+        base: crate::runtime_helpers::RuntimeHelperFunctionBase,
         function: &mut Function,
     ) -> GcStackReference<SymbolValue> {
-        emit_root_get(function, self.well_known_symbols);
-        // `array.get` traps on a null table itself, and the index push
-        // between them has no effect: a `ref.as_non_null` would repeat it.
-        key.ordinal().load(function);
-        self.array_type::<WellKnownSymbolTable>().emit_get(function);
-        GcStackReference::new()
+        self.resolve_well_known_symbol_reference(key.ordinal(), base, function)
     }
-    /// A sealed value row retains the same Agent-wide Symbol identity as keys.
+    /// A sealed value row uses the same Store-wide Symbol identity as keys.
     pub(crate) fn property_layout_symbol_reference(
         &self,
         row: &crate::runtime_helpers::RuntimeHelperPropertyLayoutRow,
+        base: crate::runtime_helpers::RuntimeHelperFunctionBase,
         function: &mut Function,
     ) -> GcStackReference<SymbolValue> {
-        emit_root_get(function, self.well_known_symbols);
-        function.instruction(&Instruction::RefAsNonNull);
-        row.emit_well_known_symbol_ordinal(function);
-        self.array_type::<WellKnownSymbolTable>().emit_get(function);
+        self.resolve_well_known_symbol_reference(
+            row.well_known_symbol_ordinal(function),
+            base,
+            function,
+        )
+    }
+    /// Only the R helper publishes a missing symbol.
+    fn resolve_well_known_symbol_reference(
+        &self,
+        ordinal: impl Into<GcIndex>,
+        base: crate::runtime_helpers::RuntimeHelperFunctionBase,
+        function: &mut Function,
+    ) -> GcStackReference<SymbolValue> {
+        let ordinal = ordinal.into();
+        let output = self.reference_type::<SymbolValue>(GcNullability::NonNullable);
+        function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(output))));
+        self.array_type::<WellKnownSymbolTable>().read_top(
+            self.well_known_symbol_table_reference(function),
+            ordinal,
+            function,
+        );
+        function.likely(&Instruction::BrOnNonNull(0));
+        let _ = self.helper_reference_on_stack(self.call_helper(
+            crate::runtime_helpers::WellKnownSymbolResolveArguments::new(ordinal),
+            base,
+            function,
+        ));
+        function.instruction(&Instruction::End);
         GcStackReference::new()
+    }
+
+    /// A missing symbol has never been hashed. The instanceof proof can
+    /// check this fact without allocating the symbol.
+    pub(crate) fn emit_well_known_symbol_never_hashed(
+        &self,
+        symbol: scriptw_ir::WellKnownSymbol,
+        function: &mut Function,
+    ) {
+        let present = self.reference_type::<SymbolValue>(GcNullability::NonNullable);
+        function.instruction(&Instruction::Block(BlockType::Result(ValType::I32)));
+        function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(present))));
+        self.array_type::<WellKnownSymbolTable>().read_top(
+            self.well_known_symbol_table_reference(function),
+            GcIndex::Constant(symbol as u32),
+            function,
+        );
+        function.likely(&Instruction::BrOnNonNull(0));
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::Br(1));
+        function.instruction(&Instruction::End);
+        self.field(SymbolValueSchema::KEY_HASH_ID)
+            .read_top(GcStackReference::<SymbolValue>::new(), function);
+        function.instruction(&Instruction::I64Eqz);
+        function.instruction(&Instruction::End);
     }
 
     /// Actual caller identity at the current source-call boundary. Opaque
@@ -2583,6 +2700,28 @@ impl RuntimeSchema {
         output.store(function);
         handled.store(function);
     }
+
+    /// The defining P thunk publishes the proof in its admission result. The
+    /// arithmetic result is discarded, so the test operands prove nothing.
+    pub(crate) fn emit_binary_numeric_subtraction_admitted(
+        &self,
+        entry: &FunctionLocal<BinaryNumericCallback>,
+        function: &mut Function,
+    ) {
+        for _ in 0..2 {
+            function.instruction(&Instruction::F64Const(0.0.into()));
+        }
+        entry.load(function);
+        function.instruction(&Instruction::CallRef(
+            BinaryNumericCallback::SIGNATURE.type_index(),
+        ));
+        function.instruction(&Instruction::Drop);
+        function.instruction(&Instruction::I32Const(
+            BinaryNumericCallback::SUBTRACTION_ADMITTED,
+        ));
+        function.instruction(&Instruction::I32Eq);
+    }
+
     pub(crate) fn call_entry(
         &self,
         entry: &crate::function_entry::PlannedFunctionEntry,
@@ -3892,6 +4031,27 @@ fn emit_code_unit_array_new(length: I32Local, schema: &RuntimeSchema, function: 
 /// Copies `length` units from `source[source_index..]` (index zero when
 /// absent) to `destination[destination_index..]`. Both ranges are checked by
 /// the engine's array bounds checks.
+fn emit_bulk_code_unit_copy(
+    destination: &GcLocal<CodeUnitArray>,
+    destination_index: I32Local,
+    source: &GcLocal<CodeUnitArray>,
+    source_index: I32Local,
+    length: I32Local,
+    schema: &RuntimeSchema,
+    function: &mut Function,
+) {
+    let type_index = schema.array_type::<CodeUnitArray>().type_index().raw();
+    destination.load(schema, function);
+    destination_index.load(function);
+    source.load(schema, function);
+    source_index.load(function);
+    length.load(function);
+    function.instruction(&Instruction::ArrayCopy {
+        array_type_index_dst: type_index,
+        array_type_index_src: type_index,
+    });
+}
+
 fn emit_code_unit_copy(
     destination: &GcLocal<CodeUnitArray>,
     destination_index: Option<I32Local>,
@@ -3952,6 +4112,21 @@ fn emit_code_unit_copy(
         array_type_index_src: index,
     });
     function.instruction(&Instruction::End);
+}
+
+impl GcStructType<StringValue> {
+    /// Centralize physical field order for both fresh and prehashed strings.
+    fn construct(
+        self,
+        (code_units, raw_hash, entry_hint): (
+            GcOperand<'_, GcRef<CodeUnitArray>, NonNullable>,
+            GcOperand<'_, I64Value, NonNullable>,
+            GcOperand<'_, I32Value, NonNullable>,
+        ),
+        function: &mut Function,
+    ) -> GcStackReference<StringValue> {
+        self.construct_hash_first((raw_hash, code_units, entry_hint), function)
+    }
 }
 
 pub(crate) struct StringConstruction {
@@ -4064,6 +4239,22 @@ impl StringConstruction {
         schema: &RuntimeSchema,
         function: &mut Function,
     ) {
+        length.load(function);
+        function.instruction(&Instruction::I32Const(4));
+        function.instruction(&Instruction::I32Eq);
+        function.instruction(&Instruction::If(BlockType::Empty));
+        self.units.load(schema, function);
+        destination_index.load(function);
+        source.load(schema, function);
+        function.instruction(&Instruction::I32Const(0));
+        // Wasmtime can inline an immediate four-unit copy as an 8-byte copy.
+        function.instruction(&Instruction::I32Const(4));
+        let array = schema.array_type::<CodeUnitArray>().type_index().raw();
+        function.instruction(&Instruction::ArrayCopy {
+            array_type_index_dst: array,
+            array_type_index_src: array,
+        });
+        function.instruction(&Instruction::Else);
         emit_code_unit_copy(
             &self.units,
             Some(destination_index),
@@ -4074,6 +4265,7 @@ impl StringConstruction {
             schema,
             function,
         );
+        function.instruction(&Instruction::End);
     }
     /// Copy a selected interval into private construction storage, keeping
     /// partial slices independent of their source backing allocation.

@@ -1,154 +1,159 @@
-//! A fresh global object's bindings, published together in binding order.
+//! Direct publication into the fresh global dictionary, in binding order.
 use super::*;
-use crate::objects::FreshDataAttributes;
+use crate::heap::StoredPropertyAttributes;
 
-/// The keys, values and attributes of one global object's bindings, filled in
-/// binding order and published by one runtime call. Construction proves the
-/// names distinct, which the publication helper relies on instead of probing
-/// each key for a previous entry. Computing a binding's value runs no
-/// JavaScript, so publishing after every value exists is unobservable.
-#[must_use = "recorded bindings reach the global object only through publish"]
-pub(super) struct GlobalBindingPublication {
-    keys: GcLocal<PooledStringTable>,
-    values: GcLocal<IntrinsicPropertyValueCache>,
-    flags: Vec<i32>,
-    hashes: Vec<i64>,
-    count: usize,
-    row: I32Local,
+struct GlobalBindingRow<'a> {
+    name: &'a str,
+    hash: i64,
+    bucket: u32,
 }
 
-impl GlobalBindingPublication {
-    pub(super) fn new<'a>(
+/// A checked binding order with unique keys and final linear-probe buckets.
+/// Computing the initial values runs no JavaScript and reads no global property.
+#[must_use = "every planned binding must reach the global dictionary"]
+pub(super) struct GlobalBindingPublication<'a> {
+    rows: std::vec::IntoIter<GlobalBindingRow<'a>>,
+    capacity: u32,
+    position: u32,
+    storage: GcLocal<OrdinaryPropertyStorage>,
+    pooled_names: GcLocal<PooledStringTable>,
+    absent: GcLocal<StoredValue>,
+}
+
+impl<'a> GlobalBindingPublication<'a> {
+    pub(super) fn new(
+        object: &GcLocal<OrdinaryObject>,
         builder: &FunctionBuilder<'_>,
-        names: impl IntoIterator<Item = &'a str>,
+        names: impl ExactSizeIterator<Item = &'a str>,
         function: &mut Function,
     ) -> Result<Self, EmitError> {
+        let count = names.len();
+        if count > (1 << 30) {
+            return Err(EmitError::unsupported("too many global bindings"));
+        }
+        let capacity = count.max(4).next_power_of_two();
+        let mask = 2 * capacity - 1;
+        let mut occupied = vec![false; 2 * capacity];
         let mut distinct = std::collections::BTreeSet::new();
+        let mut rows = Vec::with_capacity(count);
         for name in names {
             if !distinct.insert(name) {
                 return Err(EmitError::unsupported(format!(
                     "global binding {name} is published twice"
                 )));
             }
+            let hash = crate::operations::string_property_key_hash(name);
+            let mut bucket = hash as u32 as usize & mask;
+            while occupied[bucket] {
+                bucket = (bucket + 1) & mask;
+            }
+            occupied[bucket] = true;
+            rows.push(GlobalBindingRow {
+                name,
+                hash,
+                bucket: bucket as u32,
+            });
         }
-        let count = distinct.len();
         let schema = builder.runtime_schema();
-        let row = schema.reserve_i32_local(function);
-        row.set_constant(
-            i32::try_from(count).map_err(|_| EmitError::unsupported("too many global bindings"))?,
-            function,
-        );
-        let keys = schema.reserve_gc_local(function).initialize(
+        let storage = schema.reserve_gc_local(function).initialize(
             schema
-                .array_type::<PooledStringTable>()
-                .filled(GcOperand::null(schema), row, function),
+                .field(OrdinaryObjectSchema::PROPERTIES)
+                .read(object, schema, function)
+                .reference()
+                .cast_subtype::<OrdinaryPropertyStorage>(schema, function),
             function,
         );
-        let values = schema.reserve_gc_local(function).initialize(
-            schema.array_type::<IntrinsicPropertyValueCache>().filled(
-                GcOperand::null(schema),
-                row,
-                function,
-            ),
-            function,
-        );
+        let absent = schema
+            .reserve_gc_local(function)
+            .initialize(schema.stored_undefined(function), function);
+        let pooled_names = schema
+            .reserve_gc_local(function)
+            .initialize(schema.pooled_string_table_reference(function), function);
         Ok(Self {
-            keys,
-            values,
-            flags: Vec::with_capacity(count),
-            hashes: Vec::with_capacity(count),
-            count,
-            row,
+            rows: rows.into_iter(),
+            capacity: capacity as u32,
+            position: 0,
+            storage,
+            pooled_names,
+            absent,
         })
     }
 
-    /// Records the next binding. Bindings arrive in their publication order.
     pub(super) fn push(
         &mut self,
         builder: &FunctionBuilder<'_>,
         name: &str,
         value: &GcLocal<PropertyValue>,
-        attributes: FreshDataAttributes,
+        attributes: StoredPropertyAttributes,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        if self.flags.len() == self.count {
-            return Err(EmitError::unsupported(
-                "global binding outside the published name set",
-            ));
-        }
+        let row = self
+            .rows
+            .next()
+            .filter(|row| row.name == name)
+            .ok_or_else(|| {
+                EmitError::unsupported("global bindings must follow publication order")
+            })?;
         let schema = builder.runtime_schema();
-        self.row.set_constant(self.flags.len() as i32, function);
-        let key = schema.reserve_gc_local(function).initialize(
-            builder.emit_interned_string_reference(name, function)?,
+        let key = match schema.try_bootstrap_pooled_name(
+            &self.pooled_names,
+            builder.strings,
+            name,
+            self.position,
             function,
-        );
-        schema.array_type::<PooledStringTable>().write(
-            &self.keys,
-            self.row,
-            GcOperand::nullable_reference(&key, schema),
-            schema,
-            function,
-        );
-        key.clear(function);
-        schema.array_type::<IntrinsicPropertyValueCache>().write(
-            &self.values,
-            self.row,
-            GcOperand::nullable_reference(value, schema),
-            schema,
-            function,
-        );
-        self.flags.push(attributes.word());
-        self.hashes
-            .push(crate::operations::string_property_key_hash(name));
-        Ok(())
-    }
-
-    /// Publishes every recorded binding into the fresh global object.
-    pub(super) fn publish(
-        self,
-        builder: &FunctionBuilder<'_>,
-        object: &ValueLocals,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        if self.flags.len() != self.count {
-            return Err(EmitError::unsupported("a global binding was not recorded"));
-        }
-        let schema = builder.runtime_schema();
-        let flags = schema.reserve_gc_local(function).initialize(
-            schema.array_type::<OrdinaryPropertyIndex>().fixed(
-                self.flags.iter().map(|word| GcOperand::i32(*word)),
+        )? {
+            Some(key) => key,
+            None => builder.emit_interned_string_reference(name, function)?,
+        };
+        let key = schema.reserve_gc_local(function).initialize(key, function);
+        let descriptor = schema.reserve_gc_local(function).initialize(
+            schema.struct_type::<PropertyDescriptor>().construct(
+                (
+                    GcOperand::descriptor_word(attributes.descriptor_word()),
+                    GcOperand::reference(value, schema),
+                    GcOperand::reference(&self.absent, schema),
+                    GcOperand::reference(&self.absent, schema),
+                ),
                 function,
             ),
             function,
         );
-        let hashes = schema.reserve_gc_local(function).initialize(
-            schema.array_type::<NumberBitsI64Array>().fixed(
-                self.hashes.iter().map(|hash| GcOperand::i64(*hash)),
-                function,
-            ),
-            function,
-        );
-        let header = schema.reserve_gc_local(function).initialize(
-            builder.emit_object_header_projection(object, function),
-            function,
-        );
+        let hash = schema.reserve_i64_local(function);
+        hash.set_constant(row.hash, function);
+        let capacity = if self.position == 0 { self.capacity } else { 0 };
+        let final_length = if self.rows.len() == 0 {
+            self.position + 1
+        } else {
+            0
+        };
         schema.call_helper(
             crate::runtime_helpers::FreshDataPropertiesPublishArguments::new(
-                &header,
-                &self.keys,
-                &self.values,
-                &flags,
-                &hashes,
+                &self.storage,
+                &key,
+                &descriptor,
+                GcIndex::Constant(self.position),
+                GcIndex::Constant(capacity),
+                GcIndex::Constant(final_length),
+                hash,
+                GcIndex::Constant(row.bucket),
             ),
             builder.runtime_helper_base()?,
             function,
         );
-        header.clear(function);
-        hashes.clear(function);
-        flags.clear(function);
-        self.values.clear(function);
-        self.keys.clear(function);
-        schema.release_i32_local(self.row, function);
+        schema.release_i64_local(hash, function);
+        descriptor.clear(function);
+        key.clear(function);
+        self.position += 1;
+        Ok(())
+    }
+
+    pub(super) fn finish(self, function: &mut Function) -> Result<(), EmitError> {
+        if self.rows.len() != 0 {
+            return Err(EmitError::unsupported("a global binding was not published"));
+        }
+        self.absent.clear(function);
+        self.pooled_names.clear(function);
+        self.storage.clear(function);
         Ok(())
     }
 }

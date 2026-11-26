@@ -3261,80 +3261,78 @@ Not done:
 
 ## 2026-11-26 local benchmarks: edge, cold start, and Porffor
 
-Measured **2026-11-26** on a local **AMD Ryzen 7 7800X3D** Linux host, pinned to **CPUs 0–1** under a **4 GiB / 0 swap** systemd cgroup scope, comparing a local `--release` build (Runtime ABI 92, final compiler fingerprint `ed27e234152d`) against ABI 91 (`f216b64bb`), **Node 24.19.0** (`V8 13.6.233.17-node.51`), and **Porffor 0.61.13** (`wasmtime-py 47.0.1` and Node 24.19.0 Wasm). Exact stdout was checked on every run, and warmup observations were excluded from every median. This is a separate local cohort from the 2026-11-17/25 Xeon cloud panels above; compare actors within one cohort only.
+Measured **2026-11-26** on a local **AMD Ryzen 7 7800X3D** Linux host, pinned to **CPUs 6–7** under a **4 GiB / 0 swap** systemd cgroup scope, comparing a local `--release` build (Runtime ABI 93, final compiler fingerprint `3ac71dbb5761`) against ABI 92 (`ed27e234152d`), **Node 24.19.0** (`V8 13.6.233.17-node.51`), and **Porffor 0.61.13** (`wasmtime-py 47.0.1` and Node 24.19.0 Wasm) in one paired interleaved cohort (`NODE_DISABLE_COMPILE_CACHE=1`, `SCRIPTW_JOBS=1`). Exact stdout or Flight SHA-256 was checked on every run, and warmup observations were excluded from every median. Because the host had concurrent background activity during the campaign (notably during the RSC panel), compare actors strictly within this paired cohort rather than across separate dates or cloud cohorts above.
 
 ### Cold-start CLI (`scriptw run` warm cache vs Node 24)
 
-Medians of 15 interleaved warm runs after 3 warmups on final binary `ed27e234152d` (with full JS source admission running before every disk-cache lookup so poisoned caches cannot mask parse or prelude errors):
+Medians of 15 interleaved warm runs after 3 warmups on final binary `3ac71dbb5761` (with full JS source admission running before every disk-cache lookup, execution-only runtime receipt skipping compiler build-package decoding on warm hits, and bounded caller-thread `FiberStack` execution):
 
-| Fixture | ABI 91 (`f216b64bb`) | ABI 92 (`ed27e234152d`) | Node 24.19.0 | Scriptw ÷ Node |
+| Fixture | ABI 92 (`ed27e234152d`) | ABI 93 (`3ac71dbb5761`) | Node 24.19.0 | Scriptw ÷ Node |
 | --- | ---: | ---: | ---: | ---: |
-| `startup.js` | 3.06 ms | **2.90 ms** (min 2.79) | 15.37 ms | **0.189× (5.30× faster)** |
-| `numeric-loop-50000.js` | 3.11 ms | **3.18 ms** (min 2.92) | 15.59 ms | **0.204× (4.91× faster)** |
-| `edge-router.js` | 3.56 ms | **4.20 ms** (min 3.61) | 17.67 ms | **0.238× (4.21× faster)** |
-| `edge-json-api.js` | 3.67 ms | **3.91 ms** (min 3.73) | 15.37 ms | **0.254× (3.93× faster)** |
-| `edge-html.js` | 4.07 ms | **4.29 ms** (min 4.08) | 16.63 ms | **0.258× (3.88× faster)** |
-| **Geomean** | — | — | — | **0.227× (4.41× faster)** |
+| `startup.js` | 2.90 ms | **2.64 ms** (min 2.33) | 15.34 ms | **0.172× (5.82× faster)** |
+| `numeric-loop-50000.js` | 3.18 ms | **3.06 ms** (min 2.43) | 16.72 ms | **0.183× (5.47× faster)** |
+| `edge-router.js` | 4.20 ms | **3.92 ms** (min 3.30) | 18.01 ms | **0.218× (4.59× faster)** |
+| `edge-json-api.js` | 3.91 ms | **3.96 ms** (min 3.41) | 16.87 ms | **0.235× (4.26× faster)** |
+| `edge-html.js` | 4.29 ms | **4.31 ms** (min 3.76) | 18.22 ms | **0.237× (4.22× faster)** |
+| **Geomean** | 0.227× (4.41×) | — | — | **0.207× (4.83× faster, 5/5)** |
 
 ### Edge workloads and fresh-Realm floor (precompiled fresh Realm vs V8)
 
-Deferring 51 additional intrinsics/namespaces (1 eager constructor and 5 eager `IntrinsicPropertyStorage` layouts at Realm birth) and precomputing compile-time global key hashes cut the `startup.js` fresh-Realm execution floor from `11.59 µs` to **`8.28 µs`** (−28.6%; `191.86 µs` total). Medians of 21 fresh-Realm runs after 5 excluded warmups:
+Cutting 78 direct GC allocations from Store + Realm + raw `ProgramInstance` birth (lazy symbol tables, demand `ArrayConstructor`/`%ThrowTypeError%`, lazy `RegExpLegacyState`, null-until-needed native payload, direct global dictionary publication) lowered the `startup.js` fresh-Realm execution floor from `11.59 µs` (ABI 91) and `8.28 µs` (ABI 92) to **`7.32 µs`** (min **`6.73 µs`**, `207.13 µs` total; −11.6% vs ABI 92, −36.8% vs ABI 91). Medians of 5 interleaved processes × 21 fresh-Realm runs (5 excluded warmups for Scriptw/V8 5w; 80 for V8 80w):
 
-| Edge fixture | ABI 91 exec | ABI 92 exec (Δ) | ABI 92 total | V8 5w exec (Ratio) | V8 80w exec (Ratio) |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| `edge-json-api.js` | 146.8 µs | **132.79 µs** (−9.5%) | 350.60 µs | 167.48 µs (**0.79×**) | 155.80 µs (**0.85×**) |
-| `edge-router.js` | 87.0 µs | **84.90 µs** (−2.4%) | 296.58 µs | 104.32 µs (**0.81×**) | 86.71 µs (**0.98×**) |
-| `edge-query.js` | 198.2 µs | **183.35 µs** (−7.5%) | 407.27 µs | 313.90 µs (**0.58×**) | 307.76 µs (**0.60×**) |
-| `edge-middleware.js` | 79.2 µs | **77.72 µs** (−1.9%) | 299.59 µs | 72.49 µs (1.07×) | 94.12 µs (**0.83×**) |
-| `edge-html.js` | 263.6 µs | **238.73 µs** (−9.4%) | 459.37 µs | 553.66 µs (**0.43×**) | 472.75 µs (**0.50×**) |
-| `edge-nested-result.js` | 192.5 µs | **193.87 µs** (+0.7%) | 424.95 µs | 231.37 µs (**0.84×**) | 236.19 µs (**0.82×**) |
-| **Geomean** | — | **−5.1%** | — | **0.725× (1.38× faster, 5/6)** | **0.745× (1.34× faster, 6/6)** |
+| Edge fixture | ABI 93 exec | ABI 93 total | V8 5w exec (Ratio) | V8 80w exec (Ratio) |
+| --- | ---: | ---: | ---: | ---: |
+| `edge-json-api.js` | **137.35 µs** | 366.44 µs | 201.13 µs (**0.68×**) | 205.95 µs (**0.67×**) |
+| `edge-router.js` | **86.56 µs** | 310.31 µs | 115.11 µs (**0.75×**) | 116.03 µs (**0.75×**) |
+| `edge-query.js` | **194.28 µs** | 426.63 µs | 333.63 µs (**0.58×**) | 365.90 µs (**0.53×**) |
+| `edge-middleware.js` | **83.59 µs** | 316.19 µs | 95.73 µs (**0.87×**) | 90.66 µs (**0.92×**) |
+| `edge-html.js` | **236.33 µs** | 472.12 µs | 556.82 µs (**0.42×**) | 585.17 µs (**0.40×**) |
+| `edge-nested-result.js` | **189.94 µs** | 424.35 µs | 251.88 µs (**0.75×**) | 206.90 µs (**0.92×**) |
+| **Geomean** | — | — | **0.661× (1.51× faster, 6/6)** | **0.670× (1.49× faster, 6/6)** |
 
 ### Live 17-kernel comparison with Porffor 0.61.13 and Node 24.19.0 / V8
 
-Precompiled fresh-Realm execution medians (warmups excluded; exact stdout verified) using `compiler_precompiled_baseline`, `scripts/wasm_peer_wasmtime.py`, `scripts/wasm_peer_node.cjs`, and Node 24.19.0 `vm.Script` fresh-context execution (15 measured runs after 5 warmups for the V8 panel; 21 measured runs after 10 warmups for the Porffor execution panel; 4 fresh runs each for `scriptw build wasm` vs `porf wasm` compilation):
+Unified paired precompiled fresh-Realm execution medians (5 interleaved processes × 21 measured runs per actor after 10 excluded warmups for Scriptw and Porffor, 5/80 excluded warmups for V8; exact stdout verified) using `compiler_precompiled_baseline`, `scripts/wasm_peer_wasmtime.py`, `scripts/wasm_peer_node.cjs`, and Node 24.19.0 `vm.Script`, plus 4 ABBA fresh runs per kernel for `scriptw build wasm` vs `porf wasm` compilation:
 
-| Kernel | Scriptw (V8 panel, µs) | V8 5w / 80w (µs) | Scriptw ÷ V8 80w | Scriptw (Porf panel, µs) | Porffor WT (µs) | Porffor V8 Wasm (µs) | Scriptw ÷ Porf (WT) | Build: Scriptw / Porffor (ms) |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `sort-reverse-128.js` | 13.20 | **11.23 / 11.12** | 1.19× | **13.38** | 90.76 | 97.64 | **0.15×** | 68.3 / 113.7 |
-| `sort-reverse-512.js` | **19.18** | 67.10 / 190.59 | **0.10×** | **25.05** | 1,167.99 | 1,451.35 | **0.02×** | 61.6 / 113.6 |
-| `sort-sorted-512.js` | **18.78** | 61.63 / 204.83 | **0.09×** | **19.42** | 23.51 | 33.43 | **0.83×** | 64.9 / 126.3 |
-| `to-sorted-512.js` | **22.82** | 63.76 / 238.64 | **0.10×** | **22.44** | 1,224.07 | 1,448.51 | **0.02×** | 60.8 / 119.9 |
-| `join-1024.js` | 33.09 | 40.37 / **28.83** | 1.15× | **32.70** | wrong output | wrong output | — | 58.0 / 114.1 |
-| `join-4096.js` | **99.47** | 114.06 / 279.57 | **0.36×** | **97.17** | wrong output | wrong output | — | 69.7 / 138.8 |
-| `join-mixed-1024.js` | **30.09** | 59.12 / 112.03 | **0.27×** | 49.20\* | 33.30\* | 56.01 | 1.48×\* | 73.2 / 133.0 |
-| `numeric-loop-10000.js` | **9.70** | 120.29 / 279.37 | **0.03×** | **8.94** | 19.43 | 14.27 | **0.46×** | 62.5 / 117.4 |
-| `numeric-loop-50000.js` | **8.66** | 339.27 / 469.67 | **0.02×** | **9.81** | 53.86 | 51.13 | **0.18×** | 68.7 / 139.9 |
-| `folded-string-4096.js` | **29.99** | 70.70 / 93.99 | **0.32×** | **30.80** | 93.18 | 117.55 | **0.33×** | 66.2 / 110.3 |
-| `dynamic-string-4096.js` | **42.52** | 119.41 / 120.21 | **0.35×** | **41.79** | 91.61 | 65.22 | **0.46×** | 70.6 / 155.7 |
-| `integer.js` | **9.87** | 1,136.89 / 1,189.57 | **0.008×** | **9.66** | wrong output | wrong output | — | 63.0 / 98.4 |
-| `objects.js` | **27.35** | 31.43 / 31.57 | **0.87×** | **27.18** | 101.25 | 962.19 | **0.27×** | 53.5 / 96.9 |
-| `retained-objects.js` | **763.87** | 994.25 / 1,177.27 | **0.65×** | **827.55** | wrong output | wrong output | — | 55.2 / 94.5 |
-| `join-empty-1024.js` | **9.93** | 37.47 / 86.80 | **0.11×** | **10.19** | 167.10 | 585.11 | **0.06×** | 53.7 / 98.0 |
-| `join-singleton-1024.js` | **10.09** | 56.37 / 115.07 | **0.09×** | **10.67** | 205.84 | 2,435.78 | **0.05×** | 53.3 / 98.5 |
-| `join-small-1024.js` | **10.17** | 124.92 / 182.19 | **0.06×** | **10.68** | 232.85 | 2,159.71 | **0.05×** | 57.9 / 95.2 |
+| Kernel | Scriptw (µs) | V8 5w / 80w (µs) | Scriptw ÷ V8 80w | Porffor WT (µs) | Porffor V8 Wasm (µs) | Scriptw ÷ Porf (WT) | Build: Scriptw / Porffor (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `sort-reverse-128.js` | **16.09** | 17.64 / 17.02 | **0.95×** | 85.21 | 104.14 | **0.19×** | 92.2 / 159.2 |
+| `sort-reverse-512.js` | **19.25** | 47.11 / 51.55 | **0.37×** | 1,201.38 | 1,565.01 | **0.02×** | 94.8 / 170.5 |
+| `sort-sorted-512.js` | **19.32** | 46.02 / 51.84 | **0.37×** | 39.44 | 42.75 | **0.49×** | 87.3 / 176.3 |
+| `to-sorted-512.js` | **39.55** | 78.03 / 85.16 | **0.46×** | 2,418.14 | 2,882.47 | **0.02×** | 117.3 / 227.4 |
+| `join-1024.js` | **45.62** | 51.07 / 62.01 | **0.74×** | wrong output | wrong output | — | 95.2 / 184.6 |
+| `join-4096.js` | **92.85** | 156.20 / 165.32 | **0.56×** | wrong output | wrong output | — | 112.2 / 196.6 |
+| `join-mixed-1024.js` | **30.03** | 61.98 / 67.25 | **0.45×** | 33.51 | 55.60 | **0.90×** | 73.8 / 119.0 |
+| `numeric-loop-10000.js` | **8.49** | 109.69 / 120.02 | **0.07×** | 20.01 | 19.86 | **0.42×** | 75.4 / 124.1 |
+| `numeric-loop-50000.js` | **8.45** | 282.18 / 279.58 | **0.03×** | 55.22 | 48.48 | **0.15×** | 75.3 / 119.6 |
+| `folded-string-4096.js` | **29.77** | 73.37 / 84.16 | **0.35×** | 90.44 | 127.54 | **0.33×** | 73.1 / 133.2 |
+| `dynamic-string-4096.js` | **41.77** | 101.33 / 117.06 | **0.36×** | 90.28 | 64.28 | **0.46×** | 70.2 / 117.7 |
+| `integer.js` | **13.86** | 1,688.08 / 1,604.49 | **0.009×** | wrong output | wrong output | — | 70.8 / 119.8 |
+| `objects.js` | **30.96** | 56.97 / 58.68 | **0.53×** | 113.79 | 1,170.58 | **0.27×** | 93.1 / 144.1 |
+| `retained-objects.js` | **1,052.50** | 1,265.01 / 1,446.01 | **0.73×** | runtime failed | runtime failed | — | 94.8 / 182.4 |
+| `join-empty-1024.js` | **13.21** | 49.25 / 63.83 | **0.21×** | 175.12 | 740.00 | **0.08×** | 90.9 / 173.8 |
+| `join-singleton-1024.js` | **15.45** | 79.82 / 102.13 | **0.15×** | 287.00 | 2,932.32 | **0.05×** | 99.3 / 178.4 |
+| `join-small-1024.js` | **14.90** | 113.48 / 154.81 | **0.10×** | 263.86 | 2,548.69 | **0.06×** | 120.4 / 204.1 |
 
-\* On `join-mixed-1024.js`, the initial 21-sample sweep recorded a transient 49.20 µs Scriptw spike; a dedicated 31-sample / 10-warmup re-check measured **30.37 µs** (min 29.89 µs) for Scriptw vs **33.13 µs** (min 32.90 µs) for Porffor on Wasmtime (**0.917×**, **1.09× faster**), matching the V8-panel median of **30.09 µs** and giving **13/13** wins on Wasmtime (~**0.151×**, **6.6× faster** geomean).
-
-| Comparison (2026-11-26 local cohort, ABI 92) | Kernels | Scriptw faster | Scriptw ÷ other (geomean) | Range |
+| Comparison (2026-11-26 local cohort, ABI 93) | Kernels | Scriptw faster | Scriptw ÷ other (geomean) | Range |
 | --- | ---: | ---: | ---: | ---: |
-| Scriptw vs Porffor on Wasmtime 47.0.1 | 13 | **12 / 13** (13 / 13 on re-check\*) | **0.157× (6.38× faster)** | 0.018×–1.48× (0.92×\*) |
-| Scriptw vs Porffor on Node 24 / V8 Wasm | 13 | **13 / 13** | **0.078× (12.80× faster)** | 0.004×–0.878× |
-| Scriptw vs Node 24 / V8 JavaScript (5w) | 17 | **16 / 17** | **0.257× (3.89× faster)** | 0.009×–1.18× |
-| Scriptw vs Node 24 / V8 JavaScript (80w) | 17 | **15 / 17** | **0.157× (6.36× faster)** | 0.008×–1.19× |
-| JS → Wasm compile: Scriptw vs Porffor | 17 | **17 / 17** | **0.543× (1.84× faster)** | 0.453×–0.640× |
+| Scriptw vs Porffor on Wasmtime 47.0.1 | 13 | **13 / 13** | **0.146× (6.86× faster)** | 0.016×–0.896× |
+| Scriptw vs Porffor on Node 24 / V8 Wasm | 13 | **13 / 13** | **0.070× (14.20× faster)** | 0.005×–0.650× |
+| Scriptw vs Node 24 / V8 JavaScript (5w) | 17 | **17 / 17** | **0.269× (3.72× faster)** | 0.008×–0.912× |
+| Scriptw vs Node 24 / V8 JavaScript (80w) | 17 | **17 / 17** | **0.241× (4.16× faster)** | 0.009×–0.945× |
+| JS → Wasm compile: Scriptw vs Porffor | 17 | **17 / 17** | **0.567× (1.76× faster)** | 0.495×–0.646× |
 
 ### React 19.3.1 Server Components (retained Flight vs Node 24.19.0)
 
-Same-source `rsc.js` bundle (`SHA-256 2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334`, React / React DOM / `react-server-dom-webpack` 19.3.1) run in a balanced 2-block reversed schedule of **8 fresh processes per actor and case**, **100 checked warmups** and **101 timed retained Flight requests** each (`rsc_baseline` vs `react-driver.cjs retained-module`, `SCRIPTW_JOBS=1`, `NODE_DISABLE_COMPILE_CACHE=1`, exact Flight SHA-256 verified on every call, pinned CPUs 0–1, 4 GiB / 0 swap cap):
+Same-source `rsc.js` bundle (`SHA-256 2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334`, React / React DOM / `react-server-dom-webpack` 19.3.1) run in a balanced 2-block reversed schedule of **8 fresh processes per actor and case**, **100 checked warmups** and **101 timed retained Flight requests** each (`rsc_baseline` vs `react-driver.cjs retained-module`, `SCRIPTW_JOBS=1`, `NODE_DISABLE_COMPILE_CACHE=1`, exact Flight SHA-256 verified on every call, pinned CPUs 6–7, 4 GiB / 0 swap cap):
 
-| Case | Actor | Median [min–max] | Mean | p95 | Scriptw ÷ V8 | Steady RSS |
+| Case | Actor | Median [min–max] | Mean | p95 | Scriptw ÷ V8 | Steady RSS (warm / cold) |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| **Sync Flight** (`rsc-sync`) | **Scriptw Speed (ABI 92)** | **0.183 ms** [0.180–0.413] | **0.193 ms** | 0.248 ms | **1.21×** | 339.2 MiB |
-| **Sync Flight** (`rsc-sync`) | Scriptw Fast (ABI 92) | 0.547 ms [0.540–0.828] | 0.557 ms | 0.615 ms | 3.61× | 249.9 MiB |
-| **Sync Flight** (`rsc-sync`) | Node 24.19.0 / V8 (JIT) | 0.151 ms [0.144–0.157] | 0.193 ms | 0.215 ms | 1.00× | — |
-| **Async Flight** (`rsc-async`) | **Scriptw Speed (ABI 92)** | **0.206 ms** [0.204–0.230] | **0.217 ms** | 0.270 ms | **1.28×** | 339.0 MiB |
-| **Async Flight** (`rsc-async`) | Scriptw Fast (ABI 92) | 0.597 ms [0.584–0.745] | 0.609 ms | 0.667 ms | 3.70× | 271.1 MiB |
-| **Async Flight** (`rsc-async`) | Node 24.19.0 / V8 (JIT) | 0.161 ms [0.153–0.263] | 0.180 ms | 0.233 ms | 1.00× | — |
+| **Sync Flight** (`rsc-sync`) | **Scriptw Speed (ABI 93)** | **0.282 ms** [0.209–0.388] | **0.334 ms** | **0.522 ms** | **1.05×** | **131.3 MiB** / 302.1 MiB |
+| **Sync Flight** (`rsc-sync`) | Scriptw Fast (ABI 93) | 0.841 ms [0.592–0.917] | 0.972 ms | 2.154 ms | 3.14× | 138.3 MiB / 252.9 MiB |
+| **Sync Flight** (`rsc-sync`) | Node 24.19.0 / V8 (JIT) | 0.268 ms [0.175–0.299] | 0.428 ms | 1.449 ms | 1.00× | — |
+| **Async Flight** (`rsc-async`) | **Scriptw Speed (ABI 93)** | **0.366 ms** [0.241–0.434] | **0.362 ms** | **0.551 ms** | **1.34×** | **132.4 MiB** |
+| **Async Flight** (`rsc-async`) | Scriptw Fast (ABI 93) | 0.741 ms [0.692–0.989] | 0.876 ms | 1.240 ms | 2.71× | 139.6 MiB |
+| **Async Flight** (`rsc-async`) | Node 24.19.0 / V8 (JIT) | 0.273 ms [0.183–0.330] | 0.375 ms | 1.104 ms | 1.00× | — |
 
-Compared to the earlier 2026-11-17 Xeon cloud cohort (`1.62×` sync, `1.65×` async), ABI 92 Scriptw Speed narrows the gap against 100-warmup V8 JIT to **1.21× sync** (matching V8's `0.193 ms` mean) and **1.28× async**.
+Concurrent host load during the RSC panel raised absolute wall times for both engines compared to the quieter ABI 92 run (`0.183 / 0.206 ms` vs `0.151 / 0.161 ms`), while paired Scriptw Speed narrowed Sync Flight median to **1.05× V8**, beat V8 JIT on both **mean** (`0.334 vs 0.428 ms` Sync; `0.362 vs 0.375 ms` Async) and **p95** (`0.522 vs 1.449 ms` Sync; `0.551 vs 1.104 ms` Async), and cut steady warm-cache RSS to **131–132 MiB** (`302.1 MiB` on cold compile vs `339.2 MiB` in ABI 92).

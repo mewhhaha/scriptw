@@ -163,8 +163,9 @@ impl FunctionBuilder<'_> {
         let value = schema.reserve_value_local(function);
         value.set_undefined(function);
         let slot = crate::module::standard_builtin_function_realm_slot(builtin);
-        if builtin == StandardBuiltinId::DateConstructor
-            || slot.is_some_and(|slot| slot.is_regexp())
+        if slot.is_some_and(|slot| {
+            slot.is_date() || slot.is_regexp() || crate::heap::is_demand_intrinsic_slot(slot)
+        })
         {
             // The demand gate either publishes the canonical callable or
             // traps; no independent, incomplete family fallback exists.

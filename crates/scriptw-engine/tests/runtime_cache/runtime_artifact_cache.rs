@@ -389,7 +389,8 @@ fn embedded_runtime_executes_fresh_programs_without_a_native_runtime_compile() {
         );
         assert_native_cache_counts(&output, 0, 1); // Only this fresh P compiles natively.
     }
-    // A same-source hit must reattach R through the same checked package path.
+    // A same-source hit skips compiler-package admission and attaches the
+    // execution-only native runtime bundle directly.
     let cached = child(
         &executable,
         EMBEDDED_TEST,
@@ -397,7 +398,11 @@ fn embedded_runtime_executes_fresh_programs_without_a_native_runtime_compile() {
         &directory.0.join("producer"),
     );
     let trace = String::from_utf8_lossy(&cached.stderr);
-    assert!(trace.contains("runtime-build-package hit:"), "{trace}");
+    assert!(trace.contains("runtime-native-bundle hit:"), "{trace}");
+    assert!(
+        !trace.contains("runtime-build-package hit:"),
+        "warm program-cache hits skip compiler-package admission: {trace}"
+    );
     assert_embedded_compilation_modes(&trace);
     assert_native_backing(&trace, backing);
     assert!(trace.contains("program-cache hit:"), "{trace}");

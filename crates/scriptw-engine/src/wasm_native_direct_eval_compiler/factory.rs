@@ -31,10 +31,9 @@ pub(super) fn instantiate_and_execute(
         }
     }
     let emit = trace.map(|trace| trace.phase(Phase::Emit));
-    let artifact = scriptw_aot_wasm::emit_runtime_direct_eval_with_validated_runtime(
-        program,
-        context.validated_runtime(),
-    );
+    let runtime = context.validated_runtime()?;
+    let artifact =
+        scriptw_aot_wasm::emit_runtime_direct_eval_with_validated_runtime(program, runtime);
     context.check_budget()?;
     let artifact = artifact.map_err(|e| {
         wasmtime::Error::new(EngineError::from_wasm_emit_error(program.program(), e))
@@ -43,7 +42,7 @@ pub(super) fn instantiate_and_execute(
     let checks = trace.map(|trace| trace.phase(Phase::ArtifactChecks));
     // The artifact producer retains this exact immutable runtime owner. Identity
     // proves the same key, layout and bytes without rescanning R on every call.
-    if !Arc::ptr_eq(artifact.runtime(), context.runtime()) {
+    if !Arc::ptr_eq(artifact.runtime(), runtime.runtime()) {
         return Err(abi_error(
             "new direct eval P is not linked to the exact admitted R",
         ));

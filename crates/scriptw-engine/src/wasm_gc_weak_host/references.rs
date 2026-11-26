@@ -2,7 +2,7 @@ use super::*;
 
 struct WeakRefResource(WeakAnyRef);
 
-pub(super) fn link(linker: &mut WasmtimeLinker<WasmHostState>) -> Result<(), EngineError> {
+pub(super) fn link(linker: &mut FixedHostFunctions<'_, '_>) -> Result<(), EngineError> {
     let row = GcHostImport::WeakRefAllocate;
     linker
         .func_wrap(

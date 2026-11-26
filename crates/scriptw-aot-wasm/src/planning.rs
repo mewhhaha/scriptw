@@ -3854,6 +3854,11 @@ pub(crate) struct FunctionMetaRegistry {
     /// How many static property sites of this module keep their record in
     /// a global of their own; each new site takes the next one.
     site_records: std::cell::RefCell<Vec<crate::gc_types::SiteRecordKind>>,
+    /// One shared P-local `ExecutableCode` global per `(source_id, class_element_execution)`.
+    executable_code_sites: std::cell::RefCell<BTreeMap<(i64, u8), u32>>,
+    /// False for reusable `NativeFactory` dynamic-program templates, which must
+    /// keep an empty P `GlobalSection` so compiled instances can be reused.
+    allow_cached_executable_code_globals: bool,
     /// The profiled sites among them, in the order the module's bodies
     /// asked for them, enumerated alike whatever the profile.
     profile_sites: std::cell::RefCell<crate::profile::SiteMapBuilder>,
@@ -3915,6 +3920,36 @@ impl FunctionMetaRegistry {
         let position = u32::try_from(records.len())
             .map_err(|_| EmitError::unsupported("site records exceed u32"))?;
         records.push(kind);
+        Ok(position)
+    }
+
+    pub(crate) fn with_cached_executable_code_globals(mut self, allow: bool) -> Self {
+        self.allow_cached_executable_code_globals = allow;
+        self
+    }
+
+    pub(crate) const fn allows_cached_executable_code_globals(&self) -> bool {
+        self.allow_cached_executable_code_globals
+    }
+
+    /// Reuses one `ExecutableCode` site global per P-local entry and execution kind.
+    pub(crate) fn cached_executable_code_site(
+        &self,
+        source_id: i64,
+        class_element_execution: ClassElementExecutionKind,
+    ) -> Result<u32, EmitError> {
+        let execution_key = match class_element_execution {
+            ClassElementExecutionKind::None => 0,
+            ClassElementExecutionKind::InstanceFieldInitializer => 1,
+            ClassElementExecutionKind::StaticFieldInitializer => 2,
+            ClassElementExecutionKind::StaticBlock => 3,
+        };
+        let key = (source_id, execution_key);
+        if let Some(&position) = self.executable_code_sites.borrow().get(&key) {
+            return Ok(position);
+        }
+        let position = self.next_site_record(crate::gc_types::SiteRecordKind::ExecutableCode)?;
+        self.executable_code_sites.borrow_mut().insert(key, position);
         Ok(position)
     }
 
@@ -4069,6 +4104,8 @@ impl FunctionMetaRegistry {
             compact_shape_sites: std::cell::RefCell::new(BTreeMap::new()),
             next_own_data_read_site: std::cell::Cell::new(0),
             site_records: std::cell::RefCell::new(Vec::new()),
+            executable_code_sites: std::cell::RefCell::new(BTreeMap::new()),
+            allow_cached_executable_code_globals: true,
             profile_sites: std::cell::RefCell::new(Default::default()),
             profile: crate::profile::ProfileUse::None,
             profile_collector: None,

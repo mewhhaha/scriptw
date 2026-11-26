@@ -502,8 +502,9 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                     scriptw_aot_wasm::snapshot_symbol_index(name) as u32,
                 )
                 .map_err(invariant)?;
-            let candidate = eq_reference(self.store, raw)?
-                .ok_or_else(|| invariant("null well-known Symbol"))?;
+            let Some(candidate) = eq_reference(self.store, raw)? else {
+                continue;
+            };
             self.require(candidate, L::Symbol)?;
             if Rooted::ref_eq(&*self.store, symbol, &candidate).map_err(invariant)? {
                 if registry.is_some() {

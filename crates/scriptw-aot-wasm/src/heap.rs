@@ -344,6 +344,7 @@ runtime_scalar_domain!(DemandConstructor, 0, {
     Object = 26,
     Function = 27,
     String = 28,
+    Array = 29,
 });
 
 impl DemandConstructor {
@@ -379,6 +380,7 @@ impl DemandConstructor {
             Self::Object => B::ObjectConstructor,
             Self::Function => B::FunctionConstructor,
             Self::String => B::StringConstructor,
+            Self::Array => B::ArrayConstructor,
         }
     }
 
@@ -414,14 +416,15 @@ impl DemandConstructor {
             Self::Object => S::ObjectConstructor,
             Self::Function => S::FunctionConstructor,
             Self::String => S::StringConstructor,
+            Self::Array => S::ArrayConstructor,
         }
     }
 
-    /// The prototype that the constructor's `prototype` names (eager or demand).
-    /// Proxy has none and receives Object.prototype, as eager bootstrap did.
-    pub(crate) const fn prototype_slot(self) -> crate::functions::NonArrayRealmIntrinsicSlot {
+    /// Array uses the dedicated, typed Array.prototype slot. Proxy has no
+    /// public prototype and receives Object.prototype as its bootstrap input.
+    pub(crate) const fn prototype_slot(self) -> Option<crate::functions::NonArrayRealmIntrinsicSlot> {
         use crate::functions::NonArrayRealmIntrinsicSlot as S;
-        match self {
+        Some(match self {
             Self::Proxy => S::ObjectPrototype,
             Self::Iterator => S::IteratorPrototype,
             Self::Number => S::NumberPrototype,
@@ -451,7 +454,8 @@ impl DemandConstructor {
             Self::Object => S::ObjectPrototype,
             Self::Function => S::FunctionPrototype,
             Self::String => S::StringPrototype,
-        }
+            Self::Array => return None,
+        })
     }
 
     pub(crate) fn from_builtin(builtin: scriptw_ir::StandardBuiltinId) -> Option<Self> {
@@ -464,6 +468,46 @@ impl DemandConstructor {
         Self::ALL
             .into_iter()
             .find(|demand| demand.slot().gc_index() == slot.gc_index())
+    }
+}
+
+/// Canonical native callables shared by public properties or internal users.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DemandCallable {
+    ThrowTypeError,
+    ArrayPrototypeValues,
+    ArrayPrototypeToString,
+}
+
+impl DemandCallable {
+    pub(crate) const ALL: [Self; 3] = [
+        Self::ThrowTypeError,
+        Self::ArrayPrototypeValues,
+        Self::ArrayPrototypeToString,
+    ];
+
+    pub(crate) const fn builtin(self) -> scriptw_ir::StandardBuiltinId {
+        use scriptw_ir::StandardBuiltinId as B;
+        match self {
+            Self::ThrowTypeError => B::ThrowTypeError,
+            Self::ArrayPrototypeValues => B::ArrayPrototypeValues,
+            Self::ArrayPrototypeToString => B::TypedArrayPrototypeToString,
+        }
+    }
+
+    pub(crate) const fn slot(self) -> crate::functions::NonArrayRealmIntrinsicSlot {
+        use crate::functions::NonArrayRealmIntrinsicSlot as S;
+        match self {
+            Self::ThrowTypeError => S::ThrowTypeError,
+            Self::ArrayPrototypeValues => S::ArrayPrototypeValues,
+            Self::ArrayPrototypeToString => S::TypedArrayPrototypeToString,
+        }
+    }
+
+    pub(crate) fn from_builtin(builtin: scriptw_ir::StandardBuiltinId) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|demand| demand.builtin() == builtin)
     }
 }
 
@@ -797,13 +841,14 @@ impl DemandNamespace {
 }
 
 /// Closed discriminator stored in `DeferredDemandConstructor.CONSTRUCTOR`
-/// identifying which defining-Realm demand intrinsic a global property recipe
+/// identifying which defining-Realm demand intrinsic a property recipe
 /// resolves through `emit_load_non_array_realm_intrinsic_stored`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum DemandGlobalRecipe {
     Constructor(DemandConstructor),
     HostFunction(DemandHostFunction),
     Namespace(DemandNamespace),
+    ArrayPrototypeToString,
 }
 
 impl DemandGlobalRecipe {
@@ -817,6 +862,10 @@ impl DemandGlobalRecipe {
                 (DemandConstructor::ALL.len() + DemandHostFunction::ALL.len()) as i32
                     + demand.word() as i32
             }
+            Self::ArrayPrototypeToString => {
+                (DemandConstructor::ALL.len() + DemandHostFunction::ALL.len()
+                    + DemandNamespace::ALL.len()) as i32
+            }
         }
     }
 
@@ -825,6 +874,7 @@ impl DemandGlobalRecipe {
             Self::Constructor(demand) => demand.slot(),
             Self::HostFunction(demand) => demand.slot(),
             Self::Namespace(demand) => demand.slot(),
+            Self::ArrayPrototypeToString => DemandCallable::ArrayPrototypeToString.slot(),
         }
     }
 
@@ -834,11 +884,15 @@ impl DemandGlobalRecipe {
             .map(Self::Constructor)
             .chain(DemandHostFunction::ALL.into_iter().map(Self::HostFunction))
             .chain(DemandNamespace::ALL.into_iter().map(Self::Namespace))
+            .chain(std::iter::once(Self::ArrayPrototypeToString))
     }
 }
 
 pub(crate) fn is_demand_intrinsic_slot(slot: crate::functions::NonArrayRealmIntrinsicSlot) -> bool {
     DemandConstructor::from_slot(slot).is_some()
+        || DemandCallable::ALL
+            .iter()
+            .any(|demand| demand.slot().gc_index() == slot.gc_index())
         || DemandPrototype::from_slot(slot).is_some()
         || DemandBoxedPrototype::from_slot(slot).is_some()
         || DemandDynamicFunction::from_slot(slot).is_some()

@@ -1,7 +1,7 @@
 //! Realm protectors: facts about a Realm's intrinsic prototypes that a fast
 //! path may assume instead of re-proving them at every use.
 //!
-//! When a Realm's intrinsics are complete, `emit_arm_realm_protectors`
+//! During intrinsic initialization, `emit_arm_realm_protectors`
 //! records the Realm's %Object.prototype%, %Function.prototype%,
 //! %Array.prototype% and %String.prototype% in an immutable
 //! `RealmProtectors` record, each with the intrinsic storage (its *rows*)
@@ -82,47 +82,22 @@ impl ProtectedHolder {
 }
 
 impl FunctionBuilder<'_> {
-    /// Records the Realm's protected prototypes once its intrinsics are
-    /// complete; before this the Realm's PROTECTORS is null and every
-    /// accessor declines. A prototype whose header does not hold intrinsic
-    /// storage is recorded without rows, which no live storage equals.
+    /// Records the freshly constructed prototypes during bootstrap. The
+    /// String prototype is passed directly before publishing its canonical
+    /// slot, so the witness comes from the initial storage. Before arming
+    /// every accessor declines. A header without intrinsic storage is
+    /// recorded without rows, which no live storage equals.
     pub(crate) fn emit_arm_realm_protectors(
         &mut self,
         realm: &GcLocal<RealmRecord>,
-        object_prototype: &ValueLocals,
+        object: &GcLocal<OrdinaryObject>,
         function_prototype: &GcLocal<FunctionObject>,
+        array: &GcLocal<ArrayObject>,
+        string: &GcLocal<PrimitiveBox>,
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
-        let skip = self.open_frame(ControlFrameKind::Block, f);
-        let object = s.reserve_non_null_gc_local(f).initialize(
-            object_prototype.sealed_reference_or_branch::<OrdinaryObject>(
-                s,
-                self.local_branch_label(skip),
-                f,
-            ),
-            f,
-        );
-        let string_value = s.reserve_value_local(f);
-        self.emit_load_non_array_realm_intrinsic(
-            realm,
-            NonArrayRealmIntrinsicSlot::StringPrototype,
-            &string_value,
-            f,
-        );
-        let string = s.reserve_non_null_gc_local(f).initialize(
-            string_value.sealed_reference_or_branch::<PrimitiveBox>(
-                s,
-                self.local_branch_label(skip),
-                f,
-            ),
-            f,
-        );
-        string_value.clear(f);
-        let array = s
-            .reserve_non_null_gc_local(f)
-            .initialize(self.emit_load_realm_array_prototype(realm, f), f);
-        let object_rows = self.emit_object_prototype_rows_at_arming(&object, f)?;
+        let object_rows = self.emit_object_prototype_rows_at_arming(object, f)?;
         let function_header = s.reserve_non_null_gc_local(f).initialize(
             s.field(FunctionObjectSchema::OBJECT)
                 .read(function_prototype, s, f)
@@ -133,7 +108,7 @@ impl FunctionBuilder<'_> {
         function_header.clear(f);
         let array_header = s.reserve_non_null_gc_local(f).initialize(
             s.field(ArrayObjectSchema::OBJECT)
-                .read(&array, s, f)
+                .read(array, s, f)
                 .reference(),
             f,
         );
@@ -141,7 +116,7 @@ impl FunctionBuilder<'_> {
         array_header.clear(f);
         let string_header = s.reserve_non_null_gc_local(f).initialize(
             s.field(PrimitiveBoxSchema::OBJECT)
-                .read(&string, s, f)
+                .read(string, s, f)
                 .reference(),
             f,
         );
@@ -150,13 +125,13 @@ impl FunctionBuilder<'_> {
         let protectors = s.reserve_non_null_gc_local(f).initialize(
             s.struct_type::<RealmProtectors>().construct(
                 (
-                    GcOperand::reference(&object, s),
+                    GcOperand::reference(object, s),
                     GcOperand::reference(&object_rows, s),
                     GcOperand::reference(function_prototype, s),
                     GcOperand::reference(&function_rows, s),
-                    GcOperand::reference(&array, s),
+                    GcOperand::reference(array, s),
                     GcOperand::reference(&array_rows, s),
-                    GcOperand::reference(&string, s),
+                    GcOperand::reference(string, s),
                     GcOperand::reference(&string_rows, s),
                 ),
                 f,
@@ -174,11 +149,6 @@ impl FunctionBuilder<'_> {
         array_rows.clear(f);
         function_rows.clear(f);
         object_rows.clear(f);
-        array.clear(f);
-        string.clear(f);
-        object.clear(f);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
         Ok(())
     }
 

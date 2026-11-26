@@ -144,7 +144,7 @@ impl Engine {
         }
         Ok(ProgramWasmArtifact {
             bytes: Arc::from(artifact.bytes),
-            runtime,
+            runtime: runtime.map(wasm_runtime_link::ProgramRuntime::Raw),
             cached_entry: None,
             compilation_policy: WasmCompilationPolicy::from_unit(&unit),
         })

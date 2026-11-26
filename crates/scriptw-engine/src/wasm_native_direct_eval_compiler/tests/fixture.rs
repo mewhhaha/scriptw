@@ -9,6 +9,7 @@ pub(super) fn string_types(engine: &WasmtimeEngine) -> (StructType, ArrayType) {
     let string = StructType::new(
         engine,
         [
+            FieldType::new(Mutability::Var, StorageType::ValType(ValType::I64)),
             FieldType::new(
                 Mutability::Const,
                 StorageType::ValType(ValType::Ref(RefType::new(
@@ -16,7 +17,6 @@ pub(super) fn string_types(engine: &WasmtimeEngine) -> (StructType, ArrayType) {
                     HeapType::ConcreteArray(units.clone()),
                 ))),
             ),
-            FieldType::new(Mutability::Var, StorageType::ValType(ValType::I64)),
             FieldType::new(Mutability::Var, StorageType::ValType(ValType::I32)),
         ],
     )

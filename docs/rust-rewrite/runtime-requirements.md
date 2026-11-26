@@ -82,7 +82,7 @@ states what admits that image.
 
 ## Runtime ABI
 
-The runtime ABI is **92**. Portable bundles and native images built under an
+The runtime ABI is **93**. Portable bundles and native images built under an
 earlier ABI must be rebuilt. ABIs 58 to 77 added per-site read, write,
 `instanceof` and global read records, a dictionary position hint on Strings,
 further native call entries, one JSON output accumulator, compact shape
@@ -131,7 +131,21 @@ and 5 eager `IntrinsicPropertyStorage` layouts at Realm birth), passes
 compile-time precomputed property-key hashes into `FreshDataPropertiesPublish`,
 adds the `StringConcatStringNumber` leaf helper, and lowers guarded inline
 2-arg `Math.min`/`Math.max`, 1-arg `String`/`Number`, and within-capacity 1-arg
-`Array.prototype.push` directly in P. `LAYOUT_VERSION` in
+`Array.prototype.push` directly in P. ABI 93 compacts `StringValue` to 32 bytes
+(`RAW_KEY_HASH` first, `CODE_UNITS` at field 1, `ENTRY_HINT` at field 2), defers
+`WellKnownSymbolTable`, `RegisteredSymbolTable`, `ArrayConstructor`,
+`%ThrowTypeError%`, `RegExpLegacyState`, and `ProgramInstance` native payloads
+until first use (removing 78 eager GC allocations per Store + Realm +
+`ProgramInstance`), caches per-entry `ExecutableCode` references in P globals
+when not emitting a reusable `NativeFactory` template, adds in-place monotonic
+numeric subtraction sort (`BinaryNumericCallback::SUBTRACTION_ADMITTED`), fused
+multi-stage `.split().join()` replacement and prefix projection helpers,
+4-record compact property-read caching, direct own-descriptor predicates,
+compact `for…in`, zero-copy non-shared `TextDecoder.decode`, an execution-only
+runtime receipt for warm cache hits, and bounded caller-thread `FiberStack`
+caching (at most 2 idle stacks process-wide), alongside Cranelift local GC
+safepoint retention and Wasmtime copying-GC barrier/initialization and
+ephemeron improvements. `LAYOUT_VERSION` in
 `crates/scriptw-aot-wasm/src/runtime_artifact.rs` records each step.
 
 ### Locals and GC roots

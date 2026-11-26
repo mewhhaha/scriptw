@@ -7,7 +7,7 @@
 //! the pair of identities is the hash, and the collector's own owner and key
 //! decide a hit, so two objects that share an identity are still two keys.
 use super::*;
-use wasmtime::AsContext;
+use wasmtime::{GcEphemeronUpdate, RawGcEphemerons};
 
 /// One operation's collection and key: the raw references of the running
 /// host call, and the hash of their identities.
@@ -53,8 +53,7 @@ struct Cell {
 }
 
 /// Where a missing key's entry would go.
-#[derive(Clone, Copy)]
-pub(super) enum Vacancy {
+enum Vacancy {
     /// The table has no cells yet.
     Unallocated,
     Empty(usize),
@@ -62,20 +61,10 @@ pub(super) enum Vacancy {
     Retired(usize),
 }
 
-/// A key's entry, or where one would go. Valid only until the Store can next
-/// collect or the index next changes.
-pub(super) enum Found {
-    Entry(GcEphemeron),
-    Missing(Vacancy),
-}
-
-impl Found {
-    pub(super) fn entry(self) -> Option<GcEphemeron> {
-        match self {
-            Self::Entry(entry) => Some(entry),
-            Self::Missing(_) => None,
-        }
-    }
+enum Candidate<T> {
+    Match(T),
+    Mismatch,
+    Retired,
 }
 
 /// Open addressing with linear probing over a power-of-two table that always
@@ -90,32 +79,67 @@ pub(super) struct Entries {
 const MINIMUM_CELLS: usize = 16;
 
 impl Entries {
-    /// Finds the entry under a shared Store borrow, which cannot collect, so
-    /// the raw references stay the objects' identities throughout.
-    pub(super) fn find(&self, store: impl AsContext, at: Operands) -> wasmtime::Result<Found> {
-        let store = store.as_context();
+    /// Inspects entries with the same hash. Only insertion needs to track
+    /// retired cells and record a vacancy.
+    #[inline]
+    fn probe<T>(
+        &self,
+        at: Operands,
+        vacancy: Option<&mut Vacancy>,
+        mut inspect: impl FnMut(GcEphemeron) -> wasmtime::Result<Candidate<T>>,
+    ) -> wasmtime::Result<Option<T>> {
         let Some(mask) = self.cells.len().checked_sub(1) else {
-            return Ok(Found::Missing(Vacancy::Unallocated));
+            return Ok(None);
         };
         let mut index = at.hash as usize & mask;
         let mut retired = None;
         loop {
             let cell = self.cells[index];
             let Some(entry) = cell.entry else {
-                return Ok(Found::Missing(
-                    retired.map_or(Vacancy::Empty(index), Vacancy::Retired),
-                ));
+                if let Some(vacancy) = vacancy {
+                    *vacancy = retired.map_or(Vacancy::Empty(index), Vacancy::Retired);
+                }
+                return Ok(None);
             };
             if cell.hash == at.hash {
-                if entry.matches_raw(&store, at.owner, at.key)? {
-                    return Ok(Found::Entry(entry));
-                }
-                if retired.is_none() && !entry.is_live(&store)? {
-                    retired = Some(index);
+                match inspect(entry)? {
+                    Candidate::Match(value) => return Ok(Some(value)),
+                    Candidate::Mismatch => {}
+                    Candidate::Retired => {
+                        retired.get_or_insert(index);
+                    }
                 }
             }
             index = (index + 1) & mask;
         }
+    }
+
+    pub(super) fn find(
+        &self,
+        store: &WasmtimeCaller<'_, WasmHostState>,
+        at: Operands,
+    ) -> wasmtime::Result<Option<GcEphemeron>> {
+        self.probe(at, None, |entry| {
+            Ok(if entry.matches_raw(store, at.owner, at.key)? {
+                Candidate::Match(entry)
+            } else {
+                Candidate::Mismatch
+            })
+        })
+    }
+
+    pub(super) fn get(
+        caller: &mut WasmtimeCaller<'_, WasmHostState>,
+        at: Operands,
+    ) -> wasmtime::Result<u32> {
+        GcEphemeron::with_raw_access(caller, |state, ephemerons| {
+            let value = state.weak.index.probe(at, None, |entry| {
+                Ok(ephemerons
+                    .value_if_matches_raw(entry, at.owner, at.key)?
+                    .map_or(Candidate::Mismatch, Candidate::Match))
+            })?;
+            Ok(value.unwrap_or(0))
+        })
     }
 
     /// Whether one more cell may be occupied: at most five eighths are.
@@ -130,13 +154,15 @@ impl Entries {
     /// sixteenth do: entries that die together at each collection then keep
     /// one capacity instead of shrinking and growing again. Nothing changes
     /// when an allocation fails.
-    fn rebuild(&mut self, store: impl AsContext) -> wasmtime::Result<()> {
-        let store = store.as_context();
+    fn rebuild(&mut self, ephemerons: &RawGcEphemerons<'_>) -> wasmtime::Result<()> {
         let mut live = Vec::new();
         live.try_reserve_exact(self.used)
             .map_err(wasmtime::Error::new)?;
         for cell in &self.cells {
-            if cell.entry.map(|entry| entry.is_live(&store)).transpose()? == Some(true) {
+            let Some(entry) = cell.entry else {
+                continue;
+            };
+            if ephemerons.is_live(entry)? {
                 live.push(*cell);
             }
         }
@@ -191,33 +217,41 @@ impl Entries {
         at: Operands,
         value: u32,
     ) -> wasmtime::Result<()> {
-        let vacancy = match caller.data().weak.index.find(&*caller, at)? {
-            // SAFETY: the caller's contract; nothing above collects.
-            Found::Entry(entry) => return unsafe { entry.set_value_raw(&mut *caller, value) },
-            Found::Missing(vacancy) => vacancy,
-        };
-        // Make room before registering the conditional edge, so a failed
-        // allocation cannot leave a value-retaining slot the index does not
-        // know. Registration cannot collect, so the references stay current.
-        let cell = match vacancy {
-            Vacancy::Retired(cell) => cell,
-            Vacancy::Empty(cell) if caller.data().weak.index.has_room() => cell,
-            Vacancy::Empty(_) | Vacancy::Unallocated => {
-                let mut index = std::mem::take(&mut caller.data_mut().weak.index);
-                let rebuilt = index.rebuild(&*caller);
-                caller.data_mut().weak.index = index;
-                rebuilt?;
-                Self::first_empty(&caller.data().weak.index.cells, at.hash)
+        GcEphemeron::with_raw_access(caller, |state, ephemerons| {
+            let index = &mut state.weak.index;
+            let mut vacancy = Vacancy::Unallocated;
+            let updated = index.probe(at, Some(&mut vacancy), |entry| {
+                // SAFETY: the caller's contract; the raw access cannot collect.
+                let result =
+                    unsafe { ephemerons.set_value_if_matches_raw(entry, at.owner, at.key, value)? };
+                Ok(match result {
+                    GcEphemeronUpdate::Updated => Candidate::Match(()),
+                    GcEphemeronUpdate::Mismatch => Candidate::Mismatch,
+                    GcEphemeronUpdate::Retired => Candidate::Retired,
+                })
+            })?;
+            if updated.is_some() {
+                return Ok(());
             }
-        };
-        // SAFETY: the caller's contract; nothing above collects.
-        let entry = unsafe { GcEphemeron::new_raw(&mut *caller, at.owner, at.key, value)? };
-        let index = &mut caller.data_mut().weak.index;
-        index.used += usize::from(index.cells[cell].entry.is_none());
-        index.cells[cell] = Cell {
-            hash: at.hash,
-            entry: Some(entry),
-        };
-        Ok(())
+
+            // Prepare a cell before registering the edge, so a failed allocation
+            // cannot leave a value-retaining slot outside the index.
+            let cell = match vacancy {
+                Vacancy::Retired(cell) => cell,
+                Vacancy::Empty(cell) if index.has_room() => cell,
+                Vacancy::Empty(_) | Vacancy::Unallocated => {
+                    index.rebuild(ephemerons)?;
+                    Self::first_empty(&index.cells, at.hash)
+                }
+            };
+            // SAFETY: the caller's contract; the raw access cannot collect.
+            let entry = unsafe { ephemerons.insert_raw(at.owner, at.key, value)? };
+            index.used += usize::from(index.cells[cell].entry.is_none());
+            index.cells[cell] = Cell {
+                hash: at.hash,
+                entry: Some(entry),
+            };
+            Ok(())
+        })
     }
 }

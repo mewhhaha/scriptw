@@ -1,5 +1,19 @@
 use super::*;
 
+pub(super) struct TextDecoderInput {
+    pub(super) bytes: GcLocal<ByteArray>,
+    pub(super) start: I32Local,
+    pub(super) length: I32Local,
+}
+
+impl TextDecoderInput {
+    pub(super) fn clear(self, s: &RuntimeSchema, f: &mut Function) {
+        self.bytes.clear(f);
+        s.release_i32_local(self.start, f);
+        s.release_i32_local(self.length, f);
+    }
+}
+
 impl FunctionBuilder<'_> {
     pub(super) fn emit_text_decoder_input_brand(
         &mut self,
@@ -35,24 +49,21 @@ impl FunctionBuilder<'_> {
         )
     }
 
-    /// Snapshot the selected byte range, including non-byte TypedArrays and
-    /// DataViews. Backing admission happens after dictionary getters.
+    /// Borrow the validated ordinary backing after dictionary getters have
+    /// run. Shared memory still needs a private snapshot before decoding.
     pub(super) fn emit_text_decoder_input(
         &mut self,
         input: &ValueLocals,
         output: &CompletionLocals,
         exit: ControlTarget,
         f: &mut Function,
-    ) -> Result<GcLocal<ByteArray>, EmitError> {
+    ) -> Result<TextDecoderInput, EmitError> {
         let s = self.runtime_schema();
         let extent = s.reserve_i32_local(f);
-        f.instruction(&Instruction::I32Const(0));
-        extent.store(f);
-        let result = s.reserve_gc_local(f).initialize(
-            s.array_type::<ByteArray>()
-                .filled(GcOperand::i32(0), extent, f),
-            f,
-        );
+        let start = s.reserve_i32_local(f);
+        let result = s
+            .reserve_gc_local::<ByteArray, Nullable>(f)
+            .initialize_null(s, f);
         input.tag().load(f);
         f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Undefined.tag()));
         f.instruction(&Instruction::I32Ne);
@@ -149,13 +160,7 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         valid.load(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.emit_text_codec_error_if(
-            RuntimeErrorMessage::TEXT_DECODER_INVALID_INPUT,
-            output,
-            exit,
-            f,
-        )?;
+        self.open_frame(ControlFrameKind::If, f);
         length.load(f);
         f.instruction(&Instruction::I64Const(i32::MAX as i64));
         f.instruction(&Instruction::I64GtU);
@@ -166,6 +171,8 @@ impl FunctionBuilder<'_> {
         length.load(f);
         f.instruction(&Instruction::I32WrapI64);
         extent.store(f);
+        access.shared.load(f);
+        self.open_frame(ControlFrameKind::If, f);
         let bytes = s.reserve_gc_local(f).initialize(
             s.array_type::<ByteArray>()
                 .filled(GcOperand::i32(0), extent, f),
@@ -177,28 +184,6 @@ impl FunctionBuilder<'_> {
         let byte = s.reserve_i32_local(f);
         f.instruction(&Instruction::I64Const(0));
         index.store(f);
-        // An ArrayBuffer's validated live window is one bulk copy. Shared
-        // backing keeps its per-byte host-memory reads below.
-        access.shared.load(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, f);
-        let source = s
-            .reserve_gc_local(f)
-            .initialize(access.bytes.load(s, f).require_non_null(f), f);
-        let zero = s.reserve_i32_local(f);
-        f.instruction(&Instruction::I32Const(0));
-        zero.store(f);
-        offset.load(f);
-        f.instruction(&Instruction::I32WrapI64);
-        at.store(f);
-        s.array_type::<ByteArray>()
-            .copy_range_from(&bytes, zero, &source, at, extent, s, f);
-        s.release_i32_local(zero, f);
-        source.clear(f);
-        length.load(f);
-        index.store(f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
         let done = self.open_frame(ControlFrameKind::Block, f);
         let again = self.open_frame(ControlFrameKind::Loop, f);
         index.load(f);
@@ -221,21 +206,61 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        result.replace(bytes.load(s, f), f);
+        result.replace(bytes.load(s, f).nullable(), f);
+        start.set_constant(0, f);
         bytes.clear(f);
-        for local in [byte, at, valid] {
+        for local in [byte, at] {
             s.release_i32_local(local, f);
         }
-        for local in [position, index, length, offset] {
+        for local in [position, index] {
             s.release_i64_local(local, f);
         }
+        f.instruction(&Instruction::Else);
+        result.replace(access.bytes.load(s, f), f);
+        offset.load(f);
+        f.instruction(&Instruction::I32WrapI64);
+        start.store(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::Else);
+        // Brand admission already ran before the `stream` getter; a detached
+        // buffer or out-of-bounds view yields an empty byte sequence per Web IDL.
+        extent.set_constant(0, f);
+        start.set_constant(0, f);
+        result.replace(
+            s.array_type::<ByteArray>()
+                .filled(GcOperand::i32(0), extent, f)
+                .nullable(),
+            f,
+        );
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(valid, f);
+        s.release_i64_local(length, f);
+        s.release_i64_local(offset, f);
         access.clear(s, f);
         selected.clear(f);
         owner.clear(f);
         view.clear(f);
+        f.instruction(&Instruction::Else);
+        extent.set_constant(0, f);
+        start.set_constant(0, f);
+        result.replace(
+            s.array_type::<ByteArray>()
+                .filled(GcOperand::i32(0), extent, f)
+                .nullable(),
+            f,
+        );
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        s.release_i32_local(extent, f);
-        Ok(result)
+        let bytes = s
+            .reserve_gc_local(f)
+            .initialize(result.load(s, f).require_non_null(f), f);
+        result.clear(f);
+        Ok(TextDecoderInput {
+            bytes,
+            start,
+            length: extent,
+        })
     }
 }

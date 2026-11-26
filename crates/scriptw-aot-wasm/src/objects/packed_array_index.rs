@@ -4,7 +4,7 @@
 use super::*;
 use crate::gc_types::{
     ArrayIndexKeyConstruction, ArrayIndexedStorageMode, ArrayObject, ArrayObjectSchema,
-    IndexedTable, NumberBitsI64Array, NumberPresenceU64Array,
+    IndexedTable, NumberBitsI64Array, NumberPresenceU64Array, PackedValueTable, StoredValue,
 };
 use crate::heap::StoredPropertyAttributes;
 use crate::runtime_helpers::{
@@ -145,26 +145,37 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
-        let storage = self.emit_array_index_storage(array, f);
-        s.array_storage_is_packed(&storage, f);
+        s.array_storage_is_packed(array, f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(general, f);
-        let found = s.reserve_i32_local(f);
-        found.set_constant(0, f);
-        self.emit_packed_array_present(&storage, index, found, f);
-        found.load(f);
-        self.open_frame(ControlFrameKind::If, f);
-        // Unadmitted packed growth publishes nothing and leaves the Set.
-        let published = self.packed_number_write(&storage, index, value, f);
-        published.load(f);
-        f.instruction(&Instruction::I32Eqz);
-        s.release_i32_local(published, f);
-        self.emit_branch_if_to_target(general, f);
-        f.instruction(&Instruction::Else);
+        let done = self.open_frame(ControlFrameKind::Block, f);
         let length = s.reserve_i64_local(f);
         s.field(ArrayObjectSchema::LENGTH)
             .read(array, s, f)
             .store_i64(length, f);
+
+        let absent = self.open_frame(ControlFrameKind::Block, f);
+        // No own array index can be at or beyond the live length.
+        index.load(f);
+        length.load(f);
+        f.instruction(&Instruction::I64GeU);
+        self.emit_branch_if_to_target(absent, f);
+        let found = s.reserve_i32_local(f);
+        found.set_constant(0, f);
+        self.emit_packed_array_present(array, index, found, f);
+        found.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(absent, f);
+        s.release_i32_local(found, f);
+        let published = self.packed_number_write(array, index, value, f);
+        published.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        s.release_i32_local(published, f);
+        self.emit_branch_if_to_target(general, f);
+        self.emit_branch_to_target(done, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+
         index.load(f);
         length.load(f);
         f.instruction(&Instruction::I64GeU);
@@ -181,7 +192,6 @@ impl FunctionBuilder<'_> {
         );
         s.field(OrdinaryObjectSchema::EXTENSIBLE)
             .read(&header, s, f);
-        header.clear(f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(general, f);
         let end = s.reserve_i64_local(f);
@@ -189,12 +199,46 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I64Const(1));
         f.instruction(&Instruction::I64Add);
         end.store(f);
+
+        let publish = self.open_frame(ControlFrameKind::Block, f);
+        let walk = self.open_frame(ControlFrameKind::Block, f);
+        // A dense packed array with its protected prototype can append
+        // directly. Growth or promotion still uses the shared publication.
+        index.load(f);
+        length.load(f);
+        f.instruction(&Instruction::I64Eq);
+        s.field(ArrayObjectSchema::COUNT).read(array, s, f);
+        length.load(f);
+        f.instruction(&Instruction::I64Eq);
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(walk, f);
+        let prototype = s.reserve_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(&header, s, f)
+                .reference(),
+            f,
+        );
+        header.clear(f);
+        self.emit_array_prototype_chain_without_indices_or_branch(&prototype, walk, f);
+        prototype.clear(f);
+        self.emit_packed_append_within_capacity_or_branch(array, index, value, publish, f);
+        s.field(ArrayObjectSchema::COUNT)
+            .write(array, GcOperand::i64_local(end), s, f);
+        s.field(ArrayObjectSchema::LENGTH)
+            .write(array, GcOperand::i64_local(end), s, f);
+        self.emit_branch_to_target(done, f);
+
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         let permitted = self.emit_packed_push_prototypes_permit_append(array, index, end, f)?;
         permitted.load(f);
         f.instruction(&Instruction::I32Eqz);
         s.release_i32_local(permitted, f);
         self.emit_branch_if_to_target(general, f);
-        // No user code runs between admission and publication.
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+
         self.emit_array_indexed_publish_default_data(array, index, value, f)?;
         index.load(f);
         length.load(f);
@@ -203,13 +247,157 @@ impl FunctionBuilder<'_> {
         s.field(ArrayObjectSchema::LENGTH)
             .write(array, GcOperand::i64_local(end), s, f);
         f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         s.release_i64_local(end, f);
         s.release_i64_local(length, f);
+        Ok(())
+    }
+
+    /// Appends to a result whose existing elements form a dense prefix.
+    /// The caller proves an array index and owns length publication.
+    pub(crate) fn emit_dense_packed_value_append_or_branch(
+        &mut self,
+        array: &GcLocal<ArrayObject>,
+        index: I64Local,
+        value: &ValueLocals,
+        fallback: crate::emit::ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        s.array_storage_mode_is(array, ArrayIndexedStorageMode::PackedValues, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(fallback, f);
+        s.field(ArrayObjectSchema::COUNT).read(array, s, f);
+        index.load(f);
+        f.instruction(&Instruction::I64Ne);
+        self.emit_branch_if_to_target(fallback, f);
+        let slot = s.reserve_i32_local(f);
+        index.load(f);
+        f.instruction(&Instruction::I32WrapI64);
+        slot.store(f);
+        self.emit_packed_value_store_within_capacity_or_branch(array, slot, value, fallback, f);
+        s.release_i32_local(slot, f);
+        let end = s.reserve_i64_local(f);
+        index.load(f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Add);
+        end.store(f);
+        s.field(ArrayObjectSchema::COUNT)
+            .write(array, GcOperand::i64_local(end), s, f);
+        s.release_i64_local(end, f);
+    }
+
+    fn emit_packed_value_store_within_capacity_or_branch(
+        &mut self,
+        array: &GcLocal<ArrayObject>,
+        slot: I32Local,
+        value: &ValueLocals,
+        publish: crate::emit::ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let values = s.reserve_gc_local(f).initialize(
+            s.field(ArrayObjectSchema::VALUES)
+                .read(array, s, f)
+                .reference()
+                .require_non_null(f),
+            f,
+        );
+        slot.load(f);
+        s.array_type::<PackedValueTable>().length(&values, s, f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(publish, f);
+        let stored = s
+            .reserve_gc_local::<StoredValue, Nullable>(f)
+            .initialize_null(s, f);
+        value.tag().load(f);
+        f.instruction(&Instruction::I32Const(
+            WasmRuntimeValueTag::Undefined as i32,
+        ));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        stored.replace(s.stored_undefined(f).nullable(), f);
+        f.instruction(&Instruction::Else);
+        stored.replace(
+            s.struct_type::<StoredValue>()
+                .from_value(value, f)
+                .nullable(),
+            f,
+        );
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        s.release_i32_local(found, f);
-        storage.clear(f);
-        Ok(())
+        s.array_type::<PackedValueTable>().write(
+            &values,
+            slot,
+            GcOperand::reference(&stored, s),
+            s,
+            f,
+        );
+        stored.clear(f);
+        values.clear(f);
+    }
+
+    /// The caller has proved that index is the first unoccupied slot and
+    /// owns publication of length and count after the store.
+    fn emit_packed_append_within_capacity_or_branch(
+        &mut self,
+        array: &GcLocal<ArrayObject>,
+        index: I64Local,
+        value: &ValueLocals,
+        publish: crate::emit::ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let slot = s.reserve_i32_local(f);
+        index.load(f);
+        f.instruction(&Instruction::I32WrapI64);
+        slot.store(f);
+        s.array_storage_mode_is(array, ArrayIndexedStorageMode::PackedValues, f);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_packed_value_store_within_capacity_or_branch(array, slot, value, publish, f);
+        f.instruction(&Instruction::Else);
+        // The packed admission left only PackedNumbers. Changing its value
+        // type requires the existing promotion path.
+        value.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(publish, f);
+        let (numbers, presence) = self.packed_backings(array, f);
+        slot.load(f);
+        s.array_type::<NumberBitsI64Array>().length(&numbers, s, f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(publish, f);
+        let word = s.reserve_i32_local(f);
+        let mask = s.reserve_i64_local(f);
+        let bits = s.reserve_i64_local(f);
+        self.packed_presence(&presence, slot, word, mask, bits, f);
+        s.array_type::<NumberBitsI64Array>().write(
+            &numbers,
+            slot,
+            GcOperand::i64_local(value.scalar()),
+            s,
+            f,
+        );
+        bits.load(f);
+        mask.load(f);
+        f.instruction(&Instruction::I64Or);
+        bits.store(f);
+        s.array_type::<NumberPresenceU64Array>().write(
+            &presence,
+            word,
+            GcOperand::i64_local(bits),
+            s,
+            f,
+        );
+        s.release_i64_local(bits, f);
+        s.release_i64_local(mask, f);
+        s.release_i32_local(word, f);
+        presence.clear(f);
+        numbers.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(slot, f);
     }
 
     fn packed_backings(
