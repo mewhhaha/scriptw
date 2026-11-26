@@ -57,11 +57,13 @@ on AMD Ryzen 7 7800X3D (CPUs 0–1, 4 GiB cap, exact stdout verified;
 [Method and limits](docs/rust-rewrite/benchmarks.md#process-density) ·
 [data](docs/rust-rewrite/process-density-current.json).
 
-### React Server Components (2026-11-17)
+### React Server Components (2026-11-26, Runtime ABI 92)
 
-**React 19.3.1 RSC** (`697c47c22eb0`, 4-vCPU Xeon cloud host, 100 warmups + 101 timed retained requests, exact Flight output): Scriptw Speed **0.269 / 0.294 ms** vs Node 24 / V8 **0.166 / 0.178 ms** (sync / async; [details](docs/rust-rewrite/benchmarks.md#react-server-components) · [data](docs/rust-rewrite/rsc-current.json)).
+![React 19.3.1 Server Components: Scriptw ABI 92 vs Node 24 / V8](docs/rust-rewrite/assets/local-20261126/rsc-runtime.svg)
 
-![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
+[Full 2026-11-26 RSC table](docs/rust-rewrite/benchmarks.md#react-1931-server-components-retained-flight-vs-node-24190) ·
+[earlier 2026-11-17 cloud RSC panel](docs/rust-rewrite/benchmarks.md#react-server-components) ·
+[cloud data](docs/rust-rewrite/rsc-current.json).
 
 <details>
 <summary>Earlier cloud comparison panels (2026-11-17, Xeon 4-vCPU)</summary>

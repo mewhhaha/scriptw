@@ -3323,3 +3323,18 @@ Precompiled fresh-Realm execution medians (warmups excluded; exact stdout verifi
 | Scriptw vs Node 24 / V8 JavaScript (5w) | 17 | **16 / 17** | **0.257× (3.89× faster)** | 0.009×–1.18× |
 | Scriptw vs Node 24 / V8 JavaScript (80w) | 17 | **15 / 17** | **0.157× (6.36× faster)** | 0.008×–1.19× |
 | JS → Wasm compile: Scriptw vs Porffor | 17 | **17 / 17** | **0.543× (1.84× faster)** | 0.453×–0.640× |
+
+### React 19.3.1 Server Components (retained Flight vs Node 24.19.0)
+
+Same-source `rsc.js` bundle (`SHA-256 2d272dda1c759db2daeab5a9ce08506621db98084cc1738cebfcc52ed47c9334`, React / React DOM / `react-server-dom-webpack` 19.3.1) run in a balanced 2-block reversed schedule of **8 fresh processes per actor and case**, **100 checked warmups** and **101 timed retained Flight requests** each (`rsc_baseline` vs `react-driver.cjs retained-module`, `SCRIPTW_JOBS=1`, `NODE_DISABLE_COMPILE_CACHE=1`, exact Flight SHA-256 verified on every call, pinned CPUs 0–1, 4 GiB / 0 swap cap):
+
+| Case | Actor | Median [min–max] | Mean | p95 | Scriptw ÷ V8 | Steady RSS |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| **Sync Flight** (`rsc-sync`) | **Scriptw Speed (ABI 92)** | **0.183 ms** [0.180–0.413] | **0.193 ms** | 0.248 ms | **1.21×** | 339.2 MiB |
+| **Sync Flight** (`rsc-sync`) | Scriptw Fast (ABI 92) | 0.547 ms [0.540–0.828] | 0.557 ms | 0.615 ms | 3.61× | 249.9 MiB |
+| **Sync Flight** (`rsc-sync`) | Node 24.19.0 / V8 (JIT) | 0.151 ms [0.144–0.157] | 0.193 ms | 0.215 ms | 1.00× | — |
+| **Async Flight** (`rsc-async`) | **Scriptw Speed (ABI 92)** | **0.206 ms** [0.204–0.230] | **0.217 ms** | 0.270 ms | **1.28×** | 339.0 MiB |
+| **Async Flight** (`rsc-async`) | Scriptw Fast (ABI 92) | 0.597 ms [0.584–0.745] | 0.609 ms | 0.667 ms | 3.70× | 271.1 MiB |
+| **Async Flight** (`rsc-async`) | Node 24.19.0 / V8 (JIT) | 0.161 ms [0.153–0.263] | 0.180 ms | 0.233 ms | 1.00× | — |
+
+Compared to the earlier 2026-11-17 Xeon cloud cohort (`1.62×` sync, `1.65×` async), ABI 92 Scriptw Speed narrows the gap against 100-warmup V8 JIT to **1.21× sync** (matching V8's `0.193 ms` mean) and **1.28× async**.
