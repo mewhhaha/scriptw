@@ -5,6 +5,27 @@ use crate::gc_types::{
     SymbolValueSchema,
 };
 
+const FNV1A_OFFSET_BASIS: i64 = -3750763034362895579;
+const FNV1A_PRIME: i64 = 1099511628211;
+const MURMUR3_FINALIZER_STAGES: [(i64, i64); 2] =
+    [(33, -49064778989728563i64), (33, -4265267296055464877i64)];
+
+/// Compile-time equivalent of `emit_string_key_hash` followed by
+/// `emit_key_hash_constant_tag_mix(WasmRuntimeValueTag::String)`.
+pub(crate) fn string_property_key_hash(text: &str) -> i64 {
+    let mut hash = FNV1A_OFFSET_BASIS as u64;
+    for unit in scriptw_ir::decode_js_string_utf16(text) {
+        hash ^= u64::from(unit);
+        hash = hash.wrapping_mul(FNV1A_PRIME as u64);
+    }
+    hash ^= i64::from(WasmRuntimeValueTag::String.tag()) as u64;
+    for (shift, multiplier) in MURMUR3_FINALIZER_STAGES {
+        hash = (hash ^ (hash >> (shift as u32))).wrapping_mul(multiplier as u64);
+    }
+    hash ^= hash >> 33;
+    hash as i64
+}
+
 impl FunctionBuilder<'_> {
     pub(crate) fn emit_property_key_hash(
         &mut self,
@@ -61,7 +82,7 @@ impl FunctionBuilder<'_> {
         count.store(f);
         f.instruction(&Instruction::I32Const(0));
         index.store(f);
-        f.instruction(&Instruction::I64Const(-3750763034362895579));
+        f.instruction(&Instruction::I64Const(FNV1A_OFFSET_BASIS));
         hash.store(f);
         let exit = self.open_frame(ControlFrameKind::Block, f);
         let repeat = self.open_frame(ControlFrameKind::Loop, f);
@@ -76,7 +97,7 @@ impl FunctionBuilder<'_> {
         unit.load(f);
         f.instruction(&Instruction::I64ExtendI32U);
         f.instruction(&Instruction::I64Xor);
-        f.instruction(&Instruction::I64Const(1099511628211));
+        f.instruction(&Instruction::I64Const(FNV1A_PRIME));
         f.instruction(&Instruction::I64Mul);
         hash.store(f);
         index.load(f);
@@ -147,7 +168,7 @@ impl FunctionBuilder<'_> {
     }
 
     fn emit_key_hash_finish(hash: I64Local, f: &mut Function) {
-        for (shift, multiplier) in [(33, -49064778989728563i64), (33, -4265267296055464877i64)] {
+        for (shift, multiplier) in MURMUR3_FINALIZER_STAGES {
             hash.load(f);
             hash.load(f);
             f.instruction(&Instruction::I64Const(shift));

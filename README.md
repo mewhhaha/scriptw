@@ -32,18 +32,18 @@ Test262 publication still use `--release`
 
 ## Benchmarks
 
-The older cloud panels below were measured on **2026-11-17** (`d2948d619`, fingerprint `697c47c22eb0`) and **2026-11-25** (`5ed84a21a`) on a shared four-vCPU cloud machine (Intel Xeon, 2.30 GHz) with Node 24.22.1. A separate **2026-11-26** local cohort (AMD Ryzen 7 7800X3D, pinned CPUs 0–1, 4 GiB cap, Node 24.19.0 / V8 13.6.233.17-node.51, Porffor 0.61.13, compiler `26b3ef6e5f75`) is summarized first; compare engines within one cohort, not across machines.
+The older cloud panels below were measured on **2026-11-17** (`d2948d619`, fingerprint `697c47c22eb0`) and **2026-11-25** (`5ed84a21a`) on a shared four-vCPU cloud machine (Intel Xeon, 2.30 GHz) with Node 24.22.1. A separate **2026-11-26** local cohort (AMD Ryzen 7 7800X3D, pinned CPUs 0–1, 4 GiB cap, Node 24.19.0 / V8 13.6.233.17-node.51, Porffor 0.61.13, compiler `ed27e234152d`, Runtime ABI 92) is summarized first; compare engines within one cohort, not across machines.
 [Benchmark details](docs/rust-rewrite/benchmarks.md) hold the full tables, methods and limits.
 
 ### Latest local benchmarks (2026-11-26)
 
 | Suite (pinned CPUs 0–1, 4 GiB cap) | Scriptw vs Node 24 / V8 | Scriptw vs Porffor 0.61.13 |
 | --- | --- | --- |
-| **CLI cold start** (`scriptw run`, warm cache, 5 fixtures) | **5/5 faster**, **0.224×** geomean (**4.5× faster**; 3.06–4.07 ms vs 14.9–16.5 ms) | — |
-| **Fresh-Realm setup** (instantiation vs `vm.createContext`, 6 edge) | **6/6 faster**, **0.168×** geomean (**5.9× faster**; 37.5–40.4 µs vs 187–269 µs) | — |
-| **Edge kernels** (0-warmup AOT fresh Realm, 6 fixtures) | **6/6 faster total** (**0.799×** vs 80w, **0.692×** vs 5w); **5/6 faster exec** vs 80w (**0.728×**, **1.37× faster**), **6/6** vs 5w (**0.636×**) | Porffor fails **6/6** edge fixtures |
-| **Runtime kernels** (`original17`, precompiled fresh Realm) | **16/17 faster exec**, **0.330×** geomean (**3.0× faster**); **13/13** faster total on baseline subset | **12/13 faster** on Wasmtime (**0.167×**, **6.0× faster**); **13/13** on Node/V8 Wasm (**0.084×**, **11.9× faster**); Porffor fails **4/17** |
-| **JS → Wasm compilation** (`original17`, 4 fresh runs each) | — | **17/17 faster**, **0.725×** geomean (**1.38× faster**; 63.9–67.9 ms vs 86.8–93.4 ms) |
+| **CLI cold start** (`scriptw run`, warm cache, 5 fixtures) | **5/5 faster**, **0.227×** geomean (**4.41× faster**; 2.90–4.29 ms vs 15.37–17.67 ms) | — |
+| **Fresh-Realm startup floor** (`startup.js`, precompiled) | **8.28 µs** exec (**−28.6%** vs ABI 91's 11.59 µs; 191.86 µs total) | — |
+| **Edge kernels** (precompiled fresh Realm, 6 fixtures) | **6/6 faster exec** vs 80w (**0.745×**, **1.34× faster**); **5/6** vs 5w (**0.725×**, **1.38× faster**) | Porffor fails **6/6** edge fixtures |
+| **Runtime kernels** (`original17`, precompiled fresh Realm) | **16/17 faster exec** vs 5w (**0.257×**, **3.89× faster**); **15/17** vs 80w (**0.157×**, **6.36× faster**) | **13/13 faster** on Node/V8 Wasm (**0.078×**, **12.8× faster**); **12/13** in initial Wasmtime sweep (**0.157×**, **6.38× faster**; **13/13** after 31-sample `join-mixed-1024` re-check at 30.37 vs 33.13 µs); Porffor fails **4/17** |
+| **JS → Wasm compilation** (`original17`, 4 fresh runs each) | — | **17/17 faster**, **0.543×** geomean (**1.84× faster**; 53.3–73.2 ms vs 94.5–155.7 ms) |
 
 See [full 2026-11-26 tables and measurement boundaries](docs/rust-rewrite/benchmarks.md#2026-11-26-local-benchmarks-edge-cold-start-and-porffor).
 
@@ -220,7 +220,7 @@ Latest full engine suite (**2026-11-17**, source `2957071d1`): 4,266 tests and t
   their peaks add up); compile untrusted source under an OS memory limit and a
   deadline
   ([details](docs/rust-rewrite/runtime-requirements.md#compile-memory)).
-- **Runtime ABI 91:** rebuild Portable bundles and native images built under an
+- **Runtime ABI 92:** rebuild Portable bundles and native images built under an
   earlier ABI ([details](docs/rust-rewrite/runtime-requirements.md#runtime-abi)).
 
 [Development and verification](CONTRIBUTING.md) ·

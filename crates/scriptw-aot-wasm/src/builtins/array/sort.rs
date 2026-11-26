@@ -72,6 +72,22 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
+        // For a 2-element snapshot, branching to `unordered` just proved
+        // list[0] > list[1] with `left` = list[0] and `right` = list[1].
+        // Swap in place without allocating scratch or re-comparing.
+        count.load(f);
+        f.instruction(&Instruction::I64Const(2));
+        f.instruction(&Instruction::I64Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        cursor.set_constant(0, f);
+        s.array_type::<ValueArray>()
+            .write(&list, cursor, GcOperand::reference(&right, s), s, f);
+        cursor.set_constant(1, f);
+        s.array_type::<ValueArray>()
+            .write(&list, cursor, GcOperand::reference(&left, s), s, f);
+        self.emit_branch_to_target(sorted, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         count.load(f);
         f.instruction(&Instruction::I32WrapI64);
         cursor.store(f);

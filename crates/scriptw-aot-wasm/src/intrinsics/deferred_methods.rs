@@ -521,9 +521,9 @@ impl FunctionBuilder<'_> {
         s.field(DeferredDemandConstructorSchema::CONSTRUCTOR)
             .read(&recipe, s, &mut f)
             .store(constructor, &mut f);
-        for identity in crate::heap::DemandConstructor::ALL {
+        for identity in crate::heap::DemandGlobalRecipe::all() {
             constructor.load(&mut f);
-            f.instruction(&Instruction::I32Const(identity.word() as i32));
+            f.instruction(&Instruction::I32Const(identity.word()));
             f.instruction(&Instruction::I32Eq);
             self.open_frame(ControlFrameKind::If, &mut f);
             let stored =

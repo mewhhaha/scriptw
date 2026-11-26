@@ -82,7 +82,7 @@ states what admits that image.
 
 ## Runtime ABI
 
-The runtime ABI is **91**. Portable bundles and native images built under an
+The runtime ABI is **92**. Portable bundles and native images built under an
 earlier ABI must be rebuilt. ABIs 58 to 77 added per-site read, write,
 `instanceof` and global read records, a dictionary position hint on Strings,
 further native call entries, one JSON output accumulator, compact shape
@@ -122,8 +122,16 @@ segments map copy-on-write from a memory image
 with recipe inputs cleared upon observation), widens `InlineCompactDataStorage`
 from two to four inline fields, adds the immutable `CompactDataShape.LACKS_TO_JSON`
 witness, expands direct local-argument native builtin entries to 55 builtins,
-and switches `CollectionHashTable` sizing to power-of-two bitmasking.
-`LAYOUT_VERSION` in
+and switches `CollectionHashTable` sizing to power-of-two bitmasking. ABI 92
+defers 51 additional Realm intrinsics and namespaces (`DemandPrototype`,
+`DemandDynamicFunction`, `DemandBoxedPrototype`, `DemandHostFunction`,
+`DemandNamespace`, and `Object`/`Function`/`String` constructors via
+`DemandGlobalRecipe` and `RealmEnsureConstructor`, leaving 1 eager constructor
+and 5 eager `IntrinsicPropertyStorage` layouts at Realm birth), passes
+compile-time precomputed property-key hashes into `FreshDataPropertiesPublish`,
+adds the `StringConcatStringNumber` leaf helper, and lowers guarded inline
+2-arg `Math.min`/`Math.max`, 1-arg `String`/`Number`, and within-capacity 1-arg
+`Array.prototype.push` directly in P. `LAYOUT_VERSION` in
 `crates/scriptw-aot-wasm/src/runtime_artifact.rs` records each step.
 
 ### Locals and GC roots

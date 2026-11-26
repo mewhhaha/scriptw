@@ -6,21 +6,18 @@ use super::*;
 impl FunctionBuilder<'_> {
     pub(super) fn emit_json_parse_string(
         &mut self,
-        text: &GcLocal<StringValue>,
-        index: I64Local,
-        length: I64Local,
+        cursor: &JsonCursor<'_>,
         realm: &GcLocal<RealmRecord>,
         message: RuntimeErrorMessage,
         f: &mut Function,
     ) -> Result<GcLocal<StringValue>, EmitError> {
         let s = self.runtime_schema();
-        self.emit_json_expect_unit(text, index, length, 34, realm, message, f)?;
-        let cursor = JsonCursor::open(text, index, length, s, f);
+        cursor.expect_unit(34, realm, message, self, f)?;
         let unit = s.reserve_i32_local(f);
         let start = s.reserve_i32_local(f);
         cursor.at.load(f);
         start.store(f);
-        self.emit_json_string_run(&cursor, unit, f);
+        self.emit_json_string_run(cursor, unit, f);
         let result = s
             .reserve_gc_local::<StringValue, Nullable>(f)
             .initialize_null(s, f);
@@ -28,25 +25,14 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(34));
         f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
-        let from = s.reserve_i64_local(f);
-        let to = s.reserve_i64_local(f);
-        start.load(f);
-        f.instruction(&Instruction::I64ExtendI32U);
-        from.store(f);
-        cursor.at.load(f);
-        f.instruction(&Instruction::I64ExtendI32U);
-        to.store(f);
-        result.replace(self.emit_gc_string_slice(text, from, to, f).nullable(), f);
-        s.release_i64_local(to, f);
-        s.release_i64_local(from, f);
+        result.replace(cursor.slice_string(start, cursor.at, self, f)?.nullable(), f);
         cursor.advance(f);
         f.instruction(&Instruction::Else);
-        let decoded = self.emit_json_escaped_string(&cursor, start, unit, realm, message, f)?;
+        let decoded = self.emit_json_escaped_string(cursor, start, unit, realm, message, f)?;
         result.replace(decoded.load(s, f).nullable(), f);
         decoded.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        cursor.close(index, s, f);
         let string = s
             .reserve_gc_local(f)
             .initialize(result.load(s, f).require_non_null(f), f);
@@ -58,16 +44,23 @@ impl FunctionBuilder<'_> {
 
     /// Advances over units that stand for themselves and leaves the first
     /// other one (`"`, `\`, a control unit, or -1 at the end) in `unit`.
-    fn emit_json_string_run(&mut self, cursor: &JsonCursor, unit: I32Local, f: &mut Function) {
+    fn emit_json_string_run(&mut self, cursor: &JsonCursor<'_>, unit: I32Local, f: &mut Function) {
         let s = self.runtime_schema();
         let done = self.open_frame(ControlFrameKind::Block, f);
         let next = self.open_frame(ControlFrameKind::Loop, f);
-        cursor.peek(unit, s, f);
-        // unit + 1 < 33 holds exactly for -1 and U+0000..U+001F.
+        cursor.at.load(f);
+        cursor.end.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.open_frame(ControlFrameKind::If, f);
+        unit.set_constant(-1, f);
+        self.emit_branch_to_target(done, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.array_type::<CodeUnitArray>()
+            .read(&cursor.units, cursor.at, s, f)
+            .store(unit, f);
         unit.load(f);
-        f.instruction(&Instruction::I32Const(1));
-        f.instruction(&Instruction::I32Add);
-        f.instruction(&Instruction::I32Const(33));
+        f.instruction(&Instruction::I32Const(32));
         f.instruction(&Instruction::I32LtU);
         unit.load(f);
         f.instruction(&Instruction::I32Const(34));
@@ -92,7 +85,7 @@ impl FunctionBuilder<'_> {
     /// bounds the units written before the closing quote or the first error.
     fn emit_json_escaped_string(
         &mut self,
-        cursor: &JsonCursor,
+        cursor: &JsonCursor<'_>,
         start: I32Local,
         unit: I32Local,
         realm: &GcLocal<RealmRecord>,
@@ -220,7 +213,7 @@ impl FunctionBuilder<'_> {
     /// Decodes the escape after a consumed backslash into `decoded`.
     fn emit_json_escape(
         &mut self,
-        cursor: &JsonCursor,
+        cursor: &JsonCursor<'_>,
         unit: I32Local,
         decoded: I32Local,
         realm: &GcLocal<RealmRecord>,

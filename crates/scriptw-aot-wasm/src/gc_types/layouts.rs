@@ -154,7 +154,7 @@ closed_scalar_storage!(
     crate::heap::DateInitializationState,
     crate::heap::RegExpInitializationState,
     crate::heap::ErrorIntrinsicConstructor,
-    crate::heap::DemandConstructor,
+    crate::heap::DemandGlobalRecipe,
     crate::heap::DisposableStackState,
     crate::heap::AsyncDisposableStackState,
     crate::heap::DisposableStackEntryKind,
@@ -901,7 +901,7 @@ gc_layout_registry! {
         }
         struct DeferredDemandConstructor: PropertyValue => DeferredDemandConstructorSchema {
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
-            CONSTRUCTOR: crate::heap::DemandConstructor, Immutable, NonNullable;
+            CONSTRUCTOR: crate::heap::DemandGlobalRecipe, Immutable, NonNullable;
         }
         struct DeferredBinaryDataConstructor: PropertyValue => DeferredBinaryDataConstructorSchema {
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;

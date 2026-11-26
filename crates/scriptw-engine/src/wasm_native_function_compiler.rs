@@ -1,10 +1,11 @@
 //! Native compilation of already-converted Function source Strings in one Store.
 //! Entry/ABI and AOT factory consumers are required before this can be merged.
 
+use super::wasm_gc_host::TypedGcHostImport;
 use super::*;
 use scriptw_aot_wasm::GcHostImport;
 use scriptw_ir::{lower_runtime_function, DynamicFunctionKind};
-use wasmtime::{ExternType, RootScope, Val};
+use wasmtime::{RootScope, Val};
 
 mod factory;
 #[cfg(test)]
@@ -32,24 +33,15 @@ fn abi_error(message: impl std::fmt::Display) -> wasmtime::Error {
 
 pub(super) fn link(
     linker: &mut WasmtimeLinker<WasmHostState>,
-    module: &WasmtimeModule,
+    import: TypedGcHostImport<'_>,
 ) -> Result<(), EngineError> {
     let row = GcHostImport::CompileDynamicFunction;
-    let mut imports = module
-        .imports()
-        .filter(|import| import.module() == row.module() && import.name() == row.name());
-    let Some(import) = imports.next() else {
+    let Some(function) = import.into_func(
+        "duplicate native Function compiler import",
+        "native Function compiler import is not a function",
+    )?
+    else {
         return Ok(());
-    };
-    if imports.next().is_some() {
-        return Err(EngineError::new(
-            "duplicate native Function compiler import",
-        ));
-    }
-    let ExternType::Func(function) = import.ty() else {
-        return Err(EngineError::new(
-            "native Function compiler import is not a function",
-        ));
     };
     let signature = NativeFunctionSignature::validate(function).map_err(|error| {
         EngineError::new(format!("native Function compiler signature: {error:#}"))

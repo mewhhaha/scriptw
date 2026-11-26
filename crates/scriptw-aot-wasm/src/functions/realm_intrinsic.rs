@@ -141,7 +141,7 @@ impl FunctionBuilder<'_> {
         }
         let stored =
             self.emit_load_realm_intrinsic_stored_at_index(realm, slot.gc_index(), function);
-        if crate::heap::DemandConstructor::from_slot(slot).is_some() {
+        if crate::heap::is_demand_intrinsic_slot(slot) {
             self.emit_ensure_demand_constructor(realm, &stored, None, slot.gc_index(), function);
         }
         stored
@@ -403,5 +403,30 @@ impl FunctionBuilder<'_> {
         let prototype = value.cast_reference::<ArrayObject>(schema, function);
         value.clear(function);
         prototype
+    }
+
+    /// Reads a non-Array Realm intrinsic without invoking demand initialization,
+    /// branching to `uninitialized` when the slot still holds the Undefined
+    /// placeholder (or any non-object). Call-free speculative paths such as the
+    /// property-read hit entry use this and hand uninitialized slots to the miss
+    /// kernel.
+    pub(crate) fn emit_try_load_ready_non_array_realm_intrinsic_or_branch(
+        &mut self,
+        realm: &GcLocal<RealmRecord>,
+        slot: NonArrayRealmIntrinsicSlot,
+        result: &ValueLocals,
+        uninitialized: crate::emit::ControlTarget,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        let stored =
+            self.emit_load_realm_intrinsic_stored_at_index(realm, slot.gc_index(), function);
+        schema
+            .struct_type::<StoredValue>()
+            .read_into(&stored, result, schema, function);
+        stored.clear(function);
+        crate::gc_types::emit_tag_in(result.tag(), crate::gc_types::OBJECT_TAGS, function);
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(uninitialized, function);
     }
 }

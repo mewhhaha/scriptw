@@ -1,9 +1,10 @@
 //! Real independent global Script compilation inside the existing native Store.
+use super::wasm_gc_host::TypedGcHostImport;
 use super::*;
 use crate::wasm_native_source_compiler::{Family, NativeSourceCompilerContext, Phase};
 use scriptw_aot_wasm::GcHostImport;
 use scriptw_ir::lower_runtime_global_script;
-use wasmtime::{ExternType, RootScope, Val};
+use wasmtime::{RootScope, Val};
 
 mod factory;
 #[cfg(test)]
@@ -29,24 +30,15 @@ fn abi_error(message: impl std::fmt::Display) -> wasmtime::Error {
 
 pub(super) fn link(
     linker: &mut WasmtimeLinker<WasmHostState>,
-    module: &WasmtimeModule,
+    import: TypedGcHostImport<'_>,
 ) -> Result<(), EngineError> {
     let row = GcHostImport::CompileGlobalScript;
-    let mut imports = module
-        .imports()
-        .filter(|i| i.module() == row.module() && i.name() == row.name());
-    let Some(import) = imports.next() else {
+    let Some(function) = import.into_func(
+        "duplicate native global Script compiler import",
+        "native global Script compiler import is not a function",
+    )?
+    else {
         return Ok(());
-    };
-    if imports.next().is_some() {
-        return Err(EngineError::new(
-            "duplicate native global Script compiler import",
-        ));
-    }
-    let ExternType::Func(function) = import.ty() else {
-        return Err(EngineError::new(
-            "native global Script compiler import is not a function",
-        ));
     };
     let signature = NativeGlobalScriptSignature::validate(function)
         .map_err(|e| EngineError::new(format!("native global Script compiler signature: {e:#}")))?;

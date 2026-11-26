@@ -127,8 +127,20 @@ fn array_species_create_emitter_has_all_seven_array_callers() {
         1
     );
     assert_eq!(
+        ARRAY_SOURCE
+            .matches("pub(super) fn emit_array_species_create_with_default_flag(")
+            .count(),
+        1
+    );
+    assert_eq!(
         ARRAY_SOURCE.matches("emit_array_species_create(").count(),
-        4
+        3
+    );
+    assert_eq!(
+        ARRAY_SOURCE
+            .matches("self.emit_array_species_create_with_default_flag(")
+            .count(),
+        2
     );
 
     assert_eq!(
@@ -140,13 +152,13 @@ fn array_species_create_emitter_has_all_seven_array_callers() {
 
     assert_eq!(
         CALLBACK_ITERATION_SOURCE
-            .matches("self.emit_array_species_create(")
+            .matches("self.emit_array_species_create_with_default_flag(")
             .count(),
         2
     );
     for kind in ["Map", "Filter"] {
         assert!(CALLBACK_ITERATION_SOURCE.contains(&format!(
-            "ArrayCallbackIterationKind::{kind} => {{\n                self.emit_array_species_create("
+            "ArrayCallbackIterationKind::{kind} => self.emit_array_species_create_with_default_flag("
         )));
     }
     assert_eq!(CALLBACK_ITERATION_SOURCE.matches(SPECIES_READ).count(), 0);
@@ -175,7 +187,12 @@ fn array_species_create_emitter_has_all_seven_array_callers() {
         "    fn compile_array_splice_output(",
         "    pub(crate) fn compile_array_prototype_join_builtin(",
     );
-    assert_eq!(slice.matches("self.emit_array_species_create(").count(), 1);
+    assert_eq!(
+        slice
+            .matches("self.emit_array_species_create_with_default_flag(")
+            .count(),
+        1
+    );
     assert_eq!(splice.matches("self.emit_array_species_create(").count(), 1);
     assert!(splice.contains(
         "ArraySpliceOutput::Receiver => {\n                self.emit_array_species_create("

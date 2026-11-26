@@ -724,7 +724,11 @@ enum_i32_codec!(crate::heap::ErrorInitializationState; Dormant => 0, Building =>
 enum_i32_codec!(crate::heap::DateInitializationState; Dormant => 0, Building => 1, Ready => 2);
 enum_i32_codec!(crate::heap::RegExpInitializationState; Dormant => 0, Building => 1, Ready => 2);
 enum_i32_codec!(crate::heap::ErrorIntrinsicConstructor; Error => 0, EvalError => 1, AggregateError => 2, SuppressedError => 3, RangeError => 4, SyntaxError => 5, TypeError => 6, URIError => 7, ReferenceError => 8, DOMException => 9);
-enum_i32_codec!(crate::heap::DemandConstructor; Proxy => 0, Iterator => 1, Number => 2, Boolean => 3, Promise => 4, Map => 5, WeakMap => 6, WeakRef => 7, FinalizationRegistry => 8, WeakSet => 9, AsyncDisposableStack => 10, DisposableStack => 11, AbortController => 12, AbortSignal => 13, EventTarget => 14, Event => 15, TextEncoder => 16, TextDecoder => 17, Set => 18, Symbol => 19, BigInt => 20, ShadowRealm => 21, ReadableStream => 22, ReadableStreamDefaultReader => 23, ReadableByteStreamController => 24, AbstractModuleSource => 25);
+impl GcI32Constant for crate::heap::DemandGlobalRecipe {
+    fn encode(self) -> i32 {
+        self.word()
+    }
+}
 enum_i32_codec!(crate::heap::BinaryDataInitializationState; Dormant => 0, Building => 1, Ready => 2);
 enum_i32_codec!(crate::heap::BinaryDataConstructor; ArrayBuffer => 0, SharedArrayBuffer => 1, DataView => 2, Float64Array => 3, Float32Array => 4, Float16Array => 5, Int32Array => 6, Int16Array => 7, Int8Array => 8, Uint32Array => 9, Uint16Array => 10, Uint8Array => 11, Uint8ClampedArray => 12, BigInt64Array => 13, BigUint64Array => 14);
 enum_i32_codec!(crate::heap::PromiseReactionType; Fulfill => 1, Reject => 2);

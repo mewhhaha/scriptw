@@ -16,6 +16,15 @@ use wasmtime_environ::StaticModuleIndex;
 use wasmtime_environ::{CompiledTrap, lookup_trap_code, obj};
 use wasmtime_unwinder::ExceptionTable;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PublishState {
+    Unpublished,
+    Published,
+    /// A permission transition failed and could not be rolled back cleanly;
+    /// neither execution nor mutable `text_mut` access is permitted.
+    Failed,
+}
+
 /// Management of executable memory within a `MmapVec`
 ///
 /// This type consumes ownership of a region of memory and will manage the
@@ -26,7 +35,8 @@ pub struct CodeMemory {
     unwind_registration: Option<crate::runtime::vm::UnwindRegistration>,
     #[cfg(feature = "debug-builtins")]
     debug_registration: Option<crate::runtime::vm::GdbJitImageRegistration>,
-    published: bool,
+    publish_state: PublishState,
+    custom_published: bool,
     registered: bool,
     enable_branch_protection: bool,
     needs_executable: bool,
@@ -52,6 +62,14 @@ pub struct CodeMemory {
 
 impl Drop for CodeMemory {
     fn drop(&mut self) {
+        // Drop the registrations before `custom_unpublish` and `self.mmap` so
+        // even if a custom unpublish callback fails or panics, unwind and
+        // debug records are already deregistered before `self.mmap` is unmapped.
+        #[cfg(has_host_compiler_backend)]
+        let _ = self.unwind_registration.take();
+        #[cfg(feature = "debug-builtins")]
+        let _ = self.debug_registration.take();
+
         // If there is a custom code memory handler, restore the
         // original (non-executable) state of the memory.
         //
@@ -59,18 +77,12 @@ impl Drop for CodeMemory {
         // want to skip the mprotect() if we natively own the mmap and
         // are going to munmap soon anyway.
         if let Some(mem) = self.custom_code_memory.as_ref() {
-            if self.published && self.needs_executable {
+            if self.custom_published && self.needs_executable {
                 let text = self.text();
                 mem.unpublish_executable(text.as_ptr(), text.len())
                     .expect("Executable memory unpublish failed");
             }
         }
-
-        // Drop the registrations before `self.mmap` since they (implicitly) refer to it.
-        #[cfg(has_host_compiler_backend)]
-        let _ = self.unwind_registration.take();
-        #[cfg(feature = "debug-builtins")]
-        let _ = self.debug_registration.take();
     }
 }
 
@@ -257,7 +269,8 @@ impl CodeMemory {
             unwind_registration: None,
             #[cfg(feature = "debug-builtins")]
             debug_registration: None,
-            published: false,
+            publish_state: PublishState::Unpublished,
+            custom_published: false,
             registered: false,
             enable_branch_protection: enable_branch_protection
                 .ok_or_else(|| format_err!("missing `{}` section", obj::ELF_WASM_BTI))?,
@@ -413,12 +426,17 @@ impl CodeMemory {
     /// The action may be reversed by calling [`Self::unpublish`], as long
     /// as that method's safety requirements are upheld.
     pub fn publish(&mut self) -> Result<()> {
-        assert!(!self.published);
-        self.published = true;
+        assert_eq!(self.publish_state, PublishState::Unpublished);
 
         if self.text().is_empty() {
+            self.publish_state = PublishState::Published;
             return Ok(());
         }
+
+        // Transition into `Failed` while modifying page protections so a
+        // partial failure (or panic) cannot expose mixed permissions as either
+        // published executable code or writable `text_mut` memory.
+        self.publish_state = PublishState::Failed;
 
         // The unsafety here comes from a few things:
         //
@@ -428,7 +446,8 @@ impl CodeMemory {
         //   correctness of the information in the first place. This applies to
         //   both the actual unwinding tables as well as the validity of the
         //   pointers we pass in itself.
-        unsafe {
+        let was_registered = self.registered;
+        let result: Result<()> = (|| unsafe {
             // Next freeze the contents of this image by making all of the
             // memory readonly. Nothing after this point should ever be modified
             // so commit everything. For a compiled-in-memory image this will
@@ -440,21 +459,55 @@ impl CodeMemory {
             // Note that if virtual memory is disabled this is skipped because
             // we aren't able to make it readonly, but this is just a
             // defense-in-depth measure and isn't required for correctness.
+            //
+            // Scriptw patch: when publishing a page-aligned `.text` section
+            // through native virtual memory, freeze only the small non-text
+            // prefix/suffix as readonly and transition `.text` directly from RW
+            // to RX in one pass instead of walking the full multi-megabyte
+            // `.text` page tables twice.
             #[cfg(has_virtual_memory)]
-            if self.mmap.supports_virtual_memory() {
-                self.mmap.make_readonly(0..self.mmap.len())?;
+            let split_text_publish = self.needs_executable
+                && self.custom_code_memory.is_none()
+                && self.mmap.supports_virtual_memory()
+                && {
+                    let page_size = crate::runtime::vm::host_page_size();
+                    self.text.start % page_size == 0
+                        && (self.text.end % page_size == 0 || self.text.end == self.mmap.len())
+                };
+
+            #[cfg(has_virtual_memory)]
+            if split_text_publish {
+                if self.text.start > 0 {
+                    self.mmap.make_readonly(0..self.text.start)?;
+                }
+                if self.text.end < self.mmap.len() {
+                    self.mmap.make_readonly(self.text.end..self.mmap.len())?;
+                }
+                self.mmap
+                    .make_executable(self.text.clone(), self.enable_branch_protection)
+                    .context("unable to make memory executable")?;
+            } else {
+                if self.mmap.supports_virtual_memory() {
+                    self.mmap.make_readonly(0..self.mmap.len())?;
+                }
+
+                // Switch the executable portion from readonly to read/execute.
+                if self.needs_executable {
+                    if !self.custom_publish()? {
+                        if !self.mmap.supports_virtual_memory() {
+                            bail!("this target requires virtual memory to be enabled");
+                        }
+                        self.mmap
+                            .make_executable(self.text.clone(), self.enable_branch_protection)
+                            .context("unable to make memory executable")?;
+                    }
+                }
             }
 
-            // Switch the executable portion from readonly to read/execute.
+            #[cfg(not(has_virtual_memory))]
             if self.needs_executable {
-                if !self.custom_publish()? {
-                    if !self.mmap.supports_virtual_memory() {
-                        bail!("this target requires virtual memory to be enabled");
-                    }
-                    #[cfg(has_virtual_memory)]
-                    self.mmap
-                        .make_executable(self.text.clone(), self.enable_branch_protection)
-                        .context("unable to make memory executable")?;
+                if !self.custom_publish()? && !self.mmap.supports_virtual_memory() {
+                    bail!("this target requires virtual memory to be enabled");
                 }
             }
 
@@ -469,14 +522,45 @@ impl CodeMemory {
                 self.register_debug_image()?;
                 self.registered = true;
             }
+
+            Ok(())
+        })();
+
+        if let Err(err) = result {
+            if !was_registered && !self.registered {
+                #[cfg(has_host_compiler_backend)]
+                let _ = self.unwind_registration.take();
+                #[cfg(feature = "debug-builtins")]
+                let _ = self.debug_registration.take();
+            }
+            let mut rolled_back = true;
+            if self.custom_published {
+                if self.custom_unpublish().is_err() {
+                    rolled_back = false;
+                }
+            }
+            #[cfg(has_virtual_memory)]
+            if rolled_back && self.mmap.supports_virtual_memory() {
+                if unsafe { self.mmap.make_readwrite(0..self.mmap.len()) }.is_err() {
+                    rolled_back = false;
+                }
+            }
+            if rolled_back {
+                self.publish_state = PublishState::Unpublished;
+            }
+            return Err(err);
         }
 
+        self.publish_state = PublishState::Published;
         Ok(())
     }
 
     fn custom_publish(&mut self) -> Result<bool> {
-        if let Some(mem) = self.custom_code_memory.as_ref() {
-            let text = self.text();
+        if let Some(mem) = self.custom_code_memory.clone() {
+            let (text_ptr, text_len) = {
+                let text = self.text();
+                (text.as_ptr(), text.len())
+            };
             // The text section should be aligned to
             // `custom_code_memory.required_alignment()` due to a
             // combination of two invariants:
@@ -484,13 +568,17 @@ impl CodeMemory {
             // - MmapVec aligns its start address, even in owned-Vec mode; and
             // - The text segment inside the ELF image will be aligned according
             //   to the platform's requirements.
-            let text_addr = text.as_ptr() as usize;
+            let text_addr = text_ptr as usize;
             assert_eq!(text_addr & (mem.required_alignment() - 1), 0);
 
+            // Record the custom cleanup obligation before invoking the hook:
+            // if the hook changes permissions and then fails (e.g. during
+            // icache coherence), rollback and Drop must still unpublish it.
+            self.custom_published = true;
             // The custom code memory handler will ensure the
             // memory is executable and also handle icache
             // coherence.
-            mem.publish_executable(text.as_ptr(), text.len())?;
+            mem.publish_executable(text_ptr, text_len)?;
             Ok(true)
         } else {
             Ok(false)
@@ -511,15 +599,36 @@ impl CodeMemory {
     ///
     /// If this fails, then the memory remains executable.
     pub fn unpublish(&mut self) -> Result<()> {
-        assert!(self.published);
-        self.published = false;
+        assert_eq!(self.publish_state, PublishState::Published);
 
         if self.text().is_empty() {
+            self.publish_state = PublishState::Unpublished;
             return Ok(());
         }
 
-        if self.custom_unpublish()? {
-            return Ok(());
+        if self.custom_code_memory.is_some() {
+            // Transition through Failed so a panic or unrecoverable failure
+            // inside the custom hook never leaves Published or Unpublished set.
+            self.publish_state = PublishState::Failed;
+            match self.custom_unpublish() {
+                Ok(true) => {
+                    self.publish_state = PublishState::Unpublished;
+                    return Ok(());
+                }
+                Ok(false) => {
+                    self.publish_state = PublishState::Published;
+                }
+                Err(err) => {
+                    // A custom unpublish hook gives no guarantee about
+                    // permissions on error; try to restore executable
+                    // permissions before returning a recoverable error, and
+                    // keep Failed if restoration fails.
+                    if self.custom_publish().is_ok() {
+                        self.publish_state = PublishState::Published;
+                    }
+                    return Err(err);
+                }
+            }
         }
 
         if !self.mmap.supports_virtual_memory() {
@@ -530,10 +639,15 @@ impl CodeMemory {
         // we have exclusive access to this code and can change its
         // permissions (removing the execute bit) without causing
         // problems.
+        // Mark Failed before changing protections so a partial VM error cannot
+        // leave Published set after text has already lost execute permission.
+        self.publish_state = PublishState::Failed;
         #[cfg(has_virtual_memory)]
         unsafe {
             self.mmap.make_readwrite(0..self.mmap.len())?;
         }
+
+        self.publish_state = PublishState::Unpublished;
 
         // Note that we do *not* unregister: we expect unpublish
         // to be used for temporary edits, so we want the
@@ -544,13 +658,22 @@ impl CodeMemory {
     }
 
     fn custom_unpublish(&mut self) -> Result<bool> {
-        if let Some(mem) = self.custom_code_memory.as_ref() {
-            let text = self.text();
-            mem.unpublish_executable(text.as_ptr(), text.len())?;
+        if let Some(mem) = self.custom_code_memory.clone() {
+            let (text_ptr, text_len) = {
+                let text = self.text();
+                (text.as_ptr(), text.len())
+            };
+            mem.unpublish_executable(text_ptr, text_len)?;
+            self.custom_published = false;
             Ok(true)
         } else {
             Ok(false)
         }
+    }
+
+    #[cfg(feature = "debug")]
+    pub(crate) fn is_published(&self) -> bool {
+        self.publish_state == PublishState::Published
     }
 
     /// Return a mutable borrow to the code, suitable for editing.
@@ -562,8 +685,8 @@ impl CodeMemory {
     /// This method panics if the code has been published (and not
     /// subsequently unpublished).
     pub fn text_mut(&mut self) -> &mut [u8] {
-        assert!(!self.published);
-        // SAFETY: we assert !published, which means we either have
+        assert_eq!(self.publish_state, PublishState::Unpublished);
+        // SAFETY: we assert Unpublished, which means we either have
         // not yet applied readonly + execute permissions, or we have
         // undone that and flipped back to read-write via unpublish.
         unsafe { &mut self.mmap.as_mut_slice()[self.text.clone()] }

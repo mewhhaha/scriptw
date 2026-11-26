@@ -229,6 +229,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::IntegerDecimalString
             | RuntimeHelperId::StringConcat
             | RuntimeHelperId::StringConcatThree
+            | RuntimeHelperId::StringConcatStringNumber
             | RuntimeHelperId::PooledStringsInitialize
             | RuntimeHelperId::GlobalLexicalDeclarationCheck
             | RuntimeHelperId::GlobalVarDeclarationCheck

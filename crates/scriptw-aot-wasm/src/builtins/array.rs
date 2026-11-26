@@ -3762,9 +3762,24 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(handled, f);
         s.release_f64_local(direct_result, f);
         f.instruction(&Instruction::Else);
+        left.tag().load(f);
+        f.instruction(&Instruction::I32Const(ValueKind::String.tag() as i32));
+        f.instruction(&Instruction::I32Eq);
+        right.tag().load(f);
+        f.instruction(&Instruction::I32Const(ValueKind::String.tag() as i32));
+        f.instruction(&Instruction::I32Eq);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        let l = s
+            .reserve_gc_local(f)
+            .initialize(left.cast_reference::<crate::gc_types::StringValue>(s, f), f);
+        let r = s
+            .reserve_gc_local(f)
+            .initialize(right.cast_reference::<crate::gc_types::StringValue>(s, f), f);
+        f.instruction(&Instruction::Else);
         self.emit_value_to_string_payload(&left, &comparison, f)?;
         self.emit_array_native_propagate(&comparison, f);
-        let l = s.reserve_gc_local(f).initialize(
+        l.replace(
             comparison
                 .value()
                 .cast_reference::<crate::gc_types::StringValue>(s, f),
@@ -3772,12 +3787,14 @@ impl FunctionBuilder<'_> {
         );
         self.emit_value_to_string_payload(&right, &comparison, f)?;
         self.emit_array_native_propagate(&comparison, f);
-        let r = s.reserve_gc_local(f).initialize(
+        r.replace(
             comparison
                 .value()
                 .cast_reference::<crate::gc_types::StringValue>(s, f),
             f,
         );
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         self.emit_string_payload_utf16_compare_i32(&l, &r, f);
         f.instruction(&Instruction::I32Const(0));
         f.instruction(&Instruction::I32GtS);

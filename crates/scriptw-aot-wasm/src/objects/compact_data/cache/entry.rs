@@ -1586,7 +1586,13 @@ impl FunctionBuilder<'_> {
             }
             let realm: GcLocal<RealmRecord> = self.load_current_realm(f);
             let intrinsic = s.reserve_value_local(f);
-            self.emit_load_non_array_realm_intrinsic(&realm, slot, &intrinsic, f);
+            self.emit_try_load_ready_non_array_realm_intrinsic_or_branch(
+                &realm,
+                slot,
+                &intrinsic,
+                miss,
+                f,
+            );
             realm.clear(f);
             let header = self.emit_realm_prototype_header_or_branch(&intrinsic, miss, f);
             intrinsic.clear(f);
@@ -1713,7 +1719,13 @@ impl FunctionBuilder<'_> {
         }
         let realm: GcLocal<RealmRecord> = self.load_current_realm(f);
         let intrinsic = s.reserve_value_local(f);
-        self.emit_load_non_array_realm_intrinsic(&realm, slot, &intrinsic, f);
+        self.emit_try_load_ready_non_array_realm_intrinsic_or_branch(
+            &realm,
+            slot,
+            &intrinsic,
+            miss,
+            f,
+        );
         realm.clear(f);
         let table = self.emit_realm_prototype_header_or_branch(&intrinsic, miss, f);
         intrinsic.clear(f);

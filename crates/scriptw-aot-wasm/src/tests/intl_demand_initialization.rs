@@ -3,7 +3,7 @@ use super::*;
 use crate::functions::NonArrayRealmIntrinsicSlot as Slot;
 use crate::gc_types::{
     DeferredIntlNamespace, FinalizedRuntimeModule, GcHeapType, GcNullability, GcSnapshotField,
-    GlobalLedger, IntrinsicTable, NonNullable, Nullable, OrdinaryObject, PropertyValue,
+    GlobalLedger, IntrinsicTable, NonNullable, Nullable, PropertyValue,
     RealmRecord, RealmRecordSchema, RuntimeModuleTypes, RuntimeSchema, StoredValue,
 };
 use crate::heap::IntlInitializationState;
@@ -284,9 +284,9 @@ fn canonical_runtime_defers_the_complete_intl_graph_and_preserves_its_typed_abi(
     else {
         panic!("eager bootstrap has an actual registered signature");
     };
-    assert_eq!(
-        signature.results(),
-        [reference(type_index::<OrdinaryObject>(schema), true); 4]
+    assert!(
+        signature.results().is_empty(),
+        "eager bootstrap returns nothing; all standard namespaces remain defining-Realm recipes"
     );
 
     for module in [bytes, artifact.bytes.as_slice()] {

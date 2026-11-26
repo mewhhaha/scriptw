@@ -9,7 +9,7 @@ use crate::{
     SupportedValuesKey, SupportedValuesList, SupportedValuesSetupError,
 };
 use sha2::{Digest, Sha256};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 mod execution;
 
@@ -45,6 +45,18 @@ impl PartialEq for IntlCompilationBytes {
 }
 impl Eq for IntlCompilationBytes {}
 
+#[derive(Debug)]
+enum SupportedValuesStore {
+    Eager([Option<Arc<SupportedValuesList>>; 6]),
+    LazyBuild {
+        bytes: IntlCompilationBytes,
+        /// Eagerly validated `(start, end, count)` slices inside `bytes` for
+        /// each `SupportedValuesKey`, decoded on first lookup.
+        ranges: [(usize, usize, usize); 6],
+        decoded: [OnceLock<Arc<SupportedValuesList>>; 6],
+    },
+}
+
 /// Actual frame identity and consumer-admitted constant catalogues, without
 /// requiring formatter/provider ownership during compilation or non-Intl runs.
 #[derive(Debug)]
@@ -53,7 +65,7 @@ pub struct IntlCompilationData {
     identity: IntlDataIdentity,
     services: Option<CheckedIntlServiceSelection>,
     frames: Vec<(IntlDataComponent, IntlCompilationBytes)>,
-    values: [Option<Arc<SupportedValuesList>>; 6],
+    values: SupportedValuesStore,
 }
 impl IntlCompilationData {
     pub(crate) fn from_selected(
@@ -80,7 +92,7 @@ impl IntlCompilationData {
                 .into_iter()
                 .map(|(component, bytes)| (component, IntlCompilationBytes::Shared(bytes)))
                 .collect(),
-            values,
+            values: SupportedValuesStore::Eager(values),
         })
     }
     pub fn identity(&self) -> &IntlDataIdentity {
@@ -99,10 +111,35 @@ impl IntlCompilationData {
         &self,
         key: SupportedValuesKey,
     ) -> Result<Arc<SupportedValuesList>, SupportedValuesSetupError> {
-        self.values[key.index()]
-            .as_ref()
-            .map(Arc::clone)
-            .ok_or(SupportedValuesSetupError::UnavailableData(key))
+        match &self.values {
+            SupportedValuesStore::Eager(values) => values[key.index()]
+                .as_ref()
+                .map(Arc::clone)
+                .ok_or(SupportedValuesSetupError::UnavailableData(key)),
+            SupportedValuesStore::LazyBuild {
+                bytes,
+                ranges,
+                decoded,
+            } => {
+                let list = decoded[key.index()].get_or_init(|| {
+                    let (start, end, count) = ranges[key.index()];
+                    let mut r = Reader(&bytes.as_ref()[start..end]);
+                    let mut list: Vec<Box<str>> = Vec::with_capacity(count);
+                    for _ in 0..count {
+                        let value = r
+                            .text()
+                            .expect("validated build supported-values metadata");
+                        list.push(value.into());
+                    }
+                    debug_assert!(r.0.is_empty());
+                    Arc::new(SupportedValuesList::from_build_catalogue(
+                        list.into_boxed_slice(),
+                        self.identity.clone(),
+                    ))
+                });
+                Ok(Arc::clone(list))
+            }
+        }
     }
 }
 
@@ -201,13 +238,15 @@ impl IntlDataSelection {
         build: crate::ImmutableIntlBuildData<IntlDataComponent>,
     ) -> Result<Self, IntlBundleExportError> {
         let (metadata, source, frames) = build.into_parts();
-        Self::from_minimal_compilation_data(Arc::new(decode_metadata(
+        let decoded = decode_metadata(
             metadata,
             source,
             frames,
             FrameValidation::AdmittedAtBuild,
-        )?))
-        .ok_or(IntlBundleExportError::Identity)
+            IntlCompilationBytes::Build,
+        )?;
+        Self::from_minimal_compilation_data(Arc::new(decoded))
+            .ok_or(IntlBundleExportError::Identity)
     }
 }
 
@@ -224,14 +263,21 @@ fn decode_build_metadata(
     source: &[u8; 32],
     frames: Vec<(IntlDataComponent, &'static [u8])>,
 ) -> Result<IntlCompilationData, IntlBundleExportError> {
-    decode_metadata(metadata, source, frames, FrameValidation::AtUse)
+    decode_metadata(
+        metadata,
+        source,
+        frames,
+        FrameValidation::AtUse,
+        |tail| IntlCompilationBytes::Shared(Arc::from(tail)),
+    )
 }
 
-fn decode_metadata(
-    metadata: &[u8],
+fn decode_metadata<'a>(
+    metadata: &'a [u8],
     source: &[u8; 32],
     frames: Vec<(IntlDataComponent, &'static [u8])>,
     frame_validation: FrameValidation,
+    wrap_values: impl FnOnce(&'a [u8]) -> IntlCompilationBytes,
 ) -> Result<IntlCompilationData, IntlBundleExportError> {
     let (identity, mut r) = execution::identity_prefix(metadata, source)?;
     if frames.len() != IntlDataComponent::ALL.len() {
@@ -256,27 +302,28 @@ fn decode_metadata(
         }
         admitted.push((component, IntlCompilationBytes::Build(bytes)));
     }
-    let mut values = std::array::from_fn(|_| None);
+    let values_tail = r.0;
+    let tail_len = values_tail.len();
+    let mut ranges = [(0usize, 0usize, 0usize); 6];
     for key in SupportedValuesKey::ALL {
         let count = r.u32()?;
         if count > r.0.len() / 4 {
             return Err(IntlBundleExportError::TooLarge);
         }
-        let mut list: Vec<Box<str>> = Vec::with_capacity(count);
+        let start = tail_len - r.0.len();
+        let mut prev: Option<&str> = None;
         for _ in 0..count {
             let value = r.text()?;
-            if value.is_empty() || list.last().is_some_and(|last| last.as_ref() >= value) {
+            if value.is_empty() || prev.is_some_and(|last| last >= value) {
                 return Err(IntlBundleExportError::Identity);
             }
-            list.push(value.into());
+            prev = Some(value);
         }
-        if list.is_empty() && key != SupportedValuesKey::Collation {
+        if count == 0 && key != SupportedValuesKey::Collation {
             return Err(IntlBundleExportError::Identity);
         }
-        values[key.index()] = Some(Arc::new(SupportedValuesList::from_build_catalogue(
-            list.into_boxed_slice(),
-            identity.clone(),
-        )));
+        let end = tail_len - r.0.len();
+        ranges[key.index()] = (start, end, count);
     }
     if !r.0.is_empty() {
         return Err(IntlBundleExportError::Framing("trailing compiler metadata"));
@@ -286,14 +333,17 @@ fn decode_metadata(
         identity,
         services: None,
         frames: admitted,
-        values,
+        values: SupportedValuesStore::LazyBuild {
+            bytes: wrap_values(values_tail),
+            ranges,
+            decoded: std::array::from_fn(|_| OnceLock::new()),
+        },
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::OnceLock;
     const SOURCE: [u8; 32] = [17; 32];
     struct Fixture {
         metadata: Vec<u8>,
@@ -349,6 +399,8 @@ mod tests {
         }
         for key in SupportedValuesKey::ALL {
             let actual = parsed.supported_values(key).unwrap();
+            let cached = parsed.supported_values(key).unwrap();
+            assert!(Arc::ptr_eq(&actual, &cached));
             let expected = full.supported_values(key).unwrap();
             assert_eq!(actual.provider_identity(), expected.provider_identity());
             assert_eq!(actual.values(), expected.values());
@@ -379,6 +431,83 @@ mod tests {
         let mut trailing = f.metadata[..f.metadata.len() - 32].to_vec();
         trailing.push(0);
         assert!(decode_build_metadata(&resign(trailing), &SOURCE, f.frames.clone()).is_err());
+    }
+
+    #[test]
+    fn lazy_supported_values_still_rejects_unsorted_empty_and_invalid_utf8_eagerly() {
+        let f = fixture();
+        let (_, mut r) = execution::identity_prefix(&f.metadata, &SOURCE).unwrap();
+        for _ in IntlDataComponent::ALL {
+            let _ = r.take(2 + 4 + 32).unwrap();
+        }
+        let body_len = f.metadata.len() - 32;
+        let prefix_len = body_len - r.0.len();
+        let prefix = &f.metadata[..prefix_len];
+
+        let build_with_lists = |lists: [&[&[u8]]; 6]| {
+            let mut body = prefix.to_vec();
+            for list in lists {
+                body.extend_from_slice(&(list.len() as u32).to_le_bytes());
+                for item in list {
+                    body.extend_from_slice(&(item.len() as u32).to_le_bytes());
+                    body.extend_from_slice(item);
+                }
+            }
+            resign(body)
+        };
+
+        let valid: [&[&[u8]]; 6] = [
+            &[b"a".as_slice(), b"b".as_slice()],
+            &[],
+            &[b"USD".as_slice()],
+            &[b"latn".as_slice()],
+            &[b"UTC".as_slice()],
+            &[b"meter".as_slice()],
+        ];
+        assert!(decode_build_metadata(&build_with_lists(valid), &SOURCE, f.frames.clone()).is_ok());
+
+        // Unsorted list must fail eagerly at admission time.
+        let unsorted_slice = [b"b".as_slice(), b"a".as_slice()];
+        let mut unsorted = valid;
+        unsorted[0] = &unsorted_slice;
+        assert!(
+            decode_build_metadata(&build_with_lists(unsorted), &SOURCE, f.frames.clone()).is_err()
+        );
+
+        // Duplicate entry must fail eagerly at admission time.
+        let duplicate_slice = [b"a".as_slice(), b"a".as_slice()];
+        let mut duplicate = valid;
+        duplicate[0] = &duplicate_slice;
+        assert!(
+            decode_build_metadata(&build_with_lists(duplicate), &SOURCE, f.frames.clone()).is_err()
+        );
+
+        // Empty non-Collation list must fail eagerly at admission time.
+        let mut empty_calendar = valid;
+        empty_calendar[0] = &[];
+        assert!(decode_build_metadata(
+            &build_with_lists(empty_calendar),
+            &SOURCE,
+            f.frames.clone()
+        )
+        .is_err());
+
+        // Empty string entry must fail eagerly at admission time.
+        let empty_entry_slice = [b"".as_slice()];
+        let mut empty_entry = valid;
+        empty_entry[2] = &empty_entry_slice;
+        assert!(
+            decode_build_metadata(&build_with_lists(empty_entry), &SOURCE, f.frames.clone())
+                .is_err()
+        );
+
+        // Invalid UTF-8 entry must fail eagerly at admission time.
+        let bad_utf8_slice = [&[0xff][..]];
+        let mut bad_utf8 = valid;
+        bad_utf8[3] = &bad_utf8_slice;
+        assert!(
+            decode_build_metadata(&build_with_lists(bad_utf8), &SOURCE, f.frames.clone()).is_err()
+        );
     }
 
     #[test]

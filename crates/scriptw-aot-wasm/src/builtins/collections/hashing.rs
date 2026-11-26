@@ -12,6 +12,16 @@ impl FunctionBuilder<'_> {
         key.scalar().load(f);
         hash.store(f);
         key.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String.tag()));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        let text = s
+            .reserve_gc_local(f)
+            .initialize(key.cast_reference::<StringValue>(s, f), f);
+        self.emit_string_key_hash(&text, hash, f);
+        text.clear(f);
+        f.instruction(&Instruction::Else);
+        key.tag().load(f);
         f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number.tag()));
         f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
@@ -34,19 +44,37 @@ impl FunctionBuilder<'_> {
         hash.store(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        f.instruction(&Instruction::Else);
+        self.emit_is_heap_object_like_tag_i32(key.tag(), f);
+        self.open_frame(ControlFrameKind::If, f);
+        let header = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_object_header_projection(key, f), f);
+        s.struct_type::<OrdinaryObject>()
+            .field(OrdinaryObjectSchema::KEY_HASH_ID)
+            .read(&header, s, f)
+            .store_i64(hash, f);
+        hash.load(f);
+        f.instruction(&Instruction::I64Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        s.emit_next_collection_key_hash_id(hash, f);
+        s.struct_type::<OrdinaryObject>()
+            .field(OrdinaryObjectSchema::KEY_HASH_ID)
+            .write(&header, GcOperand::i64_local(hash), s, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        header.clear(f);
+        f.instruction(&Instruction::Else);
         key.tag().load(f);
-        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String.tag()));
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Symbol.tag()));
         f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
-        let text = s
+        let symbol = s
             .reserve_gc_local(f)
-            .initialize(key.cast_reference::<StringValue>(s, f), f);
-        self.emit_string_key_hash(&text, hash, f);
-        text.clear(f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
+            .initialize(key.cast_reference::<SymbolValue>(s, f), f);
+        self.emit_symbol_key_hash(&symbol, hash, f);
+        symbol.clear(f);
+        f.instruction(&Instruction::Else);
         key.tag().load(f);
         f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::BigInt.tag()));
         f.instruction(&Instruction::I32Eq);
@@ -108,36 +136,12 @@ impl FunctionBuilder<'_> {
         bigint.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        key.tag().load(f);
-        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Symbol.tag()));
-        f.instruction(&Instruction::I32Eq);
-        self.open_frame(ControlFrameKind::If, f);
-        let symbol = s
-            .reserve_gc_local(f)
-            .initialize(key.cast_reference::<SymbolValue>(s, f), f);
-        self.emit_symbol_key_hash(&symbol, hash, f);
-        symbol.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        self.emit_is_heap_object_like_tag_i32(key.tag(), f);
-        self.open_frame(ControlFrameKind::If, f);
-        let header = s
-            .reserve_gc_local(f)
-            .initialize(self.emit_object_header_projection(key, f), f);
-        s.struct_type::<OrdinaryObject>()
-            .field(OrdinaryObjectSchema::KEY_HASH_ID)
-            .read(&header, s, f)
-            .store_i64(hash, f);
-        hash.load(f);
-        f.instruction(&Instruction::I64Eqz);
-        self.open_frame(ControlFrameKind::If, f);
-        s.emit_next_collection_key_hash_id(hash, f);
-        s.struct_type::<OrdinaryObject>()
-            .field(OrdinaryObjectSchema::KEY_HASH_ID)
-            .write(&header, GcOperand::i64_local(hash), s, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        header.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.emit_key_hash_tag_mix(key, hash, f);

@@ -4,10 +4,7 @@
 //! This slice supports byte sources and default readers; BYOB, auto-allocation,
 //! generic streams, tee, piping and async iteration are separate work.
 use super::super::*;
-use crate::functions::{
-    NonArrayRealmIntrinsicSlot as Slot, OrdinaryDefaultPrototype,
-    RealmFunctionMaterializationContext,
-};
+use crate::functions::{NonArrayRealmIntrinsicSlot as Slot, OrdinaryDefaultPrototype};
 use crate::gc_types::*;
 use crate::heap::PromiseSettlement;
 use wasm_encoder::Ieee64;
@@ -68,48 +65,6 @@ pub(crate) const STREAM_POOL_STRINGS: &[&str] = &[
 ];
 
 impl FunctionBuilder<'_> {
-    pub(crate) fn emit_initialize_stream_intrinsics(
-        &mut self,
-        realm: &RealmFunctionMaterializationContext,
-        object_prototype: &ValueLocals,
-        f: &mut Function,
-    ) -> Result<(), EmitError> {
-        use crate::intrinsics::IntrinsicPropertyLayoutId as Layout;
-        // Each constructor is a crate::heap::DemandConstructor: its first
-        // canonical read, or its prototype's constructor row, builds it.
-        for (slot, layout) in [
-            (
-                Slot::ReadableStreamPrototype,
-                Layout::ReadableStreamPrototype,
-            ),
-            (
-                Slot::ReadableStreamDefaultReaderPrototype,
-                Layout::ReadableStreamDefaultReaderPrototype,
-            ),
-            (
-                Slot::ReadableByteStreamControllerPrototype,
-                Layout::ReadableByteStreamControllerPrototype,
-            ),
-        ] {
-            let s = self.runtime_schema();
-            let header = s.reserve_gc_local(f).initialize(
-                self.emit_alloc_intrinsic_layout_header(
-                    object_prototype,
-                    layout,
-                    realm.realm(),
-                    f,
-                )?,
-                f,
-            );
-            let prototype = s.reserve_value_local(f);
-            prototype.set_reference(&header, s, f);
-            self.emit_store_non_array_realm_intrinsic(realm.realm(), slot, &prototype, f);
-            prototype.clear(f);
-            header.clear(f);
-        }
-        Ok(())
-    }
-
     pub(crate) fn emit_stream_builtin(
         &mut self,
         builtin: StandardBuiltinId,

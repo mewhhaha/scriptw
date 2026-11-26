@@ -29,10 +29,6 @@ pub(crate) use temporal_initialization::TemporalIntrinsicBuild;
 pub(crate) struct BootstrapRealm {
     realm: RealmFunctionMaterializationContext,
     object_prototype: ValueLocals,
-    reflect: Option<ValueLocals>,
-    math: Option<ValueLocals>,
-    json: Option<ValueLocals>,
-    atomics: Option<ValueLocals>,
 }
 /// The canonical globals of every Realm the runtime creates. The string pool
 /// interns these names in its compiler-owned phase, so the bodies that install
@@ -74,12 +70,6 @@ pub(crate) fn created_realm_global_bindings() -> Vec<scriptw_ir::ScriptGlobalBin
 
 impl BootstrapRealm {
     fn clear(self, builder: &mut FunctionBuilder<'_>, function: &mut Function) {
-        for value in [self.atomics, self.json, self.math, self.reflect]
-            .into_iter()
-            .flatten()
-        {
-            value.clear(function);
-        }
         builder.release_realm_function_materialization_context(self.realm, function);
         self.object_prototype.clear(function);
     }
@@ -502,115 +492,97 @@ impl<'a> FunctionBuilder<'a> {
         )
     }
 
-    fn emit_bootstrap_dynamic_function_intrinsics(
+    pub(super) fn emit_bootstrap_dynamic_function_intrinsic(
         &mut self,
+        builtin: HostBuiltinId,
+        prototype_slot: NonArrayRealmIntrinsicSlot,
+        constructor_slot: NonArrayRealmIntrinsicSlot,
         realm: &RealmFunctionMaterializationContext,
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        for (builtin, prototype_slot, constructor_slot) in [
-            (
-                HostBuiltinId::GeneratorFunctionConstructor,
-                NonArrayRealmIntrinsicSlot::GeneratorFunctionPrototype,
-                NonArrayRealmIntrinsicSlot::GeneratorFunctionConstructor,
-            ),
-            (
-                HostBuiltinId::AsyncFunctionConstructor,
-                NonArrayRealmIntrinsicSlot::AsyncFunctionPrototype,
-                NonArrayRealmIntrinsicSlot::AsyncFunctionConstructor,
-            ),
-            (
-                HostBuiltinId::AsyncGeneratorFunctionConstructor,
-                NonArrayRealmIntrinsicSlot::AsyncGeneratorFunctionPrototype,
-                NonArrayRealmIntrinsicSlot::AsyncGeneratorFunctionConstructor,
-            ),
-        ] {
-            let meta = self
-                .functions
-                .get(&builtin.function_id())
-                .cloned()
-                .ok_or_else(|| {
-                    EmitError::unsupported(format!(
-                        "missing dynamic intrinsic {}",
-                        builtin.as_str()
-                    ))
-                })?;
-            let prototype = schema.reserve_value_local(function);
-            self.emit_load_non_array_realm_intrinsic(
-                realm.realm(),
-                prototype_slot,
-                &prototype,
+        let meta = self
+            .functions
+            .get(&builtin.function_id())
+            .cloned()
+            .ok_or_else(|| {
+                EmitError::unsupported(format!("missing dynamic intrinsic {}", builtin.as_str()))
+            })?;
+        let prototype = schema.reserve_value_local(function);
+        self.emit_load_non_array_realm_intrinsic(
+            realm.realm(),
+            prototype_slot,
+            &prototype,
+            function,
+        );
+        let constructor = schema
+            .reserve_gc_local::<FunctionObject, NonNullable>(function)
+            .initialize(
+                self.emit_realm_constructor_function_record(&meta, realm, function)?,
                 function,
             );
-            let constructor = schema
-                .reserve_gc_local::<FunctionObject, NonNullable>(function)
-                .initialize(
-                    self.emit_realm_constructor_function_record(&meta, realm, function)?,
-                    function,
-                );
-            let constructor_value = schema.reserve_value_local(function);
-            constructor_value.set_reference(&constructor, schema, function);
-            let header = schema
-                .reserve_gc_local::<OrdinaryObject, NonNullable>(function)
-                .initialize(
-                    self.emit_object_header_projection(&constructor_value, function),
-                    function,
-                );
-            let function_constructor = schema.reserve_value_local(function);
-            self.emit_load_non_array_realm_intrinsic(
-                realm.realm(),
-                NonArrayRealmIntrinsicSlot::FunctionConstructor,
-                &function_constructor,
+        let constructor_value = schema.reserve_value_local(function);
+        constructor_value.set_reference(&constructor, schema, function);
+        let header = schema
+            .reserve_gc_local::<OrdinaryObject, NonNullable>(function)
+            .initialize(
+                self.emit_object_header_projection(&constructor_value, function),
                 function,
             );
-            let parent = schema.reserve_gc_local(function).initialize(
-                schema.prototype_reference(&function_constructor, function),
+        let function_constructor = schema.reserve_value_local(function);
+        self.emit_load_non_array_realm_intrinsic(
+            realm.realm(),
+            NonArrayRealmIntrinsicSlot::FunctionConstructor,
+            &function_constructor,
+            function,
+        );
+        let parent = schema.reserve_gc_local(function).initialize(
+            schema.prototype_reference(&function_constructor, function),
+            function,
+        );
+        schema
+            .struct_type::<OrdinaryObject>()
+            .field(OrdinaryObjectSchema::PROTOTYPE)
+            .write(
+                &header,
+                GcOperand::reference(&parent, schema),
+                schema,
                 function,
             );
-            schema
-                .struct_type::<OrdinaryObject>()
-                .field(OrdinaryObjectSchema::PROTOTYPE)
-                .write(
-                    &header,
-                    GcOperand::reference(&parent, schema),
-                    schema,
-                    function,
-                );
-            parent.clear(function);
-            function_constructor.clear(function);
-            header.clear(function);
-            let stored = schema
-                .reserve_gc_local::<StoredValue, NonNullable>(function)
-                .initialize(
-                    schema
-                        .struct_type::<StoredValue>()
-                        .from_value(&prototype, function),
-                    function,
-                );
-            schema
-                .struct_type::<FunctionObject>()
-                .field(FunctionObjectSchema::PUBLIC_PROTOTYPE_CACHE)
-                .write(
-                    &constructor,
-                    GcOperand::reference(&stored, schema),
-                    schema,
-                    function,
-                );
-            stored.clear(function);
-            self.emit_store_non_array_realm_intrinsic(
-                realm.realm(),
-                constructor_slot,
-                &constructor_value,
+        parent.clear(function);
+        function_constructor.clear(function);
+        header.clear(function);
+        let stored = schema
+            .reserve_gc_local::<StoredValue, NonNullable>(function)
+            .initialize(
+                schema
+                    .struct_type::<StoredValue>()
+                    .from_value(&prototype, function),
                 function,
             );
-            constructor_value.clear(function);
-            constructor.clear(function);
-            prototype.clear(function);
-        }
+        schema
+            .struct_type::<FunctionObject>()
+            .field(FunctionObjectSchema::PUBLIC_PROTOTYPE_CACHE)
+            .write(
+                &constructor,
+                GcOperand::reference(&stored, schema),
+                schema,
+                function,
+            );
+        stored.clear(function);
+        self.emit_store_non_array_realm_intrinsic(
+            realm.realm(),
+            constructor_slot,
+            &constructor_value,
+            function,
+        );
+        constructor_value.clear(function);
+        constructor.clear(function);
+        prototype.clear(function);
         Ok(())
     }
 
-    fn emit_bootstrap_plain_prototype(
+    pub(super) fn emit_bootstrap_plain_prototype(
         &mut self,
         realm: &RealmFunctionMaterializationContext,
         slot: NonArrayRealmIntrinsicSlot,
@@ -636,7 +608,7 @@ impl<'a> FunctionBuilder<'a> {
         Ok(())
     }
 
-    fn emit_bootstrap_boxed_prototype(
+    pub(super) fn emit_bootstrap_boxed_prototype(
         &mut self,
         realm: &RealmFunctionMaterializationContext,
         slot: NonArrayRealmIntrinsicSlot,
@@ -701,7 +673,7 @@ impl<'a> FunctionBuilder<'a> {
         Ok(())
     }
 
-    fn emit_bootstrap_constructor_from_slot(
+    pub(super) fn emit_bootstrap_constructor_from_slot(
         &mut self,
         builtin: StandardBuiltinId,
         realm: &RealmFunctionMaterializationContext,
@@ -744,8 +716,6 @@ impl<'a> FunctionBuilder<'a> {
             function,
         )?;
         self.emit_store_realm_function_prototype(&context, function);
-        let function_prototype = schema.reserve_value_local(function);
-        function_prototype.set_reference(context.function_prototype(), schema, function);
         let reserved = self.reserve_realm_array_prototype_local(function);
         let array = self.emit_initialize_realm_array_prototype(
             reserved,
@@ -755,100 +725,16 @@ impl<'a> FunctionBuilder<'a> {
         )?;
         self.emit_store_realm_array_prototype(realm, array.array(), function);
         self.release_realm_array_prototype_local(array, function);
-        self.emit_bootstrap_plain_prototype(
-            &context,
-            NonArrayRealmIntrinsicSlot::IteratorPrototype,
-            &object_prototype,
-            function,
-        )?;
-        let parent = schema.reserve_value_local(function);
-        self.emit_load_non_array_realm_intrinsic(
-            realm,
-            NonArrayRealmIntrinsicSlot::IteratorPrototype,
-            &parent,
-            function,
-        );
-        for slot in [
-            NonArrayRealmIntrinsicSlot::IteratorHelperPrototype,
-            NonArrayRealmIntrinsicSlot::IteratorFromWrapperPrototype,
-            NonArrayRealmIntrinsicSlot::ArrayIteratorPrototype,
-            NonArrayRealmIntrinsicSlot::StringIteratorPrototype,
-            NonArrayRealmIntrinsicSlot::RegExpStringIteratorPrototype,
-            NonArrayRealmIntrinsicSlot::MapIteratorPrototype,
-            NonArrayRealmIntrinsicSlot::SetIteratorPrototype,
-            NonArrayRealmIntrinsicSlot::GeneratorPrototype,
-        ] {
-            self.emit_bootstrap_plain_prototype(&context, slot, &parent, function)?;
-        }
-        for slot in [
-            NonArrayRealmIntrinsicSlot::GeneratorFunctionPrototype,
-            NonArrayRealmIntrinsicSlot::AsyncFunctionPrototype,
-            NonArrayRealmIntrinsicSlot::AsyncGeneratorFunctionPrototype,
-        ] {
-            self.emit_bootstrap_plain_prototype(&context, slot, &function_prototype, function)?;
-        }
-        self.emit_bootstrap_plain_prototype(
-            &context,
-            NonArrayRealmIntrinsicSlot::AsyncIteratorPrototype,
-            &object_prototype,
-            function,
-        )?;
-        self.emit_load_non_array_realm_intrinsic(
-            realm,
-            NonArrayRealmIntrinsicSlot::AsyncIteratorPrototype,
-            &parent,
-            function,
-        );
-        self.emit_bootstrap_plain_prototype(
-            &context,
-            NonArrayRealmIntrinsicSlot::AsyncGeneratorPrototype,
-            &parent,
-            function,
-        )?;
-        for slot in [
-            NonArrayRealmIntrinsicSlot::PromisePrototype,
-            NonArrayRealmIntrinsicSlot::MapPrototype,
-            NonArrayRealmIntrinsicSlot::WeakMapPrototype,
-            NonArrayRealmIntrinsicSlot::WeakRefPrototype,
-            NonArrayRealmIntrinsicSlot::FinalizationRegistryPrototype,
-            NonArrayRealmIntrinsicSlot::WeakSetPrototype,
-            NonArrayRealmIntrinsicSlot::AsyncDisposableStackPrototype,
-            NonArrayRealmIntrinsicSlot::DisposableStackPrototype,
-            NonArrayRealmIntrinsicSlot::AbortControllerPrototype,
-            NonArrayRealmIntrinsicSlot::EventTargetPrototype,
-            NonArrayRealmIntrinsicSlot::EventPrototype,
-            NonArrayRealmIntrinsicSlot::TextEncoderPrototype,
-            NonArrayRealmIntrinsicSlot::TextDecoderPrototype,
-            NonArrayRealmIntrinsicSlot::SetPrototype,
-            NonArrayRealmIntrinsicSlot::SymbolPrototype,
-            NonArrayRealmIntrinsicSlot::BigIntPrototype,
-        ] {
-            self.emit_bootstrap_plain_prototype(&context, slot, &object_prototype, function)?;
-        }
-        self.emit_load_non_array_realm_intrinsic(
-            realm,
-            NonArrayRealmIntrinsicSlot::EventTargetPrototype,
-            &parent,
-            function,
-        );
-        self.emit_bootstrap_plain_prototype(
-            &context,
-            NonArrayRealmIntrinsicSlot::AbortSignalPrototype,
-            &parent,
-            function,
-        )?;
-        // DOMException.prototype inherits Error.prototype, so the Error
-        // family's demand owner builds it; reading Error.prototype here would
-        // build every Error intrinsic at Realm creation.
+        // Demand prototypes (Iterator*, Generator*, Async*, Promise, Map, Set,
+        // Weak*, Disposable*, Abort*, Event*, Text*, Symbol, BigInt, Number,
+        // Boolean, ShadowRealm, AbstractModuleSource, ModuleSource,
+        // ReadableStream*), dynamic function constructors, DemandConstructors
+        // (including Object, Function, String), parseInt/parseFloat,
+        // Reflect/Math/JSON/Atomics namespaces, Error/DOMException, Date,
+        // RegExp, BinaryData, Temporal and Intl are built on their first
+        // canonical read (see demand_constructors). %String.prototype% stays
+        // eager because Realm protector arming records its storage at birth.
         let primitive = schema.reserve_value_local(function);
-        primitive.set_scalar(ScalarValue::NumberBits(0), function);
-        self.emit_bootstrap_boxed_prototype(
-            &context,
-            NonArrayRealmIntrinsicSlot::NumberPrototype,
-            &object_prototype,
-            &primitive,
-            function,
-        )?;
         let empty_string = schema
             .reserve_gc_local::<StringValue, NonNullable>(function)
             .initialize(self.emit_interned_string_reference("", function)?, function);
@@ -861,61 +747,8 @@ impl<'a> FunctionBuilder<'a> {
             function,
         )?;
         empty_string.clear(function);
-        primitive.set_scalar(ScalarValue::Boolean(false), function);
-        self.emit_bootstrap_boxed_prototype(
-            &context,
-            NonArrayRealmIntrinsicSlot::BooleanPrototype,
-            &object_prototype,
-            &primitive,
-            function,
-        )?;
         primitive.clear(function);
-        self.emit_bootstrap_constructor_from_slot(
-            StandardBuiltinId::FunctionConstructor,
-            &context,
-            NonArrayRealmIntrinsicSlot::FunctionPrototype,
-            function,
-        )?;
         self.init_throw_type_error_intrinsic(&context, function)?;
-        for builtin in [HostBuiltinId::ParseInt, HostBuiltinId::ParseFloat] {
-            if self.functions.get(&builtin.function_id()).is_some() {
-                let callable =
-                    self.emit_intrinsic_canonical_host_callable(builtin, &context, function)?;
-                callable.clear(function);
-            }
-        }
-        self.emit_bootstrap_dynamic_function_intrinsics(&context, function)?;
-        self.emit_bootstrap_constructor_from_slot(
-            StandardBuiltinId::ObjectConstructor,
-            &context,
-            NonArrayRealmIntrinsicSlot::ObjectPrototype,
-            function,
-        )?;
-        if self
-            .runtime_bootstrap_plan
-            .should_initialize_standard_builtin(StandardBuiltinId::AbstractModuleSourceConstructor)
-        {
-            self.emit_initialize_abstract_module_source_intrinsic(
-                &context,
-                &object_prototype,
-                function,
-            )?;
-        }
-        if self
-            .runtime_bootstrap_plan
-            .should_initialize_standard_builtin(StandardBuiltinId::ShadowRealmConstructor)
-        {
-            self.emit_initialize_shadow_realm_intrinsic(&context, &object_prototype, function)?;
-        }
-        if self
-            .runtime_bootstrap_plan
-            .should_initialize_standard_builtin(StandardBuiltinId::ReadableStreamConstructor)
-        {
-            self.emit_initialize_stream_intrinsics(&context, &object_prototype, function)?;
-        }
-        // Proxy, Iterator, ShadowRealm, AbstractModuleSource, the stream
-        // constructors and the others in crate::heap::DemandConstructor are
-        // built by their first canonical read (see demand_constructors).
         if self
             .runtime_bootstrap_plan
             .should_initialize_standard_builtin(StandardBuiltinId::ArrayConstructor)
@@ -939,45 +772,15 @@ impl<'a> FunctionBuilder<'a> {
             prototype.clear(function);
             array.clear(function);
         }
-        for (builtin, slot) in [(
-            StandardBuiltinId::StringConstructor,
-            NonArrayRealmIntrinsicSlot::StringPrototype,
-        )] {
-            if self
-                .runtime_bootstrap_plan
-                .should_initialize_standard_builtin(builtin)
-            {
-                self.emit_bootstrap_constructor_from_slot(builtin, &context, slot, function)?;
-            }
-        }
-        parent.clear(function);
-        function_prototype.clear(function);
         self.emit_arm_realm_protectors(
             realm,
             &object_prototype,
             context.function_prototype(),
             function,
         )?;
-        let plan = self.runtime_bootstrap_plan.clone();
-        let reflect = (plan.full_standard_globals || plan.reflect_object)
-            .then(|| self.init_reflect_object(&context, &object_prototype, function))
-            .transpose()?;
-        let math = (plan.full_standard_globals || plan.math_object)
-            .then(|| self.init_math_object(&context, &object_prototype, function))
-            .transpose()?;
-        let json = (plan.full_standard_globals || plan.json_object)
-            .then(|| self.init_json_object(&context, &object_prototype, function))
-            .transpose()?;
-        let atomics = (plan.full_standard_globals || plan.atomics_object)
-            .then(|| self.init_atomics_object(&context, &object_prototype, function))
-            .transpose()?;
         Ok(BootstrapRealm {
             realm: context,
             object_prototype,
-            reflect,
-            math,
-            json,
-            atomics,
         })
     }
 
@@ -1138,42 +941,42 @@ impl<'a> FunctionBuilder<'a> {
                     callable.clear(function);
                     None
                 }
-                GlobalPropertyInitializerIr::ReflectObject => {
-                    value.copy_from(
-                        bootstrap.reflect.as_ref().ok_or_else(|| {
-                            EmitError::unsupported("planned reflect namespace was not constructed")
-                        })?,
+                GlobalPropertyInitializerIr::ReflectObject => Some(
+                    self.emit_deferred_demand_recipe_value(
+                        crate::heap::DemandGlobalRecipe::Namespace(
+                            crate::heap::DemandNamespace::Reflect,
+                        ),
+                        &bootstrap.realm,
                         function,
-                    );
-                    None
-                }
-                GlobalPropertyInitializerIr::MathObject => {
-                    value.copy_from(
-                        bootstrap.math.as_ref().ok_or_else(|| {
-                            EmitError::unsupported("planned math namespace was not constructed")
-                        })?,
+                    )?,
+                ),
+                GlobalPropertyInitializerIr::MathObject => Some(
+                    self.emit_deferred_demand_recipe_value(
+                        crate::heap::DemandGlobalRecipe::Namespace(
+                            crate::heap::DemandNamespace::Math,
+                        ),
+                        &bootstrap.realm,
                         function,
-                    );
-                    None
-                }
-                GlobalPropertyInitializerIr::JsonObject => {
-                    value.copy_from(
-                        bootstrap.json.as_ref().ok_or_else(|| {
-                            EmitError::unsupported("planned json namespace was not constructed")
-                        })?,
+                    )?,
+                ),
+                GlobalPropertyInitializerIr::JsonObject => Some(
+                    self.emit_deferred_demand_recipe_value(
+                        crate::heap::DemandGlobalRecipe::Namespace(
+                            crate::heap::DemandNamespace::Json,
+                        ),
+                        &bootstrap.realm,
                         function,
-                    );
-                    None
-                }
-                GlobalPropertyInitializerIr::AtomicsObject => {
-                    value.copy_from(
-                        bootstrap.atomics.as_ref().ok_or_else(|| {
-                            EmitError::unsupported("planned atomics namespace was not constructed")
-                        })?,
+                    )?,
+                ),
+                GlobalPropertyInitializerIr::AtomicsObject => Some(
+                    self.emit_deferred_demand_recipe_value(
+                        crate::heap::DemandGlobalRecipe::Namespace(
+                            crate::heap::DemandNamespace::Atomics,
+                        ),
+                        &bootstrap.realm,
                         function,
-                    );
-                    None
-                }
+                    )?,
+                ),
                 GlobalPropertyInitializerIr::TemporalObject => {
                     // Deleting or replacing the property cannot recreate it.
                     let recipe = schema.reserve_gc_local(function).initialize(
@@ -1226,8 +1029,8 @@ impl<'a> FunctionBuilder<'a> {
                     } else if let Some(demand) =
                         crate::heap::DemandConstructor::from_builtin(*builtin)
                     {
-                        Some(self.emit_deferred_demand_constructor_value(
-                            demand,
+                        Some(self.emit_deferred_demand_recipe_value(
+                            crate::heap::DemandGlobalRecipe::Constructor(demand),
                             &bootstrap.realm,
                             function,
                         )?)
@@ -1275,7 +1078,13 @@ impl<'a> FunctionBuilder<'a> {
                     }
                 }
                 GlobalPropertyInitializerIr::HostFunction(builtin) => {
-                    if canonical_host_function_realm_slot(*builtin).is_some() {
+                    if let Some(demand) = crate::heap::DemandHostFunction::from_builtin(*builtin) {
+                        Some(self.emit_deferred_demand_recipe_value(
+                            crate::heap::DemandGlobalRecipe::HostFunction(demand),
+                            &bootstrap.realm,
+                            function,
+                        )?)
+                    } else if canonical_host_function_realm_slot(*builtin).is_some() {
                         let callable = self.emit_intrinsic_canonical_host_callable(
                             *builtin,
                             &bootstrap.realm,
@@ -1283,6 +1092,7 @@ impl<'a> FunctionBuilder<'a> {
                         )?;
                         value.set_reference(&callable, schema, function);
                         callable.clear(function);
+                        None
                     } else {
                         let meta = self
                             .functions
@@ -1303,8 +1113,8 @@ impl<'a> FunctionBuilder<'a> {
                             );
                         value.set_reference(&callable, schema, function);
                         callable.clear(function);
+                        None
                     }
-                    None
                 }
             };
             let property_value = match deferred {

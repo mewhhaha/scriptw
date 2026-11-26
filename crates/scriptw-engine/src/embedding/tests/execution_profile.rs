@@ -25,7 +25,7 @@ const TRUE_KIND_FIXTURES: &[(&str, &str, Option<ReadSpecialisation>, u64)] = &[
     ),
     (
         "own array",
-        "function probe(o) { return o.x; } var t = 0; for (var i = 0; i < 64; i++) t += probe({ a: 1, b: 2, c: 3, x: i }); t;",
+        "function probe(o) { return o.x; } var t = 0; for (var i = 0; i < 64; i++) t += probe({ a: 1, b: 2, c: 3, d: 4, x: i }); t;",
         Some(ReadSpecialisation::OwnCompact(CompactStorageLayout::Array)),
         64,
     ),
@@ -39,7 +39,7 @@ const TRUE_KIND_FIXTURES: &[(&str, &str, Option<ReadSpecialisation>, u64)] = &[
     ),
     (
         "absent array",
-        "function probe(o) { return o.x; } var t = 0; for (var i = 0; i < 64; i++) if (probe({ a: 1, b: 2, c: i }) === undefined) t++; t;",
+        "function probe(o) { return o.x; } var t = 0; for (var i = 0; i < 64; i++) if (probe({ a: 1, b: 2, c: 3, d: 4, e: i }) === undefined) t++; t;",
         Some(ReadSpecialisation::AbsentClosedTail(
             CompactStorageLayout::Array,
         )),
@@ -284,14 +284,14 @@ fn check_fixture(name: &str, source: &str) -> Trained {
     assert_eq!(decoded.encode(), encoded, "{name}: canonical encoding");
     let admitted = AdmittedProfile::admit(&decoded, &scriptw_aot_wasm::ProgramKey::new(key))
         .unwrap_or_else(|error| panic!("{name}: {error}"));
-    // The probe's own inline hit already proves an own array slot, so
-    // that kind is not guarded again.
+    // The probe's own inline hit already proves an own compact slot of either
+    // layout, so those kinds are not guarded again.
     let hot = reads
         .iter()
         .filter(|read| {
             read.executions >= 8
                 && read.dominant.is_some_and(|kind| {
-                    kind != ReadSpecialisation::OwnCompact(CompactStorageLayout::Array)
+                    !matches!(kind, ReadSpecialisation::OwnCompact(_))
                 })
         })
         .count();
@@ -824,7 +824,7 @@ fn check_exactness(name: &str, body: &str, surface: HostSurfacePolicy) -> Vec<St
             "{name}: true profile ({kind:?}) {applied} against {expected}"
         ));
     }
-    if applied_fuel >= unprofiled_fuel {
+    if !matches!(kind, Some(ReadSpecialisation::OwnCompact(_))) && applied_fuel >= unprofiled_fuel {
         problems.push(format!(
             "{name}: the trained {kind:?} guard does not hit before the mutation ({applied_fuel} fuel against {unprofiled_fuel})"
         ));

@@ -3324,30 +3324,6 @@ impl Engine {
         cache: Option<Arc<cache::FunctionCache>>,
         role: module_loader::EmbeddedSourceRole,
     ) -> Result<ProgramWasmArtifact, EngineError> {
-        // A graph-free ambient Script without `import`, `ShadowRealm`, or
-        // Unicode escapes can never acquire a module graph, so a cached entry
-        // keyed on `graph == None` is exact and avoids parsing JS on warm hits.
-        let mut pre_parse_checked_key = None;
-        if let Some(cache) = &cache {
-            if goal == ParseGoal::Script
-                && matches!(
-                    options.module_loading_policy,
-                    ModuleLoadingPolicy::Filesystem | ModuleLoadingPolicy::RejectAll
-                )
-                && options.module_prelude.is_none()
-                && !source.contains("import")
-                && !source.contains("ShadowRealm")
-                && !source.contains("\\u")
-            {
-                let key = program_cache_key_for_role(source, goal, &options, None, role);
-                if let Some(key) = key {
-                    if let Some(artifact) = Self::load_cached_program_wasm(cache, key, &options) {
-                        return Ok(artifact);
-                    }
-                    pre_parse_checked_key = Some(key);
-                }
-            }
-        }
         let parsed = self.parse_compilation_for_role(source, goal, &options, role)?;
         // A candidate is the exact graph just admitted by the current loader,
         // including dependency bytes, resolutions, options and compiler image.
@@ -3358,11 +3334,9 @@ impl Engine {
         let candidate_key = cache.as_ref().and_then(|_| {
             program_cache_key_for_role(source, goal, &options, parsed.modules.graph(), role)
         });
-        if candidate_key != pre_parse_checked_key {
-            if let (Some(cache), Some(key)) = (&cache, candidate_key) {
-                if let Some(artifact) = Self::load_cached_program_wasm(cache, key, &options) {
-                    return Ok(artifact);
-                }
+        if let (Some(cache), Some(key)) = (&cache, candidate_key) {
+            if let Some(artifact) = Self::load_cached_program_wasm(cache, key, &options) {
+                return Ok(artifact);
             }
         }
 

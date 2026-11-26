@@ -12,6 +12,7 @@ pub(super) struct GlobalBindingPublication {
     keys: GcLocal<PooledStringTable>,
     values: GcLocal<IntrinsicPropertyValueCache>,
     flags: Vec<i32>,
+    hashes: Vec<i64>,
     count: usize,
     row: I32Local,
 }
@@ -55,6 +56,7 @@ impl GlobalBindingPublication {
             keys,
             values,
             flags: Vec::with_capacity(count),
+            hashes: Vec::with_capacity(count),
             count,
             row,
         })
@@ -96,6 +98,8 @@ impl GlobalBindingPublication {
             function,
         );
         self.flags.push(attributes.word());
+        self.hashes
+            .push(crate::operations::string_property_key_hash(name));
         Ok(())
     }
 
@@ -117,6 +121,13 @@ impl GlobalBindingPublication {
             ),
             function,
         );
+        let hashes = schema.reserve_gc_local(function).initialize(
+            schema.array_type::<NumberBitsI64Array>().fixed(
+                self.hashes.iter().map(|hash| GcOperand::i64(*hash)),
+                function,
+            ),
+            function,
+        );
         let header = schema.reserve_gc_local(function).initialize(
             builder.emit_object_header_projection(object, function),
             function,
@@ -127,11 +138,13 @@ impl GlobalBindingPublication {
                 &self.keys,
                 &self.values,
                 &flags,
+                &hashes,
             ),
             builder.runtime_helper_base()?,
             function,
         );
         header.clear(function);
+        hashes.clear(function);
         flags.clear(function);
         self.values.clear(function);
         self.keys.clear(function);

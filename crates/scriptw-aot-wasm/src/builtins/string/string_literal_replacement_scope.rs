@@ -206,6 +206,238 @@ impl FunctionBuilder<'_> {
         s.release_i64_local(cursor, f);
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn emit_native_string_replace_literal_plain_fast_path(
+        &mut self,
+        scope: &StringLiteralReplacementScope,
+        input: &GcLocal<StringValue>,
+        needle: &GcLocal<StringValue>,
+        replacement_string: &GcLocal<StringValue>,
+        input_length: I64Local,
+        needle_length: I64Local,
+        functional: I32Local,
+        cursor: I64Local,
+        position: I64Local,
+        output: &CompletionLocals,
+        exit: ControlTarget,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        functional.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        needle_length.load(f);
+        f.instruction(&Instruction::I64Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        let rep_units = s.reserve_gc_local(f).initialize(
+            s.field(StringValueSchema::CODE_UNITS)
+                .read(replacement_string, s, f)
+                .reference(),
+            f,
+        );
+        let rep_len32 = s.reserve_i32_local(f);
+        let zero32 = s.reserve_i32_local(f);
+        let dollar = s.reserve_i32_local(f);
+        let dollar_pos = s.reserve_i32_local(f);
+        s.array_type::<CodeUnitArray>().length(&rep_units, s, f);
+        rep_len32.store(f);
+        zero32.set_constant(0, f);
+        dollar.set_constant(i32::from(b'$'), f);
+        s.call_helper(
+            crate::runtime_helpers::CodeUnitFindArguments::new(
+                &rep_units, zero32, rep_len32, dollar,
+            ),
+            self.runtime_helper_base()?,
+            f,
+        )
+        .store(dollar_pos, f);
+        s.release_i32_local(dollar, f);
+        s.release_i32_local(zero32, f);
+        dollar_pos.load(f);
+        rep_len32.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.open_frame(ControlFrameKind::If, f);
+        match scope {
+            StringLiteralReplacementScope::AllOccurrences => {
+                let fused = s
+                    .call_helper(
+                        crate::runtime_helpers::StringSplitJoinArguments::new(
+                            input,
+                            needle,
+                            replacement_string,
+                        ),
+                        self.runtime_helper_base()?,
+                        f,
+                    )
+                    .bind(s, s.reserve_gc_local(f), f);
+                fused.load(s, f).is_null(f);
+                f.instruction(&Instruction::I32Eqz);
+                self.open_frame(ControlFrameKind::If, f);
+                let present = s
+                    .reserve_gc_local(f)
+                    .initialize(fused.load(s, f).require_non_null(f), f);
+                self.emit_native_string_normal_reference(&present, output, f);
+                present.clear(f);
+                fused.set_null(s, f);
+                self.emit_branch_to_target(exit, f);
+                f.instruction(&Instruction::Else);
+                // `needle_length > 0` is already proved above, so null uniquely
+                // means the replacement result exceeds `MAX_STRING_LENGTH`.
+                // Throw the RangeError immediately instead of building a
+                // position list that can exhaust the live heap first.
+                self.emit_throw_runtime_error(
+                    NativeErrorKind::RangeError,
+                    RuntimeErrorMessage::STRING_LENGTH_EXCEEDS_IMPLEMENTATION_LIMIT,
+                    output,
+                    f,
+                )?;
+                self.emit_branch_to_target(exit, f);
+                self.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+                fused.clear(f);
+            }
+            StringLiteralReplacementScope::FirstOccurrence => {
+                cursor.set_constant(0, f);
+                self.emit_native_string_index_of(
+                    input,
+                    needle,
+                    input_length,
+                    needle_length,
+                    cursor,
+                    position,
+                    f,
+                );
+                position.load(f);
+                f.instruction(&Instruction::I64Const(-1));
+                f.instruction(&Instruction::I64Eq);
+                self.open_frame(ControlFrameKind::If, f);
+                self.emit_native_string_normal_reference(input, output, f);
+                self.emit_branch_to_target(exit, f);
+                self.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+                // Match found: input_length >= needle_length > 0, so
+                // (input_length - needle_length) + rep_len cannot overflow u64.
+                let total = s.reserve_i64_local(f);
+                input_length.load(f);
+                needle_length.load(f);
+                f.instruction(&Instruction::I64Sub);
+                rep_len32.load(f);
+                f.instruction(&Instruction::I64ExtendI32U);
+                f.instruction(&Instruction::I64Add);
+                total.store(f);
+                total.load(f);
+                f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
+                f.instruction(&Instruction::I64LeU);
+                self.open_frame(ControlFrameKind::If, f);
+                let total_len32 = s.reserve_i32_local(f);
+                total.load(f);
+                f.instruction(&Instruction::I32WrapI64);
+                total_len32.store(f);
+                total_len32.load(f);
+                f.instruction(&Instruction::I32Eqz);
+                self.open_frame(ControlFrameKind::If, f);
+                let empty = s
+                    .reserve_gc_local(f)
+                    .initialize(self.emit_interned_string_reference("", f)?, f);
+                self.emit_native_string_normal_reference(&empty, output, f);
+                empty.clear(f);
+                self.emit_branch_to_target(exit, f);
+                self.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+                let input_units = s.reserve_gc_local(f).initialize(
+                    s.field(StringValueSchema::CODE_UNITS)
+                        .read(input, s, f)
+                        .reference(),
+                    f,
+                );
+                let construction = crate::gc_types::StringConstruction::allocate(
+                    s,
+                    s.reserve_gc_local(f),
+                    total_len32,
+                    f,
+                );
+                let dest = s.reserve_i32_local(f);
+                let pos32 = s.reserve_i32_local(f);
+                let tail_start32 = s.reserve_i32_local(f);
+                let tail_len32 = s.reserve_i32_local(f);
+                dest.set_constant(0, f);
+                position.load(f);
+                f.instruction(&Instruction::I32WrapI64);
+                pos32.store(f);
+                pos32.load(f);
+                self.open_frame(ControlFrameKind::If, f);
+                construction.copy_units_from(dest, &input_units, pos32, s, f);
+                pos32.load(f);
+                dest.store(f);
+                self.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+                rep_len32.load(f);
+                self.open_frame(ControlFrameKind::If, f);
+                construction.copy_units_from(dest, &rep_units, rep_len32, s, f);
+                dest.load(f);
+                rep_len32.load(f);
+                f.instruction(&Instruction::I32Add);
+                dest.store(f);
+                self.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+                position.load(f);
+                needle_length.load(f);
+                f.instruction(&Instruction::I64Add);
+                f.instruction(&Instruction::I32WrapI64);
+                tail_start32.store(f);
+                input_length.load(f);
+                f.instruction(&Instruction::I32WrapI64);
+                tail_start32.load(f);
+                f.instruction(&Instruction::I32Sub);
+                tail_len32.store(f);
+                tail_len32.load(f);
+                self.open_frame(ControlFrameKind::If, f);
+                construction.copy_units_range_from(
+                    dest,
+                    &input_units,
+                    tail_start32,
+                    tail_len32,
+                    s,
+                    f,
+                );
+                self.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+                let built = s
+                    .reserve_gc_local(f)
+                    .initialize(construction.publish(s, f), f);
+                self.emit_native_string_normal_reference(&built, output, f);
+                built.clear(f);
+                s.release_i32_local(tail_len32, f);
+                s.release_i32_local(tail_start32, f);
+                s.release_i32_local(pos32, f);
+                s.release_i32_local(dest, f);
+                input_units.clear(f);
+                s.release_i32_local(total_len32, f);
+                self.emit_branch_to_target(exit, f);
+                f.instruction(&Instruction::Else);
+                self.emit_throw_runtime_error(
+                    NativeErrorKind::RangeError,
+                    RuntimeErrorMessage::STRING_LENGTH_EXCEEDS_IMPLEMENTATION_LIMIT,
+                    output,
+                    f,
+                )?;
+                self.emit_branch_to_target(exit, f);
+                self.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+                s.release_i64_local(total, f);
+            }
+        }
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(dollar_pos, f);
+        s.release_i32_local(rep_len32, f);
+        rep_units.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        Ok(())
+    }
+
     pub(super) fn emit_string_replace_literal_first_occurrence_from_string_locals(
         &mut self,
         input: &GcLocal<StringValue>,
@@ -293,6 +525,22 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.emit_native_gc_string_length(input, input_length, f);
         self.emit_native_gc_string_length(&needle, needle_length, f);
+        // Fast path for non-callable, non-empty literal replacement when the
+        // replacement string contains no '$' substitution sequences.
+        self.emit_native_string_replace_literal_plain_fast_path(
+            &scope,
+            input,
+            &needle,
+            &replacement_string,
+            input_length,
+            needle_length,
+            functional,
+            cursor,
+            position,
+            output,
+            exit,
+            f,
+        )?;
         needle_length.load(f);
         advance.store(f);
         advance.load(f);
@@ -515,6 +763,147 @@ impl FunctionBuilder<'_> {
             .initialize(pending.value().cast_reference::<StringValue>(s, f), f);
         self.emit_native_gc_string_length(input, input_length, f);
         self.emit_native_gc_string_length(&needle, needle_length, f);
+        let split_done = self.open_frame(ControlFrameKind::Block, f);
+        // 1. max == 0 -> empty Array (no PackedValueTable allocation).
+        max.load(f);
+        f.instruction(&Instruction::I64Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let zero_len = s.reserve_i64_local(f);
+        zero_len.set_constant(0, f);
+        let prototype = self.emit_load_current_function_realm_array_prototype(f);
+        let array = s.reserve_gc_local(f).initialize(
+            self.emit_alloc_array_with_current_function_realm_prototype(zero_len, prototype, f)?,
+            f,
+        );
+        value.set_reference(&array, s, f);
+        output.set_normal(&value, f);
+        array.clear(f);
+        s.release_i64_local(zero_len, f);
+        self.emit_branch_to_target(split_done, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        // 2. separator === undefined (with max > 0) -> exact 1-element Array [input].
+        separator.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Undefined.tag()));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_singleton_string_array_to_output(input, output, f)?;
+        self.emit_branch_to_target(split_done, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        // 3. Fast 1-unit separator split (max > 0, separator defined): hoist
+        // input_units and sep_unit once and scan in i32 directly with CodeUnitFind.
+        needle_length.load(f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        let helper_base = self.runtime_helper_base()?;
+        let input_units = s.reserve_gc_local(f).initialize(
+            s.field(StringValueSchema::CODE_UNITS)
+                .read(input, s, f)
+                .reference(),
+            f,
+        );
+        let needle_units = s.reserve_gc_local(f).initialize(
+            s.field(StringValueSchema::CODE_UNITS)
+                .read(&needle, s, f)
+                .reference(),
+            f,
+        );
+        let input_len32 = s.reserve_i32_local(f);
+        let sep_unit = s.reserve_i32_local(f);
+        let last_end32 = s.reserve_i32_local(f);
+        let pos32 = s.reserve_i32_local(f);
+        input_length.load(f);
+        f.instruction(&Instruction::I32WrapI64);
+        input_len32.store(f);
+        last_end32.set_constant(0, f);
+        s.array_type::<CodeUnitArray>()
+            .read(&needle_units, last_end32, s, f)
+            .store(sep_unit, f);
+        needle_units.clear(f);
+        s.call_helper(
+            crate::runtime_helpers::CodeUnitFindArguments::new(
+                &input_units,
+                last_end32,
+                input_len32,
+                sep_unit,
+            ),
+            helper_base,
+            f,
+        )
+        .store(pos32, f);
+        pos32.load(f);
+        input_len32.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.open_frame(ControlFrameKind::If, f);
+        // Zero matches (including "".split(",")): exact 1-element Array reusing immutable input.
+        self.emit_singleton_string_array_to_output(input, output, f)?;
+        f.instruction(&Instruction::Else);
+        let fast_list = crate::gc_types::PackedValueListConstruction::allocate(s, f);
+        count.set_constant(0, f);
+        let fast_list_done = self.open_frame(ControlFrameKind::Block, f);
+        let fast_search_done = self.open_frame(ControlFrameKind::Block, f);
+        let fast_next = self.open_frame(ControlFrameKind::Loop, f);
+        self.emit_code_units_slice_to_value(&input_units, last_end32, pos32, &value, f)?;
+        fast_list.append(&value, s, f);
+        count.load(f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Add);
+        count.store(f);
+        count.load(f);
+        max.load(f);
+        f.instruction(&Instruction::I64GeU);
+        self.emit_branch_if_to_target(fast_list_done, f);
+        pos32.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        last_end32.store(f);
+        s.call_helper(
+            crate::runtime_helpers::CodeUnitFindArguments::new(
+                &input_units,
+                last_end32,
+                input_len32,
+                sep_unit,
+            ),
+            helper_base,
+            f,
+        )
+        .store(pos32, f);
+        pos32.load(f);
+        input_len32.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(fast_search_done, f);
+        self.emit_branch_to_target(fast_next, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        self.emit_code_units_slice_to_value(&input_units, last_end32, input_len32, &value, f)?;
+        fast_list.append(&value, s, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let prototype = self.emit_load_current_function_realm_array_prototype(f);
+        let array = s.reserve_gc_local(f).initialize(
+            self.emit_publish_packed_value_list_with_current_function_realm_prototype(
+                fast_list, prototype, f,
+            )?,
+            f,
+        );
+        value.set_reference(&array, s, f);
+        output.set_normal(&value, f);
+        array.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(pos32, f);
+        s.release_i32_local(last_end32, f);
+        s.release_i32_local(sep_unit, f);
+        s.release_i32_local(input_len32, f);
+        input_units.clear(f);
+        self.emit_branch_to_target(split_done, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        // 4. General path: empty separator (needle_length == 0) or multi-unit separator.
         // The result List is private until CreateArrayFromList returns it,
         // so each piece is appended once into the Array's own packed backing.
         let list = crate::gc_types::PackedValueListConstruction::allocate(s, f);
@@ -525,18 +914,6 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I64Const(0));
         cursor.store(f);
         let list_done = self.open_frame(ControlFrameKind::Block, f);
-        max.load(f);
-        f.instruction(&Instruction::I64Eqz);
-        self.emit_branch_if_to_target(list_done, f);
-        separator.tag().load(f);
-        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Undefined.tag()));
-        f.instruction(&Instruction::I32Eq);
-        self.open_frame(ControlFrameKind::If, f);
-        value.set_reference(input, s, f);
-        list.append(&value, s, f);
-        self.emit_branch_to_target(list_done, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
         needle_length.load(f);
         f.instruction(&Instruction::I64Eqz);
         self.open_frame(ControlFrameKind::If, f);
@@ -629,6 +1006,8 @@ impl FunctionBuilder<'_> {
         value.set_reference(&array, s, f);
         output.set_normal(&value, f);
         array.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         needle.clear(f);
         for local in [
             end,
@@ -644,6 +1023,90 @@ impl FunctionBuilder<'_> {
         }
         value.clear(f);
         pending.clear(f);
+        Ok(())
+    }
+
+    /// CreateArrayFromList(« element ») with an exact 1-element PackedValues
+    /// backing (capacity 1, a power of two), reusing the immutable `element`
+    /// String with zero slice allocation.
+    fn emit_singleton_string_array_to_output(
+        &mut self,
+        element: &GcLocal<StringValue>,
+        output: &CompletionLocals,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let realm = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_current_function_realm(f), f);
+        let prototype = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_load_realm_array_prototype(&realm, f), f);
+        realm.clear(f);
+        let proto_value = s.reserve_value_local(f);
+        proto_value.set_reference(&prototype, s, f);
+        let header = s.reserve_gc_local(f).initialize(
+            self.emit_alloc_plain_object_with_prototype(Some(&proto_value), f)?,
+            f,
+        );
+        proto_value.clear(f);
+        prototype.clear(f);
+        let elem_value = s.reserve_value_local(f);
+        elem_value.set_reference(element, s, f);
+        let list = crate::gc_types::PackedValueListConstruction::singleton(&elem_value, s, f);
+        let array = s.reserve_gc_local(f).initialize(
+            s.struct_type::<ArrayObject>()
+                .with_packed_value_list(&header, list, s, f),
+            f,
+        );
+        header.clear(f);
+        elem_value.set_reference(&array, s, f);
+        output.set_normal(&elem_value, f);
+        array.clear(f);
+        elem_value.clear(f);
+        Ok(())
+    }
+
+    /// Slice `units[start..end]` into `destination`, returning the interned
+    /// empty String when `start == end` and allocating one exact-size String
+    /// otherwise.
+    fn emit_code_units_slice_to_value(
+        &mut self,
+        units: &GcLocal<CodeUnitArray>,
+        start: I32Local,
+        end: I32Local,
+        destination: &ValueLocals,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let span = s.reserve_i32_local(f);
+        end.load(f);
+        start.load(f);
+        f.instruction(&Instruction::I32Sub);
+        span.store(f);
+        span.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let empty = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_interned_string_reference("", f)?, f);
+        destination.set_reference(&empty, s, f);
+        empty.clear(f);
+        f.instruction(&Instruction::Else);
+        let zero = s.reserve_i32_local(f);
+        zero.set_constant(0, f);
+        let construction =
+            crate::gc_types::StringConstruction::allocate(s, s.reserve_gc_local(f), span, f);
+        construction.copy_units_range_from(zero, units, start, span, s, f);
+        s.release_i32_local(zero, f);
+        let part = s
+            .reserve_gc_local(f)
+            .initialize(construction.publish(s, f), f);
+        destination.set_reference(&part, s, f);
+        part.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(span, f);
         Ok(())
     }
 
@@ -691,8 +1154,11 @@ impl FunctionBuilder<'_> {
         let src_start = s.reserve_i32_local(&mut f);
         let span = s.reserve_i32_local(&mut f);
         let rep_len32 = s.reserve_i32_local(&mut f);
+        let input_len32 = s.reserve_i32_local(&mut f);
         s.array_type::<CodeUnitArray>()
             .length(&input_units, s, &mut f);
+        input_len32.store(&mut f);
+        input_len32.load(&mut f);
         f.instruction(&Instruction::I64ExtendI32U);
         input_len.store(&mut f);
         s.array_type::<CodeUnitArray>()
@@ -710,6 +1176,186 @@ impl FunctionBuilder<'_> {
         sep_len.load(&mut f);
         f.instruction(&Instruction::I64Eqz);
         self.emit_branch_if_to_target(done, &mut f);
+        // Fast path for 1-unit separators: hoist sep_unit once and scan in i32
+        // directly with CodeUnitFind across both counting and copy passes.
+        sep_len.load(&mut f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Eq);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let helper_base = self.runtime_helper_base()?;
+        let sep_unit = s.reserve_i32_local(&mut f);
+        let at32 = s.reserve_i32_local(&mut f);
+        let first_pos32 = s.reserve_i32_local(&mut f);
+        let pos32 = s.reserve_i32_local(&mut f);
+        let matches32 = s.reserve_i32_local(&mut f);
+        at32.set_constant(0, &mut f);
+        s.array_type::<CodeUnitArray>()
+            .read(&sep_units, at32, s, &mut f)
+            .store(sep_unit, &mut f);
+        s.call_helper(
+            crate::runtime_helpers::CodeUnitFindArguments::new(
+                &input_units,
+                at32,
+                input_len32,
+                sep_unit,
+            ),
+            helper_base,
+            &mut f,
+        )
+        .store(first_pos32, &mut f);
+        first_pos32.load(&mut f);
+        input_len32.load(&mut f);
+        f.instruction(&Instruction::I32GeU);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        result.replace(p.input.load(s, &mut f).nullable(), &mut f);
+        self.emit_branch_to_target(done, &mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        // Pass 1: count all matches in i32.
+        matches32.set_constant(1, &mut f);
+        first_pos32.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        at32.store(&mut f);
+        let counted1 = self.open_frame(ControlFrameKind::Block, &mut f);
+        let count_loop1 = self.open_frame(ControlFrameKind::Loop, &mut f);
+        s.call_helper(
+            crate::runtime_helpers::CodeUnitFindArguments::new(
+                &input_units,
+                at32,
+                input_len32,
+                sep_unit,
+            ),
+            helper_base,
+            &mut f,
+        )
+        .store(pos32, &mut f);
+        pos32.load(&mut f);
+        input_len32.load(&mut f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(counted1, &mut f);
+        matches32.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        matches32.store(&mut f);
+        pos32.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        at32.store(&mut f);
+        self.emit_branch_to_target(count_loop1, &mut f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        matches32.load(&mut f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        matches.store(&mut f);
+        // Check `input_len - matches + matches * rep_len <= MAX_STRING_LENGTH`
+        // without u64 overflow.
+        input_len.load(&mut f);
+        matches.load(&mut f);
+        f.instruction(&Instruction::I64Sub);
+        total.store(&mut f);
+        matches.load(&mut f);
+        rep_len.load(&mut f);
+        f.instruction(&Instruction::I64Mul);
+        cursor.store(&mut f);
+        cursor.load(&mut f);
+        f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
+        f.instruction(&Instruction::I64GtU);
+        self.emit_branch_if_to_target(done, &mut f);
+        total.load(&mut f);
+        cursor.load(&mut f);
+        f.instruction(&Instruction::I64Add);
+        total.store(&mut f);
+        total.load(&mut f);
+        f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
+        f.instruction(&Instruction::I64GtU);
+        self.emit_branch_if_to_target(done, &mut f);
+        // Pass 2: allocate one exact-size StringConstruction and copy spans + replacements.
+        total.load(&mut f);
+        f.instruction(&Instruction::I32WrapI64);
+        span.store(&mut f);
+        let construction1 = crate::gc_types::StringConstruction::allocate(
+            s,
+            s.reserve_gc_local(&mut f),
+            span,
+            &mut f,
+        );
+        dest.set_constant(0, &mut f);
+        src_start.set_constant(0, &mut f);
+        first_pos32.load(&mut f);
+        pos32.store(&mut f);
+        let copied1 = self.open_frame(ControlFrameKind::Block, &mut f);
+        let copy_loop1 = self.open_frame(ControlFrameKind::Loop, &mut f);
+        pos32.load(&mut f);
+        src_start.load(&mut f);
+        f.instruction(&Instruction::I32GtU);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        pos32.load(&mut f);
+        src_start.load(&mut f);
+        f.instruction(&Instruction::I32Sub);
+        span.store(&mut f);
+        construction1.copy_units_range_from(dest, &input_units, src_start, span, s, &mut f);
+        dest.load(&mut f);
+        span.load(&mut f);
+        f.instruction(&Instruction::I32Add);
+        dest.store(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        rep_len32.load(&mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        construction1.copy_units_from(dest, &rep_units, rep_len32, s, &mut f);
+        dest.load(&mut f);
+        rep_len32.load(&mut f);
+        f.instruction(&Instruction::I32Add);
+        dest.store(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        pos32.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        src_start.store(&mut f);
+        s.call_helper(
+            crate::runtime_helpers::CodeUnitFindArguments::new(
+                &input_units,
+                src_start,
+                input_len32,
+                sep_unit,
+            ),
+            helper_base,
+            &mut f,
+        )
+        .store(pos32, &mut f);
+        pos32.load(&mut f);
+        input_len32.load(&mut f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(copied1, &mut f);
+        self.emit_branch_to_target(copy_loop1, &mut f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        input_len32.load(&mut f);
+        src_start.load(&mut f);
+        f.instruction(&Instruction::I32GtU);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        input_len32.load(&mut f);
+        src_start.load(&mut f);
+        f.instruction(&Instruction::I32Sub);
+        span.store(&mut f);
+        construction1.copy_units_range_from(dest, &input_units, src_start, span, s, &mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        result.replace(construction1.publish(s, &mut f).nullable(), &mut f);
+        s.release_i32_local(matches32, &mut f);
+        s.release_i32_local(pos32, &mut f);
+        s.release_i32_local(first_pos32, &mut f);
+        s.release_i32_local(at32, &mut f);
+        s.release_i32_local(sep_unit, &mut f);
+        self.emit_branch_to_target(done, &mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         cursor.set_constant(0, &mut f);
         self.emit_native_string_index_of(
             &p.input,
@@ -868,6 +1514,7 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         result.load(s, &mut f);
+        s.release_i32_local(input_len32, &mut f);
         s.release_i32_local(rep_len32, &mut f);
         s.release_i32_local(span, &mut f);
         s.release_i32_local(src_start, &mut f);

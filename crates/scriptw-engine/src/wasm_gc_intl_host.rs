@@ -1,8 +1,9 @@
 //! Private Intl bytes cross Stores without JavaScript values or linear pointers.
 
+use super::wasm_gc_host::TypedGcHostImport;
 use super::*;
 use scriptw_aot_wasm::{GcHostImport, GcHostLayout};
-use wasmtime::{ArrayRef, ArrayRefPre, ArrayType, ExternType, FuncType, Mutability, Val};
+use wasmtime::{ArrayRef, ArrayRefPre, ArrayType, FuncType, Mutability, Val};
 
 /// Preserve the module's canonical array type, including its recursive group.
 /// Manufacturing an independent array type can produce an incompatible result.
@@ -13,12 +14,17 @@ struct IntlByteArraySignature {
 
 impl IntlByteArraySignature {
     fn validate(function: FuncType) -> wasmtime::Result<Self> {
-        let params: Vec<_> = function.params().collect();
-        let results: Vec<_> = function.results().collect();
-        let ([parameter], [result]) = (params.as_slice(), results.as_slice()) else {
-            return Err(wasmtime::Error::msg(
-                "Intl GC import requires one input and one output",
-            ));
+        let (parameter, result) = {
+            let mut params = function.params();
+            let mut results = function.results();
+            let (Some(parameter), None, Some(result), None) =
+                (params.next(), params.next(), results.next(), results.next())
+            else {
+                return Err(wasmtime::Error::msg(
+                    "Intl GC import requires one input and one output",
+                ));
+            };
+            (parameter, result)
         };
         let parameter = parameter
             .as_ref()
@@ -62,20 +68,15 @@ impl IntlByteArraySignature {
 
 fn link_intl(
     linker: &mut WasmtimeLinker<WasmHostState>,
-    module: &WasmtimeModule,
+    import: TypedGcHostImport<'_>,
 ) -> Result<(), EngineError> {
     let row = GcHostImport::IntlProviderCall;
-    let mut imports = module
-        .imports()
-        .filter(|import| import.module() == row.module() && import.name() == row.name());
-    let Some(import) = imports.next() else {
+    let Some(function) = import.into_func(
+        "duplicate Intl GC host import",
+        "Intl GC host import is not a function",
+    )?
+    else {
         return Ok(());
-    };
-    if imports.next().is_some() {
-        return Err(EngineError::new("duplicate Intl GC host import"));
-    }
-    let ExternType::Func(function) = import.ty() else {
-        return Err(EngineError::new("Intl GC host import is not a function"));
     };
     let signature = IntlByteArraySignature::validate(function)
         .map_err(|error| EngineError::new(format!("invalid Intl GC host import: {error}")))?;
@@ -396,12 +397,15 @@ pub(super) fn execute(
 
 impl IntlByteArraySignature {
     fn validate_system_zone(function: FuncType) -> wasmtime::Result<Self> {
-        let params: Vec<_> = function.params().collect();
-        let results: Vec<_> = function.results().collect();
-        let ([], [result]) = (params.as_slice(), results.as_slice()) else {
-            return Err(wasmtime::Error::msg(
-                "system-zone GC import requires no inputs and one output",
-            ));
+        let result = {
+            let mut params = function.params();
+            let mut results = function.results();
+            let (None, Some(result), None) = (params.next(), results.next(), results.next()) else {
+                return Err(wasmtime::Error::msg(
+                    "system-zone GC import requires no inputs and one output",
+                ));
+            };
+            result
         };
         let reference = result
             .as_ref()
@@ -428,32 +432,45 @@ impl IntlByteArraySignature {
     }
 }
 
+pub(super) fn link_imports(
+    linker: &mut WasmtimeLinker<WasmHostState>,
+    intl_provider: TypedGcHostImport<'_>,
+    system_time_zone: TypedGcHostImport<'_>,
+) -> Result<(), EngineError> {
+    link_intl(linker, intl_provider)?;
+    link_system_zone(linker, system_time_zone)
+}
+
+#[cfg(test)]
 pub(super) fn link(
     linker: &mut WasmtimeLinker<WasmHostState>,
     module: &WasmtimeModule,
 ) -> Result<(), EngineError> {
-    link_intl(linker, module)?;
-    link_system_zone(linker, module)
+    let intl_row = GcHostImport::IntlProviderCall;
+    let zone_row = GcHostImport::SystemTimeZoneSnapshot;
+    let mut intl_provider = TypedGcHostImport::default();
+    let mut system_time_zone = TypedGcHostImport::default();
+    for import in module.imports() {
+        if import.module() == intl_row.module() && import.name() == intl_row.name() {
+            intl_provider.record(import);
+        } else if import.module() == zone_row.module() && import.name() == zone_row.name() {
+            system_time_zone.record(import);
+        }
+    }
+    link_imports(linker, intl_provider, system_time_zone)
 }
 
 fn link_system_zone(
     linker: &mut WasmtimeLinker<WasmHostState>,
-    module: &WasmtimeModule,
+    import: TypedGcHostImport<'_>,
 ) -> Result<(), EngineError> {
     let row = GcHostImport::SystemTimeZoneSnapshot;
-    let mut imports = module
-        .imports()
-        .filter(|import| import.module() == row.module() && import.name() == row.name());
-    let Some(import) = imports.next() else {
+    let Some(function) = import.into_func(
+        "duplicate system-zone GC import",
+        "system-zone GC host import is not a function",
+    )?
+    else {
         return Ok(());
-    };
-    if imports.next().is_some() {
-        return Err(EngineError::new("duplicate system-zone GC import"));
-    }
-    let ExternType::Func(function) = import.ty() else {
-        return Err(EngineError::new(
-            "system-zone GC host import is not a function",
-        ));
     };
     let signature = IntlByteArraySignature::validate_system_zone(function).map_err(|error| {
         EngineError::new(format!("invalid system-zone GC host import: {error}"))

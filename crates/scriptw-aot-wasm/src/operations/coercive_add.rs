@@ -212,6 +212,43 @@ impl FunctionBuilder<'_> {
                 self.compile_expr_to_value(rhs, right, function)?;
                 let done = self.open_frame(ControlFrameKind::Block, function);
                 let general = self.open_frame(ControlFrameKind::Block, function);
+                if matches!(side, StringAddSide::Left) {
+                    // Direct fused String + Number helper avoids allocating an
+                    // intermediate decimal StringValue and checking bounds twice.
+                    left.tag().load(function);
+                    function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+                    function.instruction(&Instruction::I32Eq);
+                    right.tag().load(function);
+                    function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
+                    function.instruction(&Instruction::I32Eq);
+                    function.instruction(&Instruction::I32And);
+                    self.open_frame(ControlFrameKind::If, function);
+                    let prefix = schema.reserve_gc_local(function).initialize(
+                        left.cast_reference::<StringValue>(schema, function),
+                        function,
+                    );
+                    let fused = schema
+                        .reserve_gc_local::<StringValue, crate::gc_types::Nullable>(function)
+                        .initialize(
+                            schema.helper_reference_on_stack(schema.call_helper(
+                                crate::runtime_helpers::StringConcatStringNumberArguments::new(
+                                    &prefix,
+                                    right.scalar(),
+                                ),
+                                self.runtime_helper_base()?,
+                                function,
+                            )),
+                            function,
+                        );
+                    prefix.clear(function);
+                    fused.load(schema, function).is_null(function);
+                    self.emit_branch_if_to_target(general, function);
+                    self.emit_string_add_result(&fused, result, function);
+                    fused.clear(function);
+                    self.emit_branch_to_target(done, function);
+                    self.pop_control(ControlFrameKind::If);
+                    function.instruction(&Instruction::End);
+                }
                 let first = schema
                     .reserve_gc_local::<StringValue, crate::gc_types::Nullable>(function)
                     .initialize_null(schema, function);
@@ -606,6 +643,182 @@ impl FunctionBuilder<'_> {
         let _result = result;
         function.instruction(&Instruction::End);
         Ok(self.finish_function(function))
+    }
+
+    /// Concatenation of a String prefix and a Number: formats nonnegative u32
+    /// integers directly into one allocation without an intermediate String,
+    /// returning null when the combined length exceeds `MAX_STRING_LENGTH`.
+    pub(crate) fn compile_string_concat_string_number_helper(
+        &mut self,
+    ) -> Result<Function, EmitError> {
+        let mut f = self.begin_helper_body(RuntimeHelperId::StringConcatStringNumber);
+        let p = self
+            .helper_parameters::<crate::runtime_helpers::StringConcatStringNumberParameters>(
+                &mut f,
+            );
+        let s = self.runtime_schema();
+        let output = s
+            .reserve_gc_local::<StringValue, crate::gc_types::Nullable>(&mut f)
+            .initialize_null(s, &mut f);
+        let left_units = s.reserve_gc_local(&mut f).initialize(
+            s.field(StringValueSchema::CODE_UNITS)
+                .read(&p.left, s, &mut f)
+                .reference(),
+            &mut f,
+        );
+        let left_len = s.reserve_i32_local(&mut f);
+        s.array_type::<CodeUnitArray>()
+            .length(&left_units, s, &mut f);
+        left_len.store(&mut f);
+
+        let small = s.reserve_i32_local(&mut f);
+        p.right_bits.load(&mut f);
+        f.instruction(&Instruction::F64ReinterpretI64);
+        f.instruction(&Instruction::I32TruncSatF64U);
+        small.store(&mut f);
+        small.load(&mut f);
+        f.instruction(&Instruction::F64ConvertI32U);
+        p.right_bits.load(&mut f);
+        f.instruction(&Instruction::F64ReinterpretI64);
+        f.instruction(&Instruction::F64Eq);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let digits = s.reserve_i32_local(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        for threshold in [
+            10u32,
+            100,
+            1_000,
+            10_000,
+            100_000,
+            1_000_000,
+            10_000_000,
+            100_000_000,
+            1_000_000_000,
+        ] {
+            small.load(&mut f);
+            f.instruction(&Instruction::I32Const(threshold as i32));
+            f.instruction(&Instruction::I32GeU);
+            f.instruction(&Instruction::I32Add);
+        }
+        digits.store(&mut f);
+        let total64 = s.reserve_i64_local(&mut f);
+        left_len.load(&mut f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        digits.load(&mut f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        f.instruction(&Instruction::I64Add);
+        total64.store(&mut f);
+        total64.load(&mut f);
+        f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
+        f.instruction(&Instruction::I64LeU);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let total = s.reserve_i32_local(&mut f);
+        let cursor = s.reserve_i32_local(&mut f);
+        let rem = s.reserve_i32_local(&mut f);
+        let quot = s.reserve_i32_local(&mut f);
+        let unit = s.reserve_i32_local(&mut f);
+        total64.load(&mut f);
+        f.instruction(&Instruction::I32WrapI64);
+        total.store(&mut f);
+        let text = crate::gc_types::StringConstruction::allocate(
+            s,
+            s.reserve_gc_local(&mut f),
+            total,
+            &mut f,
+        );
+        left_len.load(&mut f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32Ne);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        cursor.set_constant(0, &mut f);
+        text.copy_concatenated_units_from(cursor, &left_units, left_len, s, &mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        small.load(&mut f);
+        f.instruction(&Instruction::I32Const(10));
+        f.instruction(&Instruction::I32LtU);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        small.load(&mut f);
+        f.instruction(&Instruction::I32Const(48));
+        f.instruction(&Instruction::I32Add);
+        unit.store(&mut f);
+        text.write(left_len, unit, s, &mut f);
+        f.instruction(&Instruction::Else);
+        total.load(&mut f);
+        cursor.store(&mut f);
+        small.load(&mut f);
+        rem.store(&mut f);
+        let digit_loop = self.open_frame(ControlFrameKind::Loop, &mut f);
+        cursor.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Sub);
+        cursor.store(&mut f);
+        rem.load(&mut f);
+        f.instruction(&Instruction::I32Const(10));
+        f.instruction(&Instruction::I32DivU);
+        quot.store(&mut f);
+        rem.load(&mut f);
+        quot.load(&mut f);
+        f.instruction(&Instruction::I32Const(10));
+        f.instruction(&Instruction::I32Mul);
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Const(48));
+        f.instruction(&Instruction::I32Add);
+        unit.store(&mut f);
+        text.write(cursor, unit, s, &mut f);
+        quot.load(&mut f);
+        rem.store(&mut f);
+        cursor.load(&mut f);
+        left_len.load(&mut f);
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(digit_loop, &mut f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        output.replace(text.publish(s, &mut f).nullable(), &mut f);
+        s.release_i32_local(unit, &mut f);
+        s.release_i32_local(quot, &mut f);
+        s.release_i32_local(rem, &mut f);
+        s.release_i32_local(cursor, &mut f);
+        s.release_i32_local(total, &mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i64_local(total64, &mut f);
+        s.release_i32_local(digits, &mut f);
+        f.instruction(&Instruction::Else);
+        let right_text = s.reserve_gc_local(&mut f).initialize(
+            self.emit_number_to_string_payload(p.right_bits, &mut f)?,
+            &mut f,
+        );
+        let right_len = s.reserve_i64_local(&mut f);
+        self.emit_native_gc_string_length(&right_text, right_len, &mut f);
+        left_len.load(&mut f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        right_len.load(&mut f);
+        f.instruction(&Instruction::I64Add);
+        f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
+        f.instruction(&Instruction::I64LeU);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        output.replace(
+            self.emit_concat_gc_strings(&p.left, &right_text, &mut f)
+                .nullable(),
+            &mut f,
+        );
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i64_local(right_len, &mut f);
+        right_text.clear(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(small, &mut f);
+        s.release_i32_local(left_len, &mut f);
+        left_units.clear(&mut f);
+        output.load(s, &mut f);
+        output.clear(&mut f);
+        p.release(&mut f);
+        f.instruction(&Instruction::End);
+        Ok(self.finish_function(f))
     }
 
     pub(crate) fn finish_coercive_add_completion(

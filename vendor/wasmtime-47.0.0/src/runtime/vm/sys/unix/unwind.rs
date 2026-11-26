@@ -78,7 +78,9 @@ impl UnwindRegistration {
             "The unwind info must always be aligned to a page"
         );
 
-        let mut registrations = TryVec::new();
+        let mut registration = UnwindRegistration {
+            registrations: TryVec::new(),
+        };
         unsafe {
             if using_libunwind() {
                 // For libunwind, `__register_frame` takes a pointer to a single
@@ -89,15 +91,22 @@ impl UnwindRegistration {
                 let end = start.add(unwind_len - 4);
                 let mut current = start;
 
-                // Walk all of the entries in the frame table and register them
+                // Walk all of the entries in the frame table and register them.
+                // Reserve bookkeeping space before each `__register_frame` call
+                // and keep the `UnwindRegistration` RAII guard alive so any OOM
+                // cleanly deregisters frames already added.
                 while current < end {
                     let len = current.cast::<u32>().read_unaligned() as usize;
 
                     // Skip over the CIE
                     if current != start {
+                        registration.registrations.reserve(1)?;
                         __register_frame(current);
                         let cur = NonNull::new(current.cast_mut()).unwrap();
-                        registrations.push(SendSyncPtr::new(cur))?;
+                        registration
+                            .registrations
+                            .push(SendSyncPtr::new(cur))
+                            .expect("reserved one slot before __register_frame");
                     }
 
                     // Move to the next table entry (+4 because the length itself is
@@ -106,14 +115,19 @@ impl UnwindRegistration {
                 }
             } else {
                 // On gnu (libgcc), `__register_frame` will walk the FDEs until an
-                // entry of length 0
+                // entry of length 0. Reserve before registering so OOM cannot
+                // leave a live registration untracked.
+                registration.registrations.reserve(1)?;
                 __register_frame(unwind_info);
                 let info = NonNull::new(unwind_info.cast_mut()).unwrap();
-                registrations.push(SendSyncPtr::new(info))?;
+                registration
+                    .registrations
+                    .push(SendSyncPtr::new(info))
+                    .expect("reserved one slot before __register_frame");
             }
         }
 
-        Ok(UnwindRegistration { registrations })
+        Ok(registration)
     }
 }
 

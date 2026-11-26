@@ -285,7 +285,15 @@ impl Engine {
                 "adversarial verification profile",
                 std::num::NonZeroU32::MIN,
             );
-            let kinds = scriptw_aot_wasm::ReadSpecialisation::ALL;
+            // Rotate through the guarded specialisations so every adversarial
+            // seed emits a real profiled guard even on one-site ordinary reads
+            // (which already prove OwnCompact layouts inline without a guard).
+            let kinds: Vec<_> = scriptw_aot_wasm::ReadSpecialisation::ALL
+                .into_iter()
+                .filter(|kind| {
+                    !matches!(kind, scriptw_aot_wasm::ReadSpecialisation::OwnCompact(_))
+                })
+                .collect();
             for (index, site) in site_map.read_sites().enumerate() {
                 profile
                     .observe_read(

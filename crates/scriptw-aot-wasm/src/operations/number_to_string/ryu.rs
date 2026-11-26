@@ -1303,6 +1303,7 @@ impl<'a> FunctionBuilder<'a> {
         let schema = self.runtime_schema();
         let count = schema.reserve_i32_local(function);
         let remaining = schema.reserve_i32_local(function);
+        let quot = schema.reserve_i32_local(function);
         let unit = schema.reserve_i32_local(function);
         function.instruction(&Instruction::I32Const(3));
         for threshold in [
@@ -1335,20 +1336,25 @@ impl<'a> FunctionBuilder<'a> {
         count.store(function);
         remaining.load(function);
         function.instruction(&Instruction::I32Const(10));
-        function.instruction(&Instruction::I32RemU);
+        function.instruction(&Instruction::I32DivU);
+        quot.store(function);
+        remaining.load(function);
+        quot.load(function);
+        function.instruction(&Instruction::I32Const(10));
+        function.instruction(&Instruction::I32Mul);
+        function.instruction(&Instruction::I32Sub);
         function.instruction(&Instruction::I32Const(48));
         function.instruction(&Instruction::I32Add);
         unit.store(function);
         text.write(count, unit, schema, function);
-        remaining.load(function);
-        function.instruction(&Instruction::I32Const(10));
-        function.instruction(&Instruction::I32DivU);
+        quot.load(function);
         remaining.store(function);
         count.load(function);
         function.instruction(&Instruction::BrIf(0));
         function.instruction(&Instruction::End);
         let result = text.publish(schema, function);
         schema.release_i32_local(unit, function);
+        schema.release_i32_local(quot, function);
         schema.release_i32_local(remaining, function);
         schema.release_i32_local(count, function);
         result

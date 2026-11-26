@@ -431,15 +431,74 @@ impl FunctionBuilder<'_> {
         let value = s.reserve_value_local(f);
         let replacer = s.reserve_value_local(f);
         let space = s.reserve_value_local(f);
-        let holder = s.reserve_value_local(f);
         let key = s.reserve_value_local(f);
         let appended = s.reserve_value_local(f);
         let output = s.reserve_value_local(f);
-        let callable = s.reserve_i32_local(f);
         self.emit_builtin_arg_to_value(0, &value, f);
         self.emit_builtin_arg_to_value(1, &replacer, f);
         self.emit_builtin_arg_to_value(2, &space, f);
         let realm = self.emit_execution_realm(f);
+        let indent = s.reserve_i64_local(f);
+        json_i64(indent, 0, f);
+        let accumulator_opt = s
+            .reserve_gc_local::<StringAccumulator, Nullable>(f)
+            .initialize_null(s, f);
+        // Fast path when both `replacer` and `space` are `undefined`: skip
+        // callable, property-list, gap, wrapper-holder and plain-context checks.
+        replacer.tag().load(f);
+        f.instruction(&Instruction::I32Const(
+            WasmRuntimeValueTag::Undefined as i32,
+        ));
+        f.instruction(&Instruction::I32Eq);
+        space.tag().load(f);
+        f.instruction(&Instruction::I32Const(
+            WasmRuntimeValueTag::Undefined as i32,
+        ));
+        f.instruction(&Instruction::I32Eq);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        let property_list = s
+            .reserve_gc_local::<ValueArray, Nullable>(f)
+            .initialize_null(s, f);
+        let replacement = s.reserve_gc_local(f).initialize(s.stored_undefined(f), f);
+        let empty = self.emit_json_string("", f)?;
+        key.set_reference(&empty, s, f);
+        let accumulator = s
+            .reserve_gc_local(f)
+            .initialize(StringAccumulatorCursor::allocate(s, 128, f), f);
+        accumulator_opt.replace(accumulator.load(s, f).nullable(), f);
+        let stack_length = s.reserve_i32_local(f);
+        json_i32(stack_length, 8, f);
+        let stack = s.reserve_gc_local(f).initialize(
+            s.array_type::<JsonStringifyStack>()
+                .filled(GcOperand::null_eq(), stack_length, f),
+            f,
+        );
+        s.release_i32_local(stack_length, f);
+        let context = s.reserve_gc_local(f).initialize(
+            s.struct_type::<JsonStringifyContext>().construct(
+                (
+                    GcOperand::reference(&realm, s),
+                    GcOperand::reference(&replacement, s),
+                    GcOperand::reference(&property_list, s),
+                    GcOperand::reference(&empty, s),
+                    GcOperand::reference(&accumulator, s),
+                    GcOperand::reference(&stack, s),
+                ),
+                f,
+            ),
+            f,
+        );
+        self.emit_json_stringify_plain_call(&value, &key, &context, indent, &appended, f)?;
+        context.clear(f);
+        stack.clear(f);
+        accumulator.clear(f);
+        empty.clear(f);
+        replacement.clear(f);
+        property_list.clear(f);
+        f.instruction(&Instruction::Else);
+        let holder = s.reserve_value_local(f);
+        let callable = s.reserve_i32_local(f);
         let property_list = s
             .reserve_gc_local::<ValueArray, Nullable>(f)
             .initialize_null(s, f);
@@ -463,7 +522,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        let gap = s
+        let gap_opt = s
             .reserve_gc_local::<StringValue, Nullable>(f)
             .initialize_null(s, f);
         space.tag().load(f);
@@ -473,17 +532,18 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
         let empty_gap = self.emit_json_string("", f)?;
-        gap.replace(empty_gap.load(s, f).nullable(), f);
+        gap_opt.replace(empty_gap.load(s, f).nullable(), f);
         empty_gap.clear(f);
         f.instruction(&Instruction::Else);
         let prepared_gap = self.emit_json_prepare_gap(&space, f)?;
-        gap.replace(prepared_gap.load(s, f).nullable(), f);
+        gap_opt.replace(prepared_gap.load(s, f).nullable(), f);
         prepared_gap.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         let gap = s
             .reserve_gc_local(f)
-            .initialize(gap.load(s, f).require_non_null(f), f);
+            .initialize(gap_opt.load(s, f).require_non_null(f), f);
+        gap_opt.clear(f);
         let replacement_opt = s
             .reserve_gc_local::<StoredValue, Nullable>(f)
             .initialize_null(s, f);
@@ -496,7 +556,9 @@ impl FunctionBuilder<'_> {
         replacement_opt.replace(s.stored_undefined(f).nullable(), f);
         f.instruction(&Instruction::Else);
         replacement_opt.replace(
-            s.struct_type::<StoredValue>().from_value(&replacer, f).nullable(),
+            s.struct_type::<StoredValue>()
+                .from_value(&replacer, f)
+                .nullable(),
             f,
         );
         self.pop_control(ControlFrameKind::If);
@@ -508,6 +570,7 @@ impl FunctionBuilder<'_> {
         let accumulator = s
             .reserve_gc_local(f)
             .initialize(StringAccumulatorCursor::allocate(s, 128, f), f);
+        accumulator_opt.replace(accumulator.load(s, f).nullable(), f);
         let stack_length = s.reserve_i32_local(f);
         json_i32(stack_length, 8, f);
         let stack = s.reserve_gc_local(f).initialize(
@@ -550,8 +613,6 @@ impl FunctionBuilder<'_> {
         callable.load(f);
         f.instruction(&Instruction::I32Eqz);
         fetched.store(f);
-        let indent = s.reserve_i64_local(f);
-        json_i64(indent, 0, f);
         // A plain context (no replacer function, no property list, an empty
         // gap) serializes through the hot entry, which also serves every
         // nested value; the general helper serves every other context.
@@ -565,31 +626,38 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         s.release_i32_local(plain, f);
         s.release_i32_local(fetched, f);
-        output.set_undefined(f);
-        self.emit_json_tag_test(&appended, WasmRuntimeValueTag::Undefined, f);
-        f.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, f);
-        let text = s
-            .reserve_gc_local(f)
-            .initialize(StringAccumulatorCursor::publish(&accumulator, s, f), f);
-        output.set_reference(&text, s, f);
-        text.clear(f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        self.completion().set_normal(&output, f);
-        s.release_i64_local(indent, f);
         context.clear(f);
         stack.clear(f);
         accumulator.clear(f);
         replacement.clear(f);
         gap.clear(f);
         property_list.clear(f);
-        realm.clear(f);
         s.release_i32_local(callable, f);
+        holder.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        output.set_undefined(f);
+        self.emit_json_tag_test(&appended, WasmRuntimeValueTag::Undefined, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let accumulator = s
+            .reserve_gc_local(f)
+            .initialize(accumulator_opt.load(s, f).require_non_null(f), f);
+        let text = s
+            .reserve_gc_local(f)
+            .initialize(StringAccumulatorCursor::publish(&accumulator, s, f), f);
+        output.set_reference(&text, s, f);
+        text.clear(f);
+        accumulator.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.completion().set_normal(&output, f);
+        accumulator_opt.clear(f);
+        s.release_i64_local(indent, f);
+        realm.clear(f);
         output.clear(f);
         appended.clear(f);
         key.clear(f);
-        holder.clear(f);
         space.clear(f);
         replacer.clear(f);
         value.clear(f);

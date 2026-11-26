@@ -1,10 +1,9 @@
 //! Each agent message owns primitive ID data and a native shared byte resource.
 
+use super::wasm_gc_host::TypedGcHostImport;
 use super::*;
 use scriptw_aot_wasm::{GcHostImport, GcHostLayout};
-use wasmtime::{
-    ArrayRef, ArrayRefPre, ArrayType, ExternRef, ExternType, FuncType, Mutability, Val, ValType,
-};
+use wasmtime::{ArrayRef, ArrayRefPre, ArrayType, ExternRef, FuncType, Mutability, Val, ValType};
 
 struct AgentResourceSignature {
     function: FuncType,
@@ -13,25 +12,45 @@ struct AgentResourceSignature {
 
 impl AgentResourceSignature {
     fn validate(function: FuncType, receive: bool) -> wasmtime::Result<Self> {
-        let params: Vec<_> = function.params().collect();
-        let results: Vec<_> = function.results().collect();
-        let (resource, bytes) = if receive {
-            let ([], [resource, ValType::I64, bytes]) = (params.as_slice(), results.as_slice())
-            else {
-                return Err(wasmtime::Error::msg(
-                    "agent receive requires resource, Int32 carrier and BigInt bytes",
-                ));
-            };
-            (resource, bytes)
-        } else {
-            let ([resource, ValType::I64, bytes], [ValType::I64]) =
-                (params.as_slice(), results.as_slice())
-            else {
-                return Err(wasmtime::Error::msg(
-                    "agent broadcast requires resource, Int32 carrier and BigInt bytes",
-                ));
-            };
-            (resource, bytes)
+        let (resource, bytes) = {
+            let mut params = function.params();
+            let mut results = function.results();
+            if receive {
+                let (None, Some(resource), Some(ValType::I64), Some(bytes), None) = (
+                    params.next(),
+                    results.next(),
+                    results.next(),
+                    results.next(),
+                    results.next(),
+                ) else {
+                    return Err(wasmtime::Error::msg(
+                        "agent receive requires resource, Int32 carrier and BigInt bytes",
+                    ));
+                };
+                (resource, bytes)
+            } else {
+                let (
+                    Some(resource),
+                    Some(ValType::I64),
+                    Some(bytes),
+                    None,
+                    Some(ValType::I64),
+                    None,
+                ) = (
+                    params.next(),
+                    params.next(),
+                    params.next(),
+                    params.next(),
+                    results.next(),
+                    results.next(),
+                )
+                else {
+                    return Err(wasmtime::Error::msg(
+                        "agent broadcast requires resource, Int32 carrier and BigInt bytes",
+                    ));
+                };
+                (resource, bytes)
+            }
         };
         let resource = resource
             .as_ref()
@@ -72,21 +91,15 @@ impl AgentResourceSignature {
 }
 
 fn signature(
-    module: &WasmtimeModule,
-    row: GcHostImport,
+    import: TypedGcHostImport<'_>,
     receive: bool,
 ) -> Result<Option<AgentResourceSignature>, EngineError> {
-    let mut imports = module
-        .imports()
-        .filter(|import| import.module() == row.module() && import.name() == row.name());
-    let Some(import) = imports.next() else {
+    let Some(function) = import.into_func(
+        "duplicate agent resource import",
+        "agent resource import is not a function",
+    )?
+    else {
         return Ok(None);
-    };
-    if imports.next().is_some() {
-        return Err(EngineError::new("duplicate agent resource import"));
-    }
-    let ExternType::Func(function) = import.ty() else {
-        return Err(EngineError::new("agent resource import is not a function"));
     };
     AgentResourceSignature::validate(function, receive)
         .map(Some)
@@ -103,10 +116,11 @@ fn decimal_id(bytes: Vec<u8>) -> wasmtime::Result<WasmAgentMessageId> {
 
 pub(super) fn link(
     linker: &mut WasmtimeLinker<WasmHostState>,
-    module: &WasmtimeModule,
+    broadcast_import: TypedGcHostImport<'_>,
+    receive_import: TypedGcHostImport<'_>,
 ) -> Result<(), EngineError> {
     let row = GcHostImport::AgentBroadcastResource;
-    if let Some(signature) = signature(module, row, false)? {
+    if let Some(signature) = signature(broadcast_import, false)? {
         linker
             .func_new(
                 row.module(),
@@ -170,7 +184,7 @@ pub(super) fn link(
             })?;
     }
     let row = GcHostImport::AgentReceiveResource;
-    if let Some(signature) = signature(module, row, true)? {
+    if let Some(signature) = signature(receive_import, true)? {
         linker
             .func_new(
                 row.module(),

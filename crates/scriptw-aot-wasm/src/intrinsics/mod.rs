@@ -4,7 +4,6 @@
 use super::*;
 use crate::objects::{AccessorDescriptor, AccessorDescriptorLocals};
 
-mod abstract_module_source;
 mod accessor_allocation;
 pub(crate) mod array;
 pub(crate) mod binary_data;
@@ -23,7 +22,6 @@ mod property_publication;
 pub(crate) use property_layouts::IntrinsicPropertyLayoutId;
 mod property_layout_values;
 pub(crate) mod regexp;
-pub(crate) mod shadow_realm;
 pub(crate) mod temporal;
 
 /// The completed Realm and public values borrowed by one family installer.
@@ -124,8 +122,8 @@ impl FunctionBuilder<'_> {
             function,
         );
         assert!(
-            crate::heap::DemandConstructor::from_slot(slot).is_none(),
-            "a demand constructor slot is read only through its gate"
+            !crate::heap::is_demand_intrinsic_slot(slot),
+            "a demand intrinsic slot is read only through its gate"
         );
         let index = schema.reserve_i32_local(function);
         function.instruction(&Instruction::I32Const(slot.gc_index() as i32));
@@ -225,14 +223,6 @@ impl FunctionBuilder<'_> {
         let slot = crate::module::canonical_host_function_realm_slot(builtin)
             .ok_or_else(|| EmitError::unsupported("host intrinsic has no canonical Realm slot"))?;
         let schema = self.runtime_schema();
-        let value = schema.reserve_value_local(function);
-        self.emit_load_intrinsic_for_installation(realm.realm(), slot, &value, function);
-        value.tag().load(function);
-        function.instruction(&Instruction::I32Const(
-            crate::WasmRuntimeValueTag::Undefined as i32,
-        ));
-        function.instruction(&Instruction::I32Eq);
-        function.instruction(&Instruction::If(BlockType::Empty));
         let meta = self
             .functions
             .get(&builtin.function_id())
@@ -243,6 +233,17 @@ impl FunctionBuilder<'_> {
                     builtin.as_str()
                 ))
             })?;
+        let value = schema.reserve_value_local(function);
+        let demand = crate::heap::is_demand_intrinsic_slot(slot);
+        if !demand {
+            self.emit_load_intrinsic_for_installation(realm.realm(), slot, &value, function);
+            value.tag().load(function);
+            function.instruction(&Instruction::I32Const(
+                crate::WasmRuntimeValueTag::Undefined as i32,
+            ));
+            function.instruction(&Instruction::I32Eq);
+            function.instruction(&Instruction::If(BlockType::Empty));
+        }
         let callable = schema.reserve_gc_local(function).initialize(
             self.emit_function_value_payload_in_realm(&meta, realm, function)?,
             function,
@@ -250,7 +251,9 @@ impl FunctionBuilder<'_> {
         value.set_reference(&callable, schema, function);
         self.emit_store_non_array_realm_intrinsic(realm.realm(), slot, &value, function);
         callable.clear(function);
-        function.instruction(&Instruction::End);
+        if !demand {
+            function.instruction(&Instruction::End);
+        }
         let callable = schema.reserve_gc_local(function).initialize(
             value.cast_reference::<crate::gc_types::FunctionObject>(schema, function),
             function,

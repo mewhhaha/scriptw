@@ -364,6 +364,12 @@ fn only_insertion_compaction_and_deletion_write_a_dictionary_table() {
     assert_eq!(
         non_read_uses(&sources, "OrdinaryPropertyStorageSchema::LENGTH"),
         expected(&[
+            // Commits the final fresh row count once after all rows [0..count) are populated.
+            (
+                "objects/fresh_publication.rs",
+                "compile_fresh_data_properties_publish_helper",
+                "write"
+            ),
             (
                 "objects/property_storage.rs",
                 "emit_ordinary_insert_in_dictionary",

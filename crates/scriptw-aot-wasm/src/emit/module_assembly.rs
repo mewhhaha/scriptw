@@ -1497,6 +1497,10 @@ fn emit_script_module_with_factory(
         register_runtime_helper!(StringConcat, compile_string_concat_helper);
         register_runtime_helper!(StringConcatThree, compile_string_concat_three_helper);
         register_runtime_helper!(
+            StringConcatStringNumber,
+            compile_string_concat_string_number_helper
+        );
+        register_runtime_helper!(
             LexicalBindingUninitialized,
             compile_lexical_binding_uninitialized_helper
         );

@@ -1,7 +1,7 @@
 //! First data properties of a fresh plain object, published in one call.
 use super::property_storage::{FreshDictionaryCursor, PreparedOrdinaryPropertyKey};
 use super::*;
-use crate::gc_types::{IntrinsicPropertyValueCache, PooledStringTable};
+use crate::gc_types::{IntrinsicPropertyValueCache, NumberBitsI64Array, PooledStringTable};
 
 /// The three data attributes of one fresh row, packed as the emitter writes
 /// them into the row's flag word.
@@ -54,6 +54,11 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Ne);
         s.array_type::<OrdinaryPropertyIndex>()
             .length(&p.flags, s, &mut f);
+        count.load(&mut f);
+        f.instruction(&Instruction::I32Ne);
+        f.instruction(&Instruction::I32Or);
+        s.array_type::<NumberBitsI64Array>()
+            .length(&p.hashes, s, &mut f);
         count.load(&mut f);
         f.instruction(&Instruction::I32Ne);
         f.instruction(&Instruction::I32Or);
@@ -212,10 +217,12 @@ impl FunctionBuilder<'_> {
             &mut f,
         );
         value.clear(&mut f);
-        // All fresh keys are non-null Strings; hash directly and delegate the
-        // PropertyEntry construction to emit_ordinary_insert_in_dictionary.
-        self.emit_string_key_hash(&text, hash, &mut f);
-        self.emit_key_hash_constant_tag_mix(WasmRuntimeValueTag::String, hash, &mut f);
+        // All fresh keys are non-null Strings with compile-time precomputed
+        // property key hashes; delegate PropertyEntry creation to
+        // emit_ordinary_insert_in_dictionary.
+        s.array_type::<NumberBitsI64Array>()
+            .read(&p.hashes, row, s, &mut f)
+            .store_i64(hash, &mut f);
         let prepared = PreparedOrdinaryPropertyKey {
             key: &dummy_key,
             hash,
@@ -245,6 +252,12 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
+        s.field(OrdinaryPropertyStorageSchema::LENGTH).write(
+            &storage,
+            GcOperand::i32_local(count),
+            s,
+            &mut f,
+        );
         dummy_key.clear(&mut f);
         s.release_i64_local(hash, &mut f);
         s.release_i32_local(configurable, &mut f);

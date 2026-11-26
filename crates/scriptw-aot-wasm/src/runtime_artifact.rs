@@ -197,7 +197,15 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 91 adds DeferredLegacyArguments (lazy sloppy-function `.arguments`
 // materialization) and widens LegacyReflectionPropertyState.EXPECTED_VALUE to
 // PropertyValue.
-const LAYOUT_VERSION: u32 = 91;
+// Version 92 adds StringConcatStringNumber, moves remaining demand prototypes
+// (37 plain + Number/Boolean boxed), 3 dynamic function constructors,
+// Object/Function/String constructors, parseInt/parseFloat, and
+// Reflect/Math/JSON/Atomics namespaces to demand initialization in
+// RealmEnsureConstructor (making RealmInitializeIntrinsics return Void),
+// precomputes 64-bit property key hashes for FreshDataPropertiesPublish, and
+// optimizes JSON.parse, String replaceAll/replace/split, Array push/join/sort,
+// and decimal integer formatting.
+const LAYOUT_VERSION: u32 = 92;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

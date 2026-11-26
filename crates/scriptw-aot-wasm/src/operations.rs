@@ -22,6 +22,7 @@ mod loose_equality;
 mod number_remainder;
 mod number_to_string;
 mod property_key_hash;
+pub(crate) use property_key_hash::string_property_key_hash;
 mod relational_comparison;
 mod scalar_number;
 mod strict_singleton;

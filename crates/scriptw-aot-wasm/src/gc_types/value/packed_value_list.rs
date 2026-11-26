@@ -31,6 +31,31 @@ impl PackedValueListConstruction {
         Self { values, length }
     }
 
+    /// Allocates an exact 1-element packed list containing one present data
+    /// value, ready for immediate publication as a singleton Array.
+    pub(crate) fn singleton(
+        value: &ValueLocals,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) -> Self {
+        let stored = schema.reserve_gc_local(function).initialize(
+            schema
+                .struct_type::<StoredValue>()
+                .from_value(value, function),
+            function,
+        );
+        let values = schema.reserve_gc_local(function).initialize(
+            schema
+                .array_type::<PackedValueTable>()
+                .fixed([GcOperand::nullable_reference(&stored, schema)], function),
+            function,
+        );
+        stored.clear(function);
+        let length = schema.reserve_i32_local(function);
+        length.set_constant(1, function);
+        Self { values, length }
+    }
+
     /// Appends one present ordinary data value. Slots past the count stay
     /// null, which is a hole, so publication needs no fill or copy.
     pub(crate) fn append(

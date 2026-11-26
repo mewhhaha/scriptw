@@ -4,7 +4,10 @@
 //! The canonical slot holds the Undefined placeholder until then.
 
 use super::*;
-use crate::heap::DemandConstructor;
+use crate::heap::{
+    DemandBoxedPrototype, DemandConstructor, DemandDynamicFunction, DemandGlobalRecipe,
+    DemandHostFunction, DemandNamespace, DemandPrototype,
+};
 use crate::intrinsics::property_layouts::IntrinsicPropertyRecipe;
 use crate::runtime_helpers::{HelperParameters, RealmEnsureConstructorParameters};
 
@@ -78,21 +81,152 @@ impl FunctionBuilder<'_> {
             function.instruction(&Instruction::I32Const(demand.slot().gc_index() as i32));
             function.instruction(&Instruction::I32Eq);
             self.open_frame(ControlFrameKind::If, &mut function);
-            let prototype = schema.reserve_value_local(&mut function);
-            self.emit_load_non_array_realm_intrinsic(
-                &parameters.realm,
-                demand.prototype_slot(),
-                &prototype,
-                &mut function,
-            );
-            let constructor = self.init_builtin_constructor_object(
+            self.emit_bootstrap_constructor_from_slot(
                 demand.builtin(),
                 &context,
-                &prototype,
+                demand.prototype_slot(),
                 &mut function,
             )?;
-            constructor.clear(&mut function);
-            prototype.clear(&mut function);
+            function.instruction(&Instruction::Return);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        }
+        for demand in DemandPrototype::ALL {
+            parameters.slot.load(&mut function);
+            function.instruction(&Instruction::I32Const(demand.slot().gc_index() as i32));
+            function.instruction(&Instruction::I32Eq);
+            self.open_frame(ControlFrameKind::If, &mut function);
+            let parent = schema.reserve_value_local(&mut function);
+            self.emit_load_non_array_realm_intrinsic(
+                &parameters.realm,
+                demand.parent_slot(),
+                &parent,
+                &mut function,
+            );
+            self.emit_bootstrap_plain_prototype(&context, demand.slot(), &parent, &mut function)?;
+            parent.clear(&mut function);
+            function.instruction(&Instruction::Return);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        }
+        for demand in DemandBoxedPrototype::ALL {
+            parameters.slot.load(&mut function);
+            function.instruction(&Instruction::I32Const(demand.slot().gc_index() as i32));
+            function.instruction(&Instruction::I32Eq);
+            self.open_frame(ControlFrameKind::If, &mut function);
+            let parent = schema.reserve_value_local(&mut function);
+            self.emit_load_non_array_realm_intrinsic(
+                &parameters.realm,
+                NonArrayRealmIntrinsicSlot::ObjectPrototype,
+                &parent,
+                &mut function,
+            );
+            let primitive = schema.reserve_value_local(&mut function);
+            match demand {
+                DemandBoxedPrototype::Number => {
+                    primitive.set_scalar(ScalarValue::NumberBits(0), &mut function);
+                }
+                DemandBoxedPrototype::Boolean => {
+                    primitive.set_scalar(ScalarValue::Boolean(false), &mut function);
+                }
+            }
+            self.emit_bootstrap_boxed_prototype(
+                &context,
+                demand.slot(),
+                &parent,
+                &primitive,
+                &mut function,
+            )?;
+            primitive.clear(&mut function);
+            parent.clear(&mut function);
+            function.instruction(&Instruction::Return);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        }
+        for demand in DemandDynamicFunction::ALL {
+            if self
+                .functions
+                .get(&demand.builtin().function_id())
+                .is_none()
+            {
+                continue;
+            }
+            parameters.slot.load(&mut function);
+            function.instruction(&Instruction::I32Const(demand.slot().gc_index() as i32));
+            function.instruction(&Instruction::I32Eq);
+            self.open_frame(ControlFrameKind::If, &mut function);
+            self.emit_bootstrap_dynamic_function_intrinsic(
+                demand.builtin(),
+                demand.prototype_slot(),
+                demand.slot(),
+                &context,
+                &mut function,
+            )?;
+            function.instruction(&Instruction::Return);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        }
+        for demand in DemandHostFunction::ALL {
+            if self
+                .functions
+                .get(&demand.builtin().function_id())
+                .is_none()
+            {
+                continue;
+            }
+            parameters.slot.load(&mut function);
+            function.instruction(&Instruction::I32Const(demand.slot().gc_index() as i32));
+            function.instruction(&Instruction::I32Eq);
+            self.open_frame(ControlFrameKind::If, &mut function);
+            let callable = self.emit_intrinsic_canonical_host_callable(
+                demand.builtin(),
+                &context,
+                &mut function,
+            )?;
+            callable.clear(&mut function);
+            function.instruction(&Instruction::Return);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        }
+        for demand in DemandNamespace::ALL {
+            if !(self.runtime_bootstrap_plan.full_standard_globals
+                || self.strings.has_intrinsic_property_layout(demand.layout())?)
+            {
+                continue;
+            }
+            parameters.slot.load(&mut function);
+            function.instruction(&Instruction::I32Const(demand.slot().gc_index() as i32));
+            function.instruction(&Instruction::I32Eq);
+            self.open_frame(ControlFrameKind::If, &mut function);
+            let object_prototype = schema.reserve_value_local(&mut function);
+            self.emit_load_non_array_realm_intrinsic(
+                &parameters.realm,
+                NonArrayRealmIntrinsicSlot::ObjectPrototype,
+                &object_prototype,
+                &mut function,
+            );
+            let namespace = match demand {
+                DemandNamespace::Reflect => {
+                    self.init_reflect_object(&context, &object_prototype, &mut function)?
+                }
+                DemandNamespace::Math => {
+                    self.init_math_object(&context, &object_prototype, &mut function)?
+                }
+                DemandNamespace::Json => {
+                    self.init_json_object(&context, &object_prototype, &mut function)?
+                }
+                DemandNamespace::Atomics => {
+                    self.init_atomics_object(&context, &object_prototype, &mut function)?
+                }
+            };
+            self.emit_store_non_array_realm_intrinsic(
+                &parameters.realm,
+                demand.slot(),
+                &namespace,
+                &mut function,
+            );
+            namespace.clear(&mut function);
+            object_prototype.clear(&mut function);
             function.instruction(&Instruction::Return);
             self.pop_control(ControlFrameKind::If);
             function.instruction(&Instruction::End);
@@ -107,9 +241,9 @@ impl FunctionBuilder<'_> {
 
     /// The recipe a global binding publishes at its original position and
     /// attributes. Its first semantic read performs the canonical read.
-    pub(super) fn emit_deferred_demand_constructor_value(
+    pub(super) fn emit_deferred_demand_recipe_value(
         &mut self,
-        demand: DemandConstructor,
+        demand: DemandGlobalRecipe,
         realm: &RealmFunctionMaterializationContext,
         function: &mut Function,
     ) -> Result<GcLocal<PropertyValue>, EmitError> {

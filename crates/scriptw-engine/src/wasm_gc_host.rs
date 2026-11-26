@@ -8,12 +8,107 @@ use wasmtime::{ExternRef, Rooted};
 #[cfg(test)]
 mod tests;
 
-fn imports_native_source_compiler(module: &WasmtimeModule) -> bool {
-    module.imports().any(|import| {
-        GcHostImport::SOURCE_COMPILERS
+#[derive(Default)]
+pub(super) enum TypedGcHostImport<'module> {
+    #[default]
+    Missing,
+    Single(wasmtime::ImportType<'module>),
+    Duplicate,
+}
+
+impl<'module> TypedGcHostImport<'module> {
+    pub(super) fn record(&mut self, import: wasmtime::ImportType<'module>) {
+        *self = match core::mem::replace(self, Self::Missing) {
+            Self::Missing => Self::Single(import),
+            Self::Single(_) | Self::Duplicate => Self::Duplicate,
+        };
+    }
+
+    pub(super) fn is_present(&self) -> bool {
+        !matches!(self, Self::Missing)
+    }
+
+    pub(super) fn into_func(
+        self,
+        duplicate_error: &str,
+        non_func_error: &str,
+    ) -> Result<Option<wasmtime::FuncType>, EngineError> {
+        match self {
+            Self::Missing => Ok(None),
+            Self::Duplicate => Err(EngineError::new(duplicate_error)),
+            Self::Single(import) => match import.ty() {
+                wasmtime::ExternType::Func(function) => Ok(Some(function)),
+                _ => Err(EngineError::new(non_func_error)),
+            },
+        }
+    }
+}
+
+#[derive(Default)]
+struct ScannedGcHostImports<'module> {
+    agent_broadcast: TypedGcHostImport<'module>,
+    agent_receive: TypedGcHostImport<'module>,
+    byte_array_allocate: TypedGcHostImport<'module>,
+    compile_dynamic_function: TypedGcHostImport<'module>,
+    compile_global_script: TypedGcHostImport<'module>,
+    compile_direct_eval: TypedGcHostImport<'module>,
+    intl_provider_call: TypedGcHostImport<'module>,
+    system_time_zone_snapshot: TypedGcHostImport<'module>,
+}
+
+impl<'module> ScannedGcHostImports<'module> {
+    fn scan(module: &'module WasmtimeModule) -> Self {
+        let mut scanned = Self::default();
+        let host_module = GcHostImport::CollectGc.module();
+        debug_assert!(GcHostImport::ALL
             .iter()
-            .any(|row| import.module() == row.module() && import.name() == row.name())
-    })
+            .all(|row| row.module() == host_module));
+        for import in module.imports() {
+            if import.module() != host_module {
+                continue;
+            }
+            let slot = match import.name() {
+                name if name == GcHostImport::AgentBroadcastResource.name() => {
+                    &mut scanned.agent_broadcast
+                }
+                name if name == GcHostImport::AgentReceiveResource.name() => {
+                    &mut scanned.agent_receive
+                }
+                name if name == GcHostImport::ByteArrayAllocate.name() => {
+                    &mut scanned.byte_array_allocate
+                }
+                name if name == GcHostImport::CompileDynamicFunction.name() => {
+                    &mut scanned.compile_dynamic_function
+                }
+                name if name == GcHostImport::CompileGlobalScript.name() => {
+                    &mut scanned.compile_global_script
+                }
+                name if name == GcHostImport::CompileDirectEval.name() => {
+                    &mut scanned.compile_direct_eval
+                }
+                name if name == GcHostImport::IntlProviderCall.name() => {
+                    &mut scanned.intl_provider_call
+                }
+                name if name == GcHostImport::SystemTimeZoneSnapshot.name() => {
+                    &mut scanned.system_time_zone_snapshot
+                }
+                _ => continue,
+            };
+            slot.record(import);
+        }
+        scanned
+    }
+
+    fn has_native_source_compiler(&self) -> bool {
+        self.compile_dynamic_function.is_present()
+            || self.compile_global_script.is_present()
+            || self.compile_direct_eval.is_present()
+    }
+}
+
+#[cfg(test)]
+fn imports_native_source_compiler(module: &WasmtimeModule) -> bool {
+    ScannedGcHostImports::scan(module).has_native_source_compiler()
 }
 
 pub(super) fn resource(
@@ -47,8 +142,10 @@ pub(super) fn link(
     linker: &mut WasmtimeLinker<WasmHostState>,
     module: &WasmtimeModule,
 ) -> Result<(), EngineError> {
+    let scanned = ScannedGcHostImports::scan(module);
+    let has_native_source_compiler = scanned.has_native_source_compiler();
     #[cfg(not(feature = "native-source-compiler"))]
-    if imports_native_source_compiler(module) {
+    if has_native_source_compiler {
         return Err(EngineError::new(
             "native source compilation is unavailable in this build; enable native-source-compiler",
         ));
@@ -155,7 +252,7 @@ pub(super) fn link(
         )
         .map_err(bind_error)?;
 
-    wasm_agent_resource_host::link(linker, module)?;
+    wasm_agent_resource_host::link(linker, scanned.agent_broadcast, scanned.agent_receive)?;
 
     let import = GcHostImport::RegisterAsyncWaiter;
     linker
@@ -239,18 +336,22 @@ pub(super) fn link(
             },
         )
         .map_err(bind_error)?;
-    wasm_gc_byte_array_host::link(linker, module)?;
+    wasm_gc_byte_array_host::link(linker, scanned.byte_array_allocate)?;
     // Portable R has no native source compiler imports. Avoid entering these
     // larger binding routines for an immutable module that needs none of them.
     // A present name still enters every original validator, regardless of its
     // type or the Store's compiler context (which may be armed after linking).
     #[cfg(feature = "native-source-compiler")]
-    if imports_native_source_compiler(module) {
-        wasm_native_function_compiler::link(linker, module)?;
-        wasm_native_global_script_compiler::link(linker, module)?;
-        wasm_native_direct_eval_compiler::link(linker, module)?;
+    if has_native_source_compiler {
+        wasm_native_function_compiler::link(linker, scanned.compile_dynamic_function)?;
+        wasm_native_global_script_compiler::link(linker, scanned.compile_global_script)?;
+        wasm_native_direct_eval_compiler::link(linker, scanned.compile_direct_eval)?;
     }
-    wasm_gc_intl_host::link(linker, module)?;
+    wasm_gc_intl_host::link_imports(
+        linker,
+        scanned.intl_provider_call,
+        scanned.system_time_zone_snapshot,
+    )?;
     wasm_gc_weak_host::link(linker)?;
     Ok(())
 }

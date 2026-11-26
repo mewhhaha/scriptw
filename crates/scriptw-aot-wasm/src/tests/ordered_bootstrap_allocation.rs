@@ -90,8 +90,8 @@ fn eager_layout_births_keep_demand_recipe_and_constructor_allocation_owners() {
     let constructor_calls = calls(&bootstrap, constructor);
     assert_eq!(
         constructor_calls.len(),
-        7,
-        "all eager constructors retain the shared Context/FunctionObject cycle; demand constructors are built on first read"
+        1,
+        "the eager Array constructor retains the shared Context/FunctionObject cycle; dynamic-function and other demand constructors are built on first read"
     );
     let layouts = allocations(&bootstrap, type_index::<IntrinsicPropertyStorage>(schema));
     for (position, &callable) in constructor_calls.iter().enumerate() {
@@ -301,10 +301,9 @@ fn eager_layout_births_keep_demand_recipe_and_constructor_allocation_owners() {
             nullable_reference(type_index::<Environment>(schema)),
         ]
     );
-    assert_eq!(
-        signature.results(),
-        [nullable_reference(type_index::<OrdinaryObject>(schema)); 4],
-        "eager bootstrap returns Reflect, Math, JSON and Atomics; Intl remains a defining-Realm recipe"
+    assert!(
+        signature.results().is_empty(),
+        "eager bootstrap returns nothing; Reflect, Math, JSON, Atomics, Intl and Temporal remain defining-Realm recipes"
     );
     let wasmparser::CompositeInnerType::Func(signature) = &types
         [declarations[batch as usize] as usize]

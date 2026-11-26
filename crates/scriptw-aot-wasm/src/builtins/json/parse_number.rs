@@ -39,20 +39,16 @@ struct JsonNumberLocals {
 impl FunctionBuilder<'_> {
     pub(super) fn emit_json_parse_number(
         &mut self,
-        text: &GcLocal<StringValue>,
-        index: I64Local,
-        length: I64Local,
+        cursor: &JsonCursor<'_>,
         realm: &GcLocal<RealmRecord>,
         message: RuntimeErrorMessage,
         out: &ValueLocals,
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
-        let cursor = JsonCursor::open(text, index, length, s, f);
         let start = s.reserve_i32_local(f);
         let unit = s.reserve_i32_local(f);
         let negative = s.reserve_i32_local(f);
-        let exponent_negative = s.reserve_i32_local(f);
         let number = JsonNumberLocals {
             significand: s.reserve_i64_local(f),
             scale: s.reserve_i64_local(f),
@@ -62,10 +58,7 @@ impl FunctionBuilder<'_> {
         cursor.at.load(f);
         start.store(f);
         negative.set_constant(0, f);
-        exponent_negative.set_constant(0, f);
         number.significand.set_constant(0, f);
-        number.scale.set_constant(0, f);
-        number.exponent.set_constant(0, f);
         number.inexact.set_constant(0, f);
         cursor.peek(unit, s, f);
         unit.load(f);
@@ -82,9 +75,10 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
         cursor.advance(f);
+        cursor.peek(unit, s, f);
         f.instruction(&Instruction::Else);
         self.emit_json_number_digits(
-            &cursor,
+            cursor,
             unit,
             &number,
             JsonDigits::Integer,
@@ -94,14 +88,54 @@ impl FunctionBuilder<'_> {
         )?;
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        cursor.peek(unit, s, f);
+
+        // Fast path for exact plain integers (no `.` or `e`/`E`, exact within 2^53).
+        // Both integer arms above leave `unit == cursor.peek()`.
+        let bits = s.reserve_i64_local(f);
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(46));
+        f.instruction(&Instruction::I32Ne);
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(32));
+        f.instruction(&Instruction::I32Or);
+        f.instruction(&Instruction::I32Const(101));
+        f.instruction(&Instruction::I32Ne);
+        f.instruction(&Instruction::I32And);
+        number.inexact.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32And);
+        number.significand.load(f);
+        f.instruction(&Instruction::I64Const(EXACT_SIGNIFICAND_LIMIT));
+        f.instruction(&Instruction::I64LeU);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        let value = s.reserve_f64_local(f);
+        number.significand.load(f);
+        f.instruction(&Instruction::F64ConvertI64U);
+        value.store(f);
+        negative.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        value.load(f);
+        f.instruction(&Instruction::F64Neg);
+        value.store(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        value.load(f);
+        f.instruction(&Instruction::I64ReinterpretF64);
+        bits.store(f);
+        s.release_f64_local(value, f);
+        f.instruction(&Instruction::Else);
+        let exponent_negative = s.reserve_i32_local(f);
+        exponent_negative.set_constant(0, f);
+        number.scale.set_constant(0, f);
+        number.exponent.set_constant(0, f);
         unit.load(f);
         f.instruction(&Instruction::I32Const(46));
         f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
         cursor.advance(f);
         self.emit_json_number_digits(
-            &cursor,
+            cursor,
             unit,
             &number,
             JsonDigits::Fraction,
@@ -111,7 +145,6 @@ impl FunctionBuilder<'_> {
         )?;
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        cursor.peek(unit, s, f);
         unit.load(f);
         f.instruction(&Instruction::I32Const(32));
         f.instruction(&Instruction::I32Or);
@@ -136,7 +169,7 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.emit_json_number_digits(
-            &cursor,
+            cursor,
             unit,
             &number,
             JsonDigits::Exponent,
@@ -164,7 +197,6 @@ impl FunctionBuilder<'_> {
         number.scale.load(f);
         f.instruction(&Instruction::I64Sub);
         decimal_exponent.store(f);
-        let bits = s.reserve_i64_local(f);
         let exact = s.reserve_i32_local(f);
         number.significand.load(f);
         f.instruction(&Instruction::I64Eqz);
@@ -188,17 +220,9 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::Else);
         // The token is a validated StrDecimalLiteral with its sign, the
         // span StringToNumber hands the same exact converter.
-        let from = s.reserve_i64_local(f);
-        let to = s.reserve_i64_local(f);
-        start.load(f);
-        f.instruction(&Instruction::I64ExtendI32U);
-        from.store(f);
-        cursor.at.load(f);
-        f.instruction(&Instruction::I64ExtendI32U);
-        to.store(f);
         let token = s
             .reserve_gc_local(f)
-            .initialize(self.emit_gc_string_slice(text, from, to, f), f);
+            .initialize(cursor.slice_string(start, cursor.at, self, f)?, f);
         s.call_helper(
             crate::runtime_helpers::DecimalToBinary64Arguments::new(&token),
             self.runtime_helper_base()?,
@@ -206,20 +230,19 @@ impl FunctionBuilder<'_> {
         )
         .store(bits, f);
         token.clear(f);
-        s.release_i64_local(to, f);
-        s.release_i64_local(from, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(exact, f);
+        s.release_i64_local(decimal_exponent, f);
+        s.release_i32_local(exponent_negative, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         out.set_number(bits, f);
-        cursor.close(index, s, f);
-        s.release_i32_local(exact, f);
         s.release_i64_local(bits, f);
-        s.release_i64_local(decimal_exponent, f);
         s.release_i32_local(number.inexact, f);
         s.release_i64_local(number.exponent, f);
         s.release_i64_local(number.scale, f);
         s.release_i64_local(number.significand, f);
-        s.release_i32_local(exponent_negative, f);
         s.release_i32_local(negative, f);
         s.release_i32_local(unit, f);
         s.release_i32_local(start, f);
@@ -230,7 +253,7 @@ impl FunctionBuilder<'_> {
     #[allow(clippy::too_many_arguments)]
     fn emit_json_number_digits(
         &mut self,
-        cursor: &JsonCursor,
+        cursor: &JsonCursor<'_>,
         unit: I32Local,
         number: &JsonNumberLocals,
         digits: JsonDigits,

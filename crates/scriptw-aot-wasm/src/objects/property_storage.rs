@@ -305,8 +305,10 @@ impl FunctionBuilder<'_> {
             schema,
             function,
         );
-        let final_length = if let Some(cursor) = fresh {
+        if let Some(cursor) = fresh {
             // Fresh dictionary has no tombstones and half load factor: probe until 0.
+            // FreshDataPropertiesPublish commits the dictionary length once after
+            // populating every row.
             let bucket = schema.reserve_i32_local(function);
             let ordinal = schema.reserve_i32_local(function);
             hash.load(function);
@@ -345,20 +347,17 @@ impl FunctionBuilder<'_> {
                 schema,
                 function,
             );
+            schema.release_i32_local(ordinal, function);
             schema.release_i32_local(bucket, function);
-            ordinal
         } else {
             self.emit_ordinary_property_index_publish(buckets, table, hash, position, function);
-            new_length_owned.expect("owned new_length")
-        };
-        schema.field(OrdinaryPropertyStorageSchema::LENGTH).write(
-            storage,
-            GcOperand::i32_local(final_length),
-            schema,
-            function,
-        );
-        if fresh.is_some() {
-            schema.release_i32_local(final_length, function);
+            let final_length = new_length_owned.expect("owned new_length");
+            schema.field(OrdinaryPropertyStorageSchema::LENGTH).write(
+                storage,
+                GcOperand::i32_local(final_length),
+                schema,
+                function,
+            );
         }
         entry.clear(function);
         stored_key.clear(function);

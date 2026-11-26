@@ -399,6 +399,113 @@ impl FunctionBuilder<'_> {
                 f.instruction(&Instruction::End);
                 s.release_i32_local(count32, f);
                 f.instruction(&Instruction::Else);
+                single_sep.load(f);
+                builder.open_frame(ControlFrameKind::If, f);
+                // Fast i32 loop for mixed (String/null/undefined) arrays joined
+                // by a 1-unit separator: hoist element 0 so every iteration
+                // writes sep_unit unconditionally without index/separator tests.
+                slot.set_constant(0, f);
+                let first_stored = s.reserve_gc_local(f).initialize(
+                    s.array_type::<PackedValueTable>()
+                        .read(&values, slot, s, f)
+                        .reference()
+                        .require_non_null(f),
+                    f,
+                );
+                s.field(StoredValueSchema::TAG)
+                    .read(&first_stored, s, f)
+                    .store(tag, f);
+                tag.load(f);
+                f.instruction(&Instruction::I32Const(ValueKind::String.tag() as i32));
+                f.instruction(&Instruction::I32Eq);
+                builder.open_frame(ControlFrameKind::If, f);
+                s.field(StoredValueSchema::REFERENCE)
+                    .read(&first_stored, s, f)
+                    .store_eq(element.reference(), f);
+                let first_text = s
+                    .reserve_gc_local(f)
+                    .initialize(element.cast_reference::<StringValue>(s, f), f);
+                let first_units = s.reserve_gc_local(f).initialize(
+                    s.field(StringValueSchema::CODE_UNITS)
+                        .read(&first_text, s, f)
+                        .reference(),
+                    f,
+                );
+                s.array_type::<CodeUnitArray>().length(&first_units, s, f);
+                part_length.store(f);
+                construction.copy_concatenated_units_from(offset, &first_units, part_length, s, f);
+                part_length.load(f);
+                offset.store(f);
+                first_units.clear(f);
+                first_text.clear(f);
+                builder.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+                first_stored.clear(f);
+                let count32 = s.reserve_i32_local(f);
+                length.load(f);
+                f.instruction(&Instruction::I32WrapI64);
+                count32.store(f);
+                slot.set_constant(1, f);
+                let mixed_done = builder.open_frame(ControlFrameKind::Block, f);
+                let mixed_loop = builder.open_frame(ControlFrameKind::Loop, f);
+                slot.load(f);
+                count32.load(f);
+                f.instruction(&Instruction::I32GeU);
+                builder.emit_branch_if_to_target(mixed_done, f);
+                construction.write(offset, sep_unit, s, f);
+                offset.load(f);
+                f.instruction(&Instruction::I32Const(1));
+                f.instruction(&Instruction::I32Add);
+                offset.store(f);
+                let stored = s.reserve_gc_local(f).initialize(
+                    s.array_type::<PackedValueTable>()
+                        .read(&values, slot, s, f)
+                        .reference()
+                        .require_non_null(f),
+                    f,
+                );
+                s.field(StoredValueSchema::TAG)
+                    .read(&stored, s, f)
+                    .store(tag, f);
+                tag.load(f);
+                f.instruction(&Instruction::I32Const(ValueKind::String.tag() as i32));
+                f.instruction(&Instruction::I32Eq);
+                builder.open_frame(ControlFrameKind::If, f);
+                s.field(StoredValueSchema::REFERENCE)
+                    .read(&stored, s, f)
+                    .store_eq(element.reference(), f);
+                let text = s
+                    .reserve_gc_local(f)
+                    .initialize(element.cast_reference::<StringValue>(s, f), f);
+                let units = s.reserve_gc_local(f).initialize(
+                    s.field(StringValueSchema::CODE_UNITS)
+                        .read(&text, s, f)
+                        .reference(),
+                    f,
+                );
+                s.array_type::<CodeUnitArray>().length(&units, s, f);
+                part_length.store(f);
+                construction.copy_concatenated_units_from(offset, &units, part_length, s, f);
+                offset.load(f);
+                part_length.load(f);
+                f.instruction(&Instruction::I32Add);
+                offset.store(f);
+                units.clear(f);
+                text.clear(f);
+                builder.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+                stored.clear(f);
+                slot.load(f);
+                f.instruction(&Instruction::I32Const(1));
+                f.instruction(&Instruction::I32Add);
+                slot.store(f);
+                builder.emit_branch_to_target(mixed_loop, f);
+                builder.pop_control(ControlFrameKind::Loop);
+                f.instruction(&Instruction::End);
+                builder.pop_control(ControlFrameKind::Block);
+                f.instruction(&Instruction::End);
+                s.release_i32_local(count32, f);
+                f.instruction(&Instruction::Else);
                 index.set_constant(0, f);
                 let copied = builder.open_frame(ControlFrameKind::Block, f);
                 let copy = builder.open_frame(ControlFrameKind::Loop, f);
@@ -414,14 +521,6 @@ impl FunctionBuilder<'_> {
                 f.instruction(&Instruction::I32Eqz);
                 f.instruction(&Instruction::I32And);
                 builder.open_frame(ControlFrameKind::If, f);
-                single_sep.load(f);
-                builder.open_frame(ControlFrameKind::If, f);
-                construction.write(offset, sep_unit, s, f);
-                offset.load(f);
-                f.instruction(&Instruction::I32Const(1));
-                f.instruction(&Instruction::I32Add);
-                offset.store(f);
-                f.instruction(&Instruction::Else);
                 construction.copy_concatenated_units_from(
                     offset,
                     &separator_units,
@@ -433,8 +532,6 @@ impl FunctionBuilder<'_> {
                 separator_length.load(f);
                 f.instruction(&Instruction::I32Add);
                 offset.store(f);
-                builder.pop_control(ControlFrameKind::If);
-                f.instruction(&Instruction::End);
                 builder.pop_control(ControlFrameKind::If);
                 f.instruction(&Instruction::End);
                 // No user code occurs between proof and these reads. The backing,
@@ -485,6 +582,8 @@ impl FunctionBuilder<'_> {
                 builder.pop_control(ControlFrameKind::Loop);
                 f.instruction(&Instruction::End);
                 builder.pop_control(ControlFrameKind::Block);
+                f.instruction(&Instruction::End);
+                builder.pop_control(ControlFrameKind::If);
                 f.instruction(&Instruction::End);
                 builder.pop_control(ControlFrameKind::If);
                 f.instruction(&Instruction::End);

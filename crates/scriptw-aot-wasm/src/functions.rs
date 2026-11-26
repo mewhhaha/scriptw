@@ -290,6 +290,10 @@ pub(crate) enum NonArrayRealmIntrinsicSlot {
     SharedArrayBufferPrototype,
     DataViewPrototype,
     TypedArrayPrototype,
+    ReflectObject,
+    MathObject,
+    JsonObject,
+    AtomicsObject,
 }
 
 macro_rules! error_message_constructor_kinds {
@@ -397,7 +401,7 @@ error_message_constructor_kinds! {
 /// actual caller.
 impl NonArrayRealmIntrinsicSlot {
     pub(crate) const ARRAY_INDEX: u32 = 0;
-    pub(crate) const TABLE_LENGTH: u32 = 179;
+    pub(crate) const TABLE_LENGTH: u32 = 183;
 
     pub(crate) const fn is_date(self) -> bool {
         matches!(self, Self::DateConstructor | Self::DatePrototype)
@@ -745,6 +749,10 @@ impl NonArrayRealmIntrinsicSlot {
             Self::SharedArrayBufferPrototype => 151,
             Self::DataViewPrototype => 152,
             Self::TypedArrayPrototype => 153,
+            Self::ReflectObject => 179,
+            Self::MathObject => 180,
+            Self::JsonObject => 181,
+            Self::AtomicsObject => 182,
         }
     }
 }

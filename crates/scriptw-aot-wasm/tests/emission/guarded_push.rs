@@ -172,8 +172,12 @@ fn fixed_push_proves_actual_native_then_keeps_argument_allocations_in_fallback()
                     "the saved actual callable supplies the execution Realm");
                 assert!(body[..direct].iter().any(|op| matches!(op, Operator::RefEq)),
                     "the actual execution Realm is compared with the caller Realm");
-                assert_eq!(source_allocations(&body[..direct]), source_allocations(control),
-                    "successful fixed push allocates no per-argument StoredValue snapshots");
+                let inline_packed_value_stored = usize::from(arity == 1);
+                assert_eq!(
+                    source_allocations(&body[..direct]),
+                    source_allocations(control) + inline_packed_value_stored,
+                    "successful fixed push allocates at most the single inline PackedValues StoredValue for arity 1 and no per-argument argv snapshots"
+                );
                 incoming_empty_argv_normalization(body, program.function_type(source), argv);
                 let before_push = body[..direct].iter().enumerate()
                     .filter_map(|(index, op)| argv_allocation(op, argv).then_some(index))

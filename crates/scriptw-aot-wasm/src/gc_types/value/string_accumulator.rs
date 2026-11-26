@@ -205,30 +205,31 @@ impl StringAccumulatorCursor {
         let array = schema.array_type::<CodeUnitArray>();
         let digits = schema.reserve_i32_local(function);
         let rest = schema.reserve_i32_local(function);
+        let quot = schema.reserve_i32_local(function);
         let at = schema.reserve_i32_local(function);
         // Ten digits spell every nonnegative I32.
         digits.set_constant(10, function);
         self.reserve(owner, digits, schema, function);
-        digits.set_constant(1, function);
-        value.load(function);
-        rest.store(function);
-        function.instruction(&Instruction::Block(BlockType::Empty));
-        function.instruction(&Instruction::Loop(BlockType::Empty));
-        rest.load(function);
-        function.instruction(&Instruction::I32Const(10));
-        function.instruction(&Instruction::I32LtU);
-        function.instruction(&Instruction::BrIf(1));
-        rest.load(function);
-        function.instruction(&Instruction::I32Const(10));
-        function.instruction(&Instruction::I32DivU);
-        rest.store(function);
-        digits.load(function);
+        // Branchless digit count avoids a first division loop; the single pass
+        // below computes one quotient and derives remainder via multiply-sub.
         function.instruction(&Instruction::I32Const(1));
-        function.instruction(&Instruction::I32Add);
+        for threshold in [
+            10u32,
+            100,
+            1_000,
+            10_000,
+            100_000,
+            1_000_000,
+            10_000_000,
+            100_000_000,
+            1_000_000_000,
+        ] {
+            value.load(function);
+            function.instruction(&Instruction::I32Const(threshold as i32));
+            function.instruction(&Instruction::I32GeU);
+            function.instruction(&Instruction::I32Add);
+        }
         digits.store(function);
-        function.instruction(&Instruction::Br(0));
-        function.instruction(&Instruction::End);
-        function.instruction(&Instruction::End);
         self.length.load(function);
         digits.load(function);
         function.instruction(&Instruction::I32Add);
@@ -243,22 +244,27 @@ impl StringAccumulatorCursor {
         function.instruction(&Instruction::I32Const(1));
         function.instruction(&Instruction::I32Sub);
         at.store(function);
-        self.units.access(function);
-        at.load(function);
-        rest.load(function);
-        function.instruction(&Instruction::I32Const(10));
-        function.instruction(&Instruction::I32RemU);
-        function.instruction(&Instruction::I32Const(i32::from(b'0')));
-        function.instruction(&Instruction::I32Add);
-        array.emit_set(function);
         rest.load(function);
         function.instruction(&Instruction::I32Const(10));
         function.instruction(&Instruction::I32DivU);
+        quot.store(function);
+        self.units.access(function);
+        at.load(function);
+        rest.load(function);
+        quot.load(function);
+        function.instruction(&Instruction::I32Const(10));
+        function.instruction(&Instruction::I32Mul);
+        function.instruction(&Instruction::I32Sub);
+        function.instruction(&Instruction::I32Const(i32::from(b'0')));
+        function.instruction(&Instruction::I32Add);
+        array.emit_set(function);
+        quot.load(function);
         rest.store(function);
         rest.load(function);
         function.instruction(&Instruction::BrIf(0));
         function.instruction(&Instruction::End);
         schema.release_i32_local(at, function);
+        schema.release_i32_local(quot, function);
         schema.release_i32_local(rest, function);
         schema.release_i32_local(digits, function);
     }

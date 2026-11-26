@@ -201,14 +201,30 @@ impl FunctionBuilder<'_> {
         ]
         .into_iter()
         .find(|(builtin, name)| {
-            callee_expression
-                .function_targets
-                .known_targets()
+            targets
                 .iter()
                 .any(|id| StandardBuiltinId::from_function_id(id) == Some(*builtin))
                 || callee_reads_static_property(callee_expression, name)
         })
         .map(|(builtin, _)| builtin);
+        let numeric_math_binary_candidate = [
+            (StandardBuiltinId::MathMin, "min"),
+            (StandardBuiltinId::MathMax, "max"),
+        ]
+        .into_iter()
+        .find(|(builtin, name)| {
+            targets
+                .iter()
+                .any(|id| StandardBuiltinId::from_function_id(id) == Some(*builtin))
+                || callee_reads_static_property(callee_expression, name)
+        })
+        .map(|(builtin, _)| builtin);
+        let string_constructor_candidate = targets.iter().any(|id| {
+            StandardBuiltinId::from_function_id(id) == Some(StandardBuiltinId::StringConstructor)
+        }) || callee_nominates_identifier(callee_expression, "String");
+        let number_constructor_candidate = targets.iter().any(|id| {
+            StandardBuiltinId::from_function_id(id) == Some(StandardBuiltinId::NumberConstructor)
+        }) || callee_nominates_identifier(callee_expression, "Number");
         // `x.call(...)` syntax or target knowledge only nominates the
         // forwarding guard; the actual callee's code identity decides, with
         // these once-evaluated operands.
@@ -240,6 +256,38 @@ impl FunctionBuilder<'_> {
                 })
                 .transpose()?
                 != Some(true)
+            && numeric_math_binary_candidate
+                .map(|builtin| {
+                    self.try_emit_numeric_math_binary_call(
+                        &callee,
+                        &receiver,
+                        arguments,
+                        builtin,
+                        continuation,
+                        output,
+                        function,
+                    )
+                })
+                .transpose()?
+                != Some(true)
+            && (!string_constructor_candidate
+                || !self.try_emit_string_constructor_call(
+                    &callee,
+                    &receiver,
+                    arguments,
+                    continuation,
+                    output,
+                    function,
+                )?)
+            && (!number_constructor_candidate
+                || !self.try_emit_number_constructor_call(
+                    &callee,
+                    &receiver,
+                    arguments,
+                    continuation,
+                    output,
+                    function,
+                )?)
             && (!call_forwarding_candidate
                 || !self.try_emit_function_call_forwarding(
                     &callee,
@@ -393,5 +441,24 @@ fn callee_reads_static_property(callee: &TypedExpr, name: &str) -> bool {
             Some(ExprIr::String(key)) if key == name
         ),
         _ => false,
+    }
+}
+
+/// The callee is an identifier, global read, or static property named
+/// `expected`. Syntax only nominates a guarded native route; the runtime
+/// builtin guard still proves the evaluated callee and its Realm.
+fn callee_nominates_identifier(callee: &TypedExpr, expected: &str) -> bool {
+    match &callee.expr {
+        ExprIr::GlobalPropertyRead { name }
+        | ExprIr::GlobalIdentifierRead { name }
+        | ExprIr::Identifier(name) => name == expected,
+        ExprIr::EnvironmentIdentifier(identifier) => {
+            identifier.name == expected
+                && matches!(
+                    identifier.operation,
+                    scriptw_ir::EnvironmentIdentifierOperationIr::Read
+                )
+        }
+        _ => callee_reads_static_property(callee, expected),
     }
 }

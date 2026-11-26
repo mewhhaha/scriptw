@@ -124,11 +124,11 @@ pub struct RegisterBreakpointState<'a>(pub(crate) PhantomData<&'a ()>);
 
 impl<'a> RegisterBreakpointState<'a> {
     #[cfg(feature = "debug")]
-    fn update(&self, code: &mut StoreCode, module: &Module) -> Result<()> {
-        self.0.patch_new_module(code, module)
+    fn update(&self, code: &mut StoreCode, module: &Module, live: bool) -> Result<()> {
+        self.0.patch_new_module(code, module, live)
     }
     #[cfg(not(feature = "debug"))]
-    fn update(&self, _code: &mut StoreCode, _module: &Module) -> Result<()> {
+    fn update(&self, _code: &mut StoreCode, _module: &Module, _live: bool) -> Result<()> {
         Ok(())
     }
 }
@@ -269,12 +269,22 @@ impl ModuleRegistry {
             ModuleOrComponent::Component(_) => None,
         };
 
-        // Create a StoreCode if one does not already exist.
+        // Create a StoreCode if one does not already exist, completing any
+        // initial single-step patching before publishing it into the registry.
+        let mut newly_patched = false;
         let store_code_pc = match self.store_code.entry(code.text_range().start) {
             Entry::Vacant(v) => {
-                let store_code = StoreCode::new(engine, code)?;
+                let mut store_code = StoreCode::new(engine, code)?;
                 let store_code_pc = store_code.text_range().start;
                 assert_no_overlap(&self.loaded_code, store_code.text_range());
+                match module_or_component {
+                    ModuleOrComponent::Module(module) => {
+                        breakpoint_state.update(&mut store_code, module, false)?;
+                        newly_patched = true;
+                    }
+                    #[cfg(feature = "component-model")]
+                    ModuleOrComponent::Component(_) => {}
+                }
                 let index = match module_or_component {
                     ModuleOrComponent::Module(module) => module.index(),
                     #[cfg(feature = "component-model")]
@@ -299,10 +309,19 @@ impl ModuleRegistry {
                 .loaded_code
                 .get_mut(store_code_pc)
                 .expect("loaded_code must have entry for StoreCodePC");
-            loaded_code
+            let module_index = module.env_module().module_index;
+            let already_registered = loaded_code
                 .modules
-                .insert(module.env_module().module_index, Some(id))?;
-            breakpoint_state.update(&mut loaded_code.code, module)?;
+                .get(module_index)
+                .copied()
+                .flatten()
+                .is_some();
+            if !newly_patched && !already_registered {
+                breakpoint_state.update(&mut loaded_code.code, module, true)?;
+            }
+            if !already_registered {
+                loaded_code.modules.insert(module_index, Some(id))?;
+            }
         }
 
         Ok(id)

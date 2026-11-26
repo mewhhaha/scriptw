@@ -1,11 +1,9 @@
 //! ArrayBuffer backing allocation preserves the real collector's OOM result.
 
+use super::wasm_gc_host::TypedGcHostImport;
 use super::*;
 use scriptw_aot_wasm::{GcHostImport, GcHostLayout};
-use wasmtime::{
-    ArrayRef, ArrayRefPre, ArrayType, ExternType, FuncType, GcHeapOutOfMemory, Mutability, Val,
-    ValType,
-};
+use wasmtime::{ArrayRef, ArrayRefPre, ArrayType, FuncType, GcHeapOutOfMemory, Mutability, Val, ValType};
 
 /// Use the import's canonical type rather than creating a parallel GC layout.
 struct ByteArrayAllocationSignature {
@@ -15,12 +13,17 @@ struct ByteArrayAllocationSignature {
 
 impl ByteArrayAllocationSignature {
     fn validate(function: FuncType) -> wasmtime::Result<Self> {
-        let params: Vec<_> = function.params().collect();
-        let results: Vec<_> = function.results().collect();
-        let ([ValType::I32], [result]) = (params.as_slice(), results.as_slice()) else {
-            return Err(wasmtime::Error::msg(
-                "GC byte allocation requires one I32 length and one result",
-            ));
+        let result = {
+            let mut params = function.params();
+            let mut results = function.results();
+            let (Some(ValType::I32), None, Some(result), None) =
+                (params.next(), params.next(), results.next(), results.next())
+            else {
+                return Err(wasmtime::Error::msg(
+                    "GC byte allocation requires one I32 length and one result",
+                ));
+            };
+            result
         };
         let result = result
             .as_ref()
@@ -51,22 +54,15 @@ impl ByteArrayAllocationSignature {
 
 pub(super) fn link(
     linker: &mut WasmtimeLinker<WasmHostState>,
-    module: &WasmtimeModule,
+    import: TypedGcHostImport<'_>,
 ) -> Result<(), EngineError> {
     let row = GcHostImport::ByteArrayAllocate;
-    let mut imports = module
-        .imports()
-        .filter(|import| import.module() == row.module() && import.name() == row.name());
-    let Some(import) = imports.next() else {
+    let Some(function) = import.into_func(
+        "duplicate GC byte allocation import",
+        "GC byte allocation import is not a function",
+    )?
+    else {
         return Ok(());
-    };
-    if imports.next().is_some() {
-        return Err(EngineError::new("duplicate GC byte allocation import"));
-    }
-    let ExternType::Func(function) = import.ty() else {
-        return Err(EngineError::new(
-            "GC byte allocation import is not a function",
-        ));
     };
     let signature = ByteArrayAllocationSignature::validate(function)
         .map_err(|error| EngineError::new(format!("invalid GC byte allocation import: {error}")))?;

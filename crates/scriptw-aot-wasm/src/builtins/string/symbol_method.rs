@@ -207,8 +207,9 @@ impl FunctionBuilder<'_> {
         self.emit_native_string_require_coercible(&receiver, &output, exit, f)?;
         match &operation {
             NativeStringProtocol::MatchAll | NativeStringProtocol::ReplaceAll => {
-                self.compile_nullish_tagged_i32(pattern.tag(), f)?;
-                f.instruction(&Instruction::I32Eqz);
+                // IsRegExp(argument) step 1 returns false for any non-Object
+                // (including null, undefined, and primitive Strings).
+                self.emit_is_heap_object_like_tag_i32(pattern.tag(), f);
                 self.open_frame(ControlFrameKind::If, f);
                 self.emit_string_search_argument_is_regexp_to_local(
                     &pattern, is_regexp, &pending, f,

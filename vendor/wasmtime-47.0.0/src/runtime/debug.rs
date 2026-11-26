@@ -1030,15 +1030,46 @@ impl BreakpointState {
     /// single-stepping. When a module is newly registered in a
     /// `Store`, we need to patch all breakpoints into the copy for
     /// this `Store` if single-stepping is currently enabled.
-    pub(crate) fn patch_new_module(&self, code: &mut StoreCode, module: &Module) -> Result<()> {
+    pub(crate) fn patch_new_module(
+        &self,
+        code: &mut StoreCode,
+        module: &Module,
+        live: bool,
+    ) -> Result<()> {
         // Apply single-step state if single-stepping is enabled. Note
         // that no other individual breakpoints will exist yet (as
         // this is a newly registered module).
         if self.single_step {
             let mem = code.code_memory_mut().unwrap();
-            mem.unpublish()?;
-            BreakpointEdit::apply_single_step(mem, module, true, |_key| false)?;
-            mem.publish()?;
+            let mut live_guard = LiveTransitionAbortGuard::new(live);
+            let unpub = mem.unpublish();
+            if let Err(err) = unpub {
+                if live && !mem.is_published() {
+                    live_guard.disarm();
+                    abort_on_republish_error(err);
+                }
+                live_guard.disarm();
+                return Err(err);
+            }
+            if let Err(err) = BreakpointEdit::apply_single_step(mem, module, true, |_key| false) {
+                if let Err(pub_err) = mem.publish() {
+                    if live {
+                        live_guard.disarm();
+                        abort_on_republish_error(pub_err);
+                    }
+                }
+                live_guard.disarm();
+                return Err(err);
+            }
+            if let Err(err) = mem.publish() {
+                if live {
+                    live_guard.disarm();
+                    abort_on_republish_error(err);
+                }
+                live_guard.disarm();
+                return Err(err);
+            }
+            live_guard.disarm();
         }
         Ok(())
     }
@@ -1058,8 +1089,17 @@ impl<'a> BreakpointEdit<'a> {
             .expect("Just checked presence above")
             .code_memory_mut()
             .expect("Must have unique ownership of StoreCode in guest-debug mode");
-        if dirty_modules.insert(store_code_pc) {
-            code_memory.unpublish()?;
+        if !dirty_modules.contains(&store_code_pc) {
+            let mut live_guard = LiveTransitionAbortGuard::new(true);
+            let res = code_memory.unpublish();
+            live_guard.disarm();
+            if let Err(err) = res {
+                if !code_memory.is_published() {
+                    abort_on_republish_error(err);
+                }
+                return Err(err);
+            }
+            dirty_modules.insert(store_code_pc);
         }
         Ok(code_memory)
     }
@@ -1097,6 +1137,16 @@ impl<'a> BreakpointEdit<'a> {
         let requested_key = BreakpointKey::from_raw(module, pc);
         let actual_key = BreakpointKey::from_raw(module, actual_pc);
 
+        let existing = self.state.breakpoints.get(&actual_key).copied().unwrap_or(0);
+        if existing == 0 {
+            // First reference: patch the code before committing metadata so a
+            // recoverable unpublish error leaves breakpoint state unchanged.
+            let mem =
+                Self::get_code_memory(self.state, self.registry, &mut self.dirty_modules, module)?;
+            let patches = frame_table.lookup_breakpoint_patches_by_pc(actual_pc);
+            Self::patch(patches, mem, true);
+        }
+
         if actual_pc != pc {
             log::trace!("slipping breakpoint from {requested_key:?} to {actual_key:?}");
             self.state
@@ -1106,13 +1156,6 @@ impl<'a> BreakpointEdit<'a> {
 
         let refcount = self.state.breakpoints.entry(actual_key).or_insert(0);
         *refcount += 1;
-        if *refcount == 1 {
-            // First reference: actually patch the code.
-            let mem =
-                Self::get_code_memory(self.state, self.registry, &mut self.dirty_modules, module)?;
-            let patches = frame_table.lookup_breakpoint_patches_by_pc(actual_pc);
-            Self::patch(patches, mem, true);
-        }
         Ok(())
     }
 
@@ -1125,28 +1168,30 @@ impl<'a> BreakpointEdit<'a> {
         let actual_key = self
             .state
             .breakpoint_redirects
-            .remove(&requested_key)
+            .get(&requested_key)
+            .copied()
             .unwrap_or(requested_key);
         let actual_pc = actual_key.1;
 
-        if let Some(refcount) = self.state.breakpoints.get_mut(&actual_key) {
-            *refcount -= 1;
-            if *refcount == 0 {
-                self.state.breakpoints.remove(&actual_key);
-                if !self.state.single_step {
-                    let mem = Self::get_code_memory(
-                        self.state,
-                        self.registry,
-                        &mut self.dirty_modules,
-                        module,
-                    )?;
-                    let frame_table = module
-                        .frame_table()
-                        .expect("Frame table must be present when guest-debug is enabled");
-                    let patches = frame_table.lookup_breakpoint_patches_by_pc(actual_pc);
-                    Self::patch(patches, mem, false);
-                }
-            }
+        let Some(&refcount) = self.state.breakpoints.get(&actual_key) else {
+            self.state.breakpoint_redirects.remove(&requested_key);
+            return Ok(());
+        };
+        if refcount == 1 && !self.state.single_step {
+            let mem =
+                Self::get_code_memory(self.state, self.registry, &mut self.dirty_modules, module)?;
+            let frame_table = module
+                .frame_table()
+                .expect("Frame table must be present when guest-debug is enabled");
+            let patches = frame_table.lookup_breakpoint_patches_by_pc(actual_pc);
+            Self::patch(patches, mem, false);
+        }
+
+        self.state.breakpoint_redirects.remove(&requested_key);
+        if refcount == 1 {
+            self.state.breakpoints.remove(&actual_key);
+        } else if let Some(slot) = self.state.breakpoints.get_mut(&actual_key) {
+            *slot -= 1;
         }
         Ok(())
     }
@@ -1190,6 +1235,13 @@ impl<'a> BreakpointEdit<'a> {
             .all_modules()
             .map(|(_, m)| m.clone())
             .collect::<Vec<_>>();
+        // Acquire writable access to every module first so a recoverable
+        // unpublish error cannot leave an earlier subset patched for the new
+        // mode while `self.state.single_step` still reflects the old mode.
+        for module in &modules {
+            let _ =
+                Self::get_code_memory(self.state, self.registry, &mut self.dirty_modules, module)?;
+        }
         for module in modules {
             let mem =
                 Self::get_code_memory(self.state, self.registry, &mut self.dirty_modules, &module)?;
@@ -1208,13 +1260,40 @@ impl<'a> Drop for BreakpointEdit<'a> {
     fn drop(&mut self) {
         for &store_code_base in &self.dirty_modules {
             let store_code = self.registry.store_code_mut(store_code_base).unwrap();
-            if let Err(e) = store_code
+            let mut live_guard = LiveTransitionAbortGuard::new(true);
+            let res = store_code
                 .code_memory_mut()
                 .expect("Must have unique ownership of StoreCode in guest-debug mode")
-                .publish()
-            {
+                .publish();
+            live_guard.disarm();
+            if let Err(e) = res {
                 abort_on_republish_error(e);
             }
+        }
+    }
+}
+
+/// Aborts the process if a panic unwinds across a live code-memory permission
+/// transition, preventing unwinding back into guest frames whose execute
+/// permissions may have been removed.
+struct LiveTransitionAbortGuard(bool);
+
+impl LiveTransitionAbortGuard {
+    fn new(armed: bool) -> Self {
+        Self(armed)
+    }
+
+    fn disarm(&mut self) {
+        self.0 = false;
+    }
+}
+
+impl Drop for LiveTransitionAbortGuard {
+    fn drop(&mut self) {
+        if self.0 {
+            abort_on_republish_error(crate::format_err!(
+                "panic during live code-memory permission transition"
+            ));
         }
     }
 }
@@ -1248,6 +1327,13 @@ impl<'a> Drop for BreakpointEdit<'a> {
 /// [1]: https://searchfox.org/firefox-main/rev/7496c8515212669451d7e775a00c2be07da38ca5/js/src/jit/AutoWritableJitCode.h#26-56
 #[cfg(feature = "std")]
 fn abort_on_republish_error(e: crate::Error) -> ! {
+    struct AbortOnDrop;
+    impl Drop for AbortOnDrop {
+        fn drop(&mut self) {
+            std::process::abort();
+        }
+    }
+    let _abort = AbortOnDrop;
     log::error!(
         "Failed to re-publish executable code: {e:?}. Wasmtime cannot return through JIT code on the stack and cannot even panic; aborting the process."
     );
@@ -1255,12 +1341,20 @@ fn abort_on_republish_error(e: crate::Error) -> ! {
 }
 
 /// In the `no_std` case, we don't have a concept of a "process
-/// abort", so rely on `panic!`. Typically an embedded scenario that
-/// uses `no_std` will build with `panic=abort` so the effect is the
-/// same. If it doesn't, there is truly nothing we can do here so
-/// let's panic anyway; the panic propagation through the trampolines
-/// will at least deterministically crash.
+/// abort", so rely on `panic!`. With `panic = "unwind"`, manufacture an
+/// uncatchable double-panic so an embedder cannot unwind through guest frames
+/// that may have lost execute permission.
 #[cfg(not(feature = "std"))]
 fn abort_on_republish_error(e: crate::Error) -> ! {
+    #[cfg(not(panic = "abort"))]
+    struct PanicAgainOnDrop;
+    #[cfg(not(panic = "abort"))]
+    impl Drop for PanicAgainOnDrop {
+        fn drop(&mut self) {
+            panic!("panicking again to trigger a process abort");
+        }
+    }
+    #[cfg(not(panic = "abort"))]
+    let _bomb = PanicAgainOnDrop;
     panic!("Failed to re-publish executable code: {e:?}");
 }

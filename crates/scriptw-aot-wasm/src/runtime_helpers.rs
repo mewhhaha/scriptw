@@ -719,32 +719,6 @@ impl ModuleGatherCallResult {
     }
 }
 
-/// Reflect, Math, JSON and Atomics remain rooted across the
-/// initialization/publication boundary. An absent namespace has a null result.
-#[must_use = "all four Realm namespace results must be rooted before publication"]
-pub(crate) struct RealmInitializeIntrinsicsCallResult {
-    private: (),
-}
-impl RealmInitializeIntrinsicsCallResult {
-    pub(crate) fn bind(
-        self,
-        schema: &RuntimeSchema,
-        function: &mut Function,
-    ) -> [GcLocal<OrdinaryObject, Nullable>; 4] {
-        // Bind every stack result before the caller can allocate. Results are
-        // popped in reverse ABI order, then returned in publication order.
-        let mut roots: [GcLocal<OrdinaryObject, Nullable>; 4] = std::array::from_fn(|_| {
-            let slot = schema.reserve_gc_local(function);
-            ReferenceHelperResult {
-                private: std::marker::PhantomData,
-            }
-            .bind(schema, slot, function)
-        });
-        roots.reverse();
-        roots
-    }
-}
-
 /// Only an actual StandardBuiltinId or a checked immutable installation row
 /// can populate this parameter. An arbitrary I32 cannot enter a recipe's domain.
 pub(crate) struct RuntimeHelperStandardBuiltinParameter {
@@ -942,7 +916,6 @@ macro_rules! helper_field {
     (@result_type OwnPropertyDescriptor) => { OwnPropertyDescriptorCallResult };
     (@result_type EnvironmentIdentifierResolution) => { EnvironmentIdentifierResolutionCallResult };
     (@result_type ModuleGather) => { ModuleGatherCallResult };
-    (@result_type RealmInitializeIntrinsics) => { RealmInitializeIntrinsicsCallResult };
     (@result_abi Completion) => { crate::module::COMPLETION_TYPES.to_vec() };
     (@result_abi Void) => { Vec::new() };
     (@result_abi I32) => { vec![AbiType::I32] };
@@ -981,7 +954,6 @@ macro_rules! helper_field {
         types
     } };
     (@result_abi ModuleGather) => { vec![AbiType::Gc(GcLayout::ModuleRegistry, GcNullability::NonNullable), AbiType::I64] };
-    (@result_abi RealmInitializeIntrinsics) => { vec![AbiType::Gc(GcLayout::OrdinaryObject, GcNullability::Nullable); 4] };
     (@result Completion) => { HelperCompletion { private: () } };
     (@result Void) => { () };
     (@result I32) => { I32HelperResult { private: () } };
@@ -1002,7 +974,6 @@ macro_rules! helper_field {
     (@result OwnPropertyDescriptor) => { OwnPropertyDescriptorCallResult { private: () } };
     (@result EnvironmentIdentifierResolution) => { EnvironmentIdentifierResolutionCallResult { private: () } };
     (@result ModuleGather) => { ModuleGatherCallResult { private: () } };
-    (@result RealmInitializeIntrinsics) => { RealmInitializeIntrinsicsCallResult { private: () } };
 }
 
 /// Generate exactly one caller trait per row. Hook rows never implement the
@@ -1232,7 +1203,7 @@ runtime_helper_domain! {
     CompactObjectAllocate / CompactObjectAllocateArguments / CompactObjectAllocateParameters / "compact_object_allocate" { prototype:Value } => (Ref OrdinaryObject NonNullable);
     CompactShapeIndex / CompactShapeIndexArguments / CompactShapeIndexParameters / "compact_shape_index" { shape:(Ref CompactDataShape NonNullable) } => (Ref OrdinaryPropertyIndex NonNullable);
     IntrinsicDataPublish / IntrinsicDataPublishArguments / IntrinsicDataPublishParameters / "intrinsic_data_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,value:(Ref PropertyValue NonNullable),writable:I32,enumerable:I32,configurable:I32 } => Void;
-    FreshDataPropertiesPublish / FreshDataPropertiesPublishArguments / FreshDataPropertiesPublishParameters / "fresh_data_properties_publish" { object:(Ref OrdinaryObject NonNullable),keys:(Ref PooledStringTable NonNullable),values:(Ref IntrinsicPropertyValueCache NonNullable),flags:(Ref OrdinaryPropertyIndex NonNullable) } => Void;
+    FreshDataPropertiesPublish / FreshDataPropertiesPublishArguments / FreshDataPropertiesPublishParameters / "fresh_data_properties_publish" { object:(Ref OrdinaryObject NonNullable),keys:(Ref PooledStringTable NonNullable),values:(Ref IntrinsicPropertyValueCache NonNullable),flags:(Ref OrdinaryPropertyIndex NonNullable),hashes:(Ref NumberBitsI64Array NonNullable) } => Void;
     IntrinsicAccessorPublish / IntrinsicAccessorPublishArguments / IntrinsicAccessorPublishParameters / "intrinsic_accessor_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,getter:(Ref StoredValue NonNullable),setter:(Ref StoredValue NonNullable),enumerable:I32,configurable:I32 } => Void;
     PropertyValueResolve / PropertyValueResolveArguments / PropertyValueResolveParameters / "property_value_resolve" { value:(Ref PropertyValue NonNullable) } => (Ref StoredValue NonNullable);
     IntrinsicAccessorAllocate / IntrinsicAccessorAllocateArguments / IntrinsicAccessorAllocateParameters / "intrinsic_accessor_allocate" { header:(Ref OrdinaryObject NonNullable),code:(Ref ExecutableCode NonNullable),realm:(Ref RealmRecord NonNullable),source_ordinal:I32 } => (Ref FunctionObject NonNullable);
@@ -1262,7 +1233,7 @@ runtime_helper_domain! {
     RegExpLiteralAllocate / RegExpLiteralAllocateArguments / RegExpLiteralAllocateParameters / "regexp_literal_allocate" { prototype:Value,source:(Ref StringValue NonNullable),flags:(Ref StringValue NonNullable),program:(Ref RegExpProgram NonNullable),realm:(Ref RealmRecord NonNullable) } => (Ref RegExpObject NonNullable);
     NativeRegExpLiteralFactory / NativeRegExpLiteralFactoryArguments / NativeRegExpLiteralFactoryParameters / "native_regexp_literal_factory" { source_units:(Ref CodeUnitArray NonNullable),flags_units:(Ref CodeUnitArray NonNullable),compiled:(Ref ImmutableByteArray NonNullable),environment:(Ref Environment NonNullable),realm:(Ref RealmRecord NonNullable) } => StatusCompletion;
     FunctionMetadataPublish / FunctionMetadataPublishArguments / FunctionMetadataPublishParameters / "function_metadata_publish" { callable:(Ref FunctionObject NonNullable),length_bits:I64,name:(Ref StringValue NonNullable),configurable:I32,has_caller:I32,create_prototype:I32,constructor_back_reference:I32,prototype_parent:Value } => Void;
-    RealmInitializeIntrinsics / RealmInitializeIntrinsicsArguments / RealmInitializeIntrinsicsParameters / "realm_initialize_intrinsics" { realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable) } => RealmInitializeIntrinsics;
+    RealmInitializeIntrinsics / RealmInitializeIntrinsicsArguments / RealmInitializeIntrinsicsParameters / "realm_initialize_intrinsics" { realm:(Ref RealmRecord NonNullable),caller_environment:(Ref Environment Nullable) } => Void;
     RealmEnsureTemporal / RealmEnsureTemporalArguments / RealmEnsureTemporalParameters / "realm_ensure_temporal" { realm:(Ref RealmRecord NonNullable) } => (Ref StoredValue NonNullable);
     RealmEnsureBinaryData / RealmEnsureBinaryDataArguments / RealmEnsureBinaryDataParameters / "realm_ensure_binary_data" { realm:(Ref RealmRecord NonNullable) } => Void;
     RealmEnsureErrors / RealmEnsureErrorsArguments / RealmEnsureErrorsParameters / "realm_ensure_errors" { realm:(Ref RealmRecord NonNullable) } => Void;
@@ -1281,6 +1252,7 @@ runtime_helper_domain! {
     NumberToString / NumberToStringArguments / NumberToStringParameters / "number_to_string" { bits:I64 } => (Ref StringValue NonNullable);
     StringConcat / StringConcatArguments / StringConcatParameters / "string_concat" { left:(Ref StringValue NonNullable),right:(Ref StringValue NonNullable) } => (Ref StringValue NonNullable);
     StringConcatThree / StringConcatThreeArguments / StringConcatThreeParameters / "string_concat_three" { first:(Ref StringValue NonNullable),second:(Ref StringValue NonNullable),third:(Ref StringValue NonNullable) } => (Ref StringValue NonNullable);
+    StringConcatStringNumber / StringConcatStringNumberArguments / StringConcatStringNumberParameters / "string_concat_string_number" { left:(Ref StringValue NonNullable),right_bits:I64 } => (Ref StringValue Nullable);
     StringToNumber / StringToNumberArguments / StringToNumberParameters / "string_to_number" { input:(Ref StringValue NonNullable) } => I64;
     ValueToString / ValueToStringArguments / ValueToStringParameters / "value_to_string" { input:Value,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
     ValueToNumber / ValueToNumberArguments / ValueToNumberParameters / "value_to_number" { input:Value,caller_environment:(Ref Environment Nullable),caller_program:Program } => Completion;
@@ -1491,6 +1463,7 @@ impl RuntimeHelperId {
             Self::NumberToString => HelperOwner::Runtime,
             Self::StringConcat => HelperOwner::Runtime,
             Self::StringConcatThree => HelperOwner::Runtime,
+            Self::StringConcatStringNumber => HelperOwner::Runtime,
             Self::StringToNumber => HelperOwner::Runtime,
             Self::ValueToString => HelperOwner::Runtime,
             Self::ValueToNumber => HelperOwner::Runtime,
@@ -1684,6 +1657,7 @@ impl RuntimeHelperId {
             Self::NumberToString => true,
             Self::StringConcat => true,
             Self::StringConcatThree => true,
+            Self::StringConcatStringNumber => true,
             Self::StringToNumber => true,
             Self::ValueToString => true,
             Self::ValueToNumber => true,

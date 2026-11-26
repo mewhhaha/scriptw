@@ -313,7 +313,7 @@ impl ErrorIntrinsicConstructor {
 }
 
 // Canonical constructors that a Realm builds on their first canonical read.
-// Their prototypes stay eager; see builtins/bootstrap/demand_constructors.rs.
+// See builtins/bootstrap/demand_constructors.rs.
 runtime_scalar_domain!(DemandConstructor, 0, {
     Proxy = 0,
     Iterator = 1,
@@ -341,6 +341,9 @@ runtime_scalar_domain!(DemandConstructor, 0, {
     ReadableStreamDefaultReader = 23,
     ReadableByteStreamController = 24,
     AbstractModuleSource = 25,
+    Object = 26,
+    Function = 27,
+    String = 28,
 });
 
 impl DemandConstructor {
@@ -373,6 +376,9 @@ impl DemandConstructor {
             Self::ReadableStreamDefaultReader => B::ReadableStreamDefaultReaderConstructor,
             Self::ReadableByteStreamController => B::ReadableByteStreamControllerConstructor,
             Self::AbstractModuleSource => B::AbstractModuleSourceConstructor,
+            Self::Object => B::ObjectConstructor,
+            Self::Function => B::FunctionConstructor,
+            Self::String => B::StringConstructor,
         }
     }
 
@@ -405,10 +411,13 @@ impl DemandConstructor {
             Self::ReadableStreamDefaultReader => S::ReadableStreamDefaultReaderConstructor,
             Self::ReadableByteStreamController => S::ReadableByteStreamControllerConstructor,
             Self::AbstractModuleSource => S::AbstractModuleSourceConstructor,
+            Self::Object => S::ObjectConstructor,
+            Self::Function => S::FunctionConstructor,
+            Self::String => S::StringConstructor,
         }
     }
 
-    /// The eagerly built prototype that the constructor's `prototype` names.
+    /// The prototype that the constructor's `prototype` names (eager or demand).
     /// Proxy has none and receives Object.prototype, as eager bootstrap did.
     pub(crate) const fn prototype_slot(self) -> crate::functions::NonArrayRealmIntrinsicSlot {
         use crate::functions::NonArrayRealmIntrinsicSlot as S;
@@ -439,6 +448,9 @@ impl DemandConstructor {
             Self::ReadableStreamDefaultReader => S::ReadableStreamDefaultReaderPrototype,
             Self::ReadableByteStreamController => S::ReadableByteStreamControllerPrototype,
             Self::AbstractModuleSource => S::AbstractModuleSourcePrototype,
+            Self::Object => S::ObjectPrototype,
+            Self::Function => S::FunctionPrototype,
+            Self::String => S::StringPrototype,
         }
     }
 
@@ -453,6 +465,385 @@ impl DemandConstructor {
             .into_iter()
             .find(|demand| demand.slot().gc_index() == slot.gc_index())
     }
+}
+
+/// Intrinsic prototypes built on their first canonical read rather than eagerly
+/// at Realm creation. Their dependency graph is an acyclic DAG rooted at the
+/// core eager prototypes (`ObjectPrototype`, `FunctionPrototype`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DemandPrototype {
+    Iterator,
+    IteratorHelper,
+    IteratorFromWrapper,
+    ArrayIterator,
+    StringIterator,
+    RegExpStringIterator,
+    MapIterator,
+    SetIterator,
+    Generator,
+    GeneratorFunction,
+    AsyncFunction,
+    AsyncGeneratorFunction,
+    AsyncIterator,
+    AsyncGenerator,
+    Promise,
+    Map,
+    WeakMap,
+    WeakRef,
+    FinalizationRegistry,
+    WeakSet,
+    AsyncDisposableStack,
+    DisposableStack,
+    AbortController,
+    EventTarget,
+    Event,
+    AbortSignal,
+    TextEncoder,
+    TextDecoder,
+    Set,
+    Symbol,
+    BigInt,
+    ShadowRealm,
+    AbstractModuleSource,
+    ModuleSource,
+    ReadableStream,
+    ReadableStreamDefaultReader,
+    ReadableByteStreamController,
+}
+
+impl DemandPrototype {
+    pub(crate) const ALL: [Self; 37] = [
+        Self::Iterator,
+        Self::IteratorHelper,
+        Self::IteratorFromWrapper,
+        Self::ArrayIterator,
+        Self::StringIterator,
+        Self::RegExpStringIterator,
+        Self::MapIterator,
+        Self::SetIterator,
+        Self::Generator,
+        Self::GeneratorFunction,
+        Self::AsyncFunction,
+        Self::AsyncGeneratorFunction,
+        Self::AsyncIterator,
+        Self::AsyncGenerator,
+        Self::Promise,
+        Self::Map,
+        Self::WeakMap,
+        Self::WeakRef,
+        Self::FinalizationRegistry,
+        Self::WeakSet,
+        Self::AsyncDisposableStack,
+        Self::DisposableStack,
+        Self::AbortController,
+        Self::EventTarget,
+        Self::Event,
+        Self::AbortSignal,
+        Self::TextEncoder,
+        Self::TextDecoder,
+        Self::Set,
+        Self::Symbol,
+        Self::BigInt,
+        Self::ShadowRealm,
+        Self::AbstractModuleSource,
+        Self::ModuleSource,
+        Self::ReadableStream,
+        Self::ReadableStreamDefaultReader,
+        Self::ReadableByteStreamController,
+    ];
+
+    pub(crate) const fn slot(self) -> crate::functions::NonArrayRealmIntrinsicSlot {
+        use crate::functions::NonArrayRealmIntrinsicSlot as S;
+        match self {
+            Self::Iterator => S::IteratorPrototype,
+            Self::IteratorHelper => S::IteratorHelperPrototype,
+            Self::IteratorFromWrapper => S::IteratorFromWrapperPrototype,
+            Self::ArrayIterator => S::ArrayIteratorPrototype,
+            Self::StringIterator => S::StringIteratorPrototype,
+            Self::RegExpStringIterator => S::RegExpStringIteratorPrototype,
+            Self::MapIterator => S::MapIteratorPrototype,
+            Self::SetIterator => S::SetIteratorPrototype,
+            Self::Generator => S::GeneratorPrototype,
+            Self::GeneratorFunction => S::GeneratorFunctionPrototype,
+            Self::AsyncFunction => S::AsyncFunctionPrototype,
+            Self::AsyncGeneratorFunction => S::AsyncGeneratorFunctionPrototype,
+            Self::AsyncIterator => S::AsyncIteratorPrototype,
+            Self::AsyncGenerator => S::AsyncGeneratorPrototype,
+            Self::Promise => S::PromisePrototype,
+            Self::Map => S::MapPrototype,
+            Self::WeakMap => S::WeakMapPrototype,
+            Self::WeakRef => S::WeakRefPrototype,
+            Self::FinalizationRegistry => S::FinalizationRegistryPrototype,
+            Self::WeakSet => S::WeakSetPrototype,
+            Self::AsyncDisposableStack => S::AsyncDisposableStackPrototype,
+            Self::DisposableStack => S::DisposableStackPrototype,
+            Self::AbortController => S::AbortControllerPrototype,
+            Self::EventTarget => S::EventTargetPrototype,
+            Self::Event => S::EventPrototype,
+            Self::AbortSignal => S::AbortSignalPrototype,
+            Self::TextEncoder => S::TextEncoderPrototype,
+            Self::TextDecoder => S::TextDecoderPrototype,
+            Self::Set => S::SetPrototype,
+            Self::Symbol => S::SymbolPrototype,
+            Self::BigInt => S::BigIntPrototype,
+            Self::ShadowRealm => S::ShadowRealmPrototype,
+            Self::AbstractModuleSource => S::AbstractModuleSourcePrototype,
+            Self::ModuleSource => S::ModuleSourcePrototype,
+            Self::ReadableStream => S::ReadableStreamPrototype,
+            Self::ReadableStreamDefaultReader => S::ReadableStreamDefaultReaderPrototype,
+            Self::ReadableByteStreamController => S::ReadableByteStreamControllerPrototype,
+        }
+    }
+
+    pub(crate) const fn parent_slot(self) -> crate::functions::NonArrayRealmIntrinsicSlot {
+        use crate::functions::NonArrayRealmIntrinsicSlot as S;
+        match self {
+            Self::Iterator
+            | Self::AsyncIterator
+            | Self::Promise
+            | Self::Map
+            | Self::WeakMap
+            | Self::WeakRef
+            | Self::FinalizationRegistry
+            | Self::WeakSet
+            | Self::AsyncDisposableStack
+            | Self::DisposableStack
+            | Self::AbortController
+            | Self::EventTarget
+            | Self::Event
+            | Self::TextEncoder
+            | Self::TextDecoder
+            | Self::Set
+            | Self::Symbol
+            | Self::BigInt
+            | Self::ShadowRealm
+            | Self::AbstractModuleSource
+            | Self::ReadableStream
+            | Self::ReadableStreamDefaultReader
+            | Self::ReadableByteStreamController => S::ObjectPrototype,
+            Self::IteratorHelper
+            | Self::IteratorFromWrapper
+            | Self::ArrayIterator
+            | Self::StringIterator
+            | Self::RegExpStringIterator
+            | Self::MapIterator
+            | Self::SetIterator
+            | Self::Generator => S::IteratorPrototype,
+            Self::GeneratorFunction | Self::AsyncFunction | Self::AsyncGeneratorFunction => {
+                S::FunctionPrototype
+            }
+            Self::AsyncGenerator => S::AsyncIteratorPrototype,
+            Self::AbortSignal => S::EventTargetPrototype,
+            Self::ModuleSource => S::AbstractModuleSourcePrototype,
+        }
+    }
+
+    pub(crate) fn from_slot(slot: crate::functions::NonArrayRealmIntrinsicSlot) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|demand| demand.slot().gc_index() == slot.gc_index())
+    }
+}
+
+/// Dynamic function constructors (`%GeneratorFunction%`, `%AsyncFunction%`,
+/// `%AsyncGeneratorFunction%`) built lazily on their first canonical read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DemandDynamicFunction {
+    GeneratorFunction,
+    AsyncFunction,
+    AsyncGeneratorFunction,
+}
+
+impl DemandDynamicFunction {
+    pub(crate) const ALL: [Self; 3] = [
+        Self::GeneratorFunction,
+        Self::AsyncFunction,
+        Self::AsyncGeneratorFunction,
+    ];
+
+    pub(crate) const fn builtin(self) -> scriptw_ir::HostBuiltinId {
+        match self {
+            Self::GeneratorFunction => scriptw_ir::HostBuiltinId::GeneratorFunctionConstructor,
+            Self::AsyncFunction => scriptw_ir::HostBuiltinId::AsyncFunctionConstructor,
+            Self::AsyncGeneratorFunction => {
+                scriptw_ir::HostBuiltinId::AsyncGeneratorFunctionConstructor
+            }
+        }
+    }
+
+    pub(crate) const fn prototype_slot(self) -> crate::functions::NonArrayRealmIntrinsicSlot {
+        use crate::functions::NonArrayRealmIntrinsicSlot as S;
+        match self {
+            Self::GeneratorFunction => S::GeneratorFunctionPrototype,
+            Self::AsyncFunction => S::AsyncFunctionPrototype,
+            Self::AsyncGeneratorFunction => S::AsyncGeneratorFunctionPrototype,
+        }
+    }
+
+    pub(crate) const fn slot(self) -> crate::functions::NonArrayRealmIntrinsicSlot {
+        use crate::functions::NonArrayRealmIntrinsicSlot as S;
+        match self {
+            Self::GeneratorFunction => S::GeneratorFunctionConstructor,
+            Self::AsyncFunction => S::AsyncFunctionConstructor,
+            Self::AsyncGeneratorFunction => S::AsyncGeneratorFunctionConstructor,
+        }
+    }
+
+    pub(crate) fn from_slot(slot: crate::functions::NonArrayRealmIntrinsicSlot) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|demand| demand.slot().gc_index() == slot.gc_index())
+    }
+}
+
+/// Boxed primitive prototypes (`%Number.prototype%`, `%Boolean.prototype%`)
+/// built lazily on their first canonical read. `%String.prototype%` stays
+/// eager because Realm protector arming records its storage at birth.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DemandBoxedPrototype {
+    Number,
+    Boolean,
+}
+
+impl DemandBoxedPrototype {
+    pub(crate) const ALL: [Self; 2] = [Self::Number, Self::Boolean];
+
+    pub(crate) const fn slot(self) -> crate::functions::NonArrayRealmIntrinsicSlot {
+        use crate::functions::NonArrayRealmIntrinsicSlot as S;
+        match self {
+            Self::Number => S::NumberPrototype,
+            Self::Boolean => S::BooleanPrototype,
+        }
+    }
+
+    pub(crate) fn from_slot(slot: crate::functions::NonArrayRealmIntrinsicSlot) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|demand| demand.slot().gc_index() == slot.gc_index())
+    }
+}
+
+// Canonical global host functions (`parseInt`, `parseFloat`) built lazily on
+// their first canonical read (via globalThis or Number.*).
+runtime_scalar_domain!(DemandHostFunction, 0, {
+    ParseInt = 0,
+    ParseFloat = 1,
+});
+
+impl DemandHostFunction {
+    pub(crate) const fn builtin(self) -> scriptw_ir::HostBuiltinId {
+        match self {
+            Self::ParseInt => scriptw_ir::HostBuiltinId::ParseInt,
+            Self::ParseFloat => scriptw_ir::HostBuiltinId::ParseFloat,
+        }
+    }
+
+    pub(crate) const fn slot(self) -> crate::functions::NonArrayRealmIntrinsicSlot {
+        use crate::functions::NonArrayRealmIntrinsicSlot as S;
+        match self {
+            Self::ParseInt => S::ParseInt,
+            Self::ParseFloat => S::ParseFloat,
+        }
+    }
+
+    pub(crate) fn from_builtin(builtin: scriptw_ir::HostBuiltinId) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|demand| demand.builtin() == builtin)
+    }
+
+    pub(crate) fn from_slot(slot: crate::functions::NonArrayRealmIntrinsicSlot) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|demand| demand.slot().gc_index() == slot.gc_index())
+    }
+}
+
+// Standard global namespace objects (`Reflect`, `Math`, `JSON`, `Atomics`)
+// built lazily on their first canonical read from their defining Realm.
+runtime_scalar_domain!(DemandNamespace, 0, {
+    Reflect = 0,
+    Math = 1,
+    Json = 2,
+    Atomics = 3,
+});
+
+impl DemandNamespace {
+    pub(crate) const fn slot(self) -> crate::functions::NonArrayRealmIntrinsicSlot {
+        use crate::functions::NonArrayRealmIntrinsicSlot as S;
+        match self {
+            Self::Reflect => S::ReflectObject,
+            Self::Math => S::MathObject,
+            Self::Json => S::JsonObject,
+            Self::Atomics => S::AtomicsObject,
+        }
+    }
+
+    pub(crate) const fn layout(self) -> crate::intrinsics::IntrinsicPropertyLayoutId {
+        use crate::intrinsics::IntrinsicPropertyLayoutId as L;
+        match self {
+            Self::Reflect => L::Reflect,
+            Self::Math => L::Math,
+            Self::Json => L::Json,
+            Self::Atomics => L::Atomics,
+        }
+    }
+
+    pub(crate) fn from_slot(slot: crate::functions::NonArrayRealmIntrinsicSlot) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|demand| demand.slot().gc_index() == slot.gc_index())
+    }
+}
+
+/// Closed discriminator stored in `DeferredDemandConstructor.CONSTRUCTOR`
+/// identifying which defining-Realm demand intrinsic a global property recipe
+/// resolves through `emit_load_non_array_realm_intrinsic_stored`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DemandGlobalRecipe {
+    Constructor(DemandConstructor),
+    HostFunction(DemandHostFunction),
+    Namespace(DemandNamespace),
+}
+
+impl DemandGlobalRecipe {
+    pub(crate) const fn word(self) -> i32 {
+        match self {
+            Self::Constructor(demand) => demand.word() as i32,
+            Self::HostFunction(demand) => {
+                DemandConstructor::ALL.len() as i32 + demand.word() as i32
+            }
+            Self::Namespace(demand) => {
+                (DemandConstructor::ALL.len() + DemandHostFunction::ALL.len()) as i32
+                    + demand.word() as i32
+            }
+        }
+    }
+
+    pub(crate) const fn slot(self) -> crate::functions::NonArrayRealmIntrinsicSlot {
+        match self {
+            Self::Constructor(demand) => demand.slot(),
+            Self::HostFunction(demand) => demand.slot(),
+            Self::Namespace(demand) => demand.slot(),
+        }
+    }
+
+    pub(crate) fn all() -> impl Iterator<Item = Self> {
+        DemandConstructor::ALL
+            .into_iter()
+            .map(Self::Constructor)
+            .chain(DemandHostFunction::ALL.into_iter().map(Self::HostFunction))
+            .chain(DemandNamespace::ALL.into_iter().map(Self::Namespace))
+    }
+}
+
+pub(crate) fn is_demand_intrinsic_slot(slot: crate::functions::NonArrayRealmIntrinsicSlot) -> bool {
+    DemandConstructor::from_slot(slot).is_some()
+        || DemandPrototype::from_slot(slot).is_some()
+        || DemandBoxedPrototype::from_slot(slot).is_some()
+        || DemandDynamicFunction::from_slot(slot).is_some()
+        || DemandHostFunction::from_slot(slot).is_some()
+        || DemandNamespace::from_slot(slot).is_some()
 }
 
 // Only public constructors can inhabit a deferred global recipe. The abstract

@@ -89,19 +89,19 @@ fn string_literal_replacement_scope_is_a_private_non_copyable_two_variant_domain
         STRING_LITERAL_REPLACEMENT_SCOPE
             .matches("StringLiteralReplacementScope")
             .count(),
-        6
+        9
     );
     assert_eq!(
         STRING_LITERAL_REPLACEMENT_SCOPE
             .matches("FirstOccurrence")
             .count(),
-        3
+        4
     );
     assert_eq!(
         STRING_LITERAL_REPLACEMENT_SCOPE
             .matches("AllOccurrences")
             .count(),
-        3
+        4
     );
 }
 
