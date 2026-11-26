@@ -27,47 +27,39 @@ CI releases and Test262 publication use `--release`.
 
 ## Benchmarks
 
-Compare engines within one cohort only. Full tables, charts, methods and limits
-live in [benchmark details](docs/rust-rewrite/benchmarks.md).
+Compare engines within one cohort only. Full numbers, methods and limits live in
+[benchmark details](docs/rust-rewrite/benchmarks.md).
 
-### Latest local benchmarks (2026-11-26)
+### Cold start & edge workloads (2026-11-26, Runtime ABI 92)
 
-Local `--release` build (compiler `ed27e234152d`, **Runtime ABI 92**) vs **Node 24.19.0**
-(`V8 13.6.233.17-node.51`) and **Porffor 0.61.13** on an AMD Ryzen 7 7800X3D
-(pinned CPUs 0–1, 4 GiB / 0 swap cap, warmups excluded, exact stdout verified).
+Local `--release` build (`ed27e234152d`) vs **Node 24.19.0** (`V8 13.6.233.17-node.51`)
+on AMD Ryzen 7 7800X3D (CPUs 0–1, 4 GiB cap, exact stdout verified;
+[full tables](docs/rust-rewrite/benchmarks.md#2026-11-26-local-benchmarks-edge-cold-start-and-porffor)).
 
-| Suite | Scriptw vs Node 24 / V8 | Scriptw vs Porffor 0.61.13 |
-| --- | --- | --- |
-| **CLI cold start** (`scriptw run`, warm cache, 5 fixtures) | **5/5 faster**, **0.227×** geomean (**4.41× faster**; 2.90–4.29 ms vs 15.37–17.67 ms) | — |
-| **Fresh-Realm startup floor** (`startup.js`, precompiled) | **8.28 µs** exec (**−28.6%** vs ABI 91's 11.59 µs; 191.86 µs total) | — |
-| **Edge kernels** (precompiled fresh Realm, 6 fixtures) | **6/6 faster** vs 80w (**0.745×**, **1.34× faster**); **5/6** vs 5w (**0.725×**, **1.38× faster**) | Porffor fails **6/6** edge fixtures |
-| **Runtime kernels** (`original17`, precompiled fresh Realm) | **16/17 faster** vs 5w (**0.257×**, **3.89× faster**); **15/17** vs 80w (**0.157×**, **6.36× faster**) | **13/13 faster** on Node/V8 Wasm (**0.078×**, **12.8× faster**); **12/13** on Wasmtime (**0.157×**, **6.38× faster**)\*; Porffor fails **4/17** |
-| **JS → Wasm compilation** (`original17`, 4 fresh runs each) | — | **17/17 faster**, **0.543×** geomean (**1.84× faster**; 53.3–73.2 ms vs 94.5–155.7 ms) |
+![CLI cold start: Scriptw vs Node 24.19.0](docs/rust-rewrite/assets/local-20261126/cli-cold-start.svg)
 
-\* A 31-sample re-check of `join-mixed-1024` measured **30.37 µs** vs Porffor's **33.13 µs** on Wasmtime (**1.09× faster**, **13/13** wins, ~**6.6×** geomean).
-See [full 2026-11-26 tables and measurement boundaries](docs/rust-rewrite/benchmarks.md#2026-11-26-local-benchmarks-edge-cold-start-and-porffor).
+![Edge workloads: Scriptw vs V8 (80w)](docs/rust-rewrite/assets/local-20261126/edge-kernels.svg)
+
+### Runtime kernels vs V8 (2026-11-26, Runtime ABI 92)
+
+![Runtime kernels: Scriptw speedup over Node 24 / V8 (80w)](docs/rust-rewrite/assets/local-20261126/runtime-kernels-v8.svg)
+
+### Scriptw vs Porffor 0.61.13 (2026-11-26, Runtime ABI 92)
+
+![Scriptw vs Porffor 0.61.13 runtime kernels](docs/rust-rewrite/assets/local-20261126/porffor-comparison.svg)
+
+![JS to Wasm compilation: Scriptw vs Porffor 0.61.13](docs/rust-rewrite/assets/local-20261126/porffor-compile.svg)
 
 ### Process density (2026-11-25)
 
-Local release build `5ed84a21a`, N = 1–32 concurrent processes held after a print-only program, summed PSS ([method and limits](docs/rust-rewrite/benchmarks.md#process-density) · [data](docs/rust-rewrite/process-density-current.json)):
+![Process density: memory per added process](docs/rust-rewrite/assets/local-20261126/process-density.svg)
 
-| Print-only program | Memory per added process | Processes in 16 GiB | Process wall |
-| --- | ---: | ---: | ---: |
-| Scriptw, precompiled image (benchmark host) | 1.7 MiB | 9,796 | 10 ms |
-| Node 24.22.1 | 8.6 MiB | 1,895 | 27 ms |
-| Node 22.23.4 | 6.7 MiB | 2,444 | 27 ms |
-| Porffor 0.61.13 native | 0.3 MiB | 58,996 | 3 ms |
-
-Scriptw fits **5.2×** as many processes as Node 24 (and more than Node 22/24 on all six measured programs, including an 8,192-retained-object kernel).
+[Method and limits](docs/rust-rewrite/benchmarks.md#process-density) ·
+[data](docs/rust-rewrite/process-density-current.json).
 
 ### React Server Components (2026-11-17)
 
-**React 19.3.1 RSC**, compiler `697c47c22eb0`, four-vCPU Xeon cloud host, medians of 8 fresh processes (100 warmups, 101 timed requests, exact Flight output; [details](docs/rust-rewrite/benchmarks.md#react-server-components) · [data](docs/rust-rewrite/rsc-current.json)):
-
-| Retained request | Scriptw Fast | Scriptw Speed | Node 24 / V8 |
-| --- | ---: | ---: | ---: |
-| Sync | 0.675 ms | 0.269 ms | 0.166 ms |
-| Async | 0.777 ms | 0.294 ms | 0.178 ms |
+**React 19.3.1 RSC** (`697c47c22eb0`, 4-vCPU Xeon cloud host, 100 warmups + 101 timed retained requests, exact Flight output): Scriptw Speed **0.269 / 0.294 ms** vs Node 24 / V8 **0.166 / 0.178 ms** (sync / async; [details](docs/rust-rewrite/benchmarks.md#react-server-components) · [data](docs/rust-rewrite/rsc-current.json)).
 
 ![Retained RSC requests](docs/rust-rewrite/assets/rsc-current/runtime.svg)
 

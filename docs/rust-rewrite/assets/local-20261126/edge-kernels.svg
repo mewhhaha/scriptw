@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="420" viewBox="0 0 760 420" role="img" aria-labelledby="title desc">
+<title id="title">Edge workloads: Scriptw vs V8</title>
+<desc id="desc">Six edge workloads in a precompiled fresh Realm vs 80-warmup V8: Scriptw wins 6/6 with a 1.34x geometric mean speedup.</desc>
+<rect x="0.5" y="0.5" width="759" height="419" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+<g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fill="#24292f">
+<text x="28" y="34" font-size="18" font-weight="650" fill="#24292f">Edge workloads — precompiled fresh Realm vs V8 (80w)</text>
+<text x="28" y="54" font-size="12" fill="#57606a">Lower is faster (µs, execution) · 6/6 faster vs V8 (80w) · 1.34× geomean · Porffor 0.61.13 fails 6/6</text>
+<rect x="28.0" y="66" width="11" height="11" rx="2.5" fill="#0969da"/>
+<text x="44.0" y="75.5" font-size="11.5" fill="#57606a">Scriptw (ABI 92)</text>
+<rect x="166.0" y="66" width="11" height="11" rx="2.5" fill="#d97724"/>
+<text x="182.0" y="75.5" font-size="11.5" fill="#57606a">Node 24 / V8 (80w)</text>
+<line x1="165.0" y1="94" x2="165.0" y2="358" stroke="#eaeef2" stroke-width="1"/>
+<text x="165.0" y="374" text-anchor="middle" font-size="11" fill="#57606a">0 µs</text>
+<line x1="256.0" y1="94" x2="256.0" y2="358" stroke="#eaeef2" stroke-width="1"/>
+<text x="256.0" y="374" text-anchor="middle" font-size="11" fill="#57606a">100 µs</text>
+<line x1="347.0" y1="94" x2="347.0" y2="358" stroke="#eaeef2" stroke-width="1"/>
+<text x="347.0" y="374" text-anchor="middle" font-size="11" fill="#57606a">200 µs</text>
+<line x1="438.0" y1="94" x2="438.0" y2="358" stroke="#eaeef2" stroke-width="1"/>
+<text x="438.0" y="374" text-anchor="middle" font-size="11" fill="#57606a">300 µs</text>
+<line x1="529.0" y1="94" x2="529.0" y2="358" stroke="#eaeef2" stroke-width="1"/>
+<text x="529.0" y="374" text-anchor="middle" font-size="11" fill="#57606a">400 µs</text>
+<line x1="620.0" y1="94" x2="620.0" y2="358" stroke="#eaeef2" stroke-width="1"/>
+<text x="620.0" y="374" text-anchor="middle" font-size="11" fill="#57606a">500 µs</text>
+<line x1="165" y1="94" x2="165" y2="358" stroke="#d0d7de" stroke-width="1"/>
+<text x="153" y="120" text-anchor="end" font-size="12.5" font-weight="500">edge-html</text>
+<rect x="165" y="103" width="217.2" height="14" rx="3" fill="#0969da"/>
+<text x="389.2" y="114" font-size="11.5" font-weight="600" fill="#0969da">238.7 µs</text>
+<rect x="165" y="120" width="430.2" height="14" rx="3" fill="#d97724" opacity="0.88"/>
+<text x="602.2" y="131" font-size="11" fill="#57606a">472.8 µs</text>
+<rect x="668" y="109" width="64" height="20" rx="10" fill="#ddf4ff"/>
+<text x="700" y="123" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">1.98×</text>
+<text x="153" y="164" text-anchor="end" font-size="12.5" font-weight="500">edge-query</text>
+<rect x="165" y="147" width="166.9" height="14" rx="3" fill="#0969da"/>
+<text x="338.9" y="158" font-size="11.5" font-weight="600" fill="#0969da">183.4 µs</text>
+<rect x="165" y="164" width="280.1" height="14" rx="3" fill="#d97724" opacity="0.88"/>
+<text x="452.1" y="175" font-size="11" fill="#57606a">307.8 µs</text>
+<rect x="668" y="153" width="64" height="20" rx="10" fill="#ddf4ff"/>
+<text x="700" y="167" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">1.68×</text>
+<text x="153" y="208" text-anchor="end" font-size="12.5" font-weight="500">edge-nested-result</text>
+<rect x="165" y="191" width="176.4" height="14" rx="3" fill="#0969da"/>
+<text x="348.4" y="202" font-size="11.5" font-weight="600" fill="#0969da">193.9 µs</text>
+<rect x="165" y="208" width="214.9" height="14" rx="3" fill="#d97724" opacity="0.88"/>
+<text x="386.9" y="219" font-size="11" fill="#57606a">236.2 µs</text>
+<rect x="668" y="197" width="64" height="20" rx="10" fill="#ddf4ff"/>
+<text x="700" y="211" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">1.22×</text>
+<text x="153" y="252" text-anchor="end" font-size="12.5" font-weight="500">edge-middleware</text>
+<rect x="165" y="235" width="70.7" height="14" rx="3" fill="#0969da"/>
+<text x="242.7" y="246" font-size="11.5" font-weight="600" fill="#0969da">77.7 µs</text>
+<rect x="165" y="252" width="85.6" height="14" rx="3" fill="#d97724" opacity="0.88"/>
+<text x="257.6" y="263" font-size="11" fill="#57606a">94.1 µs</text>
+<rect x="668" y="241" width="64" height="20" rx="10" fill="#ddf4ff"/>
+<text x="700" y="255" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">1.21×</text>
+<text x="153" y="296" text-anchor="end" font-size="12.5" font-weight="500">edge-json-api</text>
+<rect x="165" y="279" width="120.8" height="14" rx="3" fill="#0969da"/>
+<text x="292.8" y="290" font-size="11.5" font-weight="600" fill="#0969da">132.8 µs</text>
+<rect x="165" y="296" width="141.8" height="14" rx="3" fill="#d97724" opacity="0.88"/>
+<text x="313.8" y="307" font-size="11" fill="#57606a">155.8 µs</text>
+<rect x="668" y="285" width="64" height="20" rx="10" fill="#ddf4ff"/>
+<text x="700" y="299" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">1.17×</text>
+<text x="153" y="340" text-anchor="end" font-size="12.5" font-weight="500">edge-router</text>
+<rect x="165" y="323" width="77.3" height="14" rx="3" fill="#0969da"/>
+<text x="249.3" y="334" font-size="11.5" font-weight="600" fill="#0969da">84.9 µs</text>
+<rect x="165" y="340" width="78.9" height="14" rx="3" fill="#d97724" opacity="0.88"/>
+<text x="250.9" y="351" font-size="11" fill="#57606a">86.7 µs</text>
+<rect x="668" y="329" width="64" height="20" rx="10" fill="#ddf4ff"/>
+<text x="700" y="343" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">1.02×</text>
+<text x="28" y="404" font-size="11" fill="#57606a">2026-11-26 · ABI 92 · Ryzen 7 7800X3D (CPUs 0–1, 4 GiB) · medians of 21 fresh-Realm runs (5 warmups excluded) · vs V8 5w: 5/6 (1.38×)</text>
+</g>
+</svg>

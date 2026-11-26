@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="602" viewBox="0 0 760 602" role="img" aria-labelledby="title desc">
+<title id="title">JS to Wasm compilation: Scriptw vs Porffor 0.61.13</title>
+<desc id="desc">Compilation time across all 17 runtime kernels: Scriptw 53.3–73.2 ms vs Porffor 94.5–155.7 ms (17/17 faster, 1.84x geomean).</desc>
+<rect x="0.5" y="0.5" width="759" height="601" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+<g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fill="#24292f">
+<text x="28" y="34" font-size="18" font-weight="650" fill="#24292f">JS → Wasm compilation — scriptw build wasm vs porf wasm</text>
+<text x="28" y="54" font-size="12" fill="#57606a">Lower is faster (ms, fresh process) · 17/17 faster · 1.84× geomean (53.3–73.2 ms vs 94.5–155.7 ms)</text>
+<rect x="28.0" y="66" width="11" height="11" rx="2.5" fill="#0969da"/>
+<text x="44.0" y="75.5" font-size="11.5" fill="#57606a">Scriptw (ABI 92)</text>
+<rect x="166.0" y="66" width="11" height="11" rx="2.5" fill="#2da44e"/>
+<text x="182.0" y="75.5" font-size="11.5" fill="#57606a">Porffor 0.61.13</text>
+<line x1="168.0" y1="94" x2="168.0" y2="538" stroke="#eaeef2" stroke-width="1"/>
+<text x="168.0" y="554" text-anchor="middle" font-size="11" fill="#57606a">0 ms</text>
+<line x1="282.2" y1="94" x2="282.2" y2="538" stroke="#eaeef2" stroke-width="1"/>
+<text x="282.2" y="554" text-anchor="middle" font-size="11" fill="#57606a">40 ms</text>
+<line x1="396.5" y1="94" x2="396.5" y2="538" stroke="#eaeef2" stroke-width="1"/>
+<text x="396.5" y="554" text-anchor="middle" font-size="11" fill="#57606a">80 ms</text>
+<line x1="510.8" y1="94" x2="510.8" y2="538" stroke="#eaeef2" stroke-width="1"/>
+<text x="510.8" y="554" text-anchor="middle" font-size="11" fill="#57606a">120 ms</text>
+<line x1="625.0" y1="94" x2="625.0" y2="538" stroke="#eaeef2" stroke-width="1"/>
+<text x="625.0" y="554" text-anchor="middle" font-size="11" fill="#57606a">160 ms</text>
+<line x1="168" y1="94" x2="168" y2="538" stroke="#d0d7de" stroke-width="1"/>
+<text x="156" y="116" text-anchor="end" font-size="12" font-weight="500">dynamic-string-4096</text>
+<rect x="168" y="103" width="201.7" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="114" width="444.7" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="116" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">2.21×</tspan>  (71 vs 156 ms)</text>
+<text x="156" y="142" text-anchor="end" font-size="12" font-weight="500">numeric-loop-50000</text>
+<rect x="168" y="129" width="196.2" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="140" width="399.6" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="142" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">2.04×</tspan>  (69 vs 140 ms)</text>
+<text x="156" y="168" text-anchor="end" font-size="12" font-weight="500">join-4096</text>
+<rect x="168" y="155" width="199.1" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="166" width="396.4" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="168" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">1.99×</tspan>  (70 vs 139 ms)</text>
+<text x="156" y="194" text-anchor="end" font-size="12" font-weight="500">join-1024</text>
+<rect x="168" y="181" width="165.7" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="192" width="325.9" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="194" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">1.97×</tspan>  (58 vs 114 ms)</text>
+<text x="156" y="220" text-anchor="end" font-size="12" font-weight="500">to-sorted-512</text>
+<rect x="168" y="207" width="173.7" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="218" width="342.5" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="220" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">1.97×</tspan>  (61 vs 120 ms)</text>
+<text x="156" y="246" text-anchor="end" font-size="12" font-weight="500">sort-sorted-512</text>
+<rect x="168" y="233" width="185.4" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="244" width="360.7" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="246" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">1.95×</tspan>  (65 vs 126 ms)</text>
+<text x="156" y="272" text-anchor="end" font-size="12" font-weight="500">numeric-loop-10000</text>
+<rect x="168" y="259" width="178.5" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="270" width="335.3" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="272" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">1.88×</tspan>  (62 vs 117 ms)</text>
+<text x="156" y="298" text-anchor="end" font-size="12" font-weight="500">join-singleton-1024</text>
+<rect x="168" y="285" width="152.2" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="296" width="281.3" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="298" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">1.85×</tspan>  (53 vs 98 ms)</text>
+<text x="156" y="324" text-anchor="end" font-size="12" font-weight="500">sort-reverse-512</text>
+<rect x="168" y="311" width="175.9" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="322" width="324.5" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="324" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">1.84×</tspan>  (62 vs 114 ms)</text>
+<text x="156" y="350" text-anchor="end" font-size="12" font-weight="500">join-empty-1024</text>
+<rect x="168" y="337" width="153.4" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="348" width="279.9" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="350" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">1.82×</tspan>  (54 vs 98 ms)</text>
+<text x="156" y="376" text-anchor="end" font-size="12" font-weight="500">join-mixed-1024</text>
+<rect x="168" y="363" width="209.1" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="374" width="379.9" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="376" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">1.82×</tspan>  (73 vs 133 ms)</text>
+<text x="156" y="402" text-anchor="end" font-size="12" font-weight="500">objects</text>
+<rect x="168" y="389" width="152.8" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="400" width="276.8" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="402" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">1.81×</tspan>  (54 vs 97 ms)</text>
+<text x="156" y="428" text-anchor="end" font-size="12" font-weight="500">retained-objects</text>
+<rect x="168" y="415" width="157.7" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="426" width="269.9" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="428" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">1.71×</tspan>  (55 vs 94 ms)</text>
+<text x="156" y="454" text-anchor="end" font-size="12" font-weight="500">folded-string-4096</text>
+<rect x="168" y="441" width="189.1" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="452" width="315.0" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="454" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">1.67×</tspan>  (66 vs 110 ms)</text>
+<text x="156" y="480" text-anchor="end" font-size="12" font-weight="500">sort-reverse-128</text>
+<rect x="168" y="467" width="195.1" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="478" width="324.8" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="480" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">1.66×</tspan>  (68 vs 114 ms)</text>
+<text x="156" y="506" text-anchor="end" font-size="12" font-weight="500">join-small-1024</text>
+<rect x="168" y="493" width="165.4" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="504" width="271.9" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="506" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">1.64×</tspan>  (58 vs 95 ms)</text>
+<text x="156" y="532" text-anchor="end" font-size="12" font-weight="500">integer</text>
+<rect x="168" y="519" width="179.9" height="9" rx="2" fill="#0969da"/>
+<rect x="168" y="530" width="281.1" height="9" rx="2" fill="#2da44e" opacity="0.82"/>
+<text x="736" y="532" text-anchor="end" font-size="11" fill="#57606a"><tspan fill="#0969da" font-weight="650">1.56×</tspan>  (63 vs 98 ms)</text>
+<text x="28" y="586" font-size="11" fill="#57606a">2026-11-26 · ABI 92 · Ryzen 7 7800X3D (CPUs 0–1, 4 GiB) · medians of 4 fresh CLI builds per kernel (includes startup and output I/O)</text>
+</g>
+</svg>
