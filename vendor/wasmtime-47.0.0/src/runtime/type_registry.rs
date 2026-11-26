@@ -863,11 +863,15 @@ impl TypeRegistryInner {
         trace_info.reserve(types.wasm_types().len())?;
 
         for (_rec_group_index, module_group) in types.rec_groups() {
-            let entry = self.register_rec_group(
+            // Scriptw patch: probe the hash-consing map before cloning
+            // `non_canon_types`. Program modules P re-register R's shared GC
+            // rec groups and hit on every shared group, avoiding a second full
+            // clone of all `WasmSubType`s on every P load.
+            let entry = self.register_module_rec_group(
                 gc_runtime,
                 map,
                 module_group.clone(),
-                iter_entity_range(module_group.clone()).map(|ty| types[ty].try_clone()),
+                types,
             )?;
 
             // Update the module-to-engine map with this rec group's
@@ -891,6 +895,50 @@ impl TypeRegistryInner {
         }
 
         Ok(())
+    }
+
+    fn register_module_rec_group(
+        &mut self,
+        gc_runtime: Option<&dyn GcRuntime>,
+        map: &TryPrimaryMap<ModuleInternedTypeIndex, VMSharedTypeIndex>,
+        range: Range<ModuleInternedTypeIndex>,
+        module_types: &ModuleTypes,
+    ) -> Result<RecGroupEntry, OutOfMemory> {
+        let hash_consing_key = WasmRecGroup {
+            types: iter_entity_range(range.clone())
+                .map(|module_index| {
+                    let mut ty = module_types[module_index].try_clone()?;
+                    ty.canonicalize_for_hash_consing(range.clone(), &mut |idx| {
+                        debug_assert!(idx < range.clone().start);
+                        map[idx]
+                    });
+                    Ok(ty)
+                })
+                .try_collect::<Box<[_]>, OutOfMemory>()?,
+        };
+
+        if cfg!(debug_assertions) {
+            hash_consing_key
+                .trace_engine_indices::<_, ()>(&mut |index| Ok(self.debug_assert_registered(index)))
+                .unwrap();
+        }
+
+        if let Some(entry) = self.hash_consing_map.get(&hash_consing_key) {
+            log::trace!("hash-consing map hit: reusing {entry:?}");
+            assert_eq!(entry.0.unregistered.load(Acquire), false);
+            self.debug_assert_all_registered(entry);
+            entry.incref("hash-consing map hit");
+            Ok(entry.clone())
+        } else {
+            log::trace!("hash-consing map miss: making new registration");
+            let mut non_canon_types = TryVec::with_capacity(hash_consing_key.types.len())?;
+            for module_index in iter_entity_range(range.clone()) {
+                non_canon_types
+                    .push((module_index, module_types[module_index].try_clone()?))
+                    .expect("reserved capacity");
+            }
+            self.register_new_rec_group(gc_runtime, map, range, hash_consing_key, non_canon_types)
+        }
     }
 
     /// Register a rec group in this registry.

@@ -47,6 +47,10 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         .struct_type::<DeferredRegExpConstructor>()
         .type_index()
         .raw();
+    let legacy_arguments_index = schema
+        .struct_type::<DeferredLegacyArguments>()
+        .type_index()
+        .raw();
     let realm_index = schema.struct_type::<RealmRecord>().type_index().raw();
     let reference = |index, nullable| {
         wasmparser::StorageType::Val(wasmparser::ValType::Ref(
@@ -87,6 +91,7 @@ fn compact_records_preserve_the_emitted_host_schema_and_scalar_widths() {
         error_index,
         date_index,
         regexp_index,
+        legacy_arguments_index,
     ];
     expected.sort_unstable();
     assert_eq!(alternatives, expected);
@@ -524,18 +529,18 @@ fn compact_storage_has_a_shape_only_base_and_two_sealed_physical_variants() {
     );
     assert!(array[2..].iter().all(|field| field.mutable));
     let inline = fields(GcLayout::InlineCompactDataStorage);
-    assert_eq!(inline.len(), 6);
+    assert_eq!(inline.len(), 10);
     assert_eq!(
         inline[1].element_type,
         wasmparser::StorageType::Val(wasmparser::ValType::I32)
     );
-    for field in &inline[2..4] {
+    for field in &inline[2..6] {
         assert_eq!(
             field.element_type,
             wasmparser::StorageType::Val(wasmparser::ValType::I64)
         );
     }
-    for field in &inline[4..] {
+    for field in &inline[6..] {
         assert_eq!(
             field.element_type,
             wasmparser::StorageType::Val(wasmparser::ValType::Ref(wasmparser::RefType::EQREF))
@@ -554,12 +559,22 @@ fn compact_storage_has_a_shape_only_base_and_two_sealed_physical_variants() {
     );
     assert_eq!(InlineCompactDataStorageSchema::SCALAR0.ordinal().raw(), 2);
     assert_eq!(InlineCompactDataStorageSchema::SCALAR1.ordinal().raw(), 3);
+    assert_eq!(InlineCompactDataStorageSchema::SCALAR2.ordinal().raw(), 4);
+    assert_eq!(InlineCompactDataStorageSchema::SCALAR3.ordinal().raw(), 5);
     assert_eq!(
         InlineCompactDataStorageSchema::REFERENCE0.ordinal().raw(),
-        4
+        6
     );
     assert_eq!(
         InlineCompactDataStorageSchema::REFERENCE1.ordinal().raw(),
-        5
+        7
+    );
+    assert_eq!(
+        InlineCompactDataStorageSchema::REFERENCE2.ordinal().raw(),
+        8
+    );
+    assert_eq!(
+        InlineCompactDataStorageSchema::REFERENCE3.ordinal().raw(),
+        9
     );
 }

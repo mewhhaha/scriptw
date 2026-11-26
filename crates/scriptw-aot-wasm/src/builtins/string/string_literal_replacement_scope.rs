@@ -646,4 +646,243 @@ impl FunctionBuilder<'_> {
         pending.clear(f);
         Ok(())
     }
+
+    /// Fused `input.split(separator).join(replacement)` for proven primitive
+    /// Strings with a non-empty separator under unchanged Realm protectors.
+    /// Returns `input` directly with zero allocations when `separator` does
+    /// not occur, builds one exact-size String when it does, or returns null
+    /// if the output exceeds `MAX_STRING_LENGTH` so the caller runs the
+    /// general path and throws its exact RangeError.
+    pub(crate) fn compile_string_split_join_helper(&mut self) -> Result<Function, EmitError> {
+        use crate::runtime_helpers::{HelperParameters, StringSplitJoinParameters};
+        let mut f = self.begin_helper_body(RuntimeHelperId::StringSplitJoin);
+        let p = self.helper_parameters::<StringSplitJoinParameters>(&mut f);
+        let s = self.runtime_schema();
+        let result = s
+            .reserve_gc_local::<StringValue, Nullable>(&mut f)
+            .initialize_null(s, &mut f);
+        let input_units = s.reserve_gc_local(&mut f).initialize(
+            s.field(StringValueSchema::CODE_UNITS)
+                .read(&p.input, s, &mut f)
+                .reference(),
+            &mut f,
+        );
+        let sep_units = s.reserve_gc_local(&mut f).initialize(
+            s.field(StringValueSchema::CODE_UNITS)
+                .read(&p.separator, s, &mut f)
+                .reference(),
+            &mut f,
+        );
+        let rep_units = s.reserve_gc_local(&mut f).initialize(
+            s.field(StringValueSchema::CODE_UNITS)
+                .read(&p.replacement, s, &mut f)
+                .reference(),
+            &mut f,
+        );
+        let input_len = s.reserve_i64_local(&mut f);
+        let sep_len = s.reserve_i64_local(&mut f);
+        let rep_len = s.reserve_i64_local(&mut f);
+        let first_pos = s.reserve_i64_local(&mut f);
+        let pos = s.reserve_i64_local(&mut f);
+        let cursor = s.reserve_i64_local(&mut f);
+        let matches = s.reserve_i64_local(&mut f);
+        let total = s.reserve_i64_local(&mut f);
+        let dest = s.reserve_i32_local(&mut f);
+        let src_start = s.reserve_i32_local(&mut f);
+        let span = s.reserve_i32_local(&mut f);
+        let rep_len32 = s.reserve_i32_local(&mut f);
+        s.array_type::<CodeUnitArray>()
+            .length(&input_units, s, &mut f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        input_len.store(&mut f);
+        s.array_type::<CodeUnitArray>()
+            .length(&sep_units, s, &mut f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        sep_len.store(&mut f);
+        s.array_type::<CodeUnitArray>()
+            .length(&rep_units, s, &mut f);
+        rep_len32.store(&mut f);
+        rep_len32.load(&mut f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        rep_len.store(&mut f);
+        let done = self.open_frame(ControlFrameKind::Block, &mut f);
+        // Empty separator declines to general path.
+        sep_len.load(&mut f);
+        f.instruction(&Instruction::I64Eqz);
+        self.emit_branch_if_to_target(done, &mut f);
+        cursor.set_constant(0, &mut f);
+        self.emit_native_string_index_of(
+            &p.input,
+            &p.separator,
+            input_len,
+            sep_len,
+            cursor,
+            first_pos,
+            &mut f,
+        );
+        // No match: return the immutable input String with zero allocations.
+        first_pos.load(&mut f);
+        f.instruction(&Instruction::I64Const(-1));
+        f.instruction(&Instruction::I64Eq);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        result.replace(p.input.load(s, &mut f).nullable(), &mut f);
+        self.emit_branch_to_target(done, &mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        // Pass 1: count all non-overlapping matches to compute exact output length.
+        matches.set_constant(1, &mut f);
+        first_pos.load(&mut f);
+        sep_len.load(&mut f);
+        f.instruction(&Instruction::I64Add);
+        cursor.store(&mut f);
+        let counted = self.open_frame(ControlFrameKind::Block, &mut f);
+        let count_loop = self.open_frame(ControlFrameKind::Loop, &mut f);
+        self.emit_native_string_index_of(
+            &p.input,
+            &p.separator,
+            input_len,
+            sep_len,
+            cursor,
+            pos,
+            &mut f,
+        );
+        pos.load(&mut f);
+        f.instruction(&Instruction::I64Const(-1));
+        f.instruction(&Instruction::I64Eq);
+        self.emit_branch_if_to_target(counted, &mut f);
+        self.emit_increment_local(matches, 1, &mut f);
+        pos.load(&mut f);
+        sep_len.load(&mut f);
+        f.instruction(&Instruction::I64Add);
+        cursor.store(&mut f);
+        self.emit_branch_to_target(count_loop, &mut f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        // Check `input_len - matches * sep_len + matches * rep_len <= MAX_STRING_LENGTH`
+        // without u64 overflow (`matches <= input_len <= u32::MAX` and `rep_len <= u32::MAX`,
+        // so `matches * rep_len` never overflows u64).
+        input_len.load(&mut f);
+        matches.load(&mut f);
+        sep_len.load(&mut f);
+        f.instruction(&Instruction::I64Mul);
+        f.instruction(&Instruction::I64Sub);
+        total.store(&mut f);
+        matches.load(&mut f);
+        rep_len.load(&mut f);
+        f.instruction(&Instruction::I64Mul);
+        cursor.store(&mut f);
+        cursor.load(&mut f);
+        f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
+        f.instruction(&Instruction::I64GtU);
+        self.emit_branch_if_to_target(done, &mut f);
+        total.load(&mut f);
+        cursor.load(&mut f);
+        f.instruction(&Instruction::I64Add);
+        total.store(&mut f);
+        total.load(&mut f);
+        f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
+        f.instruction(&Instruction::I64GtU);
+        self.emit_branch_if_to_target(done, &mut f);
+        // Pass 2: allocate one exact-size StringConstruction and copy spans + replacements.
+        total.load(&mut f);
+        f.instruction(&Instruction::I32WrapI64);
+        span.store(&mut f);
+        let construction =
+            crate::gc_types::StringConstruction::allocate(s, s.reserve_gc_local(&mut f), span, &mut f);
+        dest.set_constant(0, &mut f);
+        cursor.set_constant(0, &mut f);
+        first_pos.load(&mut f);
+        pos.store(&mut f);
+        let copied = self.open_frame(ControlFrameKind::Block, &mut f);
+        let copy_loop = self.open_frame(ControlFrameKind::Loop, &mut f);
+        pos.load(&mut f);
+        f.instruction(&Instruction::I64Const(-1));
+        f.instruction(&Instruction::I64Eq);
+        self.emit_branch_if_to_target(copied, &mut f);
+        pos.load(&mut f);
+        cursor.load(&mut f);
+        f.instruction(&Instruction::I64GtU);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        cursor.load(&mut f);
+        f.instruction(&Instruction::I32WrapI64);
+        src_start.store(&mut f);
+        pos.load(&mut f);
+        cursor.load(&mut f);
+        f.instruction(&Instruction::I64Sub);
+        f.instruction(&Instruction::I32WrapI64);
+        span.store(&mut f);
+        construction.copy_units_range_from(dest, &input_units, src_start, span, s, &mut f);
+        dest.load(&mut f);
+        span.load(&mut f);
+        f.instruction(&Instruction::I32Add);
+        dest.store(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        rep_len32.load(&mut f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32Ne);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        construction.copy_units_from(dest, &rep_units, rep_len32, s, &mut f);
+        dest.load(&mut f);
+        rep_len32.load(&mut f);
+        f.instruction(&Instruction::I32Add);
+        dest.store(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        pos.load(&mut f);
+        sep_len.load(&mut f);
+        f.instruction(&Instruction::I64Add);
+        cursor.store(&mut f);
+        self.emit_native_string_index_of(
+            &p.input,
+            &p.separator,
+            input_len,
+            sep_len,
+            cursor,
+            pos,
+            &mut f,
+        );
+        self.emit_branch_to_target(copy_loop, &mut f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        input_len.load(&mut f);
+        cursor.load(&mut f);
+        f.instruction(&Instruction::I64GtU);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        cursor.load(&mut f);
+        f.instruction(&Instruction::I32WrapI64);
+        src_start.store(&mut f);
+        input_len.load(&mut f);
+        cursor.load(&mut f);
+        f.instruction(&Instruction::I64Sub);
+        f.instruction(&Instruction::I32WrapI64);
+        span.store(&mut f);
+        construction.copy_units_range_from(dest, &input_units, src_start, span, s, &mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        result.replace(construction.publish(s, &mut f).nullable(), &mut f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        result.load(s, &mut f);
+        s.release_i32_local(rep_len32, &mut f);
+        s.release_i32_local(span, &mut f);
+        s.release_i32_local(src_start, &mut f);
+        s.release_i32_local(dest, &mut f);
+        for local in [
+            total, matches, cursor, pos, first_pos, rep_len, sep_len, input_len,
+        ] {
+            s.release_i64_local(local, &mut f);
+        }
+        rep_units.clear(&mut f);
+        sep_units.clear(&mut f);
+        input_units.clear(&mut f);
+        result.clear(&mut f);
+        p.release(&mut f);
+        f.instruction(&Instruction::End);
+        Ok(self.finish_function(f))
+    }
 }

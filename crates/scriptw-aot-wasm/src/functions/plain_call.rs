@@ -237,9 +237,19 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::RefEq);
         function.instruction(&Instruction::I32And);
         if planned.converts_receiver {
-            // ToObject(object) is identity; any other receiver is converted
-            // by the general helper in the callee's Realm.
+            // ToObject(object) is identity; undefined/null become the callee
+            // Realm's globalThis inline. Other primitives keep the general helper.
             self.emit_object_value_i32(receiver, function);
+            receiver.tag().load(function);
+            function.instruction(&Instruction::I32Const(
+                WasmRuntimeValueTag::Undefined.tag(),
+            ));
+            function.instruction(&Instruction::I32Eq);
+            function.instruction(&Instruction::I32Or);
+            receiver.tag().load(function);
+            function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Null.tag()));
+            function.instruction(&Instruction::I32Eq);
+            function.instruction(&Instruction::I32Or);
             function.instruction(&Instruction::I32And);
         }
         owner.clear(function);
@@ -258,6 +268,50 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
+        let bound_receiver = planned.converts_receiver.then(|| {
+            let bound = schema.reserve_value_local(function);
+            receiver.tag().load(function);
+            function.instruction(&Instruction::I32Const(
+                WasmRuntimeValueTag::Undefined.tag(),
+            ));
+            function.instruction(&Instruction::I32Eq);
+            receiver.tag().load(function);
+            function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Null.tag()));
+            function.instruction(&Instruction::I32Eq);
+            function.instruction(&Instruction::I32Or);
+            function.instruction(&Instruction::If(BlockType::Empty));
+            let global_this = schema
+                .reserve_gc_local::<crate::gc_types::StoredValue, crate::gc_types::Nullable>(
+                    function,
+                )
+                .initialize(
+                    schema
+                        .struct_type::<crate::gc_types::RealmRecord>()
+                        .field(crate::gc_types::RealmRecordSchema::GLOBAL_THIS)
+                        .read(&realm, schema, function)
+                        .reference(),
+                    function,
+                );
+            global_this.load(schema, function).is_null(function);
+            function.instruction(&Instruction::If(BlockType::Empty));
+            bound.copy_from(receiver, function);
+            function.instruction(&Instruction::Else);
+            let present = schema.reserve_gc_local(function).initialize(
+                global_this.load(schema, function).require_non_null(function),
+                function,
+            );
+            schema
+                .struct_type::<crate::gc_types::StoredValue>()
+                .read_into(&present, &bound, schema, function);
+            present.clear(function);
+            function.instruction(&Instruction::End);
+            global_this.clear(function);
+            function.instruction(&Instruction::Else);
+            bound.copy_from(receiver, function);
+            function.instruction(&Instruction::End);
+            bound
+        });
+        let effective_receiver = bound_receiver.as_ref().unwrap_or(receiver);
         let caller_realm = self.load_current_realm(function);
         match route {
             SiteCallRoute::Continue { result, entered } => {
@@ -267,7 +321,7 @@ impl FunctionBuilder<'_> {
                     entry.emit_source_call(
                         &callable,
                         OrdinaryBodyInputs::call(
-                            receiver,
+                            effective_receiver,
                             EntryArguments::new(arguments),
                             &caller_realm,
                             self.current_program(),
@@ -289,7 +343,7 @@ impl FunctionBuilder<'_> {
                 entry.emit_source_return_call(
                     &callable,
                     OrdinaryBodyInputs::call(
-                        receiver,
+                        effective_receiver,
                         EntryArguments::new(arguments),
                         &caller_realm,
                         &calling_program,
@@ -301,6 +355,9 @@ impl FunctionBuilder<'_> {
             }
         }
         caller_realm.clear(function);
+        if let Some(bound) = bound_receiver {
+            bound.clear(function);
+        }
         realm.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);

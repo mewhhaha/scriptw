@@ -122,6 +122,20 @@ impl FunctionBuilder<'_> {
                 self.compile_return_position_expr(rhs, function)?;
             }
             ExprIr::MaterializeBinding { name, value, body } => {
+                let fused_value = self.runtime_schema().reserve_value_local(function);
+                if self.try_compile_split_join_materialized_binding(
+                    name,
+                    value,
+                    body,
+                    &CallContinuation::Return,
+                    &fused_value,
+                    function,
+                )? {
+                    self.emit_return_position_value(&fused_value, function)?;
+                    fused_value.clear(function);
+                    return Ok(());
+                }
+                fused_value.clear(function);
                 let initialized = self.runtime_schema().reserve_value_local(function);
                 self.compile_expr_to_value(value, &initialized, function)?;
                 self.push_scope();

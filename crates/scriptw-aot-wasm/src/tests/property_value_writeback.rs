@@ -101,11 +101,18 @@ enum Write {
 /// Track only the straight-line deferred arm, including reference upcasts and
 /// temporary roots. A local-number change cannot disguise writing the recipe
 /// back instead of the canonical resolver result.
-fn deferred_writes(operators: &[Operator<'_>], resolve: u32) -> (Origin, Vec<Write>) {
+fn deferred_writes(
+    operators: &[Operator<'_>],
+    resolve: u32,
+    deferred_legacy: u32,
+) -> (Origin, Vec<Write>) {
     let mut stack = Vec::new();
     let mut locals = BTreeMap::new();
     let mut writes = Vec::new();
     let mut input = None;
+    let mut deferred_guard_depth = 0usize;
+    let deferred_legacy_heap =
+        wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(deferred_legacy));
     for op in operators {
         match *op {
             Operator::LocalGet { local_index } => stack.push(
@@ -123,6 +130,29 @@ fn deferred_writes(operators: &[Operator<'_>], resolve: u32) -> (Origin, Vec<Wri
             Operator::RefAsNonNull
             | Operator::RefCastNonNull { .. }
             | Operator::RefCastNullable { .. } => {}
+            Operator::RefTestNonNull { hty } if hty == deferred_legacy_heap => {
+                let tested = stack.pop().unwrap();
+                assert_eq!(
+                    Some(tested),
+                    input,
+                    "only the DeferredLegacyArguments identity guard may branch on write-back"
+                );
+                stack.push(Origin::Other);
+            }
+            Operator::I32Eqz => {
+                stack.pop().unwrap();
+                stack.push(Origin::Other);
+            }
+            Operator::If {
+                blockty: wasmparser::BlockType::Empty,
+            } => {
+                stack.pop().unwrap();
+                deferred_guard_depth += 1;
+                assert_eq!(deferred_guard_depth, 1);
+            }
+            Operator::End if deferred_guard_depth > 0 => {
+                deferred_guard_depth -= 1;
+            }
             Operator::RefNull { .. }
             | Operator::I32Const { .. }
             | Operator::I64Const { .. }
@@ -174,6 +204,7 @@ fn deferred_writes(operators: &[Operator<'_>], resolve: u32) -> (Origin, Vec<Wri
             }
         }
     }
+    assert_eq!(deferred_guard_depth, 0);
     assert!(stack.is_empty());
     (input.expect("one resolver input"), writes)
 }
@@ -234,6 +265,7 @@ fn observed_data_recipes_write_back_the_resolved_record_without_warming_promotio
     let cache = type_index::<IntrinsicPropertyValueCache>(schema);
     let cache_field = cache_field(&runtime);
     let stored = type_index::<StoredValue>(schema);
+    let deferred_legacy = type_index::<crate::gc_types::DeferredLegacyArguments>(schema);
     let stored_heap = wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(stored));
     let operators = body(bytes, read);
     let mut descriptor_writes = 0;
@@ -259,7 +291,7 @@ fn observed_data_recipes_write_back_the_resolved_record_without_warming_promotio
             3
         );
         assert_eq!(calls(deferred, resolve), 1);
-        let (input, writes) = deferred_writes(deferred, resolve);
+        let (input, writes) = deferred_writes(deferred, resolve, deferred_legacy);
         let Origin::Local(recipe_local) = input else {
             panic!("resolution starts with the retained recipe");
         };

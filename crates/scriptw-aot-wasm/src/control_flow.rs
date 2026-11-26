@@ -8715,8 +8715,38 @@ impl<'a> FunctionBuilder<'a> {
                     storage_without_environment.expect("for-of var storage must exist"),
                 );
         }
+        let fast_array = schema
+            .reserve_gc_local::<ArrayObject, Nullable>(function)
+            .initialize_null(schema, function);
+        let fast_index = schema.reserve_i64_local(function);
+        fast_index.set_constant(0, function);
+        let iterator_record = schema
+            .reserve_gc_local::<IteratorRecord, Nullable>(function)
+            .initialize_null(schema, function);
+        if matches!(&lifecycle, SyncForOfIterationLifecycleLocals::Assignment(_)) {
+            let generic = self.open_frame(ControlFrameKind::Block, function);
+            let candidate = schema.reserve_gc_local(function).initialize(
+                source.sealed_reference_or_branch::<ArrayObject>(
+                    schema,
+                    self.local_branch_label(generic),
+                    function,
+                ),
+                function,
+            );
+            self.emit_fast_array_for_of_protectors_or_branch(&candidate, generic, function)?;
+            fast_array.replace(candidate.load(schema, function).nullable(), function);
+            candidate.clear(function);
+            self.pop_control(ControlFrameKind::Block);
+            function.instruction(&Instruction::End);
+        }
+        fast_array.load(schema, function).is_null(function);
+        self.open_frame(ControlFrameKind::If, function);
         let iterator =
             self.emit_get_sync_iterator(&source, SyncIteratorConsumer::ForOf, function)?;
+        iterator_record.replace(iterator.record.load(schema, function).nullable(), function);
+        iterator.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         source.clear(function);
         let value = schema.reserve_value_local(function);
         let loop_value = schema.reserve_value_local(function);
@@ -8728,7 +8758,73 @@ impl<'a> FunctionBuilder<'a> {
         let break_frame = self.open_frame(ControlFrameKind::Block, function);
         self.breakable_stack.push(break_frame);
         let loop_frame = self.open_frame(ControlFrameKind::Loop, function);
-        self.emit_sync_iterator_step_value(&iterator, done, &value, function)?;
+        fast_array.load(schema, function).is_null(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        let arr = schema
+            .reserve_gc_local(function)
+            .initialize(fast_array.load(schema, function).require_non_null(function), function);
+        fast_index.load(function);
+        schema
+            .field(ArrayObjectSchema::LENGTH)
+            .read(&arr, schema, function);
+        function.instruction(&Instruction::I64GeU);
+        self.open_frame(ControlFrameKind::If, function);
+        done.set_constant(1, function);
+        function.instruction(&Instruction::Else);
+        done.set_constant(0, function);
+        let found = schema.reserve_i32_local(function);
+        found.set_constant(0, function);
+        self.emit_array_own_indexed_value(&arr, fast_index, &value, found, function);
+        let read_index = schema.reserve_i64_local(function);
+        fast_index.load(function);
+        read_index.store(function);
+        self.emit_increment_local(fast_index, 1, function);
+        found.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        let negative = schema.reserve_i32_local(function);
+        negative.set_constant(0, function);
+        let text = schema
+            .call_helper(
+                crate::runtime_helpers::IntegerDecimalStringArguments::new(read_index, negative),
+                self.runtime_helper_base()?,
+                function,
+            )
+            .bind(schema, schema.reserve_gc_local(function), function);
+        schema.release_i32_local(negative, function);
+        let key = crate::operations::PropertyKeyLocals::from_string(schema, &text, function);
+        text.clear(function);
+        let arr_val = schema.reserve_value_local(function);
+        arr_val.set_reference(&arr, schema, function);
+        let step_pending = schema.reserve_completion(function);
+        self.emit_object_read(&arr_val, &arr_val, &key, &step_pending, function)?;
+        key.clear(function);
+        arr_val.clear(function);
+        self.emit_propagate_pending_throw(&step_pending, &[step_pending.value()], function);
+        value.copy_from(step_pending.value(), function);
+        step_pending.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        schema.release_i64_local(read_index, function);
+        schema.release_i32_local(found, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        arr.clear(function);
+        function.instruction(&Instruction::Else);
+        let step_iter = OwnedSyncIterator {
+            record: schema.reserve_gc_local(function).initialize(
+                iterator_record
+                    .load(schema, function)
+                    .require_non_null(function),
+                function,
+            ),
+            consumer: SyncIteratorConsumer::ForOf,
+        };
+        self.emit_sync_iterator_step_value(&step_iter, done, &value, function)?;
+        step_iter.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         done.load(function);
         self.open_frame(ControlFrameKind::If, function);
         self.completion().set_normal(&loop_value, function);
@@ -8813,7 +8909,58 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I32Const(CompletionKind::Normal.code() as i32));
         function.instruction(&Instruction::I32Ne);
         self.open_frame(ControlFrameKind::If, function);
-        self.emit_sync_iterator_close(&iterator, &pending, &closed, function)?;
+        fast_array.load(schema, function).is_null(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        closed.copy_from(&pending, function);
+        let close_done = self.open_frame(ControlFrameKind::Block, function);
+        let needs_close = self.open_frame(ControlFrameKind::Block, function);
+        self.emit_array_iterator_prototype_chain_unchanged_or_branch(needs_close, function)?;
+        self.emit_branch_to_target(close_done, function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        // Rare path: the loop body mutated %ArrayIteratorPrototype%,
+        // %IteratorPrototype%, or %Object.prototype% before an abrupt exit.
+        // Materialize the live ArrayIteratorObject and run full IteratorClose.
+        let arr_val = schema.reserve_value_local(function);
+        let arr_nn = schema
+            .reserve_gc_local(function)
+            .initialize(fast_array.load(schema, function).require_non_null(function), function);
+        arr_val.set_reference(&arr_nn, schema, function);
+        arr_nn.clear(function);
+        let raw_iter = schema.reserve_gc_local(function).initialize(
+            self.emit_array_iterator_create_from_locals(
+                &arr_val,
+                crate::gc_types::ArrayIterationKind::Value,
+                function,
+            )?,
+            function,
+        );
+        arr_val.clear(function);
+        schema
+            .field(ArrayIteratorObjectSchema::NEXT_INDEX)
+            .write(&raw_iter, GcOperand::i64_local(fast_index), schema, function);
+        let iter_val = schema.reserve_value_local(function);
+        iter_val.set_reference(&raw_iter, schema, function);
+        raw_iter.clear(function);
+        self.emit_iterator_close_with_completion(&iter_val, &pending, &closed, function)?;
+        iter_val.clear(function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        function.instruction(&Instruction::Else);
+        let close_iter = OwnedSyncIterator {
+            record: schema.reserve_gc_local(function).initialize(
+                iterator_record
+                    .load(schema, function)
+                    .require_non_null(function),
+                function,
+            ),
+            consumer: SyncIteratorConsumer::ForOf,
+        };
+        self.emit_sync_iterator_close(&close_iter, &pending, &closed, function)?;
+        close_iter.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         self.completion().copy_from(&closed, function);
         self.emit_dispatch_current_completion(function)?;
         function.instruction(&Instruction::Else);
@@ -8835,7 +8982,9 @@ impl<'a> FunctionBuilder<'a> {
         schema.release_i32_local(done, function);
         loop_value.clear(function);
         value.clear(function);
-        iterator.clear(function);
+        iterator_record.clear(function);
+        schema.release_i64_local(fast_index, function);
+        fast_array.clear(function);
         Ok(())
     }
 

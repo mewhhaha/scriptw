@@ -12,8 +12,14 @@ pub(crate) struct UnobservedStrictArguments<'a>(&'a FunctionIr);
 
 impl<'a> UnobservedStrictArguments<'a> {
     pub(crate) fn admit(function: &'a FunctionIr) -> Option<Self> {
-        if !function.strict
-            || function.protocol != FunctionProtocolIr::OrdinaryCallAndConstruct
+        // Strict ordinary functions hide legacy reflection; arrow functions
+        // (strict or sloppy) never own `arguments`, `this`, or legacy reflection.
+        let protocol_admitted = match function.protocol {
+            FunctionProtocolIr::OrdinaryCallAndConstruct => function.strict,
+            FunctionProtocolIr::Arrow => true,
+            _ => false,
+        };
+        if !protocol_admitted
             || function.class_element_execution_kind != ClassElementExecutionKind::None
             || function.class_instance_element_plan.is_some()
             || function.lexical_derived_activation.is_some()
@@ -50,6 +56,57 @@ impl<'a> UnobservedStrictArguments<'a> {
             ))
         ) {
             arguments.0 = FunctionArgumentsState::Pending(FunctionArgumentsKind::UnobservedStrict);
+        }
+        UserFunctionActivationPlan::retaining_storage(self.0, arguments)
+    }
+}
+
+/// Sloppy ordinary functions whose own body cannot observe `arguments` (no
+/// source `arguments` read, no direct eval, no child capturing `arguments`).
+/// Only legacy `fn.arguments` reflection can observe their ArgumentsObject, so
+/// they publish a lightweight `DeferredLegacyArguments` token and materialize
+/// the mapped ArgumentsObject lazily on first reflection read.
+pub(crate) struct UnobservedSloppyArguments<'a>(&'a FunctionIr);
+
+impl<'a> UnobservedSloppyArguments<'a> {
+    pub(crate) fn admit(function: &'a FunctionIr) -> Option<Self> {
+        if function.strict
+            || function.protocol != FunctionProtocolIr::OrdinaryCallAndConstruct
+            || function.class_element_execution_kind != ClassElementExecutionKind::None
+            || function.class_instance_element_plan.is_some()
+            || function.lexical_derived_activation.is_some()
+            || function.is_derived_constructor
+            || function.generator_plan.is_some()
+            || function.resumable_plan.is_some()
+            || function.params.len() > 8
+            || function
+                .params
+                .iter()
+                .any(|parameter| parameter.is_rest || parameter.default_init.is_some())
+            || function.captures_lexical_arguments
+            || function
+                .captured_bindings
+                .iter()
+                .any(|binding| !unobserved_name(&binding.source_name))
+            || !BodyWalk::for_function(function).block(&function.body)
+        {
+            return None;
+        }
+        Some(Self(function))
+    }
+
+    pub(super) fn consume(
+        self,
+        mut arguments: FunctionArgumentsProtocol,
+    ) -> UserFunctionActivationPlan<'a> {
+        let deferred = match &arguments.0 {
+            FunctionArgumentsState::Pending(FunctionArgumentsKind::Present(
+                PresentArgumentsObjectProtocol::Mapped(plan),
+            )) => DeferredLegacyArgumentsPlan::from_mapped(plan, self.0.params.len()),
+            _ => None,
+        };
+        if let Some(plan) = deferred {
+            arguments.0 = FunctionArgumentsState::Pending(FunctionArgumentsKind::DeferredLegacy(plan));
         }
         UserFunctionActivationPlan::retaining_storage(self.0, arguments)
     }

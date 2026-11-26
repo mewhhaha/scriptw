@@ -895,6 +895,10 @@ impl RowScratch {
         function.instruction(&Instruction::I32And);
         self.value.tag().store(function);
         slot.load(function);
+        function.instruction(&Instruction::I32Const(2));
+        function.instruction(&Instruction::I32LtU);
+        builder.open_frame(ControlFrameKind::If, function);
+        slot.load(function);
         function.instruction(&Instruction::I32Eqz);
         builder.open_frame(ControlFrameKind::If, function);
         s.field(InlineCompactDataStorageSchema::SCALAR0)
@@ -910,6 +914,28 @@ impl RowScratch {
         s.field(InlineCompactDataStorageSchema::REFERENCE1)
             .read(&self.inline, s, function)
             .store_eq(self.value.reference(), function);
+        builder.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        function.instruction(&Instruction::Else);
+        slot.load(function);
+        function.instruction(&Instruction::I32Const(2));
+        function.instruction(&Instruction::I32Eq);
+        builder.open_frame(ControlFrameKind::If, function);
+        s.field(InlineCompactDataStorageSchema::SCALAR2)
+            .read(&self.inline, s, function)
+            .store_i64(self.value.scalar(), function);
+        s.field(InlineCompactDataStorageSchema::REFERENCE2)
+            .read(&self.inline, s, function)
+            .store_eq(self.value.reference(), function);
+        function.instruction(&Instruction::Else);
+        s.field(InlineCompactDataStorageSchema::SCALAR3)
+            .read(&self.inline, s, function)
+            .store_i64(self.value.scalar(), function);
+        s.field(InlineCompactDataStorageSchema::REFERENCE3)
+            .read(&self.inline, s, function)
+            .store_eq(self.value.reference(), function);
+        builder.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         builder.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
     }

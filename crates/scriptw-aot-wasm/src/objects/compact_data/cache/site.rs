@@ -15,10 +15,6 @@ use super::*;
 use crate::emit::ControlTarget;
 use crate::gc_types::SiteRecordGlobal;
 
-/// The kind of read the site's own inline hit proves.
-const ARRAY_OWN_SLOT: crate::profile::ReadSpecialisation =
-    crate::profile::ReadSpecialisation::OwnCompact(crate::profile::CompactStorageLayout::Array);
-
 /// The key a site's record is made for.
 enum SiteKey<'a> {
     /// The site's static key, materialized only when R makes the record.
@@ -85,12 +81,12 @@ impl FunctionBuilder<'_> {
         let (global, site) =
             self.next_profiled_site_record(crate::profile::SiteKind::PropertyRead)?;
         // A site whose base may be ordinary already proves an own slot of
-        // the array layout inline, right after the guard: guarding that kind
-        // too would only repeat the proof.
+        // either compact layout inline, right after the guard: guarding those
+        // kinds too would only repeat the proof.
         let specialisation = self
             .functions
             .read_specialisation(&site)
-            .filter(|kind| !(may_be_ordinary && *kind == ARRAY_OWN_SLOT));
+            .filter(|kind| !(may_be_ordinary && matches!(kind, crate::profile::ReadSpecialisation::OwnCompact(_))));
         let record = self.emit_site_record(global, SiteKey::Literal(name), f)?;
         let done = (may_be_ordinary || specialisation.is_some())
             .then(|| self.open_frame(ControlFrameKind::Block, f));
@@ -249,12 +245,12 @@ impl FunctionBuilder<'_> {
 
     /// Falls through with `value` when the record proves an own data
     /// property of `base` as the hit entry does: an actual OrdinaryObject
-    /// whose current storage is array-layout compact with the record's
-    /// shape, which has the key at the record's nonnegative slot. A shape is
-    /// immutable, so that slot holds the property's value whatever happened
-    /// since the record was made. Every other record or receiver is the
-    /// entry's: this branches to `miss` having observed nothing, written no
-    /// part of `value` and retaining no temporary root.
+    /// whose current storage is inline- or array-layout compact with the
+    /// record's shape, which has the key at the record's nonnegative slot. A
+    /// shape is immutable, so that slot holds the property's value whatever
+    /// happened since the record was made. Every other record or receiver is
+    /// the entry's: this branches to `miss` having observed nothing, written
+    /// no part of `value` and retaining no temporary root.
     fn emit_own_compact_record_hit(
         &mut self,
         base: &ValueLocals,
@@ -281,31 +277,48 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(0));
         f.instruction(&Instruction::I32LtS);
         self.emit_branch_if_to_target(miss, f);
-        self.emit_own_array_compact_storage_or_branch(base, miss, f, |builder, array, hit, f| {
-            let s = builder.runtime_schema();
-            s.field(ArrayCompactDataStorageSchema::SHAPE)
-                .read(array, s, f);
-            s.field(OwnDataReadCacheSchema::SHAPE).read(record, s, f);
-            f.instruction(&Instruction::RefEq);
-            f.instruction(&Instruction::If(BlockType::Empty));
-            builder.emit_array_compact_value_at(array, slot, value, f);
-            hit.set_constant(1, f);
-            f.instruction(&Instruction::End);
-        });
+        self.emit_own_compact_storage_or_branch(
+            base,
+            miss,
+            f,
+            |builder, inline, hit, f| {
+                let s = builder.runtime_schema();
+                s.field(InlineCompactDataStorageSchema::SHAPE)
+                    .read(inline, s, f);
+                s.field(OwnDataReadCacheSchema::SHAPE).read(record, s, f);
+                f.instruction(&Instruction::RefEq);
+                f.instruction(&Instruction::If(BlockType::Empty));
+                builder.emit_inline_compact_recorded_value_at(inline, slot, value, f);
+                hit.set_constant(1, f);
+                f.instruction(&Instruction::End);
+            },
+            |builder, array, hit, f| {
+                let s = builder.runtime_schema();
+                s.field(ArrayCompactDataStorageSchema::SHAPE)
+                    .read(array, s, f);
+                s.field(OwnDataReadCacheSchema::SHAPE).read(record, s, f);
+                f.instruction(&Instruction::RefEq);
+                f.instruction(&Instruction::If(BlockType::Empty));
+                builder.emit_array_compact_value_at(array, slot, value, f);
+                hit.set_constant(1, f);
+                f.instruction(&Instruction::End);
+            },
+        );
         s.release_i32_local(slot, f);
     }
 
-    /// Runs `answer` on the array-layout compact storage of `base`, an
-    /// actual OrdinaryObject, which sets the flag it is given when it
+    /// Runs `inline_answer` or `array_answer` on the compact storage of `base`,
+    /// an actual OrdinaryObject, which sets the flag it is given when it
     /// answers. Branches to `miss` for any other value or storage and when
-    /// `answer` leaves the flag clear, in each case retaining no temporary
+    /// the handler leaves the flag clear, in each case retaining no temporary
     /// root.
-    fn emit_own_array_compact_storage_or_branch(
+    fn emit_own_compact_storage_or_branch(
         &mut self,
         base: &ValueLocals,
         miss: ControlTarget,
         f: &mut Function,
-        answer: impl FnOnce(&mut Self, &GcLocal<ArrayCompactDataStorage>, I32Local, &mut Function),
+        inline_answer: impl FnOnce(&mut Self, &GcLocal<InlineCompactDataStorage>, I32Local, &mut Function),
+        array_answer: impl FnOnce(&mut Self, &GcLocal<ArrayCompactDataStorage>, I32Local, &mut Function),
     ) {
         let s = self.runtime_schema();
         let hit = s.reserve_i32_local(f);
@@ -319,6 +332,21 @@ impl FunctionBuilder<'_> {
             f,
         );
         let other = self.open_frame(ControlFrameKind::Block, f);
+        let not_inline = self.open_frame(ControlFrameKind::Block, f);
+        let inline = s.reserve_gc_local(f).initialize(
+            storage
+                .sealed_nested_subtype_or_branch::<CompactDataStorage, InlineCompactDataStorage>(
+                    s,
+                    self.local_branch_label(not_inline),
+                    f,
+                ),
+            f,
+        );
+        inline_answer(self, &inline, hit, f);
+        inline.clear(f);
+        self.emit_branch_to_target(other, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         let array = s.reserve_gc_local(f).initialize(
             storage.sealed_nested_subtype_or_branch::<CompactDataStorage, ArrayCompactDataStorage>(
                 s,
@@ -327,7 +355,7 @@ impl FunctionBuilder<'_> {
             ),
             f,
         );
-        answer(self, &array, hit, f);
+        array_answer(self, &array, hit, f);
         array.clear(f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
@@ -341,11 +369,11 @@ impl FunctionBuilder<'_> {
     /// Stores `value` and falls through when the record proves that
     /// OrdinarySet(target, key, value, receiver) only replaces the value of
     /// an existing own data property: the receiver is the target, an actual
-    /// OrdinaryObject whose current storage is array-layout compact with the
-    /// record's shape, which has the key at the record's nonnegative slot
-    /// under a writable attribute word, and the storage already has every
-    /// backing the value needs. Every other case branches to `miss` having
-    /// written nothing and retaining no temporary root.
+    /// OrdinaryObject whose current storage is inline- or array-layout compact
+    /// with the record's shape, which has the key at the record's nonnegative
+    /// slot under a writable attribute word, and (for array storage) already
+    /// has every backing the value needs. Every other case branches to `miss`
+    /// having written nothing and retaining no temporary root.
     fn emit_own_compact_record_store(
         &mut self,
         target: &ValueLocals,
@@ -374,32 +402,59 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(0));
         f.instruction(&Instruction::I32LtS);
         self.emit_branch_if_to_target(miss, f);
-        self.emit_own_array_compact_storage_or_branch(target, miss, f, |builder, array, hit, f| {
-            let s = builder.runtime_schema();
-            // The live shape is the record's, and its one attribute word is
-            // writable data.
-            s.field(ArrayCompactDataStorageSchema::SHAPE)
-                .read(array, s, f);
-            s.field(OwnDataReadCacheSchema::SHAPE).read(record, s, f);
-            f.instruction(&Instruction::RefEq);
-            let shape = s
-                .field(ArrayCompactDataStorageSchema::SHAPE)
-                .read(array, s, f)
-                .reference();
-            s.field(CompactDataShapeSchema::ATTRIBUTES)
-                .read_top(shape, f);
-            f.instruction(&Instruction::I32Const(DescriptorMask::WRITABLE.as_i32()));
-            f.instruction(&Instruction::I32And);
-            f.instruction(&Instruction::I32Const(0));
-            f.instruction(&Instruction::I32Ne);
-            f.instruction(&Instruction::I32And);
-            f.instruction(&Instruction::If(BlockType::Empty));
-            let stored = builder.emit_array_compact_backed_store_i32(array, slot, value, f);
-            stored.load(f);
-            hit.store(f);
-            s.release_i32_local(stored, f);
-            f.instruction(&Instruction::End);
-        });
+        self.emit_own_compact_storage_or_branch(
+            target,
+            miss,
+            f,
+            |builder, inline, hit, f| {
+                let s = builder.runtime_schema();
+                s.field(InlineCompactDataStorageSchema::SHAPE)
+                    .read(inline, s, f);
+                s.field(OwnDataReadCacheSchema::SHAPE).read(record, s, f);
+                f.instruction(&Instruction::RefEq);
+                let shape = s
+                    .field(InlineCompactDataStorageSchema::SHAPE)
+                    .read(inline, s, f)
+                    .reference();
+                s.field(CompactDataShapeSchema::ATTRIBUTES)
+                    .read_top(shape, f);
+                f.instruction(&Instruction::I32Const(DescriptorMask::WRITABLE.as_i32()));
+                f.instruction(&Instruction::I32And);
+                f.instruction(&Instruction::I32Const(0));
+                f.instruction(&Instruction::I32Ne);
+                f.instruction(&Instruction::I32And);
+                f.instruction(&Instruction::If(BlockType::Empty));
+                builder.emit_inline_compact_recorded_store_at(inline, slot, value, f);
+                hit.set_constant(1, f);
+                f.instruction(&Instruction::End);
+            },
+            |builder, array, hit, f| {
+                let s = builder.runtime_schema();
+                // The live shape is the record's, and its one attribute word is
+                // writable data.
+                s.field(ArrayCompactDataStorageSchema::SHAPE)
+                    .read(array, s, f);
+                s.field(OwnDataReadCacheSchema::SHAPE).read(record, s, f);
+                f.instruction(&Instruction::RefEq);
+                let shape = s
+                    .field(ArrayCompactDataStorageSchema::SHAPE)
+                    .read(array, s, f)
+                    .reference();
+                s.field(CompactDataShapeSchema::ATTRIBUTES)
+                    .read_top(shape, f);
+                f.instruction(&Instruction::I32Const(DescriptorMask::WRITABLE.as_i32()));
+                f.instruction(&Instruction::I32And);
+                f.instruction(&Instruction::I32Const(0));
+                f.instruction(&Instruction::I32Ne);
+                f.instruction(&Instruction::I32And);
+                f.instruction(&Instruction::If(BlockType::Empty));
+                let stored = builder.emit_array_compact_backed_store_i32(array, slot, value, f);
+                stored.load(f);
+                hit.store(f);
+                s.release_i32_local(stored, f);
+                f.instruction(&Instruction::End);
+            },
+        );
         s.release_i32_local(slot, f);
     }
 }

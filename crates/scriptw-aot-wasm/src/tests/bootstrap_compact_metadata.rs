@@ -310,9 +310,9 @@ fn inline_compact_reads_and_stores_reject_indices_outside_shape_before_field_acc
             .collect::<Vec<_>>();
         assert!(prefix.windows(11).any(|ops| matches!(ops,
             [Operator::LocalGet { local_index: slot }, Operator::LocalGet { .. }, Operator::ArrayLen,
-             Operator::I32GeU, Operator::LocalGet { local_index: same_slot }, Operator::I32Const { value: 2 },
+             Operator::I32GeU, Operator::LocalGet { local_index: same_slot }, Operator::I32Const { value: 4 },
              Operator::I32GeU, Operator::I32Or, Operator::If { .. }, Operator::Unreachable, Operator::End]
-             if slot == same_slot)), "{name} must reject slot >= shape length or slot >= two before accessing fields");
+             if slot == same_slot)), "{name} must reject slot >= shape length or slot >= four before accessing fields");
         if name == "helper::compact_data_store" {
             store = Some(body);
         }
@@ -321,8 +321,12 @@ fn inline_compact_reads_and_stores_reject_indices_outside_shape_before_field_acc
     for (field, incoming_parameter) in [
         (GcSnapshotField::InlineScalar0.index(), 3),
         (GcSnapshotField::InlineScalar1.index(), 3),
+        (GcSnapshotField::InlineScalar2.index(), 3),
+        (GcSnapshotField::InlineScalar3.index(), 3),
         (GcSnapshotField::InlineReference0.index(), 4),
         (GcSnapshotField::InlineReference1.index(), 4),
+        (GcSnapshotField::InlineReference2.index(), 4),
+        (GcSnapshotField::InlineReference3.index(), 4),
     ] {
         let writes = store.iter().enumerate().filter_map(|(position, op)| matches!(op, Operator::StructSet { struct_type_index, field_index } if *struct_type_index == inline && *field_index == field).then_some(position)).collect::<Vec<_>>();
         assert_eq!(
@@ -395,7 +399,7 @@ fn compact_allocator_selects_inline_only_for_one_or_two_keys_without_backing_arr
     for length in (0u32..=16).chain([u32::MAX]) {
         assert_eq!(
             length.wrapping_sub(lower) < width,
-            length == 1 || length == 2,
+            (1..=4).contains(&length),
             "emitted predicate for length {length}"
         );
     }

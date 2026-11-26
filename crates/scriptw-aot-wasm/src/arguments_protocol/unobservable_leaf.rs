@@ -26,7 +26,10 @@ impl<'a> UserFunctionActivationPlan<'a> {
             Some(leaf) => leaf.consume(arguments),
             None => match super::unobserved_strict::UnobservedStrictArguments::admit(function) {
                 Some(proof) => proof.consume(arguments),
-                None => Self::retaining_storage(function, arguments),
+                None => match super::unobserved_strict::UnobservedSloppyArguments::admit(function) {
+                    Some(proof) => proof.consume(arguments),
+                    None => Self::retaining_storage(function, arguments),
+                },
             },
         })
     }
@@ -269,11 +272,10 @@ mod tests {
                         .into_parts();
                 assert_eq!(bindings, function.owned_env_bindings.as_slice(), "{source}");
                 assert!(
-                    arguments
-                        .take_for_binding()
-                        .unwrap()
-                        .into_present()
-                        .is_some(),
+                    !matches!(
+                        arguments.take_for_binding().unwrap().into_action(),
+                        ArgumentsBindingAction::None
+                    ),
                     "{source}"
                 );
             });

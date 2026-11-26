@@ -113,6 +113,139 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(zero, f);
         record
     }
+    /// Computes a power-of-two bucket count >= `capacity` (clamped to `[4, 0x4000_0000]`)
+    /// so `emit_collection_hash_bucket` can mask with `count - 1` instead of `i64.rem_u`.
+    fn emit_collection_power_of_two_bucket_count(
+        &self,
+        capacity: I32Local,
+        bucket_count: I32Local,
+        f: &mut Function,
+    ) {
+        capacity.load(f);
+        f.instruction(&Instruction::I32Const(4));
+        f.instruction(&Instruction::I32LeU);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        bucket_count.set_constant(4, f);
+        f.instruction(&Instruction::Else);
+        capacity.load(f);
+        f.instruction(&Instruction::I32Const(0x4000_0000));
+        f.instruction(&Instruction::I32GeU);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        bucket_count.set_constant(0x4000_0000, f);
+        f.instruction(&Instruction::Else);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Const(32));
+        capacity.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Clz);
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Shl);
+        bucket_count.store(f);
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::End);
+    }
+
+    /// Single-pass Map.prototype.get lookup: reads `MapEntry.VALUE` directly
+    /// from the matched entry without reloading the table or entry key.
+    pub(super) fn emit_collection_get_map_value(
+        &mut self,
+        record: &GcLocal<MapObject>,
+        key: &ValueLocals,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let prepared = self.emit_collection_prepare_key(key, f);
+        let s = self.runtime_schema();
+        let needle = &prepared.value;
+        let hash = prepared.hash;
+        let cursor = s.reserve_i32_local(f);
+        let bucket = s.reserve_i32_local(f);
+        let found = s.reserve_i32_local(f);
+        let chain = s.reserve_i64_local(f);
+        let retained = s.reserve_value_local(f);
+        let table = s.reserve_gc_local(f).initialize(
+            s.struct_type::<MapObject>()
+                .field(MapObjectSchema::ENTRIES)
+                .read(record, s, f)
+                .reference(),
+            f,
+        );
+        let buckets = s.reserve_gc_local(f).initialize(
+            s.struct_type::<MapObject>()
+                .field(MapObjectSchema::HASH_INDEX)
+                .read(record, s, f)
+                .reference(),
+            f,
+        );
+        self.emit_collection_hash_bucket(&buckets, hash, bucket, f);
+        s.array_type::<CollectionHashTable>()
+            .read(&buckets, bucket, s, f)
+            .store_i64(chain, f);
+        let exit = self.open_frame(ControlFrameKind::Block, f);
+        let again = self.open_frame(ControlFrameKind::Loop, f);
+        chain.load(f);
+        f.instruction(&Instruction::I64Eqz);
+        self.emit_branch_if_to_target(exit, f);
+        chain.load(f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Sub);
+        f.instruction(&Instruction::I32WrapI64);
+        cursor.store(f);
+        let entry = s.reserve_gc_local(f).initialize(
+            s.array_type::<MapEntryTable>()
+                .read(&table, cursor, s, f)
+                .reference()
+                .require_non_null(f),
+            f,
+        );
+        let stored_key = s.reserve_gc_local(f).initialize(
+            s.struct_type::<MapEntry>()
+                .field(MapEntrySchema::KEY)
+                .read(&entry, s, f)
+                .reference(),
+            f,
+        );
+        self.emit_stored_value_to_locals(&stored_key, &retained, f);
+        self.emit_tagged_payload_same_value_zero_i32(&retained, needle, f)?;
+        found.store(f);
+        stored_key.clear(f);
+        s.struct_type::<MapEntry>()
+            .field(MapEntrySchema::HASH_NEXT)
+            .read(&entry, s, f)
+            .store_i64(chain, f);
+        found.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let stored_value = s.reserve_gc_local(f).initialize(
+            s.struct_type::<MapEntry>()
+                .field(MapEntrySchema::VALUE)
+                .read(&entry, s, f)
+                .reference(),
+            f,
+        );
+        self.emit_stored_value_to_locals(&stored_value, value, f);
+        stored_value.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        entry.clear(f);
+        found.load(f);
+        self.emit_branch_if_to_target(exit, f);
+        self.emit_branch_to_target(again, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        retained.clear(f);
+        buckets.clear(f);
+        table.clear(f);
+        s.release_i64_local(chain, f);
+        s.release_i32_local(found, f);
+        s.release_i32_local(bucket, f);
+        s.release_i32_local(cursor, f);
+        prepared.release(self, f);
+        Ok(())
+    }
+
     pub(super) fn emit_collection_find_map(
         &mut self,
         record: &GcLocal<MapObject>,
@@ -453,11 +586,14 @@ impl FunctionBuilder<'_> {
         );
         f.instruction(&Instruction::I32Const(4));
         capacity.store(f);
+        let bucket_count = s.reserve_i32_local(f);
+        self.emit_collection_power_of_two_bucket_count(capacity, bucket_count, f);
         let buckets = s.reserve_gc_local(f).initialize(
             s.array_type::<CollectionHashTable>()
-                .filled(GcOperand::i64(0), capacity, f),
+                .filled(GcOperand::i64(0), bucket_count, f),
             f,
         );
+        s.release_i32_local(bucket_count, f);
         let ordinals = s.reserve_gc_local(f).initialize(s.empty_number_bits(f), f);
         s.field(MapObjectSchema::ENTRIES)
             .write(record, GcOperand::reference(&entries, s), s, f);
@@ -1287,11 +1423,14 @@ impl FunctionBuilder<'_> {
         );
         f.instruction(&Instruction::I32Const(4));
         capacity.store(f);
+        let bucket_count = s.reserve_i32_local(f);
+        self.emit_collection_power_of_two_bucket_count(capacity, bucket_count, f);
         let buckets = s.reserve_gc_local(f).initialize(
             s.array_type::<CollectionHashTable>()
-                .filled(GcOperand::i64(0), capacity, f),
+                .filled(GcOperand::i64(0), bucket_count, f),
             f,
         );
+        s.release_i32_local(bucket_count, f);
         let ordinals = s.reserve_gc_local(f).initialize(s.empty_number_bits(f), f);
         s.field(SetObjectSchema::ENTRIES)
             .write(record, GcOperand::reference(&entries, s), s, f);
@@ -1714,11 +1853,14 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
+        let bucket_count = s.reserve_i32_local(f);
+        self.emit_collection_power_of_two_bucket_count(capacity, bucket_count, f);
         let buckets = s.reserve_gc_local(f).initialize(
             s.array_type::<CollectionHashTable>()
-                .filled(GcOperand::i64(0), capacity, f),
+                .filled(GcOperand::i64(0), bucket_count, f),
             f,
         );
+        s.release_i32_local(bucket_count, f);
         s.struct_type::<MapObject>()
             .field(MapObjectSchema::HISTORY_LENGTH)
             .read(record, s, f)
@@ -1937,11 +2079,14 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
+        let bucket_count = s.reserve_i32_local(f);
+        self.emit_collection_power_of_two_bucket_count(capacity, bucket_count, f);
         let buckets = s.reserve_gc_local(f).initialize(
             s.array_type::<CollectionHashTable>()
-                .filled(GcOperand::i64(0), capacity, f),
+                .filled(GcOperand::i64(0), bucket_count, f),
             f,
         );
+        s.release_i32_local(bucket_count, f);
         s.struct_type::<SetObject>()
             .field(SetObjectSchema::HISTORY_LENGTH)
             .read(record, s, f)

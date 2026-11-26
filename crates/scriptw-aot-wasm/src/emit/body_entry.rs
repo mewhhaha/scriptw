@@ -238,6 +238,7 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::AsciiNarrow
             | RuntimeHelperId::AsciiWiden
             | RuntimeHelperId::CodeUnitFind
+            | RuntimeHelperId::StringSplitJoin
             | RuntimeHelperId::JsonPlainRun
             | RuntimeHelperId::CompactArrayLiteral
             | RuntimeHelperId::InitializeInstanceElements

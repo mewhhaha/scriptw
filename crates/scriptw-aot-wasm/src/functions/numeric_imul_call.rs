@@ -100,4 +100,82 @@ impl FunctionBuilder<'_> {
         lhs.clear(function);
         Ok(true)
     }
+
+    /// Numeric-only unary Math builtins (`floor`, `ceil`, `trunc`, `abs`,
+    /// `sqrt`) lower directly to a single Wasm f64 instruction after proving
+    /// the current Realm's canonical builtin and a Number operand.
+    pub(super) fn try_emit_numeric_math_unary_call(
+        &mut self,
+        callee: &ValueLocals,
+        receiver: &ValueLocals,
+        arguments: &[TypedExpr],
+        builtin: StandardBuiltinId,
+        continuation: &CallContinuation,
+        output: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<bool, EmitError> {
+        let [arg_expr] = arguments else {
+            return Ok(false);
+        };
+        if matches!(
+            arg_expr.expr,
+            ExprIr::SpreadArgument(_) | ExprIr::CapturedArgumentList(_)
+        ) {
+            return Ok(false);
+        }
+        let op = match builtin {
+            StandardBuiltinId::MathFloor => Instruction::F64Floor,
+            StandardBuiltinId::MathCeil => Instruction::F64Ceil,
+            StandardBuiltinId::MathTrunc => Instruction::F64Trunc,
+            StandardBuiltinId::MathAbs => Instruction::F64Abs,
+            StandardBuiltinId::MathSqrt => Instruction::F64Sqrt,
+            _ => return Ok(false),
+        };
+        let schema = self.runtime_schema();
+        let arg = schema.reserve_value_local(function);
+        self.compile_expr_to_value(arg_expr, &arg, function)?;
+        self.emit_propagate_current_throw_if_needed(function);
+        let handled = schema.reserve_i32_local(function);
+        function.instruction(&Instruction::I32Const(0));
+        handled.store(function);
+
+        self.emit_with_current_native_builtin(callee, builtin, function, |builder, function| {
+            arg.tag().load(function);
+            function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number.tag()));
+            function.instruction(&Instruction::I32Eq);
+            builder.open_frame(ControlFrameKind::If, function);
+            let bits = schema.reserve_i64_local(function);
+            arg.scalar().load(function);
+            function.instruction(&Instruction::F64ReinterpretI64);
+            function.instruction(&op);
+            function.instruction(&Instruction::I64ReinterpretF64);
+            bits.store(function);
+            output.set_number(bits, function);
+            schema.release_i64_local(bits, function);
+            function.instruction(&Instruction::I32Const(1));
+            handled.store(function);
+            builder.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+            Ok(())
+        })?;
+
+        handled.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        let list = self.emit_pre_evaluated_arg_vector(&[&arg], function);
+        self.emit_indirect_call_with_argv_to_value(
+            callee,
+            receiver,
+            &list,
+            continuation,
+            output,
+            function,
+        )?;
+        list.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(handled, function);
+        arg.clear(function);
+        Ok(true)
+    }
 }

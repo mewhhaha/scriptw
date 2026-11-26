@@ -35,7 +35,7 @@ use super::*;
 use crate::emit::ControlTarget;
 use crate::functions::NonArrayRealmIntrinsicSlot;
 use crate::gc_types::{
-    ArrayObjectSchema, FunctionObject, FunctionObjectSchema, IntrinsicPropertyStorage,
+    ArrayObject, ArrayObjectSchema, FunctionObject, FunctionObjectSchema, IntrinsicPropertyStorage,
     IntrinsicPropertyStorageSchema, JavaScriptObject, ObjectPropertyStorage, PrimitiveBox,
     PrimitiveBoxSchema, RealmProtectors, RealmProtectorsSchema, RealmRecord, RealmRecordSchema,
 };
@@ -308,6 +308,343 @@ impl FunctionBuilder<'_> {
         s.field(RealmProtectorsSchema::OBJECT_PROTOTYPE_ROWS)
             .read(protectors, s, f);
         f.instruction(&Instruction::RefEq);
+    }
+
+    /// Falls through while the current Realm's %String.prototype%,
+    /// %Array.prototype% and %Object.prototype% all hold their recorded
+    /// untouched intrinsic rows, %String.prototype% and %Array.prototype%
+    /// inherit directly from %Object.prototype%, and %Array.prototype% has no
+    /// own indexed properties. Used by `.split(sep).join(rep)` fusion.
+    pub(crate) fn emit_string_split_join_protectors_or_branch(
+        &mut self,
+        unprotected: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let protectors = self.emit_armed_realm_protectors_or_branch(unprotected, f);
+        // %Object.prototype% rows unchanged (and immutable null [[Prototype]]).
+        self.emit_object_prototype_rows_unchanged_i32(&protectors, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(unprotected, f);
+        // %String.prototype% rows unchanged and [[Prototype]] == %Object.prototype%.
+        let string_proto = s.reserve_non_null_gc_local(f).initialize(
+            s.field(RealmProtectorsSchema::STRING_PROTOTYPE)
+                .read(&protectors, s, f)
+                .reference(),
+            f,
+        );
+        let string_header = s.reserve_non_null_gc_local(f).initialize(
+            s.field(PrimitiveBoxSchema::OBJECT)
+                .read(&string_proto, s, f)
+                .reference(),
+            f,
+        );
+        string_proto.clear(f);
+        s.field(OrdinaryObjectSchema::PROPERTIES)
+            .read(&string_header, s, f);
+        s.field(RealmProtectorsSchema::STRING_PROTOTYPE_ROWS)
+            .read(&protectors, s, f);
+        f.instruction(&Instruction::RefEq);
+        s.field(OrdinaryObjectSchema::PROTOTYPE)
+            .read(&string_header, s, f);
+        s.field(RealmProtectorsSchema::OBJECT_PROTOTYPE)
+            .read(&protectors, s, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32And);
+        string_header.clear(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(unprotected, f);
+        // %Array.prototype% rows unchanged, COUNT == 0, [[Prototype]] == %Object.prototype%.
+        let array_proto = s.reserve_non_null_gc_local(f).initialize(
+            s.field(RealmProtectorsSchema::ARRAY_PROTOTYPE)
+                .read(&protectors, s, f)
+                .reference(),
+            f,
+        );
+        s.field(ArrayObjectSchema::COUNT)
+            .read(&array_proto, s, f);
+        f.instruction(&Instruction::I64Eqz);
+        let array_header = s.reserve_non_null_gc_local(f).initialize(
+            s.field(ArrayObjectSchema::OBJECT)
+                .read(&array_proto, s, f)
+                .reference(),
+            f,
+        );
+        array_proto.clear(f);
+        s.field(OrdinaryObjectSchema::PROPERTIES)
+            .read(&array_header, s, f);
+        s.field(RealmProtectorsSchema::ARRAY_PROTOTYPE_ROWS)
+            .read(&protectors, s, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32And);
+        s.field(OrdinaryObjectSchema::PROTOTYPE)
+            .read(&array_header, s, f);
+        s.field(RealmProtectorsSchema::OBJECT_PROTOTYPE)
+            .read(&protectors, s, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32And);
+        array_header.clear(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(unprotected, f);
+        protectors.clear(f);
+    }
+
+    /// Falls through when %ArrayIteratorPrototype% -> %IteratorPrototype% ->
+    /// %Object.prototype% all still hold their untouched intrinsic layouts
+    /// (proving canonical `.next` and absence of `.return`). Anything else
+    /// branches to `unprotected`.
+    pub(crate) fn emit_array_iterator_prototype_chain_unchanged_or_branch(
+        &mut self,
+        unprotected: ControlTarget,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        if !self
+            .strings
+            .has_intrinsic_property_layout(IntrinsicPropertyLayoutId::ArrayIteratorPrototype)?
+            || !self
+                .strings
+                .has_intrinsic_property_layout(IntrinsicPropertyLayoutId::IteratorPrototype)?
+        {
+            self.emit_branch_to_target(unprotected, f);
+            return Ok(());
+        }
+        let array_iter_span = self
+            .strings
+            .intrinsic_property_layout_span(IntrinsicPropertyLayoutId::ArrayIteratorPrototype)?;
+        let iter_span = self
+            .strings
+            .intrinsic_property_layout_span(IntrinsicPropertyLayoutId::IteratorPrototype)?;
+        let s = self.runtime_schema();
+        let protectors = self.emit_armed_realm_protectors_or_branch(unprotected, f);
+        self.emit_object_prototype_rows_unchanged_i32(&protectors, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(unprotected, f);
+        let realm = self.load_current_realm(f);
+        let arr_iter_val = s.reserve_value_local(f);
+        self.emit_load_non_array_realm_intrinsic(
+            &realm,
+            NonArrayRealmIntrinsicSlot::ArrayIteratorPrototype,
+            &arr_iter_val,
+            f,
+        );
+        let iter_val = s.reserve_value_local(f);
+        self.emit_load_non_array_realm_intrinsic(
+            &realm,
+            NonArrayRealmIntrinsicSlot::IteratorPrototype,
+            &iter_val,
+            f,
+        );
+        realm.clear(f);
+        let arr_iter = s.reserve_non_null_gc_local(f).initialize(
+            arr_iter_val.sealed_reference_or_branch::<OrdinaryObject>(
+                s,
+                self.local_branch_label(unprotected),
+                f,
+            ),
+            f,
+        );
+        arr_iter_val.clear(f);
+        let iter_proto = s.reserve_non_null_gc_local(f).initialize(
+            iter_val.sealed_reference_or_branch::<OrdinaryObject>(
+                s,
+                self.local_branch_label(unprotected),
+                f,
+            ),
+            f,
+        );
+        iter_val.clear(f);
+        // Check prototype links: ArrayIteratorPrototype -> IteratorPrototype -> Object.prototype.
+        s.field(OrdinaryObjectSchema::PROTOTYPE)
+            .read(&arr_iter, s, f);
+        let _ = iter_proto.load(s, f);
+        f.instruction(&Instruction::RefEq);
+        s.field(OrdinaryObjectSchema::PROTOTYPE)
+            .read(&iter_proto, s, f);
+        s.field(RealmProtectorsSchema::OBJECT_PROTOTYPE)
+            .read(&protectors, s, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32And);
+        protectors.clear(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(unprotected, f);
+        // Check both headers still hold their untouched IntrinsicPropertyStorage.
+        for (owner, expected_addr) in [
+            (&arr_iter, array_iter_span.address()),
+            (&iter_proto, iter_span.address()),
+        ] {
+            let base = s.reserve_non_null_gc_local(f).initialize(
+                s.field(OrdinaryObjectSchema::PROPERTIES)
+                    .read(owner, s, f)
+                    .reference(),
+                f,
+            );
+            let storage = s.reserve_non_null_gc_local(f).initialize(
+                base.sealed_subtype_or_branch::<IntrinsicPropertyStorage>(
+                    s,
+                    self.local_branch_label(unprotected),
+                    f,
+                ),
+                f,
+            );
+            base.clear(f);
+            s.field(IntrinsicPropertyStorageSchema::ADDRESS)
+                .read(&storage, s, f);
+            storage.clear(f);
+            f.instruction(&Instruction::I32Const(expected_addr as i32));
+            f.instruction(&Instruction::I32Ne);
+            self.emit_branch_if_to_target(unprotected, f);
+        }
+        iter_proto.clear(f);
+        arr_iter.clear(f);
+        Ok(())
+    }
+
+    /// Falls through when `array` is an actual Array whose own header holds an
+    /// empty dictionary (no own `@@iterator`), whose [[Prototype]] is unchanged
+    /// `%Array.prototype%` -> `%Object.prototype%`, and whose Realm's
+    /// `%ArrayIteratorPrototype%` -> `%IteratorPrototype%` -> `%Object.prototype%`
+    /// are all untouched. Anything else branches to `unprotected`.
+    pub(crate) fn emit_fast_array_for_of_protectors_or_branch(
+        &mut self,
+        array: &GcLocal<ArrayObject>,
+        unprotected: ControlTarget,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let header = s.reserve_non_null_gc_local(f).initialize(
+            s.field(ArrayObjectSchema::OBJECT).read(array, s, f).reference(),
+            f,
+        );
+        // Empty ordinary storage proves no own [Symbol.iterator].
+        let props = s.reserve_non_null_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROPERTIES)
+                .read(&header, s, f)
+                .reference(),
+            f,
+        );
+        let dict = s.reserve_non_null_gc_local(f).initialize(
+            props.sealed_subtype_or_branch::<OrdinaryPropertyStorage>(
+                s,
+                self.local_branch_label(unprotected),
+                f,
+            ),
+            f,
+        );
+        props.clear(f);
+        s.field(OrdinaryPropertyStorageSchema::LENGTH)
+            .read(&dict, s, f);
+        dict.clear(f);
+        self.emit_branch_if_to_target(unprotected, f);
+        let prototype = s
+            .reserve_gc_local::<JavaScriptObject, Nullable>(f)
+            .initialize(
+                s.field(OrdinaryObjectSchema::PROTOTYPE)
+                    .read(&header, s, f)
+                    .reference(),
+                f,
+            );
+        header.clear(f);
+        let protectors = self.emit_armed_realm_protectors_or_branch(unprotected, f);
+        let array_proto = s.reserve_non_null_gc_local(f).initialize(
+            s.field(RealmProtectorsSchema::ARRAY_PROTOTYPE)
+                .read(&protectors, s, f)
+                .reference(),
+            f,
+        );
+        let _ = array_proto.load(s, f);
+        let _ = prototype.load(s, f);
+        f.instruction(&Instruction::RefEq);
+        prototype.clear(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(unprotected, f);
+        let array_header = s.reserve_non_null_gc_local(f).initialize(
+            s.field(ArrayObjectSchema::OBJECT)
+                .read(&array_proto, s, f)
+                .reference(),
+            f,
+        );
+        array_proto.clear(f);
+        s.field(OrdinaryObjectSchema::PROPERTIES)
+            .read(&array_header, s, f);
+        s.field(RealmProtectorsSchema::ARRAY_PROTOTYPE_ROWS)
+            .read(&protectors, s, f);
+        f.instruction(&Instruction::RefEq);
+        s.field(OrdinaryObjectSchema::PROTOTYPE)
+            .read(&array_header, s, f);
+        s.field(RealmProtectorsSchema::OBJECT_PROTOTYPE)
+            .read(&protectors, s, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32And);
+        array_header.clear(f);
+        protectors.clear(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(unprotected, f);
+        self.emit_array_iterator_prototype_chain_unchanged_or_branch(unprotected, f)
+    }
+
+    /// Falls through when `prototype` is the current Realm's unchanged
+    /// %Object.prototype% (with its immutable null [[Prototype]]) or
+    /// unchanged %Array.prototype% (whose [[Prototype]] is unchanged
+    /// %Object.prototype%): neither intrinsic layout defines "toJSON".
+    /// Anything else branches to `unprotected`.
+    pub(crate) fn emit_prototype_chain_lacks_to_json_or_branch(
+        &mut self,
+        prototype: &GcLocal<JavaScriptObject, Nullable>,
+        unprotected: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let protectors = self.emit_armed_realm_protectors_or_branch(unprotected, f);
+        let accepted = self.open_frame(ControlFrameKind::Block, f);
+        // Commonest case: plain object inheriting directly from %Object.prototype%.
+        s.field(RealmProtectorsSchema::OBJECT_PROTOTYPE)
+            .read(&protectors, s, f);
+        let _ = prototype.load(s, f);
+        f.instruction(&Instruction::RefEq);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_object_prototype_rows_unchanged_i32(&protectors, f);
+        self.emit_branch_if_to_target(accepted, f);
+        self.emit_branch_to_target(unprotected, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        // Second case: Array inheriting from unchanged %Array.prototype% -> %Object.prototype%.
+        let array = s.reserve_non_null_gc_local(f).initialize(
+            s.field(RealmProtectorsSchema::ARRAY_PROTOTYPE)
+                .read(&protectors, s, f)
+                .reference(),
+            f,
+        );
+        let _ = array.load(s, f);
+        let _ = prototype.load(s, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(unprotected, f);
+        let array_header = s.reserve_non_null_gc_local(f).initialize(
+            s.field(ArrayObjectSchema::OBJECT)
+                .read(&array, s, f)
+                .reference(),
+            f,
+        );
+        array.clear(f);
+        s.field(OrdinaryObjectSchema::PROPERTIES)
+            .read(&array_header, s, f);
+        s.field(RealmProtectorsSchema::ARRAY_PROTOTYPE_ROWS)
+            .read(&protectors, s, f);
+        f.instruction(&Instruction::RefEq);
+        s.field(OrdinaryObjectSchema::PROTOTYPE)
+            .read(&array_header, s, f);
+        s.field(RealmProtectorsSchema::OBJECT_PROTOTYPE)
+            .read(&protectors, s, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32And);
+        array_header.clear(f);
+        self.emit_object_prototype_rows_unchanged_i32(&protectors, f);
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(unprotected, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        protectors.clear(f);
     }
 
     /// Falls through when `prototype` is the current Realm's

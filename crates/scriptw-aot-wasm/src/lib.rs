@@ -169,7 +169,9 @@ pub(crate) use emitted_function::{
 pub use emitted_function::{EmittedFunctionSummary, FunctionBodySize, FunctionLocalCount};
 use function_layout::{FunctionIndexLayout, SourceFunctions};
 mod foreign;
-pub use foreign::{foreign_registry_from_module, FOREIGN_MODULES_CUSTOM_SECTION};
+pub use foreign::{
+    foreign_registry_from_module, inspect_linked_program_metadata, FOREIGN_MODULES_CUSTOM_SECTION,
+};
 pub(crate) use functions::NonArrayRealmIntrinsicSlot;
 use heap::*;
 use intrinsics::*;

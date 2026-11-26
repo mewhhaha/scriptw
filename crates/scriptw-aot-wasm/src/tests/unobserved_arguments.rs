@@ -1,12 +1,14 @@
 //! Inspect the encoded source body, including allocations omitted by the proof.
 use super::*;
 use crate::gc_types::{
-    ArgumentsObject, BindingCell, Environment, GcNullability, GlobalLedger, RuntimeModuleTypes,
+    ArgumentsObject, BindingCell, DeferredLegacyArguments, Environment, GcNullability,
+    GlobalLedger, RuntimeModuleTypes,
 };
 
 #[derive(Debug, Default)]
 struct ActivationTraffic {
     arguments: usize,
+    deferred_arguments: usize,
     environments: usize,
     cells: usize,
     metadata_appends: usize,
@@ -65,6 +67,12 @@ fn activation_traffic(source: &str) -> ActivationTraffic {
     else {
         panic!("arguments object must name a concrete registered GC type");
     };
+    let wasm_encoder::HeapType::Concrete(deferred_arguments) = schema
+        .reference_type::<DeferredLegacyArguments>(GcNullability::NonNullable)
+        .heap_type
+    else {
+        panic!("deferred legacy arguments must name a concrete registered GC type");
+    };
     let wasm_encoder::HeapType::Concrete(environment) = schema
         .reference_type::<Environment>(GcNullability::NonNullable)
         .heap_type
@@ -96,6 +104,8 @@ fn activation_traffic(source: &str) -> ActivationTraffic {
                     Operator::StructNew { struct_type_index }
                     | Operator::StructNewDefault { struct_type_index } => {
                         traffic.arguments += usize::from(struct_type_index == arguments);
+                        traffic.deferred_arguments +=
+                            usize::from(struct_type_index == deferred_arguments);
                         traffic.environments += usize::from(struct_type_index == environment);
                         traffic.cells += usize::from(struct_type_index == cell);
                     }
@@ -140,8 +150,27 @@ fn synchronous_leaf_bodies_omit_arguments_and_mapping_only_gc_allocations() {
 
 #[test]
 fn observers_keep_actual_arguments_allocation_in_the_encoded_body() {
+    let direct =
+        activation_traffic("function make(input) { return arguments[0]; } make(globalThis.input);");
+    assert_eq!(
+        (direct.arguments, direct.deferred_arguments),
+        (1, 0),
+        "direct arguments observer must keep the eager object: {direct:?}"
+    );
+    assert!(
+        direct.environments > 0 && direct.cells > 0,
+        "mapped parameters retain their physical cells: {direct:?}"
+    );
+    assert!(
+        direct.metadata_appends >= 3,
+        "arguments length/callee/iterator must still be published: {direct:?}"
+    );
+    assert!(direct.depth_guard, "{direct:?}");
+
+    // Sloppy bodies that never reference `arguments` still retain mapped
+    // parameter cells and publish a DeferredLegacyArguments token so legacy
+    // `fn.arguments` materializes the exact mapped object lazily on demand.
     for source in [
-        "function make(input) { return arguments[0]; } make(globalThis.input);",
         "function make(input) { return input(); } make(globalThis.input);",
         "function make(input) { return input.x; } make(globalThis.input);",
         "function make(input) { return +input; } make(globalThis.input);",
@@ -149,16 +178,17 @@ fn observers_keep_actual_arguments_allocation_in_the_encoded_body() {
     ] {
         let traffic = activation_traffic(source);
         assert_eq!(
-            traffic.arguments, 1,
-            "an observer must keep the real object: {source}: {traffic:?}"
+            (traffic.arguments, traffic.deferred_arguments),
+            (0, 1),
+            "reentrant sloppy body without direct arguments uses deferred legacy token: {source}: {traffic:?}"
         );
         assert!(
             traffic.environments > 0 && traffic.cells > 0,
             "mapped parameters retain their physical cells: {source}: {traffic:?}"
         );
-        assert!(
-            traffic.metadata_appends >= 3,
-            "arguments length/callee/iterator must still be published: {source}: {traffic:?}"
+        assert_eq!(
+            traffic.metadata_appends, 0,
+            "deferred legacy token avoids eager arguments metadata appends: {source}: {traffic:?}"
         );
         assert!(traffic.depth_guard, "{source}: {traffic:?}");
     }

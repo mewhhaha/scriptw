@@ -284,8 +284,8 @@ fn true_kind_fixtures_specialise_their_probe_site() {
         validate(&specialised, name);
         assert_eq!(specialised.site_map(), site_map, "{name}");
         assert_eq!(specialised.site_map().digest(), site_map.digest(), "{name}");
-        if *kind == ReadSpecialisation::OwnCompact(CompactStorageLayout::Array) {
-            // The probe's own inline hit already proves that kind.
+        if matches!(kind, ReadSpecialisation::OwnCompact(_)) {
+            // The probe's own inline hit already proves both compact layouts.
             assert_eq!(specialised.bytes, unprofiled.bytes, "{name}");
         } else {
             assert!(specialised.bytes.len() > unprofiled.bytes.len(), "{name}");

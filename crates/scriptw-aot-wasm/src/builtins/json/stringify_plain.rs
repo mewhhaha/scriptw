@@ -205,8 +205,15 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local(f)
             .initialize(selected_header.load(s, f).require_non_null(f), f);
         selected_header.clear(f);
-        self.emit_json_plain_to_json_absent_or_branch(&header, general, f)?;
-        header.clear(f);
+        let captured_compact = s
+            .reserve_gc_local::<CompactDataStorage, Nullable>(f)
+            .initialize_null(s, f);
+        self.emit_json_plain_to_json_absent_or_branch(
+            &header,
+            &captured_compact,
+            general,
+            f,
+        )?;
         // SerializeJSONProperty steps 2 to 4 had no effect; step 10 serializes
         // `value`, whose IsArray is exactly `is_array`.
         self.emit_json_cycle_enter(value, context, indent, f)?;
@@ -218,9 +225,18 @@ impl FunctionBuilder<'_> {
         self.emit_json_plain_array_elements(value, &array, context, indent, f)?;
         array.clear(f);
         f.instruction(&Instruction::Else);
-        self.emit_json_plain_object_members(value, context, indent, f)?;
+        self.emit_json_plain_object_members(
+            value,
+            &header,
+            &captured_compact,
+            context,
+            indent,
+            f,
+        )?;
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        captured_compact.clear(f);
+        header.clear(f);
         s.release_i32_local(is_array, f);
         Ok(())
     }
@@ -232,16 +248,160 @@ impl FunctionBuilder<'_> {
     /// prove that of. "toJSON" is neither an array index nor "length", so an
     /// Array's header (and an Array prototype's) answers for it.
     ///
-    /// Seam: a Realm protector proving that %Object.prototype% and
-    /// %Array.prototype% still lack "toJSON" (and that the latter's
-    /// prototype is still the former) could stop the walk at either.
+    /// When the fast compact path proves absence, `captured_compact` is
+    /// populated if the storage also satisfies plain-object enumeration
+    /// (`OWN_KEYS_ORDERED` and default data attributes), avoiding a second
+    /// cast and shape check in `emit_json_plain_object_members`.
     fn emit_json_plain_to_json_absent_or_branch(
         &mut self,
         header: &GcLocal<OrdinaryObject>,
+        captured_compact: &GcLocal<CompactDataStorage, Nullable>,
         decline: ControlTarget,
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
+        let default_attributes = crate::heap::StoredPropertyAttributes::Data {
+            writable: true,
+            enumerable: true,
+            configurable: true,
+        }
+        .descriptor_word()
+        .as_i32();
+        let proved = self.open_frame(ControlFrameKind::Block, f);
+        let slow = self.open_frame(ControlFrameKind::Block, f);
+        let prototype = s
+            .reserve_gc_local::<JavaScriptObject, Nullable>(f)
+            .initialize(
+                s.field(OrdinaryObjectSchema::PROTOTYPE)
+                    .read(header, s, f)
+                    .reference(),
+                f,
+            );
+        self.emit_prototype_chain_lacks_to_json_or_branch(&prototype, slow, f);
+        prototype.clear(f);
+        // Prototype chain provably lacks "toJSON". Check only the object's own
+        // header: compact shapes carry an immutable LACKS_TO_JSON witness, and
+        // empty dictionaries (nearly all Arrays) return absent in 2 loads
+        // without interning or hashing "toJSON".
+        let storage = s.reserve_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROPERTIES)
+                .read(header, s, f)
+                .reference(),
+            f,
+        );
+        let fast_absent = s.reserve_i32_local(f);
+        fast_absent.set_constant(0, f);
+        let fast_done = self.open_frame(ControlFrameKind::Block, f);
+        let try_array_compact = self.open_frame(ControlFrameKind::Block, f);
+        let inline_compact = s.reserve_gc_local(f).initialize(
+            storage.sealed_nested_subtype_or_branch::<CompactDataStorage, InlineCompactDataStorage>(
+                s,
+                self.local_branch_label(try_array_compact),
+                f,
+            ),
+            f,
+        );
+        let shape = s.reserve_gc_local(f).initialize(
+            s.field(InlineCompactDataStorageSchema::SHAPE)
+                .read(&inline_compact, s, f)
+                .reference(),
+            f,
+        );
+        s.field(CompactDataShapeSchema::LACKS_TO_JSON)
+            .read(&shape, s, f)
+            .store(fast_absent, f);
+        s.field(CompactDataShapeSchema::OWN_KEYS_ORDERED)
+            .read(&shape, s, f);
+        s.field(CompactDataShapeSchema::ATTRIBUTES)
+            .read(&shape, s, f);
+        f.instruction(&Instruction::I32Const(default_attributes));
+        f.instruction(&Instruction::I32Eq);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        captured_compact.replace(
+            inline_compact
+                .load(s, f)
+                .upcast::<CompactDataStorage>()
+                .nullable(),
+            f,
+        );
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        inline_compact.clear(f);
+        shape.clear(f);
+        self.emit_branch_to_target(fast_done, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let try_empty_dict = self.open_frame(ControlFrameKind::Block, f);
+        let array_compact = s.reserve_gc_local(f).initialize(
+            storage.sealed_nested_subtype_or_branch::<CompactDataStorage, ArrayCompactDataStorage>(
+                s,
+                self.local_branch_label(try_empty_dict),
+                f,
+            ),
+            f,
+        );
+        let shape = s.reserve_gc_local(f).initialize(
+            s.field(ArrayCompactDataStorageSchema::SHAPE)
+                .read(&array_compact, s, f)
+                .reference(),
+            f,
+        );
+        s.field(CompactDataShapeSchema::LACKS_TO_JSON)
+            .read(&shape, s, f)
+            .store(fast_absent, f);
+        s.field(CompactDataShapeSchema::OWN_KEYS_ORDERED)
+            .read(&shape, s, f);
+        s.field(CompactDataShapeSchema::ATTRIBUTES)
+            .read(&shape, s, f);
+        f.instruction(&Instruction::I32Const(default_attributes));
+        f.instruction(&Instruction::I32Eq);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        captured_compact.replace(
+            array_compact
+                .load(s, f)
+                .upcast::<CompactDataStorage>()
+                .nullable(),
+            f,
+        );
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        array_compact.clear(f);
+        shape.clear(f);
+        self.emit_branch_to_target(fast_done, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let dict = s.reserve_gc_local(f).initialize(
+            storage.sealed_subtype_or_branch::<OrdinaryPropertyStorage>(
+                s,
+                self.local_branch_label(fast_done),
+                f,
+            ),
+            f,
+        );
+        s.field(OrdinaryPropertyStorageSchema::LENGTH)
+            .read(&dict, s, f);
+        dict.clear(f);
+        f.instruction(&Instruction::I32Eqz);
+        fast_absent.store(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        storage.clear(f);
+        fast_absent.load(f);
+        s.release_i32_local(fast_absent, f);
+        self.emit_branch_if_to_target(proved, f);
+        let name = self.emit_json_string("toJSON", f)?;
+        let key = crate::operations::PropertyKeyLocals::from_string(s, &name, f);
+        let absent = self.emit_ordinary_header_own_property_absent_i32(header, &key, f)?;
+        key.clear(f);
+        name.clear(f);
+        absent.load(f);
+        s.release_i32_local(absent, f);
+        self.emit_branch_if_to_target(proved, f);
+        self.emit_branch_to_target(decline, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         let name = self.emit_json_string("toJSON", f)?;
         let hash = s.reserve_i64_local(f);
         self.emit_string_key_hash(&name, hash, f);
@@ -261,6 +421,8 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(named, f);
         s.release_i64_local(hash, f);
         name.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         Ok(())
     }
 
@@ -376,6 +538,8 @@ impl FunctionBuilder<'_> {
     fn emit_json_plain_object_members(
         &mut self,
         value: &ValueLocals,
+        header: &GcLocal<OrdinaryObject>,
+        captured_compact: &GcLocal<CompactDataStorage, Nullable>,
         context: &GcLocal<JsonStringifyContext>,
         indent: I64Local,
         f: &mut Function,
@@ -396,9 +560,19 @@ impl FunctionBuilder<'_> {
         let plain_keys = s
             .reserve_gc_local::<CompactShapeKeys, Nullable>(f)
             .initialize_null(s, f);
-        // A plain data object's own keys and values: its compact storage as
-        // captured here and that storage's immutable shape keys.
-        let plain = self.emit_plain_data_object_storage(value, f);
+        // Reuse the compact storage captured during the toJSON check when
+        // available; only fall back to emit_plain_data_object_storage when the
+        // slow prototype walk ran.
+        let plain = s
+            .reserve_gc_local::<CompactDataStorage, Nullable>(f)
+            .initialize(captured_compact.load(s, f), f);
+        plain.load(s, f).is_null(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let probed = self.emit_plain_data_object_storage(value, f);
+        plain.replace(probed.load(s, f), f);
+        probed.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         plain.load(s, f).is_null(f);
         self.open_frame(ControlFrameKind::If, f);
         let snapshot = self.emit_json_enumerable_key_table(value, count, f)?;
@@ -437,16 +611,6 @@ impl FunctionBuilder<'_> {
         count.load(f);
         f.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(done, f);
-        // The used length before this member's separator, key and value.
-        let output = StringAccumulatorCursor::open(&accumulator, s, f);
-        output.length().load(f);
-        mark.store(f);
-        emitted.load(f);
-        self.open_frame(ControlFrameKind::If, f);
-        output.push_literal(&accumulator, ",", s, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        output.close(&accumulator, s, f);
         plain_keys.load(s, f).is_null(f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
@@ -479,12 +643,13 @@ impl FunctionBuilder<'_> {
         table.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        // Save the used length before this member and emit optional `,`,
+        // quoted key, and `:` under one cursor open/reserve/close.
         let name = s
             .reserve_gc_local(f)
             .initialize(key_value.cast_reference::<StringValue>(s, f), f);
-        self.emit_json_quote_into(&accumulator, &name, f)?;
+        self.emit_json_quote_object_key_into(&accumulator, &name, emitted, mark, f)?;
         name.clear(f);
-        self.emit_json_append_literal(&accumulator, ":", f);
         let serialized = self.open_frame(ControlFrameKind::Block, f);
         // Get(value, key): the captured storage's slot while it is still
         // the object's storage, and otherwise the general own-data read or
@@ -496,7 +661,7 @@ impl FunctionBuilder<'_> {
         let storage = s
             .reserve_gc_local(f)
             .initialize(plain.load(s, f).require_non_null(f), f);
-        self.emit_plain_data_object_value_or_branch(value, &storage, item, &entry, changed, f);
+        self.emit_plain_data_header_value_or_branch(header, &storage, item, &entry, changed, f);
         storage.clear(f);
         self.emit_branch_to_target(got, f);
         self.pop_control(ControlFrameKind::Block);

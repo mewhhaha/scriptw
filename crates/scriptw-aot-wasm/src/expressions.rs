@@ -1879,6 +1879,16 @@ impl<'a> FunctionBuilder<'a> {
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        if self.try_compile_split_join_materialized_binding(
+            name,
+            value,
+            body,
+            &crate::functions::CallContinuation::Continue,
+            output,
+            function,
+        )? {
+            return Ok(());
+        }
         let initialized = self.runtime_schema().reserve_value_local(function);
         self.compile_expr_to_value(value, &initialized, function)?;
         self.push_scope();
@@ -1888,5 +1898,191 @@ impl<'a> FunctionBuilder<'a> {
         self.release_local_binding(id, function);
         initialized.clear(function);
         result
+    }
+
+    /// Fuses `recv.split("sep").join("rep")` (for non-empty constant string
+    /// `sep` and constant string `rep`) under unchanged Realm protectors for
+    /// `%String.prototype%`, `%Array.prototype%` and `%Object.prototype%`.
+    /// `recv` is evaluated exactly once (linear code size on chained calls);
+    /// any guard failure or length overflow falls back to the exact original
+    /// `.split(...)` and `.join(...)` call bodies with `continuation` preserved.
+    pub(crate) fn try_compile_split_join_materialized_binding(
+        &mut self,
+        join_name: &str,
+        split_expr: &TypedExpr,
+        join_body: &TypedExpr,
+        continuation: &crate::functions::CallContinuation,
+        output: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<bool, EmitError> {
+        let is_named_get = |callee: &TypedExpr, binding: &str, method: &str| match &callee.expr {
+            ExprIr::PropertyRead {
+                target,
+                key: PropertyKeyIr::StaticString(key),
+            } => key == method && matches!(&target.expr, ExprIr::Identifier(id) if id == binding),
+            ExprIr::SpecOperation {
+                operation: SpecOperationIr::GetV,
+                operands,
+            } => matches!(
+                operands.as_slice(),
+                [
+                    TypedExpr {
+                        expr: ExprIr::Identifier(id),
+                        ..
+                    },
+                    TypedExpr {
+                        expr: ExprIr::String(key),
+                        ..
+                    }
+                ] if id == binding && key == method
+            ),
+            _ => false,
+        };
+        let ExprIr::CallIndirect {
+            direct_eval: None,
+            static_regexp_compilation: None,
+            callee: join_callee,
+            this_arg: Some(join_this),
+            args: join_args,
+        } = &join_body.expr
+        else {
+            return Ok(false);
+        };
+        if !matches!(&join_this.expr, ExprIr::Identifier(id) if id == join_name)
+            || !is_named_get(join_callee, join_name, "join")
+        {
+            return Ok(false);
+        }
+        let [TypedExpr {
+            expr: ExprIr::String(rep_literal),
+            ..
+        }] = join_args.as_slice()
+        else {
+            return Ok(false);
+        };
+        let ExprIr::MaterializeBinding {
+            name: split_name,
+            value: recv_expr,
+            body: split_body,
+        } = &split_expr.expr
+        else {
+            return Ok(false);
+        };
+        let ExprIr::CallIndirect {
+            direct_eval: None,
+            static_regexp_compilation: None,
+            callee: split_callee,
+            this_arg: Some(split_this),
+            args: split_args,
+        } = &split_body.expr
+        else {
+            return Ok(false);
+        };
+        if !matches!(&split_this.expr, ExprIr::Identifier(id) if id == split_name)
+            || !is_named_get(split_callee, split_name, "split")
+        {
+            return Ok(false);
+        }
+        let [TypedExpr {
+            expr: ExprIr::String(sep_literal),
+            ..
+        }] = split_args.as_slice()
+        else {
+            return Ok(false);
+        };
+        if sep_literal.is_empty() {
+            return Ok(false);
+        }
+        let schema = self.runtime_schema();
+        // Evaluate `recv_expr` exactly once so nested chains stay O(N) in size.
+        let recv_val = schema.reserve_value_local(function);
+        self.compile_expr_to_value(recv_expr, &recv_val, function)?;
+        self.emit_propagate_current_throw_if_needed(function);
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        let fallback = self.open_frame(ControlFrameKind::Block, function);
+        recv_val.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+        function.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(fallback, function);
+        self.emit_string_split_join_protectors_or_branch(fallback, function);
+        let input_str = schema
+            .reserve_gc_local(function)
+            .initialize(recv_val.cast_reference::<StringValue>(schema, function), function);
+        let sep_str = schema.reserve_gc_local(function).initialize(
+            self.emit_interned_string_reference(sep_literal, function)?,
+            function,
+        );
+        let rep_str = schema.reserve_gc_local(function).initialize(
+            self.emit_interned_string_reference(rep_literal, function)?,
+            function,
+        );
+        let fused = schema
+            .call_helper(
+                crate::runtime_helpers::StringSplitJoinArguments::new(
+                    &input_str, &sep_str, &rep_str,
+                ),
+                self.runtime_helper_base()?,
+                function,
+            )
+            .bind(schema, schema.reserve_gc_local(function), function);
+        rep_str.clear(function);
+        sep_str.clear(function);
+        input_str.clear(function);
+        let is_null = schema.reserve_i32_local(function);
+        fused.load(schema, function).is_null(function);
+        is_null.store(function);
+        is_null.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        let present = schema
+            .reserve_gc_local(function)
+            .initialize(fused.load(schema, function).require_non_null(function), function);
+        output.set_reference(&present, schema, function);
+        present.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        fused.clear(function);
+        is_null.load(function);
+        schema.release_i32_local(is_null, function);
+        self.emit_branch_if_to_target(fallback, function);
+        self.emit_branch_to_target(done, function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        // Fallback: run the exact original split and join bodies with the
+        // already-evaluated `recv_val`.
+        let split_result = schema.reserve_value_local(function);
+        self.push_scope();
+        let (_, split_id) = self.retain_expression_operand(split_name, &recv_val, function);
+        let split_res = self.compile_expr_to_value(split_body, &split_result, function);
+        self.pop_scope();
+        self.release_local_binding(split_id, function);
+        split_res?;
+        self.push_scope();
+        let (_, join_id) = self.retain_expression_operand(join_name, &split_result, function);
+        let join_res = match continuation {
+            crate::functions::CallContinuation::Continue => {
+                self.compile_expr_to_value(join_body, output, function)
+            }
+            crate::functions::CallContinuation::Return => {
+                self.emit_indirect_call(
+                    join_callee,
+                    Some(join_this),
+                    join_args,
+                    None,
+                    None,
+                    continuation,
+                    output,
+                    function,
+                )
+            }
+        };
+        self.pop_scope();
+        self.release_local_binding(join_id, function);
+        split_result.clear(function);
+        join_res?;
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        recv_val.clear(function);
+        Ok(true)
     }
 }

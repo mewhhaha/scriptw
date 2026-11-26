@@ -22,8 +22,8 @@ enum NativeCompactPayloads {
     },
     Inline {
         packed_tags: u32,
-        scalars: [i64; 2],
-        references: [Option<Rooted<EqRef>>; 2],
+        scalars: [i64; 4],
+        references: [Option<Rooted<EqRef>>; 4],
     },
 }
 
@@ -982,7 +982,7 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                     }
                 }
                 NativeCompactStorageKind::Inline => {
-                    if !matches!(length, 1 | 2) {
+                    if !(1..=4).contains(&length) {
                         return Err(invariant("invalid inline compact property extent"));
                     }
                     NativeCompactPayloads::Inline {
@@ -990,10 +990,14 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                         scalars: [
                             self.integer(storage, F::InlineScalar0)?,
                             self.integer(storage, F::InlineScalar1)?,
+                            self.integer(storage, F::InlineScalar2)?,
+                            self.integer(storage, F::InlineScalar3)?,
                         ],
                         references: [
                             self.reference(storage, F::InlineReference0)?,
                             self.reference(storage, F::InlineReference1)?,
+                            self.reference(storage, F::InlineReference2)?,
+                            self.reference(storage, F::InlineReference3)?,
                         ],
                     }
                 }

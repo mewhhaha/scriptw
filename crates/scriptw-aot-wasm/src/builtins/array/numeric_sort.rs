@@ -31,11 +31,19 @@ impl FunctionBuilder<'_> {
         let list = s
             .reserve_gc_local(f)
             .initialize(snapshot.load(s, f).require_non_null(f), f);
-        let list =
-            self.emit_array_private_number_sort(list, length, &callable, comparator, pending, f)?;
+        let mutated = s.reserve_i32_local(f);
+        mutated.set_constant(0, f);
+        let list = self.emit_array_private_number_sort(
+            list, length, &callable, comparator, mutated, pending, f,
+        )?;
         callable.clear(f);
         let written = self.open_frame(ControlFrameKind::Block, f);
         if matches!(output, ArraySortOutput::Receiver) {
+            // An already-sorted pure numeric pass ran no mutating user code;
+            // the receiver's own elements remain identical in order.
+            mutated.load(f);
+            f.instruction(&Instruction::I32Eqz);
+            self.emit_branch_if_to_target(written, f);
             let done = self.emit_try_packed_number_sort_writeback(target, length, &list, f)?;
             done.load(f);
             s.release_i32_local(done, f);
@@ -91,6 +99,7 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         handled.set_constant(1, f);
+        s.release_i32_local(mutated, f);
         list.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -162,6 +171,7 @@ impl FunctionBuilder<'_> {
         count: I64Local,
         entry: &FunctionLocal<BinaryNumericCallback>,
         comparator: &ValueLocals,
+        mutated: I32Local,
         pending: &CompletionLocals,
         f: &mut Function,
     ) -> Result<GcLocal<NumberBitsI64Array>, EmitError> {
@@ -205,6 +215,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
         // Only strictly descending runs reverse; equality/NaN must keep order.
+        mutated.set_constant(1, f);
         l.set_constant(0, f);
         count.load(f);
         f.instruction(&Instruction::I64Const(1));
@@ -281,6 +292,7 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
 
+        mutated.set_constant(1, f);
         count.load(f);
         f.instruction(&Instruction::I32WrapI64);
         slot.store(f);

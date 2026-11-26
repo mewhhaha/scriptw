@@ -5,7 +5,9 @@ fn source_body_definition_calls(expression: &str) -> (usize, usize, usize) {
     let artifact = emit_script(&format!(
         // Ordinary initializers use the shared literal emitter. Directly
         // returned spread literals have a separate frontend staging path.
-        "function make(input) {{ var result = {expression}; return result; }} make(globalThis.input);"
+        // Observe `arguments` uniformly so control and literal share the same
+        // arguments protocol regardless of literal property kinds.
+        "function make(input) {{ void arguments; var result = {expression}; return result; }} make(globalThis.input);"
     ))
     .expect("literal control emits");
     expect_valid_module(&artifact, 1);
@@ -128,12 +130,18 @@ fn literal_definition_calls(
 #[test]
 fn bounded_static_data_literals_reach_the_compact_allocator() {
     let control = source_body_definition_calls("input");
+    // 1..=4 fields construct InlineCompactDataStorage directly without calling
+    // the runtime allocator helper.
     assert_eq!(
         literal_definition_calls("({first: input, last: input})", control),
+        (0, 0, 0)
+    );
+    assert_eq!(literal_definition_calls("({input})", control), (0, 0, 0));
+    assert_eq!(literal_definition_calls("({})", control), (0, 0, 0));
+    assert_eq!(
+        literal_definition_calls("({a: input, b: input, c: input, d: input, e: input})", control),
         (0, 0, 1)
     );
-    assert_eq!(literal_definition_calls("({input})", control), (0, 0, 1));
-    assert_eq!(literal_definition_calls("({})", control), (0, 0, 0));
     let sixteen = (0..16)
         .map(|index| format!("key{index}: input"))
         .collect::<Vec<_>>()

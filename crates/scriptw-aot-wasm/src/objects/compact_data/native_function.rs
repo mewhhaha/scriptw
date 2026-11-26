@@ -35,6 +35,7 @@ impl FunctionBuilder<'_> {
                     GcOperand::reference(&key_table, schema),
                     GcOperand::data_descriptor_flags(false, false, configurable),
                     GcOperand::boolean(true),
+                    GcOperand::boolean(true),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                 ),

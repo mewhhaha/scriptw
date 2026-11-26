@@ -162,12 +162,34 @@ fn foreign_error(message: impl std::fmt::Display) -> EmitError {
 /// Unexpected functions, duplicate sections, undeclared tags, unsupported
 /// scalar signatures and metadata/import disagreement fail closed.
 pub fn foreign_registry_from_module(bytes: &[u8]) -> Result<ForeignModuleRegistry, EmitError> {
+    parse_program_module_metadata(bytes, false).map(|(_, registry)| registry)
+}
+
+/// Inspect both the source-compilation profile and foreign-module requirements
+/// of a linked or standalone program module in a single pass, decoding the
+/// type section only when foreign imports or tags are actually present.
+pub fn inspect_linked_program_metadata(
+    bytes: &[u8],
+) -> Result<(crate::RuntimeSourceCompilationProfile, ForeignModuleRegistry), EmitError> {
+    let (profile, registry) = parse_program_module_metadata(bytes, true)?;
+    Ok((
+        profile.expect("profile admission is requested and validated"),
+        registry,
+    ))
+}
+
+fn parse_program_module_metadata(
+    bytes: &[u8],
+    require_profile: bool,
+) -> Result<(Option<crate::RuntimeSourceCompilationProfile>, ForeignModuleRegistry), EmitError> {
     use wasmparser::{CompositeInnerType, Encoding, Parser, Payload, TypeRef};
     let mut metadata = None;
-    let mut types = Vec::new();
+    let mut type_sections = Vec::new();
     let mut functions = Vec::new();
     let mut tags = Vec::new();
     let mut reached_foreign_functions = false;
+    let mut profile_admission = require_profile
+        .then(crate::runtime_artifact::SourceCompilationProfileAdmission::default);
     for payload in Parser::new(0).parse_all(bytes) {
         match payload.map_err(foreign_error)? {
             Payload::Version {
@@ -178,20 +200,14 @@ pub fn foreign_registry_from_module(bytes: &[u8]) -> Result<ForeignModuleRegistr
                 return Err(foreign_error("expected a core Wasm program module"));
             }
             Payload::TypeSection(groups) => {
-                for group in groups {
-                    for subtype in group.map_err(foreign_error)?.into_types() {
-                        types.push(match subtype.composite_type.inner {
-                            CompositeInnerType::Func(signature) => Some(signature),
-                            CompositeInnerType::Array(_)
-                            | CompositeInnerType::Struct(_)
-                            | CompositeInnerType::Cont(_) => None,
-                        });
-                    }
-                }
+                type_sections.push(groups);
             }
             Payload::ImportSection(imports) => {
                 for import in imports.into_imports() {
                     let import = import.map_err(foreign_error)?;
+                    if let Some(admission) = profile_admission.as_mut() {
+                        admission.import(&import)?;
+                    }
                     match import.ty {
                         TypeRef::Func(index) | TypeRef::FuncExact(index) => {
                             if import.module != crate::module::HOST_IMPORT_MODULE
@@ -231,9 +247,19 @@ pub fn foreign_registry_from_module(bytes: &[u8]) -> Result<ForeignModuleRegistr
                     return Err(foreign_error("duplicate linked requirements section"));
                 }
             }
+            Payload::CustomSection(section)
+                if require_profile
+                    && section.name()
+                        == crate::RUNTIME_SOURCE_COMPILATION_PROFILE_CUSTOM_SECTION =>
+            {
+                if let Some(admission) = profile_admission.as_mut() {
+                    admission.section(section.data())?;
+                }
+            }
             _ => {}
         }
     }
+    let profile = profile_admission.map(|admission| admission.finish()).transpose()?;
     let registry = match metadata {
         Some(wire) => {
             let registry =
@@ -251,6 +277,27 @@ pub fn foreign_registry_from_module(bytes: &[u8]) -> Result<ForeignModuleRegistr
         return Err(foreign_error(
             "actual foreign import count differs from linked requirements",
         ));
+    }
+    if functions.is_empty() && tags.is_empty() {
+        if registry.error_tag().is_some() {
+            return Err(foreign_error(
+                "actual error tag inventory differs from linked requirements",
+            ));
+        }
+        return Ok((profile, registry));
+    }
+    let mut types = Vec::new();
+    for groups in type_sections {
+        for group in groups {
+            for subtype in group.map_err(foreign_error)?.into_types() {
+                types.push(match subtype.composite_type.inner {
+                    CompositeInnerType::Func(signature) => Some(signature),
+                    CompositeInnerType::Array(_)
+                    | CompositeInnerType::Struct(_)
+                    | CompositeInnerType::Cont(_) => None,
+                });
+            }
+        }
     }
     for ((module, name, type_index), (_, declaration)) in functions.iter().zip(registry.functions())
     {
@@ -288,7 +335,7 @@ pub fn foreign_registry_from_module(bytes: &[u8]) -> Result<ForeignModuleRegistr
             ));
         }
     }
-    Ok(registry)
+    Ok((profile, registry))
 }
 
 /// One closed mapping drives emitted signatures and persisted admission.

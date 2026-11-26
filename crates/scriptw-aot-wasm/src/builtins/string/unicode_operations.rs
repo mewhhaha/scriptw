@@ -1435,11 +1435,118 @@ impl FunctionBuilder<'_> {
             let units = b.emit_unicode_units(input, f);
             let length = s.reserve_i64_local(f);
             b.emit_native_gc_string_length(input, length, f);
+            let ascii_done = b.open_frame(ControlFrameKind::Block, f);
+            if !operation.localized() {
+                // Non-localized ASCII case conversion maps only 'A'..'Z' or
+                // 'a'..'z' in place; an already-cased ASCII string returns
+                // `input` with zero allocation, and any non-ASCII code unit
+                // falls through to the full Unicode algorithm.
+                let fallback = b.open_frame(ControlFrameKind::Block, f);
+                let len32 = s.reserve_i32_local(f);
+                let idx = s.reserve_i32_local(f);
+                let unit = s.reserve_i32_local(f);
+                let changed = s.reserve_i32_local(f);
+                let (lo, hi) = if operation.upper() {
+                    (b'a' as i32, b'z' as i32)
+                } else {
+                    (b'A' as i32, b'Z' as i32)
+                };
+                length.load(f);
+                f.instruction(&Instruction::I32WrapI64);
+                len32.store(f);
+                idx.set_constant(0, f);
+                changed.set_constant(0, f);
+                let scanned = b.open_frame(ControlFrameKind::Block, f);
+                let scan = b.open_frame(ControlFrameKind::Loop, f);
+                idx.load(f);
+                len32.load(f);
+                f.instruction(&Instruction::I32GeU);
+                b.emit_branch_if_to_target(scanned, f);
+                s.array_type::<CodeUnitArray>()
+                    .read(&units, idx, s, f)
+                    .store(unit, f);
+                unit.load(f);
+                f.instruction(&Instruction::I32Const(0x80));
+                f.instruction(&Instruction::I32GeU);
+                b.emit_branch_if_to_target(fallback, f);
+                unit.load(f);
+                f.instruction(&Instruction::I32Const(lo));
+                f.instruction(&Instruction::I32Sub);
+                f.instruction(&Instruction::I32Const(hi - lo));
+                f.instruction(&Instruction::I32LeU);
+                changed.load(f);
+                f.instruction(&Instruction::I32Or);
+                changed.store(f);
+                idx.load(f);
+                f.instruction(&Instruction::I32Const(1));
+                f.instruction(&Instruction::I32Add);
+                idx.store(f);
+                b.emit_branch_to_target(scan, f);
+                b.pop_control(ControlFrameKind::Loop);
+                f.instruction(&Instruction::End);
+                b.pop_control(ControlFrameKind::Block);
+                f.instruction(&Instruction::End);
+                changed.load(f);
+                f.instruction(&Instruction::I32Eqz);
+                b.open_frame(ControlFrameKind::If, f);
+                b.emit_native_string_normal_reference(input, output, f);
+                b.emit_branch_to_target(ascii_done, f);
+                b.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+                let construction =
+                    StringConstruction::allocate(s, s.reserve_gc_local(f), len32, f);
+                idx.set_constant(0, f);
+                let written = b.open_frame(ControlFrameKind::Block, f);
+                let write = b.open_frame(ControlFrameKind::Loop, f);
+                idx.load(f);
+                len32.load(f);
+                f.instruction(&Instruction::I32GeU);
+                b.emit_branch_if_to_target(written, f);
+                s.array_type::<CodeUnitArray>()
+                    .read(&units, idx, s, f)
+                    .store(unit, f);
+                unit.load(f);
+                f.instruction(&Instruction::I32Const(lo));
+                f.instruction(&Instruction::I32Sub);
+                f.instruction(&Instruction::I32Const(hi - lo));
+                f.instruction(&Instruction::I32LeU);
+                b.open_frame(ControlFrameKind::If, f);
+                unit.load(f);
+                f.instruction(&Instruction::I32Const(0x20));
+                f.instruction(&Instruction::I32Xor);
+                unit.store(f);
+                b.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+                construction.write(idx, unit, s, f);
+                idx.load(f);
+                f.instruction(&Instruction::I32Const(1));
+                f.instruction(&Instruction::I32Add);
+                idx.store(f);
+                b.emit_branch_to_target(write, f);
+                b.pop_control(ControlFrameKind::Loop);
+                f.instruction(&Instruction::End);
+                b.pop_control(ControlFrameKind::Block);
+                f.instruction(&Instruction::End);
+                let converted = s
+                    .reserve_gc_local(f)
+                    .initialize(construction.publish(s, f), f);
+                b.emit_native_string_normal_reference(&converted, output, f);
+                converted.clear(f);
+                b.emit_branch_to_target(ascii_done, f);
+                b.pop_control(ControlFrameKind::Block);
+                f.instruction(&Instruction::End);
+                s.release_i32_local(changed, f);
+                s.release_i32_local(unit, f);
+                s.release_i32_local(idx, f);
+                s.release_i32_local(len32, f);
+            }
             let result = b.emit_unicode_publish_string(f, |b, sink, f| {
                 b.emit_unicode_case_pass(operation, locale, &units, length, sink, f)
             })?;
             b.emit_native_string_normal_reference(&result, output, f);
             result.clear(f);
+            b.pop_control(ControlFrameKind::Block);
+            f.instruction(&Instruction::End);
             s.release_i64_local(length, f);
             units.clear(f);
             s.release_i64_local(locale, f);

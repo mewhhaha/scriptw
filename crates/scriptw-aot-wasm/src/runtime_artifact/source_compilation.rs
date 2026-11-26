@@ -67,13 +67,13 @@ fn compiler_import_slot(name: &str) -> Option<usize> {
 }
 
 #[derive(Default)]
-pub(super) struct SourceCompilationProfileAdmission {
+pub(crate) struct SourceCompilationProfileAdmission {
     profile: Option<RuntimeSourceCompilationProfile>,
     imports: [bool; COMPILER_IMPORTS.len()],
 }
 
 impl SourceCompilationProfileAdmission {
-    pub(super) fn import(&mut self, import: &Import<'_>) -> Result<(), EmitError> {
+    pub(crate) fn import(&mut self, import: &Import<'_>) -> Result<(), EmitError> {
         let Some(slot) = compiler_import_slot(import.name) else {
             return Ok(());
         };
@@ -87,7 +87,7 @@ impl SourceCompilationProfileAdmission {
         Ok(())
     }
 
-    pub(super) fn section(&mut self, bytes: &[u8]) -> Result<(), EmitError> {
+    pub(crate) fn section(&mut self, bytes: &[u8]) -> Result<(), EmitError> {
         if self.profile.is_some() {
             return Err(RuntimeSourceCompilationProfile::malformed());
         }
@@ -98,7 +98,7 @@ impl SourceCompilationProfileAdmission {
         Ok(())
     }
 
-    pub(super) fn finish(self) -> Result<RuntimeSourceCompilationProfile, EmitError> {
+    pub(crate) fn finish(self) -> Result<RuntimeSourceCompilationProfile, EmitError> {
         let profile = self
             .profile
             .ok_or_else(RuntimeSourceCompilationProfile::malformed)?;

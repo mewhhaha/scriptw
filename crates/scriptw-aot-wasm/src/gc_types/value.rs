@@ -1082,15 +1082,20 @@ impl GcStructType<ExecutableCode> {
                         && metadata.class_element_execution
                             == scriptw_ir::ClassElementExecutionKind::None
                         && match metadata.kind {
-                            ExecutableCodeKind::JavaScript => {
-                                metadata.protocol
-                                    == scriptw_ir::FunctionProtocolIr::OrdinaryCallAndConstruct
-                            }
+                            ExecutableCodeKind::JavaScript => matches!(
+                                metadata.protocol,
+                                scriptw_ir::FunctionProtocolIr::OrdinaryCallAndConstruct
+                                    | scriptw_ir::FunctionProtocolIr::Arrow
+                            ),
                             ExecutableCodeKind::StandardBuiltin => {
-                                narrow
-                                    && crate::function_entry::NativeLocalArgumentsBuiltin::admits(
-                                        metadata.standard_builtin,
-                                    )
+                                crate::function_entry::NativeLocalArgumentsBuiltin::from_builtin_option(
+                                    metadata.standard_builtin,
+                                )
+                                .is_some_and(|native| {
+                                    (native.arity()
+                                        == crate::function_entry::LocalArgumentsArity::Narrow)
+                                        == narrow
+                                })
                                     && metadata.protocol
                                         == scriptw_ir::FunctionProtocolIr::OrdinaryCallOnly
                             }
@@ -3411,6 +3416,13 @@ impl<'a> GcOperand<'a, AnyGcRef, Nullable> {
             shape: PhantomData,
         }
     }
+
+    pub(crate) fn gc_reference<T: GcHeapType>(value: &'a GcLocal<T>, _schema: &RuntimeSchema) -> Self {
+        Self {
+            source: value.non_null_source(),
+            shape: PhantomData,
+        }
+    }
 }
 
 impl<Owner: GcStructHeapType> GcStructType<Owner> {
@@ -3448,6 +3460,22 @@ impl GcStructType<StoredValue> {
                 GcOperand::i64_local(value.scalar),
                 GcOperand::i32_local(value.tag),
                 GcOperand::eq_reference(&value.reference),
+            ),
+            function,
+        )
+    }
+
+    pub(crate) fn from_string(
+        self,
+        text: &GcLocal<StringValue>,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) -> GcStackReference<StoredValue> {
+        self.construct(
+            (
+                GcOperand::i64(0),
+                GcOperand::i32(WasmRuntimeValueTag::String.tag()),
+                GcOperand::gc_reference(text, schema),
             ),
             function,
         )

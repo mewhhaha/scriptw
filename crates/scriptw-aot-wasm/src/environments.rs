@@ -1091,22 +1091,32 @@ impl<'a> FunctionBuilder<'a> {
             })
             .collect::<Vec<_>>();
         let arguments_protocol = self.function_arguments_protocol.take_for_binding()?;
-        if let Some(arguments_protocol) = arguments_protocol.into_present() {
-            let arguments_storage =
-                self.allocate_dynamic_binding_storage(LEXICAL_ARGUMENTS_NAME, function);
-            self.binding_scopes
-                .last_mut()
-                .expect("binding scope stack must exist")
-                .insert(LEXICAL_ARGUMENTS_NAME.to_string(), arguments_storage);
-            if let Some(proof) = self.strict_arguments_projection.take() {
-                self.initialize_projected_arguments_binding(
-                    proof,
-                    arguments_storage,
-                    arguments_protocol,
-                    function,
-                )?;
-            } else {
-                self.initialize_arguments_binding(arguments_storage, arguments_protocol, function)?;
+        match arguments_protocol.into_action() {
+            crate::arguments_protocol::ArgumentsBindingAction::None => {}
+            crate::arguments_protocol::ArgumentsBindingAction::DeferredLegacy(plan) => {
+                self.emit_publish_deferred_source_activation_arguments(plan, function);
+            }
+            crate::arguments_protocol::ArgumentsBindingAction::Present(arguments_protocol) => {
+                let arguments_storage =
+                    self.allocate_dynamic_binding_storage(LEXICAL_ARGUMENTS_NAME, function);
+                self.binding_scopes
+                    .last_mut()
+                    .expect("binding scope stack must exist")
+                    .insert(LEXICAL_ARGUMENTS_NAME.to_string(), arguments_storage);
+                if let Some(proof) = self.strict_arguments_projection.take() {
+                    self.initialize_projected_arguments_binding(
+                        proof,
+                        arguments_storage,
+                        arguments_protocol,
+                        function,
+                    )?;
+                } else {
+                    self.initialize_arguments_binding(
+                        arguments_storage,
+                        arguments_protocol,
+                        function,
+                    )?;
+                }
             }
         }
 

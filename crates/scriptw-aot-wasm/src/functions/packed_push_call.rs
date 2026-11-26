@@ -19,7 +19,7 @@ impl FunctionBuilder<'_> {
         // A tail continuation admits the same route: the guarded native push
         // runs no user code, so only the caller's earlier retirement (stack
         // depth) distinguishes it from the proper tail call its miss keeps.
-        if !(1..=3).contains(&arguments.len())
+        if !(1..=8).contains(&arguments.len())
             || arguments.iter().any(|argument| {
                 matches!(
                     argument.expr,
@@ -46,7 +46,7 @@ impl FunctionBuilder<'_> {
             |builder, function| {
                 let pending = s.reserve_completion(function);
                 let base = builder.runtime_helper_base()?;
-                match saved.as_slice() {
+                let emit_chunk = |chunk: &[ValueLocals], function: &mut Function| match chunk {
                     [first] => s
                         .call_helper(
                             ArrayPackedPush1Arguments::new(receiver, first),
@@ -68,26 +68,84 @@ impl FunctionBuilder<'_> {
                             function,
                         )
                         .store(&pending, function),
-                    _ => unreachable!("fixed push admission checked its arity"),
+                    _ => unreachable!("packed push chunks have arity 1..=3"),
+                };
+                if saved.len() <= 3 {
+                    emit_chunk(&saved, function);
+                    pending.kind().load(function);
+                    function
+                        .instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
+                    function.instruction(&Instruction::I32Eq);
+                    builder.open_frame(ControlFrameKind::If, function);
+                    builder.completion().copy_from(&pending, function);
+                    builder.emit_propagate_current_throw(function);
+                    builder.pop_control(ControlFrameKind::If);
+                    function.instruction(&Instruction::End);
+                    // A completed Number is the helper's publication capability;
+                    // Undefined means a pure miss before any mutation or user code.
+                    pending.value().tag().load(function);
+                    function.instruction(&Instruction::I32Const(ValueKind::Number.tag() as i32));
+                    function.instruction(&Instruction::I32Eq);
+                    builder.open_frame(ControlFrameKind::If, function);
+                    output.copy_from(pending.value(), function);
+                    handled.set_constant(1, function);
+                    builder.pop_control(ControlFrameKind::If);
+                    function.instruction(&Instruction::End);
+                } else {
+                    // For 4..=8 arguments, require an actual ArrayObject whose
+                    // post-push length stays strictly within PACKED_INDEX_LIMIT
+                    // and whose prototype chain is the untouched %Array.prototype%
+                    // -> %Object.prototype% -> null (zero indexed descriptors at
+                    // any index), so once chunk 1 validates storage/extensibility/
+                    // length-writability and commits, all remaining chunks are
+                    // guaranteed to succeed without partial commits.
+                    let skip = builder.open_frame(ControlFrameKind::Block, function);
+                    let arr = s.reserve_gc_local(function).initialize(
+                        receiver.sealed_reference_or_branch::<crate::gc_types::ArrayObject>(
+                            s,
+                            builder.local_branch_label(skip),
+                            function,
+                        ),
+                        function,
+                    );
+                    s.field(crate::gc_types::ArrayObjectSchema::LENGTH)
+                        .read(&arr, s, function);
+                    function.instruction(&Instruction::I64Const((1i64 << 20) - 8));
+                    function.instruction(&Instruction::I64GtU);
+                    builder.emit_branch_if_to_target(skip, function);
+                    let header = s.reserve_gc_local(function).initialize(
+                        s.field(crate::gc_types::ArrayObjectSchema::OBJECT)
+                            .read(&arr, s, function)
+                            .reference(),
+                        function,
+                    );
+                    arr.clear(function);
+                    let prototype = s.reserve_gc_local(function).initialize(
+                        s.field(crate::gc_types::OrdinaryObjectSchema::PROTOTYPE)
+                            .read(&header, s, function)
+                            .reference(),
+                        function,
+                    );
+                    header.clear(function);
+                    builder.emit_array_prototype_chain_without_indices_or_branch(
+                        &prototype,
+                        skip,
+                        function,
+                    );
+                    prototype.clear(function);
+                    emit_chunk(&saved[..3], function);
+                    pending.value().tag().load(function);
+                    function.instruction(&Instruction::I32Const(ValueKind::Number.tag() as i32));
+                    function.instruction(&Instruction::I32Ne);
+                    builder.emit_branch_if_to_target(skip, function);
+                    for chunk in saved[3..].chunks(3) {
+                        emit_chunk(chunk, function);
+                    }
+                    output.copy_from(pending.value(), function);
+                    handled.set_constant(1, function);
+                    builder.pop_control(ControlFrameKind::Block);
+                    function.instruction(&Instruction::End);
                 }
-                pending.kind().load(function);
-                function.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
-                function.instruction(&Instruction::I32Eq);
-                builder.open_frame(ControlFrameKind::If, function);
-                builder.completion().copy_from(&pending, function);
-                builder.emit_propagate_current_throw(function);
-                builder.pop_control(ControlFrameKind::If);
-                function.instruction(&Instruction::End);
-                // A completed Number is the helper's publication capability;
-                // Undefined means a pure miss before any mutation or user code.
-                pending.value().tag().load(function);
-                function.instruction(&Instruction::I32Const(ValueKind::Number.tag() as i32));
-                function.instruction(&Instruction::I32Eq);
-                builder.open_frame(ControlFrameKind::If, function);
-                output.copy_from(pending.value(), function);
-                handled.set_constant(1, function);
-                builder.pop_control(ControlFrameKind::If);
-                function.instruction(&Instruction::End);
                 pending.clear(function);
                 Ok(())
             },

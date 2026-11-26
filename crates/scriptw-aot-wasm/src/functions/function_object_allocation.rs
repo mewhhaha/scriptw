@@ -609,13 +609,17 @@ impl FunctionBuilder<'_> {
             );
         let stored_home = schema.reserve_gc_local(function).initialize(
             match executable_kind {
-                crate::gc_types::ExecutableCodeKind::JavaScript => schema
-                    .struct_type::<StoredValue>()
-                    .from_value(inputs.home_object, function),
-                // Native entries have no ECMAScript [[HomeObject]]. Their
-                // factories supply undefined, including captured builtins.
-                // Source methods/classes retain their actual defining home.
-                crate::gc_types::ExecutableCodeKind::StandardBuiltin
+                crate::gc_types::ExecutableCodeKind::JavaScript
+                    if meta.protocol() != FunctionProtocolIr::Arrow =>
+                {
+                    schema
+                        .struct_type::<StoredValue>()
+                        .from_value(inputs.home_object, function)
+                }
+                // Native entries and arrow functions have no ECMAScript
+                // [[HomeObject]]: reuse the shared undefined snapshot.
+                crate::gc_types::ExecutableCodeKind::JavaScript
+                | crate::gc_types::ExecutableCodeKind::StandardBuiltin
                 | crate::gc_types::ExecutableCodeKind::HostBuiltin => {
                     schema.stored_undefined(function)
                 }

@@ -467,6 +467,7 @@ impl FunctionBuilder<'_> {
             &dictionary,
             &PreparedOrdinaryPropertyKey { key: &key, hash },
             &descriptor,
+            None,
             f,
         );
         s.release_i64_local(hash, f);

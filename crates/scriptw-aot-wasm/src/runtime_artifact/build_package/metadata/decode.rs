@@ -34,12 +34,46 @@ impl<'a> Reader<'a> {
 impl BuildMetadata {
     // This function is private to the unsafe build-candidate boundary. A valid
     // checksum protects framing mistakes; it cannot authorize caller metadata.
+    // The inputs are static immutable Cargo build slices; caching by their exact
+    // addresses and profile avoids decoding and re-hashing intl_metadata three
+    // times on every cold process startup.
     pub(in crate::runtime_artifact::build_package) fn decode(
         proof: super::super::inputs::ImmutableMetadata,
         profile: RuntimeSourceCompilationProfile,
-    ) -> Option<Self> {
+    ) -> Option<Arc<Self>> {
+        type CacheKey = (usize, usize, usize, usize, u8);
+        static DECODED: std::sync::OnceLock<
+            std::sync::Mutex<Vec<(CacheKey, Option<Arc<BuildMetadata>>)>>,
+        > = std::sync::OnceLock::new();
         let (package, source, intl_metadata, metadata) = proof.parts();
-        Self::parse(metadata, package, source, profile, intl_metadata)
+        let key: CacheKey = (
+            package.as_ptr() as usize,
+            source.as_ptr() as usize,
+            intl_metadata.as_ptr() as usize,
+            metadata.as_ptr() as usize,
+            profile.wire(),
+        );
+        let cache = DECODED.get_or_init(Default::default);
+        {
+            let guard = cache
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            if let Some((_, entry)) = guard.iter().find(|(k, _)| *k == key) {
+                return entry.clone();
+            }
+        }
+        let parsed = Self::parse(metadata, package, source, profile, intl_metadata).map(Arc::new);
+        let mut guard = cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some((_, entry)) = guard.iter().find(|(k, _)| *k == key) {
+            return entry.clone();
+        }
+        if guard.len() >= 8 {
+            guard.remove(0);
+        }
+        guard.push((key, parsed.clone()));
+        parsed
     }
 
     fn parse(

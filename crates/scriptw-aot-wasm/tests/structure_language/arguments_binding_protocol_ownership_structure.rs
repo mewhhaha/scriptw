@@ -249,14 +249,14 @@ fn binding_authority_is_one_private_non_cloneable_closed_lifecycle() {
     );
     assert_eq!(
         authority,
-        "pub(crate)structArgumentsBindingProtocol(Option<PresentArgumentsObjectProtocol>);"
+        "pub(crate)structArgumentsBindingProtocol(ArgumentsBindingAction);"
     );
     assert_eq!(
         count_identifier_in_rust_sources(
             &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
             "ArgumentsBindingProtocol",
         ),
-        5
+        6
     );
 }
 
@@ -276,10 +276,12 @@ fn binding_transition_moves_the_protocol_and_presence_cannot_recover_it() {
             "&mutself)->Result<ArgumentsBindingProtocol,EmitError>{",
             "matchcore::mem::replace(&mutself.0,FunctionArgumentsState::BoundAbsent)",
             "Pending(FunctionArgumentsKind::Absent|FunctionArgumentsKind::EmptyStrictBody(_)|FunctionArgumentsKind::UnobservableLeaf|FunctionArgumentsKind::UnobservedStrict,)",
-            "ArgumentsBindingProtocol(None)",
+            "ArgumentsBindingProtocol(ArgumentsBindingAction::None)",
+            "Pending(FunctionArgumentsKind::DeferredLegacy(plan))",
+            "ArgumentsBindingProtocol(ArgumentsBindingAction::DeferredLegacy(plan),)",
             "Pending(FunctionArgumentsKind::Present(protocol))",
             "self.0=FunctionArgumentsState::BoundPresent",
-            "ArgumentsBindingProtocol(Some(protocol))",
+            "ArgumentsBindingProtocol(ArgumentsBindingAction::Present(protocol,))",
             "FunctionArgumentsState::BoundAbsent",
             "FunctionArgumentsState::BoundPresent",
         ],
@@ -293,7 +295,7 @@ fn binding_transition_moves_the_protocol_and_presence_cannot_recover_it() {
     );
     assert_eq!(
         presence,
-        "&self)->Option<()>{match&self.0{FunctionArgumentsState::Pending(FunctionArgumentsKind::Absent|FunctionArgumentsKind::EmptyStrictBody(_)|FunctionArgumentsKind::UnobservableLeaf|FunctionArgumentsKind::UnobservedStrict,)|FunctionArgumentsState::BoundAbsent=>None,FunctionArgumentsState::Pending(FunctionArgumentsKind::Present(_))|FunctionArgumentsState::BoundPresent=>Some(()),}}"
+        "&self)->Option<()>{match&self.0{FunctionArgumentsState::Pending(FunctionArgumentsKind::Absent|FunctionArgumentsKind::EmptyStrictBody(_)|FunctionArgumentsKind::UnobservableLeaf|FunctionArgumentsKind::UnobservedStrict|FunctionArgumentsKind::DeferredLegacy(_),)|FunctionArgumentsState::BoundAbsent=>None,FunctionArgumentsState::Pending(FunctionArgumentsKind::Present(_))|FunctionArgumentsState::BoundPresent=>Some(()),}}"
     );
 }
 
@@ -396,12 +398,13 @@ fn parameter_binding_consumes_authority_before_owned_initialization() {
         &binding,
         &[
             "self.function_arguments_protocol.take_for_binding()?",
-            "arguments_protocol.into_present()",
-            "initialize_arguments_binding(arguments_storage,arguments_protocol,function)?",
+            "arguments_protocol.into_action()",
+            "ArgumentsBindingAction::Present(arguments_protocol)",
+            "initialize_arguments_binding(arguments_storage,arguments_protocol,function,)?",
         ],
     );
     assert_eq!(exact_identifier_count(&binding, "take_for_binding"), 1);
-    assert_eq!(exact_identifier_count(&binding, "into_present"), 1);
+    assert_eq!(exact_identifier_count(&binding, "into_action"), 1);
     assert_eq!(
         exact_identifier_count(&binding, "initialize_arguments_binding"),
         1

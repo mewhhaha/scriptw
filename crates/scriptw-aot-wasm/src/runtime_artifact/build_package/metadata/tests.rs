@@ -27,7 +27,7 @@ fn fixture() -> &'static Fixture {
         }
     })
 }
-fn decode(bytes: &[u8]) -> Option<BuildMetadata> {
+fn decode(bytes: &[u8]) -> Option<Arc<BuildMetadata>> {
     let f = fixture();
     assert!(std::ptr::eq(bytes, &f.metadata[..]));
     // SAFETY: the complete fixture producer owns these unchanged outputs.

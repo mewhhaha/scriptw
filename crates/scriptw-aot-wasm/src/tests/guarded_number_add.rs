@@ -89,12 +89,14 @@ fn branches<'a>(
 fn dynamic_and_saved_compound_additions_use_actual_number_tags_before_the_runtime_fallback() {
     let artifact = emit_script(
         "function binary(left,right){return left+right;}\n\
-         function compound(left,right){left+=right;return left;}\n[binary,compound];",
+         function compound(left,right){left+=right;return left;}\n\
+         function in_loop(left,right,cond){var out=left;while(cond){out=out+right;cond=false;}return out;}\n\
+         [binary,compound,in_loop];",
     )
     .expect("unspecialized additions emit");
-    expect_valid_module(&artifact, 2);
+    expect_valid_module(&artifact, 3);
     let add = addition_import(&artifact);
-    for name in ["binary", "compound"] {
+    for name in ["binary", "compound", "in_loop"] {
         let operators = source_body(&artifact, name);
         let guards = operators
             .windows(8)
@@ -128,19 +130,25 @@ fn dynamic_and_saved_compound_additions_use_actual_number_tags_before_the_runtim
             if *value == WasmRuntimeValueTag::Number as i32)),
             "the result publishes its actual Number tag"
         );
-        assert!(
-            numeric
-                .iter()
-                .any(|op| matches!(op, Operator::RefNull { .. })),
-            "the Number result clears any previous strong reference"
-        );
-        assert!(
-            matches!(&numeric[numeric.len() - 4..],
-            [Operator::I32Const { value: normal }, Operator::LocalSet { .. },
-             Operator::I32Const { value: 0 }, Operator::LocalSet { .. }]
-            if *normal == crate::COMPLETION_KIND_NORMAL as i32),
-            "the fast result resets both completion kind and target"
-        );
+        // Inside loops, code_sink cannot prove fresh locals are still at their
+        // Wasm default values (null / 0), so it emits explicit reference clear
+        // and completion kind/target resets. Straight-line bodies elide those
+        // redundant default-value stores when the locals have never been written.
+        if name == "in_loop" {
+            assert!(
+                numeric
+                    .iter()
+                    .any(|op| matches!(op, Operator::RefNull { .. })),
+                "the Number result clears any previous strong reference"
+            );
+            assert!(
+                matches!(&numeric[numeric.len() - 4..],
+                [Operator::I32Const { value: normal }, Operator::LocalSet { .. },
+                 Operator::I32Const { value: 0 }, Operator::LocalSet { .. }]
+                if *normal == crate::COMPLETION_KIND_NORMAL as i32),
+                "the fast result resets both completion kind and target"
+            );
+        }
         assert_eq!(
             fallback
                 .iter()

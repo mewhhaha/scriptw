@@ -907,6 +907,18 @@ gc_layout_registry! {
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
             CONSTRUCTOR: crate::heap::BinaryDataConstructor, Immutable, NonNullable;
         }
+        // Lazy sloppy-function legacy `.arguments` token: avoids eagerly
+        // constructing a full mapped ArgumentsObject on every call when the
+        // body never observes `arguments`, while materializing and caching the
+        // exact mapped ArgumentsObject on first observation or freeze.
+        struct DeferredLegacyArguments: PropertyValue => DeferredLegacyArgumentsSchema {
+            CALLABLE: GcRef<FunctionObject>, Mutable, Nullable;
+            ARGUMENTS: GcRef<ValueArray>, Mutable, Nullable;
+            ENVIRONMENT: GcRef<Environment>, Mutable, Nullable;
+            MAPPED_PACKED: I64Value, Immutable, NonNullable;
+            MAPPED_COUNT: I32Value, Immutable, NonNullable;
+            MATERIALIZED: GcRef<StoredValue>, Mutable, Nullable;
+        }
         struct OrdinaryObject: JavaScriptObject => OrdinaryObjectSchema {
             PROTOTYPE: GcRef<JavaScriptObject>, Mutable, Nullable;
             PROPERTIES: GcRef<ObjectPropertyStorage>, Mutable, NonNullable;
@@ -990,8 +1002,12 @@ gc_layout_registry! {
             PACKED_TAGS: I32Value, Mutable, NonNullable;
             SCALAR0: I64Value, Mutable, NonNullable;
             SCALAR1: I64Value, Mutable, NonNullable;
+            SCALAR2: I64Value, Mutable, NonNullable;
+            SCALAR3: I64Value, Mutable, NonNullable;
             REFERENCE0: AnyGcRef, Mutable, Nullable;
             REFERENCE1: AnyGcRef, Mutable, Nullable;
+            REFERENCE2: AnyGcRef, Mutable, Nullable;
+            REFERENCE3: AnyGcRef, Mutable, Nullable;
         }
         // Shape graphs retain only immutable primitive string metadata.
         struct CompactDataShape => CompactDataShapeSchema {
@@ -999,6 +1015,8 @@ gc_layout_registry! {
             ATTRIBUTES: crate::heap::DescriptorWord, Immutable, NonNullable;
             // No canonical Array-index key: physical insertion order is OwnKeys order.
             OWN_KEYS_ORDERED: bool, Immutable, NonNullable;
+            // No key equals "toJSON": plain JSON.stringify skips own-key probing.
+            LACKS_TO_JSON: bool, Immutable, NonNullable;
             // Canonical one-key extensions in creation order, null-terminated
             // and bounded. A cache of further shapes only; never values.
             TRANSITIONS: GcRef<CompactShapeTable>, Mutable, Nullable;
@@ -1180,7 +1198,7 @@ gc_layout_registry! {
         struct LegacyReflectionPropertyState => LegacyReflectionPropertyStateSchema {
             ENTRY: GcRef<PropertyEntry>, Mutable, Nullable;
             DESCRIPTOR: GcRef<PropertyDescriptor>, Mutable, Nullable;
-            EXPECTED_VALUE: GcRef<StoredValue>, Mutable, Nullable;
+            EXPECTED_VALUE: GcRef<PropertyValue>, Mutable, Nullable;
         }
         // One physical P instance's code/data owner. These references are never
         // published through the shared runtime's mutable program globals.

@@ -82,7 +82,7 @@ states what admits that image.
 
 ## Runtime ABI
 
-The runtime ABI is **90**. Portable bundles and native images built under an
+The runtime ABI is **91**. Portable bundles and native images built under an
 earlier ABI must be rebuilt. ABIs 58 to 77 added per-site read, write,
 `instanceof` and global read records, a dictionary position hint on Strings,
 further native call entries, one JSON output accumulator, compact shape
@@ -117,7 +117,12 @@ its text as a literal ordinal until `Function.prototype.toString` asks for it
 ([contract](contracts/program-literal-root-ownership.md)). ABI 90 has R define
 its private linear memory instead of importing a host-created one, so its data
 segments map copy-on-write from a memory image
-([contract](contracts/runtime-byte-ownership.md)).
+([contract](contracts/runtime-byte-ownership.md)). ABI 91 adds
+`DeferredLegacyArguments` (lazy sloppy-function `.arguments` materialization
+with recipe inputs cleared upon observation), widens `InlineCompactDataStorage`
+from two to four inline fields, adds the immutable `CompactDataShape.LACKS_TO_JSON`
+witness, expands direct local-argument native builtin entries to 55 builtins,
+and switches `CollectionHashTable` sizing to power-of-two bitmasking.
 `LAYOUT_VERSION` in
 `crates/scriptw-aot-wasm/src/runtime_artifact.rs` records each step.
 

@@ -109,6 +109,97 @@ impl<'ir> PlainDataLiteral<'ir> {
         let schema = builder.runtime_schema();
         let names: Vec<&str> = self.fields.iter().map(|field| field.key).collect();
         let shape = builder.emit_compact_literal_shape(&names, f)?;
+        if self.fields.len() <= super::compact_data::INLINE_COMPACT_FIELDS {
+            // Evaluate every field expression in source order before allocating
+            // the fresh inline record so all 1..=4 values are published in one
+            // struct.new with zero R helper calls.
+            let mut values = Vec::with_capacity(self.fields.len());
+            for field in self.fields {
+                let value = schema.reserve_value_local(f);
+                builder.compile_expr_to_value(field.value, &value, f)?;
+                builder.emit_propagate_current_throw_if_needed(f);
+                values.push(value);
+            }
+            let prototype = schema.reserve_value_local(f);
+            builder.emit_source_literal_prototype_to_value(
+                crate::environments::global_environment::SourceLiteralPrototype::Object,
+                &prototype,
+                f,
+            );
+            let undefined = WasmRuntimeValueTag::Undefined as i32;
+            let mut unused_tags = 0i32;
+            for slot in values.len()..super::compact_data::INLINE_COMPACT_FIELDS {
+                unused_tags |= undefined << (slot * 8);
+            }
+            let tags = schema.reserve_i32_local(f);
+            f.instruction(&Instruction::I32Const(unused_tags));
+            for (slot, value) in values.iter().enumerate() {
+                value.tag().load(f);
+                f.instruction(&Instruction::I32Const(255));
+                f.instruction(&Instruction::I32And);
+                if slot > 0 {
+                    f.instruction(&Instruction::I32Const((slot * 8) as i32));
+                    f.instruction(&Instruction::I32Shl);
+                }
+                f.instruction(&Instruction::I32Or);
+            }
+            tags.store(f);
+            let scalar_operand = |index: usize| {
+                values
+                    .get(index)
+                    .map_or(GcOperand::i64(0), |v| GcOperand::i64_local(v.scalar()))
+            };
+            let ref_operand = |index: usize| {
+                values
+                    .get(index)
+                    .map_or(GcOperand::null_eq(), |v| GcOperand::eq_reference(v.reference()))
+            };
+            let inline = schema.reserve_gc_local(f).initialize(
+                schema.struct_type::<InlineCompactDataStorage>().construct(
+                    (
+                        GcOperand::reference(&shape, schema),
+                        GcOperand::i32_local(tags),
+                        scalar_operand(0),
+                        scalar_operand(1),
+                        scalar_operand(2),
+                        scalar_operand(3),
+                        ref_operand(0),
+                        ref_operand(1),
+                        ref_operand(2),
+                        ref_operand(3),
+                    ),
+                    f,
+                ),
+                f,
+            );
+            let base = schema
+                .reserve_gc_local::<ObjectPropertyStorage, NonNullable>(f)
+                .initialize(
+                    inline
+                        .load(schema, f)
+                        .upcast::<CompactDataStorage>()
+                        .upcast(),
+                    f,
+                );
+            let immutable = schema.reserve_i32_local(f);
+            immutable.set_constant(0, f);
+            let object = schema.reserve_gc_local(f).initialize(
+                builder.emit_alloc_object_header_with_storage(&prototype, immutable, &base, f),
+                f,
+            );
+            output.set_reference(&object, schema, f);
+            object.clear(f);
+            schema.release_i32_local(immutable, f);
+            base.clear(f);
+            inline.clear(f);
+            schema.release_i32_local(tags, f);
+            prototype.clear(f);
+            for value in values.into_iter().rev() {
+                value.clear(f);
+            }
+            shape.clear(f);
+            return Ok(());
+        }
         let prototype = schema.reserve_value_local(f);
         builder.emit_source_literal_prototype_to_value(
             crate::environments::global_environment::SourceLiteralPrototype::Object,

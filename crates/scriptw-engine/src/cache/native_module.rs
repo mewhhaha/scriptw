@@ -46,7 +46,19 @@ impl NativeModuleCache {
         wasm: &[u8],
         compile: impl FnOnce() -> Result<Module, E>,
     ) -> Result<Module, E> {
-        let key = entry_key(engine, wasm);
+        let wasm_sha256: [u8; 32] = Sha256::digest(wasm).into();
+        self.load_or_compile_with_digest(engine, wasm_sha256, compile)
+    }
+
+    /// Same as [`Self::load_or_compile`], reusing an already-computed SHA-256
+    /// digest of the Wasm bytes to avoid hashing the same module twice.
+    pub(crate) fn load_or_compile_with_digest<E>(
+        &self,
+        engine: &Engine,
+        wasm_sha256: [u8; 32],
+        compile: impl FnOnce() -> Result<Module, E>,
+    ) -> Result<Module, E> {
+        let key = entry_key_for_digest(engine, &wasm_sha256);
         if let Some(module) = self.load(engine, &key) {
             self.hits.fetch_add(1, Ordering::Relaxed);
             return Ok(module);
@@ -98,7 +110,12 @@ impl NativeModuleCache {
 /// and compiler flags, tunables, features and the module version, which
 /// product Engines set to the native compiler fingerprint. Two Engines that
 /// agree on it accept each other's images.
+#[cfg(test)]
 fn entry_key(engine: &Engine, wasm: &[u8]) -> [u8; 32] {
+    entry_key_for_digest(engine, &Sha256::digest(wasm).into())
+}
+
+fn entry_key_for_digest(engine: &Engine, wasm_sha256: &[u8; 32]) -> [u8; 32] {
     struct Sha256Hasher(Sha256);
 
     impl Hasher for Sha256Hasher {
@@ -113,7 +130,7 @@ fn entry_key(engine: &Engine, wasm: &[u8]) -> [u8; 32] {
 
     let mut hasher = Sha256Hasher(Sha256::new());
     hasher.0.update(KEY_DOMAIN);
-    hasher.0.update(Sha256::digest(wasm));
+    hasher.0.update(wasm_sha256);
     // Last, because its length is whatever the `Hash` implementations write.
     engine.precompile_compatibility_hash().hash(&mut hasher);
     hasher.0.finalize().into()

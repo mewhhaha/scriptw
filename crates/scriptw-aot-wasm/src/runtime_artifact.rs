@@ -24,6 +24,7 @@ mod build_package;
 mod cache;
 mod residency;
 mod source_compilation;
+pub(crate) use source_compilation::SourceCompilationProfileAdmission;
 pub use source_compilation::{
     RuntimeSourceCompilationProfile, RUNTIME_SOURCE_COMPILATION_PROFILE_CUSTOM_SECTION,
 };
@@ -193,7 +194,10 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 90 makes R define its private linear memory (index 1, after the
 // imported shared memory) instead of importing a host-created one, so its data
 // segments become a copy-on-write memory image.
-const LAYOUT_VERSION: u32 = 90;
+// Version 91 adds DeferredLegacyArguments (lazy sloppy-function `.arguments`
+// materialization) and widens LegacyReflectionPropertyState.EXPECTED_VALUE to
+// PropertyValue.
+const LAYOUT_VERSION: u32 = 91;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.
@@ -235,7 +239,7 @@ impl RuntimeArtifactKey {
 
 /// What a program module must import from the runtime, and the data boundary
 /// its own pool continues from.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct RuntimeLayout {
     imported_functions: u32,
     function_types: Vec<u32>,

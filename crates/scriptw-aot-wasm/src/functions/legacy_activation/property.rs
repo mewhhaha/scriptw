@@ -1,20 +1,28 @@
 //! An activation may write only its original, still-mutable legacy property.
 
 use super::*;
+use crate::arguments_protocol::DeferredLegacyArgumentsPlan;
 use crate::gc_types::{
-    GcOperand, LegacyReflectionPropertyStateSchema, NonNullable, PropertyDescriptor,
-    PropertyDescriptorSchema, PropertyEntrySchema, PropertyValue, RuntimeSchema, StoredValue,
-    ValueLocals,
+    DeferredLegacyArguments, Environment, FunctionObject, GcOperand,
+    LegacyReflectionPropertyStateSchema, NonNullable, PropertyDescriptor, PropertyDescriptorSchema,
+    PropertyEntrySchema, PropertyValue, RuntimeSchema, StoredValue, ValueArray, ValueLocals,
 };
 use crate::heap::DescriptorMask;
 
 /// What an activation writes: the value captured at entry, restored at exit,
-/// or a value boxed only on the arm that stores it, so an unobserved
+/// a value boxed only on the arm that stores it, or a deferred arguments
+/// recipe materialized only on reflection observation, so an unobserved
 /// property costs no allocation.
 #[derive(Clone, Copy)]
 enum Written<'a> {
-    Stored(&'a GcLocal<StoredValue, Nullable>),
+    Stored(&'a GcLocal<PropertyValue, Nullable>),
     Fresh(&'a ValueLocals),
+    DeferredLegacy {
+        callable: &'a GcLocal<FunctionObject>,
+        arguments: &'a GcLocal<ValueArray>,
+        environment: &'a GcLocal<Environment, Nullable>,
+        plan: DeferredLegacyArgumentsPlan,
+    },
 }
 
 /// The state names the property's entry record, so no write looks the key
@@ -22,7 +30,7 @@ enum Written<'a> {
 /// reflection contract.
 pub(super) struct ReflectionProperty {
     state: GcLocal<LegacyReflectionPropertyState, Nullable>,
-    previous_value: GcLocal<StoredValue, Nullable>,
+    previous_value: GcLocal<PropertyValue, Nullable>,
 }
 
 impl ReflectionProperty {
@@ -33,7 +41,7 @@ impl ReflectionProperty {
     ) -> Self {
         let schema = builder.runtime_schema();
         let previous_value = schema
-            .reserve_gc_local::<StoredValue, Nullable>(function)
+            .reserve_gc_local::<PropertyValue, Nullable>(function)
             .initialize_null(schema, function);
         state.load(schema, function).is_null(function);
         function.instruction(&Instruction::I32Eqz);
@@ -113,7 +121,7 @@ impl ReflectionProperty {
         );
         let current = Self::current_descriptor(&state, schema, function);
         let expected = schema
-            .reserve_gc_local::<StoredValue, Nullable>(function)
+            .reserve_gc_local::<PropertyValue, Nullable>(function)
             .initialize(
                 schema
                     .field(LegacyReflectionPropertyStateSchema::EXPECTED_VALUE)
@@ -164,7 +172,7 @@ impl ReflectionProperty {
         function.instruction(&Instruction::If(BlockType::Empty));
         // A live original owner captured a non-null prior token; publication
         // also supplies a non-null token. Retired owners cannot reach this arm.
-        let stored = match value {
+        let stored: GcLocal<PropertyValue> = match value {
             Written::Stored(value) => schema.reserve_gc_local(function).initialize(
                 value.load(schema, function).require_non_null(function),
                 function,
@@ -172,13 +180,36 @@ impl ReflectionProperty {
             Written::Fresh(value) => schema.reserve_gc_local(function).initialize(
                 schema
                     .struct_type::<StoredValue>()
-                    .from_value(value, function),
+                    .from_value(value, function)
+                    .upcast::<PropertyValue>(),
+                function,
+            ),
+            Written::DeferredLegacy {
+                callable,
+                arguments,
+                environment,
+                plan,
+            } => schema.reserve_gc_local(function).initialize(
+                schema
+                    .struct_type::<DeferredLegacyArguments>()
+                    .construct(
+                        (
+                            GcOperand::nullable_reference(callable, schema),
+                            GcOperand::nullable_reference(arguments, schema),
+                            GcOperand::reference(environment, schema),
+                            GcOperand::i64(plan.packed_slots()),
+                            GcOperand::i32(plan.param_count()),
+                            GcOperand::null(schema),
+                        ),
+                        function,
+                    )
+                    .upcast::<PropertyValue>(),
                 function,
             ),
         };
         schema.field(PropertyDescriptorSchema::VALUE).write(
             &descriptor,
-            GcOperand::subtype_reference(&stored, schema),
+            GcOperand::reference(&stored, schema),
             schema,
             function,
         );
@@ -220,6 +251,27 @@ impl ReflectionProperty {
         function: &mut Function,
     ) {
         self.write(Written::Fresh(value), schema, function);
+    }
+
+    pub(super) fn publish_deferred_arguments(
+        &self,
+        callable: &GcLocal<FunctionObject>,
+        arguments: &GcLocal<ValueArray>,
+        environment: &GcLocal<Environment, Nullable>,
+        plan: DeferredLegacyArgumentsPlan,
+        schema: &RuntimeSchema,
+        function: &mut Function,
+    ) {
+        self.write(
+            Written::DeferredLegacy {
+                callable,
+                arguments,
+                environment,
+                plan,
+            },
+            schema,
+            function,
+        );
     }
 
     pub(super) fn restore(&self, schema: &RuntimeSchema, function: &mut Function) {

@@ -227,14 +227,47 @@ impl FunctionBuilder<'_> {
             }
         };
         self.emit_branch_if_to_target(exit, f);
-        // FindViaPredicate performs Get even for holes; no HasProperty shortcut.
-        self.emit_typed_array_or_object_index_read_from_locals(&receiver, index, &pending, f)?;
-        self.emit_array_native_propagate(&pending, f);
-        element.copy_from(pending.value(), f);
+        // FindViaPredicate performs Get even for holes; an own data slot on an
+        // actual ArrayObject answers Get directly without a string key, while
+        // holes, accessors and Proxies fall through to the complete Get.
+        if !typed_array {
+            let found = s.reserve_i32_local(f);
+            found.set_constant(0, f);
+            receiver.reference().load(f);
+            f.instruction(&Instruction::RefTestNonNull(
+                s.reference_type::<ArrayObject>(crate::gc_types::GcNullability::NonNullable)
+                    .heap_type,
+            ));
+            self.open_frame(ControlFrameKind::If, f);
+            let array_ref = s
+                .reserve_gc_local(f)
+                .initialize(receiver.cast_reference::<ArrayObject>(s, f), f);
+            self.emit_array_own_indexed_value(&array_ref, index, &element, found, f);
+            array_ref.clear(f);
+            self.pop_control(ControlFrameKind::If);
+            f.instruction(&Instruction::End);
+            found.load(f);
+            f.instruction(&Instruction::I32Eqz);
+            self.open_frame(ControlFrameKind::If, f);
+            self.emit_typed_array_or_object_index_read_from_locals(&receiver, index, &pending, f)?;
+            self.emit_array_native_propagate(&pending, f);
+            element.copy_from(pending.value(), f);
+            self.pop_control(ControlFrameKind::If);
+            f.instruction(&Instruction::End);
+            s.release_i32_local(found, f);
+        } else {
+            self.emit_typed_array_or_object_index_read_from_locals(&receiver, index, &pending, f)?;
+            self.emit_array_native_propagate(&pending, f);
+            element.copy_from(pending.value(), f);
+        }
         self.emit_array_native_number(index, &index_value, f);
-        let argv = self.emit_pre_evaluated_arg_vector(&[&element, &index_value, &receiver], f);
-        self.emit_function_or_proxy_call_with_argv(&predicate, &this_arg, &argv, &pending, f)?;
-        argv.clear(f);
+        self.emit_array_callback_call_from_values(
+            &predicate,
+            &this_arg,
+            &[&element, &index_value, &receiver],
+            &pending,
+            f,
+        )?;
         self.emit_array_native_propagate(&pending, f);
         self.compile_truthy_tagged_i32(pending.value(), f)?;
         self.open_frame(ControlFrameKind::If, f);

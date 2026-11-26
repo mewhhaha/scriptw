@@ -290,7 +290,7 @@ impl StringAccumulatorCursor {
             &source,
             None,
             count,
-            INLINE_CODE_UNIT_COPY_LIMIT,
+            INLINE_CONCATENATION_COPY_LIMIT,
             schema,
             function,
         );
@@ -368,7 +368,7 @@ impl StringAccumulatorCursor {
             &cursor.units,
             None,
             cursor.length,
-            INLINE_CODE_UNIT_COPY_LIMIT,
+            INLINE_CONCATENATION_COPY_LIMIT,
             schema,
             function,
         );

@@ -93,8 +93,11 @@ impl EmbeddedNativeRuntime {
         Self::admit_manifest_with_digest(images, manifest, || digests::digest(images.package))
     }
 
-    fn admit_runtime(images: Images, runtime: &RuntimeArtifact) -> Option<Self> {
-        let manifest = manifest::Manifest::decode(images.manifest)?;
+    fn admit_runtime(
+        images: Images,
+        manifest: manifest::Manifest,
+        runtime: &RuntimeArtifact,
+    ) -> Option<Self> {
         Self::admit_manifest_with_digest(images, manifest, || {
             runtime
                 .immutable_build_package_digest(images.package)
@@ -163,7 +166,7 @@ pub(super) fn load_native(
         return None;
     }
     let admitted = native_bundle(images.profile, || {
-        EmbeddedNativeRuntime::admit_runtime(images, runtime)
+        EmbeddedNativeRuntime::admit_runtime(images, candidate, runtime)
     })?;
     timings.admission = admission_started.elapsed();
     admitted.load(engine, runtime, mode, timings)

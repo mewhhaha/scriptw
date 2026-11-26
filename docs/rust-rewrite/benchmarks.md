@@ -3258,3 +3258,63 @@ Not done:
   new campaign should freeze a dist binary.
 - Two diagnostics are outside the set: RSC Fast policy and `scriptw build wasm`
   of the whole RSC bundle. The latter grew past 12 GB RSS in a trial and was stopped.
+
+## 2026-11-26 local benchmarks: edge, cold start, and Porffor
+
+Measured **2026-11-26** on a local **AMD Ryzen 7 7800X3D** Linux host, pinned to **CPUs 0–1** under a **4 GiB / 0 swap** systemd cgroup scope, comparing a local `--release` build (compiler fingerprint `26b3ef6e5f75`, ABI 91) against **Node 24.19.0** (`V8 13.6.233.17-node.51`) and **Porffor 0.61.13** (`wasmtime-py 47.0.1` and Node 24.19.0 Wasm). Exact stdout was checked on every run. This is a separate local cohort from the 2026-11-17/25 Xeon cloud panels above; compare actors within one cohort only.
+
+### Cold-start CLI (`scriptw run` warm cache vs Node 24)
+
+| Fixture | Baseline (`06be47c3b`) | New Scriptw | Delta | Node 24.19.0 | Scriptw ÷ Node |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `startup.js` | 3.37 ms | **3.06 ms** | −9.1% | 15.12 ms | **0.20× (4.93× faster)** |
+| `numeric-loop-50000.js` | 3.42 ms | **3.11 ms** | −9.1% | 14.87 ms | **0.21× (4.78× faster)** |
+| `edge-router.js` | 4.39 ms | **3.56 ms** | −18.9% | 15.17 ms | **0.23× (4.26× faster)** |
+| `edge-json-api.js` | 4.61 ms | **3.67 ms** | −20.5% | 16.16 ms | **0.23× (4.40× faster)** |
+| `edge-html.js` | 5.59 ms | **4.07 ms** | −27.1% | 16.48 ms | **0.25× (4.05× faster)** |
+| **Geomean** | — | — | **−17.2%** | — | **0.224× (4.47× faster)** |
+
+### Edge workloads (0-warmup precompiled fresh-Realm AOT vs V8)
+
+Scriptw fresh-Store setup (`setup_us`) dropped from `113–116 µs` to **`37.5–40.4 µs`** (**0.168×** V8 `vm.createContext`, **5.94× faster**).
+
+| Edge fixture | Base exec | New exec (Δ) | V8 5w exec (Ratio) | V8 80w exec (Ratio) | New total | V8 5w / 80w total (Ratio) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `edge-json-api.js` | 197.4 µs | **146.8 µs** (−25.6%) | 214.5 µs (**0.68×**) | 195.4 µs (**0.75×**) | **360.0 µs** | 508.0 / 472.6 µs (**0.71× / 0.76×**) |
+| `edge-router.js` | 127.2 µs | **87.0 µs** (−31.6%) | 127.9 µs (**0.68×**) | 115.5 µs (**0.75×**) | **295.3 µs** | 420.5 / 380.4 µs (**0.70× / 0.78×**) |
+| `edge-query.js` | 371.5 µs | **198.2 µs** (−46.7%) | 356.7 µs (**0.56×**) | 359.8 µs (**0.55×**) | **417.0 µs** | 661.4 / 562.5 µs (**0.63× / 0.74×**) |
+| `edge-middleware.js` | 116.3 µs | **79.2 µs** (−31.9%) | 104.7 µs (**0.76×**) | 78.4 µs (1.01×) | **291.0 µs** | 368.7 / 318.6 µs (**0.79× / 0.91×**) |
+| `edge-html.js` | 550.3 µs | **263.6 µs** (−52.1%) | 553.3 µs (**0.48×**) | 460.8 µs (**0.57×**) | **488.6 µs** | 832.4 / 647.0 µs (**0.59× / 0.76×**) |
+| `edge-nested-result.js` | 258.0 µs | **192.5 µs** (−25.4%) | 270.4 µs (**0.71×**) | 233.6 µs (**0.82×**) | **414.8 µs** | 547.0 / 482.2 µs (**0.76× / 0.86×**) |
+| **Geomean** | — | **−36.4%** | **0.636× (1.57× faster)** | **0.728× (1.37× faster)** | — | **0.692× / 0.799× (1.44× / 1.25× faster)** |
+
+### Live 17-kernel comparison with Porffor 0.61.13 and Node 24.19.0 / V8
+
+Four interleaved fresh processes per actor and kernel (21 measured entries after 10 checked warmups each, exact stdout verified), using `compiler_precompiled_baseline`, `scripts/wasm_peer_wasmtime.py`, `scripts/wasm_peer_node.cjs`, and `node-runtime.cjs`. Compilation times are medians of 4 interleaved fresh `scriptw build wasm` vs `porf wasm` runs per kernel.
+
+| Kernel | Scriptw (µs) | Porffor on Wasmtime (µs) | Porffor on Node/V8 Wasm (µs) | Node 24 / V8 JS (µs) | Scriptw ÷ Porffor (WT) | Scriptw ÷ V8 | Build: Scriptw / Porffor (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `sort-reverse-128.js` | **14.5** | 89.4 | 98.0 | 14.6 | **0.16×** | **1.00×** | 67.8 / 92.8 |
+| `sort-reverse-512.js` | **21.6** | 1,156.3 | 1,431.0 | 41.6 | **0.02×** | **0.52×** | 65.4 / 92.5 |
+| `sort-sorted-512.js` | **21.6** | 23.3 | 33.7 | 41.2 | **0.93×** | **0.52×** | 66.6 / 93.1 |
+| `to-sorted-512.js` | **25.0** | 1,197.9 | 1,437.0 | 42.5 | **0.02×** | **0.59×** | 66.4 / 92.6 |
+| `join-1024.js` | 37.0 | wrong output | wrong output | **32.2** | — | 1.15× | 67.9 / 92.9 |
+| `join-4096.js` | **111.4** | wrong output | wrong output | 146.2 | — | **0.76×** | 67.6 / 93.4 |
+| `join-mixed-1024.js` | 33.5 | **32.8** | 43.3 | 50.8 | 1.02× | **0.66×** | 65.3 / 91.6 |
+| `numeric-loop-10000.js` | **10.2** | 19.1 | 19.1 | 113.5 | **0.54×** | **0.09×** | 64.7 / 92.6 |
+| `numeric-loop-50000.js` | **13.0** | 53.6 | 46.6 | 266.3 | **0.24×** | **0.05×** | 63.9 / 87.7 |
+| `folded-string-4096.js` | **31.7** | 91.2 | 116.0 | 71.6 | **0.35×** | **0.44×** | 64.9 / 87.9 |
+| `dynamic-string-4096.js` | **43.7** | 92.2 | 65.3 | 92.0 | **0.47×** | **0.48×** | 64.4 / 91.2 |
+| `integer.js` | **10.7** | wrong output | wrong output | 1,139.3 | — | **0.01×** | 65.9 / 88.6 |
+| `objects.js` | **31.5** | 101.6 | 967.8 | 33.7 | **0.31×** | **0.93×** | 65.4 / 90.4 |
+| `retained-objects.js` | **842.6** | runtime failed | runtime failed | 935.1 | — | **0.90×** | 67.0 / 89.3 |
+| `join-empty-1024.js` | **11.3** | 165.0 | 662.6 | 32.3 | **0.07×** | **0.35×** | 65.4 / 89.7 |
+| `join-singleton-1024.js` | **11.4** | 201.4 | 1,913.1 | 51.8 | **0.06×** | **0.22×** | 65.3 / 90.6 |
+| `join-small-1024.js` | **11.6** | 231.1 | 1,933.8 | 91.6 | **0.05×** | **0.13×** | 64.6 / 86.8 |
+
+| Comparison (2026-11-26 local cohort) | Kernels | Scriptw faster | Scriptw ÷ other (geomean) | Range |
+| --- | ---: | ---: | ---: | ---: |
+| Scriptw vs Porffor on Wasmtime 47.0.1 | 13 | **12 / 13** | **0.167× (6.0× faster)** | 0.019×–1.02× |
+| Scriptw vs Porffor on Node 24 / V8 Wasm | 13 | **13 / 13** | **0.084× (11.9× faster)** | 0.006×–0.773× |
+| Scriptw vs Node 24 / V8 JavaScript | 17 | **16 / 17** | **0.330× (3.03× faster)** | 0.009×–1.15× |
+| JS → Wasm compile: Scriptw vs Porffor | 17 | **17 / 17** | **0.725× (1.38× faster)** | — |

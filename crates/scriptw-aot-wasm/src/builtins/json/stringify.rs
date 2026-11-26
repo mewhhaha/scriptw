@@ -443,6 +443,13 @@ impl FunctionBuilder<'_> {
         let property_list = s
             .reserve_gc_local::<ValueArray, Nullable>(f)
             .initialize_null(s, f);
+        callable.set_constant(0, f);
+        replacer.tag().load(f);
+        f.instruction(&Instruction::I32Const(
+            WasmRuntimeValueTag::Undefined as i32,
+        ));
+        f.instruction(&Instruction::I32Ne);
+        self.open_frame(ControlFrameKind::If, f);
         self.emit_is_callable_i32(&replacer, f)?;
         callable.store(f);
         callable.load(f);
@@ -454,10 +461,50 @@ impl FunctionBuilder<'_> {
         replacer.set_undefined(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        let gap = self.emit_json_prepare_gap(&space, f)?;
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        let gap = s
+            .reserve_gc_local::<StringValue, Nullable>(f)
+            .initialize_null(s, f);
+        space.tag().load(f);
+        f.instruction(&Instruction::I32Const(
+            WasmRuntimeValueTag::Undefined as i32,
+        ));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        let empty_gap = self.emit_json_string("", f)?;
+        gap.replace(empty_gap.load(s, f).nullable(), f);
+        empty_gap.clear(f);
+        f.instruction(&Instruction::Else);
+        let prepared_gap = self.emit_json_prepare_gap(&space, f)?;
+        gap.replace(prepared_gap.load(s, f).nullable(), f);
+        prepared_gap.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        let gap = s
+            .reserve_gc_local(f)
+            .initialize(gap.load(s, f).require_non_null(f), f);
+        let replacement_opt = s
+            .reserve_gc_local::<StoredValue, Nullable>(f)
+            .initialize_null(s, f);
+        replacer.tag().load(f);
+        f.instruction(&Instruction::I32Const(
+            WasmRuntimeValueTag::Undefined as i32,
+        ));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        replacement_opt.replace(s.stored_undefined(f).nullable(), f);
+        f.instruction(&Instruction::Else);
+        replacement_opt.replace(
+            s.struct_type::<StoredValue>().from_value(&replacer, f).nullable(),
+            f,
+        );
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         let replacement = s
             .reserve_gc_local(f)
-            .initialize(s.struct_type::<StoredValue>().from_value(&replacer, f), f);
+            .initialize(replacement_opt.load(s, f).require_non_null(f), f);
+        replacement_opt.clear(f);
         let accumulator = s
             .reserve_gc_local(f)
             .initialize(StringAccumulatorCursor::allocate(s, 128, f), f);

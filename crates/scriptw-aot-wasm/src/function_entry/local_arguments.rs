@@ -243,24 +243,66 @@ enum LocalArgumentsOwner {
     Native(NativeLocalArgumentsBuiltin),
 }
 
-/// Native algorithms that read at most the two narrow argument slots and
-/// never observe the argument count or any later argument. An absent argument
-/// is undefined in both ABIs, so the vector adapter and a direct local call
-/// reach the same algorithm. A body that reads the count or the vector cannot
-/// be compiled for this ABI (`BodyEntryLocals` rejects it at emission).
+/// Native algorithms that read at most their typed local argument slots
+/// (2 for Narrow, 5 for Wide) and never observe the argument count or any
+/// later argument. An absent argument is undefined in both ABIs, so the vector
+/// adapter and a direct local call reach the same algorithm. A body that reads
+/// the count or the vector cannot be compiled for this ABI (`BodyEntryLocals`
+/// rejects it at emission).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum NativeLocalArgumentsBuiltin {
     FunctionPrototypeSymbolHasInstance,
     ObjectGetPrototypeOf,
+    ObjectHasOwn,
+    ObjectKeys,
+    ObjectValues,
+    ObjectEntries,
+    ObjectFromEntries,
     ObjectPrototypeHasOwnProperty,
     ArrayIsArray,
+    ArrayPrototypeMap,
+    ArrayPrototypeFilter,
+    ArrayPrototypeEvery,
+    ArrayPrototypeSome,
+    ArrayPrototypeFind,
+    ArrayPrototypeFindIndex,
+    ArrayPrototypeForEach,
+    ArrayPrototypeSlice,
+    ArrayPrototypeSort,
+    NumberIsFinite,
+    NumberIsInteger,
+    NumberIsNaN,
+    NumberIsSafeInteger,
     NumberPrototypeToString,
+    MathAbs,
+    MathCeil,
+    MathFloor,
+    MathRound,
+    MathSqrt,
+    MathTrunc,
     StringPrototypeCharCodeAt,
     StringPrototypeIndexOf,
+    StringPrototypeIncludes,
+    StringPrototypeStartsWith,
+    StringPrototypeEndsWith,
     StringPrototypeSlice,
+    StringPrototypeSplit,
+    StringPrototypeTrim,
+    StringPrototypeToLowerCase,
+    StringPrototypeToUpperCase,
+    StringPrototypeReplace,
+    StringPrototypeReplaceAll,
+    DecodeUriComponent,
+    EncodeUriComponent,
+    JsonParse,
+    JsonStringify,
     MapPrototypeGet,
     MapPrototypeHas,
     MapPrototypeSet,
+    MapPrototypeDelete,
+    SetPrototypeHas,
+    SetPrototypeAdd,
+    SetPrototypeDelete,
     WeakMapPrototypeGet,
     WeakMapPrototypeHas,
     WeakMapPrototypeSet,
@@ -268,22 +310,70 @@ pub(crate) enum NativeLocalArgumentsBuiltin {
 
 impl NativeLocalArgumentsBuiltin {
     /// Declaration order is the order of the common R suffix of local bodies.
-    pub(crate) const ALL: [Self; 14] = [
+    pub(crate) const ALL: [Self; 55] = [
         Self::FunctionPrototypeSymbolHasInstance,
         Self::ObjectGetPrototypeOf,
+        Self::ObjectHasOwn,
+        Self::ObjectKeys,
+        Self::ObjectValues,
+        Self::ObjectEntries,
+        Self::ObjectFromEntries,
         Self::ObjectPrototypeHasOwnProperty,
         Self::ArrayIsArray,
+        Self::ArrayPrototypeMap,
+        Self::ArrayPrototypeFilter,
+        Self::ArrayPrototypeEvery,
+        Self::ArrayPrototypeSome,
+        Self::ArrayPrototypeFind,
+        Self::ArrayPrototypeFindIndex,
+        Self::ArrayPrototypeForEach,
+        Self::ArrayPrototypeSlice,
+        Self::ArrayPrototypeSort,
+        Self::NumberIsFinite,
+        Self::NumberIsInteger,
+        Self::NumberIsNaN,
+        Self::NumberIsSafeInteger,
         Self::NumberPrototypeToString,
+        Self::MathAbs,
+        Self::MathCeil,
+        Self::MathFloor,
+        Self::MathRound,
+        Self::MathSqrt,
+        Self::MathTrunc,
         Self::StringPrototypeCharCodeAt,
         Self::StringPrototypeIndexOf,
+        Self::StringPrototypeIncludes,
+        Self::StringPrototypeStartsWith,
+        Self::StringPrototypeEndsWith,
         Self::StringPrototypeSlice,
+        Self::StringPrototypeSplit,
+        Self::StringPrototypeTrim,
+        Self::StringPrototypeToLowerCase,
+        Self::StringPrototypeToUpperCase,
+        Self::StringPrototypeReplace,
+        Self::StringPrototypeReplaceAll,
+        Self::DecodeUriComponent,
+        Self::EncodeUriComponent,
+        Self::JsonParse,
+        Self::JsonStringify,
         Self::MapPrototypeGet,
         Self::MapPrototypeHas,
         Self::MapPrototypeSet,
+        Self::MapPrototypeDelete,
+        Self::SetPrototypeHas,
+        Self::SetPrototypeAdd,
+        Self::SetPrototypeDelete,
         Self::WeakMapPrototypeGet,
         Self::WeakMapPrototypeHas,
         Self::WeakMapPrototypeSet,
     ];
+
+    pub(crate) const fn arity(self) -> LocalArgumentsArity {
+        match self {
+            Self::JsonStringify => LocalArgumentsArity::Wide,
+            _ => LocalArgumentsArity::Narrow,
+        }
+    }
 
     pub(crate) const fn builtin(self) -> StandardBuiltinId {
         match self {
@@ -291,15 +381,56 @@ impl NativeLocalArgumentsBuiltin {
                 StandardBuiltinId::FunctionPrototypeSymbolHasInstance
             }
             Self::ObjectGetPrototypeOf => StandardBuiltinId::ObjectGetPrototypeOf,
+            Self::ObjectHasOwn => StandardBuiltinId::ObjectHasOwn,
+            Self::ObjectKeys => StandardBuiltinId::ObjectKeys,
+            Self::ObjectValues => StandardBuiltinId::ObjectValues,
+            Self::ObjectEntries => StandardBuiltinId::ObjectEntries,
+            Self::ObjectFromEntries => StandardBuiltinId::ObjectFromEntries,
             Self::ObjectPrototypeHasOwnProperty => StandardBuiltinId::ObjectPrototypeHasOwnProperty,
             Self::ArrayIsArray => StandardBuiltinId::ArrayIsArray,
+            Self::ArrayPrototypeMap => StandardBuiltinId::ArrayPrototypeMap,
+            Self::ArrayPrototypeFilter => StandardBuiltinId::ArrayPrototypeFilter,
+            Self::ArrayPrototypeEvery => StandardBuiltinId::ArrayPrototypeEvery,
+            Self::ArrayPrototypeSome => StandardBuiltinId::ArrayPrototypeSome,
+            Self::ArrayPrototypeFind => StandardBuiltinId::ArrayPrototypeFind,
+            Self::ArrayPrototypeFindIndex => StandardBuiltinId::ArrayPrototypeFindIndex,
+            Self::ArrayPrototypeForEach => StandardBuiltinId::ArrayPrototypeForEach,
+            Self::ArrayPrototypeSlice => StandardBuiltinId::ArrayPrototypeSlice,
+            Self::ArrayPrototypeSort => StandardBuiltinId::ArrayPrototypeSort,
+            Self::NumberIsFinite => StandardBuiltinId::NumberIsFinite,
+            Self::NumberIsInteger => StandardBuiltinId::NumberIsInteger,
+            Self::NumberIsNaN => StandardBuiltinId::NumberIsNaN,
+            Self::NumberIsSafeInteger => StandardBuiltinId::NumberIsSafeInteger,
             Self::NumberPrototypeToString => StandardBuiltinId::NumberPrototypeToString,
+            Self::MathAbs => StandardBuiltinId::MathAbs,
+            Self::MathCeil => StandardBuiltinId::MathCeil,
+            Self::MathFloor => StandardBuiltinId::MathFloor,
+            Self::MathRound => StandardBuiltinId::MathRound,
+            Self::MathSqrt => StandardBuiltinId::MathSqrt,
+            Self::MathTrunc => StandardBuiltinId::MathTrunc,
             Self::StringPrototypeCharCodeAt => StandardBuiltinId::StringPrototypeCharCodeAt,
             Self::StringPrototypeIndexOf => StandardBuiltinId::StringPrototypeIndexOf,
+            Self::StringPrototypeIncludes => StandardBuiltinId::StringPrototypeIncludes,
+            Self::StringPrototypeStartsWith => StandardBuiltinId::StringPrototypeStartsWith,
+            Self::StringPrototypeEndsWith => StandardBuiltinId::StringPrototypeEndsWith,
             Self::StringPrototypeSlice => StandardBuiltinId::StringPrototypeSlice,
+            Self::StringPrototypeSplit => StandardBuiltinId::StringPrototypeSplit,
+            Self::StringPrototypeTrim => StandardBuiltinId::StringPrototypeTrim,
+            Self::StringPrototypeToLowerCase => StandardBuiltinId::StringPrototypeToLowerCase,
+            Self::StringPrototypeToUpperCase => StandardBuiltinId::StringPrototypeToUpperCase,
+            Self::StringPrototypeReplace => StandardBuiltinId::StringPrototypeReplace,
+            Self::StringPrototypeReplaceAll => StandardBuiltinId::StringPrototypeReplaceAll,
+            Self::DecodeUriComponent => StandardBuiltinId::DecodeUriComponent,
+            Self::EncodeUriComponent => StandardBuiltinId::EncodeUriComponent,
+            Self::JsonParse => StandardBuiltinId::JsonParse,
+            Self::JsonStringify => StandardBuiltinId::JsonStringify,
             Self::MapPrototypeGet => StandardBuiltinId::MapPrototypeGet,
             Self::MapPrototypeHas => StandardBuiltinId::MapPrototypeHas,
             Self::MapPrototypeSet => StandardBuiltinId::MapPrototypeSet,
+            Self::MapPrototypeDelete => StandardBuiltinId::MapPrototypeDelete,
+            Self::SetPrototypeHas => StandardBuiltinId::SetPrototypeHas,
+            Self::SetPrototypeAdd => StandardBuiltinId::SetPrototypeAdd,
+            Self::SetPrototypeDelete => StandardBuiltinId::SetPrototypeDelete,
             Self::WeakMapPrototypeGet => StandardBuiltinId::WeakMapPrototypeGet,
             Self::WeakMapPrototypeHas => StandardBuiltinId::WeakMapPrototypeHas,
             Self::WeakMapPrototypeSet => StandardBuiltinId::WeakMapPrototypeSet,
@@ -308,6 +439,10 @@ impl NativeLocalArgumentsBuiltin {
 
     pub(crate) fn admits(builtin: Option<StandardBuiltinId>) -> bool {
         builtin.and_then(Self::from_builtin).is_some()
+    }
+
+    pub(crate) fn from_builtin_option(builtin: Option<StandardBuiltinId>) -> Option<Self> {
+        builtin.and_then(Self::from_builtin)
     }
 
     pub(crate) fn from_builtin(builtin: StandardBuiltinId) -> Option<Self> {
@@ -379,7 +514,7 @@ impl PlannedLocalArgumentsEntry {
     pub(crate) fn arity(&self) -> LocalArgumentsArity {
         match &self.owner {
             LocalArgumentsOwner::Source { proof, .. } => proof.arity,
-            LocalArgumentsOwner::Native(_) => LocalArgumentsArity::Narrow,
+            LocalArgumentsOwner::Native(native) => native.arity(),
         }
     }
 

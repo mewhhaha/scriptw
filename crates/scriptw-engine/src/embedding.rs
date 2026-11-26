@@ -171,6 +171,7 @@ pub struct EmbeddedRuntime {
     foreign: ForeignModuleRegistry,
     intl: intl_data_images::WasmIntlKernel,
     authority: Arc<()>,
+    host_linker: OnceLock<WasmtimeLinker<WasmStoreState>>,
     /// Where a Collect-mode P keeps its execution profile; `None` for any
     /// other P.
     profile_sites: Option<execution_profile::ProfileSites>,
@@ -266,8 +267,17 @@ impl EmbeddedRuntime {
             foreign,
             intl,
             authority: Arc::new(()),
+            host_linker: OnceLock::new(),
             profile_sites: None,
         }
+    }
+
+    fn cached_host_linker(&self) -> Result<&WasmtimeLinker<WasmStoreState>, EngineError> {
+        if let Some(linker) = self.host_linker.get() {
+            return Ok(linker);
+        }
+        let built = host_imports::build(&self.engine, self.modules.host())?;
+        Ok(self.host_linker.get_or_init(|| built))
     }
 
     /// Construct one fresh host state. The caller creates and retains the Store
@@ -364,7 +374,11 @@ impl EmbeddedRuntime {
     ) -> Result<(), EngineError> {
         self.check(store, linker, StorePhase::Fresh)?;
         store.data_mut().embedding.as_mut().unwrap().phase = StorePhase::Failed;
-        host_imports::register(linker, self.modules.host())?;
+        if linker.is_pristine() {
+            *linker = self.cached_host_linker()?.clone();
+        } else {
+            host_imports::register(linker, self.modules.host())?;
+        }
         // R defines its own private memory; instantiation links it into P.
         if let crate::host_memory_imports::PrivateMemory::Imported(ty) =
             self.modules.memories().private()
@@ -427,60 +441,72 @@ impl EmbeddedRuntime {
     ) -> Result<EmbeddedInstance, EngineError> {
         self.check(store, linker, StorePhase::Registered)?;
         store.data_mut().embedding.as_mut().unwrap().phase = StorePhase::Failed;
-        for import in self.modules.program.imports() {
-            if matches!(
-                import.module(),
-                WASM_HOST_IMPORT_NAMESPACE | scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE
-            ) {
-                continue;
-            }
-            let actual = linker
-                .get(&mut *store, import.module(), import.name())
-                .map_err(|error| {
-                    EngineError::new(format!(
-                        "missing declared foreign import {}.{}: {error:#}",
+        if self.modules.has_foreign_imports() {
+            for import in self.modules.program.imports() {
+                if matches!(
+                    import.module(),
+                    WASM_HOST_IMPORT_NAMESPACE | scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE
+                ) {
+                    continue;
+                }
+                let actual = linker
+                    .get(&mut *store, import.module(), import.name())
+                    .map_err(|error| {
+                        EngineError::new(format!(
+                            "missing declared foreign import {}.{}: {error:#}",
+                            import.module(),
+                            import.name()
+                        ))
+                    })?;
+                let matches = match (import.ty(), actual.ty(&*store)) {
+                    (WasmtimeExternType::Func(expected), WasmtimeExternType::Func(actual)) => {
+                        FuncType::eq(&expected, &actual)
+                    }
+                    (WasmtimeExternType::Tag(expected), WasmtimeExternType::Tag(actual)) => {
+                        FuncType::eq(expected.ty(), actual.ty())
+                    }
+                    _ => false,
+                };
+                if !matches {
+                    return Err(EngineError::new(format!(
+                        "foreign import type mismatch: {}.{}",
                         import.module(),
                         import.name()
-                    ))
-                })?;
-            let matches = match (import.ty(), actual.ty(&*store)) {
-                (WasmtimeExternType::Func(expected), WasmtimeExternType::Func(actual)) => {
-                    FuncType::eq(&expected, &actual)
+                    )));
                 }
-                (WasmtimeExternType::Tag(expected), WasmtimeExternType::Tag(actual)) => {
-                    FuncType::eq(expected.ty(), actual.ty())
-                }
-                _ => false,
-            };
-            if !matches {
-                return Err(EngineError::new(format!(
-                    "foreign import type mismatch: {}.{}",
-                    import.module(),
-                    import.name()
-                )));
-            }
-            if let WasmtimeExtern::Tag(actual_tag) = actual {
-                let expected_tag = store
-                    .data()
-                    .embedding
-                    .as_ref()
-                    .unwrap()
-                    .error_tag
-                    .ok_or_else(|| {
-                        EngineError::new("foreign error tag has no registered Store authority")
-                    })?;
-                if !wasmtime::Tag::eq(&actual_tag, &expected_tag, &*store) {
-                    return Err(EngineError::new(
-                        "foreign error tag differs from the registered Store tag",
-                    ));
+                if let WasmtimeExtern::Tag(actual_tag) = actual {
+                    let expected_tag = store
+                        .data()
+                        .embedding
+                        .as_ref()
+                        .unwrap()
+                        .error_tag
+                        .ok_or_else(|| {
+                            EngineError::new("foreign error tag has no registered Store authority")
+                        })?;
+                    if !wasmtime::Tag::eq(&actual_tag, &expected_tag, &*store) {
+                        return Err(EngineError::new(
+                            "foreign error tag differs from the registered Store tag",
+                        ));
+                    }
                 }
             }
         }
         let (program, roots) = wasm_runtime_link::instantiate(linker, store, &self.modules)?;
-        let main = program
-            .get_typed_func::<(), GcMainCompletion>(&mut *store, "main")
-            .map_err(|error| EngineError::new(format!("embedding main signature: {error:#}")))?;
-        let bridges = operations::Bridges::new(&mut *store, &program, &roots);
+        let main = match self
+            .modules
+            .program_main_export()
+            .and_then(|export| program.get_module_export(&mut *store, export))
+            .and_then(WasmtimeExtern::into_func)
+        {
+            Some(func) => func
+                .typed::<(), GcMainCompletion>(&*store)
+                .map_err(|error| EngineError::new(format!("embedding main signature: {error:#}")))?,
+            None => program
+                .get_typed_func::<(), GcMainCompletion>(&mut *store, "main")
+                .map_err(|error| EngineError::new(format!("embedding main signature: {error:#}")))?,
+        };
+        let bridges = operations::Bridges::new(&mut *store, &program, &roots, &self.modules);
         let state = store.data_mut().embedding.as_mut().unwrap();
         state.phase = StorePhase::Instantiated;
         Ok(EmbeddedInstance {
@@ -517,7 +543,7 @@ impl EmbeddedInstance {
         &mut self,
         store: &mut WasmtimeStore<WasmStoreState>,
     ) -> Result<EmbeddedEvaluation, EngineError> {
-        run_on_execution_stack(|| self.initialize_inner(store))
+        run_on_execution_stack(|| self.initialize_inner(store, true))
     }
 
     /// Initialize with CPU time sampled on the actual execution worker.
@@ -531,9 +557,17 @@ impl EmbeddedInstance {
         &mut self,
         store: &mut WasmtimeStore<WasmStoreState>,
     ) -> Result<(EmbeddedEvaluation, WasmThreadCpuObservation), EngineError> {
+        self.initialize_profiled_inner(store, true)
+    }
+
+    fn initialize_profiled_inner(
+        &mut self,
+        store: &mut WasmtimeStore<WasmStoreState>,
+        retain_entry_context: bool,
+    ) -> Result<(EmbeddedEvaluation, WasmThreadCpuObservation), EngineError> {
         run_on_execution_stack(|| {
             let started = WasmThreadCpuInstant::now();
-            let result = self.initialize_inner(store);
+            let result = self.initialize_inner(store, retain_entry_context);
             let cpu = match started {
                 Ok(started) => started.elapsed(),
                 Err(reason) => WasmThreadCpuObservation::Unavailable(reason),
@@ -545,6 +579,7 @@ impl EmbeddedInstance {
     fn initialize_inner(
         &mut self,
         store: &mut WasmtimeStore<WasmStoreState>,
+        retain_entry_context: bool,
     ) -> Result<EmbeddedEvaluation, EngineError> {
         let state = store
             .data_mut()
@@ -571,7 +606,7 @@ impl EmbeddedInstance {
                 return Err(embedded_error(error));
             }
         };
-        if global_script_prelude::failed(&self.program, &mut roots)? {
+        if global_script_prelude::failed_global(self.bridges.prelude_phase, &mut roots)? {
             roots
                 .as_context_mut()
                 .data_mut()
@@ -585,11 +620,13 @@ impl EmbeddedInstance {
                 completion,
             )?);
         }
-        // `main` has created the entry Realm and installed this program's
-        // Module graph (also when its evaluation is pending or threw). If
-        // entry left them unresolvable, every operation keeps reading them
-        // afresh and reports exactly what it finds.
-        self.entry = operations::EntryContext::resolve(&self.bridges, &mut roots).ok();
+        if retain_entry_context {
+            // `main` has created the entry Realm and installed this program's
+            // Module graph (also when its evaluation is pending or threw). If
+            // entry left them unresolvable, every operation keeps reading them
+            // afresh and reports exactly what it finds.
+            self.entry = operations::EntryContext::resolve(&self.bridges, &mut roots).ok();
+        }
         match module_entry_status(self.bridges.module_status.clone(), &mut roots)? {
             Some(WasmModuleEvaluationStatus::Pending) => Ok(EmbeddedEvaluation::Pending),
             Some(WasmModuleEvaluationStatus::NotStarted) => Err(EngineError::new(
@@ -607,7 +644,7 @@ impl EmbeddedInstance {
         mut self,
         store: &mut WasmtimeStore<WasmStoreState>,
     ) -> Result<ObservedRunOutcome, EngineError> {
-        let evaluation = self.initialize(store)?;
+        let evaluation = run_on_execution_stack(|| self.initialize_inner(store, false))?;
         Self::finish_evaluation(evaluation, store)
     }
 
@@ -618,7 +655,7 @@ impl EmbeddedInstance {
         mut self,
         store: &mut WasmtimeStore<WasmStoreState>,
     ) -> Result<(ObservedRunOutcome, WasmThreadCpuObservation), EngineError> {
-        let (evaluation, cpu) = self.initialize_profiled(store)?;
+        let (evaluation, cpu) = self.initialize_profiled_inner(store, false)?;
         let outcome = Self::finish_evaluation(evaluation, store)?;
         Ok((outcome, cpu))
     }

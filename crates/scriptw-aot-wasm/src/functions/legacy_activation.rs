@@ -245,6 +245,44 @@ impl FunctionBuilder<'_> {
         value.clear(function);
     }
 
+    pub(crate) fn emit_publish_deferred_source_activation_arguments(
+        &self,
+        plan: crate::arguments_protocol::DeferredLegacyArgumentsPlan,
+        function: &mut Function,
+    ) {
+        let Some(reflection) = self
+            .source_activation
+            .as_ref()
+            .and_then(|owner| owner.reflection.as_ref())
+        else {
+            return;
+        };
+        let schema = self.runtime_schema();
+        let entry = self
+            .body_entry_locals()
+            .expect("deferred legacy arguments require body-entry roles");
+        let callable = schema.reserve_gc_local(function).initialize(
+            entry
+                .function_object()
+                .expect("deferred legacy arguments require an actual callable")
+                .load(schema, function),
+            function,
+        );
+        let arguments = schema
+            .reserve_gc_local(function)
+            .initialize(entry.arguments().load(schema, function), function);
+        reflection.arguments.publish_deferred_arguments(
+            &callable,
+            &arguments,
+            self.current_environment(),
+            plan,
+            schema,
+            function,
+        );
+        arguments.clear(function);
+        callable.clear(function);
+    }
+
     /// This emits restoration, without releasing the compile-time owner: a
     /// return in one branch must not retire locals needed by another branch.
     pub(crate) fn emit_leave_source_activation(&self, function: &mut Function) {

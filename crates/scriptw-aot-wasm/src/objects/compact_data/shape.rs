@@ -54,6 +54,7 @@ impl FunctionBuilder<'_> {
                             &scriptw_ir::decode_js_string_utf16(name),
                         )
                     })),
+                    GcOperand::boolean(names.iter().all(|name| *name != "toJSON")),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                 ),
@@ -117,13 +118,19 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32LtU);
         f.instruction(&Instruction::If(BlockType::Empty));
         let undefined = WasmRuntimeValueTag::Undefined as i32;
+        let all_undefined =
+            undefined | (undefined << 8) | (undefined << 16) | (undefined << 24);
         let inline = schema.reserve_gc_local(&mut f).initialize(
             schema.struct_type::<InlineCompactDataStorage>().construct(
                 (
                     GcOperand::reference(&p.shape, schema),
-                    GcOperand::i32(undefined | (undefined << 8)),
+                    GcOperand::i32(all_undefined),
                     GcOperand::i64(0),
                     GcOperand::i64(0),
+                    GcOperand::i64(0),
+                    GcOperand::i64(0),
+                    GcOperand::null_eq(),
+                    GcOperand::null_eq(),
                     GcOperand::null_eq(),
                     GcOperand::null_eq(),
                 ),

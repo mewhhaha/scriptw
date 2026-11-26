@@ -49,26 +49,10 @@ impl FunctionBuilder<'_> {
         );
         let selected = self.open_frame(ControlFrameKind::Block, f);
         let other = self.open_frame(ControlFrameKind::Block, f);
-        let array = s.reserve_gc_local(f).initialize(
-            base.sealed_nested_subtype_or_branch::<CompactDataStorage, ArrayCompactDataStorage>(
-                s,
-                self.local_branch_label(other),
-                f,
-            ),
-            f,
-        );
-        candidate.replace(
-            array.load(s, f).upcast::<CompactDataStorage>().nullable(),
-            f,
-        );
-        array.clear(f);
-        self.emit_branch_to_target(selected, f);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
         let inline = s.reserve_gc_local(f).initialize(
             base.sealed_nested_subtype_or_branch::<CompactDataStorage, InlineCompactDataStorage>(
                 s,
-                self.local_branch_label(declined),
+                self.local_branch_label(other),
                 f,
             ),
             f,
@@ -78,6 +62,22 @@ impl FunctionBuilder<'_> {
             f,
         );
         inline.clear(f);
+        self.emit_branch_to_target(selected, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let array = s.reserve_gc_local(f).initialize(
+            base.sealed_nested_subtype_or_branch::<CompactDataStorage, ArrayCompactDataStorage>(
+                s,
+                self.local_branch_label(declined),
+                f,
+            ),
+            f,
+        );
+        candidate.replace(
+            array.load(s, f).upcast::<CompactDataStorage>().nullable(),
+            f,
+        );
+        array.clear(f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         let compact = s
@@ -132,15 +132,30 @@ impl FunctionBuilder<'_> {
         let header = s
             .reserve_gc_local(f)
             .initialize(object.cast_reference::<OrdinaryObject>(s, f), f);
+        self.emit_plain_data_header_value_or_branch(&header, storage, slot, value, changed, f);
+        header.clear(f);
+    }
+
+    /// Same check and compact slot read when the caller already holds the
+    /// cast `OrdinaryObject` header.
+    pub(crate) fn emit_plain_data_header_value_or_branch(
+        &mut self,
+        header: &GcLocal<OrdinaryObject>,
+        storage: &GcLocal<CompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        changed: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
         let _ = s
             .field(OrdinaryObjectSchema::PROPERTIES)
-            .read(&header, s, f)
+            .read(header, s, f)
             .reference();
         let _ = storage.load(s, f);
         f.instruction(&Instruction::RefEq);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(changed, f);
         self.emit_compact_value_at(storage, slot, value, f);
-        header.clear(f);
     }
 }

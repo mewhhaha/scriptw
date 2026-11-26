@@ -226,14 +226,24 @@ enum PlainParameters {
 impl AnalysisBuilder<'_> {
     fn ordinary_module_owner_ids(&self) -> BTreeSet<FunctionId> {
         self.plain_module_owner_ids(
-            &[FunctionProtocolIr::OrdinaryCallAndConstruct],
+            &[
+                FunctionProtocolIr::OrdinaryCallAndConstruct,
+                FunctionProtocolIr::Arrow,
+            ],
             PlainParameters::Identifiers,
         )
     }
 
-    /// Strict owners of one of `protocols` with one activation record, no
-    /// enclosing `with` and a list of plain identifier parameters or, where
-    /// `parameters` admits them, binding patterns without an expression.
+    fn has_body_with_object_environment(&self, owner_id: &str) -> bool {
+        self.environment_plans.values().any(|environment| {
+            environment.owner_id == owner_id && environment.kind == EnvironmentKind::WithObject
+        })
+    }
+
+    /// Strict owners (or eval-visible sloppy arrows without `with`) of one of
+    /// `protocols` with one activation record, no enclosing or body `with`, and
+    /// a list of plain identifier parameters or, where `parameters` admits
+    /// them, binding patterns without an expression.
     fn plain_module_owner_ids(
         &self,
         protocols: &[FunctionProtocolIr],
@@ -243,7 +253,12 @@ impl AnalysisBuilder<'_> {
             .values()
             .filter(|function| {
                 let owner = &self.owner_plans[&function.id];
-                function.strict
+                let eval_visible = self.environment_plans[&owner.activation_environment_id]
+                    .eval_visible;
+                (function.strict
+                    || (function.protocol == FunctionProtocolIr::Arrow
+                        && eval_visible
+                        && !self.has_body_with_object_environment(&function.id)))
                     && protocols.contains(&function.protocol)
                     && owner.body_environment_id.is_none()
                     && self
@@ -265,8 +280,36 @@ impl AnalysisBuilder<'_> {
             .collect()
     }
 
+    /// Eval-visible sloppy ordinary owners without enclosing or body `with`,
+    /// split parameter/body records, or rest/default parameters. Mapped
+    /// `arguments` can only alias formal parameters; non-parameter `var` locals
+    /// cannot be aliased and may stay in Wasm locals when uncaptured.
+    fn sloppy_ordinary_local_owner_ids(&self) -> BTreeSet<FunctionId> {
+        self.function_plans
+            .values()
+            .filter(|function| {
+                let owner = &self.owner_plans[&function.id];
+                !function.strict
+                    && self.environment_plans[&owner.activation_environment_id].eval_visible
+                    && function.protocol == FunctionProtocolIr::OrdinaryCallAndConstruct
+                    && owner.body_environment_id.is_none()
+                    && !self.has_body_with_object_environment(&function.id)
+                    && self
+                        .surrounding_with_object_environment_ids(&function.id)
+                        .is_empty()
+                    && function.parameters.as_ref().iter().all(|parameter| {
+                        !parameter.is_rest_param()
+                            && parameter.init().is_none()
+                            && matches!(parameter.variable().binding(), Binding::Identifier(_))
+                    })
+            })
+            .map(|function| function.id.clone())
+            .collect()
+    }
+
     /// Actual eval and dynamic binding creation have already been excluded.
     /// Strict arguments snapshot the incoming list rather than alias parameters.
+    /// Arrows (strict or sloppy) have no own `arguments`, `this` or `new.target`.
     /// Keep lexical/function/self storage and all actual captures. Ordinary
     /// this/new.target reads already use body-entry values; only a real child
     /// capture requires their synthetic environment cells.
@@ -304,6 +347,40 @@ impl AnalysisBuilder<'_> {
                 .collect();
             self.module_local_candidates
                 .insert(function.id.clone(), locals);
+        }
+        // Sloppy ordinary functions keep formal parameters in environment slots
+        // for mapped `arguments`, but uncaptured non-parameter `var` bindings
+        // and synthetic `this`/`new.target`/`arguments` can still use Wasm locals.
+        for id in self.sloppy_ordinary_local_owner_ids() {
+            let function = &self.function_plans[&id];
+            let owner = &self.owner_plans[&function.id];
+            let activation = &self.environment_plans[&owner.activation_environment_id];
+            let locals: BTreeSet<String> = activation
+                .binding_modes
+                .iter()
+                .filter_map(|(name, mode)| {
+                    if matches!(
+                        name.as_str(),
+                        LEXICAL_THIS_NAME | LEXICAL_NEW_TARGET_NAME | LEXICAL_ARGUMENTS_NAME
+                    ) {
+                        return Some(name.clone());
+                    }
+                    if matches!(name.as_str(), "arguments" | LEXICAL_HOME_OBJECT_NAME)
+                        || owner.parameter_names.contains(name)
+                    {
+                        return None;
+                    }
+                    (*mode == BindingMode::Var
+                        && self.source_identifiers.contains(name)
+                        && !owner.function_bindings.contains_key(name)
+                        && function.activation_self_binding_name() != Some(name.as_str()))
+                    .then(|| name.clone())
+                })
+                .collect();
+            if !locals.is_empty() {
+                self.module_local_candidates
+                    .insert(function.id.clone(), locals);
+            }
         }
     }
 }

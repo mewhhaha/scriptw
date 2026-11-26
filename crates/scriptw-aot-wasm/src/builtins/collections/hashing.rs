@@ -150,15 +150,14 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) {
         let s = self.runtime_schema();
-        let count = s.reserve_i32_local(f);
-        s.array_type::<CollectionHashTable>().length(table, s, f);
-        count.store(f);
+        // Every CollectionHashTable is allocated with a power-of-two bucket
+        // count (4 initially, rounded up to a power of two on rehash).
         hash.load(f);
-        count.load(f);
-        f.instruction(&Instruction::I64ExtendI32U);
-        f.instruction(&Instruction::I64RemU);
         f.instruction(&Instruction::I32WrapI64);
+        s.array_type::<CollectionHashTable>().length(table, s, f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32And);
         index.store(f);
-        s.release_i32_local(count, f);
     }
 }

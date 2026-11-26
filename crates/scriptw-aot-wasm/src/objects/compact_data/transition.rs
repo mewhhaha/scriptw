@@ -261,6 +261,27 @@ impl FunctionBuilder<'_> {
         s.field(CompactDataShapeSchema::OWN_KEYS_ORDERED)
             .read(shape, s, f)
             .store(ordered, f);
+        let lacks_to_json = s.reserve_i32_local(f);
+        s.field(CompactDataShapeSchema::LACKS_TO_JSON)
+            .read(shape, s, f)
+            .store(lacks_to_json, f);
+        lacks_to_json.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let to_json = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_interned_string_reference("toJSON", f)?, f);
+        let is_to_json = s.reserve_i32_local(f);
+        let no_fold = s.reserve_i32_local(f);
+        no_fold.set_constant(0, f);
+        self.emit_gc_string_equality(name, &to_json, no_fold, is_to_json, f);
+        s.release_i32_local(no_fold, f);
+        is_to_json.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        lacks_to_json.store(f);
+        s.release_i32_local(is_to_json, f);
+        to_json.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         let extended = s.compact_shape_keys_extended(s.reserve_gc_local(f), keys, count, name, f);
         // The caller admitted only an all-default parent; children inherit it.
         let fresh = s.reserve_gc_local(f).initialize(
@@ -269,6 +290,7 @@ impl FunctionBuilder<'_> {
                     GcOperand::reference(&extended, s),
                     GcOperand::descriptor_word(default_data_attributes()),
                     GcOperand::boolean_local(ordered),
+                    GcOperand::boolean_local(lacks_to_json),
                     GcOperand::null(s),
                     GcOperand::null(s),
                 ),
@@ -276,6 +298,7 @@ impl FunctionBuilder<'_> {
             ),
             f,
         );
+        s.release_i32_local(lacks_to_json, f);
         s.release_i32_local(ordered, f);
         extended.clear(f);
         s.spend_compact_shape_budget(f);
@@ -498,11 +521,13 @@ impl FunctionBuilder<'_> {
             f,
         );
         count.load(f);
-        f.instruction(&Instruction::I32Const(1));
-        f.instruction(&Instruction::I32Eq);
+        f.instruction(&Instruction::I32Const(super::INLINE_COMPACT_FIELDS as i32));
+        f.instruction(&Instruction::I32LtU);
         self.open_frame(ControlFrameKind::If, f);
         let first = s.reserve_value_local(f);
         let second = s.reserve_value_local(f);
+        let third = s.reserve_value_local(f);
+        let fourth = s.reserve_value_local(f);
         s.field(InlineCompactDataStorageSchema::PACKED_TAGS)
             .read(&inline, s, f)
             .store(first.tag(), f);
@@ -512,30 +537,48 @@ impl FunctionBuilder<'_> {
         s.field(InlineCompactDataStorageSchema::SCALAR1)
             .read(&inline, s, f)
             .store_i64(second.scalar(), f);
+        s.field(InlineCompactDataStorageSchema::SCALAR2)
+            .read(&inline, s, f)
+            .store_i64(third.scalar(), f);
+        s.field(InlineCompactDataStorageSchema::SCALAR3)
+            .read(&inline, s, f)
+            .store_i64(fourth.scalar(), f);
         s.field(InlineCompactDataStorageSchema::REFERENCE0)
             .read(&inline, s, f)
             .store_eq(first.reference(), f);
         s.field(InlineCompactDataStorageSchema::REFERENCE1)
             .read(&inline, s, f)
             .store_eq(second.reference(), f);
-        let pair = s.reserve_gc_local(f).initialize(
+        s.field(InlineCompactDataStorageSchema::REFERENCE2)
+            .read(&inline, s, f)
+            .store_eq(third.reference(), f);
+        s.field(InlineCompactDataStorageSchema::REFERENCE3)
+            .read(&inline, s, f)
+            .store_eq(fourth.reference(), f);
+        let grown = s.reserve_gc_local(f).initialize(
             s.struct_type::<InlineCompactDataStorage>().construct(
                 (
                     GcOperand::reference(child, s),
                     GcOperand::i32_local(first.tag()),
                     GcOperand::i64_local(first.scalar()),
                     GcOperand::i64_local(second.scalar()),
+                    GcOperand::i64_local(third.scalar()),
+                    GcOperand::i64_local(fourth.scalar()),
                     GcOperand::eq_reference(first.reference()),
                     GcOperand::eq_reference(second.reference()),
+                    GcOperand::eq_reference(third.reference()),
+                    GcOperand::eq_reference(fourth.reference()),
                 ),
                 f,
             ),
             f,
         );
+        fourth.clear(f);
+        third.clear(f);
         second.clear(f);
         first.clear(f);
-        extended.replace(pair.load(s, f).upcast::<CompactDataStorage>().nullable(), f);
-        pair.clear(f);
+        extended.replace(grown.load(s, f).upcast::<CompactDataStorage>().nullable(), f);
+        grown.clear(f);
         f.instruction(&Instruction::Else);
         let capacity = s.reserve_i32_local(f);
         capacity.set_constant(INITIAL_ARRAY_CAPACITY, f);
@@ -543,7 +586,7 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(capacity, f);
         let moved = s.reserve_value_local(f);
         let slot = s.reserve_i32_local(f);
-        for ordinal in 0..2 {
+        for ordinal in 0..super::INLINE_COMPACT_FIELDS as i32 {
             slot.set_constant(ordinal, f);
             self.emit_inline_compact_value_at(&inline, slot, &moved, f);
             self.emit_array_compact_store_at(&array, slot, &moved, f);
@@ -578,9 +621,15 @@ impl FunctionBuilder<'_> {
             s.struct_type::<InlineCompactDataStorage>().construct(
                 (
                     GcOperand::reference(child, s),
-                    GcOperand::i32(undefined | (undefined << 8)),
+                    GcOperand::i32(
+                        undefined | (undefined << 8) | (undefined << 16) | (undefined << 24),
+                    ),
                     GcOperand::i64(0),
                     GcOperand::i64(0),
+                    GcOperand::i64(0),
+                    GcOperand::i64(0),
+                    GcOperand::null_eq(),
+                    GcOperand::null_eq(),
                     GcOperand::null_eq(),
                     GcOperand::null_eq(),
                 ),

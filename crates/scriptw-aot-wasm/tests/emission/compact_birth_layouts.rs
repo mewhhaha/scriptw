@@ -51,13 +51,16 @@ globalThis.layouts=[one,two,reversed,changed,wide];
     let program = Module::read(&artifact.bytes, true);
     let runtime = Module::read(artifact.runtime().unwrap().bytes(), false);
     let (allocate, _) = runtime.named("helper::compact_literal_allocate");
-    let imported = program.imported_runtime_function(&runtime, allocate);
-    let ValType::Ref(shape_parameter) = program.function_type(imported).params()[3] else {
+    let ValType::Ref(shape_parameter) = runtime.function_type(allocate).params()[3] else {
         panic!("the actual allocator accepts a typed shape");
     };
     let HeapType::Concrete(UnpackedIndex::Module(shape)) = shape_parameter.heap_type() else {
-        panic!("shape parameter retains its concrete P type");
+        panic!("shape parameter retains its concrete R/P prefix type");
     };
+    assert_eq!(
+        program.types[shape as usize], runtime.types[shape as usize],
+        "P and R share the canonical CompactDataShape type index"
+    );
     let bodies = module_bodies(&artifact.bytes);
     let slots = |name: &str| {
         let entries = bodies

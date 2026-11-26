@@ -1046,6 +1046,80 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
+    /// Combined HasProperty + Get for an Array-like index. When `source` is an
+    /// actual ArrayObject holding an own data slot at `index`, reads `element`
+    /// once and sets `present = 1` without a second probe or string key
+    /// allocation. Holes, accessors and Proxy receivers fall back to the full
+    /// observable HasProperty followed by Get.
+    pub(super) fn emit_array_native_has_and_get_index(
+        &mut self,
+        source: &ValueLocals,
+        index: I64Local,
+        element: &ValueLocals,
+        present: I32Local,
+        pending: &CompletionLocals,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        present.set_constant(0, f);
+        source.reference().load(f);
+        f.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<ArrayObject>(crate::gc_types::GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, f);
+        let array = schema
+            .reserve_gc_local(f)
+            .initialize(source.cast_reference::<ArrayObject>(schema, f), f);
+        self.emit_array_own_indexed_value(&array, index, element, present, f);
+        array.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        present.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let key = self.emit_array_native_index_key(index, f)?;
+        self.emit_object_has_property_i32(source, &key, present, f)?;
+        key.clear(f);
+        present.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_typed_array_or_object_index_read_from_locals(source, index, pending, f)?;
+        self.emit_array_native_propagate(pending, f);
+        element.copy_from(pending.value(), f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        Ok(())
+    }
+
+    /// Calls an Array iteration callback using the zero-allocation local
+    /// arguments ABI when the callee publishes one (e.g. arrow/strict
+    /// callbacks), falling back to an allocated `ValueArray` otherwise.
+    pub(super) fn emit_array_callback_call_from_values(
+        &mut self,
+        callback: &ValueLocals,
+        this_arg: &ValueLocals,
+        arguments: &[&ValueLocals],
+        pending: &CompletionLocals,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let handled = self.emit_local_argument_call_from_values(
+            callback, this_arg, arguments, pending, f,
+        )?;
+        handled.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let argv = self.emit_pre_evaluated_arg_vector(arguments, f);
+        self.emit_function_or_proxy_call_with_argv(callback, this_arg, &argv, pending, f)?;
+        argv.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.runtime_schema().release_i32_local(handled, f);
+        Ok(())
+    }
+
     fn emit_array_native_has_index(
         &mut self,
         source: &ValueLocals,
@@ -1107,6 +1181,7 @@ impl FunctionBuilder<'_> {
         source: &ValueLocals,
         length: I64Local,
         target: &ValueLocals,
+        default_species: Option<I32Local>,
         pending: &CompletionLocals,
         exit: crate::emit::ControlTarget,
         f: &mut Function,
@@ -1224,6 +1299,9 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(absent, f);
         self.emit_branch_if_to_target(general, f);
         self.emit_array_native_create(length, target, f)?;
+        if let Some(flag) = default_species {
+            flag.set_constant(1, f);
+        }
         pending.set_normal(target, f);
         self.emit_branch_to_target(exit, f);
         key.clear(f);
@@ -1249,7 +1327,21 @@ impl FunctionBuilder<'_> {
         target: &ValueLocals,
         f: &mut Function,
     ) -> Result<(), EmitError> {
+        self.emit_array_species_create_with_default_flag(source, length, target, None, f)
+    }
+
+    pub(super) fn emit_array_species_create_with_default_flag(
+        &mut self,
+        source: &ValueLocals,
+        length: I64Local,
+        target: &ValueLocals,
+        default_species: Option<I32Local>,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
+        if let Some(flag) = default_species {
+            flag.set_constant(0, f);
+        }
         let pending = s.reserve_completion(f);
         let constructor = s.reserve_value_local(f);
         let canonical = s.reserve_value_local(f);
@@ -1257,7 +1349,15 @@ impl FunctionBuilder<'_> {
         let is_array = s.reserve_i32_local(f);
         constructor.set_undefined(f);
         let exit = self.open_frame(ControlFrameKind::Block, f);
-        self.emit_array_default_species_create(source, length, target, &pending, exit, f)?;
+        self.emit_array_default_species_create(
+            source,
+            length,
+            target,
+            default_species,
+            &pending,
+            exit,
+            f,
+        )?;
         self.emit_is_array_i32(source, is_array, &pending, f)?;
         self.emit_array_native_propagate(&pending, f);
         is_array.load(f);
@@ -2161,7 +2261,14 @@ impl FunctionBuilder<'_> {
         count.store(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        self.emit_array_species_create(&receiver, count, &target, f)?;
+        let default_species = s.reserve_i32_local(f);
+        self.emit_array_species_create_with_default_flag(
+            &receiver,
+            count,
+            &target,
+            Some(default_species),
+            f,
+        )?;
         f.instruction(&Instruction::I64Const(0));
         output.store(f);
         let finished = self.open_frame(ControlFrameKind::Block, f);
@@ -2170,16 +2277,30 @@ impl FunctionBuilder<'_> {
         end.load(f);
         f.instruction(&Instruction::I64GeU);
         self.emit_branch_if_to_target(finished, f);
-        self.emit_array_native_has_index(&receiver, index, present, f)?;
+        self.emit_array_native_has_and_get_index(
+            &receiver,
+            index,
+            &argument,
+            present,
+            &pending,
+            f,
+        )?;
         present.load(f);
         self.open_frame(ControlFrameKind::If, f);
-        self.emit_typed_array_or_object_index_read_from_locals(&receiver, index, &pending, f)?;
-        self.emit_array_native_propagate(&pending, f);
-        argument.copy_from(pending.value(), f);
+        default_species.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let fresh = s
+            .reserve_gc_local(f)
+            .initialize(target.cast_reference::<ArrayObject>(s, f), f);
+        self.emit_array_indexed_publish_default_data(&fresh, output, &argument, f)?;
+        fresh.clear(f);
+        f.instruction(&Instruction::Else);
         let key = self.emit_array_native_index_key(output, f)?;
         self.emit_create_data_property_or_throw(&target, &key, &argument, &pending, f)?;
         key.clear(f);
         self.emit_array_native_propagate(&pending, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.emit_increment_local(output, 1, f);
@@ -2189,6 +2310,9 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
+        default_species.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
         self.emit_array_native_set_length(
             &target,
             output,
@@ -2197,7 +2321,10 @@ impl FunctionBuilder<'_> {
             f,
         )?;
         self.emit_array_native_propagate(&pending, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         self.completion().set_normal(&target, f);
+        s.release_i32_local(default_species, f);
         s.release_i32_local(present, f);
         for local in [output, count, end, index, relative, length] {
             s.release_i64_local(local, f);
@@ -2437,22 +2564,30 @@ impl FunctionBuilder<'_> {
         self.emit_branch_if_to_target(finished, f);
         match kind {
             ArrayCallbackReceiverKind::ArrayLike => {
-                self.emit_array_native_has_index(&receiver, index, present, f)?
+                self.emit_array_native_has_and_get_index(
+                    &receiver, index, &element, present, &pending, f,
+                )?;
             }
             ArrayCallbackReceiverKind::TypedArray => {
                 f.instruction(&Instruction::I32Const(1));
                 present.store(f);
+                self.emit_typed_array_or_object_index_read_from_locals(
+                    &receiver, index, &pending, f,
+                )?;
+                self.emit_array_native_propagate(&pending, f);
+                element.copy_from(pending.value(), f);
             }
         }
         present.load(f);
         self.open_frame(ControlFrameKind::If, f);
-        self.emit_typed_array_or_object_index_read_from_locals(&receiver, index, &pending, f)?;
-        self.emit_array_native_propagate(&pending, f);
-        element.copy_from(pending.value(), f);
         self.emit_array_native_number(index, &number, f);
-        let argv = self.emit_pre_evaluated_arg_vector(&[&element, &number, &receiver], f);
-        self.emit_function_or_proxy_call_with_argv(&callback, &this_arg, &argv, &pending, f)?;
-        argv.clear(f);
+        self.emit_array_callback_call_from_values(
+            &callback,
+            &this_arg,
+            &[&element, &number, &receiver],
+            &pending,
+            f,
+        )?;
         self.emit_array_native_propagate(&pending, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -2591,25 +2726,32 @@ impl FunctionBuilder<'_> {
         self.emit_branch_if_to_target(finished, f);
         match kind {
             ArrayCallbackReceiverKind::ArrayLike => {
-                self.emit_array_native_has_index(&receiver, index, present, f)?
+                self.emit_array_native_has_and_get_index(
+                    &receiver, index, &element, present, &pending, f,
+                )?;
             }
             ArrayCallbackReceiverKind::TypedArray => {
                 f.instruction(&Instruction::I32Const(1));
                 present.store(f);
+                self.emit_typed_array_or_object_index_read_from_locals(
+                    &receiver, index, &pending, f,
+                )?;
+                self.emit_array_native_propagate(&pending, f);
+                element.copy_from(pending.value(), f);
             }
         }
         present.load(f);
         self.open_frame(ControlFrameKind::If, f);
-        self.emit_typed_array_or_object_index_read_from_locals(&receiver, index, &pending, f)?;
-        self.emit_array_native_propagate(&pending, f);
-        element.copy_from(pending.value(), f);
         initialized.load(f);
         self.open_frame(ControlFrameKind::If, f);
         self.emit_array_native_number(index, &number, f);
-        let argv =
-            self.emit_pre_evaluated_arg_vector(&[&accumulator, &element, &number, &receiver], f);
-        self.emit_function_or_proxy_call_with_argv(&callback, &undefined, &argv, &pending, f)?;
-        argv.clear(f);
+        self.emit_array_callback_call_from_values(
+            &callback,
+            &undefined,
+            &[&accumulator, &element, &number, &receiver],
+            &pending,
+            f,
+        )?;
         self.emit_array_native_propagate(&pending, f);
         accumulator.copy_from(pending.value(), f);
         f.instruction(&Instruction::Else);

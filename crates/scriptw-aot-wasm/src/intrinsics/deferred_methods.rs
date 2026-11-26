@@ -283,6 +283,13 @@ impl FunctionBuilder<'_> {
         match owner {
             PropertyValueOwner::None => {}
             PropertyValueOwner::DescriptorValue(descriptor) => {
+                // Keep a DeferredLegacyArguments token in `descriptor.VALUE` so
+                // `LegacyReflectionPropertyState.EXPECTED_VALUE` retains exact
+                // identity until exit; `MATERIALIZED` caches the resolved
+                // `StoredValue` on the token itself.
+                value.is_subtype::<DeferredLegacyArguments>(s, f);
+                f.instruction(&Instruction::I32Eqz);
+                f.instruction(&Instruction::If(BlockType::Empty));
                 s.field(PropertyDescriptorSchema::VALUE).write(
                     descriptor,
                     GcOperand::subtype_reference(&stored, s),
@@ -292,6 +299,7 @@ impl FunctionBuilder<'_> {
                 // The descriptor's object is not known here, so this ends
                 // the builtin fact epoch for any: once per recipe.
                 s.emit_advance_builtin_fact_epoch(f);
+                f.instruction(&Instruction::End);
             }
             PropertyValueOwner::IntrinsicDataGroup { storage, row } => {
                 // IntrinsicPropertyValue has already established this cache.
@@ -333,6 +341,63 @@ impl FunctionBuilder<'_> {
             .value
             .load(s, &mut f)
             .cast_subtype::<StoredValue>(s, &mut f);
+        f.instruction(&Instruction::Return);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        parameters
+            .value
+            .is_subtype::<DeferredLegacyArguments>(s, &mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let recipe = s.reserve_gc_local(&mut f).initialize(
+            parameters
+                .value
+                .load(s, &mut f)
+                .cast_subtype::<DeferredLegacyArguments>(s, &mut f),
+            &mut f,
+        );
+        let cached = s
+            .reserve_gc_local::<StoredValue, Nullable>(&mut f)
+            .initialize(
+                s.field(DeferredLegacyArgumentsSchema::MATERIALIZED)
+                    .read(&recipe, s, &mut f)
+                    .reference(),
+                &mut f,
+            );
+        cached.load(s, &mut f).is_null(&mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let arguments = s.reserve_gc_local(&mut f).initialize(
+            self.emit_materialize_deferred_legacy_arguments(&recipe, &mut f)?,
+            &mut f,
+        );
+        let value = s.reserve_value_local(&mut f);
+        value.set_reference(&arguments, s, &mut f);
+        let stored = s
+            .reserve_gc_local(&mut f)
+            .initialize(s.struct_type::<StoredValue>().from_value(&value, &mut f), &mut f);
+        s.field(DeferredLegacyArgumentsSchema::MATERIALIZED).write(
+            &recipe,
+            GcOperand::nullable_reference(&stored, s),
+            s,
+            &mut f,
+        );
+        // Clear pending recipe inputs immediately once materialized so a
+        // frozen `fn.arguments` descriptor cannot retain deleted argument
+        // elements or activation environments past observation.
+        s.field(DeferredLegacyArgumentsSchema::CALLABLE)
+            .write(&recipe, GcOperand::null(s), s, &mut f);
+        s.field(DeferredLegacyArgumentsSchema::ARGUMENTS)
+            .write(&recipe, GcOperand::null(s), s, &mut f);
+        s.field(DeferredLegacyArgumentsSchema::ENVIRONMENT)
+            .write(&recipe, GcOperand::null(s), s, &mut f);
+        cached.replace(stored.load(s, &mut f).nullable(), &mut f);
+        stored.clear(&mut f);
+        value.clear(&mut f);
+        arguments.clear(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        cached.load(s, &mut f).require_non_null(&mut f);
+        cached.clear(&mut f);
+        recipe.clear(&mut f);
         f.instruction(&Instruction::Return);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);

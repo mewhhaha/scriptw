@@ -549,8 +549,7 @@ function repeatedRead(record, count, callback) {
                 "unresolved literal-key GetV reaches the actual cache kernel"
             );
             let (store, _) = runtime.named("helper::compact_data_store");
-            let program_store = program.imported_runtime_function(&runtime, store);
-            let program_storage = concrete_reference_type(program.function_type(program_store).params()[0]);
+            let program_storage = concrete_reference_type(runtime.function_type(store).params()[0]);
             let program_cache_type = own_data_cache_type(&program, program_storage);
             assert_eq!(program.function_type(cache), runtime.function_type(cached_definition),
                 "P calls the actual typed R cache signature with the shared GC prefix");

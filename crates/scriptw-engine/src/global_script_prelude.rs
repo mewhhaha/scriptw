@@ -6,10 +6,18 @@ pub(super) fn failed(
     instance: &WasmtimeInstance,
     store: &mut impl AsContextMut<Data = WasmHostState>,
 ) -> Result<bool, EngineError> {
-    let Some(global) = instance.get_global(
+    let global = instance.get_global(
         &mut *store,
         scriptw_aot_wasm::GLOBAL_SCRIPT_PRELUDE_PHASE_EXPORT,
-    ) else {
+    );
+    failed_global(global, store)
+}
+
+pub(super) fn failed_global(
+    global: Option<wasmtime::Global>,
+    store: &mut impl AsContextMut<Data = WasmHostState>,
+) -> Result<bool, EngineError> {
+    let Some(global) = global else {
         return Ok(false);
     };
     match global.get(&mut *store) {

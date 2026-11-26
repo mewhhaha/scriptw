@@ -779,6 +779,36 @@ impl FunctionBuilder<'_> {
         s.array_type::<CodeUnitArray>().length(&units, s, f);
         f.instruction(&Instruction::I64ExtendI32U);
         length.store(f);
+        // Decode transforms only '%' escape sequences and can throw only on
+        // them; a '%'-free string returns the original immutable StringValue.
+        if matches!(builtin, UriBuiltin::Decode(_)) {
+            let start = s.reserve_i32_local(f);
+            let end = s.reserve_i32_local(f);
+            let percent = s.reserve_i32_local(f);
+            start.set_constant(0, f);
+            length.load(f);
+            f.instruction(&Instruction::I32WrapI64);
+            end.store(f);
+            percent.set_constant(0x25, f);
+            s.call_helper(
+                crate::runtime_helpers::CodeUnitFindArguments::new(&units, start, end, percent),
+                self.runtime_helper_base()?,
+                f,
+            )
+            .store(start, f);
+            start.load(f);
+            end.load(f);
+            f.instruction(&Instruction::I32GeU);
+            self.open_frame(ControlFrameKind::If, f);
+            output.value().set_reference(&input, s, f);
+            output.set_kind(CompletionKind::Normal, f);
+            self.emit_branch_to_target(exit, f);
+            self.pop_control(ControlFrameKind::If);
+            f.instruction(&Instruction::End);
+            s.release_i32_local(percent, f);
+            s.release_i32_local(end, f);
+            s.release_i32_local(start, f);
+        }
         let count = s.reserve_i64_local(f);
         let extent = s.reserve_i32_local(f);
         f.instruction(&Instruction::I64Const(0));

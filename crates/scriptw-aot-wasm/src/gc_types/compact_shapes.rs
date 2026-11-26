@@ -47,6 +47,7 @@ impl CompactShapeGlobals {
                 },
                 Instruction::I32Const(attributes.as_i32()),
                 Instruction::I32Const(1),
+                Instruction::I32Const(1),
                 null(CompactShapeTable::LAYOUT),
                 null(OrdinaryPropertyIndex::LAYOUT),
                 Instruction::StructNew(

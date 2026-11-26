@@ -17,6 +17,10 @@ pub(crate) struct PackedArraySnapshot {
 }
 
 impl PackedArraySnapshot {
+    pub(crate) fn storage(&self) -> &GcLocal<ArrayObject> {
+        &self.storage
+    }
+
     pub(crate) fn read(
         &self,
         builder: &mut FunctionBuilder<'_>,

@@ -1302,6 +1302,28 @@ impl<T> Linker<T> {
         }
     }
 
+    /// Scriptw patch: returns true when this linker has no registered items
+    /// and retains default `allow_shadowing` / `allow_unknown_exports` flags.
+    pub fn is_pristine(&self) -> bool {
+        self.map.is_empty() && !self.allow_shadowing && !self.allow_unknown_exports
+    }
+
+    /// Scriptw patch: returns true when `module` actually has at least one
+    /// registered definition in this linker (O(1) fast miss via string pool,
+    /// exact module-key verification on pool hit).
+    pub fn has_module(&self, module: &str) -> bool {
+        let Some(atom) = self.pool.get_atom(module) else {
+            return false;
+        };
+        self.map.iter().any(|(key, _)| key.module == atom)
+    }
+
+    /// Scriptw patch: read-only O(1) check whether `(module, name)` is defined
+    /// in this linker without allocating or mutating linker state.
+    pub fn has_definition(&self, module: &str, name: &str) -> bool {
+        self._get(module, name).is_some()
+    }
+
     fn _get(&self, module: &str, name: &str) -> Option<&Definition> {
         let key = ImportKey {
             module: self.pool.get_atom(module)?,

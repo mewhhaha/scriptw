@@ -126,7 +126,7 @@ impl BuildMetadata {
     }
 
     pub(in crate::runtime_artifact) fn into_runtime(
-        self,
+        &self,
         identity: &cache::RuntimeIdentity,
     ) -> Option<RuntimeArtifact> {
         if identity.digest() != self.selection_digest
@@ -136,9 +136,9 @@ impl BuildMetadata {
         }
         Some(RuntimeArtifact {
             key: super::super::RuntimeArtifactKey(self.key),
-            bytes: std::borrow::Cow::Borrowed(&self.package[self.wasm]),
+            bytes: std::borrow::Cow::Borrowed(&self.package[self.wasm.clone()]),
             wasm_sha256: self.wasm_digest,
-            layout: self.layout,
+            layout: self.layout.clone(),
             layout_admission: Some(CurrentRuntimeLayoutVersion::emitted_current()),
             source_compilation_profile: self.profile,
             compilation_data: Some(Arc::clone(identity.compilation())),
@@ -147,7 +147,7 @@ impl BuildMetadata {
                 package: self.package,
                 package_digest: self.package_digest,
                 largest_body: self.largest_body,
-                data: self.data,
+                data: self.data.clone(),
             }),
         })
     }

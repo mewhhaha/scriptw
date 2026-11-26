@@ -336,6 +336,68 @@ impl FunctionBuilder<'_> {
             function,
         );
         entry.clear(function);
+        if R::ARITY == crate::function_entry::LocalArgumentsArity::Wide {
+            // A narrow local-arguments entry proves args >= 2 are unobservable,
+            // so a 3..=5 argument call site (e.g. Array.prototype.map/filter/
+            // find/reduce) can invoke it directly with the first two arguments.
+            function.instruction(&Instruction::Else);
+            let narrow_optional =
+                LocalArgumentsCallable::load_optional_entry(code, schema, function);
+            narrow_optional.load(function).is_null(function);
+            function.instruction(&Instruction::I32Eqz);
+            self.open_frame(ControlFrameKind::If, function);
+            let narrow_entry = schema
+                .reserve_function_local::<LocalArgumentsCallable, _>(function)
+                .initialize(
+                    narrow_optional.load(function).require_non_null(function),
+                    function,
+                );
+            let narrow_target = LocalCallTarget {
+                callable: target.callable,
+                context: target.context,
+                receiver: target.receiver,
+                arguments: &target.arguments[..target.arguments.len().min(2)],
+                handled: target.handled,
+            };
+            self.emit_entered_local_argument_call::<LocalArgumentsCallable>(
+                &narrow_target,
+                LocalCallEntry::Published(&narrow_entry),
+                continuation,
+                result,
+                function,
+            );
+            narrow_entry.clear(function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+            narrow_optional.clear(function);
+        } else {
+            // A wide local-arguments entry (3..=5 formals, e.g. JSON.stringify)
+            // pads omitted arguments with undefined, so a 0..=2 argument call
+            // site can invoke it directly without allocating a ValueArray.
+            function.instruction(&Instruction::Else);
+            let wide_optional =
+                WideLocalArgumentsCallable::load_optional_entry(code, schema, function);
+            wide_optional.load(function).is_null(function);
+            function.instruction(&Instruction::I32Eqz);
+            self.open_frame(ControlFrameKind::If, function);
+            let wide_entry = schema
+                .reserve_function_local::<WideLocalArgumentsCallable, _>(function)
+                .initialize(
+                    wide_optional.load(function).require_non_null(function),
+                    function,
+                );
+            self.emit_entered_local_argument_call::<WideLocalArgumentsCallable>(
+                target,
+                LocalCallEntry::Published(&wide_entry),
+                continuation,
+                result,
+                function,
+            );
+            wide_entry.clear(function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+            wide_optional.clear(function);
+        }
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         optional.clear(function);

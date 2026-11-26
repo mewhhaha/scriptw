@@ -266,6 +266,341 @@ impl FunctionBuilder<'_> {
         Ok(result)
     }
 
+    /// Materializes a mapped sloppy ArgumentsObject from a deferred legacy
+    /// reflection token. Invoked lazily by `PropertyValueResolve` only when
+    /// `fn.arguments` is actually observed.
+    pub(crate) fn emit_materialize_deferred_legacy_arguments(
+        &mut self,
+        recipe: &crate::gc_types::GcLocal<crate::gc_types::DeferredLegacyArguments>,
+        function: &mut Function,
+    ) -> Result<GcStackReference<ArgumentsObject>, EmitError> {
+        use crate::gc_types::{
+            BindingCell, BindingCellTable, DeclarativeEnvironment, DeclarativeEnvironmentSchema,
+            DeferredLegacyArgumentsSchema, Environment, EnvironmentSchema, FunctionContext,
+            FunctionContextSchema, FunctionObject, FunctionObjectSchema,
+        };
+        let schema = self.runtime_schema();
+        let callable = schema
+            .reserve_gc_local::<FunctionObject, NonNullable>(function)
+            .initialize(
+                schema
+                    .field(DeferredLegacyArgumentsSchema::CALLABLE)
+                    .read(recipe, schema, function)
+                    .reference()
+                    .require_non_null(function),
+                function,
+            );
+        let list = schema
+            .reserve_gc_local::<ValueArray, NonNullable>(function)
+            .initialize(
+                schema
+                    .field(DeferredLegacyArgumentsSchema::ARGUMENTS)
+                    .read(recipe, schema, function)
+                    .reference()
+                    .require_non_null(function),
+                function,
+            );
+        let context = schema
+            .reserve_gc_local::<FunctionContext, NonNullable>(function)
+            .initialize(
+                schema
+                    .field(FunctionObjectSchema::CONTEXT)
+                    .read(&callable, schema, function)
+                    .reference(),
+                function,
+            );
+        let realm = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(FunctionContextSchema::REALM)
+                .read(&context, schema, function)
+                .reference(),
+            function,
+        );
+        context.clear(function);
+        let prototype = schema.reserve_value_local(function);
+        self.emit_load_non_array_realm_intrinsic(
+            &realm,
+            NonArrayRealmIntrinsicSlot::ObjectPrototype,
+            &prototype,
+            function,
+        );
+        let header = schema.reserve_gc_local(function).initialize(
+            self.emit_alloc_plain_object_with_prototype(Some(&prototype), function)?,
+            function,
+        );
+        let count = schema.reserve_i32_local(function);
+        schema
+            .array_type::<ValueArray>()
+            .length(&list, schema, function);
+        count.store(function);
+        let indexed = schema.reserve_gc_local(function).initialize(
+            schema
+                .array_type::<IndexedTable>()
+                .filled(GcOperand::null(schema), count, function),
+            function,
+        );
+        let map = schema
+            .reserve_gc_local::<ArgumentsParameterMap, NonNullable>(function)
+            .initialize(
+                schema
+                    .array_type::<ArgumentsParameterMap>()
+                    .filled(GcOperand::null(schema), count, function),
+                function,
+            );
+        let mapped_count = schema.reserve_i32_local(function);
+        schema
+            .field(DeferredLegacyArgumentsSchema::MAPPED_COUNT)
+            .read(recipe, schema, function)
+            .store(mapped_count, function);
+        let environment = schema
+            .reserve_gc_local::<Environment, Nullable>(function)
+            .initialize(
+                schema
+                    .field(DeferredLegacyArgumentsSchema::ENVIRONMENT)
+                    .read(recipe, schema, function)
+                    .reference(),
+                function,
+            );
+        mapped_count.load(function);
+        function.instruction(&Instruction::I32Const(0));
+        function.instruction(&Instruction::I32GtS);
+        environment.load(schema, function).is_null(function);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, function);
+        let env_non_null = schema.reserve_gc_local(function).initialize(
+            environment.load(schema, function).require_non_null(function),
+            function,
+        );
+        let declarative = schema
+            .reserve_gc_local::<DeclarativeEnvironment, Nullable>(function)
+            .initialize(
+                schema
+                    .struct_type::<Environment>()
+                    .field(EnvironmentSchema::DECLARATIVE)
+                    .read(&env_non_null, schema, function)
+                    .reference(),
+                function,
+            );
+        let cells = schema
+            .reserve_gc_local::<BindingCellTable, NonNullable>(function)
+            .initialize(
+                schema
+                    .struct_type::<DeclarativeEnvironment>()
+                    .field(DeclarativeEnvironmentSchema::CELLS)
+                    .read(&declarative, schema, function)
+                    .reference(),
+                function,
+            );
+        let packed = schema.reserve_i64_local(function);
+        schema
+            .field(DeferredLegacyArgumentsSchema::MAPPED_PACKED)
+            .read(recipe, schema, function)
+            .store_i64(packed, function);
+        let position = schema.reserve_i32_local(function);
+        let slot = schema.reserve_i32_local(function);
+        position.set_constant(0, function);
+        let map_done = self.open_frame(ControlFrameKind::Block, function);
+        let map_next = self.open_frame(ControlFrameKind::Loop, function);
+        position.load(function);
+        mapped_count.load(function);
+        function.instruction(&Instruction::I32GeU);
+        position.load(function);
+        count.load(function);
+        function.instruction(&Instruction::I32GeU);
+        function.instruction(&Instruction::I32Or);
+        self.emit_branch_if_to_target(map_done, function);
+        packed.load(function);
+        position.load(function);
+        function.instruction(&Instruction::I32Const(3));
+        function.instruction(&Instruction::I32Shl);
+        function.instruction(&Instruction::I64ExtendI32U);
+        function.instruction(&Instruction::I64ShrU);
+        function.instruction(&Instruction::I32WrapI64);
+        function.instruction(&Instruction::I32Const(0xff));
+        function.instruction(&Instruction::I32And);
+        slot.store(function);
+        slot.load(function);
+        self.open_frame(ControlFrameKind::If, function);
+        slot.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Sub);
+        slot.store(function);
+        let cell = schema
+            .reserve_gc_local::<BindingCell, NonNullable>(function)
+            .initialize(
+                schema
+                    .array_type::<BindingCellTable>()
+                    .read(&cells, slot, schema, function)
+                    .reference(),
+                function,
+            );
+        schema.array_type::<ArgumentsParameterMap>().write(
+            &map,
+            position,
+            GcOperand::nullable_reference(&cell, schema),
+            schema,
+            function,
+        );
+        cell.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        position.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Add);
+        position.store(function);
+        self.emit_branch_to_target(map_next, function);
+        self.pop_control(ControlFrameKind::Loop);
+        function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(slot, function);
+        schema.release_i32_local(position, function);
+        schema.release_i64_local(packed, function);
+        cells.clear(function);
+        declarative.clear(function);
+        env_non_null.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        environment.clear(function);
+        schema.release_i32_local(mapped_count, function);
+        let parameter_map = schema
+            .reserve_gc_local::<ArgumentsParameterMap, Nullable>(function)
+            .initialize(map.load(schema, function).nullable(), function);
+        map.clear(function);
+
+        let absent = schema
+            .reserve_gc_local(function)
+            .initialize(schema.stored_undefined(function), function);
+        let index = schema.reserve_i32_local(function);
+        index.set_constant(0, function);
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        let next = self.open_frame(ControlFrameKind::Loop, function);
+        index.load(function);
+        count.load(function);
+        function.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(done, function);
+        let value = schema.reserve_gc_local(function).initialize(
+            schema
+                .array_type::<ValueArray>()
+                .read(&list, index, schema, function)
+                .reference(),
+            function,
+        );
+        let descriptor = schema.reserve_gc_local(function).initialize(
+            schema.struct_type::<PropertyDescriptor>().construct(
+                (
+                    GcOperand::descriptor_word(
+                        StoredPropertyAttributes::Data {
+                            writable: true,
+                            enumerable: true,
+                            configurable: true,
+                        }
+                        .descriptor_word(),
+                    ),
+                    GcOperand::subtype_reference(&value, schema),
+                    GcOperand::reference(&absent, schema),
+                    GcOperand::reference(&absent, schema),
+                ),
+                function,
+            ),
+            function,
+        );
+        schema.array_type::<IndexedTable>().write(
+            &indexed,
+            index,
+            GcOperand::nullable_reference(&descriptor, schema),
+            schema,
+            function,
+        );
+        descriptor.clear(function);
+        value.clear(function);
+        index.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Add);
+        index.store(function);
+        self.emit_branch_to_target(next, function);
+        self.pop_control(ControlFrameKind::Loop);
+        function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+
+        let property = schema.reserve_value_local(function);
+        let bits = schema.reserve_i64_local(function);
+        count.load(function);
+        function.instruction(&Instruction::F64ConvertI32U);
+        function.instruction(&Instruction::I64ReinterpretF64);
+        bits.store(function);
+        property.set_number(bits, function);
+        let length_key = self.emit_function_string_key("length", function)?;
+        self.emit_object_append_data_property_with_flags(
+            &header,
+            &length_key,
+            &property,
+            true,
+            false,
+            true,
+            function,
+        )?;
+        length_key.clear(function);
+        let callee_key = self.emit_function_string_key("callee", function)?;
+        property.set_reference(&callable, schema, function);
+        self.emit_object_append_data_property_with_flags(
+            &header,
+            &callee_key,
+            &property,
+            true,
+            false,
+            true,
+            function,
+        )?;
+        callee_key.clear(function);
+        self.emit_load_non_array_realm_intrinsic(
+            &realm,
+            NonArrayRealmIntrinsicSlot::ArrayPrototypeValues,
+            &property,
+            function,
+        );
+        let iterator_symbol = schema.reserve_gc_local(function).initialize(
+            self.emit_well_known_symbol_reference(scriptw_ir::WellKnownSymbol::Iterator, function)?,
+            function,
+        );
+        let iterator_key = PropertyKeyLocals::from_symbol(schema, &iterator_symbol, function);
+        self.emit_object_append_data_property_with_flags(
+            &header,
+            &iterator_key,
+            &property,
+            true,
+            false,
+            true,
+            function,
+        )?;
+        iterator_key.clear(function);
+        iterator_symbol.clear(function);
+
+        let result = schema.struct_type::<ArgumentsObject>().construct(
+            (
+                GcOperand::reference(&header, schema),
+                GcOperand::reference(&indexed, schema),
+                GcOperand::reference(&parameter_map, schema),
+            ),
+            function,
+        );
+        schema.release_i64_local(bits, function);
+        schema.release_i32_local(index, function);
+        schema.release_i32_local(count, function);
+        property.clear(function);
+        absent.clear(function);
+        parameter_map.clear(function);
+        indexed.clear(function);
+        header.clear(function);
+        prototype.clear(function);
+        realm.clear(function);
+        list.clear(function);
+        callable.clear(function);
+        Ok(result)
+    }
+
     /// Rest copies a private List; ArrayFromList alone publishes the JS Array.
     pub(crate) fn emit_rest_array_payload(
         &mut self,

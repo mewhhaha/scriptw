@@ -29,7 +29,52 @@ enum FunctionArgumentsKind {
     EmptyStrictBody(EmptyStrictBody),
     UnobservableLeaf,
     UnobservedStrict,
+    DeferredLegacy(DeferredLegacyArgumentsPlan),
     Present(PresentArgumentsObjectProtocol),
+}
+
+/// Compact description of a sloppy function's mapped parameters when its own
+/// body never observes `arguments`, so `fn.arguments` can materialize the exact
+/// mapped ArgumentsObject lazily on demand instead of on every call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DeferredLegacyArgumentsPlan {
+    packed_slots: i64,
+    param_count: i32,
+}
+
+impl DeferredLegacyArgumentsPlan {
+    pub(crate) fn from_mapped(plan: &MappedArgumentsPlan, param_count: usize) -> Option<Self> {
+        if param_count > 8 {
+            return None;
+        }
+        let mut packed: u64 = 0;
+        for entry in plan.entries() {
+            let arg = entry.argument_index();
+            let slot = entry.environment_slot();
+            if arg >= 8 || slot >= 254 {
+                return None;
+            }
+            packed |= u64::from(slot + 1) << (arg * 8);
+        }
+        Some(Self {
+            packed_slots: packed as i64,
+            param_count: param_count as i32,
+        })
+    }
+
+    pub(crate) const fn packed_slots(self) -> i64 {
+        self.packed_slots
+    }
+
+    pub(crate) const fn param_count(self) -> i32 {
+        self.param_count
+    }
+}
+
+pub(crate) enum ArgumentsBindingAction {
+    None,
+    Present(PresentArgumentsObjectProtocol),
+    DeferredLegacy(DeferredLegacyArgumentsPlan),
 }
 
 /// A source body with no parameter, binding, closure or statement observer.
@@ -45,7 +90,7 @@ pub(crate) enum PresentArgumentsObjectProtocol {
 }
 
 #[must_use = "the function arguments binding protocol must be consumed"]
-pub(crate) struct ArgumentsBindingProtocol(Option<PresentArgumentsObjectProtocol>);
+pub(crate) struct ArgumentsBindingProtocol(ArgumentsBindingAction);
 
 pub(crate) struct UnmappedArgumentsPlan {
     _private: (),
@@ -114,10 +159,18 @@ impl FunctionArgumentsProtocol {
                 | FunctionArgumentsKind::EmptyStrictBody(_)
                 | FunctionArgumentsKind::UnobservableLeaf
                 | FunctionArgumentsKind::UnobservedStrict,
-            ) => Ok(ArgumentsBindingProtocol(None)),
+            ) => Ok(ArgumentsBindingProtocol(ArgumentsBindingAction::None)),
+            FunctionArgumentsState::Pending(FunctionArgumentsKind::DeferredLegacy(plan)) => {
+                self.0 = FunctionArgumentsState::BoundAbsent;
+                Ok(ArgumentsBindingProtocol(
+                    ArgumentsBindingAction::DeferredLegacy(plan),
+                ))
+            }
             FunctionArgumentsState::Pending(FunctionArgumentsKind::Present(protocol)) => {
                 self.0 = FunctionArgumentsState::BoundPresent;
-                Ok(ArgumentsBindingProtocol(Some(protocol)))
+                Ok(ArgumentsBindingProtocol(ArgumentsBindingAction::Present(
+                    protocol,
+                )))
             }
             FunctionArgumentsState::BoundAbsent => Err(EmitError::unsupported(
                 "compiler invariant violated: function arguments protocol was bound more than once",
@@ -149,7 +202,8 @@ impl FunctionArgumentsProtocol {
                 FunctionArgumentsKind::Absent
                 | FunctionArgumentsKind::EmptyStrictBody(_)
                 | FunctionArgumentsKind::UnobservableLeaf
-                | FunctionArgumentsKind::UnobservedStrict,
+                | FunctionArgumentsKind::UnobservedStrict
+                | FunctionArgumentsKind::DeferredLegacy(_),
             )
             | FunctionArgumentsState::BoundAbsent => None,
             FunctionArgumentsState::Pending(FunctionArgumentsKind::Present(_))
@@ -177,8 +231,16 @@ fn arguments_are_unobservable(function: &FunctionIr) -> bool {
 }
 
 impl ArgumentsBindingProtocol {
-    pub(crate) fn into_present(self) -> Option<PresentArgumentsObjectProtocol> {
+    pub(crate) fn into_action(self) -> ArgumentsBindingAction {
         self.0
+    }
+
+    #[cfg(test)]
+    pub(crate) fn into_present(self) -> Option<PresentArgumentsObjectProtocol> {
+        match self.0 {
+            ArgumentsBindingAction::Present(protocol) => Some(protocol),
+            ArgumentsBindingAction::None | ArgumentsBindingAction::DeferredLegacy(_) => None,
+        }
     }
 }
 

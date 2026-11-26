@@ -291,6 +291,7 @@ impl FunctionBuilder<'_> {
                     GcOperand::reference(&key_table, s),
                     GcOperand::descriptor_word(attributes),
                     GcOperand::boolean(true),
+                    GcOperand::boolean(true),
                     GcOperand::null(s),
                     GcOperand::null(s),
                 ),

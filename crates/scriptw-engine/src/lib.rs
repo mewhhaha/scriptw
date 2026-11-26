@@ -576,6 +576,7 @@ impl ProgramWasmArtifact {
     fn program(&self) -> WasmProgramRef<'_> {
         WasmProgramRef::new(&self.bytes, self.runtime.as_ref())
             .with_compilation_policy(&self.compilation_policy)
+            .with_profile_verified()
     }
 
     fn evict_if_invalid(&self, error: &EngineError) -> bool {
@@ -1536,6 +1537,7 @@ fn largest_wasm_code_body_size(bytes: &[u8]) -> Option<usize> {
 #[derive(Clone, Copy)]
 enum WasmModuleSource<'a> {
     Program(&'a [u8]),
+    ProgramWithDigest(&'a [u8], [u8; 32]),
     Runtime(&'a scriptw_aot_wasm::RuntimeArtifact),
     DiagnosticRuntime(&'a scriptw_aot_wasm::RuntimeArtifact),
 }
@@ -1543,7 +1545,7 @@ enum WasmModuleSource<'a> {
 impl<'a> WasmModuleSource<'a> {
     fn bytes(self) -> &'a [u8] {
         match self {
-            Self::Program(bytes) => bytes,
+            Self::Program(bytes) | Self::ProgramWithDigest(bytes, _) => bytes,
             Self::Runtime(runtime) | Self::DiagnosticRuntime(runtime) => runtime.bytes(),
         }
     }
@@ -1560,7 +1562,9 @@ impl<'a> WasmModuleSource<'a> {
 
     fn runtime_image_policy(self) -> WasmRuntimeImagePolicy {
         match self {
-            Self::Program(_) | Self::Runtime(_) => WasmRuntimeImagePolicy::EmbeddedBuild,
+            Self::Program(_) | Self::ProgramWithDigest(_, _) | Self::Runtime(_) => {
+                WasmRuntimeImagePolicy::EmbeddedBuild
+            }
             Self::DiagnosticRuntime(_) => WasmRuntimeImagePolicy::MatchedDiagnostic,
         }
     }
@@ -1575,6 +1579,7 @@ fn wasm_module_memory_cache_key(
         runtime_image_policy: source.runtime_image_policy(),
         wasm_sha256: match source {
             WasmModuleSource::Program(bytes) => Sha256::digest(bytes).into(),
+            WasmModuleSource::ProgramWithDigest(_, digest) => digest,
             WasmModuleSource::Runtime(runtime) | WasmModuleSource::DiagnosticRuntime(runtime) => {
                 runtime.wasm_sha256()
             }
@@ -1585,6 +1590,14 @@ fn wasm_module_memory_cache_key(
 fn compile_wasm_module(
     engine: &WasmtimeEngine,
     bytes: &[u8],
+) -> Result<WasmtimeModule, EngineError> {
+    compile_wasm_module_with_digest(engine, bytes, None)
+}
+
+fn compile_wasm_module_with_digest(
+    engine: &WasmtimeEngine,
+    bytes: &[u8],
+    wasm_sha256: Option<[u8; 32]>,
 ) -> Result<WasmtimeModule, EngineError> {
     enum Failure {
         CompilationThread(EngineError),
@@ -1598,7 +1611,10 @@ fn compile_wasm_module(
     // A cached module is mapped on the calling thread; only a miss needs the
     // compiler's stack and workers.
     match native_module_cache() {
-        Some(cache) => cache.load_or_compile(engine, bytes, compile),
+        Some(cache) => match wasm_sha256 {
+            Some(digest) => cache.load_or_compile_with_digest(engine, digest, compile),
+            None => cache.load_or_compile(engine, bytes, compile),
+        },
         None => compile(),
     }
     .map_err(|failure| {
@@ -1660,13 +1676,14 @@ fn wasm_module_for_execution(
     native_compilation_mode: WasmNativeCompilationMode,
     runtime: Option<WasmModuleMemoryCacheKey>,
 ) -> Result<(WasmtimeModule, WasmModuleMemoryCacheOutcome), EngineError> {
+    let digest: [u8; 32] = Sha256::digest(bytes).into();
     wasm_module_for_execution_with_factory(
         engine,
-        WasmModuleSource::Program(bytes),
+        WasmModuleSource::ProgramWithDigest(bytes, digest),
         memory_cache_policy,
         native_compilation_mode,
         runtime,
-        || compile_wasm_module(engine, bytes),
+        || compile_wasm_module_with_digest(engine, bytes, Some(digest)),
     )
 }
 
@@ -1684,7 +1701,10 @@ fn wasm_module_for_execution_with_factory(
         | (WasmModuleMemoryCachePolicy::RetainRuntime, WasmModuleSource::DiagnosticRuntime(_)) => {
             memory_cached_wasm_module(engine, source, native_compilation_mode, runtime, create)
         }
-        (WasmModuleMemoryCachePolicy::RetainRuntime, WasmModuleSource::Program(_))
+        (
+            WasmModuleMemoryCachePolicy::RetainRuntime,
+            WasmModuleSource::Program(_) | WasmModuleSource::ProgramWithDigest(_, _),
+        )
         | (WasmModuleMemoryCachePolicy::BypassRetention, _) => {
             Ok((create()?, WasmModuleMemoryCacheOutcome::Bypassed))
         }
@@ -3304,6 +3324,30 @@ impl Engine {
         cache: Option<Arc<cache::FunctionCache>>,
         role: module_loader::EmbeddedSourceRole,
     ) -> Result<ProgramWasmArtifact, EngineError> {
+        // A graph-free ambient Script without `import`, `ShadowRealm`, or
+        // Unicode escapes can never acquire a module graph, so a cached entry
+        // keyed on `graph == None` is exact and avoids parsing JS on warm hits.
+        let mut pre_parse_checked_key = None;
+        if let Some(cache) = &cache {
+            if goal == ParseGoal::Script
+                && matches!(
+                    options.module_loading_policy,
+                    ModuleLoadingPolicy::Filesystem | ModuleLoadingPolicy::RejectAll
+                )
+                && options.module_prelude.is_none()
+                && !source.contains("import")
+                && !source.contains("ShadowRealm")
+                && !source.contains("\\u")
+            {
+                let key = program_cache_key_for_role(source, goal, &options, None, role);
+                if let Some(key) = key {
+                    if let Some(artifact) = Self::load_cached_program_wasm(cache, key, &options) {
+                        return Ok(artifact);
+                    }
+                    pre_parse_checked_key = Some(key);
+                }
+            }
+        }
         let parsed = self.parse_compilation_for_role(source, goal, &options, role)?;
         // A candidate is the exact graph just admitted by the current loader,
         // including dependency bytes, resolutions, options and compiler image.
@@ -3314,9 +3358,11 @@ impl Engine {
         let candidate_key = cache.as_ref().and_then(|_| {
             program_cache_key_for_role(source, goal, &options, parsed.modules.graph(), role)
         });
-        if let (Some(cache), Some(key)) = (&cache, candidate_key) {
-            if let Some(artifact) = Self::load_cached_program_wasm(cache, key, &options) {
-                return Ok(artifact);
+        if candidate_key != pre_parse_checked_key {
+            if let (Some(cache), Some(key)) = (&cache, candidate_key) {
+                if let Some(artifact) = Self::load_cached_program_wasm(cache, key, &options) {
+                    return Ok(artifact);
+                }
             }
         }
 
@@ -3344,10 +3390,9 @@ impl Engine {
     ) -> Option<ProgramWasmArtifact> {
         let started = std::time::Instant::now();
         let admitted = cache.read(&key).and_then(|entry| {
-            wasm_runtime_link::decode_cache_entry(&entry, &options.intl_profile, cache)
+            wasm_runtime_link::decode_cache_entry_with_foreign(&entry, &options.intl_profile, cache)
         });
-        if let Some((bytes, runtime)) = admitted {
-            let required = scriptw_aot_wasm::foreign_registry_from_module(&bytes).ok()?;
+        if let Some((bytes, runtime, required)) = admitted {
             if required
                 .modules()
                 .iter()
@@ -4406,8 +4451,10 @@ impl Engine {
         // R's own private memory exists only now; the regular-expression
         // engine works in it as in a host-created one, so watch it too.
         if let host_memory_imports::PrivateMemory::Defined = modules.memories().private() {
-            let private_memory = observed_instance
-                .get_memory(&mut store, host_memory_imports::HOST_MODULE_MEMORY_EXPORT)
+            let private_memory = modules
+                .runtime_private_memory_export()
+                .and_then(|export| observed_instance.get_module_export(&mut store, export))
+                .and_then(WasmtimeExtern::into_memory)
                 .ok_or_else(|| EngineError::new("wasmtime runtime exports no private memory"))?;
             store.interrupt_on_memory(&private_memory).map_err(|err| {
                 EngineError::new(format!(
@@ -4422,9 +4469,18 @@ impl Engine {
             Default::default()
         };
         let lookup_started = std::time::Instant::now();
-        let main = instance
-            .get_typed_func::<(), GcMainCompletion>(&mut store, "main")
-            .map_err(|err| EngineError::new(format!("wasmtime export lookup failed: {err}")))?;
+        let main = match modules
+            .program_main_export()
+            .and_then(|export| instance.get_module_export(&mut store, export))
+            .and_then(WasmtimeExtern::into_func)
+        {
+            Some(func) => func
+                .typed::<(), GcMainCompletion>(&store)
+                .map_err(|err| EngineError::new(format!("wasmtime export lookup failed: {err}")))?,
+            None => instance
+                .get_typed_func::<(), GcMainCompletion>(&mut store, "main")
+                .map_err(|err| EngineError::new(format!("wasmtime export lookup failed: {err}")))?,
+        };
         trace_phase("lookup main", lookup_started);
         let lookup_elapsed = if profile.is_some() {
             lookup_started.elapsed()

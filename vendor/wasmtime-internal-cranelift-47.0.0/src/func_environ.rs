@@ -4077,13 +4077,29 @@ impl FuncEnvironment<'_> {
             self.emit_defensive_array_bounds_check(builder, dst_elem_addr, copy_byte_len)?;
         }
 
-        // If this is a byte array then specialize its fill to use the same
-        // libcall as `memory.fill`. This gets us to `memset` on the host which
-        // for larger arrays can be a big boost due to the vectorized
-        // implementation.
-        if entity.allows_memset(self)
-            && let Some(value) = self.fill_value_as_memset(builder, elem_ty, value)
+        // If this is a byte array (or an uninitialized GC ref array filled with
+        // null, whose bit representation is all-zero bytes and needs no write
+        // barrier or funcref interning), specialize its fill to `memset`.
+        let memset_value = if entity.allows_memset(self) {
+            self.fill_value_as_memset(builder, elem_ty, value)
+        } else if matches!(entity, CheckedEntity::Array { initialized: false, .. })
+            && matches!(
+                elem_ty,
+                WasmStorageType::Val(WasmValType::Ref(r))
+                    if matches!(
+                        r.heap_type.top(),
+                        WasmHeapTopType::Any
+                            | WasmHeapTopType::Extern
+                            | WasmHeapTopType::Func
+                            | WasmHeapTopType::Exn
+                    )
+            )
         {
+            self.null_ref_fill_value_as_memset(builder, value)
+        } else {
+            None
+        };
+        if let Some(value) = memset_value {
             if let CheckedEntity::Array { .. } = entity {
                 self.emit_array_memset(builder, dst_elem_addr, value, copy_byte_len);
             } else {
@@ -4365,6 +4381,25 @@ impl FuncEnvironment<'_> {
             return None;
         }
         Some(builder.ins().iconst(ir::types::I32, bits & 0xff))
+    }
+
+    /// Scriptw patch: for a newly allocated uninitialized GC reference array
+    /// (`array.new` / `array.new_default`), a constant null reference (`iconst 0`)
+    /// stores all-zero bytes (`VMGcRef::NULL == 0`, `FuncRefTableId::NULL == 0`)
+    /// with no write barrier or funcref interning needed.
+    fn null_ref_fill_value_as_memset(
+        &self,
+        builder: &mut FunctionBuilder<'_>,
+        value: ir::Value,
+    ) -> Option<ir::Value> {
+        let inst = builder.func.dfg.value_def(value).inst()?;
+        match builder.func.dfg.insts[inst] {
+            ir::InstructionData::UnaryImm {
+                opcode: ir::Opcode::Iconst,
+                imm,
+            } if imm.bits() == 0 => Some(builder.ins().iconst(ir::types::I32, 0)),
+            _ => None,
+        }
     }
 
     pub fn translate_memory_fill(

@@ -30,6 +30,7 @@ impl FunctionBuilder<'_> {
         let schema = self.runtime_schema();
         let cursor = schema.reserve_i64_local(function);
         let unit = schema.reserve_i64_local(function);
+        let index = schema.reserve_i32_local(function);
         let units = schema.reserve_gc_local(function).initialize(
             schema
                 .struct_type::<StringValue>()
@@ -52,7 +53,12 @@ impl FunctionBuilder<'_> {
             end.load(function);
             function.instruction(&Instruction::I64GeU);
             function.instruction(&Instruction::BrIf(1));
-            self.emit_gc_string_code_unit_i32(string, start, function);
+            start.load(function);
+            function.instruction(&Instruction::I32WrapI64);
+            index.store(function);
+            schema
+                .array_type::<CodeUnitArray>()
+                .read(&units, index, schema, function);
             function.instruction(&Instruction::I64ExtendI32U);
             unit.store(function);
             self.emit_ecmascript_whitespace_i32(unit, function);
@@ -79,7 +85,12 @@ impl FunctionBuilder<'_> {
             function.instruction(&Instruction::I64Const(1));
             function.instruction(&Instruction::I64Sub);
             cursor.store(function);
-            self.emit_gc_string_code_unit_i32(string, cursor, function);
+            cursor.load(function);
+            function.instruction(&Instruction::I32WrapI64);
+            index.store(function);
+            schema
+                .array_type::<CodeUnitArray>()
+                .read(&units, index, schema, function);
             function.instruction(&Instruction::I64ExtendI32U);
             unit.store(function);
             self.emit_ecmascript_whitespace_i32(unit, function);
@@ -94,6 +105,7 @@ impl FunctionBuilder<'_> {
             function.instruction(&Instruction::End);
         }
         units.clear(function);
+        schema.release_i32_local(index, function);
         schema.release_i64_local(unit, function);
         schema.release_i64_local(cursor, function);
     }

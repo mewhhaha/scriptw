@@ -117,3 +117,22 @@ ok && calls === 2 && target[2] === 3;
 "#,
     );
 }
+
+#[test]
+fn multi_argument_push_observes_inherited_setter_at_fourth_index() {
+    assert_wasm_true(
+        r#"
+var a = [];
+var seen;
+var n = a.push(1, 2, 3, (
+  Object.defineProperty(Object.prototype, "3", {
+    configurable: true,
+    set: function(v) { seen = v; }
+  }),
+  4
+));
+delete Object.prototype[3];
+n === 4 && a.length === 4 && seen === 4 && a[0] === 1 && a[2] === 3;
+"#,
+    );
+}

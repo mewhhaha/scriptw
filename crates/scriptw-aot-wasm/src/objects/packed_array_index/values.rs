@@ -396,9 +396,22 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32WrapI64);
         slot.store(f);
         // The immutable wrapper is rooted while the old reference is inspected.
+        // Reuse the shared canonical `StoredValue` for `undefined` to avoid
+        // per-element allocation in mixed/sparse-undefined packed arrays.
         let stored = s
-            .reserve_gc_local(f)
-            .initialize(s.struct_type::<StoredValue>().from_value(value, f), f);
+            .reserve_gc_local::<StoredValue, Nullable>(f)
+            .initialize_null(s, f);
+        value.tag().load(f);
+        f.instruction(&Instruction::I32Const(
+            WasmRuntimeValueTag::Undefined as i32,
+        ));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        stored.replace(s.stored_undefined(f).nullable(), f);
+        f.instruction(&Instruction::Else);
+        stored.replace(s.struct_type::<StoredValue>().from_value(value, f).nullable(), f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         s.array_type::<PackedValueTable>()
             .read(&values, slot, s, f)
             .reference()
@@ -415,7 +428,7 @@ impl FunctionBuilder<'_> {
         s.array_type::<PackedValueTable>().write(
             &values,
             slot,
-            GcOperand::nullable_reference(&stored, s),
+            GcOperand::reference(&stored, s),
             s,
             f,
         );

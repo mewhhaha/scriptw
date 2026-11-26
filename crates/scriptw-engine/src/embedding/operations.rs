@@ -20,6 +20,7 @@ pub(super) struct Bridges {
     promise: Option<(Func, usize)>,
     realm: Option<Global>,
     pub(super) module_status: Option<WasmtimeExtern>,
+    pub(super) prelude_phase: Option<Global>,
 }
 
 /// `scriptw.embed.call`'s exact parameters: callee and receiver as
@@ -44,11 +45,13 @@ struct CallBridge {
     function: TypedFunc<CallParameters, GcMainCompletion>,
     arguments: ArrayRefPre,
     stored: StructRefPre,
-    /// One empty argument array shared by every zero-argument call. A
-    /// zero-length Wasm GC array has no element a callee could write, and
-    /// nothing compares argument arrays by identity: R itself shares one
-    /// empty `ValueArray` for every argument-free entry.
-    no_arguments: OwnedRooted<ArrayRef>,
+    /// One empty argument array shared by every zero-argument call, allocated
+    /// lazily on the first zero-argument `call` so one-shot `evaluate` never
+    /// touches the GC heap during instantiation. A zero-length Wasm GC array
+    /// has no element a callee could write, and nothing compares argument
+    /// arrays by identity: R itself shares one empty `ValueArray` for every
+    /// argument-free entry.
+    no_arguments: OnceLock<OwnedRooted<ArrayRef>>,
 }
 
 impl Bridges {
@@ -56,21 +59,41 @@ impl Bridges {
         store: &mut impl AsContextMut<Data = WasmStoreState>,
         program: &Instance,
         roots: &Instance,
+        modules: &wasm_runtime_link::WasmModules,
     ) -> Self {
-        let call = roots
-            .get_func(&mut *store, "scriptw.embed.call")
-            .and_then(|function| CallBridge::new(store, function).ok());
-        let promise = roots
-            .get_func(&mut *store, "scriptw.embed.promise")
-            .map(|function| (function, function.ty(&*store).results().len()));
+        let call = modules
+            .roots_embed_call_export()
+            .and_then(|export| roots.get_module_export(&mut *store, export))
+            .and_then(WasmtimeExtern::into_func)
+            .and_then(|function| {
+                let (arguments, stored) = modules.roots_embed_call_types()?;
+                CallBridge::new_with_types(store, function, arguments.clone(), stored.clone()).ok()
+            });
+        let promise = modules
+            .roots_embed_promise_export()
+            .and_then(|(export, results)| {
+                roots
+                    .get_module_export(&mut *store, export)
+                    .and_then(WasmtimeExtern::into_func)
+                    .map(|function| (function, results))
+            });
+        let realm = modules
+            .roots_snapshot_entry_realm_export()
+            .and_then(|export| roots.get_module_export(&mut *store, export))
+            .and_then(WasmtimeExtern::into_global);
+        let module_status = modules
+            .program_module_status_export()
+            .and_then(|export| program.get_module_export(&mut *store, export));
+        let prelude_phase = modules
+            .program_prelude_phase_export()
+            .and_then(|export| program.get_module_export(&mut *store, export))
+            .and_then(WasmtimeExtern::into_global);
         Bridges {
             call,
             promise,
-            realm: roots.get_global(&mut *store, scriptw_aot_wasm::SNAPSHOT_ENTRY_REALM_EXPORT),
-            module_status: program.get_export(
-                &mut *store,
-                scriptw_aot_wasm::MODULE_EVALUATION_STATUS_EXPORT,
-            ),
+            realm,
+            module_status,
+            prelude_phase,
         }
     }
 
@@ -82,6 +105,25 @@ impl Bridges {
 }
 
 impl CallBridge {
+    fn new_with_types(
+        store: &mut impl AsContextMut<Data = WasmStoreState>,
+        function: Func,
+        arguments: ArrayType,
+        stored: wasmtime::StructType,
+    ) -> Result<Self, EngineError> {
+        let function = function
+            .typed::<CallParameters, GcMainCompletion>(&*store)
+            .map_err(|error| EngineError::new(format!("embedding call signature: {error:#}")))?;
+        let arguments = ArrayRefPre::new(&mut *store, arguments);
+        let stored = StructRefPre::new(&mut *store, stored);
+        Ok(CallBridge {
+            function,
+            stored,
+            arguments,
+            no_arguments: OnceLock::new(),
+        })
+    }
+
     fn new(
         store: &mut impl AsContextMut<Data = WasmStoreState>,
         function: Func,
@@ -106,22 +148,23 @@ impl CallBridge {
             .as_concrete_struct()
             .cloned()
             .ok_or_else(|| EngineError::new("embedding argument is not a StoredValue"))?;
-        let function = function
-            .typed::<CallParameters, GcMainCompletion>(&*store)
-            .map_err(|error| EngineError::new(format!("embedding call signature: {error:#}")))?;
-        let arguments = ArrayRefPre::new(&mut *store, arguments);
-        let no_arguments = {
-            let mut scope = wasmtime::RootScope::new(&mut *store);
-            ArrayRef::new_fixed(&mut scope, &arguments, &[])
-                .and_then(|empty| empty.to_owned_rooted(&mut scope))
-                .map_err(embedded_error)?
-        };
-        Ok(CallBridge {
-            function,
-            stored: StructRefPre::new(&mut *store, stored),
-            arguments,
-            no_arguments,
-        })
+        Self::new_with_types(store, function, arguments, stored)
+    }
+
+    fn empty_arguments(
+        &self,
+        store: &mut impl AsContextMut<Data = WasmStoreState>,
+    ) -> Result<Rooted<ArrayRef>, EngineError> {
+        if let Some(empty) = self.no_arguments.get() {
+            return Ok(empty.to_rooted(&mut *store));
+        }
+        let empty = ArrayRef::new_fixed(&mut *store, &self.arguments, &[])
+            .map_err(embedded_error)?;
+        let owned = empty
+            .to_owned_rooted(&mut *store)
+            .map_err(embedded_error)?;
+        let _ = self.no_arguments.set(owned);
+        Ok(empty)
     }
 }
 
@@ -508,7 +551,7 @@ impl EmbeddedInstance {
             }
         };
         let args = if arguments.is_empty() {
-            bridge.no_arguments.to_rooted(&mut *store)
+            bridge.empty_arguments(store)?
         } else {
             u32::try_from(arguments.len())
                 .map_err(|_| EngineError::new("argument count exceeds Wasm32"))?;

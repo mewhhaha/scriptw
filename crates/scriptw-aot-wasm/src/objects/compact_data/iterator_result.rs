@@ -44,7 +44,8 @@ impl FunctionBuilder<'_> {
                         }
                         .descriptor_word(),
                     ),
-                    // Neither key is an array index.
+                    // Neither key is an array index or "toJSON".
+                    GcOperand::boolean(true),
                     GcOperand::boolean(true),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
@@ -82,11 +83,14 @@ impl FunctionBuilder<'_> {
         let schema = self.runtime_schema();
         let shape = self.emit_iterator_result_shape(f)?;
         let tags = schema.reserve_i32_local(f);
+        let undefined = WasmRuntimeValueTag::Undefined as i32;
         value.tag().load(f);
         f.instruction(&Instruction::I32Const(255));
         f.instruction(&Instruction::I32And);
         f.instruction(&Instruction::I32Const(
-            (WasmRuntimeValueTag::Boolean as i32) << 8,
+            ((WasmRuntimeValueTag::Boolean as i32) << 8)
+                | (undefined << 16)
+                | (undefined << 24),
         ));
         f.instruction(&Instruction::I32Or);
         tags.store(f);
@@ -99,8 +103,12 @@ impl FunctionBuilder<'_> {
                     GcOperand::i32_local(tags),
                     GcOperand::i64_local(value.scalar()),
                     GcOperand::i64_local(boolean.scalar()),
+                    GcOperand::i64(0),
+                    GcOperand::i64(0),
                     GcOperand::eq_reference(value.reference()),
                     GcOperand::eq_reference(boolean.reference()),
+                    GcOperand::null_eq(),
+                    GcOperand::null_eq(),
                 ),
                 f,
             ),

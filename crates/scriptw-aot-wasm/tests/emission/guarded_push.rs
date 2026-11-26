@@ -107,8 +107,8 @@ fn fixed_push_proves_actual_native_then_keeps_argument_allocations_in_fallback()
                  function three(v){var a=[];var result=a.push(v,v,v);return result;} \
                  function control(v){var a=[];return a;} \
                  function zero(v){var a=[];var result=a.push();return result;} \
-                 function four(v){var a=[];var result=a.push(v,v,v,v);return result;} \
-                 [one,two,three,control,zero,four];",
+                 function nine(v){var a=[];var result=a.push(v,v,v,v,v,v,v,v,v);return result;} \
+                 [one,two,three,control,zero,nine];",
                 ParseOptions::script(),
             ).unwrap());
             let artifact = emit_with_rooted_snapshot(
@@ -210,7 +210,7 @@ fn fixed_push_proves_actual_native_then_keeps_argument_allocations_in_fallback()
                 assert!(!kernel.iter().any(|op| argv_allocation(op, argv)),
                     "the native entry does not rebuild an argument vector internally");
             }
-            for name in ["js::zero#", "js::four#"] {
+            for name in ["js::zero#", "js::nine#"] {
                 let (_, body) = program.named(name);
                 assert!(kernels.iter().all(|kernel| !calls(body, *kernel)),
                     "unsupported fixed arities retain the general call from the start");

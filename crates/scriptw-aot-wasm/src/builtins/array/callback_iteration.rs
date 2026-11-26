@@ -38,6 +38,8 @@ impl FunctionBuilder<'_> {
         let target_index = s.reserve_i64_local(f);
         let present = s.reserve_i32_local(f);
         let selected = s.reserve_i32_local(f);
+        let default_species = s.reserve_i32_local(f);
+        default_species.set_constant(0, f);
         self.compile_this_to_locals(&receiver, f)?;
         self.emit_array_like_length_snapshot(&receiver, length, &pending, f)?;
         self.emit_builtin_arg_to_value(0, &callback, f);
@@ -52,12 +54,20 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I64Const(0));
         target_index.store(f);
         match kind {
-            ArrayCallbackIterationKind::Map => {
-                self.emit_array_species_create(&receiver, length, &target, f)?
-            }
-            ArrayCallbackIterationKind::Filter => {
-                self.emit_array_species_create(&receiver, target_index, &target, f)?
-            }
+            ArrayCallbackIterationKind::Map => self.emit_array_species_create_with_default_flag(
+                &receiver,
+                length,
+                &target,
+                Some(default_species),
+                f,
+            )?,
+            ArrayCallbackIterationKind::Filter => self.emit_array_species_create_with_default_flag(
+                &receiver,
+                target_index,
+                &target,
+                Some(default_species),
+                f,
+            )?,
             ArrayCallbackIterationKind::Every | ArrayCallbackIterationKind::Some => {}
         }
         f.instruction(&Instruction::I64Const(0));
@@ -69,28 +79,57 @@ impl FunctionBuilder<'_> {
         length.load(f);
         f.instruction(&Instruction::I64GeU);
         self.emit_branch_if_to_target(exhausted, f);
-        self.emit_array_native_has_index(&receiver, index, present, f)?;
+        self.emit_array_native_has_and_get_index(&receiver, index, &element, present, &pending, f)?;
         present.load(f);
         self.open_frame(ControlFrameKind::If, f);
-        self.emit_typed_array_or_object_index_read_from_locals(&receiver, index, &pending, f)?;
-        self.emit_array_native_propagate(&pending, f);
-        element.copy_from(pending.value(), f);
         self.emit_array_native_number(index, &index_value, f);
-        let argv = self.emit_pre_evaluated_arg_vector(&[&element, &index_value, &receiver], f);
-        self.emit_function_or_proxy_call_with_argv(&callback, &this_arg, &argv, &pending, f)?;
-        argv.clear(f);
+        self.emit_array_callback_call_from_values(
+            &callback,
+            &this_arg,
+            &[&element, &index_value, &receiver],
+            &pending,
+            f,
+        )?;
         self.emit_array_native_propagate(&pending, f);
         match kind {
             ArrayCallbackIterationKind::Map => {
-                let key = self.emit_array_native_index_key(index, f)?;
                 element.copy_from(pending.value(), f);
+                default_species.load(f);
+                self.open_frame(ControlFrameKind::If, f);
+                let fresh = s
+                    .reserve_gc_local(f)
+                    .initialize(target.cast_reference::<ArrayObject>(s, f), f);
+                self.emit_array_indexed_publish_default_data(&fresh, index, &element, f)?;
+                fresh.clear(f);
+                f.instruction(&Instruction::Else);
+                let key = self.emit_array_native_index_key(index, f)?;
                 self.emit_create_data_property_or_throw(&target, &key, &element, &pending, f)?;
                 key.clear(f);
                 self.emit_array_native_propagate(&pending, f);
+                self.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
             }
             ArrayCallbackIterationKind::Filter => {
                 self.compile_truthy_tagged_i32(pending.value(), f)?;
                 self.open_frame(ControlFrameKind::If, f);
+                default_species.load(f);
+                self.open_frame(ControlFrameKind::If, f);
+                let fresh = s
+                    .reserve_gc_local(f)
+                    .initialize(target.cast_reference::<ArrayObject>(s, f), f);
+                self.emit_array_indexed_publish_default_data(&fresh, target_index, &element, f)?;
+                target_index.load(f);
+                f.instruction(&Instruction::I64Const(1));
+                f.instruction(&Instruction::I64Add);
+                target_index.store(f);
+                s.field(ArrayObjectSchema::LENGTH).write(
+                    &fresh,
+                    GcOperand::i64_local(target_index),
+                    s,
+                    f,
+                );
+                fresh.clear(f);
+                f.instruction(&Instruction::Else);
                 let key = self.emit_array_native_index_key(target_index, f)?;
                 self.emit_create_data_property_or_throw(&target, &key, &element, &pending, f)?;
                 key.clear(f);
@@ -99,6 +138,8 @@ impl FunctionBuilder<'_> {
                 f.instruction(&Instruction::I64Const(1));
                 f.instruction(&Instruction::I64Add);
                 target_index.store(f);
+                self.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
                 self.pop_control(ControlFrameKind::If);
                 f.instruction(&Instruction::End);
             }
@@ -143,6 +184,7 @@ impl FunctionBuilder<'_> {
         }
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
+        s.release_i32_local(default_species, f);
         s.release_i32_local(selected, f);
         s.release_i32_local(present, f);
         s.release_i64_local(target_index, f);

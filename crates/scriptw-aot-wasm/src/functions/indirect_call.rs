@@ -192,6 +192,23 @@ impl FunctionBuilder<'_> {
             .iter()
             .any(|id| StandardBuiltinId::from_function_id(id) == Some(StandardBuiltinId::MathImul))
             || callee_reads_static_property(callee_expression, "imul");
+        let numeric_math_unary_candidate = [
+            (StandardBuiltinId::MathFloor, "floor"),
+            (StandardBuiltinId::MathCeil, "ceil"),
+            (StandardBuiltinId::MathTrunc, "trunc"),
+            (StandardBuiltinId::MathAbs, "abs"),
+            (StandardBuiltinId::MathSqrt, "sqrt"),
+        ]
+        .into_iter()
+        .find(|(builtin, name)| {
+            callee_expression
+                .function_targets
+                .known_targets()
+                .iter()
+                .any(|id| StandardBuiltinId::from_function_id(id) == Some(*builtin))
+                || callee_reads_static_property(callee_expression, name)
+        })
+        .map(|(builtin, _)| builtin);
         // `x.call(...)` syntax or target knowledge only nominates the
         // forwarding guard; the actual callee's code identity decides, with
         // these once-evaluated operands.
@@ -209,6 +226,20 @@ impl FunctionBuilder<'_> {
                 output,
                 function,
             )?)
+            && numeric_math_unary_candidate
+                .map(|builtin| {
+                    self.try_emit_numeric_math_unary_call(
+                        &callee,
+                        &receiver,
+                        arguments,
+                        builtin,
+                        continuation,
+                        output,
+                        function,
+                    )
+                })
+                .transpose()?
+                != Some(true)
             && (!call_forwarding_candidate
                 || !self.try_emit_function_call_forwarding(
                     &callee,

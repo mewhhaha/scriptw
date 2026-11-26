@@ -25,7 +25,7 @@ pub(crate) use transition::MAX_COMPACT_SHAPE_KEYS;
 
 /// A fresh literal of at most this many keys is born with inline slots, and
 /// every longer one with tag, scalar and reference arrays.
-pub(super) const INLINE_COMPACT_FIELDS: usize = 2;
+pub(super) const INLINE_COMPACT_FIELDS: usize = 4;
 /// Shapes with at least this many keys probe through their derived index;
 /// shorter ones scan, which costs no more than one indexed lookup.
 const INDEXED_PROBE_MIN_KEYS: i32 = 3;
@@ -179,6 +179,7 @@ impl FunctionBuilder<'_> {
             &dictionary,
             &PreparedOrdinaryPropertyKey { key: &key, hash },
             &descriptor,
+            None,
             &mut f,
         );
         schema.release_i64_local(hash, &mut f);
@@ -729,7 +730,7 @@ impl FunctionBuilder<'_> {
             .length(&keys, schema, f);
         f.instruction(&Instruction::I32GeU);
         slot.load(f);
-        f.instruction(&Instruction::I32Const(2));
+        f.instruction(&Instruction::I32Const(INLINE_COMPACT_FIELDS as i32));
         f.instruction(&Instruction::I32GeU);
         f.instruction(&Instruction::I32Or);
         f.instruction(&Instruction::If(BlockType::Empty));
@@ -768,12 +769,16 @@ impl FunctionBuilder<'_> {
             .store(value.tag(), f);
         value.tag().load(f);
         slot.load(f);
-        f.instruction(&Instruction::I32Const(8));
-        f.instruction(&Instruction::I32Mul);
+        f.instruction(&Instruction::I32Const(3));
+        f.instruction(&Instruction::I32Shl);
         f.instruction(&Instruction::I32ShrU);
         f.instruction(&Instruction::I32Const(255));
         f.instruction(&Instruction::I32And);
         value.tag().store(f);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(2));
+        f.instruction(&Instruction::I32LtU);
+        f.instruction(&Instruction::If(BlockType::Empty));
         slot.load(f);
         f.instruction(&Instruction::I32Eqz);
         f.instruction(&Instruction::If(BlockType::Empty));
@@ -794,6 +799,30 @@ impl FunctionBuilder<'_> {
             .field(InlineCompactDataStorageSchema::REFERENCE1)
             .read(storage, schema, f)
             .store_eq(value.reference(), f);
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::Else);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(2));
+        f.instruction(&Instruction::I32Eq);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        schema
+            .field(InlineCompactDataStorageSchema::SCALAR2)
+            .read(storage, schema, f)
+            .store_i64(value.scalar(), f);
+        schema
+            .field(InlineCompactDataStorageSchema::REFERENCE2)
+            .read(storage, schema, f)
+            .store_eq(value.reference(), f);
+        f.instruction(&Instruction::Else);
+        schema
+            .field(InlineCompactDataStorageSchema::SCALAR3)
+            .read(storage, schema, f)
+            .store_i64(value.scalar(), f);
+        schema
+            .field(InlineCompactDataStorageSchema::REFERENCE3)
+            .read(storage, schema, f)
+            .store_eq(value.reference(), f);
+        f.instruction(&Instruction::End);
         f.instruction(&Instruction::End);
     }
 
@@ -943,6 +972,10 @@ impl FunctionBuilder<'_> {
         // Every assignment replaces the complete tuple. Null writes must
         // retire a previous strong edge even when the new tag is a scalar.
         slot.load(f);
+        f.instruction(&Instruction::I32Const(2));
+        f.instruction(&Instruction::I32LtU);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        slot.load(f);
         f.instruction(&Instruction::I32Eqz);
         f.instruction(&Instruction::If(BlockType::Empty));
         schema.field(InlineCompactDataStorageSchema::SCALAR0).write(
@@ -974,6 +1007,42 @@ impl FunctionBuilder<'_> {
                 schema,
                 f,
             );
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::Else);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(2));
+        f.instruction(&Instruction::I32Eq);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        schema.field(InlineCompactDataStorageSchema::SCALAR2).write(
+            storage,
+            GcOperand::i64_local(value.scalar()),
+            schema,
+            f,
+        );
+        schema
+            .field(InlineCompactDataStorageSchema::REFERENCE2)
+            .write(
+                storage,
+                GcOperand::eq_reference(value.reference()),
+                schema,
+                f,
+            );
+        f.instruction(&Instruction::Else);
+        schema.field(InlineCompactDataStorageSchema::SCALAR3).write(
+            storage,
+            GcOperand::i64_local(value.scalar()),
+            schema,
+            f,
+        );
+        schema
+            .field(InlineCompactDataStorageSchema::REFERENCE3)
+            .write(
+                storage,
+                GcOperand::eq_reference(value.reference()),
+                schema,
+                f,
+            );
+        f.instruction(&Instruction::End);
         f.instruction(&Instruction::End);
         schema.release_i32_local(tags, f);
         schema.release_i32_local(shift, f);

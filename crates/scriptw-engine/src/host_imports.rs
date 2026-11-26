@@ -67,7 +67,7 @@ pub(super) fn linker(
     Ok((linker, WasmRuntimeHostImportCacheOutcome::Miss))
 }
 
-fn build(
+pub(super) fn build(
     engine: &WasmtimeEngine,
     module: &WasmtimeModule,
 ) -> Result<WasmtimeLinker<WasmHostState>, EngineError> {

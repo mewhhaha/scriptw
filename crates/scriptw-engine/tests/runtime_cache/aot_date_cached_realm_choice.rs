@@ -279,29 +279,31 @@ fn date_cached_source_and_artifact_use_each_executing_realms_choice() {
         "the two named-Realm executions must populate distinct source entries\n{stderr}"
     );
     // compiled_cases() also lowers twice to measure the exact cache budget.
-    // Only phases with a cache result belong to the four actual executions.
-    let execution_lowerings = stderr
-        .split("scriptw wasm trace: parse: ")
-        .filter_map(|phase| {
-            let hit = phase.lines().find_map(|line| {
-                if line.starts_with("scriptw wasm trace: program-cache hit: ") {
-                    Some(true)
-                } else if line.starts_with("scriptw wasm trace: program-cache miss: ") {
-                    Some(false)
-                } else {
-                    None
-                }
-            })?;
-            let lowerings = phase
-                .lines()
-                .filter(|line| line.starts_with("scriptw wasm trace: lower: "))
-                .count();
-            Some((hit, lowerings))
-        })
-        .collect::<Vec<_>>();
+    // Track each actual execution from its program-cache result through
+    // execution completion so pre-parse cache hits (0 parses, 0 lowerings)
+    // and cold misses (1 parse, 1 lowering) are both verified directly.
+    let mut execution_phases = Vec::new();
+    let mut current: Option<(bool, usize, usize)> = None;
+    for line in stderr.lines() {
+        if line.starts_with("scriptw wasm trace: program-cache hit: ") {
+            assert!(current.is_none(), "nested cache phase before execution\n{stderr}");
+            current = Some((true, 0, 0));
+        } else if line.starts_with("scriptw wasm trace: program-cache miss: ") {
+            assert!(current.is_none(), "nested cache phase before execution\n{stderr}");
+            current = Some((false, 0, 0));
+        } else if let Some((_, parses, lowerings)) = current.as_mut() {
+            if line.starts_with("scriptw wasm trace: parse: ") {
+                *parses += 1;
+            } else if line.starts_with("scriptw wasm trace: lower: ") {
+                *lowerings += 1;
+            } else if line.starts_with("scriptw wasm trace: execution: ") {
+                execution_phases.push(current.take().unwrap());
+            }
+        }
+    }
     assert_eq!(
-        execution_lowerings,
-        [(false, 1), (true, 0), (false, 1), (true, 0)],
-        "each cold execution lowers once; each cached execution uses the new Realm without lowering\n{stderr}"
+        execution_phases,
+        [(false, 1, 1), (true, 0, 0), (false, 1, 1), (true, 0, 0)],
+        "each cold execution parses and lowers once; each cached execution uses the new Realm without parsing or lowering\n{stderr}"
     );
 }

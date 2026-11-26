@@ -1,5 +1,5 @@
 //! First data properties of a fresh plain object, published in one call.
-use super::property_storage::PreparedOrdinaryPropertyKey;
+use super::property_storage::{FreshDictionaryCursor, PreparedOrdinaryPropertyKey};
 use super::*;
 use crate::gc_types::{IntrinsicPropertyValueCache, PooledStringTable};
 
@@ -109,6 +109,11 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(1));
         f.instruction(&Instruction::I32Shl);
         buckets_capacity.store(&mut f);
+        let bucket_mask = s.reserve_i32_local(&mut f);
+        buckets_capacity.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Sub);
+        bucket_mask.store(&mut f);
         let table = s.reserve_gc_local(&mut f).initialize(
             s.array_type::<PropertyTable>()
                 .filled(GcOperand::null(s), ordered, &mut f),
@@ -134,8 +139,6 @@ impl FunctionBuilder<'_> {
             s,
             &mut f,
         );
-        buckets.clear(&mut f);
-        table.clear(&mut f);
         let absent = s
             .reserve_gc_local(&mut f)
             .initialize(s.stored_undefined(&mut f), &mut f);
@@ -145,6 +148,11 @@ impl FunctionBuilder<'_> {
         let enumerable = s.reserve_i32_local(&mut f);
         let configurable = s.reserve_i32_local(&mut f);
         let hash = s.reserve_i64_local(&mut f);
+        let dummy_key_str = s
+            .reserve_gc_local(&mut f)
+            .initialize(self.emit_interned_string_reference("", &mut f)?, &mut f);
+        let dummy_key = PropertyKeyLocals::from_string(s, &dummy_key_str, &mut f);
+        dummy_key_str.clear(&mut f);
         row.set_constant(0, &mut f);
         let done = self.open_frame(ControlFrameKind::Block, &mut f);
         let next = self.open_frame(ControlFrameKind::Loop, &mut f);
@@ -162,8 +170,6 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local(&mut f)
             .initialize(maybe_key.load(s, &mut f).require_non_null(&mut f), &mut f);
         maybe_key.clear(&mut f);
-        let key = PropertyKeyLocals::from_string(s, &text, &mut f);
-        text.clear(&mut f);
         let maybe_value = s.reserve_gc_local(&mut f).initialize(
             s.array_type::<IntrinsicPropertyValueCache>()
                 .read(&p.values, row, s, &mut f)
@@ -177,18 +183,22 @@ impl FunctionBuilder<'_> {
         s.array_type::<OrdinaryPropertyIndex>()
             .read(&p.flags, row, s, &mut f)
             .store(word, &mut f);
-        for (local, bit) in [
-            (writable, FreshDataAttributes::WRITABLE),
-            (enumerable, FreshDataAttributes::ENUMERABLE),
-            (configurable, FreshDataAttributes::CONFIGURABLE),
-        ] {
-            word.load(&mut f);
-            f.instruction(&Instruction::I32Const(bit));
-            f.instruction(&Instruction::I32And);
-            f.instruction(&Instruction::I32Eqz);
-            f.instruction(&Instruction::I32Eqz);
-            local.store(&mut f);
-        }
+        word.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32And);
+        writable.store(&mut f);
+        word.load(&mut f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32ShrU);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32And);
+        enumerable.store(&mut f);
+        word.load(&mut f);
+        f.instruction(&Instruction::I32Const(2));
+        f.instruction(&Instruction::I32ShrU);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32And);
+        configurable.store(&mut f);
         let descriptor = s.reserve_gc_local(&mut f).initialize(
             s.struct_type::<PropertyDescriptor>().construct(
                 (
@@ -202,11 +212,30 @@ impl FunctionBuilder<'_> {
             &mut f,
         );
         value.clear(&mut f);
-        self.emit_property_key_hash(&key, hash, &mut f);
-        let prepared = PreparedOrdinaryPropertyKey { key: &key, hash };
-        self.emit_ordinary_insert_in_dictionary(&storage, &prepared, &descriptor, &mut f);
+        // All fresh keys are non-null Strings; hash directly and delegate the
+        // PropertyEntry construction to emit_ordinary_insert_in_dictionary.
+        self.emit_string_key_hash(&text, hash, &mut f);
+        self.emit_key_hash_constant_tag_mix(WasmRuntimeValueTag::String, hash, &mut f);
+        let prepared = PreparedOrdinaryPropertyKey {
+            key: &dummy_key,
+            hash,
+        };
+        let cursor = FreshDictionaryCursor {
+            table: &table,
+            buckets: &buckets,
+            bucket_mask,
+            position: row,
+            string_key: &text,
+        };
+        self.emit_ordinary_insert_in_dictionary(
+            &storage,
+            &prepared,
+            &descriptor,
+            Some(&cursor),
+            &mut f,
+        );
         descriptor.clear(&mut f);
-        key.clear(&mut f);
+        text.clear(&mut f);
         row.load(&mut f);
         f.instruction(&Instruction::I32Const(1));
         f.instruction(&Instruction::I32Add);
@@ -216,6 +245,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
+        dummy_key.clear(&mut f);
         s.release_i64_local(hash, &mut f);
         s.release_i32_local(configurable, &mut f);
         s.release_i32_local(enumerable, &mut f);
@@ -223,6 +253,9 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(word, &mut f);
         s.release_i32_local(row, &mut f);
         absent.clear(&mut f);
+        buckets.clear(&mut f);
+        table.clear(&mut f);
+        s.release_i32_local(bucket_mask, &mut f);
         s.release_i32_local(buckets_capacity, &mut f);
         s.release_i32_local(ordered, &mut f);
         storage.clear(&mut f);

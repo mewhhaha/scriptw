@@ -407,17 +407,18 @@ fn ordinary_storage_subtypes_and_cache_metadata_are_encoded_in_the_single_core_g
         ))
     };
     let shape = fields(GcLayout::CompactDataShape);
-    assert_eq!(shape.len(), 5);
-    // Keys, attributes and order never change; only the derived transition
-    // table and key index, which reference shapes and integers, are filled in.
-    assert!(shape[..3].iter().all(|field| !field.mutable));
-    assert!(shape[3..].iter().all(|field| field.mutable));
+    assert_eq!(shape.len(), 6);
+    // Keys, attributes, order and toJSON-absence never change; only the
+    // derived transition table and key index, which reference shapes and
+    // integers, are filled in.
+    assert!(shape[..4].iter().all(|field| !field.mutable));
+    assert!(shape[4..].iter().all(|field| field.mutable));
     assert_eq!(
-        shape[3].element_type,
+        shape[4].element_type,
         reference(GcLayout::CompactShapeTable, true)
     );
     assert_eq!(
-        shape[4].element_type,
+        shape[5].element_type,
         reference(GcLayout::OrdinaryPropertyIndex, true)
     );
     assert_eq!(
@@ -432,6 +433,11 @@ fn ordinary_storage_subtypes_and_cache_metadata_are_encoded_in_the_single_core_g
         shape[2].element_type,
         wasmparser::StorageType::Val(wasmparser::ValType::I32),
         "the immutable OwnKeys order witness is part of the shared shape",
+    );
+    assert_eq!(
+        shape[3].element_type,
+        wasmparser::StorageType::Val(wasmparser::ValType::I32),
+        "the immutable toJSON-absence witness is part of the shared shape",
     );
     let CompositeInnerType::Array(keys) = &types[index(GcLayout::CompactShapeKeys) as usize]
         .composite_type

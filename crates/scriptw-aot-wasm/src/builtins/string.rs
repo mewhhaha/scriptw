@@ -745,6 +745,10 @@ impl FunctionBuilder<'_> {
                 s.call_helper(crate::runtime_helpers::CodeUnitFindArguments::new(&string_units,at,last,first),b.runtime_helper_base()?,f).store(at,f);
                 at.load(f); f.instruction(&Instruction::I64ExtendI32U); cursor.store(f);
                 at.load(f); last.load(f); f.instruction(&Instruction::I32GeU); b.emit_branch_if_to_target(searched,f);
+                needle_length.load(f); f.instruction(&Instruction::I64Const(1)); f.instruction(&Instruction::I64Eq);
+                b.open_frame(ControlFrameKind::If,f);
+                f.instruction(&Instruction::I32Const(1)); found.store(f); cursor.load(f); found_index.store(f); b.emit_branch_to_target(searched,f);
+                b.pop_control(ControlFrameKind::If); f.instruction(&Instruction::End);
                 s.release_i32_local(last,f); s.release_i32_local(first,f);
                 b.pop_control(ControlFrameKind::If); f.instruction(&Instruction::End);
             }

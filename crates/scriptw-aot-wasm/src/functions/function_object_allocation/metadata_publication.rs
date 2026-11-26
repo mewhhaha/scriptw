@@ -235,6 +235,9 @@ impl FunctionBuilder<'_> {
                         .cast_subtype::<StoredValue>(schema, function),
                     function,
                 );
+            let expected_value = schema
+                .reserve_gc_local::<crate::gc_types::PropertyValue, NonNullable>(function)
+                .initialize(stored.load(schema, function).upcast(), function);
             let state = schema
                 .reserve_gc_local::<LegacyReflectionPropertyState, NonNullable>(function)
                 .initialize(
@@ -244,7 +247,7 @@ impl FunctionBuilder<'_> {
                             (
                                 GcOperand::nullable_reference(&entry, schema),
                                 GcOperand::nullable_reference(&descriptor, schema),
-                                GcOperand::nullable_reference(&stored, schema),
+                                GcOperand::nullable_reference(&expected_value, schema),
                             ),
                             function,
                         ),
@@ -257,6 +260,7 @@ impl FunctionBuilder<'_> {
                 function,
             );
             state.clear(function);
+            expected_value.clear(function);
             stored.clear(function);
             descriptor.clear(function);
             entry.clear(function);
