@@ -197,8 +197,13 @@ pub(super) fn resolve_fixed(
     name: &str,
 ) -> wasmtime::Result<WasmtimeExtern> {
     let mut linker = WasmtimeLinker::new(store.as_context().engine());
-    register_selected(&mut linker, None, &HashSet::from([name]), Default::default())
-        .map_err(wasmtime::Error::new)?;
+    register_selected(
+        &mut linker,
+        None,
+        &HashSet::from([name]),
+        Default::default(),
+    )
+    .map_err(wasmtime::Error::new)?;
     linker.get(&mut store, WASM_HOST_IMPORT_NAMESPACE, name)
 }
 
@@ -474,8 +479,10 @@ mod tests {
         assert!(!second.has_definition(WASM_HOST_IMPORT_NAMESPACE, WASM_HOST_IMPORT_AGENT_CALL));
         let (without_extra, outcome) = linker(&engine, &module, std::iter::empty(), key).unwrap();
         assert_eq!(outcome, WasmRuntimeHostImportCacheOutcome::Miss);
-        assert!(!without_extra
-            .has_definition(WASM_HOST_IMPORT_NAMESPACE, WASM_HOST_IMPORT_AGENT_CAN_SUSPEND));
+        assert!(!without_extra.has_definition(
+            WASM_HOST_IMPORT_NAMESPACE,
+            WASM_HOST_IMPORT_AGENT_CAN_SUSPEND
+        ));
         let mut second_store = WasmtimeStore::new(&engine, state(false));
         assert!(second.get(&mut second_store, "fresh", "memory").is_err());
         assert!(second.instantiate(&mut second_store, &module).is_err());

@@ -106,7 +106,9 @@ impl<'a> ProgramRuntimeRef<'a> {
         }
     }
 
-    pub(super) fn source_compilation_profile(self) -> scriptw_aot_wasm::RuntimeSourceCompilationProfile {
+    pub(super) fn source_compilation_profile(
+        self,
+    ) -> scriptw_aot_wasm::RuntimeSourceCompilationProfile {
         match self {
             Self::Raw(runtime) => runtime.source_compilation_profile(),
             Self::Cargo(runtime) => runtime.profile(),
@@ -504,14 +506,14 @@ impl ProgramImportPlan {
             }
         }
         let runtime_private_memory_export = runtime.and_then(|runtime_module| {
-            runtime_module
-                .get_export_index(crate::host_memory_imports::HOST_MODULE_MEMORY_EXPORT)
+            runtime_module.get_export_index(crate::host_memory_imports::HOST_MODULE_MEMORY_EXPORT)
         });
         let roots_module = runtime.unwrap_or(program);
         let roots_embed_promise_export = roots_module
             .get_export_index("scriptw.embed.promise")
             .and_then(|export| {
-                let WasmtimeExternType::Func(ty) = roots_module.get_export("scriptw.embed.promise")?
+                let WasmtimeExternType::Func(ty) =
+                    roots_module.get_export("scriptw.embed.promise")?
                 else {
                     return None;
                 };

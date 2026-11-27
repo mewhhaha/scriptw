@@ -1,8 +1,8 @@
 use super::*;
 
-// The host GC allocator takes a nonnegative I32 byte-array length. Rounding the
-// backing length up to eight bytes must also remain in that domain.
-const MAX_ARRAY_BUFFER_BACKING_LENGTH: i64 = i32::MAX as i64 - 7;
+// The host GC allocator takes an unsigned 32-bit byte-array length (`u32`,
+// up to 4 GiB - 8 bytes so 8-byte rounding stays representable in `u32`).
+const MAX_ARRAY_BUFFER_BACKING_LENGTH: i64 = (u32::MAX as i64) - 7;
 
 impl FunctionBuilder<'_> {
     /// Allocation limits belong after prototype selection. The logical maximum

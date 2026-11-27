@@ -6,13 +6,13 @@ license.workspace = true
 
 [dependencies]
 icu_collator = { version = "2.0.0", default-features = false }
-icu_collator_data = { version = "2.0.0", default-features = false }
-icu_collections = { version = "2.0.0", default-features = false }
+icu_collator_data = { version = "~2.3.0", default-features = false }
+icu_collections = { version = "~2.3.0", default-features = false }
 icu_locale = { version = "2.0.0", default-features = false, features = ["compiled_data"] }
-icu_locale_fallback = { version = "2.0.0", default-features = false, features = ["compiled_data"] }
+icu_locale_fallback = { version = "~2.3.0", default-features = false, features = ["compiled_data"] }
 icu_normalizer = { version = "2.0.1", default-features = false }
-icu_normalizer_data = { version = "2.0.0", default-features = false }
-icu_provider = { version = "2.0.0", default-features = false, features = ["sync", "baked"] }
+icu_normalizer_data = { version = "~2.3.0", default-features = false }
+icu_provider = { version = "~2.3.0", default-features = false, features = ["sync", "baked"] }
 zerovec = { version = "0.11.6", default-features = false, features = ["alloc"] }
 
 # Baked ICU exporter macros construct validated static data with generated unsafe.

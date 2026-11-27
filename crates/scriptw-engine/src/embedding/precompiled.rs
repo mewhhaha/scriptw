@@ -246,14 +246,17 @@ impl PrecompiledEmbeddedProgram {
                         Ok(module) => Ok(module),
                         Err(error)
                             if error.chain().any(|cause| {
-                                cause
-                                    .downcast_ref::<std::io::Error>()
-                                    .is_some_and(|io| io.kind() == std::io::ErrorKind::PermissionDenied)
+                                cause.downcast_ref::<std::io::Error>().is_some_and(|io| {
+                                    io.kind() == std::io::ErrorKind::PermissionDenied
+                                })
                             }) =>
                         {
                             // A valid image on a `noexec` mount cannot be mapped
                             // with PROT_EXEC; fall back to anonymous copied pages.
-                            WasmtimeModule::deserialize(engine, &bytes.as_slice()[self.native.clone()])
+                            WasmtimeModule::deserialize(
+                                engine,
+                                &bytes.as_slice()[self.native.clone()],
+                            )
                         }
                         Err(error) => Err(error),
                     }

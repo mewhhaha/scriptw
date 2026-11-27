@@ -1,44 +1,156 @@
-//! Synchronous caller-thread Wasmtime fibers for the bounded Engine entry stack.
+//! Synchronous caller-thread guarded execution stacks for the bounded Engine entry stack.
 //!
-//! Idle `FiberStack`s are cached per OS thread up to a small process-wide cap
+//! Idle `GuardedStack`s are cached per OS thread up to a small process-wide cap
 //! (`MAX_CACHED_EXECUTION_STACKS`) so repeated callers avoid OS thread spawns
 //! without unbounded virtual stack retention across large caller thread pools.
-//! A nested public Engine entry cannot resume another Wasmtime Fiber on the
-//! same thread, so reentry retains the existing scoped 64 MiB thread path and
-//! receives an independent guarded stack.
+//! Reentrant Engine entry retains the existing scoped 64 MiB thread path so
+//! nested calls receive an independent guarded stack.
+
 use super::{EngineWorkerStackGuard, ENGINE_WORKER_STACK_ACTIVE, ENGINE_WORKER_STACK_SIZE};
 use std::{
     cell::RefCell,
     panic::{self, AssertUnwindSafe},
     sync::atomic::{AtomicUsize, Ordering},
 };
-use wasmtime_fiber::{Fiber, FiberStack};
 
 const MAX_CACHED_EXECUTION_STACKS: usize = 2;
 
-/// Reserve frame headroom for the Wasmtime fiber trampoline and entry wrapper so
+/// Reserve frame headroom for the stack-switch trampoline and entry wrapper so
 /// the callee inside `run_on_execution_stack` always receives at least the full
 /// `ENGINE_WORKER_STACK_SIZE` usable stack.
 const FIBER_FRAME_HEADROOM: usize = 256 * 1024;
 
 static CACHED_EXECUTION_STACK_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-struct CachedExecutionStack(Option<FiberStack>);
+#[cfg(all(unix, any(target_arch = "x86_64", target_arch = "aarch64")))]
+mod native_stack {
+    use rustix::mm::{mmap_anonymous, mprotect, munmap, MapFlags, MprotectFlags, ProtFlags};
+    use std::ffi::c_void;
+    use std::io;
+    use std::ptr::{self, NonNull};
 
-impl CachedExecutionStack {
-    fn into_inner(mut self) -> FiberStack {
-        // The Drop impl decrements the process-wide cached count when this
-        // wrapper leaves TLS, either when taken for execution or on thread exit.
-        self.0.take().expect("cached FiberStack present")
+    pub(super) struct GuardedStack {
+        base: NonNull<u8>,
+        total_len: usize,
+    }
+
+    // SAFETY: A `GuardedStack` owns an exclusive anonymous `mmap` region not currently
+    // executing on any thread when transferred or dropped.
+    unsafe impl Send for GuardedStack {}
+
+    impl GuardedStack {
+        pub(super) fn new(usable_size: usize) -> io::Result<Self> {
+            let page_size = rustix::param::page_size().max(4096);
+            let guard_size = page_size;
+            let usable_aligned = usable_size
+                .checked_add(page_size - 1)
+                .map(|v| v & !(page_size - 1))
+                .ok_or_else(|| io::Error::other("execution stack size overflow"))?;
+            let total_len = guard_size
+                .checked_add(usable_aligned)
+                .ok_or_else(|| io::Error::other("execution stack total size overflow"))?;
+
+            // SAFETY: Anonymous private mapping with null address hint.
+            let raw: *mut c_void = unsafe {
+                mmap_anonymous(
+                    ptr::null_mut(),
+                    total_len,
+                    ProtFlags::READ | ProtFlags::WRITE,
+                    MapFlags::PRIVATE,
+                )
+            }?;
+            let base = NonNull::new(raw.cast::<u8>())
+                .ok_or_else(|| io::Error::other("mmap_anonymous returned null"))?;
+
+            // Place a PROT_NONE guard page at the bottom of the downward-growing stack.
+            // SAFETY: `[raw, raw + guard_size)` is the first page of our fresh mapping.
+            if let Err(err) = unsafe { mprotect(raw, guard_size, MprotectFlags::empty()) } {
+                // SAFETY: Unmap the entire mapping on failure.
+                let _ = unsafe { munmap(raw, total_len) };
+                return Err(err.into());
+            }
+
+            Ok(Self { base, total_len })
+        }
+
+        pub(super) fn top(&self) -> Option<*mut u8> {
+            // SAFETY: `total_len` is the exact mapping length, so `base + total_len`
+            // is the page-aligned (16-byte-aligned) one-past-the-end stack top.
+            Some(unsafe { self.base.as_ptr().add(self.total_len) })
+        }
+    }
+
+    impl Drop for GuardedStack {
+        fn drop(&mut self) {
+            // SAFETY: `self.base` and `self.total_len` came from `mmap_anonymous`.
+            let _ = unsafe { munmap(self.base.as_ptr().cast::<c_void>(), self.total_len) };
+        }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[unsafe(naked)]
+    pub(super) unsafe extern "C" fn switch_and_call(
+        _stack_top: *mut u8,
+        _entry: extern "C" fn(*mut u8),
+        _arg: *mut u8,
+    ) {
+        core::arch::naked_asm!(
+            "push rbp",
+            "mov rbp, rsp",
+            "and rdi, -16",
+            "mov rsp, rdi",
+            "mov rdi, rdx",
+            "call rsi",
+            "mov rsp, rbp",
+            "pop rbp",
+            "ret",
+        );
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    #[unsafe(naked)]
+    pub(super) unsafe extern "C" fn switch_and_call(
+        _stack_top: *mut u8,
+        _entry: extern "C" fn(*mut u8),
+        _arg: *mut u8,
+    ) {
+        core::arch::naked_asm!(
+            "stp x29, x30, [sp, #-16]!",
+            "mov x29, sp",
+            "and x0, x0, #-16",
+            "mov sp, x0",
+            "mov x0, x2",
+            "blr x1",
+            "mov sp, x29",
+            "ldp x29, x30, [sp], #16",
+            "ret",
+        );
     }
 }
 
+#[cfg(all(unix, any(target_arch = "x86_64", target_arch = "aarch64")))]
+use native_stack::{switch_and_call, GuardedStack};
+
+#[cfg(all(unix, any(target_arch = "x86_64", target_arch = "aarch64")))]
+struct CachedExecutionStack(Option<GuardedStack>);
+
+#[cfg(all(unix, any(target_arch = "x86_64", target_arch = "aarch64")))]
+impl CachedExecutionStack {
+    fn into_inner(mut self) -> GuardedStack {
+        // The Drop impl decrements the process-wide cached count when this
+        // wrapper leaves TLS, either when taken for execution or on thread exit.
+        self.0.take().expect("cached GuardedStack present")
+    }
+}
+
+#[cfg(all(unix, any(target_arch = "x86_64", target_arch = "aarch64")))]
 impl Drop for CachedExecutionStack {
     fn drop(&mut self) {
         CACHED_EXECUTION_STACK_COUNT.fetch_sub(1, Ordering::AcqRel);
     }
 }
 
+#[cfg(all(unix, any(target_arch = "x86_64", target_arch = "aarch64")))]
 thread_local! {
     static EXECUTION_STACK: RefCell<Option<CachedExecutionStack>> = const { RefCell::new(None) };
 }
@@ -66,14 +178,16 @@ impl Drop for ActiveStackTopGuard {
     }
 }
 
-fn take_execution_stack() -> FiberStack {
+#[cfg(all(unix, any(target_arch = "x86_64", target_arch = "aarch64")))]
+fn take_execution_stack() -> GuardedStack {
     if let Some(cached) = EXECUTION_STACK.with(|slot| slot.borrow_mut().take()) {
         return cached.into_inner();
     }
-    FiberStack::new(ENGINE_WORKER_STACK_SIZE + FIBER_FRAME_HEADROOM, false)
-        .unwrap_or_else(|error| panic!("scriptw execution FiberStack allocation failed: {error}"))
+    GuardedStack::new(ENGINE_WORKER_STACK_SIZE + FIBER_FRAME_HEADROOM)
+        .unwrap_or_else(|error| panic!("scriptw execution stack allocation failed: {error}"))
 }
 
+#[cfg(all(unix, any(target_arch = "x86_64", target_arch = "aarch64")))]
 fn try_reserve_cached_slot() -> bool {
     CACHED_EXECUTION_STACK_COUNT
         .fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
@@ -82,7 +196,8 @@ fn try_reserve_cached_slot() -> bool {
         .is_ok()
 }
 
-fn cache_execution_stack(stack: FiberStack) {
+#[cfg(all(unix, any(target_arch = "x86_64", target_arch = "aarch64")))]
+fn cache_execution_stack(stack: GuardedStack) {
     if !try_reserve_cached_slot() {
         drop(stack);
         return;
@@ -92,41 +207,69 @@ fn cache_execution_stack(stack: FiberStack) {
         let previous = slot.replace(Some(cached));
         assert!(
             previous.is_none(),
-            "execution FiberStack cache occupied during call"
+            "execution stack cache occupied during call"
         );
     });
 }
 
-fn run_on_cached_fiber<T, F>(f: F) -> T
+#[cfg(all(unix, any(target_arch = "x86_64", target_arch = "aarch64")))]
+struct StackCallState<T, F> {
+    func: Option<F>,
+    result: Option<std::thread::Result<T>>,
+    #[cfg(test)]
+    stack_top: Option<usize>,
+}
+
+#[cfg(all(unix, any(target_arch = "x86_64", target_arch = "aarch64")))]
+extern "C" fn execution_stack_trampoline<T, F>(raw_state: *mut u8)
+where
+    F: FnOnce() -> T,
+{
+    // SAFETY: `raw_state` points to the caller's live `StackCallState<T, F>`.
+    // `catch_unwind` ensures no Rust panic ever unwinds across `switch_and_call`.
+    let state = unsafe { &mut *(raw_state as *mut StackCallState<T, F>) };
+    let func = state.func.take().expect("execution stack closure present");
+    #[cfg(test)]
+    let stack_top = state.stack_top;
+    let result = panic::catch_unwind(AssertUnwindSafe(move || {
+        #[cfg(test)]
+        let _active_stack_top = ActiveStackTopGuard::enter(stack_top);
+        let _stack = EngineWorkerStackGuard::enter();
+        func()
+    }));
+    state.result = Some(result);
+}
+
+#[cfg(all(unix, any(target_arch = "x86_64", target_arch = "aarch64")))]
+fn run_on_cached_stack<T, F>(f: F) -> T
 where
     T: Send,
     F: FnOnce() -> T + Send,
 {
     let stack = take_execution_stack();
-    #[cfg(test)]
-    let stack_top = stack.top().map(|top| top as usize);
-    let fiber = match Fiber::new(stack, move |(), _suspend| {
+    let stack_top_ptr = stack.top().expect("guarded stack top");
+    let mut state = StackCallState {
+        func: Some(f),
+        result: None,
         #[cfg(test)]
-        let _active_stack_top = ActiveStackTopGuard::enter(stack_top);
-        let _stack = EngineWorkerStackGuard::enter();
-        f()
-    }) {
-        Ok(fiber) => fiber,
-        Err((error, stack)) => {
-            cache_execution_stack(stack);
-            panic!("scriptw execution Fiber creation failed: {error}");
-        }
+        stack_top: Some(stack_top_ptr as usize),
     };
-
-    // The Wasmtime fiber catches panics on its stack and propagates them from
-    // resume. Catch only to extract and return the completed guarded stack to
-    // this thread's cache, then resume the original panic unchanged.
-    let result = panic::catch_unwind(AssertUnwindSafe(|| fiber.resume(())));
-    let stack = fiber.into_stack();
+    // SAFETY: `stack_top_ptr` is the 16-byte-aligned top of our exclusively owned
+    // guarded stack; `execution_stack_trampoline` catches all panics before returning.
+    unsafe {
+        switch_and_call(
+            stack_top_ptr,
+            execution_stack_trampoline::<T, F>,
+            (&mut state as *mut StackCallState<T, F>).cast::<u8>(),
+        );
+    }
     cache_execution_stack(stack);
-    match result {
-        Ok(Ok(value)) => value,
-        Ok(Err(())) => unreachable!("execution fiber has no yield path"),
+    match state
+        .result
+        .take()
+        .expect("execution stack trampoline did not store a result")
+    {
+        Ok(value) => value,
         Err(payload) => panic::resume_unwind(payload),
     }
 }
@@ -136,13 +279,20 @@ where
     T: Send,
     F: FnOnce() -> T + Send,
 {
-    // A running Fiber cannot be resumed recursively on the same OS thread.
+    // A running caller-thread stack cannot be reused recursively on the same OS thread.
     // Reentrant Store/host calls keep the existing scoped thread path, which
     // provides a fresh guarded stack and preserves borrowed closure lifetimes.
     if ENGINE_WORKER_STACK_ACTIVE.get() {
         return super::run_on_sized_stack(f);
     }
-    run_on_cached_fiber(f)
+    #[cfg(all(unix, any(target_arch = "x86_64", target_arch = "aarch64")))]
+    {
+        run_on_cached_stack(f)
+    }
+    #[cfg(not(all(unix, any(target_arch = "x86_64", target_arch = "aarch64"))))]
+    {
+        super::run_on_sized_stack(f)
+    }
 }
 
 #[cfg(test)]
@@ -330,7 +480,7 @@ mod tests {
             let tls_cached = occupied.load(Ordering::Acquire);
             assert!(
                 tls_cached >= 1 && tls_cached <= MAX_CACHED_EXECUTION_STACKS,
-                "wave retained {tls_cached} TLS FiberStacks (expected 1..={MAX_CACHED_EXECUTION_STACKS})"
+                "wave retained {tls_cached} TLS execution stacks (expected 1..={MAX_CACHED_EXECUTION_STACKS})"
             );
             assert!(
                 CACHED_EXECUTION_STACK_COUNT.load(Ordering::Acquire) <= MAX_CACHED_EXECUTION_STACKS

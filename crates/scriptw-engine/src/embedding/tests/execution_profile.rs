@@ -293,8 +293,7 @@ fn check_fixture(name: &str, source: &str) -> Trained {
                 && read.dominant.is_some_and(|kind| {
                     !matches!(
                         kind,
-                        ReadSpecialisation::OwnCompact(_)
-                            | ReadSpecialisation::AbsentClosedTail(_)
+                        ReadSpecialisation::OwnCompact(_) | ReadSpecialisation::AbsentClosedTail(_)
                     )
                 })
         })

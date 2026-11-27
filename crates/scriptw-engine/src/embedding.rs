@@ -293,10 +293,9 @@ impl EmbeddedRuntime {
                     .ok_or_else(|| {
                         EngineError::new("NativeHost embedding requires a linked runtime artifact")
                     })?;
-                let policy = artifact
-                    .compilation_policy
-                    .clone()
-                    .unwrap_or_else(|| WasmCompilationPolicy::from_options(&CompileOptions::default()));
+                let policy = artifact.compilation_policy.clone().unwrap_or_else(|| {
+                    WasmCompilationPolicy::from_options(&CompileOptions::default())
+                });
                 runtime.native_source = Some((rt_artifact, policy, mode));
             }
             Ok(runtime)
@@ -571,10 +570,14 @@ impl EmbeddedRuntime {
         {
             Some(func) => func
                 .typed::<(), GcMainCompletion>(&*store)
-                .map_err(|error| EngineError::new(format!("embedding main signature: {error:#}")))?,
+                .map_err(|error| {
+                    EngineError::new(format!("embedding main signature: {error:#}"))
+                })?,
             None => program
                 .get_typed_func::<(), GcMainCompletion>(&mut *store, "main")
-                .map_err(|error| EngineError::new(format!("embedding main signature: {error:#}")))?,
+                .map_err(|error| {
+                    EngineError::new(format!("embedding main signature: {error:#}"))
+                })?,
         };
         let bridges = operations::Bridges::new(&mut *store, &program, &roots, &self.modules);
         let state = store.data_mut().embedding.as_mut().unwrap();

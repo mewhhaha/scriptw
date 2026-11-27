@@ -6,12 +6,12 @@ license.workspace = true
 
 [dependencies]
 scriptw-intl-build-data = { path = "../scriptw-intl-build-data" }
-writeable = { version = "0.6.3", default-features = false }
+writeable = { version = "0.6.4", default-features = false }
 icu_calendar = { version = "2.0.6", default-features = false, features = ["serde", "alloc"] }
 icu_collator = { version = "2.0.0", default-features = false, features = ["serde"] }
 icu_list = { version = "2.0.1", default-features = false, features = ["serde", "datagen"] }
 icu_locale = { version = "2.0.0", default-features = false, features = ["serde"] }
-icu_provider = { version = "2.0.0", default-features = false, features = ["sync", "deserialize_postcard_1", "export"] }
+icu_provider = { version = "~2.3.0", default-features = false, features = ["sync", "deserialize_postcard_1", "export"] }
 icu_provider_blob = { version = "2.0.0", default-features = false, features = ["alloc", "export"] }
 icu_provider_adapters = { version = "2.0.0", default-features = false }
 icu_normalizer = { version = "2.0.1", default-features = false, features = ["serde"] }

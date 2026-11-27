@@ -40,9 +40,7 @@ pub(super) fn run_with_config(
     let total_started = Instant::now();
     let mut config = wasmtime::Config::new();
     let store_allocation = configure(&mut config)?;
-    if barriers.instruction_counting()? {
-        config.profiler(wasmtime::ProfilingStrategy::PerfMap);
-    }
+    let _ = barriers.instruction_counting()?;
     let started = Instant::now();
     let (engine, store_allocation) = store_allocation.engine(&config)?;
     let engine_ns = started.elapsed().as_nanos();

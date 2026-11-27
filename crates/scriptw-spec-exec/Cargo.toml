@@ -14,7 +14,7 @@ oracle = ["dep:boa_engine", "dep:serde_json"]
 
 [dependencies]
 serde_json = { version = "1.0", optional = true }
-boa_engine = { version = "0.21.0", features = ["annex-b", "experimental", "intl_bundled"], optional = true }
+boa_engine = { version = "0.21.1", features = ["annex-b", "experimental", "intl_bundled"], optional = true }
 scriptw-runtime = { path = "../scriptw-runtime" }
 
 [lib]

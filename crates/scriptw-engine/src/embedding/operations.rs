@@ -134,11 +134,9 @@ impl CallBridge {
         if let Some(empty) = self.no_arguments.get() {
             return Ok(empty.to_rooted(&mut *store));
         }
-        let empty = ArrayRef::new_fixed(&mut *store, &self.arguments, &[])
-            .map_err(embedded_error)?;
-        let owned = empty
-            .to_owned_rooted(&mut *store)
-            .map_err(embedded_error)?;
+        let empty =
+            ArrayRef::new_fixed(&mut *store, &self.arguments, &[]).map_err(embedded_error)?;
+        let owned = empty.to_owned_rooted(&mut *store).map_err(embedded_error)?;
         let _ = self.no_arguments.set(owned);
         Ok(empty)
     }

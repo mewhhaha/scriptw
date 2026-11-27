@@ -3481,6 +3481,53 @@ impl Engine {
         })
     }
 
+    /// Compiles an ES module and emits a `NativeHost` Wasm artifact, caching the
+    /// emitted program Wasm bytes on disk under `program-wasm-v1` (paired with
+    /// the cached `NativeHost` runtime artifact) so cold process starts skip
+    /// JS parsing, IR lowering, and Wasm emission on warm cache.
+    pub fn compile_and_emit_module_native_host_cached(
+        &self,
+        source: &str,
+        options: CompileOptions,
+    ) -> Result<Artifact, EngineError> {
+        let cache = program_wasm_cache();
+        let cache_key = cache.as_ref().and_then(|_| {
+            let base = program_wasm_cache_key(source, ParseGoal::Module, &options)?;
+            let mut hasher = Sha256::new();
+            hasher.update(b"scriptw-native-host-module-v1\0");
+            hasher.update(base);
+            let digest: [u8; 32] = hasher.finalize().into();
+            Some(digest)
+        });
+        if let (Some(cache), Some(key)) = (cache.as_ref(), cache_key.as_ref()) {
+            if let Some(bytes) = cache.read_program(key) {
+                let selection = IntlDataSelection::new(options.intl_profile.clone());
+                let runtime_cache = wasm_runtime_link::RuntimeWasmCache::new(cache.as_ref());
+                if let Ok(runtime) = scriptw_aot_wasm::runtime_artifact_with_inputs(
+                    &selection,
+                    embedded_runtime::inputs(
+                        Some(&runtime_cache as &dyn scriptw_aot_wasm::RuntimeArtifactCache),
+                        scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost,
+                    ),
+                ) {
+                    return Ok(Artifact {
+                        bytes,
+                        description: String::new(),
+                        debug_dump: String::new(),
+                        runtime: Some(LinkedRuntime(runtime)),
+                        compilation_policy: Some(WasmCompilationPolicy::from_options(&options)),
+                    });
+                }
+            }
+        }
+        let unit = self.compile_module(source, options)?;
+        let artifact = self.emit_wasm_native_host(&unit)?;
+        if let (Some(cache), Some(key)) = (cache.as_ref(), cache_key.as_ref()) {
+            let _ = cache.write(key, artifact.bytes.clone());
+        }
+        Ok(artifact)
+    }
+
     fn emit_wasm_on_current_thread(&self, unit: &CompilationUnit) -> Result<Artifact, EngineError> {
         let cache = program_wasm_cache();
         self.emit_wasm_with_cache_on_current_thread(
@@ -4474,7 +4521,9 @@ impl Engine {
         }
         #[cfg(feature = "native-source-compiler")]
         if let (Some(runtime), Some(policy)) = (program.runtime, program.compilation_policy) {
-            if runtime.source_compilation_profile() == scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost {
+            if runtime.source_compilation_profile()
+                == scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost
+            {
                 let context = wasm_native_source_compiler::NativeSourceCompilerContext::new(
                     linker,
                     observed_instance,

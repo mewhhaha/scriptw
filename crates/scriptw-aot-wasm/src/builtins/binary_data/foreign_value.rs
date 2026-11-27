@@ -126,7 +126,7 @@ impl FunctionBuilder<'_> {
         valid.load(f);
         f.instruction(&Instruction::I32And);
         length.load(f);
-        f.instruction(&Instruction::I64Const(i64::from(i32::MAX)));
+        f.instruction(&Instruction::I64Const(i64::from(u32::MAX) - 7));
         f.instruction(&Instruction::I64LeU);
         f.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, f);
@@ -193,7 +193,7 @@ impl FunctionBuilder<'_> {
         pending.clear(f);
         self.emit_propagate_current_throw_if_needed(f);
         length.load(f);
-        f.instruction(&Instruction::I64Const(i64::from(i32::MAX)));
+        f.instruction(&Instruction::I64Const(i64::from(u32::MAX) - 7));
         f.instruction(&Instruction::I64GtU);
         self.open_frame(ControlFrameKind::If, f);
         self.emit_foreign_value_error(

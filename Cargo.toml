@@ -34,17 +34,12 @@ unused_must_use = "deny"
 [patch.crates-io]
 boa_ast = { path = "vendor/boa_ast-0.21.1" }
 boa_engine = { path = "vendor/boa_engine-0.21.1" }
+boa_gc = { path = "vendor/boa_gc-0.21.1" }
 boa_parser = { path = "vendor/boa_parser-0.21.1" }
-cranelift-codegen = { path = "vendor/cranelift-codegen-0.134.0" }
-cranelift-frontend = { path = "vendor/cranelift-frontend-0.134.0" }
-icu_calendar = { path = "vendor/icu_calendar-2.0.6" }
-regalloc2 = { path = "vendor/regalloc2-0.15.2" }
 regress = { path = "vendor/regress-0.10.5" }
 temporal_rs = { path = "vendor/temporal_rs-0.1.0" }
 timezone_provider = { path = "vendor/timezone_provider-0.1.2" }
 wasmtime = { path = "vendor/wasmtime-47.0.0" }
-wasmtime-internal-cache = { path = "vendor/wasmtime-internal-cache-47.0.0" }
-wasmtime-internal-cranelift = { path = "vendor/wasmtime-internal-cranelift-47.0.0" }
 
 # Developer builds keep Scriptw's large IR/backend crates cheap to rebuild,
 # while compiling third-party code (notably Wasmtime/Cranelift) once at a
@@ -132,42 +127,6 @@ opt-level = 3
 debug-assertions = false
 overflow-checks = false
 [profile.test.package.wasmtime]
-opt-level = 3
-debug-assertions = false
-overflow-checks = false
-
-[profile.dev.package.wasmtime-internal-cranelift]
-opt-level = 3
-debug-assertions = false
-overflow-checks = false
-[profile.test.package.wasmtime-internal-cranelift]
-opt-level = 3
-debug-assertions = false
-overflow-checks = false
-
-[profile.dev.package.cranelift-codegen]
-opt-level = 3
-debug-assertions = false
-overflow-checks = false
-[profile.test.package.cranelift-codegen]
-opt-level = 3
-debug-assertions = false
-overflow-checks = false
-
-[profile.dev.package.cranelift-frontend]
-opt-level = 3
-debug-assertions = false
-overflow-checks = false
-[profile.test.package.cranelift-frontend]
-opt-level = 3
-debug-assertions = false
-overflow-checks = false
-
-[profile.dev.package.regalloc2]
-opt-level = 3
-debug-assertions = false
-overflow-checks = false
-[profile.test.package.regalloc2]
 opt-level = 3
 debug-assertions = false
 overflow-checks = false

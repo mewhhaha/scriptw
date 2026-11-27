@@ -17,11 +17,10 @@ rayon = "1.11.0"
 blake3 = { version = "1.8.7", default-features = false, features = ["std"] }
 sha2 = "0.10.9"
 wasmparser = "0.245.1"
-wasmtime = { package = "wtime-aot-host", path = "/home/mewhhaha/src/wtime/tools/wtime-aot/host" }
-wasmtime-fiber = { package = "wasmtime-internal-fiber", version = "=47.0.0", features = ["std"] }
+wasmtime = { package = "wtime-aot-host", git = "https://github.com/mewhhaha/wtime.git", branch = "feat/aarch64-store-ci" }
 
 [target.'cfg(unix)'.dependencies]
-rustix = { version = "1.1.4", features = ["fs", "mm"] }
+rustix = { version = "1.1.4", features = ["fs", "mm", "param"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 rustix = { version = "1.1.4", features = ["fs", "time"] }

@@ -73,7 +73,9 @@ impl NativeSourceCompilerContext {
         native_compilation_mode: WasmNativeCompilationMode,
     ) -> Result<Self, EngineError> {
         use wasm_runtime_link::ProgramRuntimeRef;
-        if runtime.source_compilation_profile() != scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost {
+        if runtime.source_compilation_profile()
+            != scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost
+        {
             return Err(EngineError::new("native source runtime admission requires the NativeHost source-compilation profile"));
         }
         execution.remaining()?;

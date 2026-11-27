@@ -22,19 +22,17 @@ impl CargoExecutionRuntime {
     }
 
     pub(crate) fn native_host() -> Option<Result<&'static Arc<Self>, EngineError>> {
-        (!scriptw_runtime_image::execution_metadata().is_empty())
-            .then(|| {
-                let trace = std::env::var_os("SCRIPTW_WASM_TRACE")
-                    .map(|_| std::time::Instant::now());
-                let admitted = Self::current(RuntimeSourceCompilationProfile::NativeHost);
-                if let Some(started) = trace {
-                    eprintln!(
-                        "scriptw wasm trace: runtime-data admission: {:?}",
-                        started.elapsed()
-                    );
-                }
-                admitted
-            })
+        (!scriptw_runtime_image::execution_metadata().is_empty()).then(|| {
+            let trace = std::env::var_os("SCRIPTW_WASM_TRACE").map(|_| std::time::Instant::now());
+            let admitted = Self::current(RuntimeSourceCompilationProfile::NativeHost);
+            if let Some(started) = trace {
+                eprintln!(
+                    "scriptw wasm trace: runtime-data admission: {:?}",
+                    started.elapsed()
+                );
+            }
+            admitted
+        })
     }
 
     fn current(
@@ -151,8 +149,7 @@ impl CargoExecutionRuntime {
     }
 
     pub(crate) fn native_mode(&self) -> WasmNativeCompilationMode {
-        if self.largest_code_body_bytes >= crate::SIZE_OPTIMIZED_WASM_MIN_CODE_BODY_BYTES as u64
-        {
+        if self.largest_code_body_bytes >= crate::SIZE_OPTIMIZED_WASM_MIN_CODE_BODY_BYTES as u64 {
             WasmNativeCompilationMode::SizeOptimized
         } else {
             WasmNativeCompilationMode::Fast

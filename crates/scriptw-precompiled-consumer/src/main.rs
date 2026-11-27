@@ -11,8 +11,6 @@ mod consume;
 mod phase_barriers;
 #[path = "../../scriptw-cli/examples/runtime_precompiled/residency.rs"]
 mod residency;
-#[path = "../../scriptw-cli/examples/compiler_precompiled_baseline/wasi.rs"]
-mod wasi;
 
 include!("../../scriptw-cli/examples/runtime_precompiled/shared.rs");
 
@@ -30,7 +28,7 @@ fn run() -> Result<Value, String> {
             report["adapter"] = json!("scriptw");
         }
         (Some("execute-wasi"), 5) => {
-            report = wasi::execute(Path::new(&args[1]), &args[2], &args[3], &args[4])?;
+            return Err("execute-wasi is not supported on the wtime-aot-host consumer".into());
         }
         _ => return Err("usage: scriptw-precompiled-consumer identity | execute-{scriptw|wasi} TRUSTED_IMAGE EXPECTED_STDOUT SAMPLES WARMUPS".into()),
     }

@@ -44,7 +44,8 @@ fn lookup_arguments(arguments: &mut Arguments) -> &mut LookupArguments {
 #[inline]
 unsafe fn lookup_operands(arguments: &LookupArguments) -> wasmtime::Result<Operands> {
     // SAFETY: Wasmtime initialized every parameter of the import's type.
-    let [owner, key, owner_id, key_id] = arguments.map(|argument| unsafe { argument.assume_init() });
+    let [owner, key, owner_id, key_id] =
+        arguments.map(|argument| unsafe { argument.assume_init() });
     operands(owner, key, owner_id, key_id)
 }
 

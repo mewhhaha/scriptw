@@ -3,7 +3,9 @@
 use super::wasm_gc_host::TypedGcHostImport;
 use super::*;
 use scriptw_aot_wasm::{GcHostImport, GcHostLayout};
-use wasmtime::{ArrayRef, ArrayRefPre, ArrayType, FuncType, GcHeapOutOfMemory, Mutability, Val, ValType};
+use wasmtime::{
+    ArrayRef, ArrayRefPre, ArrayType, FuncType, GcHeapOutOfMemory, Mutability, Val, ValType,
+};
 
 /// Use the import's canonical type rather than creating a parallel GC layout.
 struct ByteArrayAllocationSignature {
@@ -79,8 +81,7 @@ pub(super) fn link(
                         "GC byte allocation callback has invalid operands",
                     ));
                 };
-                let length = u32::try_from(*length)
-                    .map_err(|_| wasmtime::Error::msg("GC byte allocation length is negative"))?;
+                let length = *length as u32;
                 let allocator = ArrayRefPre::new(&mut caller, signature.array.clone());
                 *output = match ArrayRef::new(&mut caller, &allocator, &Val::I32(0), length) {
                     Ok(bytes) => Val::AnyRef(Some(bytes.to_anyref())),

@@ -1074,7 +1074,7 @@ impl FunctionBuilder<'_> {
         let buffer_prototype = s.reserve_value_local(f);
         length.load(f);
         f.instruction(&Instruction::I64Const(
-            i64::from(i32::MAX) / (kind.bytes_per_element() as i64),
+            (i64::from(u32::MAX) - 7) / (kind.bytes_per_element() as i64),
         ));
         f.instruction(&Instruction::I64GtU);
         self.open_frame(ControlFrameKind::If, f);
