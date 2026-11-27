@@ -452,8 +452,10 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    /// Check the head's own slot before setting up the polymorphic scan.
-    /// The remaining proofs reuse the admitted header, storage and shape.
+    /// Check the head's own slot, closed tail and holder rule before setting
+    /// up the polymorphic scan over `head.NEXT` (up to `MAX_SITE_RECORDS - 1`
+    /// further records). The remaining proofs reuse the admitted header,
+    /// storage and shape.
     fn emit_ordinary_compact_read_entry(
         &mut self,
         target: &ValueLocals,
@@ -482,12 +484,16 @@ impl FunctionBuilder<'_> {
         let slot = s.reserve_i32_local(f);
         let value = s.reserve_value_local(f);
         let compact_hit = self.open_frame(ControlFrameKind::Block, f);
-        let other_rule = self.open_frame(ControlFrameKind::Block, f);
+
+        // Check `head` once (own slot, closed tail, and direct-prototype holder
+        // rule) before advancing into the `head.NEXT` scan loop.
+        let head_done = self.open_frame(ControlFrameKind::Block, f);
+        let head_holder = self.open_frame(ControlFrameKind::Block, f);
         let _ = shape.load(s, f);
         s.field(OwnDataReadCacheSchema::SHAPE).read(head, s, f);
         f.instruction(&Instruction::RefEq);
         f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(other_rule, f);
+        self.emit_branch_if_to_target(head_holder, f);
         s.field(OwnDataReadCacheSchema::SLOT)
             .read(head, s, f)
             .store(slot, f);
@@ -497,28 +503,58 @@ impl FunctionBuilder<'_> {
         self.emit_branch_if_to_target(compact_hit, f);
         // Missing $$typeof, then and toJSON commonly end at the same
         // protected Object.prototype. The record already proved absence
-        // in those rows. Cross-Realm and null tails use the scan below.
+        // in those rows. Cross-Realm and null tails use the closed-tail check.
+        let closed_tail = self.open_frame(ControlFrameKind::Block, f);
         self.emit_is_object_prototype_tail_i32(slot, f);
         f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(other_rule, f);
+        self.emit_branch_if_to_target(closed_tail, f);
         let prototype = s.reserve_gc_local(f).initialize(
             s.field(OrdinaryObjectSchema::PROTOTYPE)
                 .read(&object, s, f)
                 .reference(),
             f,
         );
-        self.emit_unchanged_object_prototype_or_branch(&prototype, other_rule, f);
+        self.emit_unchanged_object_prototype_or_branch(&prototype, closed_tail, f);
         prototype.clear(f);
         value.set_undefined(f);
         emit_return_normal(&value, f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
+        self.emit_recorded_closed_tail_hit(
+            &object,
+            slot,
+            &value,
+            head_holder,
+            ReadAnswer::Return,
+            f,
+        )?;
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        self.emit_ordinary_compact_holder_hit(
+            &object,
+            &shape,
+            head,
+            &result_storage,
+            slot,
+            &value,
+            compact_hit,
+            head_done,
+            f,
+        );
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
 
-        let record = s
-            .reserve_non_null_gc_local(f)
-            .initialize(head.load(s, f), f);
+        // Start directly at `head.NEXT` and scan up to `MAX_SITE_RECORDS - 1`
+        // further records so 3–8 shape polymorphic sites hit in this fast loop.
+        let record = s.reserve_non_null_gc_local(f).initialize(
+            s.field(OwnDataReadCacheSchema::NEXT)
+                .read(head, s, f)
+                .reference()
+                .non_null_or_branch(self.local_branch_label(decline), f),
+            f,
+        );
         let remaining = s.reserve_i32_local(f);
-        remaining.set_constant(3, f);
+        remaining.set_constant(MAX_SITE_RECORDS - 1, f);
 
         let scan = self.open_frame(ControlFrameKind::Loop, f);
         let next = self.open_frame(ControlFrameKind::Block, f);
@@ -547,86 +583,27 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
 
-        self.emit_receiver_rule_or_branch(
+        self.emit_ordinary_compact_holder_hit(
+            &object,
+            &shape,
             &record,
-            HolderReceiverKind::Object,
-            Some(&shape),
+            &result_storage,
+            slot,
+            &value,
+            compact_hit,
             next,
             f,
         );
-        s.field(OwnDataReadCacheSchema::HOLDER_SLOT)
-            .read(&record, s, f)
-            .store(slot, f);
-        slot.load(f);
-        f.instruction(&Instruction::I32Const(0));
-        f.instruction(&Instruction::I32LtS);
-        self.emit_branch_if_to_target(next, f);
-        let prototype = s.reserve_gc_local(f).initialize(
-            s.field(OrdinaryObjectSchema::PROTOTYPE)
-                .read(&object, s, f)
-                .reference(),
-            f,
-        );
-        s.field(OwnDataReadCacheSchema::HOLDER_SHAPE)
-            .read(&record, s, f);
-        f.instruction(&Instruction::RefIsNull);
-        self.open_frame(ControlFrameKind::If, f);
-        let holder = self.emit_protected_prototype_holder_or_branch(
-            &crate::objects::ProtectedPrototype::HOLDER_ORDER,
-            &prototype,
-            next,
-            f,
-        );
-        s.field(IntrinsicPropertyStorageSchema::ADDRESS)
-            .read(&holder.rows, s, f);
-        s.field(OwnDataReadCacheSchema::HOLDER_LAYOUT)
-            .read(&record, s, f);
-        f.instruction(&Instruction::I32Ne);
-        self.emit_branch_if_to_target(next, f);
-        let found = s.reserve_i32_local(f);
-        found.set_constant(0, f);
-        self.emit_materialized_intrinsic_group(&holder.rows, slot, &value, found, f);
-        found.load(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(next, f);
-        s.release_i32_local(found, f);
-        holder.clear(f);
-        emit_return_normal(&value, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        let holder = s.reserve_non_null_gc_local(f).initialize(
-            prototype.sealed_subtype_or_branch::<OrdinaryObject>(
-                s,
-                self.local_branch_label(next),
-                f,
-            ),
-            f,
-        );
-        let storage = s
-            .reserve_non_null_gc_local(f)
-            .initialize(self.emit_read_entry_compact_storage(&holder, next, f), f);
-        holder.clear(f);
-        s.field(CompactDataStorageSchema::SHAPE)
-            .read(&storage, s, f);
-        s.field(OwnDataReadCacheSchema::HOLDER_SHAPE)
-            .read(&record, s, f);
-        f.instruction(&Instruction::RefEq);
-        f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(next, f);
-        result_storage.replace(storage.load(s, f), f);
-        storage.clear(f);
-        prototype.clear(f);
-        self.emit_branch_to_target(compact_hit, f);
 
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         remaining.load(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(decline, f);
-        remaining.load(f);
         f.instruction(&Instruction::I32Const(1));
         f.instruction(&Instruction::I32Sub);
         remaining.store(f);
+        remaining.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(decline, f);
         record.replace(
             s.field(OwnDataReadCacheSchema::NEXT)
                 .read(&record, s, f)
@@ -675,6 +652,90 @@ impl FunctionBuilder<'_> {
         result_storage.clear(f);
         object.clear(f);
         Ok(())
+    }
+
+    /// Direct-prototype intrinsic or compact holder proof for `record` inside
+    /// `emit_ordinary_compact_read_entry`. Returns on an intrinsic hit,
+    /// replaces `result_storage` and branches to `compact_hit` on a compact
+    /// holder hit, or branches to `next` otherwise.
+    #[allow(clippy::too_many_arguments)]
+    fn emit_ordinary_compact_holder_hit(
+        &mut self,
+        object: &GcLocal<OrdinaryObject>,
+        shape: &GcLocal<CompactDataShape>,
+        record: &GcLocal<OwnDataReadCache>,
+        result_storage: &GcLocal<CompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        compact_hit: ControlTarget,
+        next: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        self.emit_receiver_rule_or_branch(record, HolderReceiverKind::Object, Some(shape), next, f);
+        s.field(OwnDataReadCacheSchema::HOLDER_SLOT)
+            .read(record, s, f)
+            .store(slot, f);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32LtS);
+        self.emit_branch_if_to_target(next, f);
+        let prototype = s.reserve_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(object, s, f)
+                .reference(),
+            f,
+        );
+        s.field(OwnDataReadCacheSchema::HOLDER_SHAPE)
+            .read(record, s, f);
+        f.instruction(&Instruction::RefIsNull);
+        self.open_frame(ControlFrameKind::If, f);
+        let holder = self.emit_protected_prototype_holder_or_branch(
+            &crate::objects::ProtectedPrototype::HOLDER_ORDER,
+            &prototype,
+            next,
+            f,
+        );
+        s.field(IntrinsicPropertyStorageSchema::ADDRESS)
+            .read(&holder.rows, s, f);
+        s.field(OwnDataReadCacheSchema::HOLDER_LAYOUT)
+            .read(record, s, f);
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(next, f);
+        let found = s.reserve_i32_local(f);
+        found.set_constant(0, f);
+        self.emit_materialized_intrinsic_group(&holder.rows, slot, value, found, f);
+        found.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(next, f);
+        s.release_i32_local(found, f);
+        holder.clear(f);
+        emit_return_normal(value, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        let holder = s.reserve_non_null_gc_local(f).initialize(
+            prototype.sealed_subtype_or_branch::<OrdinaryObject>(
+                s,
+                self.local_branch_label(next),
+                f,
+            ),
+            f,
+        );
+        let storage = s
+            .reserve_non_null_gc_local(f)
+            .initialize(self.emit_read_entry_compact_storage(&holder, next, f), f);
+        holder.clear(f);
+        s.field(CompactDataStorageSchema::SHAPE)
+            .read(&storage, s, f);
+        s.field(OwnDataReadCacheSchema::HOLDER_SHAPE)
+            .read(record, s, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(next, f);
+        result_storage.replace(storage.load(s, f), f);
+        storage.clear(f);
+        prototype.clear(f);
+        self.emit_branch_to_target(compact_hit, f);
     }
 
     fn emit_read_entry_compact_storage(

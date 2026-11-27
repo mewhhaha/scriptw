@@ -2976,7 +2976,9 @@ impl<'a> FunctionBuilder<'a> {
                 self.emit_propagate_current_throw_if_needed(function);
                 // The statement's value; its Normal kind is the fact of the
                 // fall-through, already the function's completion.
-                self.completion().value().copy_from(&value, function);
+                if self.observes_statement_completion_value() {
+                    self.completion().value().copy_from(&value, function);
+                }
                 value.clear(function);
             }
             StatementIr::GeneratorYield {
@@ -3315,7 +3317,9 @@ impl<'a> FunctionBuilder<'a> {
                     // Lowering and planning have already visited both branches.
                     // Preserve If's UpdateEmpty(undefined) before the selected
                     // statement, including an empty branch or no else branch.
-                    self.emit_statement_result(function);
+                    if self.observes_statement_completion_value() {
+                        self.emit_statement_result(function);
+                    }
                     if taken {
                         self.compile_statement(then_branch, function)?;
                     } else if let Some(else_branch) = else_branch {
@@ -3333,7 +3337,9 @@ impl<'a> FunctionBuilder<'a> {
                 }
                 self.compile_truthy_i32(condition, function)?;
                 self.emit_propagate_current_throw_if_needed(function);
-                self.emit_statement_result(function);
+                if self.observes_statement_completion_value() {
+                    self.emit_statement_result(function);
+                }
                 self.open_frame(ControlFrameKind::If, function);
                 self.compile_statement(then_branch, function)?;
                 if let Some(else_branch) = else_branch {
@@ -3773,16 +3779,21 @@ impl<'a> FunctionBuilder<'a> {
         catch_block: &BlockIr,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        self.emit_statement_result(function);
+        if self.observes_statement_completion_value() {
+            self.emit_statement_result(function);
+        }
         let outer_frame = self.open_frame(ControlFrameKind::Block, function);
         let catch_frame = self.open_frame(ControlFrameKind::Block, function);
+        self.rarely_taken(catch_frame, function);
         self.throw_handler_stack.push(catch_frame);
         self.push_scope();
         self.compile_block_contents(try_block, function)?;
         self.pop_scope();
         self.throw_handler_stack.pop();
         self.pop_control(ControlFrameKind::Block);
-        self.emit_branch_to_target(outer_frame, function);
+        if !Self::block_unconditionally_escapes(try_block) {
+            self.emit_branch_to_target(outer_frame, function);
+        }
         function.instruction(&Instruction::End);
 
         self.push_scope();
@@ -3817,6 +3828,18 @@ impl<'a> FunctionBuilder<'a> {
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
         Ok(())
+    }
+
+    fn block_unconditionally_escapes(block: &BlockIr) -> bool {
+        block.statements.last().is_some_and(|statement| {
+            matches!(
+                statement,
+                StatementIr::Return(_)
+                    | StatementIr::Throw(_)
+                    | StatementIr::Break { .. }
+                    | StatementIr::Continue { .. }
+            )
+        })
     }
 
     fn emit_resumable_state_in_range(
@@ -4704,7 +4727,9 @@ impl<'a> FunctionBuilder<'a> {
         finally_block: &BlockIr,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        self.emit_statement_result(function);
+        if self.observes_statement_completion_value() {
+            self.emit_statement_result(function);
+        }
         let saved = self.runtime_schema().reserve_completion(function);
 
         let _outer_frame = self.open_frame(ControlFrameKind::Block, function);
@@ -6738,13 +6763,16 @@ impl<'a> FunctionBuilder<'a> {
         finally_block: &BlockIr,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        self.emit_statement_result(function);
+        if self.observes_statement_completion_value() {
+            self.emit_statement_result(function);
+        }
         let saved = self.runtime_schema().reserve_completion(function);
 
         let _outer_frame = self.open_frame(ControlFrameKind::Block, function);
         let _finally_frame = self.open_frame(ControlFrameKind::Block, function);
         let catch_skip_frame = self.open_frame(ControlFrameKind::Block, function);
         let catch_frame = self.open_frame(ControlFrameKind::Block, function);
+        self.rarely_taken(catch_frame, function);
         self.throw_handler_stack.push(catch_frame);
         // `br` targets exit the selected block. In this layout, branching to
         // `finally_frame` would therefore skip the finalizer itself. The
@@ -6814,7 +6842,9 @@ impl<'a> FunctionBuilder<'a> {
         labels: &[String],
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        self.emit_statement_result(function);
+        if self.observes_statement_completion_value() {
+            self.emit_statement_result(function);
+        }
         let break_frame = self.open_frame(ControlFrameKind::Block, function);
         self.breakable_stack.push(break_frame);
         let continue_frame = self.open_frame(ControlFrameKind::Loop, function);
@@ -6842,7 +6872,9 @@ impl<'a> FunctionBuilder<'a> {
         labels: &[String],
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        self.emit_statement_result(function);
+        if self.observes_statement_completion_value() {
+            self.emit_statement_result(function);
+        }
         let break_frame = self.open_frame(ControlFrameKind::Block, function);
         self.breakable_stack.push(break_frame);
         let loop_frame = self.open_frame(ControlFrameKind::Loop, function);
@@ -6902,7 +6934,9 @@ impl<'a> FunctionBuilder<'a> {
         }
 
         self.push_scope();
-        self.emit_statement_result(function);
+        if self.observes_statement_completion_value() {
+            self.emit_statement_result(function);
+        }
         let break_frame = self.open_frame(ControlFrameKind::Block, function);
         self.breakable_stack.push(break_frame);
         let runtime_environment = lexical_environment.map(|environment| LexicalEnvironmentIr {
@@ -7224,7 +7258,9 @@ impl<'a> FunctionBuilder<'a> {
         debug_assert!(!resources.is_empty());
 
         self.push_scope();
-        self.emit_statement_result(function);
+        if self.observes_statement_completion_value() {
+            self.emit_statement_result(function);
+        }
         let break_frame = self.open_frame(ControlFrameKind::Block, function);
         self.breakable_stack.push(break_frame);
         let runtime_environment = lexical_environment.map(|environment| LexicalEnvironmentIr {
@@ -7313,7 +7349,9 @@ impl<'a> FunctionBuilder<'a> {
         let schema = self.runtime_schema();
         let dense = dense_switch::DenseIntegerSwitch::analyze(self, cases);
         let discriminant = schema.reserve_value_local(function);
-        self.emit_statement_result(function);
+        if self.observes_statement_completion_value() {
+            self.emit_statement_result(function);
+        }
         // A table dispatch reads an int32-domain discriminant's bits as they
         // are; no case comparison needs its Number.
         let int32 = match (&dense, crate::operations::Int32Expression::of(expression)) {
@@ -7405,7 +7443,9 @@ impl<'a> FunctionBuilder<'a> {
             selected.store(function);
             function.instruction(&Instruction::End);
         }
-        self.emit_statement_result(function);
+        if self.observes_statement_completion_value() {
+            self.emit_statement_result(function);
+        }
         function.instruction(&Instruction::I32Const(0));
         active.store(function);
         let break_frame = self.open_frame(ControlFrameKind::Block, function);
@@ -8737,7 +8777,9 @@ impl<'a> FunctionBuilder<'a> {
         let done = schema.reserve_i32_local(function);
         let pending = schema.reserve_completion(function);
         let closed = schema.reserve_completion(function);
-        self.emit_statement_result(function);
+        if self.observes_statement_completion_value() {
+            self.emit_statement_result(function);
+        }
         let break_frame = self.open_frame(ControlFrameKind::Block, function);
         self.breakable_stack.push(break_frame);
         let loop_frame = self.open_frame(ControlFrameKind::Loop, function);

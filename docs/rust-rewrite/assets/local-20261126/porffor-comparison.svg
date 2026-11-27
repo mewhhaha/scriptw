@@ -1,80 +1,80 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="618" viewBox="0 0 760 618" role="img" aria-labelledby="title desc">
 <title id="title">Scriptw vs Porffor 0.61.13 runtime kernels</title>
-<desc id="desc">Runtime kernel speedup over Porffor 0.61.13 on Wasmtime (9.13x, 13/13) and Node/V8 Wasm (18.97x, 13/13).</desc>
+<desc id="desc">Runtime kernel speedup over Porffor 0.61.13 on Wasmtime (9.96x, 13/13) and Node/V8 Wasm (20.87x, 13/13).</desc>
 <rect x="0.5" y="0.5" width="759" height="617" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
 <g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fill="#24292f">
 <text x="28" y="34" font-size="18" font-weight="650" fill="#24292f">Scriptw vs Porffor 0.61.13 — runtime kernels</text>
-<text x="28" y="54" font-size="12" fill="#57606a">Higher is faster (log scale, Porffor ÷ Scriptw) · 9.13× Wasmtime (13/13) · 18.97× Node/V8 Wasm (13/13)</text>
+<text x="28" y="54" font-size="12" fill="#57606a">Higher is faster (log scale, Porffor ÷ Scriptw) · 9.96× Wasmtime (13/13) · 20.87× Node/V8 Wasm (13/13)</text>
 <rect x="28.0" y="66" width="11" height="11" rx="2.5" fill="#0969da"/>
 <text x="44.0" y="75.5" font-size="11.5" fill="#57606a">vs Porffor (Wasmtime 47.0.1)</text>
 <rect x="241.0" y="66" width="11" height="11" rx="2.5" fill="#2da44e"/>
 <text x="257.0" y="75.5" font-size="11.5" fill="#57606a">vs Porffor (Node/V8 Wasm)</text>
 <line x1="185.5" y1="94" x2="185.5" y2="555" stroke="#6e7781" stroke-width="1.4" stroke-dasharray="3,2"/>
 <text x="185.5" y="571" text-anchor="middle" font-size="11" fill="#57606a">1×</text>
-<line x1="233.5" y1="94" x2="233.5" y2="555" stroke="#eaeef2" stroke-width="1"/>
-<text x="233.5" y="571" text-anchor="middle" font-size="11" fill="#57606a">2×</text>
-<line x1="296.8" y1="94" x2="296.8" y2="555" stroke="#eaeef2" stroke-width="1"/>
-<text x="296.8" y="571" text-anchor="middle" font-size="11" fill="#57606a">5×</text>
-<line x1="344.8" y1="94" x2="344.8" y2="555" stroke="#eaeef2" stroke-width="1"/>
-<text x="344.8" y="571" text-anchor="middle" font-size="11" fill="#57606a">10×</text>
-<line x1="456.1" y1="94" x2="456.1" y2="555" stroke="#eaeef2" stroke-width="1"/>
-<text x="456.1" y="571" text-anchor="middle" font-size="11" fill="#57606a">50×</text>
-<line x1="504.1" y1="94" x2="504.1" y2="555" stroke="#eaeef2" stroke-width="1"/>
-<text x="504.1" y="571" text-anchor="middle" font-size="11" fill="#57606a">100×</text>
-<line x1="580.1" y1="94" x2="580.1" y2="555" stroke="#eaeef2" stroke-width="1"/>
-<text x="580.1" y="571" text-anchor="middle" font-size="11" fill="#57606a">300×</text>
+<line x1="230.9" y1="94" x2="230.9" y2="555" stroke="#eaeef2" stroke-width="1"/>
+<text x="230.9" y="571" text-anchor="middle" font-size="11" fill="#57606a">2×</text>
+<line x1="290.9" y1="94" x2="290.9" y2="555" stroke="#eaeef2" stroke-width="1"/>
+<text x="290.9" y="571" text-anchor="middle" font-size="11" fill="#57606a">5×</text>
+<line x1="336.3" y1="94" x2="336.3" y2="555" stroke="#eaeef2" stroke-width="1"/>
+<text x="336.3" y="571" text-anchor="middle" font-size="11" fill="#57606a">10×</text>
+<line x1="441.6" y1="94" x2="441.6" y2="555" stroke="#eaeef2" stroke-width="1"/>
+<text x="441.6" y="571" text-anchor="middle" font-size="11" fill="#57606a">50×</text>
+<line x1="487.0" y1="94" x2="487.0" y2="555" stroke="#eaeef2" stroke-width="1"/>
+<text x="487.0" y="571" text-anchor="middle" font-size="11" fill="#57606a">100×</text>
+<line x1="577.8" y1="94" x2="577.8" y2="555" stroke="#eaeef2" stroke-width="1"/>
+<text x="577.8" y="571" text-anchor="middle" font-size="11" fill="#57606a">400×</text>
 <text x="156" y="116" text-anchor="end" font-size="12" font-weight="500">sort-reverse-512</text>
-<rect x="185.5" y="103" width="304.0" height="9" rx="2" fill="#0969da"/>
-<rect x="185.5" y="114" width="320.1" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
-<text x="512.6" y="115" font-size="11" font-weight="600" fill="#0969da">81.0×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">102×</tspan></text>
+<rect x="185.5" y="103" width="290.1" height="9" rx="2" fill="#0969da"/>
+<rect x="185.5" y="114" width="306.1" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="498.6" y="115" font-size="11" font-weight="600" fill="#0969da">83.9×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">107×</tspan></text>
 <text x="156" y="143" text-anchor="end" font-size="12" font-weight="500">to-sorted-512</text>
-<rect x="185.5" y="130" width="284.9" height="9" rx="2" fill="#0969da"/>
-<rect x="185.5" y="141" width="304.2" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
-<text x="496.7" y="142" font-size="11" font-weight="600" fill="#0969da">61.5×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">81.2×</tspan></text>
+<rect x="185.5" y="130" width="273.4" height="9" rx="2" fill="#0969da"/>
+<rect x="185.5" y="141" width="289.1" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="481.6" y="142" font-size="11" font-weight="600" fill="#0969da">65.1×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">82.8×</tspan></text>
 <text x="156" y="170" text-anchor="end" font-size="12" font-weight="500">join-small-1024</text>
-<rect x="185.5" y="157" width="245.0" height="9" rx="2" fill="#0969da"/>
-<rect x="185.5" y="168" width="400.0" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
-<text x="592.5" y="169" font-size="11" font-weight="600" fill="#0969da">34.5×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">324×</tspan></text>
+<rect x="185.5" y="157" width="236.7" height="9" rx="2" fill="#0969da"/>
+<rect x="185.5" y="168" width="391.9" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="584.4" y="169" font-size="11" font-weight="600" fill="#0969da">37.2×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">398×</tspan></text>
 <text x="156" y="197" text-anchor="end" font-size="12" font-weight="500">join-singleton-1024</text>
-<rect x="185.5" y="184" width="234.1" height="9" rx="2" fill="#0969da"/>
-<rect x="185.5" y="195" width="397.6" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
-<text x="590.1" y="196" font-size="11" font-weight="600" fill="#0969da">29.5×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">313×</tspan></text>
+<rect x="185.5" y="184" width="227.9" height="9" rx="2" fill="#0969da"/>
+<rect x="185.5" y="195" width="381.8" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="574.3" y="196" font-size="11" font-weight="600" fill="#0969da">32.5×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">341×</tspan></text>
 <text x="156" y="224" text-anchor="end" font-size="12" font-weight="500">join-empty-1024</text>
-<rect x="185.5" y="211" width="219.7" height="9" rx="2" fill="#0969da"/>
-<rect x="185.5" y="222" width="314.9" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
-<text x="507.4" y="223" font-size="11" font-weight="600" fill="#0969da">23.9×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">94.9×</tspan></text>
-<text x="156" y="251" text-anchor="end" font-size="12" font-weight="500">sort-reverse-128</text>
-<rect x="185.5" y="238" width="153.6" height="9" rx="2" fill="#0969da"/>
-<rect x="185.5" y="249" width="166.0" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
-<text x="358.5" y="250" font-size="11" font-weight="600" fill="#0969da">9.20×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">11.0×</tspan></text>
-<text x="156" y="278" text-anchor="end" font-size="12" font-weight="500">numeric-loop-50000</text>
-<rect x="185.5" y="265" width="150.9" height="9" rx="2" fill="#0969da"/>
-<rect x="185.5" y="276" width="141.8" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
-<text x="343.4" y="277" font-size="11" font-weight="600" fill="#0969da">8.86×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">7.77×</tspan></text>
+<rect x="185.5" y="211" width="214.3" height="9" rx="2" fill="#0969da"/>
+<rect x="185.5" y="222" width="301.8" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="494.3" y="223" font-size="11" font-weight="600" fill="#0969da">26.4×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">100×</tspan></text>
+<text x="156" y="251" text-anchor="end" font-size="12" font-weight="500">numeric-loop-50000</text>
+<rect x="185.5" y="238" width="154.6" height="9" rx="2" fill="#0969da"/>
+<rect x="185.5" y="249" width="144.9" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="347.1" y="250" font-size="11" font-weight="600" fill="#0969da">10.6×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">9.15×</tspan></text>
+<text x="156" y="278" text-anchor="end" font-size="12" font-weight="500">sort-reverse-128</text>
+<rect x="185.5" y="265" width="147.3" height="9" rx="2" fill="#0969da"/>
+<rect x="185.5" y="276" width="159.9" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="352.4" y="277" font-size="11" font-weight="600" fill="#0969da">9.48×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">11.5×</tspan></text>
 <text x="156" y="305" text-anchor="end" font-size="12" font-weight="500">objects</text>
-<rect x="185.5" y="292" width="100.2" height="9" rx="2" fill="#0969da"/>
-<rect x="185.5" y="303" width="259.4" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
-<text x="451.9" y="304" font-size="11" font-weight="600" fill="#0969da">4.26×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">42.5×</tspan></text>
-<text x="156" y="332" text-anchor="end" font-size="12" font-weight="500">numeric-loop-10000</text>
-<rect x="185.5" y="319" width="85.9" height="9" rx="2" fill="#0969da"/>
-<rect x="185.5" y="330" width="87.1" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
-<text x="279.6" y="331" font-size="11" font-weight="600" fill="#0969da">3.46×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">3.52×</tspan></text>
-<text x="156" y="359" text-anchor="end" font-size="12" font-weight="500">folded-string-4096</text>
-<rect x="185.5" y="346" width="82.4" height="9" rx="2" fill="#0969da"/>
-<rect x="185.5" y="357" width="108.3" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
-<text x="300.8" y="358" font-size="11" font-weight="600" fill="#0969da">3.29×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">4.78×</tspan></text>
+<rect x="185.5" y="292" width="99.3" height="9" rx="2" fill="#0969da"/>
+<rect x="185.5" y="303" width="248.5" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="441.0" y="304" font-size="11" font-weight="600" fill="#0969da">4.55×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">44.5×</tspan></text>
+<text x="156" y="332" text-anchor="end" font-size="12" font-weight="500">folded-string-4096</text>
+<rect x="185.5" y="319" width="85.8" height="9" rx="2" fill="#0969da"/>
+<rect x="185.5" y="330" width="106.0" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="298.5" y="331" font-size="11" font-weight="600" fill="#0969da">3.71×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">5.05×</tspan></text>
+<text x="156" y="359" text-anchor="end" font-size="12" font-weight="500">numeric-loop-10000</text>
+<rect x="185.5" y="346" width="84.7" height="9" rx="2" fill="#0969da"/>
+<rect x="185.5" y="357" width="85.8" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="278.3" y="358" font-size="11" font-weight="600" fill="#0969da">3.65×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">3.71×</tspan></text>
 <text x="156" y="386" text-anchor="end" font-size="12" font-weight="500">dynamic-string-4096</text>
-<rect x="185.5" y="373" width="70.3" height="9" rx="2" fill="#0969da"/>
-<rect x="185.5" y="384" width="54.9" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
-<text x="262.8" y="385" font-size="11" font-weight="600" fill="#0969da">2.76×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">2.21×</tspan></text>
+<rect x="185.5" y="373" width="76.3" height="9" rx="2" fill="#0969da"/>
+<rect x="185.5" y="384" width="53.8" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="268.8" y="385" font-size="11" font-weight="600" fill="#0969da">3.20×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">2.28×</tspan></text>
 <text x="156" y="413" text-anchor="end" font-size="12" font-weight="500">sort-sorted-512</text>
-<rect x="185.5" y="400" width="32.9" height="9" rx="2" fill="#0969da"/>
-<rect x="185.5" y="411" width="62.1" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
-<text x="254.6" y="412" font-size="11" font-weight="600" fill="#0969da">1.61×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">2.45×</tspan></text>
+<rect x="185.5" y="400" width="36.0" height="9" rx="2" fill="#0969da"/>
+<rect x="185.5" y="411" width="59.8" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="252.3" y="412" font-size="11" font-weight="600" fill="#0969da">1.73×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">2.49×</tspan></text>
 <text x="156" y="440" text-anchor="end" font-size="12" font-weight="500">join-mixed-1024</text>
-<rect x="185.5" y="427" width="24.9" height="9" rx="2" fill="#0969da"/>
-<rect x="185.5" y="438" width="30.2" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
-<text x="222.7" y="439" font-size="11" font-weight="600" fill="#0969da">1.43×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">1.55×</tspan></text>
+<rect x="185.5" y="427" width="30.3" height="9" rx="2" fill="#0969da"/>
+<rect x="185.5" y="438" width="56.5" height="9" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="249.0" y="439" font-size="11" font-weight="600" fill="#0969da">1.59×<tspan fill="#57606a" font-weight="400"> · </tspan><tspan fill="#2da44e">2.37×</tspan></text>
 <text x="156" y="467" text-anchor="end" font-size="12" font-weight="500">join-1024</text>
 <rect x="189.5" y="455" width="188" height="17" rx="8.5" fill="#f6f8fa" stroke="#d0d7de" stroke-width="0.8"/>
 <text x="283.5" y="467" text-anchor="middle" font-size="10.8" fill="#57606a">Porffor wrong output (4/17)</text>
@@ -87,6 +87,6 @@
 <text x="156" y="548" text-anchor="end" font-size="12" font-weight="500">retained-objects</text>
 <rect x="189.5" y="536" width="188" height="17" rx="8.5" fill="#f6f8fa" stroke="#d0d7de" stroke-width="0.8"/>
 <text x="283.5" y="548" text-anchor="middle" font-size="10.8" fill="#57606a">Porffor runtime failed (4/17)</text>
-<text x="28" y="601" font-size="11" fill="#57606a">2026-11-27 · ABI 97 (1fa26b5a03c7) · Ryzen 7 7800X3D (CPUs 6–7, 4 GiB) · medians of 5×21 fresh-Realm runs (10 warmups excluded)</text>
+<text x="28" y="601" font-size="11" fill="#57606a">2026-11-28 · ABI 98 (cdfac041d0de) · Ryzen 7 7800X3D (CPUs 6–7, 4 GiB) · medians of 5×21 fresh-Realm runs (10 warmups excluded)</text>
 </g>
 </svg>

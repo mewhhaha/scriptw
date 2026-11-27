@@ -4,10 +4,89 @@
 //! The same key inside a primitive String reads its one code unit directly.
 use super::*;
 use crate::gc_types::{
-    ArrayObject, CodeUnitArray, GcNullability, StringConstruction, StringValue, StringValueSchema,
+    ArrayObject, ArrayObjectSchema, CodeUnitArray, GcNullability, StringConstruction, StringValue,
+    StringValueSchema,
 };
 
 impl FunctionBuilder<'_> {
+    /// Inline numeric-key probe for `PropertyRead` (`compile_ordinary_property_read_from_locals`):
+    /// mirrors `GetV` and `compile_callee_to_value` by evaluating `index_expr` once
+    /// (keeping `Int32Expression` bits unboxed until a miss), probing packed Array
+    /// elements and primitive String code units directly, and branching to `done`
+    /// on a hit without calling `DynamicPropertyRead`.
+    ///
+    /// Returns `Ok(true)` when `key_value` has been evaluated (and any hit already
+    /// branched to `done`), or `Ok(false)` when the key was not evaluated and the
+    /// caller should compile it normally.
+    pub(super) fn try_emit_inline_indexed_property_read(
+        &mut self,
+        target: &TypedExpr,
+        key: &PropertyKeyIr,
+        receiver: &ValueLocals,
+        key_value: &ValueLocals,
+        pending: &CompletionLocals,
+        done: crate::emit::ControlTarget,
+        function: &mut Function,
+    ) -> Result<bool, EmitError> {
+        let (PropertyKeyIr::ArrayIndex(index_expr) | PropertyKeyIr::StringExpr(index_expr)) = key
+        else {
+            return Ok(false);
+        };
+        let may_be_array = target.possible_kinds.contains(ValueKind::Array);
+        let may_be_string = target.possible_kinds.contains(ValueKind::String);
+        if !index_expr.possible_kinds.contains(ValueKind::Number)
+            || (!may_be_array && !may_be_string)
+        {
+            return Ok(false);
+        }
+        let schema = self.runtime_schema();
+        if may_be_array {
+            if let Some(int32_key) = crate::operations::Int32Expression::of(index_expr) {
+                let bits = schema.reserve_i32_local(function);
+                self.compile_int32_bits(&int32_key, function)?;
+                bits.store(function);
+                let signedness = int32_key.signedness();
+                let found = self
+                    .emit_int32_array_own_data_read(receiver, bits, signedness, pending, function);
+                found.load(function);
+                schema.release_i32_local(found, function);
+                self.emit_branch_if_to_target(done, function);
+                // Materialize the Number key once on miss for String probing and
+                // the fallback DynamicPropertyRead.
+                bits.load(function);
+                signedness.emit_to_f64(function);
+                function.instruction(&Instruction::I64ReinterpretF64);
+                key_value.scalar().store(function);
+                key_value.set_number(key_value.scalar(), function);
+                schema.release_i32_local(bits, function);
+                if may_be_string {
+                    let character = self
+                        .emit_raw_numeric_string_index_read(receiver, key_value, pending, function);
+                    character.load(function);
+                    schema.release_i32_local(character, function);
+                    self.emit_branch_if_to_target(done, function);
+                }
+                return Ok(true);
+            }
+        }
+        self.compile_expr_to_value(index_expr, key_value, function)?;
+        if may_be_array {
+            let found =
+                self.emit_raw_numeric_array_own_data_read(receiver, key_value, pending, function);
+            found.load(function);
+            schema.release_i32_local(found, function);
+            self.emit_branch_if_to_target(done, function);
+        }
+        if may_be_string {
+            let character =
+                self.emit_raw_numeric_string_index_read(receiver, key_value, pending, function);
+            character.load(function);
+            schema.release_i32_local(character, function);
+            self.emit_branch_if_to_target(done, function);
+        }
+        Ok(true)
+    }
+
     pub(crate) fn emit_raw_numeric_array_own_data_read(
         &mut self,
         lookup: &ValueLocals,
@@ -30,38 +109,28 @@ impl FunctionBuilder<'_> {
                 .heap_type,
         ));
         self.open_frame(ControlFrameKind::If, f);
-        // Ordered bounds reject NaN and infinities before the integer cast.
-        // Numeric -0 is index 0; the distinct String "-0" never enters this arm.
-        raw_key.scalar().load(f);
-        f.instruction(&Instruction::F64ReinterpretI64);
-        f.instruction(&Instruction::F64Const(Ieee64::from(0.0)));
-        f.instruction(&Instruction::F64Ge);
-        raw_key.scalar().load(f);
-        f.instruction(&Instruction::F64ReinterpretI64);
-        f.instruction(&Instruction::F64Const(Ieee64::from(u32::MAX as f64)));
-        f.instruction(&Instruction::F64Lt);
-        f.instruction(&Instruction::I32And);
-        raw_key.scalar().load(f);
-        f.instruction(&Instruction::F64ReinterpretI64);
-        // An integral value equals its saturating i64 truncation converted
-        // back; the bounds above make that exact, and no rounding operator
-        // (a host call on the baseline x86-64 target) is needed.
+        // The unsigned range and round trip admit exactly array indices below
+        // 2^32 - 1. NaN, infinities, negatives and fractions fail; numeric -0
+        // equals +0.0 and names index 0 (distinct String "-0" never enters here).
+        let index = s.reserve_i64_local(f);
         raw_key.scalar().load(f);
         f.instruction(&Instruction::F64ReinterpretI64);
         f.instruction(&Instruction::I64TruncSatF64S);
+        index.store(f);
+        index.load(f);
+        f.instruction(&Instruction::I64Const(i64::from(u32::MAX)));
+        f.instruction(&Instruction::I64LtU);
+        raw_key.scalar().load(f);
+        f.instruction(&Instruction::F64ReinterpretI64);
+        index.load(f);
         f.instruction(&Instruction::F64ConvertI64S);
         f.instruction(&Instruction::F64Eq);
         f.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, f);
-        let index = s.reserve_i64_local(f);
-        raw_key.scalar().load(f);
-        f.instruction(&Instruction::F64ReinterpretI64);
-        f.instruction(&Instruction::I64TruncF64U);
-        index.store(f);
         self.emit_packed_array_own_data_at(lookup, index, result, found, f);
-        s.release_i64_local(index, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        s.release_i64_local(index, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
@@ -136,6 +205,48 @@ impl FunctionBuilder<'_> {
         found.load(f);
         self.open_frame(ControlFrameKind::If, f);
         result.set_normal(&value, f);
+        f.instruction(&Instruction::Else);
+        // Out-of-bounds read on a dense ArrayObject (COUNT == LENGTH,
+        // index >= LENGTH, index < 2^32 - 1): by ECMA-262 10.4.2.4 an Array
+        // cannot hold an own array-index property at or beyond its length, so
+        // when the prototype chain is the protected %Array.prototype% (no own
+        // indices) -> %Object.prototype% (unchanged intrinsic rows, immutable
+        // null prototype), the read is guaranteed to return undefined without
+        // observable effects or decimal key formatting.
+        let miss = self.open_frame(ControlFrameKind::Block, f);
+        let length = s.reserve_i64_local(f);
+        s.field(ArrayObjectSchema::LENGTH)
+            .read(&array, s, f)
+            .store_i64(length, f);
+        index.load(f);
+        length.load(f);
+        f.instruction(&Instruction::I64LtU);
+        s.field(ArrayObjectSchema::COUNT).read(&array, s, f);
+        length.load(f);
+        f.instruction(&Instruction::I64Ne);
+        f.instruction(&Instruction::I32Or);
+        s.release_i64_local(length, f);
+        self.emit_branch_if_to_target(miss, f);
+        let header = s.reserve_gc_local(f).initialize(
+            s.field(ArrayObjectSchema::OBJECT)
+                .read(&array, s, f)
+                .reference(),
+            f,
+        );
+        let prototype = s.reserve_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(&header, s, f)
+                .reference(),
+            f,
+        );
+        header.clear(f);
+        self.emit_array_prototype_chain_without_indices_or_branch(&prototype, miss, f);
+        prototype.clear(f);
+        value.set_undefined(f);
+        result.set_normal(&value, f);
+        found.set_constant(1, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         value.clear(f);
@@ -168,33 +279,27 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Eq);
         f.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, f);
-        // Ordered bounds reject NaN and infinities before the integer
-        // conversion. Numeric -0 is index 0, as its property name is "0".
-        raw_key.scalar().load(f);
-        f.instruction(&Instruction::F64ReinterpretI64);
-        f.instruction(&Instruction::F64Const(Ieee64::from(0.0)));
-        f.instruction(&Instruction::F64Ge);
-        raw_key.scalar().load(f);
-        f.instruction(&Instruction::F64ReinterpretI64);
-        f.instruction(&Instruction::F64Const(Ieee64::from(u32::MAX as f64)));
-        f.instruction(&Instruction::F64Lt);
-        f.instruction(&Instruction::I32And);
-        raw_key.scalar().load(f);
-        f.instruction(&Instruction::F64ReinterpretI64);
-        // An integral value equals its saturating i64 truncation converted
-        // back; the bounds above make that exact, and no rounding operator
-        // (a host call on the baseline x86-64 target) is needed.
+        // The unsigned range and round trip admit exactly array indices below
+        // 2^32 - 1. NaN, infinities, negatives and fractions fail; numeric -0
+        // equals +0.0 and names index 0.
+        let index64 = s.reserve_i64_local(f);
         raw_key.scalar().load(f);
         f.instruction(&Instruction::F64ReinterpretI64);
         f.instruction(&Instruction::I64TruncSatF64S);
+        index64.store(f);
+        index64.load(f);
+        f.instruction(&Instruction::I64Const(i64::from(u32::MAX)));
+        f.instruction(&Instruction::I64LtU);
+        raw_key.scalar().load(f);
+        f.instruction(&Instruction::F64ReinterpretI64);
+        index64.load(f);
         f.instruction(&Instruction::F64ConvertI64S);
         f.instruction(&Instruction::F64Eq);
         f.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, f);
         let index = s.reserve_i32_local(f);
-        raw_key.scalar().load(f);
-        f.instruction(&Instruction::F64ReinterpretI64);
-        f.instruction(&Instruction::I32TruncF64U);
+        index64.load(f);
+        f.instruction(&Instruction::I32WrapI64);
         index.store(f);
         let string = s
             .reserve_gc_local(f)
@@ -231,6 +336,7 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(index, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        s.release_i64_local(index64, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         found

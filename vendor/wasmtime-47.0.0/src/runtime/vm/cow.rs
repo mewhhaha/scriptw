@@ -336,6 +336,23 @@ pub struct MemoryImageSlot {
     /// Also note that this is always page-aligned.
     accessible: HostAlignedByteCount,
 
+    /// Length of the leading inaccessible (`PROT_NONE`) prefix preserved
+    /// across pooled GC heap reuses (e.g. the copying collector's null guard).
+    /// Always `<= self.accessible` and nonzero only when `self.image.is_none()`.
+    prefix_inaccessible: HostAlignedByteCount,
+
+    /// Optional exact dirty range within `prefix_inaccessible..accessible`
+    /// recorded by a GC heap that never wrote outside its first nursery.
+    dirty_watermark: Option<Range<usize>>,
+
+    /// Tracked resident bytes in this slot for `keep_resident` accounting on
+    /// the watermark fast-reset path.
+    resident_bytes: usize,
+
+    /// End offset up to which pages after `prefix_inaccessible` are already
+    /// counted as resident in `resident_bytes`.
+    resident_prefix_end: usize,
+
     /// Whether this slot may have "dirty" pages (pages written by an
     /// instantiation). Set by `instantiate()` and cleared by
     /// `clear_and_remain_ready()`, and used in assertions to ensure
@@ -344,9 +361,10 @@ pub struct MemoryImageSlot {
     /// Invariant: if !dirty, then this memory slot contains a clean
     /// CoW mapping of `image`, if `Some(..)`, and anonymous-zero
     /// memory beyond the image up to `static_size`. The addresses
-    /// from offset 0 to `self.accessible` are R+W and set to zero or the
-    /// initial image content, as appropriate. Everything between
-    /// `self.accessible` and `self.static_size` is inaccessible.
+    /// from offset `self.prefix_inaccessible` to `self.accessible` are R+W
+    /// and set to zero or the initial image content, as appropriate.
+    /// Everything in `0..self.prefix_inaccessible` and
+    /// `self.accessible..self.static_size` is inaccessible.
     dirty: bool,
 }
 
@@ -356,6 +374,7 @@ impl fmt::Debug for MemoryImageSlot {
             .field("base", &self.base)
             .field("static_size", &self.static_size)
             .field("accessible", &self.accessible)
+            .field("prefix_inaccessible", &self.prefix_inaccessible)
             .field("dirty", &self.dirty)
             .finish_non_exhaustive()
     }
@@ -379,9 +398,55 @@ impl MemoryImageSlot {
             base,
             static_size,
             accessible,
+            prefix_inaccessible: HostAlignedByteCount::ZERO,
+            dirty_watermark: None,
+            resident_bytes: 0,
+            resident_prefix_end: 0,
             image: None,
             dirty: false,
         }
+    }
+
+    /// Length in bytes of the leading inaccessible (`PROT_NONE`) prefix.
+    pub(crate) fn prefix_inaccessible(&self) -> usize {
+        self.prefix_inaccessible.byte_count()
+    }
+
+    /// Adjust the leading inaccessible (`PROT_NONE`) prefix to `len` bytes
+    /// (a host-page-aligned length `<= self.accessible`). Returns `false`
+    /// without changing permissions if protecting a nonzero prefix is
+    /// unsupported on this host.
+    pub(crate) fn set_prefix_inaccessible(&mut self, len: usize) -> Result<bool> {
+        let len = HostAlignedByteCount::new(len)?;
+        assert!(len <= self.accessible);
+        assert!(len.is_zero() || self.image.is_none());
+        if len == self.prefix_inaccessible {
+            return Ok(true);
+        }
+        if len > self.prefix_inaccessible {
+            self.set_protection(self.prefix_inaccessible..len, false)?;
+            self.prefix_inaccessible = len;
+            return Ok(true);
+        }
+        self.set_protection(len..self.prefix_inaccessible, true)?;
+        self.prefix_inaccessible = len;
+        self.resident_prefix_end = 0;
+        Ok(true)
+    }
+
+    /// Record that the only bytes written in this slot since it was last clean
+    /// lie within `dirty_range`.
+    ///
+    /// # Safety
+    /// The caller must guarantee that no byte outside `dirty_range` was written
+    /// since the slot was instantiated from its clean state.
+    pub(crate) unsafe fn set_dirty_watermark(&mut self, dirty_range: Range<usize>) {
+        assert!(self.dirty);
+        assert!(self.image.is_none());
+        assert!(dirty_range.start >= self.prefix_inaccessible.byte_count());
+        assert!(dirty_range.start <= dirty_range.end);
+        assert!(dirty_range.end <= self.accessible.byte_count());
+        self.dirty_watermark = Some(dirty_range);
     }
 
     pub(crate) fn set_heap_limit(&mut self, size_bytes: usize) -> Result<()> {
@@ -442,6 +507,11 @@ impl MemoryImageSlot {
         let initial_size_bytes_page_aligned =
             HostAlignedByteCount::new_rounded_up(initial_size_bytes)?;
 
+        if maybe_image.is_some() && !self.prefix_inaccessible.is_zero() {
+            let restored = self.set_prefix_inaccessible(0)?;
+            debug_assert!(restored);
+        }
+
         // First order of business is to blow away the previous linear memory
         // image if it doesn't match the image specified here. If one is
         // detected then it's reset with anonymous memory which means that all
@@ -477,8 +547,12 @@ impl MemoryImageSlot {
             && (memory_tunables.guard_size() > 0
                 || ty.can_use_virtual_memory(memory_tunables.tunables(), host_page_size_log2))
         {
-            self.set_protection(initial_size_bytes_page_aligned..self.accessible, false)?;
+            let hide_start = initial_size_bytes_page_aligned.max(self.prefix_inaccessible);
+            self.set_protection(hide_start..self.accessible, false)?;
             self.accessible = initial_size_bytes_page_aligned;
+            if self.prefix_inaccessible > self.accessible {
+                self.prefix_inaccessible = self.accessible;
+            }
         }
 
         // Now that memory is sized appropriately the final operation is to
@@ -507,6 +581,7 @@ impl MemoryImageSlot {
 
         // Flag ourselves as `dirty` which means that the next operation on this
         // slot is required to be `clear_and_remain_ready`.
+        debug_assert!(self.dirty_watermark.is_none());
         self.dirty = true;
 
         Ok(())
@@ -518,6 +593,7 @@ impl MemoryImageSlot {
                 image.remap_as_zeros_at(self.base.as_mut_ptr())?;
             }
             self.image = None;
+            self.resident_prefix_end = 0;
         }
         Ok(())
     }
@@ -541,9 +617,58 @@ impl MemoryImageSlot {
     ) -> Result<usize> {
         assert!(self.dirty);
 
+        // Maximum dirty nursery span zeroed directly in userspace by the
+        // watermark fast-reset path without `PAGEMAP_SCAN` or `MADV_DONTNEED`.
+        // Covers the full 4 MiB first nursery on a 32 MiB initial heap while
+        // staying bounded by the pool's `keep_resident` budget.
+        const WATERMARK_FAST_RESET_MAX_BYTES: usize = 4 * 1024 * 1024;
+
+        let dirty_watermark = self.dirty_watermark.take();
+        if let Some(range) = dirty_watermark {
+            if vm::decommit_behavior() == DecommitBehavior::RestoreOriginalMapping
+                && self.image.is_none()
+            {
+                let used = range.end - range.start;
+                if used <= WATERMARK_FAST_RESET_MAX_BYTES {
+                    let page = host_page_size();
+                    let dirty_start_aligned = range.start - (range.start % page);
+                    let dirty_end_aligned = range.end.next_multiple_of(page);
+                    let new_bytes = if used == 0 {
+                        0
+                    } else {
+                        let prev_end = self.resident_prefix_end.max(dirty_start_aligned);
+                        dirty_end_aligned.saturating_sub(prev_end)
+                    };
+                    let projected_resident = self.resident_bytes.saturating_add(new_bytes);
+                    if projected_resident <= keep_resident.byte_count() {
+                        if used > 0 {
+                            debug_assert!(range.start >= self.prefix_inaccessible.byte_count());
+                            debug_assert!(range.end <= self.accessible.byte_count());
+                            // SAFETY: `range` lies within the exclusively owned,
+                            // read-write `prefix_inaccessible..accessible` slice.
+                            unsafe {
+                                core::slice::from_raw_parts_mut(
+                                    self.base.as_mut_ptr().add(range.start),
+                                    used,
+                                )
+                                .fill(0);
+                            }
+                            self.resident_prefix_end =
+                                self.resident_prefix_end.max(dirty_end_aligned);
+                        }
+                        self.resident_bytes = projected_resident;
+                        self.dirty = false;
+                        return Ok(self.resident_bytes);
+                    }
+                }
+            }
+        }
+
         let bytes_resident =
             unsafe { self.reset_all_memory_contents(pagemap, keep_resident, decommit)? };
 
+        self.resident_bytes = bytes_resident;
+        self.resident_prefix_end = 0;
         self.dirty = false;
         Ok(bytes_resident)
     }
@@ -586,26 +711,39 @@ impl MemoryImageSlot {
             DecommitBehavior::RestoreOriginalMapping
         );
 
+        let prefix = self.prefix_inaccessible;
+        let len = self
+            .accessible
+            .checked_sub(prefix)
+            .expect("prefix_inaccessible <= accessible");
+        if len.is_zero() {
+            return 0;
+        }
+        let ptr = unsafe { self.base.as_mut_ptr().add(prefix.byte_count()) };
+
         unsafe {
             return match &self.image {
                 // If there's a backing image then manually resetting a region
                 // is a bit trickier than without an image, so delegate to the
                 // helper function below.
-                Some(image) => reset_with_pagemap(
-                    pagemap,
-                    self.base.as_mut_ptr(),
-                    self.accessible,
-                    keep_resident,
-                    |region| manually_reset_region(self.base.as_mut_ptr().addr(), image, region),
-                    decommit,
-                ),
+                Some(image) => {
+                    debug_assert!(prefix.is_zero());
+                    reset_with_pagemap(
+                        pagemap,
+                        ptr,
+                        len,
+                        keep_resident,
+                        |region| manually_reset_region(self.base.as_mut_ptr().addr(), image, region),
+                        decommit,
+                    )
+                }
 
                 // If there's no memory image for this slot then pages are always
                 // manually reset back to zero or given to `decommit`.
                 None => reset_with_pagemap(
                     pagemap,
-                    self.base.as_mut_ptr(),
-                    self.accessible,
+                    ptr,
+                    len,
                     keep_resident,
                     |region| region.fill(0),
                     decommit,
@@ -717,6 +855,10 @@ impl MemoryImageSlot {
 
         self.image = None;
         self.accessible = HostAlignedByteCount::ZERO;
+        self.prefix_inaccessible = HostAlignedByteCount::ZERO;
+        self.dirty_watermark = None;
+        self.resident_bytes = 0;
+        self.resident_prefix_end = 0;
 
         Ok(())
     }
@@ -1317,5 +1459,82 @@ mod test {
         write_page(&mut memfd, 5);
         write_page(&mut memfd, 8);
         assert_pristine_after_reset(&mut memfd);
+    }
+
+    #[test]
+    fn prefix_inaccessible_and_watermark_fast_reset() {
+        let page_size = host_page_size();
+        let ty = dummy_memory();
+        let tunables = Tunables {
+            memory_reservation: 4 << 20,
+            ..Tunables::default_miri()
+        };
+        let mmap = mmap_4mib_inaccessible();
+        let slot_len = 512 * 1024;
+        let mut slot =
+            MemoryImageSlot::create(mmap.zero_offset(), HostAlignedByteCount::ZERO, 4 << 20);
+        let mem_tunables = MemoryTunables::new(&tunables, MemoryKind::GcHeap);
+        let pagemap = PageMap::new();
+        let keep_resident = HostAlignedByteCount::new(slot_len).unwrap();
+
+        slot.instantiate(slot_len, None, &ty, &mem_tunables)
+            .unwrap();
+        assert!(slot.set_prefix_inaccessible(page_size).unwrap());
+        assert_eq!(slot.prefix_inaccessible(), page_size);
+
+        // Write a small span past the inaccessible prefix and reset via watermark.
+        unsafe {
+            with_slice_mut(&mmap, page_size..page_size + 64, |slice| {
+                slice.fill(0xa5);
+            });
+            slot.set_dirty_watermark(page_size..page_size + 64);
+        }
+        let mut decommitted = false;
+        let resident = slot
+            .clear_and_remain_ready(pagemap.as_ref(), keep_resident, |_, len| {
+                if len > 0 {
+                    decommitted = true;
+                }
+            })
+            .unwrap();
+        assert!(!decommitted);
+        assert_eq!(resident, page_size);
+        assert_eq!(slot.prefix_inaccessible(), page_size);
+
+        // Next GC reuse keeps the inaccessible prefix and reads zeros past it.
+        slot.instantiate(slot_len, None, &ty, &mem_tunables)
+            .unwrap();
+        assert_eq!(slot.prefix_inaccessible(), page_size);
+        let slice = unsafe { mmap.slice(page_size..page_size + 64) };
+        assert!(slice.iter().all(|b| *b == 0));
+
+        // Watermark exceeding `keep_resident` falls back to normal reset, still skipping prefix.
+        let large_end = page_size + 300 * 1024;
+        let small_keep_resident = HostAlignedByteCount::new(128 * 1024).unwrap();
+        unsafe {
+            with_slice_mut(&mmap, page_size..large_end, |slice| {
+                slice[0] = 0x5a;
+                slice[300 * 1024 - 1] = 0x5a;
+            });
+            slot.set_dirty_watermark(page_size..large_end);
+        }
+        slot.clear_and_remain_ready(pagemap.as_ref(), small_keep_resident, |ptr, len| unsafe {
+            decommit_pages(ptr, len).unwrap()
+        })
+        .unwrap();
+        assert_eq!(slot.prefix_inaccessible(), page_size);
+
+        // Linear memory reuse restores RW access to 0..page_size and reads zeros everywhere.
+        assert!(slot.set_prefix_inaccessible(0).unwrap());
+        assert_eq!(slot.prefix_inaccessible(), 0);
+        slot.instantiate(
+            slot_len,
+            None,
+            &ty,
+            &MemoryTunables::new(&tunables, MemoryKind::LinearMemory),
+        )
+        .unwrap();
+        let slice = unsafe { mmap.slice(0..large_end) };
+        assert!(slice.iter().all(|b| *b == 0));
     }
 }

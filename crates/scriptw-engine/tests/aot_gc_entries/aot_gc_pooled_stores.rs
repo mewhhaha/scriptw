@@ -14,7 +14,7 @@ use wasmtime::{
     StoreLimitsBuilder, StructRef, StructRefPre, Trap, Val,
 };
 
-const KEEP_RESIDENT: usize = 32 * 1024 * 1024;
+const KEEP_RESIDENT: usize = scriptw_engine::MAX_POOLED_KEEP_RESIDENT_BYTES;
 
 fn runtime_config() -> Config {
     let mut config = Config::new();
@@ -417,7 +417,7 @@ fn a_reused_slot_is_zero_past_keep_resident_and_past_the_scans_region_limit() {
                     data[page * WASM_PAGE + (page % 7) * 4096 + 13] = 0xa5;
                 }
             }
-            // Every byte: 20 MiB dirty against 16 MiB kept resident.
+            // Every byte: 4 MiB past KEEP_RESIDENT dirty against KEEP_RESIDENT kept resident.
             1 => data.fill(0x5a),
             _ => {}
         }

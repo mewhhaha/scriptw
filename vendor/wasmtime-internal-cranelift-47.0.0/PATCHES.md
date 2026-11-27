@@ -790,3 +790,15 @@ in-bounds chunk. The scalar loop resumes at the first unprocessed
 element and uses the normal checked array operations. A null operand
 selects this loop before any length load, preserving skipped accesses,
 partial writes, and Wasm trap order.
+
+## Post-inlining cold-path propagation
+
+`src/compiler.rs`, `src/func_environ.rs`: `InliningCompiler::finish_compiling`
+runs `func_environ::cold_paths::spread(&mut cx.codegen_context.func)` when
+`self.tunables.inlining != Inlining::No`, after CLIF inlining and before
+backend compilation (`FunctionCompiler::finish*`). Cranelift's CLIF inliner
+preserves `cold` flags already set inside a callee but does not mark the
+callee's entry/hot blocks cold when inlined into a cold caller block;
+re-running `cold_paths::spread` after inlining ensures every block inlined into
+a cold caller block inherits `cold` and stays out-of-line behind the function's
+likely code, while `Inlining::No` skips the redundant pass.

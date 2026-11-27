@@ -39,7 +39,7 @@ pub struct PrecompiledEmbeddedProgram {
     execution_facts: Range<usize>,
     facts: ProgramExecutionFacts,
     mode: WasmNativeCompilationMode,
-    image_sha256: [u8; 32],
+    image_sha256: std::sync::OnceLock<[u8; 32]>,
 }
 
 #[derive(Clone)]
@@ -94,8 +94,25 @@ impl PrecompiledEmbeddedProgram {
         }
     }
     /// SHA-256 of the complete envelope, including its stored checksum.
+    /// Computed lazily on demand so admission never pays SHA-256 cost, and
+    /// hashes file-backed images through a temporary mapping so the long-lived
+    /// transport view stays unfaulted.
     pub fn image_sha256(&self) -> [u8; 32] {
-        self.image_sha256
+        *self.image_sha256.get_or_init(|| {
+            use sha2::{Digest, Sha256};
+            #[cfg(all(unix, not(miri)))]
+            if let ImageBacking::File(bytes) = &self.backing {
+                // SAFETY: `bytes` already holds the checked nonzero bounded
+                // length of an immutable file inode.
+                if let Ok(temp) = unsafe {
+                    file_bytes::FileBytes::map(Arc::clone(bytes.file()), bytes.as_slice().len())
+                } {
+                    temp.advise_sequential();
+                    return Sha256::digest(temp.as_slice()).into();
+                }
+            }
+            Sha256::digest(self.as_bytes()).into()
+        })
     }
     pub fn program_wasm(&self) -> &[u8] {
         &self.as_bytes()[self.program.clone()]
@@ -180,6 +197,7 @@ impl PrecompiledEmbeddedProgram {
             // SAFETY: caller keeps the inode immutable. This temporary view
             // faults only file-cache pages and is released after verification.
             let checked = unsafe { file_bytes::FileBytes::map(Arc::clone(&file), len) }?;
+            checked.advise_sequential();
             let frame = envelope::decode(checked.as_slice())?;
             drop(checked);
             Self::check_file_runtime(&frame)?;
@@ -222,7 +240,7 @@ impl PrecompiledEmbeddedProgram {
             execution_facts: frame.execution_facts,
             facts: frame.facts,
             mode: frame.mode,
-            image_sha256: frame.image_sha256,
+            image_sha256: std::sync::OnceLock::new(),
         }
     }
 

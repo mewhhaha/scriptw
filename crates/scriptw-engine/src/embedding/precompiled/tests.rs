@@ -35,8 +35,8 @@ fn normal(completion: JsCompletion) -> JsValue {
 
 fn resign(bytes: &mut [u8]) {
     let end = bytes.len() - 32;
-    let digest = Sha256::digest(&bytes[..end]);
-    bytes[end..].copy_from_slice(&digest);
+    let digest = blake3::hash(&bytes[..end]);
+    bytes[end..].copy_from_slice(digest.as_bytes());
 }
 
 struct ImageDirectory(std::path::PathBuf);
@@ -115,6 +115,8 @@ fn precompiled_file_executes_from_the_admitted_inode_after_path_replacement() {
         image.image_sha256().as_slice(),
         Sha256::digest(produced.as_bytes()).as_slice()
     );
+    assert_eq!(image.image_sha256(), produced.image_sha256());
+    assert_eq!(image.clone().image_sha256(), produced.image_sha256());
 
     fs::rename(&path, &original).unwrap();
     fs::write(&path, b"separate inode").unwrap();
@@ -472,7 +474,7 @@ fn precompiled_execution_facts_are_canonical_bounded_and_product_versioned() {
     let bytes =
         envelope::encode(b"raw", b"native", &facts, WasmNativeCompilationMode::Fast).unwrap();
     let footer = bytes.len() - envelope::FOOTER_BYTES;
-    assert_eq!(&bytes[footer..footer + 8], b"SCRWEP04");
+    assert_eq!(&bytes[footer..footer + 8], b"SCRWEP05");
     let frame = envelope::decode(&bytes).unwrap();
     assert!(frame.facts.foreign.is_empty());
     assert!(matches!(
@@ -482,7 +484,7 @@ fn precompiled_execution_facts_are_canonical_bounded_and_product_versioned() {
     assert_eq!(&bytes[frame.program], b"raw");
     assert_eq!(frame.native, 0..6);
     assert_eq!(&bytes[frame.native], b"native");
-    for magic in [b"SCRWEP01", b"SCRWEP02", b"SCRWEP03"] {
+    for magic in [b"SCRWEP01", b"SCRWEP02", b"SCRWEP03", b"SCRWEP04"] {
         let mut historical = bytes.clone();
         historical[footer..footer + 8].copy_from_slice(magic);
         resign(&mut historical);

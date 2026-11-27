@@ -42,6 +42,18 @@ impl FileBytes {
         Ok(Self { file, address, len })
     }
 
+    pub(super) fn advise_sequential(&self) {
+        // Advisory prefetch/reclaim hint for one-pass envelope verification.
+        // SAFETY: the mapping is live for `self.len` bytes and owned by `self`.
+        let _ = unsafe {
+            rustix::mm::madvise(
+                self.address.as_ptr().cast(),
+                self.len,
+                rustix::mm::Advice::Sequential,
+            )
+        };
+    }
+
     pub(super) fn as_slice(&self) -> &[u8] {
         // SAFETY: the caller of map guarantees the contents remain immutable.
         // The returned borrow cannot outlive this owner or its mapping.

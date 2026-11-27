@@ -232,9 +232,10 @@ mod tests {
         assert!(PooledStores::new(one, MAX_POOLED_KEEP_RESIDENT_BYTES).is_ok());
         assert!(PooledStores::new(one, MAX_POOLED_KEEP_RESIDENT_BYTES + 65536).is_err());
         assert!(PooledStores::new(one, 4096).is_err());
+        assert_eq!(MAX_POOLED_KEEP_RESIDENT_BYTES, 32 * 1024 * 1024);
         assert_eq!(
             PooledStores::sequential(),
-            PooledStores::new(one, 32 * 1024 * 1024).unwrap()
+            PooledStores::new(one, MAX_POOLED_KEEP_RESIDENT_BYTES).unwrap()
         );
     }
 

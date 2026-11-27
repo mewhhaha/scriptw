@@ -1,5 +1,5 @@
 mod branch_threading;
-mod cold_paths;
+pub(crate) mod cold_paths;
 mod gc;
 mod operands;
 mod set_tests;

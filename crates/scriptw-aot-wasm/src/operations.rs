@@ -1,9 +1,9 @@
 use super::*;
 use crate::gc_types::{
     BigIntLimbArray, BigIntValue, BigIntValueSchema, CodeUnitArray, CompletionLocals,
-    FunctionObject, FunctionObjectSchema, GcLocal, I32Local, I64Local, ProxyCallCapability,
-    ProxyObject, ProxyObjectSchema, RuntimeSchema, StringValue, StringValueSchema, SymbolValue,
-    ValueLocals,
+    FunctionObject, FunctionObjectSchema, GcLocal, I32Local, I64Local, JavaScriptObject, Nullable,
+    OrdinaryObject, OrdinaryObjectSchema, ProxyCallCapability, ProxyObject, ProxyObjectSchema,
+    RuntimeSchema, StringValue, StringValueSchema, SymbolValue, ValueLocals,
 };
 use crate::runtime_helpers::RuntimeHelperPropertyKeyParameter;
 use scriptw_ir::NativeErrorKind;
@@ -820,6 +820,15 @@ impl<'a> FunctionBuilder<'a> {
                         found.load(function);
                         schema.release_i32_local(found, function);
                         self.emit_branch_if_to_target(property_exit, function);
+                        if operands[0].possible_kinds.contains(ValueKind::Object) {
+                            self.emit_raw_string_compact_absent_closed_tail(
+                                &inputs[0],
+                                &inputs[1],
+                                &pending,
+                                property_exit,
+                                function,
+                            )?;
+                        }
                     }
                 }
                 // Source operands already completed in order. A static String
@@ -1093,6 +1102,110 @@ impl<'a> FunctionBuilder<'a> {
         self.emit_branch_to_target(exit, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
+    }
+
+    /// After `emit_raw_string_own_data_read` missed on `target` and `raw_key`:
+    /// if `raw_key` is a String and `target` is a sealed `OrdinaryObject` with
+    /// `CompactDataStorage`, the key is proved absent from own storage. When
+    /// `[[Prototype]]` is `null` or the current Realm's unchanged
+    /// `%Object.prototype%` whose intrinsic layout cannot contain `raw_key`
+    /// (by its 64-bit ASCII hash-bucket filter), `GetV` returns `undefined`
+    /// directly without observable effects.
+    fn emit_raw_string_compact_absent_closed_tail(
+        &mut self,
+        target: &ValueLocals,
+        raw_key: &ValueLocals,
+        result: &CompletionLocals,
+        exit: crate::emit::ControlTarget,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let miss = self.open_frame(ControlFrameKind::Block, f);
+        raw_key.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(miss, f);
+        let object = s.reserve_non_null_gc_local(f).initialize(
+            target.sealed_reference_or_branch::<OrdinaryObject>(
+                s,
+                self.local_branch_label(miss),
+                f,
+            ),
+            f,
+        );
+        let properties = s.reserve_non_null_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROPERTIES)
+                .read(&object, s, f)
+                .reference(),
+            f,
+        );
+        let compact = s.reserve_non_null_gc_local(f).initialize(
+            s.emit_compact_storage_or_branch(&properties, self.local_branch_label(miss), f),
+            f,
+        );
+        compact.clear(f);
+        properties.clear(f);
+        let prototype = s
+            .reserve_gc_local::<JavaScriptObject, Nullable>(f)
+            .initialize(
+                s.field(OrdinaryObjectSchema::PROTOTYPE)
+                    .read(&object, s, f)
+                    .reference(),
+                f,
+            );
+        object.clear(f);
+        let absent = self.open_frame(ControlFrameKind::Block, f);
+        prototype.load(s, f).is_null(f);
+        self.emit_branch_if_to_target(absent, f);
+        if self.strings.has_intrinsic_property_layout(
+            crate::intrinsics::IntrinsicPropertyLayoutId::ObjectPrototype,
+        )? {
+            let layout = crate::intrinsics::IntrinsicPropertyLayoutId::ObjectPrototype.layout()?;
+            let mut name_buckets = 0u64;
+            for property in layout.properties() {
+                if let crate::intrinsics::IntrinsicKey::Name(name) = property.key {
+                    if !name.is_ascii() {
+                        name_buckets = u64::MAX;
+                        break;
+                    }
+                    let mut hash = 14695981039346656037u64;
+                    for &byte in name.as_bytes() {
+                        hash ^= u64::from(byte);
+                        hash = hash.wrapping_mul(1099511628211);
+                    }
+                    name_buckets |= 1u64 << (hash >> 58);
+                }
+            }
+            let name = s
+                .reserve_gc_local(f)
+                .initialize(raw_key.cast_reference::<StringValue>(s, f), f);
+            let hash = s.reserve_i64_local(f);
+            self.emit_string_key_hash(&name, hash, f);
+            name.clear(f);
+            f.instruction(&Instruction::I64Const(1));
+            hash.load(f);
+            s.release_i64_local(hash, f);
+            f.instruction(&Instruction::I64Const(58));
+            f.instruction(&Instruction::I64ShrU);
+            f.instruction(&Instruction::I64Rotl);
+            f.instruction(&Instruction::I64Const(name_buckets as i64));
+            f.instruction(&Instruction::I64And);
+            f.instruction(&Instruction::I64Eqz);
+            f.instruction(&Instruction::I32Eqz);
+            self.emit_branch_if_to_target(miss, f);
+            self.emit_unchanged_object_prototype_or_branch(&prototype, miss, f);
+        } else {
+            self.emit_branch_to_target(miss, f);
+        }
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        prototype.clear(f);
+        result.value().set_undefined(f);
+        result.set_normal(result.value(), f);
+        self.emit_branch_to_target(exit, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        Ok(())
     }
 
     pub(crate) fn emit_to_boolean_payload_from_tagged_locals(

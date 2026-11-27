@@ -500,6 +500,13 @@ struct CopyingHeap {
     /// nursery, when the JIT-visible pair is the active semi-space's.
     nursery_end: u32,
 
+    /// Monotonic latch set once this attached heap has ever allocated or
+    /// collected outside its initial `FirstNursery` span (any collection,
+    /// pretenure window, direct old allocation, or heap growth). Only while
+    /// this remains `false` is `[nursery_start() .. vmctx_data.bump_ptr()]`
+    /// guaranteed to be the sole byte range written since `attach`.
+    ever_left_first_nursery: bool,
+
     /// The active old semi-space's allocation pointer, with a nursery that
     /// the mutator allocates in (stale while `young` is `Pretenuring`).
     old_bump: u32,
@@ -557,6 +564,7 @@ impl CopyingHeap {
             null_guard,
             null_guard_protected: false,
             nursery_end,
+            ever_left_first_nursery: false,
             old_bump: 0,
             young: YoungAllocation::Nursery,
             old_end: 0,
@@ -644,6 +652,7 @@ impl CopyingHeap {
         self.minor_requested = false;
         self.grew = false;
         self.direct_old.clear();
+        self.ever_left_first_nursery = true;
         if self.nursery_end == 0 {
             return Ok(());
         }
@@ -752,6 +761,7 @@ impl CopyingHeap {
         }
         let nursery_bump = self.vmctx_data.bump_ptr();
         let start = self.old_bump;
+        self.ever_left_first_nursery = true;
         self.young = YoungAllocation::Pretenuring { nursery_bump };
         self.vmctx_data.set_bump_ptr(start);
         self.vmctx_data.set_active_space_end(start + window);
@@ -808,6 +818,7 @@ impl CopyingHeap {
         self.reset_bump_ptr();
         self.reset_nursery();
         self.young = YoungAllocation::FirstNursery;
+        self.ever_left_first_nursery = false;
     }
 
     fn resize_semi_spaces(&mut self) {
@@ -937,6 +948,7 @@ impl CopyingHeap {
                     return Some(index);
                 }
                 // No room for a window: an ordinary nursery from here on.
+                self.ever_left_first_nursery = true;
                 self.young = YoungAllocation::Nursery;
             }
             // The nursery is full. With room in the old space for a whole
@@ -954,6 +966,7 @@ impl CopyingHeap {
         }
         self.direct_old.try_reserve(1).ok()?;
         let index = self.allocate(size)?;
+        self.ever_left_first_nursery = true;
         self.grew = false;
         self.direct_old.push(index);
         Some(index)
@@ -1322,25 +1335,72 @@ unsafe impl GcHeap for CopyingHeap {
         self.memory.is_some()
     }
 
-    fn attach(&mut self, memory: crate::vm::Memory) {
+    fn attach(&mut self, mut memory: crate::vm::Memory) {
         assert!(!self.is_attached());
         assert!(!memory.is_shared_memory());
+        let expected_guard = usize::try_from(self.null_guard).unwrap();
+        let current_prefix = memory.prefix_inaccessible();
+        if expected_guard != 0 && current_prefix == expected_guard {
+            // A pooled GC heap slot retains its PROT_NONE null guard across
+            // Store reuses, skipping mprotect on both detach and attach.
+            self.null_guard_protected = true;
+        } else {
+            if current_prefix != 0 {
+                // SAFETY: restoring access to an unexpected inaccessible prefix
+                // before the heap begins allocating cannot invalidate references.
+                let restored = unsafe { memory.set_prefix_access(current_prefix, true) };
+                assert!(
+                    matches!(restored, Ok(true)),
+                    "restoring unexpected inaccessible prefix on GC heap attach: {restored:?}"
+                );
+            }
+            self.null_guard_protected = false;
+        }
         self.vmmemory = Some(memory.vmmemory());
         self.memory = Some(memory);
-        // A pooled heap object is reused with another slot or Store. Its
-        // memory arrives accessible from offset 0 (the previous owner's
-        // `detach` restored the guard; a fresh slot never had one), so the
-        // guard is not protected until `protect_null_guard` runs for it.
-        self.null_guard_protected = false;
         self.initialize_semi_spaces();
 
         if cfg!(gc_zeal) {
-            self.heap_slice_mut().fill(POISON);
+            let start = expected_guard.min(self.heap_slice().len());
+            self.heap_slice_mut()[start..].fill(POISON);
         }
     }
 
     fn detach(&mut self) -> crate::vm::Memory {
         assert!(self.is_attached());
+
+        // If the mutator stayed strictly inside its initial `FirstNursery`
+        // span with no collections, pretenure window, direct-old allocations
+        // or growth, then `[nursery_start() .. vmctx_data.bump_ptr()]` is the
+        // sole byte range ever written in this backing memory. Record it on a
+        // pooled slot so `clear_and_remain_ready` can zero small spans in
+        // userspace without `PAGEMAP_SCAN` or `MADV_DONTNEED`.
+        if !cfg!(gc_zeal)
+            && self.nursery_end != 0
+            && !self.ever_left_first_nursery
+            && self.young == YoungAllocation::FirstNursery
+            && self.direct_old.is_empty()
+            && !self.grew
+            && self.old_bump == self.active_space_start
+        {
+            let start = usize::try_from(self.nursery_start()).unwrap();
+            let end = usize::try_from(self.vmctx_data.bump_ptr()).unwrap();
+            let limit = usize::try_from(self.vmctx_data.active_space_end()).unwrap();
+            let memory = self.memory.as_mut().unwrap();
+            if memory.has_static_image()
+                && start <= end
+                && end <= limit
+                && end <= memory.byte_size()
+            {
+                // SAFETY: `!ever_left_first_nursery`, `FirstNursery`, empty
+                // `direct_old`, `!grew`, `old_bump == active_space_start`, and
+                // `!cfg!(gc_zeal)` guarantee no bytes outside `start..end`
+                // were written since `attach`.
+                unsafe {
+                    memory.set_clean_watermark(start..end);
+                }
+            }
+        }
 
         // Any open window is abandoned with the memory.
         self.young = YoungAllocation::Nursery;
@@ -1356,18 +1416,24 @@ unsafe impl GcHeap for CopyingHeap {
         // The next Store publishes its own table.
         self.vmctx_data.set_func_refs(crate::vm::FuncRefTableView::unpublished());
 
-        // The memory's next owner may access every byte again: a pooling
-        // allocator resets a returned slot from offset 0 and may hand it to
-        // another Store's heap or linear memory. Nothing may reach the
-        // deallocation with the guard still inaccessible.
+        // A pooled slot tracks `prefix_inaccessible` and preserves the
+        // `PROT_NONE` null guard across GC heap reuses (skipping `mprotect` on
+        // detach and next attach; `clear_and_remain_ready` skips the prefix
+        // and non-GC linear memory allocations restore RW). Non-pooled
+        // backings restore access before deallocation.
         if self.null_guard_protected {
             let len = usize::try_from(self.null_guard).unwrap();
-            // SAFETY: restoring access cannot invalidate any reference.
-            let restored = unsafe { self.memory.as_mut().unwrap().set_prefix_access(len, true) };
-            assert!(
-                matches!(restored, Ok(true)),
-                "restoring access to the GC heap's null guard: {restored:?}"
-            );
+            let memory = self.memory.as_mut().unwrap();
+            if memory.has_static_image() {
+                debug_assert_eq!(memory.prefix_inaccessible(), len);
+            } else {
+                // SAFETY: restoring access cannot invalidate any reference.
+                let restored = unsafe { memory.set_prefix_access(len, true) };
+                assert!(
+                    matches!(restored, Ok(true)),
+                    "restoring access to the GC heap's null guard: {restored:?}"
+                );
+            }
             self.null_guard_protected = false;
         }
 
@@ -1386,6 +1452,7 @@ unsafe impl GcHeap for CopyingHeap {
             null_guard: _,
             null_guard_protected: _,
             nursery_end: _,
+            ever_left_first_nursery,
             old_bump,
             young: _,
             old_end,
@@ -1399,6 +1466,7 @@ unsafe impl GcHeap for CopyingHeap {
             young_extern_ref_set_head,
         } = self;
 
+        *ever_left_first_nursery = false;
         *old_bump = 0;
         *old_end = 0;
         *minor_requested = false;
@@ -1706,6 +1774,7 @@ unsafe impl GcHeap for CopyingHeap {
         'b: 'a,
     {
         assert_eq!(self.no_gc_count, 0, "Cannot GC inside a no-GC scope!");
+        self.ever_left_first_nursery = true;
         self.close_pretenure_window();
         // Only a full nursery asks for a minor collection, and only while the
         // old space can take everything in it; any other collection, explicit
@@ -1802,6 +1871,9 @@ unsafe impl GcHeap for CopyingHeap {
                 self.vmctx_data.set_active_space_end(end);
                 self.grew |= delta_bytes_grown > 0;
             }
+        }
+        if delta_bytes_grown > 0 {
+            self.ever_left_first_nursery = true;
         }
 
         // Poison the newly-grown region.

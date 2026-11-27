@@ -675,3 +675,37 @@ to 10):
   into an exact fresh allocation before any safepoint omit the remembered-slot
   write barrier (covering nursery, pretenuring full-GC window, and `direct_old`
   full-payload minor scanning).
+
+## Wave 11 runtime and pooling optimizations
+
+Two targeted runtime patches accompany `CONFIGURATION_SCHEMA` 11:
+
+- **Read-only `from_file_range` (`src/runtime/vm/sys/unix/mmap.rs`)**:
+  `sys::unix::mmap::Mmap::from_file_range` now maps with `ProtFlags::READ`
+  instead of `ProtFlags::READ | ProtFlags::WRITE`. Its sole caller is
+  `Engine::load_code_file_range` (`Module::deserialize_open_file_range`), which
+  only reads the ELF metadata before `CodeMemory::publish` marks `.text`
+  read-execute; `unpublish` and publish-rollback transitions still promote
+  `MAP_PRIVATE` pages via `mprotect(PROT_READ | PROT_WRITE)` if ever needed.
+- **Copying-GC nursery-watermark fast reset & persistent null-guard
+  `prefix_inaccessible` (`src/runtime/vm/{cow.rs,memory.rs,gc/enabled/copying.rs}`,
+  `src/runtime/vm/instance/allocator/pooling{.rs,/memory_pool.rs}`)**:
+  - `MemoryImageSlot` tracks `prefix_inaccessible` (the 4 KiB `PROT_NONE` null
+    guard on pooled copying GC heaps). `CopyingHeap::detach` leaves
+    `prefix_inaccessible` intact on pooled slots instead of restoring RW, and the
+    next `CopyingHeap::attach` recognizes `memory.prefix_inaccessible() ==
+    self.null_guard` to skip `mprotect(PROT_NONE)` on both ends.
+    `clear_and_remain_ready` and `reset_with_original_mapping` skip
+    `0..prefix_inaccessible`; `MemoryPool::allocate` clears
+    `prefix_inaccessible` back to RW whenever a pooled slot is handed to a
+    non-GC linear memory (`MemoryKind::LinearMemory`) or any CoW-imaged memory.
+  - `CopyingHeap` tracks a monotonic `ever_left_first_nursery` latch (set on
+    any collection, pretenure window, direct-old allocation, or heap growth).
+    When `detach` observes `!cfg!(gc_zeal) && nursery_end != 0 &&
+    !ever_left_first_nursery && young == FirstNursery && direct_old.is_empty()
+    && !grew && old_bump == active_space_start`, it records the exact written
+    span `nursery_start()..vmctx_data.bump_ptr()` on the pooled
+    `MemoryImageSlot`. When that span is at most 4 MiB and fits the pool's
+    `keep_resident` budget (accounting for tracked resident bytes),
+    `clear_and_remain_ready` zeroes that exact slice in userspace and skips
+    both `PAGEMAP_SCAN` and `MADV_DONTNEED`.

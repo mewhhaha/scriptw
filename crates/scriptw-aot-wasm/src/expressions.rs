@@ -1,8 +1,14 @@
 use super::*;
 use crate::gc_types::{
-    GcLocal, GcOperand, I32Local, NonNullable, Nullable, PooledStringTable, ScalarValue,
-    StringValue, ValueLocals,
+    ArrayCompactDataStorage, ArrayCompactDataStorageSchema, ArrayIndexedStorageMode, ArrayObject,
+    ArrayObjectSchema, CompactDataShapeSchema, CompactDataStorageSchema, CompactReferenceArray,
+    CompactScalarArray, CompactShapeKeys, CompactTagArray, GcLocal, GcOperand, I32Local,
+    InlineCompactDataStorage, InlineCompactDataStorageSchema, NonNullable, Nullable,
+    NumberBitsI64Array, NumberPresenceU64Array, OrdinaryObject, OrdinaryObjectSchema,
+    PackedValueTable, PooledStringTable, ScalarValue, StoredValue, StringValue, StringValueSchema,
+    ValueLocals,
 };
+use crate::heap::DescriptorMask;
 use crate::operations::PropertyKeyLocals;
 use scriptw_ir::{NativeErrorKind, StaticRegExpCompilation};
 
@@ -291,6 +297,7 @@ impl<'a> FunctionBuilder<'a> {
         &mut self,
         reference: EvaluatedRawOrdinaryPropertyReferenceLocals,
         read_site: Option<(&TypedExpr, &str)>,
+        may_be_numeric_array: bool,
         function: &mut Function,
     ) -> Result<ReadOrdinaryPropertyReferenceLocals, EmitError> {
         let schema = self.runtime_schema();
@@ -313,11 +320,36 @@ impl<'a> FunctionBuilder<'a> {
                 old_value,
             });
         }
+        let numeric_array_probe = if may_be_numeric_array {
+            let pending = schema.reserve_completion(function);
+            let found = self.emit_raw_numeric_array_own_data_read(
+                &reference.base_and_receiver,
+                &reference.referenced_name,
+                &pending,
+                function,
+            );
+            Some((pending, found))
+        } else {
+            None
+        };
         let reference = self.canonicalize_ordinary_property_reference(
             reference,
             RuntimeErrorMessage::CANNOT_READ_PROPERTIES_OF_NULL_OR_UNDEFINED,
             function,
         )?;
+        let (done, pending) = if let Some((pending, found)) = numeric_array_probe {
+            let done = self.open_frame(ControlFrameKind::Block, function);
+            found.load(function);
+            schema.release_i32_local(found, function);
+            self.open_frame(ControlFrameKind::If, function);
+            old_value.copy_from(pending.value(), function);
+            self.emit_branch_to_target(done, function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+            (Some(done), Some(pending))
+        } else {
+            (None, None)
+        };
         schema
             .call_helper(
                 crate::runtime_helpers::ObjectReadArguments::new(
@@ -333,6 +365,13 @@ impl<'a> FunctionBuilder<'a> {
             .store(self.completion(), function);
         self.emit_propagate_current_throw_if_needed(function);
         old_value.copy_from(self.completion().value(), function);
+        if done.is_some() {
+            self.pop_control(ControlFrameKind::Block);
+            function.instruction(&Instruction::End);
+        }
+        if let Some(pending) = pending {
+            pending.clear(function);
+        }
         Ok(ReadOrdinaryPropertyReferenceLocals {
             reference,
             old_value,
@@ -484,6 +523,8 @@ impl<'a> FunctionBuilder<'a> {
         {
             return self.emit_computed_put_value(
                 evaluated,
+                assignment.base_and_receiver(),
+                assignment.referenced_name(),
                 assignment.strictness(),
                 output,
                 function,
@@ -552,12 +593,15 @@ impl<'a> FunctionBuilder<'a> {
         Ok(())
     }
 
-    /// PutValue of a computed key after its RHS. R's computed write kernel
-    /// performs the base check, ToObject, ToPropertyKey and [[Set]] in that
-    /// order, first answering what live storage proves without converting.
+    /// PutValue of a computed key after its RHS. Inline fast paths answer
+    /// dense packed Array element overwrites / within-capacity appends and
+    /// hinted writable compact OrdinaryObject overwrites without entering R;
+    /// every other case calls R's computed write kernel in PutValue order.
     fn emit_computed_put_value(
         &mut self,
         assignment: EvaluatedRawOrdinaryPropertyAssignmentLocals,
+        base_expr: &TypedExpr,
+        key: &PropertyKeyIr,
         strictness: Strictness,
         output: &ValueLocals,
         function: &mut Function,
@@ -568,6 +612,36 @@ impl<'a> FunctionBuilder<'a> {
             referenced_name,
         } = reference;
         let schema = self.runtime_schema();
+        let key_expr = match key {
+            PropertyKeyIr::StringExpr(expr) | PropertyKeyIr::ArrayIndex(expr) => Some(expr),
+            PropertyKeyIr::StaticString(_) | PropertyKeyIr::ArrayLength => None,
+        };
+        let try_array = base_expr.possible_kinds.contains(ValueKind::Array)
+            && key_expr.is_some_and(|expr| expr.possible_kinds.contains(ValueKind::Number));
+        let try_compact = base_expr.possible_kinds.contains(ValueKind::Object)
+            && key_expr.is_some_and(|expr| expr.possible_kinds.contains(ValueKind::String));
+        let done =
+            (try_array || try_compact).then(|| self.open_frame(ControlFrameKind::Block, function));
+        if let Some(done) = done {
+            if try_array {
+                self.emit_inline_computed_array_write(
+                    &base_and_receiver,
+                    &referenced_name,
+                    &rhs,
+                    done,
+                    function,
+                );
+            }
+            if try_compact {
+                self.emit_inline_computed_compact_write(
+                    &base_and_receiver,
+                    &referenced_name,
+                    &rhs,
+                    done,
+                    function,
+                );
+            }
+        }
         schema
             .call_helper(
                 crate::runtime_helpers::ComputedPropertyWriteArguments::new(
@@ -594,11 +668,583 @@ impl<'a> FunctionBuilder<'a> {
             self.pop_control(ControlFrameKind::If);
             function.instruction(&Instruction::End);
         }
+        if done.is_some() {
+            self.pop_control(ControlFrameKind::Block);
+            function.instruction(&Instruction::End);
+        }
         output.copy_from(&rhs, function);
         rhs.clear(function);
         referenced_name.clear(function);
         base_and_receiver.clear(function);
         Ok(())
+    }
+
+    fn may_be_numeric_array_reference(base: &TypedExpr, key: &PropertyKeyIr) -> bool {
+        base.possible_kinds.contains(ValueKind::Array)
+            && matches!(
+                key,
+                PropertyKeyIr::ArrayIndex(expr) | PropertyKeyIr::StringExpr(expr)
+                    if expr.possible_kinds.contains(ValueKind::Number)
+            )
+    }
+
+    /// Inline PutValue fast path for a concrete packed `ArrayObject` with a
+    /// numeric array-index key: handles present in-bounds overwrites (no hole)
+    /// and within-capacity dense appends (`slot == length && count == length`
+    /// with writable length, extensible array, and protected prototype chain).
+    /// Branches to `done` on hit (succeeded = true) or falls through on miss
+    /// before any mutation.
+    fn emit_inline_computed_array_write(
+        &mut self,
+        base: &ValueLocals,
+        key: &ValueLocals,
+        rhs: &ValueLocals,
+        done: crate::emit::ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let miss = self.open_frame(ControlFrameKind::Block, f);
+        key.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(miss, f);
+        let array = s.reserve_non_null_gc_local(f).initialize(
+            base.sealed_reference_or_branch::<ArrayObject>(s, self.local_branch_label(miss), f),
+            f,
+        );
+        // Unsigned range and round-trip admit exactly array indices < 2^32 - 1.
+        // NaN, infinities, negatives and fractions miss; numeric -0 is index 0.
+        let index = s.reserve_i64_local(f);
+        key.scalar().load(f);
+        f.instruction(&Instruction::F64ReinterpretI64);
+        f.instruction(&Instruction::I64TruncSatF64S);
+        index.store(f);
+        index.load(f);
+        f.instruction(&Instruction::I64Const(i64::from(u32::MAX)));
+        f.instruction(&Instruction::I64LtU);
+        key.scalar().load(f);
+        f.instruction(&Instruction::F64ReinterpretI64);
+        index.load(f);
+        f.instruction(&Instruction::F64ConvertI64S);
+        f.instruction(&Instruction::F64Eq);
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, f);
+        let length = s.reserve_i64_local(f);
+        s.field(ArrayObjectSchema::LENGTH)
+            .read(&array, s, f)
+            .store_i64(length, f);
+        let slot = s.reserve_i32_local(f);
+        index.load(f);
+        f.instruction(&Instruction::I32WrapI64);
+        slot.store(f);
+        index.load(f);
+        length.load(f);
+        f.instruction(&Instruction::I64LtU);
+        self.open_frame(ControlFrameKind::If, f);
+        // In-bounds overwrite of a present own packed slot: writable data
+        // property already owned by `array`, so no prototype check is needed.
+        s.array_storage_mode_is(&array, ArrayIndexedStorageMode::PackedValues, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let values = s.reserve_gc_local(f).initialize(
+            s.field(ArrayObjectSchema::VALUES)
+                .read(&array, s, f)
+                .reference()
+                .require_non_null(f),
+            f,
+        );
+        slot.load(f);
+        s.array_type::<PackedValueTable>().length(&values, s, f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(miss, f);
+        s.array_type::<PackedValueTable>()
+            .read(&values, slot, s, f)
+            .reference()
+            .is_null(f);
+        self.emit_branch_if_to_target(miss, f);
+        rhs.tag().load(f);
+        f.instruction(&Instruction::I32Const(ValueKind::Undefined.tag() as i32));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        let stored = s
+            .reserve_gc_local::<StoredValue, Nullable>(f)
+            .initialize(s.stored_undefined(f).nullable(), f);
+        f.instruction(&Instruction::Else);
+        stored.replace(
+            s.struct_type::<StoredValue>().from_value(rhs, f).nullable(),
+            f,
+        );
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.array_type::<PackedValueTable>().write(
+            &values,
+            slot,
+            GcOperand::reference(&stored, s),
+            s,
+            f,
+        );
+        stored.clear(f);
+        values.clear(f);
+        self.emit_branch_to_target(done, f);
+        f.instruction(&Instruction::Else);
+        s.array_storage_mode_is(&array, ArrayIndexedStorageMode::PackedNumbers, f);
+        rhs.tag().load(f);
+        f.instruction(&Instruction::I32Const(ValueKind::Number.tag() as i32));
+        f.instruction(&Instruction::I32Eq);
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, f);
+        let numbers = s.reserve_gc_local(f).initialize(
+            s.field(ArrayObjectSchema::NUMBERS)
+                .read(&array, s, f)
+                .reference(),
+            f,
+        );
+        slot.load(f);
+        s.array_type::<NumberBitsI64Array>().length(&numbers, s, f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(miss, f);
+        let presence = s.reserve_gc_local(f).initialize(
+            s.field(ArrayObjectSchema::NUMBER_PRESENT)
+                .read(&array, s, f)
+                .reference(),
+            f,
+        );
+        let word = s.reserve_i32_local(f);
+        let bits = s.reserve_i64_local(f);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(6));
+        f.instruction(&Instruction::I32ShrU);
+        word.store(f);
+        s.array_type::<NumberPresenceU64Array>()
+            .read(&presence, word, s, f)
+            .store_i64(bits, f);
+        s.release_i32_local(word, f);
+        presence.clear(f);
+        bits.load(f);
+        s.release_i64_local(bits, f);
+        f.instruction(&Instruction::I64Const(1));
+        slot.load(f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        f.instruction(&Instruction::I64Shl);
+        f.instruction(&Instruction::I64And);
+        f.instruction(&Instruction::I64Eqz);
+        self.emit_branch_if_to_target(miss, f);
+        s.array_type::<NumberBitsI64Array>().write(
+            &numbers,
+            slot,
+            GcOperand::i64_local(rhs.scalar()),
+            s,
+            f,
+        );
+        numbers.clear(f);
+        self.emit_branch_to_target(done, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::Else);
+        // Within-capacity dense append: index == length (already < u32::MAX),
+        // COUNT == LENGTH, LENGTH_WRITABLE != 0, EXTENSIBLE != 0, and
+        // protected prototype chain without indexed properties.
+        index.load(f);
+        length.load(f);
+        f.instruction(&Instruction::I64Ne);
+        s.field(ArrayObjectSchema::COUNT).read(&array, s, f);
+        length.load(f);
+        f.instruction(&Instruction::I64Ne);
+        f.instruction(&Instruction::I32Or);
+        s.field(ArrayObjectSchema::LENGTH_WRITABLE)
+            .read(&array, s, f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32Or);
+        self.emit_branch_if_to_target(miss, f);
+        let header = s.reserve_gc_local(f).initialize(
+            s.field(ArrayObjectSchema::OBJECT)
+                .read(&array, s, f)
+                .reference(),
+            f,
+        );
+        s.field(OrdinaryObjectSchema::EXTENSIBLE)
+            .read(&header, s, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, f);
+        let prototype = s.reserve_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(&header, s, f)
+                .reference(),
+            f,
+        );
+        header.clear(f);
+        self.emit_array_prototype_chain_without_indices_or_branch(&prototype, miss, f);
+        prototype.clear(f);
+        let new_length = s.reserve_i64_local(f);
+        length.load(f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Add);
+        new_length.store(f);
+        s.array_storage_mode_is(&array, ArrayIndexedStorageMode::PackedValues, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let values = s.reserve_gc_local(f).initialize(
+            s.field(ArrayObjectSchema::VALUES)
+                .read(&array, s, f)
+                .reference()
+                .require_non_null(f),
+            f,
+        );
+        slot.load(f);
+        s.array_type::<PackedValueTable>().length(&values, s, f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(miss, f);
+        rhs.tag().load(f);
+        f.instruction(&Instruction::I32Const(ValueKind::Undefined.tag() as i32));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        let stored = s
+            .reserve_gc_local::<StoredValue, Nullable>(f)
+            .initialize(s.stored_undefined(f).nullable(), f);
+        f.instruction(&Instruction::Else);
+        stored.replace(
+            s.struct_type::<StoredValue>().from_value(rhs, f).nullable(),
+            f,
+        );
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.array_type::<PackedValueTable>().write(
+            &values,
+            slot,
+            GcOperand::reference(&stored, s),
+            s,
+            f,
+        );
+        stored.clear(f);
+        values.clear(f);
+        f.instruction(&Instruction::Else);
+        s.array_storage_mode_is(&array, ArrayIndexedStorageMode::PackedNumbers, f);
+        rhs.tag().load(f);
+        f.instruction(&Instruction::I32Const(ValueKind::Number.tag() as i32));
+        f.instruction(&Instruction::I32Eq);
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, f);
+        let numbers = s.reserve_gc_local(f).initialize(
+            s.field(ArrayObjectSchema::NUMBERS)
+                .read(&array, s, f)
+                .reference(),
+            f,
+        );
+        slot.load(f);
+        s.array_type::<NumberBitsI64Array>().length(&numbers, s, f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(miss, f);
+        let presence = s.reserve_gc_local(f).initialize(
+            s.field(ArrayObjectSchema::NUMBER_PRESENT)
+                .read(&array, s, f)
+                .reference(),
+            f,
+        );
+        s.array_type::<NumberBitsI64Array>().write(
+            &numbers,
+            slot,
+            GcOperand::i64_local(rhs.scalar()),
+            s,
+            f,
+        );
+        let word = s.reserve_i32_local(f);
+        let bits = s.reserve_i64_local(f);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(6));
+        f.instruction(&Instruction::I32ShrU);
+        word.store(f);
+        s.array_type::<NumberPresenceU64Array>()
+            .read(&presence, word, s, f)
+            .store_i64(bits, f);
+        bits.load(f);
+        f.instruction(&Instruction::I64Const(1));
+        slot.load(f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        f.instruction(&Instruction::I64Shl);
+        f.instruction(&Instruction::I64Or);
+        bits.store(f);
+        s.array_type::<NumberPresenceU64Array>().write(
+            &presence,
+            word,
+            GcOperand::i64_local(bits),
+            s,
+            f,
+        );
+        s.release_i64_local(bits, f);
+        s.release_i32_local(word, f);
+        presence.clear(f);
+        numbers.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.field(ArrayObjectSchema::COUNT)
+            .write(&array, GcOperand::i64_local(new_length), s, f);
+        s.field(ArrayObjectSchema::LENGTH)
+            .write(&array, GcOperand::i64_local(new_length), s, f);
+        s.release_i64_local(new_length, f);
+        self.emit_branch_to_target(done, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(slot, f);
+        s.release_i64_local(length, f);
+        s.release_i64_local(index, f);
+        array.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+    }
+
+    /// Inline PutValue fast path for a hinted existing writable own data
+    /// property on a sealed `OrdinaryObject` with `CompactDataStorage`.
+    /// Branches to `done` on hit (succeeded = true) or falls through on miss
+    /// (stale hint, absent key, non-writable shape, or unallocated lazy
+    /// backing array) before any mutation.
+    fn emit_inline_computed_compact_write(
+        &mut self,
+        base: &ValueLocals,
+        key: &ValueLocals,
+        rhs: &ValueLocals,
+        done: crate::emit::ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let miss = self.open_frame(ControlFrameKind::Block, f);
+        key.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(miss, f);
+        let object = s.reserve_non_null_gc_local(f).initialize(
+            base.sealed_reference_or_branch::<OrdinaryObject>(s, self.local_branch_label(miss), f),
+            f,
+        );
+        let properties = s.reserve_non_null_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROPERTIES)
+                .read(&object, s, f)
+                .reference(),
+            f,
+        );
+        object.clear(f);
+        let storage = s.reserve_non_null_gc_local(f).initialize(
+            s.emit_compact_storage_or_branch(&properties, self.local_branch_label(miss), f),
+            f,
+        );
+        properties.clear(f);
+        let shape = s.reserve_non_null_gc_local(f).initialize(
+            s.field(CompactDataStorageSchema::SHAPE)
+                .read(&storage, s, f)
+                .reference(),
+            f,
+        );
+        s.field(CompactDataShapeSchema::ATTRIBUTES)
+            .read(&shape, s, f);
+        f.instruction(&Instruction::I32Const(DescriptorMask::WRITABLE.as_i32()));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, f);
+        let name = s
+            .reserve_non_null_gc_local(f)
+            .initialize(key.cast_reference::<StringValue>(s, f), f);
+        let slot = s.reserve_i32_local(f);
+        s.field(StringValueSchema::ENTRY_HINT)
+            .read(&name, s, f)
+            .store(slot, f);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32LtS);
+        self.emit_branch_if_to_target(miss, f);
+        let keys = s.reserve_non_null_gc_local(f).initialize(
+            s.field(CompactDataShapeSchema::KEYS)
+                .read(&shape, s, f)
+                .reference(),
+            f,
+        );
+        shape.clear(f);
+        slot.load(f);
+        s.array_type::<CompactShapeKeys>().length(&keys, s, f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(miss, f);
+        let _ = s
+            .array_type::<CompactShapeKeys>()
+            .read(&keys, slot, s, f)
+            .reference();
+        let _ = name.load(s, f);
+        f.instruction(&Instruction::RefEq);
+        keys.clear(f);
+        name.clear(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, f);
+        storage.is_subtype::<InlineCompactDataStorage>(s, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let inline = s.reserve_non_null_gc_local(f).initialize(
+            storage
+                .load(s, f)
+                .cast_subtype::<InlineCompactDataStorage>(s, f),
+            f,
+        );
+        let shift = s.reserve_i32_local(f);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(8));
+        f.instruction(&Instruction::I32Mul);
+        shift.store(f);
+        let tags = s.reserve_i32_local(f);
+        s.field(InlineCompactDataStorageSchema::PACKED_TAGS)
+            .read(&inline, s, f)
+            .store(tags, f);
+        tags.load(f);
+        f.instruction(&Instruction::I32Const(255));
+        shift.load(f);
+        f.instruction(&Instruction::I32Shl);
+        f.instruction(&Instruction::I32Const(-1));
+        f.instruction(&Instruction::I32Xor);
+        f.instruction(&Instruction::I32And);
+        rhs.tag().load(f);
+        f.instruction(&Instruction::I32Const(255));
+        f.instruction(&Instruction::I32And);
+        shift.load(f);
+        f.instruction(&Instruction::I32Shl);
+        f.instruction(&Instruction::I32Or);
+        tags.store(f);
+        s.field(InlineCompactDataStorageSchema::PACKED_TAGS).write(
+            &inline,
+            GcOperand::i32_local(tags),
+            s,
+            f,
+        );
+        s.release_i32_local(tags, f);
+        s.release_i32_local(shift, f);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(2));
+        f.instruction(&Instruction::I32LtU);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        slot.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        s.field(InlineCompactDataStorageSchema::SCALAR0).write(
+            &inline,
+            GcOperand::i64_local(rhs.scalar()),
+            s,
+            f,
+        );
+        s.field(InlineCompactDataStorageSchema::REFERENCE0).write(
+            &inline,
+            GcOperand::eq_reference(rhs.reference()),
+            s,
+            f,
+        );
+        f.instruction(&Instruction::Else);
+        s.field(InlineCompactDataStorageSchema::SCALAR1).write(
+            &inline,
+            GcOperand::i64_local(rhs.scalar()),
+            s,
+            f,
+        );
+        s.field(InlineCompactDataStorageSchema::REFERENCE1).write(
+            &inline,
+            GcOperand::eq_reference(rhs.reference()),
+            s,
+            f,
+        );
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::Else);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(2));
+        f.instruction(&Instruction::I32Eq);
+        f.instruction(&Instruction::If(BlockType::Empty));
+        s.field(InlineCompactDataStorageSchema::SCALAR2).write(
+            &inline,
+            GcOperand::i64_local(rhs.scalar()),
+            s,
+            f,
+        );
+        s.field(InlineCompactDataStorageSchema::REFERENCE2).write(
+            &inline,
+            GcOperand::eq_reference(rhs.reference()),
+            s,
+            f,
+        );
+        f.instruction(&Instruction::Else);
+        s.field(InlineCompactDataStorageSchema::SCALAR3).write(
+            &inline,
+            GcOperand::i64_local(rhs.scalar()),
+            s,
+            f,
+        );
+        s.field(InlineCompactDataStorageSchema::REFERENCE3).write(
+            &inline,
+            GcOperand::eq_reference(rhs.reference()),
+            s,
+            f,
+        );
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::End);
+        inline.clear(f);
+        self.emit_branch_to_target(done, f);
+        f.instruction(&Instruction::Else);
+        let array = s.reserve_non_null_gc_local(f).initialize(
+            storage
+                .load(s, f)
+                .cast_subtype::<ArrayCompactDataStorage>(s, f),
+            f,
+        );
+        s.field(ArrayCompactDataStorageSchema::SCALARS)
+            .read(&array, s, f)
+            .reference()
+            .is_null(f);
+        rhs.scalar().load(f);
+        f.instruction(&Instruction::I64Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32And);
+        s.field(ArrayCompactDataStorageSchema::REFERENCES)
+            .read(&array, s, f)
+            .reference()
+            .is_null(f);
+        rhs.reference().load(f);
+        f.instruction(&Instruction::RefIsNull);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Or);
+        self.emit_branch_if_to_target(miss, f);
+        let tags = s
+            .field(ArrayCompactDataStorageSchema::TAGS)
+            .read(&array, s, f)
+            .reference();
+        s.array_type::<CompactTagArray>()
+            .write_top(tags, slot, GcOperand::i32_local(rhs.tag()), f);
+        f.instruction(&Instruction::Block(BlockType::Empty));
+        let absent = f.label_depth();
+        let scalars = s
+            .field(ArrayCompactDataStorageSchema::SCALARS)
+            .read(&array, s, f)
+            .reference()
+            .non_null_or_branch(absent, f);
+        s.array_type::<CompactScalarArray>().write_top(
+            scalars,
+            slot,
+            GcOperand::i64_local(rhs.scalar()),
+            f,
+        );
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::Block(BlockType::Empty));
+        let absent = f.label_depth();
+        let references = s
+            .field(ArrayCompactDataStorageSchema::REFERENCES)
+            .read(&array, s, f)
+            .reference()
+            .non_null_or_branch(absent, f);
+        s.array_type::<CompactReferenceArray>().write_top(
+            references,
+            slot,
+            GcOperand::eq_reference(rhs.reference()),
+            f,
+        );
+        f.instruction(&Instruction::End);
+        array.clear(f);
+        self.emit_branch_to_target(done, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(slot, f);
+        storage.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
     }
 
     fn compile_ordinary_property_logical_assignment_to_value(
@@ -611,10 +1257,19 @@ impl<'a> FunctionBuilder<'a> {
         let raw = self.evaluate_raw_ordinary_property_reference(assignment, function)?;
         let read_site = self
             .static_read_site_name(assignment.base_and_receiver(), assignment.referenced_name());
+        let may_be_numeric_array = Self::may_be_numeric_array_reference(
+            assignment.base_and_receiver(),
+            assignment.referenced_name(),
+        );
         let ReadOrdinaryPropertyReferenceLocals {
             reference,
             old_value,
-        } = self.emit_get_value_from_raw_ordinary_property_reference(raw, read_site, function)?;
+        } = self.emit_get_value_from_raw_ordinary_property_reference(
+            raw,
+            read_site,
+            may_be_numeric_array,
+            function,
+        )?;
         let rhs = schema.reserve_value_local(function);
         match assignment.op() {
             LogicalBinaryOp::And | LogicalBinaryOp::Or => {
@@ -659,10 +1314,19 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let raw = self.evaluate_raw_ordinary_property_reference(capture, function)?;
+        let may_be_numeric_array = Self::may_be_numeric_array_reference(
+            capture.base_and_receiver(),
+            capture.referenced_name(),
+        );
         let ReadOrdinaryPropertyReferenceLocals {
             reference,
             old_value,
-        } = self.emit_get_value_from_raw_ordinary_property_reference(raw, None, function)?;
+        } = self.emit_get_value_from_raw_ordinary_property_reference(
+            raw,
+            None,
+            may_be_numeric_array,
+            function,
+        )?;
         for (name, value) in [
             (
                 capture.receiver_storage_name(),
@@ -793,8 +1457,16 @@ impl<'a> FunctionBuilder<'a> {
         let raw = self.evaluate_raw_ordinary_property_reference(mutation, function)?;
         let read_site =
             self.static_read_site_name(mutation.base_and_receiver(), mutation.referenced_name());
-        let read =
-            self.emit_get_value_from_raw_ordinary_property_reference(raw, read_site, function)?;
+        let may_be_numeric_array = Self::may_be_numeric_array_reference(
+            mutation.base_and_receiver(),
+            mutation.referenced_name(),
+        );
+        let read = self.emit_get_value_from_raw_ordinary_property_reference(
+            raw,
+            read_site,
+            may_be_numeric_array,
+            function,
+        )?;
         let ready =
             self.emit_result_from_read_ordinary_property_reference(read, mutation, function)?;
         self.emit_put_value_from_ready_ordinary_property_reference(
@@ -849,13 +1521,19 @@ impl<'a> FunctionBuilder<'a> {
         &mut self,
         raw: EvaluatedRawOrdinaryPropertyReferenceLocals,
         read_site: Option<(&TypedExpr, &str)>,
+        may_be_numeric_array: bool,
         value_kind: NumericUpdateValueKind,
         function: &mut Function,
     ) -> Result<ReadOrdinaryPropertyNumericUpdateLocals, EmitError> {
         let ReadOrdinaryPropertyReferenceLocals {
             reference,
             old_value,
-        } = self.emit_get_value_from_raw_ordinary_property_reference(raw, read_site, function)?;
+        } = self.emit_get_value_from_raw_ordinary_property_reference(
+            raw,
+            read_site,
+            may_be_numeric_array,
+            function,
+        )?;
         self.emit_numeric_reference_old_value(value_kind, &old_value, function)?;
         Ok(ReadOrdinaryPropertyNumericUpdateLocals {
             reference,
@@ -932,9 +1610,14 @@ impl<'a> FunctionBuilder<'a> {
         let raw = self.evaluate_raw_ordinary_property_reference(update, function)?;
         let read_site =
             self.static_read_site_name(update.base_and_receiver(), update.referenced_name());
+        let may_be_numeric_array = Self::may_be_numeric_array_reference(
+            update.base_and_receiver(),
+            update.referenced_name(),
+        );
         let read = self.emit_get_numeric_value_from_raw_ordinary_property_reference(
             raw,
             read_site,
+            may_be_numeric_array,
             update.value_kind(),
             function,
         )?;

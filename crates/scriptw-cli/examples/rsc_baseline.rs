@@ -456,7 +456,6 @@ fn run() -> Result<Value> {
         );
         let configuration = json!({
             "wasmtime":"47.0.0","precompiled_image":path,
-            "precompiled_image_sha256":image.image_sha256().iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
             "precompiled_image_bytes":image.as_bytes().len(),
             "native_policy":"chosen by scriptw precompile; native-mode names it",
             "compiler_enabled":false,"target":native.get_target(),
@@ -772,6 +771,15 @@ fn run() -> Result<Value> {
             "megamorphic_read_sites":collected.reads().filter(|(_, read)| read.megamorphic).count(),
         }));
     }
+    let steady_memory = memory("after the last request")?;
+    let mut configuration = configuration;
+    if let ProgramWasmEvidence::Precompiled(image) = &program_wasm {
+        configuration["precompiled_image_sha256"] = json!(image
+            .image_sha256()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>());
+    }
     let mut report = json!({
         "schema":"scriptw-react-retained-baseline-v1","status":"complete",
         "scope":"one process and one retained Realm/module; diagnostic, not a statistical comparison",
@@ -799,7 +807,7 @@ fn run() -> Result<Value> {
             "front_and_emit_high_water":front_and_emit_high_water,
             "compile_high_water":compile_high_water,
             "post_compile":post_compile,
-            "steady":memory("after the last request")?,
+            "steady":steady_memory,
             "scope":"Linux /proc/self/status VmHWM (high water since process start, never reset) and VmRSS, plus smaps_rollup endpoints; compile_high_water bounds front end, emission and native preparation; post_compile and steady RSS in a compiling process include compiler memory the allocator retains",
         },
         "cases":cases,

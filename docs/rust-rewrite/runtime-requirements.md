@@ -45,7 +45,7 @@ Its initial accessible backing is 32 MiB (a 4-MiB nursery and two nominal
 1 GiB. Reserving addresses does not commit 4 GiB of RAM. On the supported
 64-bit Wasmtime baseline this permits protected-page checks and a stable heap
 base; Wasm array bounds and null-reference traps remain. Native images bind
-these settings through configuration schema 10. Custom pooling allocators
+these settings through configuration schema 11. Custom pooling allocators
 require matching GC and linear-memory tunables; ordinary Scriptw uses on-demand
 allocation.
 
@@ -188,7 +188,16 @@ host registration only on table allocation/rehash); adds zero-Promise primitive
 paths, `0..=127` decimal string caching, bounded inlining of stable closed-local
 source calls, `Array.from` packed preallocation, `JsonParsePlainRun` /
 `CodeUnitEqual` leaf kernels, and `O(1)` `EnvironmentSchema::DEFINING_REALM`
-propagation. `LAYOUT_VERSION` in
+propagation. ABI 98 (configuration schema 11, `SCRWEP05`) replaces the
+precompiled envelope footer checksum with `blake3` plus lazy temporary-mmap
+`image_sha256()`, maps `Mmap::from_file_range` read-only, adds copying-GC
+first-nursery watermark fast reset and persistent pooled null-guard
+`prefix_inaccessible` (and post-inlining `cold_paths::spread` when inlining is
+enabled), and adds inline `Array.isArray` and 1-probe `WeakMap.get`/`set`,
+2-entry inline polymorphic read ICs, `NEXT`-loop and direct-store compact
+transitions/computed writes, inline `PropertyRead(ArrayIndex)` + dense OOB
+`undefined`, `GetV` compact closed-tail absence, dead statement-list completion
+elimination, and `try`/`catch` cold hints. `LAYOUT_VERSION` in
 `crates/scriptw-aot-wasm/src/runtime_artifact.rs` records each step.
 
 ### Locals and GC roots

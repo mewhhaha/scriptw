@@ -1056,12 +1056,18 @@ impl InliningCompiler for Compiler {
         log::trace!("finish compiling {symbol:?}");
         debug_assert!(!func_body.code.is::<CompiledFunction>());
         debug_assert!(func_body.code.is::<Option<CompilerContext>>());
-        let cx = func_body
+        let mut cx = func_body
             .code
             .downcast_mut::<Option<CompilerContext>>()
             .unwrap()
             .take()
             .unwrap();
+        // Propagate coldness again after CLIF inlining so blocks inlined into
+        // a cold caller block inherit `cold`. Skipped when inlining is off to
+        // avoid a redundant pass.
+        if self.tunables.inlining != wasmtime_environ::Inlining::No {
+            crate::func_environ::cold_paths::spread(&mut cx.codegen_context.func);
+        }
         let compiler = FunctionCompiler { compiler: self, cx };
 
         let symbol = match compiler.cx.abi {

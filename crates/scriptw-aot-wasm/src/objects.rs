@@ -1098,7 +1098,12 @@ impl<'a> FunctionBuilder<'a> {
         let pending = schema.reserve_completion(function);
         {
             let key_value = schema.reserve_value_local(function);
-            self.compile_property_key_operand(key, &key_value, function)?;
+            let done = self.open_frame(ControlFrameKind::Block, function);
+            if !self.try_emit_inline_indexed_property_read(
+                target, key, receiver, &key_value, &pending, done, function,
+            )? {
+                self.compile_property_key_operand(key, &key_value, function)?;
+            }
             schema
                 .call_helper(
                     crate::runtime_helpers::DynamicPropertyReadArguments::new(
@@ -1112,6 +1117,8 @@ impl<'a> FunctionBuilder<'a> {
                     function,
                 )
                 .store(&pending, function);
+            self.pop_control(ControlFrameKind::Block);
+            function.instruction(&Instruction::End);
             key_value.clear(function);
         }
         self.emit_propagate_pending_throw(&pending, &[pending.value()], function);

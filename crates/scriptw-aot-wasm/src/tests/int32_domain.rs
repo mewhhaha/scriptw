@@ -46,8 +46,17 @@ fn count(operators: &[Operator<'_>], matches: impl Fn(&Operator<'_>) -> bool) ->
         .count()
 }
 
-fn is_u32_max_bound(operator: &Operator<'_>) -> bool {
-    matches!(operator, Operator::F64Const { value } if f64::from_bits(value.bits()) == u32::MAX as f64)
+fn count_u32_max_bounds(operators: &[Operator<'_>]) -> usize {
+    operators
+        .windows(2)
+        .filter(|pair| {
+            matches!(
+                pair,
+                [Operator::I64Const { value }, Operator::I64LtU]
+                    if *value == i64::from(u32::MAX)
+            )
+        })
+        .count()
 }
 
 #[test]
@@ -111,20 +120,20 @@ fn int32_array_index_probes_without_binary64_revalidation() {
         let masked_body = body(&bodies, masked);
         let raw_body = body(&bodies, raw);
         assert_eq!(
-            count(raw_body, is_u32_max_bound),
-            count(masked_body, is_u32_max_bound) + 1,
+            count_u32_max_bounds(raw_body),
+            count_u32_max_bounds(masked_body) + 1,
             "{masked} skips the binary64 index validation"
         );
-        assert!(
+        assert_eq!(
             count(masked_body, |operator| matches!(
                 operator,
-                Operator::I64TruncF64U
-            )) + 1
-                == count(raw_body, |operator| matches!(
-                    operator,
-                    Operator::I64TruncF64U
-                )),
-            "{masked} indexes with its bits, not a truncated binary64"
+                Operator::F64ConvertI64S
+            )) + 1,
+            count(raw_body, |operator| matches!(
+                operator,
+                Operator::F64ConvertI64S
+            )),
+            "{masked} indexes with its bits, not a binary64 round-trip"
         );
         assert!(masked_body
             .iter()

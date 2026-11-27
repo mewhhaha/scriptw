@@ -109,9 +109,10 @@ impl Mmap {
         Ok(Mmap { memory })
     }
 
-    /// Scriptw patch: privately map `len` bytes of `file` starting at the
-    /// host-page-aligned `offset`. The range must lie inside the file, so no
-    /// page of the mapping can fault past its end.
+    /// Scriptw patch: privately map `len` bytes of `file` read-only starting at
+    /// the host-page-aligned `offset`. The range must lie inside the file, so
+    /// no page of the mapping can fault past its end. Only read-only code loads
+    /// (`deserialize_open_file_range`) use this entry point.
     #[cfg(feature = "std")]
     pub fn from_file_range(file: &File, offset: u64, len: usize) -> Result<Self> {
         let file_len = file
@@ -132,7 +133,7 @@ impl Mmap {
             rustix::mm::mmap(
                 ptr::null_mut(),
                 len,
-                rustix::mm::ProtFlags::READ | rustix::mm::ProtFlags::WRITE,
+                rustix::mm::ProtFlags::READ,
                 rustix::mm::MapFlags::PRIVATE,
                 &file,
                 offset,

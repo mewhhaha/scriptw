@@ -577,7 +577,11 @@ impl FunctionBuilder<'_> {
         third.clear(f);
         second.clear(f);
         first.clear(f);
-        extended.replace(grown.load(s, f).upcast::<CompactDataStorage>().nullable(), f);
+        self.emit_inline_compact_recorded_store_at(&grown, count, value, f);
+        extended.replace(
+            grown.load(s, f).upcast::<CompactDataStorage>().nullable(),
+            f,
+        );
         grown.clear(f);
         f.instruction(&Instruction::Else);
         let capacity = s.reserve_i32_local(f);
@@ -593,6 +597,7 @@ impl FunctionBuilder<'_> {
         }
         s.release_i32_local(slot, f);
         moved.clear(f);
+        self.emit_array_compact_store_at(&array, count, value, f);
         extended.replace(
             array.load(s, f).upcast::<CompactDataStorage>().nullable(),
             f,
@@ -617,18 +622,25 @@ impl FunctionBuilder<'_> {
         count.load(f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
+        let packed_tags = s.reserve_i32_local(f);
+        value.tag().load(f);
+        f.instruction(&Instruction::I32Const(255));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Const(
+            (undefined << 8) | (undefined << 16) | (undefined << 24),
+        ));
+        f.instruction(&Instruction::I32Or);
+        packed_tags.store(f);
         let first = s.reserve_gc_local(f).initialize(
             s.struct_type::<InlineCompactDataStorage>().construct(
                 (
                     GcOperand::reference(child, s),
-                    GcOperand::i32(
-                        undefined | (undefined << 8) | (undefined << 16) | (undefined << 24),
-                    ),
+                    GcOperand::i32_local(packed_tags),
+                    GcOperand::i64_local(value.scalar()),
                     GcOperand::i64(0),
                     GcOperand::i64(0),
                     GcOperand::i64(0),
-                    GcOperand::i64(0),
-                    GcOperand::null_eq(),
+                    GcOperand::eq_reference(value.reference()),
                     GcOperand::null_eq(),
                     GcOperand::null_eq(),
                     GcOperand::null_eq(),
@@ -637,6 +649,7 @@ impl FunctionBuilder<'_> {
             ),
             f,
         );
+        s.release_i32_local(packed_tags, f);
         extended.replace(
             first.load(s, f).upcast::<CompactDataStorage>().nullable(),
             f,
@@ -677,6 +690,7 @@ impl FunctionBuilder<'_> {
         );
         references.clear(f);
         scalars.clear(f);
+        self.emit_array_compact_store_at(&shared, count, value, f);
         extended.replace(
             shared.load(s, f).upcast::<CompactDataStorage>().nullable(),
             f,
@@ -684,6 +698,7 @@ impl FunctionBuilder<'_> {
         shared.clear(f);
         f.instruction(&Instruction::Else);
         let grown = self.emit_grow_compact_array_storage(&array, &tags, child, count, f);
+        self.emit_array_compact_store_at(&grown, count, value, f);
         extended.replace(
             grown.load(s, f).upcast::<CompactDataStorage>().nullable(),
             f,
@@ -701,7 +716,6 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local(f)
             .initialize(extended.load(s, f).require_non_null(f), f);
         extended.clear(f);
-        self.emit_compact_store_at(&next, count, value, f);
         // Publish only after the replacement owns every value.
         s.field(OrdinaryObjectSchema::PROPERTIES).write(
             object,

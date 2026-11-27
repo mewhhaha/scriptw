@@ -32,7 +32,7 @@ pub(crate) struct GeneratorStatementListValueContext {
 
 #[must_use = "a saved StatementList value must be restored after normal evaluation"]
 pub(crate) struct SavedStatementListValue {
-    value: ValueLocals,
+    value: Option<ValueLocals>,
 }
 
 impl FunctionBuilder<'_> {
@@ -515,6 +515,22 @@ impl FunctionBuilder<'_> {
         false
     }
 
+    /// Whether Normal statement-list completion values are observable at the
+    /// end of this body (or across resumable suspension checkpoints). Only
+    /// top-level scripts (`Main`), `PreparedScript` (`eval` / Realm scripts),
+    /// resumable bodies (generators / async functions), and runtime-owned
+    /// helpers observe them; ordinary JS function/method/constructor/module
+    /// bodies discard their Normal statement-list completion value at exit.
+    pub(crate) fn observes_statement_completion_value(&self) -> bool {
+        if !self.has_source_execution_environment() || self.statement_list_value_context.is_some() {
+            return true;
+        }
+        !matches!(
+            self.planned_entry().map(|entry| entry.body()),
+            Some(crate::function_entry::PlannedBodyEntry::Ordinary(_))
+        )
+    }
+
     pub(crate) fn emit_statement_result(&self, function: &mut Function) {
         self.completion().value().set_undefined(function);
         self.set_completion_kind(CompletionKind::Normal, function);
@@ -534,9 +550,12 @@ impl FunctionBuilder<'_> {
         &self,
         function: &mut Function,
     ) -> SavedStatementListValue {
+        if !self.observes_statement_completion_value() {
+            return SavedStatementListValue { value: None };
+        }
         let value = self.runtime_schema().reserve_value_local(function);
         value.copy_from(self.completion().value(), function);
-        SavedStatementListValue { value }
+        SavedStatementListValue { value: Some(value) }
     }
 
     pub(crate) fn restore_statement_list_value(
@@ -545,13 +564,16 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         self.emit_propagate_current_throw_if_needed(function);
+        let Some(value) = saved.value else {
+            return Ok(());
+        };
         self.completion().kind().load(function);
         function.instruction(&Instruction::I32Const(CompletionKind::Normal.code() as i32));
         function.instruction(&Instruction::I32Eq);
         function.instruction(&Instruction::If(BlockType::Empty));
-        self.completion().value().copy_from(&saved.value, function);
+        self.completion().value().copy_from(&value, function);
         function.instruction(&Instruction::End);
-        saved.value.clear(function);
+        value.clear(function);
         Ok(())
     }
 

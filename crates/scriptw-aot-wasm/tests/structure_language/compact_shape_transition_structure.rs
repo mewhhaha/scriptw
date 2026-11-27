@@ -143,7 +143,7 @@ fn transition_kernel_guards_precede_every_mutation() {
     );
     assert_eq!(scan.matches(".write(").count(), 2);
     assert_eq!(scan.matches("table_type.write(").count(), 2);
-    // Storage is published only after the replacement owns the new value.
+    // Storage is published only after every branch writes the new value directly.
     let extend = between(
         TRANSITION,
         "fn emit_compact_storage_extend(",
@@ -152,7 +152,13 @@ fn transition_kernel_guards_precede_every_mutation() {
     ordered(
         extend,
         &[
-            "self.emit_compact_store_at(&next, count, value, f);",
+            "self.emit_inline_compact_recorded_store_at(&grown, count, value, f);",
+            "self.emit_array_compact_store_at(&array, count, value, f);",
+            "GcOperand::i32_local(packed_tags)",
+            "GcOperand::i64_local(value.scalar())",
+            "GcOperand::eq_reference(value.reference())",
+            "self.emit_array_compact_store_at(&shared, count, value, f);",
+            "self.emit_array_compact_store_at(&grown, count, value, f);",
             "OrdinaryObjectSchema::PROPERTIES",
         ],
     );

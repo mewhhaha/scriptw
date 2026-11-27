@@ -441,14 +441,14 @@ ID set and native snapshot, including timeouts. Full affected native commands
 and all selected IDs are retained in the JSON rather than a permissive filter
 or expected-failure suppression.
 
-Precompiled native program frames use `SCRWEP04` (native-first with a fixed
+Precompiled native program frames use `SCRWEP05` (native-first with a fixed
 126-byte footer). Native P starts at byte offset zero so Wasmtime can map the
 native range directly from an open file (`PrecompiledEmbeddedProgram::from_file`
 on Unix via `Module::deserialize_open_file_range`) without copying the native
 image into anonymous heap memory, followed by raw P, private binary execution
 facts, and the fixed footer (magic, compiler source fingerprint, linked flag,
-runtime key, compilation mode, program/native/facts lengths, and SHA-256 of all
-preceding bytes). The private binary execution facts are minted after successful
+runtime key, compilation mode, program/native/facts lengths, and BLAKE3 digest
+of all preceding bytes). The private binary execution facts are minted after successful
 Portable compilation, including inert initialization, foreign declarations and
 the exact Cargo Minimal Portable runtime requirement.
 Facts carry the foreign ABI, optional error tag, ordered modules/functions,

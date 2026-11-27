@@ -1,7 +1,8 @@
 use super::*;
 use crate::gc_types::{
-    ExecutableCodeSchema, FunctionContext, FunctionContextSchema, FunctionObject,
-    FunctionObjectSchema, GcNullability, SourceDepthOverflow, ValueLocals,
+    ExecutableCodeKind, ExecutableCodeSchema, FunctionContext, FunctionContextSchema,
+    FunctionObject, FunctionObjectSchema, GcI32Constant, GcNullability, SourceDepthOverflow,
+    ValueLocals,
 };
 use scriptw_ir::{SmallInlineBodyIr, SmallInlineEffects, SmallInlineInitializationIr};
 
@@ -282,6 +283,20 @@ impl FunctionBuilder<'_> {
                 StandardBuiltinId::from_function_id(id)
                     == Some(StandardBuiltinId::NumberConstructor)
             }) || callee_nominates_identifier(callee_expression, "Number");
+        let array_is_array_candidate =
+            targets.iter().any(|id| {
+                StandardBuiltinId::from_function_id(id) == Some(StandardBuiltinId::ArrayIsArray)
+            }) || callee_reads_static_property(callee_expression, "isArray");
+        let weak_map_get_candidate = this_expression.is_some()
+            && (targets.iter().any(|id| {
+                StandardBuiltinId::from_function_id(id)
+                    == Some(StandardBuiltinId::WeakMapPrototypeGet)
+            }) || callee_reads_static_property(callee_expression, "get"));
+        let weak_map_set_candidate = this_expression.is_some()
+            && (targets.iter().any(|id| {
+                StandardBuiltinId::from_function_id(id)
+                    == Some(StandardBuiltinId::WeakMapPrototypeSet)
+            }) || callee_reads_static_property(callee_expression, "set"));
         // `x.call(...)` syntax or target knowledge only nominates the
         // forwarding guard; the actual callee's code identity decides, with
         // these once-evaluated operands.
@@ -345,6 +360,33 @@ impl FunctionBuilder<'_> {
                     output,
                     function,
                 )?)
+            && (!array_is_array_candidate
+                || !self.try_emit_array_is_array_call(
+                    &callee,
+                    &receiver,
+                    arguments,
+                    continuation,
+                    output,
+                    function,
+                )?)
+            && (!weak_map_get_candidate
+                || !self.try_emit_weak_map_get_call(
+                    &callee,
+                    &receiver,
+                    arguments,
+                    continuation,
+                    output,
+                    function,
+                )?)
+            && (!weak_map_set_candidate
+                || !self.try_emit_weak_map_set_call(
+                    &callee,
+                    &receiver,
+                    arguments,
+                    continuation,
+                    output,
+                    function,
+                )?)
             && (!call_forwarding_candidate
                 || !self.try_emit_function_call_forwarding(
                     &callee,
@@ -367,6 +409,106 @@ impl FunctionBuilder<'_> {
         }
         receiver.clear(function);
         callee.clear(function);
+        Ok(())
+    }
+
+    /// Proves that `value` is a sealed `FunctionObject` whose immutable code
+    /// identifies the standard builtin `builtin` of any Realm, branching to
+    /// `miss` otherwise. Proxies, bound functions, wrappers, and source
+    /// functions fail.
+    pub(super) fn emit_standard_builtin_or_branch(
+        &self,
+        value: &ValueLocals,
+        builtin: StandardBuiltinId,
+        miss: ControlTarget,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        value.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Function.tag()));
+        function.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(miss, function);
+        let callable = schema.reserve_non_null_gc_local(function).initialize(
+            value.sealed_reference_or_branch::<FunctionObject>(
+                schema,
+                self.local_branch_label(miss),
+                function,
+            ),
+            function,
+        );
+        let code = schema.reserve_non_null_gc_local(function).initialize(
+            schema
+                .field(FunctionObjectSchema::CODE)
+                .read(&callable, schema, function)
+                .reference(),
+            function,
+        );
+        callable.clear(function);
+        schema
+            .field(ExecutableCodeSchema::KIND)
+            .read(&code, schema, function);
+        function.instruction(&Instruction::I32Const(
+            ExecutableCodeKind::StandardBuiltin.encode(),
+        ));
+        function.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(miss, function);
+        schema
+            .field(ExecutableCodeSchema::STANDARD_BUILTIN)
+            .read(&code, schema, function);
+        function.instruction(&Instruction::I32Const(builtin.encode()));
+        function.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(miss, function);
+        code.clear(function);
+    }
+
+    /// Dispatches once-evaluated operands through the typed local-arguments
+    /// entry first, falling back to argv dispatch only when the actual callee
+    /// lacks a matching local entry. Preserves proper tail calls for
+    /// `CallContinuation::Return`.
+    pub(super) fn emit_pre_evaluated_fallback_call(
+        &mut self,
+        callee: &ValueLocals,
+        receiver: &ValueLocals,
+        arguments: &[&ValueLocals],
+        continuation: &CallContinuation,
+        output: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let result = schema.reserve_completion(function);
+        let entered = self.emit_local_argument_call_values_for_count(
+            callee,
+            receiver,
+            arguments,
+            continuation,
+            &result,
+            function,
+        )?;
+        entered.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        let list = self.emit_pre_evaluated_arg_vector(arguments, function);
+        match continuation {
+            CallContinuation::Continue => self.emit_function_or_proxy_call_with_argv(
+                callee, receiver, &list, &result, function,
+            )?,
+            CallContinuation::Return => {
+                self.emit_prepared_tail_call(callee, receiver, &list, function)?;
+            }
+        }
+        list.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(entered, function);
+
+        if matches!(continuation, CallContinuation::Continue) {
+            self.emit_propagate_pending_throw(&result, &[], function);
+            output.copy_from(result.value(), function);
+        } else {
+            // Both the typed local entry and the argv fallback tail-call.
+            function.instruction(&Instruction::Unreachable);
+        }
+        result.clear(function);
         Ok(())
     }
 

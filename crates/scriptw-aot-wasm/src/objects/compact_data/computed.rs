@@ -255,7 +255,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
         f.instruction(&Instruction::I32Ne);
         self.emit_branch_if_to_target(general, f);
-        let object = s.reserve_gc_local(f).initialize(
+        let object = s.reserve_non_null_gc_local(f).initialize(
             target.sealed_reference_or_branch::<OrdinaryObject>(
                 s,
                 self.local_branch_label(general),
@@ -264,26 +264,49 @@ impl FunctionBuilder<'_> {
             f,
         );
         let name = s
-            .reserve_gc_local(f)
+            .reserve_non_null_gc_local(f)
             .initialize(key.value().cast_reference::<StringValue>(s, f), f);
         let set = self.open_frame(ControlFrameKind::Block, f);
-        let base = s.reserve_gc_local(f).initialize(
+        let base = s.reserve_non_null_gc_local(f).initialize(
             s.field(OrdinaryObjectSchema::PROPERTIES)
                 .read(&object, s, f)
                 .reference(),
             f,
         );
-        base.is_subtype::<CompactDataStorage>(s, f);
-        self.open_frame(ControlFrameKind::If, f);
-        let compact = s
-            .reserve_gc_local(f)
-            .initialize(base.load(s, f).cast_subtype::<CompactDataStorage>(s, f), f);
-        let shape = s.reserve_gc_local(f).initialize(
+        let not_compact = self.open_frame(ControlFrameKind::Block, f);
+        let compact = s.reserve_non_null_gc_local(f).initialize(
+            s.emit_compact_storage_or_branch(&base, self.local_branch_label(not_compact), f),
+            f,
+        );
+        let shape = s.reserve_non_null_gc_local(f).initialize(
             s.field(CompactDataStorageSchema::SHAPE)
                 .read(&compact, s, f)
                 .reference(),
             f,
         );
+        // Check `StringValueSchema::ENTRY_HINT` before hashing and shape or
+        // transition probing. Bounds and exact String identity prove the slot.
+        let hint_miss = self.open_frame(ControlFrameKind::Block, f);
+        let hinted_slot = s.reserve_i32_local(f);
+        s.emit_hinted_compact_index_or_branch(
+            &compact,
+            &name,
+            hinted_slot,
+            self.local_branch_label(hint_miss),
+            f,
+        );
+        s.field(CompactDataShapeSchema::ATTRIBUTES)
+            .read(&shape, s, f);
+        f.instruction(&Instruction::I32Const(DescriptorMask::WRITABLE.as_i32()));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(general, f);
+        self.emit_direct_compact_store_at(&compact, hinted_slot, value, f);
+        s.release_i32_local(hinted_slot, f);
+        self.emit_branch_to_target(set, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+
         let hash = s.reserve_i64_local(f);
         self.emit_string_key_hash(&name, hash, f);
         let count = s.reserve_i32_local(f);
@@ -303,7 +326,9 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32And);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(general, f);
-        self.emit_compact_store_at(&compact, slot, value, f);
+        s.field(StringValueSchema::ENTRY_HINT)
+            .write(&name, GcOperand::i32_local(slot), s, f);
+        self.emit_direct_compact_store_at(&compact, slot, value, f);
         self.emit_branch_to_target(set, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -370,7 +395,7 @@ impl FunctionBuilder<'_> {
         s.release_i64_local(hash, f);
         shape.clear(f);
         compact.clear(f);
-        self.pop_control(ControlFrameKind::If);
+        self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         base.clear(f);
         let dictionary = self.emit_dictionary_existing_data_write(target, target, key, value, f)?;
@@ -383,6 +408,43 @@ impl FunctionBuilder<'_> {
         name.clear(f);
         object.clear(f);
         Ok(())
+    }
+
+    /// Writes `value` into a proved slot of `compact` directly through its
+    /// concrete sealed layout, avoiding a `helper::compact_data_store` call.
+    fn emit_direct_compact_store_at(
+        &mut self,
+        compact: &GcLocal<CompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let done = self.open_frame(ControlFrameKind::Block, f);
+        let array_path = self.open_frame(ControlFrameKind::Block, f);
+        let inline = s.reserve_non_null_gc_local(f).initialize(
+            compact.sealed_subtype_or_branch::<InlineCompactDataStorage>(
+                s,
+                self.local_branch_label(array_path),
+                f,
+            ),
+            f,
+        );
+        self.emit_inline_compact_recorded_store_at(&inline, slot, value, f);
+        inline.clear(f);
+        self.emit_branch_to_target(done, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let array = s.reserve_non_null_gc_local(f).initialize(
+            compact
+                .load(s, f)
+                .cast_subtype::<ArrayCompactDataStorage>(s, f),
+            f,
+        );
+        self.emit_array_compact_store_at(&array, slot, value, f);
+        array.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
     }
 
     /// Transition tables put frequently used children first. The child's

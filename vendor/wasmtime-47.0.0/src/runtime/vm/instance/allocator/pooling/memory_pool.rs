@@ -354,6 +354,7 @@ impl MemoryPool {
         request: &mut InstanceAllocationRequest<'_, '_>,
         ty: &wasmtime_environ::Memory,
         memory_index: Option<DefinedMemoryIndex>,
+        memory_kind: MemoryKind,
     ) -> Result<(MemoryAllocationIndex, Memory)> {
         let tunables = request.store.engine().tunables();
         let memory_tunables = MemoryTunables::new(tunables, MemoryKind::LinearMemory);
@@ -424,6 +425,13 @@ impl MemoryPool {
         // mmap that would leave an open space for someone
         // else to come in and map something.
         let initial_size = usize::try_from(initial_size).unwrap();
+        // A pooled GC heap may leave its leading null-guard prefix mapped
+        // PROT_NONE across GC heap reuses; restore read-write access before
+        // handing the slot to a linear memory or any CoW-imaged memory.
+        if memory_kind != MemoryKind::GcHeap || image.is_some() {
+            let restored = slot.set_prefix_inaccessible(0)?;
+            debug_assert!(restored);
+        }
         slot.instantiate(initial_size, image, ty, &memory_tunables)?;
 
         let memory = Memory::new_static(

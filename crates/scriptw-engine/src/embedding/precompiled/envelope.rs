@@ -1,12 +1,11 @@
 //! Native P, raw P, execution facts, then a fixed-size footer. Native P starts
 //! at offset zero so Wasmtime can map the exact native range without padding.
 //! The footer holds magic, compiler fingerprint, linked flag, runtime key,
-//! mode, raw/native/facts lengths (u64/u64/u32 LE), and a SHA-256 of all
+//! mode, raw/native/facts lengths (u64/u64/u32 LE), and a BLAKE3 digest of all
 //! preceding bytes. The checksum detects damage and grants no native-code authority.
 use super::*;
-use sha2::{Digest, Sha256};
 
-const MAGIC: &[u8; 8] = b"SCRWEP04";
+const MAGIC: &[u8; 8] = b"SCRWEP05";
 const MAX_FACTS_BYTES: usize = foreign_facts::MAX_BYTES;
 pub(super) const FOOTER_BYTES: usize = 126;
 pub(super) const MAX_BYTES: usize = 256 * 1024 * 1024;
@@ -17,7 +16,6 @@ pub(super) struct Frame {
     pub(super) execution_facts: Range<usize>,
     pub(super) facts: ProgramExecutionFacts,
     pub(super) mode: WasmNativeCompilationMode,
-    pub(super) image_sha256: [u8; 32],
 }
 
 pub(super) fn invalid() -> EngineError {
@@ -81,7 +79,7 @@ pub(super) fn encode(
     bytes.extend_from_slice(&(program.len() as u64).to_le_bytes());
     bytes.extend_from_slice(&(native.len() as u64).to_le_bytes());
     bytes.extend_from_slice(&(registry.len() as u32).to_le_bytes());
-    bytes.extend_from_slice(&Sha256::digest(&bytes));
+    bytes.extend_from_slice(blake3::hash(&bytes).as_bytes());
     Ok(bytes)
 }
 
@@ -127,15 +125,9 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Frame, EngineError> {
         return Err(invalid());
     }
 
-    let mut hash = Sha256::new();
-    hash.update(body);
-    if hash.clone().finalize().as_slice() != digest {
+    if blake3::hash(body).as_bytes().as_slice() != digest {
         return Err(invalid());
     }
-    // Reuse the verified body hash for callers that report the entire file's
-    // SHA-256, including the stored checksum.
-    hash.update(digest);
-    let image_sha256 = hash.finalize().into();
     let build = compiler_identity::build_source_fingerprint().map_err(EngineError::new)?;
     if producer != build.as_bytes() {
         return Err(source_mismatch(producer, build));
@@ -158,6 +150,5 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Frame, EngineError> {
         execution_facts,
         facts,
         mode,
-        image_sha256,
     })
 }

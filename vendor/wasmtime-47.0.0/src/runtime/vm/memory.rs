@@ -447,32 +447,73 @@ impl Memory {
         }
     }
 
+    /// Whether this memory owns a static pooled `MemoryImageSlot`.
+    pub(crate) fn has_static_image(&self) -> bool {
+        #[cfg(has_virtual_memory)]
+        if let Memory::Local(memory) = self {
+            return memory.memory_image.is_some();
+        }
+        false
+    }
+
+    /// Length in bytes of the leading inaccessible (`PROT_NONE`) prefix
+    /// tracked on this memory's pooled slot, or zero otherwise.
+    pub(crate) fn prefix_inaccessible(&self) -> usize {
+        #[cfg(has_virtual_memory)]
+        if let Memory::Local(memory) = self {
+            if let Some(slot) = &memory.memory_image {
+                return slot.prefix_inaccessible();
+            }
+        }
+        0
+    }
+
+    /// Record that the only bytes written in this memory's pooled slot since
+    /// instantiation lie within `dirty_range`.
+    ///
+    /// # Safety
+    /// The caller must guarantee that no byte outside `dirty_range` was written
+    /// since the memory was allocated clean.
+    pub(crate) unsafe fn set_clean_watermark(&mut self, dirty_range: Range<usize>) {
+        #[cfg(has_virtual_memory)]
+        if let Memory::Local(memory) = self {
+            if let Some(slot) = &mut memory.memory_image {
+                // SAFETY: forwarded from caller.
+                unsafe {
+                    slot.set_dirty_watermark(dirty_range);
+                }
+            }
+        }
+        #[cfg(not(has_virtual_memory))]
+        let _ = dirty_range;
+    }
+
     /// Sets the access of the first `len` bytes of this memory: inaccessible
     /// when `accessible` is false, otherwise read-write again. `len` is a
     /// multiple of the host page size within `byte_size()`. Returns `false`,
     /// changing nothing, for a backing whose pages this cannot protect.
     ///
-    /// A pooled memory's slot (or an on-demand memory's copy-on-write slot)
-    /// records only that its first `accessible` bytes are read-write; it
-    /// neither reads nor changes this prefix while the memory is in use. The
-    /// slot's reset writes from offset 0, so the caller must make the prefix
-    /// accessible again before the memory is deallocated. A slot that maps a
+    /// For a pooled memory (`MemoryImageSlot`), `prefix_inaccessible` is
+    /// tracked on the slot so GC heap reuses can keep the leading null guard
+    /// `PROT_NONE` across Stores while `clear_and_remain_ready` skips it and
+    /// non-GC linear memory reuses restore it to read-write. A slot that maps a
     /// copy-on-write image is not protected here.
     ///
     /// # Safety
-    /// While the prefix is inaccessible, nothing may access it, and it must be
-    /// accessible again before the memory is deallocated.
+    /// While the prefix is inaccessible, nothing may access it, and for a
+    /// non-pooled backing it must be accessible again before deallocation.
     pub(crate) unsafe fn set_prefix_access(&mut self, len: usize, accessible: bool) -> Result<bool> {
         assert!(len <= self.byte_size());
         let Memory::Local(memory) = self else {
             return Ok(false);
         };
-        if memory
-            .memory_image
-            .as_ref()
-            .is_some_and(MemoryImageSlot::has_image)
-        {
-            return Ok(false);
+        #[cfg(has_virtual_memory)]
+        if let Some(slot) = &mut memory.memory_image {
+            if slot.has_image() {
+                return Ok(false);
+            }
+            let target = if accessible { 0 } else { len };
+            return slot.set_prefix_inaccessible(target);
         }
         match memory.alloc.base() {
             #[cfg(has_virtual_memory)]

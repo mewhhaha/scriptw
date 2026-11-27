@@ -3519,3 +3519,94 @@ Unified paired medians (`5 procs × 21 runs` after `10` warmups for Wasm engines
 | JS → Wasm compile: `scriptw build wasm` vs `porf wasm` | 17 | **Scriptw 17 / 17** | **0.250× (3.99× faster)** |
 
 **`../wtime` notes (ABI 97):** `wtime-runtime v0.1.11` (`91d6cfe`) passed **18/18** (`startup.js` + all 17 `original17`) and **6/6** Edge workloads on Scriptw's full 38.4 MiB Portable Wasm-GC runtime (`scriptw-linked` and `scriptw-standalone`) with exact stdout, and **14/18** on Porffor Wasm. `../wtime` remains strictly a benchmark peer via standalone `scripts/wasm_peer_wtime/`; vendored Wasmtime 47 remains Scriptw's sole product backend.
+
+## 2026-11-28 local benchmarks (Runtime ABI 98): SCRWEP05, warm RSC, process density, edge, and `../wtime`
+
+Measured **2026-11-28** on a local **AMD Ryzen 7 7800X3D** Linux host, pinned to **CPUs 6–7** (`95–97%` idle on CPUs 6–7) under a **4 GiB / 0 swap** systemd cgroup scope (`NODE_DISABLE_COMPILE_CACHE=1`, `SCRIPTW_JOBS=1`), comparing a local `--release` build (**Runtime ABI 98**, `CONFIGURATION_SCHEMA = 11`, `SCRWEP05` BLAKE3 file-backed precompiled images, compiler fingerprint `cdfac041d0de`, executable SHA-256 `9b4350ef689e…`) against **Node 24.19.0** (`V8 13.6.233.17-node.51`), **Porffor 0.61.13** (`wasmtime-py 47.0.1`, Node 24.19.0 Wasm, and native `gcc -O3`), and **`../wtime` (`wtime-runtime v0.1.11`, commit `91d6cfe`, `Decoded` and `Register` policies)** through the standalone benchmark-only peer `scripts/wasm_peer_wtime/`. Exact stdout or Flight SHA-256 was verified on every run and warmups were excluded from every median. Compare actors strictly within this paired cohort.
+
+### Process density (ABI 98 `SCRWEP05`, `N = 1, 8, 32`)
+
+Concurrent held processes (`2` groups × `N = 1, 8, 32`) measured via `/proc/<pid>/smaps_rollup` using `scripts/benchmark-density.py`'s hold mechanisms (`compiler_precompiled_baseline` `SCRWEP05` phase barrier, Node `beforeExit` preload, and Porffor native `ptrace` exit stop). Linear marginal PSS per added process `(sumPSS(32) - sumPSS(1)) / 31` and 16 GiB capacity (`floor((16 GiB - fixed) / marginal)`):
+
+| Workload | Scriptw `SCRWEP05` marginal PSS (`16 GiB` procs) | Scriptw `N=32` `Private_Dirty` | Porffor 0.61.13 native marginal PSS | Node 24.19.0 default (lean) marginal PSS | Scriptw density vs Node 24 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `startup.js` (standalone) | **307.8 KiB / 0.30 MiB** (`54,483`) | **293 KiB** | 154.5 KiB / 0.15 MiB (`108,589`) | 12.53 MiB (12.50 MiB) | **41.7× denser** |
+| `numeric-loop-50000.js` | **1,001.4 KiB / 0.98 MiB** (`16,742`) | **986 KiB** | 1,183.5 KiB / 1.16 MiB (`14,176`) | 12.95 MiB (12.89 MiB) | **13.2× denser** (beats Porffor) |
+| `dynamic-string-4096.js` | **1,001.6 KiB / 0.98 MiB** (`16,738`) | **987 KiB** | 1,183.7 KiB / 1.16 MiB (`14,173`) | 12.90 MiB (12.86 MiB) | **13.2× denser** (beats Porffor) |
+| `sort-reverse-512.js` | **1,016.8 KiB / 0.99 MiB** (`16,487`) | **1,001 KiB** | wrong output | 12.59 MiB (12.54 MiB) | **12.7× denser** |
+| `objects.js` | **1,092.7 KiB / 1.07 MiB** (`15,342`) | **1,076 KiB** | wrong output | 12.57 MiB (12.53 MiB) | **11.8× denser** |
+| `retained-objects.js` | **5,072.7 KiB / 4.95 MiB** (`3,304`) | **5,056 KiB** | runtime failed | 15.66 MiB (15.67 MiB) | **3.2× denser** |
+
+### React 19.3.1 Server Components (ABI 98 warm retained and `SCRWEP05` precompiled)
+
+Balanced 2-block reversed schedule of **8 fresh processes per actor and case**, **100 checked warmups** and **101 timed retained Flight requests** each on CPUs 6–7 (exact Flight SHA-256 verified on all 12,864 calls):
+
+| Case | Actor | Median [min–max] | Mean | p95 | Scriptw ÷ V8 | Steady RSS / PSS / `Private_Dirty` |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| **Sync Flight** (`rsc-sync`) | **Scriptw `SCRWEP05` Speed** (`16.79 MB`, host target) | **0.162 ms** [0.159–0.165] | **0.175 ms** | **0.238 ms** | **0.99×** | **34.4 / 31.9 / 9.1 MiB** |
+| **Sync Flight** (`rsc-sync`) | **Scriptw Speed** (source compile, baseline target) | **0.158 ms** [0.156–0.160] | **0.170 ms** | **0.225 ms** | **0.96×** | 131.5 / 129.0 / 49.4 MiB |
+| **Sync Flight** (`rsc-sync`) | Scriptw Fast (source compile) | 0.524 ms [0.517–0.531] | 0.542 ms | 0.643 ms | 3.19× | 138.4 / 135.8 / 49.4 MiB |
+| **Sync Flight** (`rsc-sync`) | Node 24.19.0 / V8 (JIT) | 0.164 ms [0.158–0.168] | 0.182 ms | 0.225 ms | 1.00× | — |
+| **Async Flight** (`rsc-async`) | **Scriptw `SCRWEP05` Speed** (`16.79 MB`, host target) | **0.182 ms** [0.181–0.191] | **0.197 ms** | **0.274 ms** | **1.04×** | **35.2 / 32.7 / 9.4 MiB** |
+| **Async Flight** (`rsc-async`) | **Scriptw Speed** (source compile, baseline target) | **0.178 ms** [0.177–0.257] | **0.187 ms** | **0.272 ms** | **1.02×** | 132.5 / 130.0 / 49.6 MiB |
+| **Async Flight** (`rsc-async`) | Scriptw Fast (source compile) | 0.572 ms [0.563–0.580] | 0.589 ms | 0.684 ms | 3.28× | 139.4 / 136.8 / 49.6 MiB |
+| **Async Flight** (`rsc-async`) | Node 24.19.0 / V8 (JIT) | 0.175 ms [0.167–0.184] | 0.192 ms | 0.231 ms | 1.00× | — |
+
+In ABI 98 (`SCRWEP05` BLAKE3 envelope + `MADV_SEQUENTIAL` + lazy temporary-mapping `image_sha256()`, read-only `Mmap::from_file_range`, copying-GC first-nursery watermark fast reset + persistent pooled 4 KiB `PROT_NONE` null guard, inline guarded `Array.isArray` and 1-probe `WeakMap.prototype.get`/`set`, 2-entry inline polymorphic read IC and lean overwrite store, direct compact-storage extend stores, `StringValueSchema::ENTRY_HINT` computed reads/writes, inline `PropertyRead(ArrayIndex)` + dense OOB `undefined`, `GetV` closed-tail absence proof, dead Normal statement-list completion elimination, `rarely_taken(catch_frame)`, and post-inlining `cold_paths::spread`), Scriptw Speed **beats Node 24.19.0 / V8 JIT on Sync Flight** (**`0.158 ms`** source / **`0.162 ms`** `SCRWEP05` vs `0.164 ms`, **`0.96–0.99×`** median and **`0.93–0.96×`** mean), beats V8 mean on Async source (**`0.187` vs `0.192 ms`**, `1.02×` median; `1.04×` `SCRWEP05`), shrinks `rsc.swep` to **`16.79 MB`** (precompiled in `6.16 s`), and drops steady `SCRWEP05` RSS by **`-4.3 MiB`** (`38.7–39.4 -> 34.4–35.2 MiB`, `9.1–9.4 MiB` `Private_Dirty`) by keeping the file-backed transport mapping unfaulted. Three negative A/B experiments were tested and reverted cleanly before ABI 98 publication: a `128 MiB` initial heap / adaptive `4→8→16 MiB` nursery (regressed RSC RSS `+63.5%`, `Private_Dirty` `+106.9%`, `p99` `+48–83%`), inline `cached_property_add` in P (added `+260 KB` P Wasm / `+1.2 MB` native code and regressed I-cache `p50`), and Cranelift `Inlining::Yes` on P or R (`rsc-async` `+3.2%`, RSS `+12%`).
+
+Cold load to first Flight response (5 interleaved fresh processes, `samples=1, warmups=0`): `SCRWEP05` completed image admission (**`3.10 / 3.10 ms`** BLAKE3 vs `7.77 / 7.65 ms` SHA-256 in `SCRWEP04`), engine setup (`0.06 ms`), native `mmap` preparation (`1.43 / 1.50 ms`), Realm instantiation (`0.33 / 0.34 ms`), module initialization (`0.72 / 0.73 ms`), and the first Flight response (**`0.58 ms`** sync / **`0.71 ms`** async) in **`6.50 ms`** sync / **`6.88 ms`** async internal time — **`1.68–1.83×` faster than ABI 97 (`11.87 / 11.58 ms`)**, **`2.41–2.47×` faster than Node 24 internal (`16.06 / 16.56 ms`)**, and **`2.7–3.1×` faster first Flight call** than Node 24 (`1.79 / 1.89 ms`; Node whole-process wall `51.2 / 52.0 ms`). After `from_precompiled` admission, `SCRWEP05` held **`1.14 MiB` `Private_Dirty`** (`21.2 MiB` VmHWM).
+
+### Cold-start CLI and edge workloads (ABI 98)
+
+Warm-cache `scriptw run` vs Node 24.19.0 (15 interleaved runs after 3 warmups): **`5/5` faster, `0.173×` (`5.77×` faster geomean)** — `startup.js` **`1.44 ms`** (min `1.15 ms`) vs `15.99 ms` (**`11.1×`**), `numeric-loop-50000.js` **`3.08 ms`** vs `18.03 ms` (**`5.9×`**), `edge-router.js` **`3.38 ms`** vs `16.54 ms` (**`4.9×`**), `edge-json-api.js` **`3.54 ms`** vs `16.36 ms` (**`4.6×`**), `edge-html.js` **`3.85 ms`** vs `16.80 ms` (**`4.4×`**).
+
+Precompiled fresh-Realm edge workloads (`5 procs × 21 runs`, 5w for Scriptw/V8-5w, 80w for V8-80w) plus `../wtime` (`wtime-runtime v0.1.11`, `Decoded` / `Register`, 3 samples / 1 warmup) qualification on Scriptw Portable Wasm-GC. The copying-GC first-nursery watermark fast reset lowered fresh-Store total latency by **`10–28 µs`** across all six Edge workloads (`startup.js` total `95.31 -> 91.41 µs`):
+
+| Edge fixture | Scriptw ABI 98 exec (total) | V8 5w / 80w exec | Scriptw ÷ V8 80w | Scriptw Portable on `../wtime` Decoded / Register |
+| --- | ---: | ---: | ---: | ---: |
+| `startup.js` (floor) | **2.44 µs** (91.41 µs) | 4.84 / 3.83 µs | **0.64×** | **0.70 µs** / 2.02 µs (pass) |
+| `edge-html.js` | **231.53 µs** (408.57 µs) | 511.09 / 591.35 µs | **0.39× (2.55× faster)** | 44.6 ms / 49.5 ms (pass) |
+| `edge-query.js` | **186.85 µs** (362.04 µs) | 364.68 / 362.95 µs | **0.51× (1.94× faster)** | 37.7 ms / 41.2 ms (pass) |
+| `edge-json-api.js` | **133.39 µs** (305.62 µs) | 200.80 / 199.14 µs | **0.67× (1.49× faster)** | 22.6 ms / 24.3 ms (pass) |
+| `edge-router.js` | **82.67 µs** (251.73 µs) | 114.18 / 119.58 µs | **0.69× (1.45× faster)** | 13.9 ms / 15.7 ms (pass) |
+| `edge-middleware.js` | **73.43 µs** (242.34 µs) | 94.52 / 87.95 µs | **0.83× (1.20× faster)** | 13.0 ms / 14.1 ms (pass) |
+| `edge-nested-result.js` | **185.41 µs** (364.41 µs) | 270.67 / 212.74 µs | **0.87× (1.15× faster)** | 32.3 ms / 34.3 ms (pass) |
+| **Edge Geomean (6/6)** | — | **0.625× (1.60× faster vs 5w)** | **0.639× (1.57× faster vs 80w)** | **6/6 pass** (Porffor fails 6/6) |
+
+### 17-kernel + `startup.js` comparison across Wasmtime 47, V8, Porffor, and `../wtime` (ABI 98)
+
+Unified paired medians (`5 procs × 21 runs` after `10` warmups for Wasm engines; `5/80` warmups for V8 JS; `5 procs × 5 runs` after `2` warmups on the three `>40 ms` `../wtime` interpreter cells; exact stdout checked on every entry; plus `4` ABBA fresh CLI compile runs per `original17` kernel):
+
+| Workload | Scriptw WT (µs) | V8 5w / 80w (µs) | Porffor WT / V8 (µs) | Scriptw `wtime` Dec / Reg (µs) | Porffor `wtime` Dec / Reg (µs) | Compile: SW / Porf (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `startup.js` | **2.41** | 4.39 / 3.80 | 1.03 / 2.93 | **0.40** / **1.91** | 7.18 / 77.92 | — |
+| `sort-reverse-128.js` | **8.85** | 16.32 / 14.94 | 83.89 / 101.70 | **999.2** / **1,087.3** | 7,090.1 / 7,391.9 | 23.6 / 96.4 |
+| `sort-reverse-512.js` | **14.03** | 44.01 / 50.29 | 1,177.7 / 1,503.6 | **2,755.8** / **2,818.5** | 107,724 / 112,017 | 24.1 / 96.3 |
+| `sort-sorted-512.js` | **13.62** | 44.48 / 48.77 | 23.62 / 33.96 | 2,572.0 / 2,747.1 | 978.39 / 876.67 | 23.9 / 95.6 |
+| `to-sorted-512.js` | **17.92** | 44.16 / 50.78 | 1,166.2 / 1,483.0 | **3,262.4** / **3,631.1** | 109,314 / 112,565 | 24.1 / 96.6 |
+| `join-1024.js` | **20.85** | 40.35 / 33.22 | wrong output | **5,432.8** / **5,734.6** | wrong output | 24.0 / 95.0 |
+| `join-4096.js` | **61.34** | 120.72 / 154.81 | wrong output | **20,157** / **20,650** | wrong output | 23.0 / 96.8 |
+| `join-mixed-1024.js` | **22.09** | 60.89 / 62.93 | 35.09 / 52.32 | 5,623.4 / 5,928.5 | 1,794.0 / 1,294.2 | 24.4 / 97.1 |
+| `numeric-loop-10000.js` | **5.32** | 110.44 / 118.91 | 19.40 / 19.73 | 268.65 / 313.81 | 539.58 / 204.22 | 22.2 / 131.8 |
+| `numeric-loop-50000.js` | **5.17** | 278.97 / 275.71 | 54.86 / 47.28 | **259.93** / **301.46** | 2,752.9 / 934.39 | 22.2 / 97.4 |
+| `folded-string-4096.js` | **25.34** | 73.04 / 85.39 | 94.01 / 127.96 | 6,675.5 / 7,098.9 | 5,080.9 / 2,614.3 | 22.6 / 98.2 |
+| `dynamic-string-4096.js` | **29.32** | 103.22 / 135.59 | 93.97 / 66.73 | 6,306.3 / 6,642.0 | 4,167.4 / 3,103.0 | 22.5 / 94.6 |
+| `integer.js` | **6.28** | 1,168.1 / 1,186.1 | wrong output | **371.8** / **441.8** | wrong output | 23.8 / 94.5 |
+| `objects.js` | **22.66** | 45.57 / 40.96 | 103.21 / 1,008.4 | 4,679.7 / 4,902.6 | 2,067.5 / 1,608.4 | 24.8 / 99.4 |
+| `retained-objects.js` | **692.56** | 1,129.3 / 910.38 | runtime failed | **188,870** / **190,314** | runtime failed | 24.8 / 95.7 |
+| `join-empty-1024.js` | **6.30** | 33.14 / 38.10 | 166.22 / 633.02 | **331.42** / **375.46** | 741.70 / 1,089.6 | 22.6 / 92.6 |
+| `join-singleton-1024.js` | **6.30** | 52.27 / 59.00 | 204.65 / 2,147.5 | **350.36** / **390.33** | 2,220.4 / 3,438.8 | 22.3 / 94.1 |
+| `join-small-1024.js` | **9.44** | 169.50 / 176.03 | 350.90 / 3,753.3 | **385.77** / **422.69** | 5,323.9 / 4,453.3 | 22.8 / 93.6 |
+
+| Comparison (2026-11-28 local cohort, ABI 98) | Kernels | Winner | Ratio (geomean) |
+| --- | ---: | ---: | ---: |
+| Scriptw (Wasmtime 47) vs Node 24 / V8 JS (80w) | 17 | **Scriptw 17 / 17** | **0.177× (5.66× faster)** (`5.38×` vs 5w) |
+| Scriptw (Wasmtime 47) vs Porffor on Wasmtime 47.0.1 | 13 | **Scriptw 13 / 13** | **0.100× (9.96× faster)** (Porffor fails 4/17) |
+| Scriptw (Wasmtime 47) vs Porffor on Node 24 / V8 Wasm | 13 | **Scriptw 13 / 13** | **0.048× (20.87× faster)** |
+| Scriptw (Wasmtime 47) vs Porffor on `../wtime` (`Register` / `Decoded`) | 13 | **Scriptw 13 / 13** | **269× / 337× faster** |
+| **Scriptw Portable vs Porffor on `../wtime` (`Register`)** | 13 (+`startup`) | **Scriptw 7/13 (+`startup`)** | **0.471× (2.12× faster)** (`40.8×` on `startup`; `2.90×` on `Decoded`) |
+| `../wtime` (`Register`) vs Wasmtime 47 AOT — Porffor linear Wasm | 13 | Wasmtime AOT | `27.0×` slower (`Register` `1.25×` faster than `Decoded`) |
+| `../wtime` (`Decoded` / `Register`) vs Wasmtime 47 AOT — Scriptw Wasm-GC | 17 | Wasmtime AOT | `131×` / `142×` slower (`Decoded` `1.08×` faster than `Register`) |
+| JS → Wasm compile: `scriptw build wasm` vs `porf wasm` | 17 | **Scriptw 17 / 17** | **0.239× (4.18× faster)** |
+
+**`../wtime` notes (ABI 98):** `wtime-runtime v0.1.11` (`91d6cfe`) passed **18/18** (`startup.js` + all 17 `original17`) and **6/6** Edge workloads on Scriptw's full 38.4 MB (`36.6 MiB`) Portable Wasm-GC runtime (`scriptw-linked` and `scriptw-standalone`) with exact stdout, and **14/18** on Porffor Wasm. `../wtime` remains strictly a benchmark peer via standalone `scripts/wasm_peer_wtime/`; vendored Wasmtime 47 remains Scriptw's sole product backend.
