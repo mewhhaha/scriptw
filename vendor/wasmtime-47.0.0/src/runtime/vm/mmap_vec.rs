@@ -201,8 +201,7 @@ impl MmapVec {
     /// Scriptw patch: like [`MmapVec::from_file`], for `len` bytes of `file`
     /// starting at the host-page-aligned `offset`.
     #[cfg(all(feature = "std", unix, not(miri)))]
-    pub fn from_file_range(file: File, offset: u64, len: usize) -> Result<MmapVec> {
-        let file = Arc::new(file);
+    pub fn from_file_range(file: Arc<File>, offset: u64, len: usize) -> Result<MmapVec> {
         let mmap =
             Mmap::from_file_range(Arc::clone(&file), offset, len).with_context(move || {
                 format!("failed to create mmap for range {offset:#x}+{len:#x} of {file:?}")

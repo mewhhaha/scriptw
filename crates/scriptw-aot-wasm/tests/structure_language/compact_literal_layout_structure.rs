@@ -78,7 +78,7 @@ fn shared_layouts_keep_physical_instance_roots_and_live_object_reads() {
     );
     assert!(SITE.contains("crate::runtime_helpers::CachedPropertyReadArguments::new("));
     assert!(!READ.contains("OwnDataReadCacheSchema"));
-    // The site reads only the record's shape and slot; R fills records.
+    // The site reads only the record's cached metadata fields; R fills records.
     assert!(!SITE.contains(".write(record"));
     assert!(SITE.contains("crate::runtime_helpers::CachedPropertyRecordArguments::new(&name)"));
     assert!(CACHE.contains(".field(OrdinaryObjectSchema::PROPERTIES)"));

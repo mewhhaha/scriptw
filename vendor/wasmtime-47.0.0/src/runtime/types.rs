@@ -6,9 +6,11 @@ use crate::runtime::externals::Tag as RuntimeTag;
 use crate::{AsContextMut, Extern, Func, Val};
 use crate::{Engine, type_registry::RegisteredType};
 use core::fmt::{self, Display, Write};
+#[cfg(feature = "component-model")]
+use wasmtime_environ::ModuleTypes;
 use wasmtime_environ::WasmExnType;
 use wasmtime_environ::{
-    EngineOrModuleTypeIndex, EntityType, Global, IndexType, Limits, Memory, ModuleTypes,
+    EngineOrModuleTypeIndex, EntityType, Global, IndexType, Limits, Memory,
     PanicOnOom as _, Table, Tag, TypeTrace, VMSharedTypeIndex, WasmArrayType,
     WasmCompositeInnerType, WasmCompositeType, WasmFieldType, WasmFuncType, WasmHeapType,
     WasmRefType, WasmStorageType, WasmStructType, WasmSubType, WasmValType,
@@ -1488,33 +1490,34 @@ impl ExternType {
         (Tag(TagType) tag unwrap_tag)
     }
 
-    pub(crate) fn from_wasmtime(
+    #[cfg(feature = "component-model")]
+    pub(crate) fn from_wasmtime_with_module_types(
         engine: &Engine,
         types: &ModuleTypes,
         ty: &EntityType,
     ) -> ExternType {
+        // Component interfaces can describe function types that have not
+        // themselves been canonicalized, but whose members have been.
+        if let EntityType::Function(EngineOrModuleTypeIndex::Module(index)) = ty {
+            let subty = &types[*index];
+            debug_assert!(subty.is_canonicalized_for_runtime_usage());
+            return FuncType::from_wasm_func_type(
+                engine,
+                subty.is_final,
+                subty.supertype,
+                subty.unwrap_func().clone_panic_on_oom(),
+            )
+            .panic_on_oom()
+            .into();
+        }
+        Self::from_wasmtime(engine, ty)
+    }
+
+    pub(crate) fn from_wasmtime(engine: &Engine, ty: &EntityType) -> ExternType {
         match ty {
-            EntityType::Function(idx) => match idx {
-                EngineOrModuleTypeIndex::Engine(e) => {
-                    FuncType::from_shared_type_index(engine, *e).into()
-                }
-                EngineOrModuleTypeIndex::Module(m) => {
-                    let subty = &types[*m];
-                    debug_assert!(subty.is_canonicalized_for_runtime_usage());
-                    // subty.canonicalize_for_runtime_usage(&mut |idx| {
-                    //     signatures.shared_type(idx).unwrap()
-                    // });
-                    FuncType::from_wasm_func_type(
-                        engine,
-                        subty.is_final,
-                        subty.supertype,
-                        subty.unwrap_func().clone_panic_on_oom(),
-                    )
-                    .panic_on_oom()
-                    .into()
-                }
-                EngineOrModuleTypeIndex::RecGroup(_) => unreachable!(),
-            },
+            EntityType::Function(idx) => {
+                FuncType::from_shared_type_index(engine, idx.unwrap_engine_type_index()).into()
+            }
             EntityType::Global(ty) => GlobalType::from_wasmtime_global(engine, ty).into(),
             EntityType::Memory(ty) => MemoryType::from_wasmtime_memory(ty).into(),
             EntityType::Table(ty) => TableType::from_wasmtime_table(engine, ty).into(),
@@ -3540,7 +3543,6 @@ pub struct ImportType<'module> {
 
     /// The type of the import.
     ty: EntityType,
-    types: &'module ModuleTypes,
     engine: &'module Engine,
 }
 
@@ -3551,7 +3553,6 @@ impl<'module> ImportType<'module> {
         module: &'module str,
         name: &'module str,
         ty: EntityType,
-        types: &'module ModuleTypes,
         engine: &'module Engine,
     ) -> ImportType<'module> {
         assert!(ty.is_canonicalized_for_runtime_usage());
@@ -3559,7 +3560,6 @@ impl<'module> ImportType<'module> {
             module,
             name,
             ty,
-            types,
             engine,
         }
     }
@@ -3577,7 +3577,7 @@ impl<'module> ImportType<'module> {
 
     /// Returns the expected type of this import.
     pub fn ty(&self) -> ExternType {
-        ExternType::from_wasmtime(self.engine, self.types, &self.ty)
+        ExternType::from_wasmtime(self.engine, &self.ty)
     }
 }
 
@@ -3606,7 +3606,6 @@ pub struct ExportType<'module> {
 
     /// The type of the export.
     ty: EntityType,
-    types: &'module ModuleTypes,
     engine: &'module Engine,
 }
 
@@ -3616,13 +3615,11 @@ impl<'module> ExportType<'module> {
     pub(crate) fn new(
         name: &'module str,
         ty: EntityType,
-        types: &'module ModuleTypes,
         engine: &'module Engine,
     ) -> ExportType<'module> {
         ExportType {
             name,
             ty,
-            types,
             engine,
         }
     }
@@ -3634,7 +3631,7 @@ impl<'module> ExportType<'module> {
 
     /// Returns the type of this export.
     pub fn ty(&self) -> ExternType {
-        ExternType::from_wasmtime(self.engine, self.types, &self.ty)
+        ExternType::from_wasmtime(self.engine, &self.ty)
     }
 }
 

@@ -284,14 +284,18 @@ fn check_fixture(name: &str, source: &str) -> Trained {
     assert_eq!(decoded.encode(), encoded, "{name}: canonical encoding");
     let admitted = AdmittedProfile::admit(&decoded, &scriptw_aot_wasm::ProgramKey::new(key))
         .unwrap_or_else(|error| panic!("{name}: {error}"));
-    // The probe's own inline hit already proves an own compact slot of either
-    // layout, so those kinds are not guarded again.
+    // The probe's own inline hit already proves own compact slots and
+    // closed-tail absence of either layout, so those kinds are not guarded again.
     let hot = reads
         .iter()
         .filter(|read| {
             read.executions >= 8
                 && read.dominant.is_some_and(|kind| {
-                    !matches!(kind, ReadSpecialisation::OwnCompact(_))
+                    !matches!(
+                        kind,
+                        ReadSpecialisation::OwnCompact(_)
+                            | ReadSpecialisation::AbsentClosedTail(_)
+                    )
                 })
         })
         .count();
@@ -824,7 +828,11 @@ fn check_exactness(name: &str, body: &str, surface: HostSurfacePolicy) -> Vec<St
             "{name}: true profile ({kind:?}) {applied} against {expected}"
         ));
     }
-    if !matches!(kind, Some(ReadSpecialisation::OwnCompact(_))) && applied_fuel >= unprofiled_fuel {
+    if !matches!(
+        kind,
+        Some(ReadSpecialisation::OwnCompact(_) | ReadSpecialisation::AbsentClosedTail(_))
+    ) && applied_fuel >= unprofiled_fuel
+    {
         problems.push(format!(
             "{name}: the trained {kind:?} guard does not hit before the mutation ({applied_fuel} fuel against {unprofiled_fuel})"
         ));

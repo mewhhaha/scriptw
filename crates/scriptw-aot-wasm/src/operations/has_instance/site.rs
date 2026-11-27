@@ -213,7 +213,7 @@ impl FunctionBuilder<'_> {
     /// Answers `V instanceof C` into `answer` from a usable record of C, or
     /// branches to `slow`, having observed nothing. A site of an
     /// `instanceof` run walks V's chain into the run's slots, or answers from
-    /// the slots its run's first site walked for this very V.
+    /// the slots an earlier site walked for this very V.
     fn emit_instanceof_usable_record_answer(
         &mut self,
         record: &GcLocal<InstanceofSiteRecord, Nullable>,
@@ -270,16 +270,6 @@ impl FunctionBuilder<'_> {
                     .reference(),
                 f,
             );
-        // The Realm's %Object.prototype%, when the record proved it: its
-        // [[Prototype]] is null and immutable, so a chain reaching it ends.
-        let terminal = s
-            .reserve_gc_local::<JavaScriptObject, Nullable>(f)
-            .initialize(
-                s.field(InstanceofSiteRecordSchema::TERMINAL)
-                    .read(record, s, f)
-                    .reference(),
-                f,
-            );
         let next = s
             .reserve_gc_local::<JavaScriptObject, Nullable>(f)
             .initialize_null(s, f);
@@ -287,7 +277,6 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local::<JavaScriptObject, Nullable>(f)
             .initialize_null(s, f);
         // Leaves with the next object of V's chain to examine in `next`.
-        let candidates = self.open_frame(ControlFrameKind::Block, f);
         match chain {
             None => self.emit_chain_prototype_or_branch(
                 CandidateObject::Reference(object.reference()),
@@ -300,19 +289,28 @@ impl FunctionBuilder<'_> {
                 ChainWalk {
                     object,
                     prototype: &prototype,
-                    terminal: &terminal,
+                    record,
                     next: &next,
                     current: &current,
                     answer,
                     answered,
-                    candidates,
                     slow,
                 },
                 f,
             ),
         }
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
+        // A completed shared walk has already answered. Only a remaining
+        // walk needs this site's terminal proof.
+        // The Realm's %Object.prototype%, when the record proved it: its
+        // [[Prototype]] is null and immutable, so a chain reaching it ends.
+        let terminal = s
+            .reserve_gc_local::<JavaScriptObject, Nullable>(f)
+            .initialize(
+                s.field(InstanceofSiteRecordSchema::TERMINAL)
+                    .read(record, s, f)
+                    .reference(),
+                f,
+            );
         let walk = self.open_frame(ControlFrameKind::Loop, f);
         let _ = next.load(s, f);
         let _ = prototype.load(s, f);

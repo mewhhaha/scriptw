@@ -206,8 +206,9 @@ fn a_cli_precompiled_image_runs_through_the_embedding_precompiled_path() {
         "no transaction remains"
     );
 
-    // SAFETY: this test's own CLI build produced the unchanged image.
-    let program = unsafe { PrecompiledEmbeddedProgram::from_bytes(&published.unwrap()) }
+    drop(published);
+    // SAFETY: the test owns the image produced by its CLI and keeps it immutable.
+    let program = unsafe { PrecompiledEmbeddedProgram::from_file(&image) }
         .expect("the same build admits its image");
     let mut config = wasmtime::Config::new();
     configure_precompiled_wasm_runtime(&mut config);

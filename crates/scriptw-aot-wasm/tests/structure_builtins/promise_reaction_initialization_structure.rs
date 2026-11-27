@@ -208,7 +208,7 @@ fn module_reactions_accept_owned_intrinsic_records_and_keep_raw_rejection_and_re
     assert!(raw.contains("PromiseSettlement::Reject"));
     assert!(raw.contains("emit_initialize_promise_reaction"));
     assert!(raw.contains("emit_append_pending_promise_reaction"));
-    assert!(raw.contains("emit_queue_selected_promise_reaction"));
+    assert!(raw.contains("emit_append_promise_job"));
     let module = bounded(
         PROMISE_SOURCE,
         "    pub(crate) fn emit_module_promise_reactions(",

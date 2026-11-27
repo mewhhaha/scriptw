@@ -65,10 +65,15 @@ impl FunctionBuilder<'_> {
         json_i32(unit, 34, f);
         output.push(unit, s, f);
         json_i32(index, 0, f);
-        self.emit_json_quote_plain_prefix(accumulator, output, &units, length, index, unit, f);
-        json_i32(spare, 0, f);
         let done = self.open_frame(ControlFrameKind::Block, f);
+        self.emit_json_quote_plain_prefix(output, &units, length, index, unit, f);
+        index.load(f);
+        length.load(f);
+        f.instruction(&Instruction::I32Eq);
+        self.emit_branch_if_to_target(done, f);
+        json_i32(spare, 0, f);
         let next = self.open_frame(ControlFrameKind::Loop, f);
+        // Every backedge checks the extent before reading the next unit.
         index.load(f);
         length.load(f);
         f.instruction(&Instruction::I32GeU);
@@ -248,11 +253,11 @@ impl FunctionBuilder<'_> {
         units.clear(f);
     }
 
-    /// Bulk-copy a long ordinary prefix. A prefix shorter than 16 units
-    /// leaves the scalar quote loop at its original starting point.
+    /// Short ASCII spans copy directly to the already reserved output. The
+    /// first special unit stays at the current index for the full escape
+    /// loop. Long ordinary prefixes retain the bulk copy.
     fn emit_json_quote_plain_prefix(
         &mut self,
-        accumulator: &GcLocal<StringAccumulator>,
         output: &StringAccumulatorCursor,
         units: &GcLocal<CodeUnitArray>,
         length: I32Local,
@@ -263,10 +268,44 @@ impl FunctionBuilder<'_> {
         const BULK_MIN: i32 = 16;
         let s = self.runtime_schema();
         let done = self.open_frame(ControlFrameKind::Block, f);
+        let long = self.open_frame(ControlFrameKind::Block, f);
         length.load(f);
         f.instruction(&Instruction::I32Const(BULK_MIN));
-        f.instruction(&Instruction::I32LtU);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(long, f);
+        length.load(f);
+        f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(done, f);
+        let short = self.open_frame(ControlFrameKind::Loop, f);
+        s.array_type::<CodeUnitArray>()
+            .read(units, index, s, f)
+            .store(unit, f);
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(0x20));
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Const(0x80 - 0x20));
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(done, f);
+        for escaped in [34, 92] {
+            unit.load(f);
+            f.instruction(&Instruction::I32Const(escaped));
+            f.instruction(&Instruction::I32Eq);
+            self.emit_branch_if_to_target(done, f);
+        }
+        output.push(unit, s, f);
+        index.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        index.store(f);
+        index.load(f);
+        length.load(f);
+        f.instruction(&Instruction::I32LtU);
+        self.emit_branch_if_to_target(short, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.emit_branch_to_target(done, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         let span = s.reserve_i32_local(f);
         span.set_constant(0, f);
         let scanned = self.open_frame(ControlFrameKind::Block, f);
@@ -306,7 +345,6 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(BULK_MIN));
         f.instruction(&Instruction::I32LtU);
         self.emit_branch_if_to_target(done, f);
-        let _ = accumulator;
         output.append_reserved_units_range(units, index, span, s, f);
         span.load(f);
         index.store(f);

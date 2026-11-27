@@ -938,7 +938,7 @@ impl Engine {
     #[cfg(all(feature = "std", unix, not(miri)))]
     pub(crate) fn load_code_file_range(
         &self,
-        file: File,
+        file: Arc<File>,
         offset: u64,
         len: usize,
         expected: ObjectKind,

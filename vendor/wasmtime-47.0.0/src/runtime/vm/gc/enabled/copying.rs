@@ -28,8 +28,8 @@ use wasmtime_environ::copying::{
     ALIGN, ARRAY_LENGTH_OFFSET, CopyingTypeLayouts, HEADER_COPIED_BIT, HEADER_SIZE, InlineTraceInfo,
 };
 use wasmtime_environ::{
-    GcArrayLayout, GcStructLayout, GcTypeLayouts, MemoryKind, MemoryTunables, POISON, Tunables,
-    VMGcKind, VMSharedTypeIndex, gc_assert,
+    GcArrayLayout, GcLayout, GcStructLayout, GcTypeLayouts, MemoryKind, MemoryTunables, POISON,
+    Tunables, VMGcKind, VMSharedTypeIndex, gc_assert,
 };
 
 #[expect(clippy::cast_possible_truncation, reason = "known to not overflow")]
@@ -46,9 +46,13 @@ unsafe impl GcRuntime for CopyingCollector {
         &self.layouts
     }
 
+    fn needs_out_of_line_trace_info(&self, layout: &GcLayout) -> bool {
+        matches!(InlineTraceInfo::new(layout), InlineTraceInfo::OutOfLine)
+    }
+
     fn new_gc_heap(&self, engine: &Engine) -> Result<Box<dyn GcHeap>> {
         let tunables = engine.tunables();
-        let heap = CopyingHeap::new(null_guard_bytes(tunables), nursery_end(tunables))?;
+        let heap = CopyingHeap::new(null_guard_bytes(tunables), nursery_end(tunables));
         Ok(Box::new(heap) as _)
     }
 
@@ -526,17 +530,18 @@ struct CopyingHeap {
     direct_old: Vec<u32>,
 
     /// Backing store of the remembered-slot buffer that `vmctx_data`
-    /// publishes to compiled code.
-    remembered: Box<[u32]>,
+    /// publishes to compiled code. The published capacity is this vector's
+    /// initialized length, and the published pointer is null while empty.
+    remembered: Vec<u32>,
 
     /// The set of `externref`s in the nursery.
     young_extern_ref_set_head: Option<VMExternRef>,
 }
 
 impl CopyingHeap {
-    fn new(null_guard: u32, nursery_end: u32) -> Result<Self> {
+    fn new(null_guard: u32, nursery_end: u32) -> Self {
         log::trace!("allocating new copying heap");
-        let mut heap = Self {
+        Self {
             trace_infos: TraceInfos::new(),
             ephemeron_marking: EphemeronMarking::default(),
             no_gc_count: 0,
@@ -560,13 +565,9 @@ impl CopyingHeap {
             collecting_minor: false,
             last_minor: false,
             direct_old: Vec::new(),
-            remembered: Box::default(),
+            remembered: Vec::new(),
             young_extern_ref_set_head: None,
-        };
-        if nursery_end != 0 {
-            heap.resize_remembered(REMEMBERED_INITIAL)?;
         }
-        Ok(heap)
     }
 
     /// Replaces the (empty) remembered-slot buffer by one of `capacity` slots.
@@ -574,22 +575,28 @@ impl CopyingHeap {
         let mut slots = Vec::new();
         slots.try_reserve_exact(capacity)?;
         slots.resize(capacity, 0);
-        self.remembered = slots.into_boxed_slice();
+        self.remembered = slots;
         let inner = self.vmctx_data.inner.get_mut();
+        assert_eq!(inner.remembered_len, 0);
         inner.remembered = self.remembered.as_mut_ptr() as usize;
         inner.remembered_cap = u32::try_from(capacity).unwrap();
-        inner.remembered_len = 0;
-        inner.remembered_overflow = 0;
         Ok(())
     }
 
     /// Records that the old-space slot at heap index `slot` holds a nursery
     /// reference, as a write barrier does.
     fn remember_slot(&mut self, slot: u32) {
+        if self.remembered.is_empty() {
+            // A compiled store may already have flagged overflow. Preserve it
+            // even when this allocation succeeds: its edge is still missing.
+            let _ = self.resize_remembered(REMEMBERED_INITIAL);
+        }
         let inner = self.vmctx_data.inner.get_mut();
         let len = usize::try_from(inner.remembered_len).unwrap();
         if len < self.remembered.len() {
-            self.remembered[len] = slot;
+            // SAFETY: the index is in bounds. Write through the vector's
+            // raw pointer without invalidating the pointer compiled code has.
+            unsafe { self.remembered.as_mut_ptr().add(len).write(slot) };
             inner.remembered_len += 1;
         } else {
             inner.remembered_overflow = 1;
@@ -656,8 +663,12 @@ impl CopyingHeap {
         inner.remembered_len = 0;
         inner.remembered_overflow = 0;
         if overflowed && self.remembered.len() < REMEMBERED_MAX {
-            // Reallocation failure only keeps the smaller buffer.
-            let _ = self.resize_remembered((self.remembered.len() * 2).min(REMEMBERED_MAX));
+            // Compiled barriers with zero capacity only set the overflow
+            // flag. This collection covered their edges; install the first
+            // buffer or grow the previous one for the next collection.
+            // Reallocation failure keeps the previous capacity.
+            let capacity = (self.remembered.len() * 2).clamp(REMEMBERED_INITIAL, REMEMBERED_MAX);
+            let _ = self.resize_remembered(capacity);
         }
         Ok(())
     }
@@ -2366,7 +2377,7 @@ mod tests {
 
     #[test]
     fn allocation_growth_policy_uses_active_space_and_allocation_bytes() {
-        let mut heap = CopyingHeap::new(0, 0).unwrap();
+        let mut heap = CopyingHeap::new(0, 0);
         assert!(!heap.should_collect_before_growth(0, 0));
         assert!(!heap.should_collect_before_growth(32, 0));
 
@@ -2961,6 +2972,36 @@ mod generational_tests {
     }
 
     #[test]
+    fn module_struct_fields_beyond_the_inline_trace_bitmap_are_traced() {
+        let engine = engine(2 << 20);
+        let wat = format!(
+            r#"(module
+              (type $child (struct (field i32)))
+              (type $wide (struct {} (field (mut (ref null $child)))))
+              (global $root (mut (ref null $wide)) (ref.null $wide))
+              (func (export "create")
+                (global.set $root (struct.new_default $wide))
+                (struct.set $wide 23 (global.get $root)
+                  (struct.new $child (i32.const 42))))
+              (func (export "read") (result i32)
+                (struct.get $child 0 (struct.get $wide 23 (global.get $root)))))"#,
+            "(field (ref null $child)) ".repeat(23)
+        );
+        let module = Module::new(&engine, wat).unwrap();
+        let mut store = Store::new(&engine, ());
+        let instance = Instance::new(&mut store, &module, &[]).unwrap();
+        let create = instance
+            .get_typed_func::<(), ()>(&mut store, "create")
+            .unwrap();
+        let read = instance
+            .get_typed_func::<(), i32>(&mut store, "read")
+            .unwrap();
+        create.call(&mut store, ()).unwrap();
+        store.gc(None).unwrap();
+        assert_eq!(read.call(&mut store, ()).unwrap(), 42);
+    }
+
+    #[test]
     fn a_first_full_nursery_continues_in_the_old_space() {
         // 16 MiB: a 2 MiB nursery and 7 MiB semi-spaces, whose window leaves
         // room for two nurseries (each less the null guard): about 3 MiB.
@@ -3230,10 +3271,13 @@ mod generational_tests {
         let mut f = Fixture::new(2 << 20);
         f.call("make_old", &[Val::I32(64)], 0);
         f.churn();
-        // Compiled struct.set into an old object.
+        assert!(f.heap().remembered.is_empty());
+        // The first compiled store takes the overflow path at zero capacity.
         f.call("struct_set", &[Val::I32(7)], 0);
+        assert!(f.heap().remembered.is_empty());
         f.churn();
         assert_eq!(f.i32("struct_read"), 7);
+        assert_eq!(f.heap().remembered.len(), super::REMEMBERED_INITIAL);
         // Compiled array.set into an old array.
         f.call("array_set_all", &[Val::I32(100)], 0);
         f.churn();
@@ -3266,6 +3310,7 @@ mod generational_tests {
         let mut f = Fixture::new(2 << 20);
         f.call("make_old", &[Val::I32(4)], 0);
         f.churn();
+        assert!(f.heap().remembered.is_empty());
         let old = f.call("old", &[], 1).remove(0);
         {
             let mut scope = RootScope::new(&mut f.store);
@@ -3274,6 +3319,7 @@ mod generational_tests {
             old.set_field(&mut scope, 0, Val::AnyRef(Some(young.to_anyref())))
                 .unwrap();
         }
+        assert_eq!(f.heap().remembered.len(), super::REMEMBERED_INITIAL);
         f.churn();
         assert_eq!(f.i32("struct_read"), 9);
     }
@@ -3284,6 +3330,10 @@ mod generational_tests {
         let mut f = Fixture::new(4 << 20);
         f.call("make_old", &[Val::I32(10_000)], 0);
         f.churn();
+        f.call("struct_set", &[Val::I32(1)], 0);
+        f.churn();
+        assert_eq!(f.heap().remembered.len(), super::REMEMBERED_INITIAL);
+        f.store.gc(None).unwrap();
         f.call("array_set_all", &[Val::I32(1)], 0);
         f.churn();
         assert_eq!(f.i32("array_sum"), (1..10_001).sum::<i32>());

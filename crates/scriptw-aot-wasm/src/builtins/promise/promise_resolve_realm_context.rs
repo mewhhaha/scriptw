@@ -6,28 +6,28 @@ pub(super) struct PromiseResolveOperationRealmContext {
 }
 #[must_use = "intrinsic PromiseResolve Realm context must be released"]
 pub(super) struct IntrinsicPromiseResolveRealmContext {
-    materialization: PromiseInternalFunctionMaterializationContext,
-    operation: PromiseResolveOperationRealmContext,
-    constructor: ValueLocals,
+    realm: GcLocal<RealmRecord>,
 }
 
 impl FunctionBuilder<'_> {
-    fn emit_promise_resolve_internal_function_materialization_context(
+    fn emit_promise_resolve_realm(
         &mut self,
         authority: PromiseResolveRealmAuthority<'_>,
         function: &mut Function,
-    ) -> PromiseInternalFunctionMaterializationContext {
-        match authority {
-            PromiseResolveRealmAuthority::CurrentFunction => self
-                .emit_current_function_promise_internal_function_materialization_context(function),
-            PromiseResolveRealmAuthority::ExplicitRealm(realm) => self
-                .emit_promise_internal_function_materialization_context_from_realm(realm, function),
-            PromiseResolveRealmAuthority::AsyncExecution(context) => self
-                .emit_promise_internal_function_materialization_context_from_realm(
-                    context.realm(),
-                    function,
-                ),
-        }
+    ) -> GcLocal<RealmRecord> {
+        let schema = self.runtime_schema();
+        let realm = match authority {
+            PromiseResolveRealmAuthority::CurrentFunction => {
+                self.emit_current_function_realm(function)
+            }
+            PromiseResolveRealmAuthority::ExplicitRealm(realm) => realm.load(schema, function),
+            PromiseResolveRealmAuthority::AsyncExecution(context) => {
+                context.realm().load(schema, function)
+            }
+        };
+        schema
+            .reserve_gc_local(function)
+            .initialize(realm, function)
     }
     fn emit_promise_resolve_operation_in_context(
         &mut self,
@@ -54,34 +54,22 @@ impl FunctionBuilder<'_> {
         authority: PromiseResolveRealmAuthority<'_>,
         function: &mut Function,
     ) -> Result<PromiseResolveOperationRealmContext, EmitError> {
+        let realm = self.emit_promise_resolve_realm(authority, function);
         let context = self
-            .emit_promise_resolve_internal_function_materialization_context(authority, function);
+            .emit_promise_internal_function_materialization_context_from_realm(&realm, function);
         let result = self.emit_promise_resolve_operation_in_context(&context, function);
         self.release_promise_internal_function_materialization_context(context, function);
+        realm.clear(function);
         result
     }
     pub(super) fn emit_intrinsic_promise_resolve_realm_context(
         &mut self,
         authority: PromiseResolveRealmAuthority<'_>,
         function: &mut Function,
-    ) -> Result<IntrinsicPromiseResolveRealmContext, EmitError> {
-        let schema = self.runtime_schema();
-        let materialization = self
-            .emit_promise_resolve_internal_function_materialization_context(authority, function);
-        let operation =
-            self.emit_promise_resolve_operation_in_context(&materialization, function)?;
-        let constructor = schema.reserve_value_local(function);
-        self.emit_load_non_array_realm_intrinsic(
-            materialization.realm(),
-            NonArrayRealmIntrinsicSlot::PromiseConstructor,
-            &constructor,
-            function,
-        );
-        Ok(IntrinsicPromiseResolveRealmContext {
-            materialization,
-            operation,
-            constructor,
-        })
+    ) -> IntrinsicPromiseResolveRealmContext {
+        IntrinsicPromiseResolveRealmContext {
+            realm: self.emit_promise_resolve_realm(authority, function),
+        }
     }
     pub(super) fn emit_call_promise_resolve_operation(
         &mut self,
@@ -114,12 +102,7 @@ impl FunctionBuilder<'_> {
         context: IntrinsicPromiseResolveRealmContext,
         function: &mut Function,
     ) {
-        context.constructor.clear(function);
-        self.release_promise_resolve_operation_realm_context(context.operation, function);
-        self.release_promise_internal_function_materialization_context(
-            context.materialization,
-            function,
-        );
+        context.realm.clear(function);
     }
     pub(super) fn emit_intrinsic_promise_resolve_to_locals(
         &mut self,
@@ -128,12 +111,72 @@ impl FunctionBuilder<'_> {
         result: &CompletionLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        self.emit_is_heap_object_like_tag_i32(value.tag(), function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        // The intrinsic constructor is fixed and primitive resolution does
+        // not consult JavaScript properties.
+        let fresh = self.emit_alloc_promise_in_realm(&context.realm, function)?;
+        self.emit_settle_promise_record(&fresh, PromiseSettlement::Fulfill, value, function)?;
+        result.value().set_reference(&fresh, schema, function);
+        result.set_kind(CompletionKind::Normal, function);
+        result.target().set_constant(0, function);
+        fresh.clear(function);
+        self.emit_branch_to_target(done, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+
+        let slow = self.open_frame(ControlFrameKind::Block, function);
+        let promise = schema.reserve_gc_local(function).initialize(
+            value.sealed_reference_or_branch::<PromiseObject>(
+                schema,
+                self.local_branch_label(slow),
+                function,
+            ),
+            function,
+        );
+        self.emit_intrinsic_promise_constructor_or_branch(
+            &promise,
+            &context.realm,
+            slow,
+            function,
+        )?;
+        result.set_normal(value, function);
+        promise.clear(function);
+        self.emit_branch_to_target(done, function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+
+        // The existing call owns its defining Realm and the observable
+        // constructor/then Gets for custom Promises and other objects.
+        let materialization = self
+            .emit_promise_internal_function_materialization_context_from_realm(
+                &context.realm,
+                function,
+            );
+        let operation =
+            self.emit_promise_resolve_operation_in_context(&materialization, function)?;
+        let constructor = schema.reserve_value_local(function);
+        self.emit_load_non_array_realm_intrinsic(
+            &context.realm,
+            NonArrayRealmIntrinsicSlot::PromiseConstructor,
+            &constructor,
+            function,
+        );
         self.emit_call_promise_resolve_operation(
-            &context.operation,
-            &context.constructor,
+            &operation,
+            &constructor,
             value,
             result,
             function,
-        )
+        )?;
+        constructor.clear(function);
+        self.release_promise_resolve_operation_realm_context(operation, function);
+        self.release_promise_internal_function_materialization_context(materialization, function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        Ok(())
     }
 }

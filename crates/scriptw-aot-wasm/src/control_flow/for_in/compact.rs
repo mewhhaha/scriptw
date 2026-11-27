@@ -4,7 +4,238 @@ use super::enumeration::ForInVisitedKeys;
 use super::*;
 use crate::operations::PropertyKeyLocals;
 
+pub(super) struct LocalCompactForInCursor {
+    source: GcLocal<OrdinaryObject, Nullable>,
+    storage: GcLocal<CompactDataStorage, Nullable>,
+    keys: GcLocal<CompactShapeKeys, Nullable>,
+    index: I32Local,
+    length: I32Local,
+}
+
+impl LocalCompactForInCursor {
+    pub(super) fn clear(self, s: &RuntimeSchema, f: &mut Function) {
+        s.release_i32_local(self.length, f);
+        s.release_i32_local(self.index, f);
+        self.keys.clear(f);
+        self.storage.clear(f);
+        self.source.clear(f);
+    }
+}
+
 impl FunctionBuilder<'_> {
+    /// Eager cursors can borrow shape keys before the first advance. Between
+    /// creation and that advance the loop emits only its private bookkeeping.
+    pub(super) fn emit_prepare_local_compact_for_in(
+        &mut self,
+        current: &ValueLocals,
+        f: &mut Function,
+    ) -> Result<Option<LocalCompactForInCursor>, EmitError> {
+        // Resume bodies publish the record before their first advance.
+        if self
+            .body_entry_locals()
+            .and_then(|entry| entry.resume_frame())
+            .is_some()
+            || !object_prototype_has_no_enumerable_keys()?
+        {
+            return Ok(None);
+        }
+        let s = self.runtime_schema();
+        let cursor = LocalCompactForInCursor {
+            source: s.reserve_gc_local(f).initialize_null(s, f),
+            storage: s.reserve_gc_local(f).initialize_null(s, f),
+            keys: s.reserve_gc_local(f).initialize_null(s, f),
+            index: s.reserve_i32_local(f),
+            length: s.reserve_i32_local(f),
+        };
+        cursor.index.set_constant(0, f);
+        cursor.length.set_constant(0, f);
+        let declined = self.open_frame(ControlFrameKind::Block, f);
+        let source = s.reserve_gc_local(f).initialize(
+            current.sealed_reference_or_branch::<OrdinaryObject>(
+                s,
+                self.local_branch_label(declined),
+                f,
+            ),
+            f,
+        );
+        let base = s.reserve_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROPERTIES)
+                .read(&source, s, f)
+                .reference(),
+            f,
+        );
+        let storage = self.emit_for_in_compact_storage_or_branch(&base, declined, f);
+        base.clear(f);
+        self.emit_for_in_local_tail_or_branch(&source, declined, f);
+        let keys = self.emit_compact_shape_keys(&storage, f);
+        s.array_type::<CompactShapeKeys>().length(&keys, s, f);
+        cursor.length.store(f);
+        cursor.keys.replace(keys.load(s, f).nullable(), f);
+        cursor.storage.replace(storage.load(s, f).nullable(), f);
+        cursor.source.replace(source.load(s, f).nullable(), f);
+        keys.clear(f);
+        storage.clear(f);
+        source.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        Ok(Some(cursor))
+    }
+
+    pub(super) fn emit_advance_local_compact_for_in(
+        &mut self,
+        record: &GcLocal<ForInEnumerationRecord>,
+        cursor: &LocalCompactForInCursor,
+        output: &CompletionLocals,
+        complete: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let inactive = self.open_frame(ControlFrameKind::Block, f);
+        let storage = s.reserve_non_null_gc_local(f).initialize(
+            cursor
+                .storage
+                .non_null_or_branch(self.local_branch_label(inactive), f),
+            f,
+        );
+        let fallback = self.open_frame(ControlFrameKind::Block, f);
+        self.rarely_taken(fallback, f);
+        let source = s
+            .reserve_gc_local(f)
+            .initialize(cursor.source.load(s, f).require_non_null(f), f);
+        s.field(OrdinaryObjectSchema::PROPERTIES)
+            .read(&source, s, f);
+        storage.load(s, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32Eqz);
+        // Shape is immutable in a compact storage. Replacement, including a
+        // compact append, needs the original shape's unvisited key snapshot.
+        self.emit_branch_if_to_target(fallback, f);
+        cursor.index.load(f);
+        cursor.length.load(f);
+        f.instruction(&Instruction::I32LtU);
+        self.open_frame(ControlFrameKind::If, f);
+        let keys = s
+            .reserve_non_null_gc_local(f)
+            .initialize(cursor.keys.load(s, f).require_non_null(f), f);
+        self.emit_for_in_compact_key(&keys, cursor.index, output, f);
+        keys.clear(f);
+        self.emit_branch_to_target(complete, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+
+        // Until own keys are exhausted, prototype mutations do not affect
+        // which of those keys to yield. The next observation is the live tail.
+        self.emit_for_in_local_tail_or_branch(&source, fallback, f);
+        output.initialize(f);
+        self.emit_branch_to_target(complete, f);
+        source.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+
+        // R sees precisely the original key snapshot and the processed prefix.
+        // It either continues that snapshot or seeds the exact visited Set.
+        s.field(ForInEnumerationRecordSchema::COMPACT_STORAGE)
+            .write(record, GcOperand::nullable_reference(&storage, s), s, f);
+        s.field(ForInEnumerationRecordSchema::NEXT_KEY).write(
+            record,
+            GcOperand::i32_local(cursor.index),
+            s,
+            f,
+        );
+        cursor.storage.set_null(s, f);
+        cursor.source.set_null(s, f);
+        cursor.keys.set_null(s, f);
+        storage.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+    }
+
+    fn emit_for_in_local_tail_or_branch(
+        &mut self,
+        source: &GcLocal<OrdinaryObject>,
+        declined: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let prototype = s.reserve_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(source, s, f)
+                .reference(),
+            f,
+        );
+        let closed = self.open_frame(ControlFrameKind::Block, f);
+        prototype.load(s, f).is_null(f);
+        self.emit_branch_if_to_target(closed, f);
+        self.emit_unchanged_object_prototype_or_branch(&prototype, declined, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        prototype.clear(f);
+    }
+
+    fn emit_for_in_compact_storage_or_branch(
+        &mut self,
+        base: &GcLocal<ObjectPropertyStorage>,
+        declined: ControlTarget,
+        f: &mut Function,
+    ) -> GcLocal<CompactDataStorage> {
+        let s = self.runtime_schema();
+        let storage = s.reserve_non_null_gc_local(f).initialize(
+            s.emit_compact_storage_or_branch(base, self.local_branch_label(declined), f),
+            f,
+        );
+        let shape = s.reserve_gc_local(f).initialize(
+            s.field(CompactDataStorageSchema::SHAPE)
+                .read(&storage, s, f)
+                .reference(),
+            f,
+        );
+        s.field(CompactDataShapeSchema::OWN_KEYS_ORDERED)
+            .read(&shape, s, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(declined, f);
+        s.field(CompactDataShapeSchema::ATTRIBUTES)
+            .read(&shape, s, f);
+        let attributes = crate::heap::StoredPropertyAttributes::Data {
+            writable: true,
+            enumerable: true,
+            configurable: true,
+        }
+        .descriptor_word();
+        f.instruction(&Instruction::I32Const(attributes.as_i32()));
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(declined, f);
+        shape.clear(f);
+        storage
+    }
+
+    fn emit_for_in_compact_key(
+        &self,
+        keys: &GcLocal<CompactShapeKeys>,
+        index: I32Local,
+        output: &CompletionLocals,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let name = s.reserve_gc_local(f).initialize(
+            s.array_type::<CompactShapeKeys>()
+                .read(keys, index, s, f)
+                .reference(),
+            f,
+        );
+        // Consumers confirm the ordinal against the exact String reference
+        // in live storage. Other enumerations may overwrite the hint safely.
+        s.field(StringValueSchema::ENTRY_HINT)
+            .write(&name, GcOperand::i32_local(index), s, f);
+        output.value().set_reference(&name, s, f);
+        output.set_kind(CompletionKind::Normal, f);
+        output.target().set_constant(0, f);
+        name.clear(f);
+        index.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        index.store(f);
+    }
+
     pub(super) fn emit_for_in_visited_keys(
         &mut self,
         record: &GcLocal<ForInEnumerationRecord>,
@@ -47,10 +278,7 @@ impl FunctionBuilder<'_> {
         complete: ControlTarget,
         f: &mut Function,
     ) -> Result<(), EmitError> {
-        let layout = crate::intrinsics::IntrinsicPropertyLayoutId::ObjectPrototype.layout()?;
-        if layout.properties().iter().any(|property| {
-            property.flags.bits() & crate::heap::DescriptorBit::Enumerable.word() != 0
-        }) {
+        if !object_prototype_has_no_enumerable_keys()? {
             return Ok(());
         }
         let s = self.runtime_schema();
@@ -140,37 +368,10 @@ impl FunctionBuilder<'_> {
             .is_null(f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(declined, f);
-        base.is_subtype::<CompactDataStorage>(s, f);
-        f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(declined, f);
-        let candidate = s
-            .reserve_gc_local(f)
-            .initialize(base.load(s, f).cast_subtype::<CompactDataStorage>(s, f), f);
-        let shape = s.reserve_gc_local(f).initialize(
-            s.field(CompactDataStorageSchema::SHAPE)
-                .read(&candidate, s, f)
-                .reference(),
-            f,
-        );
-        s.field(CompactDataShapeSchema::OWN_KEYS_ORDERED)
-            .read(&shape, s, f);
-        f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(declined, f);
-        s.field(CompactDataShapeSchema::ATTRIBUTES)
-            .read(&shape, s, f);
-        let attributes = crate::heap::StoredPropertyAttributes::Data {
-            writable: true,
-            enumerable: true,
-            configurable: true,
-        }
-        .descriptor_word();
-        f.instruction(&Instruction::I32Const(attributes.as_i32()));
-        f.instruction(&Instruction::I32Ne);
-        self.emit_branch_if_to_target(declined, f);
+        let candidate = self.emit_for_in_compact_storage_or_branch(&base, declined, f);
         s.field(ForInEnumerationRecordSchema::COMPACT_STORAGE)
             .write(record, GcOperand::nullable_reference(&candidate, s), s, f);
         captured.replace(candidate.load(s, f).nullable(), f);
-        shape.clear(f);
         candidate.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -195,29 +396,13 @@ impl FunctionBuilder<'_> {
         length.load(f);
         f.instruction(&Instruction::I32LtU);
         self.open_frame(ControlFrameKind::If, f);
-        let name = s.reserve_gc_local(f).initialize(
-            s.array_type::<CompactShapeKeys>()
-                .read(&keys, index, s, f)
-                .reference(),
-            f,
-        );
-        // Both dictionary and compact consumers validate the hinted position
-        // against their live storage and the exact String reference.
-        s.field(StringValueSchema::ENTRY_HINT)
-            .write(&name, GcOperand::i32_local(index), s, f);
-        output.value().set_reference(&name, s, f);
-        output.set_kind(CompletionKind::Normal, f);
-        index.load(f);
-        f.instruction(&Instruction::I32Const(1));
-        f.instruction(&Instruction::I32Add);
-        index.store(f);
+        self.emit_for_in_compact_key(&keys, index, output, f);
         s.field(ForInEnumerationRecordSchema::NEXT_KEY).write(
             record,
             GcOperand::i32_local(index),
             s,
             f,
         );
-        name.clear(f);
         self.emit_branch_to_target(complete, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -291,4 +476,12 @@ impl FunctionBuilder<'_> {
         stored.clear(f);
         Ok(())
     }
+}
+
+fn object_prototype_has_no_enumerable_keys() -> Result<bool, EmitError> {
+    let layout = crate::intrinsics::IntrinsicPropertyLayoutId::ObjectPrototype.layout()?;
+    Ok(layout
+        .properties()
+        .iter()
+        .all(|property| property.flags.bits() & crate::heap::DescriptorBit::Enumerable.word() == 0))
 }

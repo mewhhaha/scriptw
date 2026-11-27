@@ -66,7 +66,7 @@ fn owner(
         },
     );
     let mut linker = WasmtimeLinker::new(engine);
-    host_imports::register(&mut linker, &module).unwrap();
+    host_imports::register(&mut linker, &module, std::iter::empty()).unwrap();
     for import in module.imports() {
         if let WasmtimeExternType::Memory(ty) = import.ty() {
             if ty.is_shared() {

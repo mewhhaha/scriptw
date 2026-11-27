@@ -21,24 +21,22 @@ pub(super) struct Operands {
 impl Operands {
     /// Compiled code answers a lookup itself when either object has no
     /// identity yet, and mints both before it stores.
+    #[inline]
     pub(super) fn new(owner: u32, key: u32, owner_id: i64, key_id: i64) -> wasmtime::Result<Self> {
         if owner_id == 0 || key_id == 0 {
             return Err(wasmtime::Error::msg("weak operand has no identity"));
         }
-        // The murmur3 finalizer over both identities: they are small
-        // counters, and the low bits pick the cell.
-        let mut hash = (owner_id as u64)
+        // Mix the two allocation counters, then fold the high bits of the
+        // product into the low bits that select the cell.
+        let pair = (owner_id as u64)
             .wrapping_mul(0x9e37_79b9_7f4a_7c15)
             .rotate_left(32)
             ^ key_id as u64;
-        hash ^= hash >> 33;
-        hash = hash.wrapping_mul(0xff51_afd7_ed55_8ccd);
-        hash ^= hash >> 33;
-        hash = hash.wrapping_mul(0xc4ce_b9fe_1a85_ec53);
+        let hash = (pair ^ (pair >> 32)).wrapping_mul(0xd6e8_feb8_6659_fd93);
         Ok(Self {
             owner,
             key,
-            hash: hash ^ (hash >> 33),
+            hash: hash ^ (hash >> 32),
         })
     }
 }
@@ -91,13 +89,14 @@ impl Entries {
         let Some(mask) = self.cells.len().checked_sub(1) else {
             return Ok(None);
         };
-        let mut index = at.hash as usize & mask;
+        let first = at.hash as usize & mask;
+        let (before, after) = self.cells.split_at(first);
         let mut retired = None;
-        loop {
-            let cell = self.cells[index];
+        for (offset, cell) in after.iter().chain(before).enumerate() {
             let Some(entry) = cell.entry else {
                 if let Some(vacancy) = vacancy {
-                    *vacancy = retired.map_or(Vacancy::Empty(index), Vacancy::Retired);
+                    let empty = (first + offset) & mask;
+                    *vacancy = retired.map_or(Vacancy::Empty(empty), Vacancy::Retired);
                 }
                 return Ok(None);
             };
@@ -106,12 +105,12 @@ impl Entries {
                     Candidate::Match(value) => return Ok(Some(value)),
                     Candidate::Mismatch => {}
                     Candidate::Retired => {
-                        retired.get_or_insert(index);
+                        retired.get_or_insert((first + offset) & mask);
                     }
                 }
             }
-            index = (index + 1) & mask;
         }
+        unreachable!("the weak collection index always has an empty cell")
     }
 
     pub(super) fn find(

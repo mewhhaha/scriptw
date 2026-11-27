@@ -484,15 +484,15 @@ pub(super) fn execute(
     }
     let engine = policy.consumer_engine(counting)?;
     report["native_configuration"] = native_configuration(&engine);
-    let bytes = fs::read(path).map_err(|e| e.to_string())?;
-    if producer["image_sha256"] != hash(&bytes) || producer["image_bytes"] != bytes.len() {
+    // SAFETY: this diagnostic requires the trusted prepare-retained producer's
+    // unchanged image and an immutable inode throughout execution.
+    let image =
+        unsafe { PrecompiledEmbeddedProgram::from_file(path) }.map_err(|e| e.to_string())?;
+    if producer["image_sha256"] != hash_key(&image.image_sha256())
+        || producer["image_bytes"] != image.as_bytes().len()
+    {
         return Err("retained image differs from producer".into());
     }
-    // SAFETY: this opt-in host accepts only its separately recorded trusted
-    // prepare-retained producer's native image, like execute-scriptw. Hashes
-    // bind evidence, and do not authorize external native code.
-    let image =
-        unsafe { PrecompiledEmbeddedProgram::from_bytes(&bytes) }.map_err(|e| e.to_string())?;
     if producer["program_wasm_sha256"] != hash(image.program_wasm())
         || producer["program_wasm_bytes"] != image.program_wasm().len()
         || producer["native_serialized_bytes"] != image.serialized_program_len()
@@ -504,7 +504,6 @@ pub(super) fn execute(
     let runtime = EmbeddedRuntime::from_precompiled(&engine, &image).map_err(|e| e.to_string())?;
     let native_admission_ns = started.elapsed().as_nanos();
     drop(image);
-    drop(bytes);
     let started = Instant::now();
     let state = runtime
         .new_state(RealmBuilder::new().build(), ())

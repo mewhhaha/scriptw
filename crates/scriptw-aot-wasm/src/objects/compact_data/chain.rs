@@ -58,7 +58,7 @@ pub(crate) enum ChainKey<'a> {
 
 /// The raw content hash of an ASCII literal, as `emit_string_key_hash`
 /// computes it over UTF-16 code units.
-const fn raw_ascii_hash(text: &str) -> i64 {
+pub(super) const fn raw_ascii_hash(text: &str) -> i64 {
     let bytes = text.as_bytes();
     let mut hash = 14695981039346656037u64;
     let mut index = 0;

@@ -661,7 +661,7 @@ impl WasmModules {
     }
 
     /// P may request fixed host callbacks beyond those directly used by R.
-    pub(super) fn additional_host_imports(&self) -> impl Iterator<Item = &str> {
+    pub(super) fn additional_host_imports(&self) -> impl Iterator<Item = &str> + Clone {
         self.plan.entries.iter().filter_map(|entry| match entry {
             ProgramImportSource::Linker { module, name }
                 if module.as_ref() == WASM_HOST_IMPORT_NAMESPACE =>

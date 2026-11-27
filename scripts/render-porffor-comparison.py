@@ -25,22 +25,24 @@ def rows(report):
     require(report.get('schema') == SCHEMA, 'unexpected report schema')
     failures = {}
     for failure in report['failures']:
-        failures.setdefault(failure['case'], set()).add(failure['status'])
+        failures.setdefault((failure['case'], failure['actor']), set()).add(failure['status'])
     output = []
     for row in report['runtime']:
         actors = row['actors']
         scriptw = actors['scriptw']['median_ns']
         require(scriptw > 0, 'Scriptw median must be positive: ' + row['case'])
         ratios = {}
+        peer_failures = set()
         for peer, _, _ in PEERS:
             if peer in actors:
                 ratios[peer] = scriptw / actors[peer]['median_ns']
             else:
-                require(row['case'] in failures, 'peer missing without a failure: ' + row['case'])
-        statuses = failures.get(row['case'], set())
-        require(len(statuses) <= 1, 'one failure status per kernel: ' + row['case'])
+                statuses = failures.get((row['case'], peer), set())
+                require(bool(statuses), 'peer missing without a failure: ' + row['case'])
+                peer_failures.update(statuses)
+        require(len(peer_failures) <= 1, 'one failure status per kernel: ' + row['case'])
         output.append(dict(case=row['case'], ratios=ratios,
-                           failure=next(iter(statuses)) if statuses else None))
+                           failure=next(iter(peer_failures)) if peer_failures else None))
     for peer, _, _ in PEERS:
         measured = [row['ratios'][peer] for row in output if peer in row['ratios']]
         comparison = report['comparisons'][peer]

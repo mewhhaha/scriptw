@@ -1,0 +1,17 @@
+[package]
+name = "scriptw-wasm-peer-wtime"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[features]
+register-executor = ["wtime-runtime/register-executor"]
+
+[dependencies]
+ryu-js = "1.0.2"
+serde_json = "1.0"
+sha2 = "0.10"
+wasmparser = { version = "0.252", default-features = false, features = ["std"] }
+wtime-runtime = { path = "../../../wtime/crates/wtime-runtime" }

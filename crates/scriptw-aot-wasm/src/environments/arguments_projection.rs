@@ -40,11 +40,10 @@ impl ProjectedArgumentsLocals {
     }
 
     fn emit_is_unmaterialized(&self, function: &mut Function) {
-        self.materialized.tag().load(function);
-        function.instruction(&Instruction::I32Const(
-            WasmRuntimeValueTag::Undefined as i32,
-        ));
-        function.instruction(&Instruction::I32Eq);
+        // Only the Undefined sentinel and the materialized Arguments
+        // object can occupy this slot.
+        self.materialized.reference().load(function);
+        function.instruction(&Instruction::RefIsNull);
     }
 }
 

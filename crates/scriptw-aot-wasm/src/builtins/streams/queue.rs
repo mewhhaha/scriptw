@@ -48,12 +48,7 @@ impl FunctionBuilder<'_> {
         let done_local = s.reserve_i32_local(f);
         done_local.set_constant(i32::from(done), f);
         let object = self.emit_iterator_result_object_in_realm(&realm, value, done_local, f)?;
-        let result = s.reserve_value_local(f);
-        result.set_reference(&object, s, f);
-        // Promise resolve, rather than direct fulfillment: an inherited `then`
-        // on the fresh result remains observable through ordinary resolution.
-        self.emit_resolve_promise_record(promise, &result, f)?;
-        result.clear(f);
+        self.emit_resolve_fresh_iterator_result(promise, &object, &realm, f)?;
         object.clear(f);
         s.release_i32_local(done_local, f);
         realm.clear(f);

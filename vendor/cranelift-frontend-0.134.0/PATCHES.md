@@ -156,14 +156,14 @@ workspace member).
 
 ## Root stores on cold call edges
 
-`src/frontend/safepoints.rs` uses the liveness pass's CFG to recognize a
-single-entry cold arm and a call-free fast path to a common join. A root
-defined after the source's last safepoint can spill in the cold arm if it
-dies in the diamond and no join safepoint needs it. The fast edge passes
-its original SSA reference when the join uses the root. The cold edge
-passes the value reloaded after the safepoint. The existing spill path
-covers extra entries, live roots at the join's safepoints and exceptional
-call edges.
+`src/frontend/safepoints.rs` recognizes a call-free guard chain whose
+single-entry cold arms jump to a common join. An eligible root defined after
+the source's last safepoint spills separately before each arm's first live
+safepoint. Collecting edges pass the relocated value to the join. Call-free
+edges pass the original SSA value. Eager spilling still covers extra
+entries, exceptional edges, and roots needed at a join safepoint or past
+the join. The cascaded-guard regression checks per-arm stack-map liveness,
+a call-free arm, and a trap that must precede the sunk spill.
 
 ## Joins of one repeated constant need no block parameter (2026-11-22)
 

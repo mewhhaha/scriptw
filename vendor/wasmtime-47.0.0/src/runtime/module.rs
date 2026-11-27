@@ -20,7 +20,7 @@ use std::{fs::File, path::Path};
 use wasmparser::{Parser, ValidPayload, Validator};
 use wasmtime_environ::{
     CompiledFunctionsTable, CompiledModuleInfo, EntityIndex, FuncKey, HostPtr, ModuleTypes,
-    ObjectKind, StaticModuleIndex, TypeTrace, VMOffsets, VMSharedTypeIndex, WasmChecksum,
+    ObjectKind, StaticModuleIndex, VMOffsets, VMSharedTypeIndex, WasmChecksum,
 };
 mod registry;
 
@@ -502,6 +502,8 @@ impl Module {
     /// embedded in a larger file (for example in the running executable) is
     /// used in place: its clean pages are the file's page-cache pages, shared
     /// with every other mapping of the file.
+    /// An existing `Arc<File>` lets admission and the mapping share one
+    /// open descriptor, including when the path is replaced or removed.
     ///
     /// [`deserialize_open_file`]: Module::deserialize_open_file
     ///
@@ -512,11 +514,11 @@ impl Module {
     #[cfg(all(feature = "std", unix, not(miri)))]
     pub unsafe fn deserialize_open_file_range(
         engine: &Engine,
-        file: File,
+        file: impl Into<Arc<File>>,
         offset: u64,
         len: usize,
     ) -> Result<Module> {
-        let code = engine.load_code_file_range(file, offset, len, ObjectKind::Module)?;
+        let code = engine.load_code_file_range(file.into(), offset, len, ObjectKind::Module)?;
         Module::from_parts(engine, code, None)
     }
 
@@ -535,7 +537,7 @@ impl Module {
         // Acquire this module's metadata and type information, deserializing
         // it from the provided artifact if it wasn't otherwise provided
         // already.
-        let (mut info, index, mut types) = match info_and_types {
+        let (mut info, index, types) = match info_and_types {
             Some((info, index, types)) => (info, index, types),
             None => postcard::from_bytes(code_memory.wasmtime_info())?,
         };
@@ -548,12 +550,19 @@ impl Module {
         // Note that the unsafety here should be ok since the `trampolines`
         // field should only point to valid trampoline function pointers
         // within the text section.
-        let signatures = engine
-            .register_and_canonicalize_types(&mut types, core::iter::once(&mut info.module))?;
+        let signatures =
+            engine.register_and_canonicalize_types(&types, core::iter::once(&mut info.module))?;
 
         // Package up all our data into an `EngineCode` and delegate to the final
         // step of module compilation.
-        let code = try_new::<Arc<_>>(EngineCode::new(code_memory, signatures, types.into())?)?;
+        // The standalone module's entity types now refer to registered engine
+        // types. Keep the registration, and release the decoded definitions.
+        drop(types);
+        let code = try_new::<Arc<_>>(EngineCode::new(
+            code_memory,
+            signatures,
+            crate::code::Types::Module,
+        )?)?;
         let index = try_new::<Arc<_>>(index)?;
         Module::from_parts_raw(engine, code, info, index, true)
     }
@@ -681,10 +690,6 @@ impl Module {
         self.compiled_module().module()
     }
 
-    pub(crate) fn types(&self) -> &ModuleTypes {
-        self.inner.code.module_types()
-    }
-
     #[cfg(any(
         feature = "gc-drc",
         feature = "gc-copying",
@@ -787,12 +792,10 @@ impl Module {
         &'module self,
     ) -> impl ExactSizeIterator<Item = ImportType<'module>> + 'module {
         let module = self.compiled_module().module();
-        let types = self.types();
         let engine = self.engine();
-        module.imports().map(move |(imp_mod, imp_field, ty)| {
-            debug_assert!(ty.is_canonicalized_for_runtime_usage());
-            ImportType::new(imp_mod, imp_field, ty, types, engine)
-        })
+        module
+            .imports()
+            .map(move |(imp_mod, imp_field, ty)| ImportType::new(imp_mod, imp_field, ty, engine))
     }
 
     /// Returns the list of exports that this [`Module`] has and will be
@@ -853,15 +856,9 @@ impl Module {
         &'module self,
     ) -> impl ExactSizeIterator<Item = ExportType<'module>> + 'module {
         let module = self.compiled_module().module();
-        let types = self.types();
         let engine = self.engine();
         module.exports.iter().map(move |(name, entity_index)| {
-            ExportType::new(
-                &module.strings[name],
-                module.type_of(*entity_index),
-                types,
-                engine,
-            )
+            ExportType::new(&module.strings[name], module.type_of(*entity_index), engine)
         })
     }
 
@@ -914,7 +911,6 @@ impl Module {
         let entity_index = module.exports.get(&name)?;
         Some(ExternType::from_wasmtime(
             self.engine(),
-            self.types(),
             &module.type_of(*entity_index),
         ))
     }

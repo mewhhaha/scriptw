@@ -11,6 +11,7 @@ use crate::runtime_helpers::{
     ArrayIndexedPublishDefaultDataArguments, ArrayIndexedPublishDefaultDataParameters,
     HelperParameters,
 };
+use values::PackedArrayWriteValue;
 
 const PACKED_INDEX_LIMIT: i64 = 1 << 20;
 
@@ -107,7 +108,8 @@ impl FunctionBuilder<'_> {
         self.emit_packed_array_present(&storage, index, found, f);
         found.load(f);
         self.open_frame(ControlFrameKind::If, f);
-        let published = self.packed_number_write(&storage, index, value, f);
+        let published =
+            self.emit_packed_array_write(&storage, index, PackedArrayWriteValue::Raw(value), f);
         published.load(f);
         handled.store(f);
         s.release_i32_local(published, f);
@@ -167,7 +169,8 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(absent, f);
         s.release_i32_local(found, f);
-        let published = self.packed_number_write(array, index, value, f);
+        let published =
+            self.emit_packed_array_write(array, index, PackedArrayWriteValue::Raw(value), f);
         published.load(f);
         f.instruction(&Instruction::I32Eqz);
         s.release_i32_local(published, f);
@@ -308,29 +311,11 @@ impl FunctionBuilder<'_> {
         s.array_type::<PackedValueTable>().length(&values, s, f);
         f.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(publish, f);
-        let stored = s
-            .reserve_gc_local::<StoredValue, Nullable>(f)
-            .initialize_null(s, f);
-        value.tag().load(f);
-        f.instruction(&Instruction::I32Const(
-            WasmRuntimeValueTag::Undefined as i32,
-        ));
-        f.instruction(&Instruction::I32Eq);
-        self.open_frame(ControlFrameKind::If, f);
-        stored.replace(s.stored_undefined(f).nullable(), f);
-        f.instruction(&Instruction::Else);
-        stored.replace(
-            s.struct_type::<StoredValue>()
-                .from_value(value, f)
-                .nullable(),
-            f,
-        );
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
+        let stored = self.emit_packed_value_for_store(value, f);
         s.array_type::<PackedValueTable>().write(
             &values,
             slot,
-            GcOperand::reference(&stored, s),
+            GcOperand::nullable_reference(&stored, s),
             s,
             f,
         );
@@ -516,22 +501,16 @@ impl FunctionBuilder<'_> {
         numbers.clear(f);
     }
 
-    fn packed_number_only_write(
+    /// The caller proved Number storage and a Number payload.
+    fn emit_packed_number_write(
         &mut self,
         storage: &GcLocal<ArrayObject>,
         index: I64Local,
-        value: &ValueLocals,
+        bits: I64Local,
+        handled: I32Local,
         f: &mut Function,
-    ) -> I32Local {
+    ) {
         let s = self.runtime_schema();
-        let handled = s.reserve_i32_local(f);
-        handled.set_constant(0, f);
-        s.array_storage_mode_is(storage, ArrayIndexedStorageMode::PackedNumbers, f);
-        value.tag().load(f);
-        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
-        f.instruction(&Instruction::I32Eq);
-        f.instruction(&Instruction::I32And);
-        self.open_frame(ControlFrameKind::If, f);
         let (numbers, presence) = self.packed_backings(storage, f);
         let capacity = s.reserve_i32_local(f);
         s.array_type::<NumberBitsI64Array>().length(&numbers, s, f);
@@ -542,22 +521,7 @@ impl FunctionBuilder<'_> {
             .store_i64(count, f);
         // Existing capacity may retain holes; new capacity is occupancy driven
         // and bounded independently of Array.length and distant index values.
-        index.load(f);
-        capacity.load(f);
-        f.instruction(&Instruction::I64ExtendI32U);
-        f.instruction(&Instruction::I64LtU);
-        index.load(f);
-        f.instruction(&Instruction::I64Const(PACKED_INDEX_LIMIT));
-        f.instruction(&Instruction::I64LtU);
-        index.load(f);
-        count.load(f);
-        f.instruction(&Instruction::I64Const(2));
-        f.instruction(&Instruction::I64Mul);
-        f.instruction(&Instruction::I64Const(8));
-        f.instruction(&Instruction::I64Add);
-        f.instruction(&Instruction::I64LeU);
-        f.instruction(&Instruction::I32And);
-        f.instruction(&Instruction::I32Or);
+        self.emit_packed_capacity_admission(index, capacity, count, f);
         self.open_frame(ControlFrameKind::If, f);
         index.load(f);
         capacity.load(f);
@@ -651,9 +615,9 @@ impl FunctionBuilder<'_> {
         slot.store(f);
         let word = s.reserve_i32_local(f);
         let mask = s.reserve_i64_local(f);
-        let bits = s.reserve_i64_local(f);
-        self.packed_presence(&presence, slot, word, mask, bits, f);
-        bits.load(f);
+        let occupied = s.reserve_i64_local(f);
+        self.packed_presence(&presence, slot, word, mask, occupied, f);
+        occupied.load(f);
         mask.load(f);
         f.instruction(&Instruction::I64And);
         f.instruction(&Instruction::I64Eqz);
@@ -669,23 +633,23 @@ impl FunctionBuilder<'_> {
         s.array_type::<NumberBitsI64Array>().write(
             &numbers,
             slot,
-            GcOperand::i64_local(value.scalar()),
-            s,
-            f,
-        );
-        bits.load(f);
-        mask.load(f);
-        f.instruction(&Instruction::I64Or);
-        bits.store(f);
-        s.array_type::<NumberPresenceU64Array>().write(
-            &presence,
-            word,
             GcOperand::i64_local(bits),
             s,
             f,
         );
+        occupied.load(f);
+        mask.load(f);
+        f.instruction(&Instruction::I64Or);
+        occupied.store(f);
+        s.array_type::<NumberPresenceU64Array>().write(
+            &presence,
+            word,
+            GcOperand::i64_local(occupied),
+            s,
+            f,
+        );
         handled.set_constant(1, f);
-        s.release_i64_local(bits, f);
+        s.release_i64_local(occupied, f);
         s.release_i64_local(mask, f);
         s.release_i32_local(word, f);
         s.release_i32_local(slot, f);
@@ -695,9 +659,6 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(capacity, f);
         presence.clear(f);
         numbers.clear(f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        handled
     }
 
     /// All descriptor consumers must call this before obtaining a reference.
@@ -844,13 +805,35 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
-        let value = s.reserve_value_local(f);
-        self.emit_property_value_into(&stored, &value, f);
-        let published = self.packed_number_write(storage, index, &value, f);
+        // Growing default-data backing comes through this descriptor path.
+        // Its immutable value edge can become the element directly.
+        let boxed = self.open_reference_block(s, f);
+        let recipe = self.open_frame(ControlFrameKind::Block, f);
+        boxed.branch_with(
+            stored.sealed_subtype_or_branch::<StoredValue>(s, self.local_branch_label(recipe), f),
+            f,
+        );
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        boxed.branch_with(
+            s.helper_reference_on_stack(
+                s.call_helper(
+                    crate::runtime_helpers::PropertyValueResolveArguments::new(&stored),
+                    self.runtime_helper_base()
+                        .expect("packed descriptor publication requires runtime helpers"),
+                    f,
+                ),
+            ),
+            f,
+        );
+        let reuse = s.reserve_gc_local(f).initialize(boxed.close(f), f);
+        self.pop_control(ControlFrameKind::Block);
+        let published =
+            self.emit_packed_array_write(storage, index, PackedArrayWriteValue::Stored(&reuse), f);
         published.load(f);
         handled.store(f);
         s.release_i32_local(published, f);
-        value.clear(f);
+        reuse.clear(f);
         stored.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);

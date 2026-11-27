@@ -48,7 +48,6 @@ local_arguments_role!(WideLocalArgumentsCallable, Wide, WIDE_LOCAL_ARGUMENTS_ENT
 pub(crate) struct LocalArgumentCallInputs<'a, R: LocalArgumentsCallableRole> {
     receiver: &'a ValueLocals,
     arguments: &'a [&'a ValueLocals],
-    padding: &'a ValueLocals,
     caller_realm: &'a GcLocal<RealmRecord>,
     calling_program: &'a ProgramInstanceLocals,
     role: std::marker::PhantomData<R>,
@@ -58,7 +57,6 @@ impl<'a, R: LocalArgumentsCallableRole> LocalArgumentCallInputs<'a, R> {
     pub(crate) fn call(
         receiver: &'a ValueLocals,
         arguments: &'a [&'a ValueLocals],
-        padding: &'a ValueLocals,
         caller_realm: &'a GcLocal<RealmRecord>,
         calling_program: &'a ProgramInstanceLocals,
     ) -> Self {
@@ -69,7 +67,6 @@ impl<'a, R: LocalArgumentsCallableRole> LocalArgumentCallInputs<'a, R> {
         Self {
             receiver,
             arguments,
-            padding,
             caller_realm,
             calling_program,
             role: std::marker::PhantomData,
@@ -153,18 +150,12 @@ impl<'a, R: LocalArgumentsCallableRole> LocalArgumentCallInputs<'a, R> {
     ) {
         callable.load(schema, function);
         self.receiver.emit(function);
-        function.instruction(&Instruction::I32Const(ValueKind::Undefined.tag() as i32));
-        function.instruction(&Instruction::I64Const(0));
-        function.instruction(&Instruction::RefNull(wasm_encoder::HeapType::Abstract {
-            shared: false,
-            ty: wasm_encoder::AbstractHeapType::Eq,
-        }));
-        for index in 0..R::ARITY.slot_count() {
-            self.arguments
-                .get(index)
-                .copied()
-                .unwrap_or(self.padding)
-                .emit(function);
+        emit_undefined_argument(function);
+        for argument in self.arguments {
+            argument.emit(function);
+        }
+        for _ in self.arguments.len()..R::ARITY.slot_count() {
+            emit_undefined_argument(function);
         }
         if R::ARITY.projection_parameters().is_some() {
             function.instruction(&Instruction::I32Const(self.arguments.len() as i32));
@@ -177,4 +168,13 @@ impl<'a, R: LocalArgumentsCallableRole> LocalArgumentCallInputs<'a, R> {
         self.caller_realm.load(schema, function);
         self.calling_program.reference(schema, function);
     }
+}
+
+fn emit_undefined_argument(function: &mut Function) {
+    function.instruction(&Instruction::I32Const(ValueKind::Undefined.tag() as i32));
+    function.instruction(&Instruction::I64Const(0));
+    function.instruction(&Instruction::RefNull(wasm_encoder::HeapType::Abstract {
+        shared: false,
+        ty: wasm_encoder::AbstractHeapType::Eq,
+    }));
 }

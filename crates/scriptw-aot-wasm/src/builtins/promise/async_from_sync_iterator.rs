@@ -131,7 +131,7 @@ impl FunctionBuilder<'_> {
         let resolve = self.emit_intrinsic_promise_resolve_realm_context(
             PromiseResolveRealmAuthority::ExplicitRealm(realm),
             function,
-        )?;
+        );
         self.emit_intrinsic_promise_resolve_to_locals(&resolve, &value, pending, function)?;
         pending.kind().load(function);
         function.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));

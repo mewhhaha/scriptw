@@ -121,14 +121,14 @@ impl FunctionBuilder<'_> {
             schema,
             function,
         );
-        let handler = schema.reserve_gc_local(function).initialize(
-            schema
-                .field(PromiseReactionSchema::REJECT_HANDLER)
-                .read(&reaction, schema, function)
-                .reference(),
-            function,
-        );
         if rejected {
+            let handler = schema.reserve_gc_local(function).initialize(
+                schema
+                    .field(PromiseReactionSchema::REJECT_HANDLER)
+                    .read(&reaction, schema, function)
+                    .reference(),
+                function,
+            );
             handler.load(schema, function).is_null(function);
             function.instruction(&Instruction::I32Eqz);
             function.instruction(&Instruction::If(BlockType::Empty));
@@ -139,6 +139,7 @@ impl FunctionBuilder<'_> {
                 function,
             );
             function.instruction(&Instruction::End);
+            handler.clear(function);
         }
         schema.field(PromiseReactionSchema::REJECT_HANDLER).write(
             &reaction,
@@ -154,7 +155,6 @@ impl FunctionBuilder<'_> {
             function,
         );
         realm.clear(function);
-        handler.clear(function);
         reaction.clear(function);
         function.instruction(&Instruction::End);
         self.emit_append_promise_job(job, function);
@@ -283,7 +283,11 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    fn emit_append_promise_job(&self, job: &GcLocal<PendingJob>, function: &mut Function) {
+    pub(super) fn emit_append_promise_job(
+        &self,
+        job: &GcLocal<PendingJob>,
+        function: &mut Function,
+    ) {
         let schema = self.runtime_schema();
         // The sole FIFO append operates on rooted references, including empty.
         let tail = schema.load_pending_job_queue(RuntimeQueueEnd::Tail, function);

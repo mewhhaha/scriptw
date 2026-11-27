@@ -4,10 +4,12 @@
 //! values still run through ordinary expression/throw emission in source order;
 //! compact values or the shared append kernel own private publication.
 use super::*;
+use crate::gc_types::*;
 use std::collections::BTreeSet;
 
 const MAX_PLAIN_DATA_FIELDS: usize = 64;
 pub(crate) const MAX_COMPACT_DATA_FIELDS: usize = 16;
+const DIRECT_ARRAY_COMPACT_FIELDS: usize = 5;
 
 struct PlainDataField<'ir> {
     key: &'ir str,
@@ -105,14 +107,12 @@ impl<'ir> PlainDataLiteral<'ir> {
         output: &ValueLocals,
         f: &mut Function,
     ) -> Result<(), EmitError> {
-        use crate::gc_types::*;
         let schema = builder.runtime_schema();
         let names: Vec<&str> = self.fields.iter().map(|field| field.key).collect();
         let shape = builder.emit_compact_literal_shape(&names, f)?;
-        if self.fields.len() <= super::compact_data::INLINE_COMPACT_FIELDS {
-            // Evaluate every field expression in source order before allocating
-            // the fresh inline record so all 1..=4 values are published in one
-            // struct.new with zero R helper calls.
+        if self.fields.len() <= DIRECT_ARRAY_COMPACT_FIELDS {
+            // Evaluate every field value in source order before publishing
+            // the complete record. The fresh header cannot escape during evaluation.
             let mut values = Vec::with_capacity(self.fields.len());
             for field in self.fields {
                 let value = schema.reserve_value_local(f);
@@ -126,36 +126,38 @@ impl<'ir> PlainDataLiteral<'ir> {
                 &prototype,
                 f,
             );
-            let undefined = WasmRuntimeValueTag::Undefined as i32;
-            let mut unused_tags = 0i32;
-            for slot in values.len()..super::compact_data::INLINE_COMPACT_FIELDS {
-                unused_tags |= undefined << (slot * 8);
-            }
-            let tags = schema.reserve_i32_local(f);
-            f.instruction(&Instruction::I32Const(unused_tags));
-            for (slot, value) in values.iter().enumerate() {
-                value.tag().load(f);
-                f.instruction(&Instruction::I32Const(255));
-                f.instruction(&Instruction::I32And);
-                if slot > 0 {
-                    f.instruction(&Instruction::I32Const((slot * 8) as i32));
-                    f.instruction(&Instruction::I32Shl);
+            let storage = if let Ok(fields) = values.as_slice().try_into() {
+                emit_five_field_compact_storage(schema, &shape, fields, f)
+            } else {
+                let undefined = WasmRuntimeValueTag::Undefined as i32;
+                let mut unused_tags = 0i32;
+                for slot in values.len()..super::compact_data::INLINE_COMPACT_FIELDS {
+                    unused_tags |= undefined << (slot * 8);
                 }
-                f.instruction(&Instruction::I32Or);
-            }
-            tags.store(f);
-            let scalar_operand = |index: usize| {
-                values
-                    .get(index)
-                    .map_or(GcOperand::i64(0), |v| GcOperand::i64_local(v.scalar()))
-            };
-            let ref_operand = |index: usize| {
-                values
-                    .get(index)
-                    .map_or(GcOperand::null_eq(), |v| GcOperand::eq_reference(v.reference()))
-            };
-            let inline = schema.reserve_gc_local(f).initialize(
-                schema.struct_type::<InlineCompactDataStorage>().construct(
+                let tags = schema.reserve_i32_local(f);
+                f.instruction(&Instruction::I32Const(unused_tags));
+                for (slot, value) in values.iter().enumerate() {
+                    value.tag().load(f);
+                    f.instruction(&Instruction::I32Const(255));
+                    f.instruction(&Instruction::I32And);
+                    if slot > 0 {
+                        f.instruction(&Instruction::I32Const((slot * 8) as i32));
+                        f.instruction(&Instruction::I32Shl);
+                    }
+                    f.instruction(&Instruction::I32Or);
+                }
+                tags.store(f);
+                let scalar_operand = |index: usize| {
+                    values
+                        .get(index)
+                        .map_or(GcOperand::i64(0), |v| GcOperand::i64_local(v.scalar()))
+                };
+                let ref_operand = |index: usize| {
+                    values
+                        .get(index)
+                        .map_or(GcOperand::null_eq(), |v| GcOperand::eq_reference(v.reference()))
+                };
+                let inline = schema.struct_type::<InlineCompactDataStorage>().construct(
                     (
                         GcOperand::reference(&shape, schema),
                         GcOperand::i32_local(tags),
@@ -169,18 +171,11 @@ impl<'ir> PlainDataLiteral<'ir> {
                         ref_operand(3),
                     ),
                     f,
-                ),
-                f,
-            );
-            let base = schema
-                .reserve_gc_local::<ObjectPropertyStorage, NonNullable>(f)
-                .initialize(
-                    inline
-                        .load(schema, f)
-                        .upcast::<CompactDataStorage>()
-                        .upcast(),
-                    f,
                 );
+                schema.release_i32_local(tags, f);
+                inline.upcast::<CompactDataStorage>().upcast()
+            };
+            let base = schema.reserve_gc_local(f).initialize(storage, f);
             let immutable = schema.reserve_i32_local(f);
             immutable.set_constant(0, f);
             let object = schema.reserve_gc_local(f).initialize(
@@ -191,8 +186,6 @@ impl<'ir> PlainDataLiteral<'ir> {
             object.clear(f);
             schema.release_i32_local(immutable, f);
             base.clear(f);
-            inline.clear(f);
-            schema.release_i32_local(tags, f);
             prototype.clear(f);
             for value in values.into_iter().rev() {
                 value.clear(f);
@@ -233,33 +226,25 @@ impl<'ir> PlainDataLiteral<'ir> {
         // shape with arrays takes a value without a scalar word inline once
         // it has its reference backing; R makes every other store, and the
         // one that allocates a backing.
-        let array = (self.fields.len() > super::compact_data::INLINE_COMPACT_FIELDS).then(|| {
-            schema
-                .reserve_gc_local::<ArrayCompactDataStorage, NonNullable>(f)
-                .initialize(storage.load(schema, f).cast_subtype(schema, f), f)
-        });
+        let array = schema
+            .reserve_gc_local::<ArrayCompactDataStorage, NonNullable>(f)
+            .initialize(storage.load(schema, f).cast_subtype(schema, f), f);
         for (index, field) in self.fields.into_iter().enumerate() {
             builder.compile_expr_to_value(field.value, &value, f)?;
             builder.emit_propagate_current_throw_if_needed(f);
             f.instruction(&Instruction::I32Const(index as i32));
             slot.store(f);
-            let Some(array) = &array else {
-                builder.emit_compact_store_at(&storage, slot, &value, f);
-                continue;
-            };
             f.instruction(&Instruction::Block(BlockType::Empty));
             let stored = f.label_depth();
             f.instruction(&Instruction::Block(BlockType::Empty));
             let general = f.label_depth();
-            builder.emit_fresh_array_compact_store_or_branch(array, slot, &value, general, f);
+            builder.emit_fresh_array_compact_store_or_branch(&array, slot, &value, general, f);
             f.branch_to_label(stored);
             f.instruction(&Instruction::End);
             builder.emit_compact_store_at(&storage, slot, &value, f);
             f.instruction(&Instruction::End);
         }
-        if let Some(array) = array {
-            array.clear(f);
-        }
+        array.clear(f);
         output.set_reference(&object, schema, f);
         schema.release_i32_local(slot, f);
         value.clear(f);
@@ -270,6 +255,79 @@ impl<'ir> PlainDataLiteral<'ir> {
         shape.clear(f);
         Ok(())
     }
+}
+
+/// Publish the existing snapshot-visible array layout in P using complete
+/// fixed-size backings. Omit the scalar/reference lanes when their default
+/// payloads reconstruct all five values.
+fn emit_five_field_compact_storage(
+    s: &RuntimeSchema,
+    shape: &GcLocal<CompactDataShape>,
+    values: &[ValueLocals; DIRECT_ARRAY_COMPACT_FIELDS],
+    f: &mut Function,
+) -> GcStackReference<ObjectPropertyStorage> {
+    let tags = s.reserve_gc_local(f).initialize(
+        s.array_type::<CompactTagArray>()
+            .fixed(values.iter().map(|value| GcOperand::i32_local(value.tag())), f),
+        f,
+    );
+    let scalars = s
+        .reserve_gc_local::<CompactScalarArray, Nullable>(f)
+        .initialize_null(s, f);
+    f.instruction(&Instruction::I64Const(0));
+    for value in values {
+        value.scalar().load(f);
+        f.instruction(&Instruction::I64Or);
+    }
+    f.instruction(&Instruction::I64Eqz);
+    f.instruction(&Instruction::I32Eqz);
+    f.instruction(&Instruction::If(BlockType::Empty));
+    scalars.replace(
+        s.array_type::<CompactScalarArray>()
+            .fixed(
+                values.iter().map(|value| GcOperand::i64_local(value.scalar())),
+                f,
+            )
+            .nullable(),
+        f,
+    );
+    f.instruction(&Instruction::End);
+    let references = s
+        .reserve_gc_local::<CompactReferenceArray, Nullable>(f)
+        .initialize_null(s, f);
+    f.instruction(&Instruction::I32Const(1));
+    for value in values {
+        value.reference().load(f);
+        f.instruction(&Instruction::RefIsNull);
+        f.instruction(&Instruction::I32And);
+    }
+    f.instruction(&Instruction::I32Eqz);
+    f.instruction(&Instruction::If(BlockType::Empty));
+    references.replace(
+        s.array_type::<CompactReferenceArray>()
+            .fixed(
+                values
+                    .iter()
+                    .map(|value| GcOperand::eq_reference(value.reference())),
+                f,
+            )
+            .nullable(),
+        f,
+    );
+    f.instruction(&Instruction::End);
+    let array = s.struct_type::<ArrayCompactDataStorage>().construct(
+        (
+            GcOperand::reference(shape, s),
+            GcOperand::reference(&tags, s),
+            GcOperand::reference(&scalars, s),
+            GcOperand::reference(&references, s),
+        ),
+        f,
+    );
+    references.clear(f);
+    scalars.clear(f);
+    tags.clear(f);
+    array.upcast::<CompactDataStorage>().upcast()
 }
 
 impl FunctionBuilder<'_> {

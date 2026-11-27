@@ -108,8 +108,9 @@ impl FunctionBuilder<'_> {
     /// Short and very large inputs are sized before encoding so they can
     /// write into the exact final backing. Intermediate inputs use a growing
     /// scratch array and copy the bytes written into the final backing. The
-    /// write loop copies each ASCII run through a leaf kernel and encodes
-    /// the remaining scalars individually.
+    /// write loop copies an ASCII prefix through a leaf kernel and encodes
+    /// mixed ASCII and two-byte scalars in one pass before handling a wider
+    /// scalar or growing the scratch array.
     pub(crate) fn emit_text_encoder_encode(&mut self, f: &mut Function) -> Result<(), EmitError> {
         // Two passes over a short input avoid the scratch allocation and
         // copy. Mid-sized inputs still benefit from single-pass encoding.
@@ -207,11 +208,14 @@ impl FunctionBuilder<'_> {
         self.emit_branch_if_to_target(count_next, f);
         byte_length.load(f);
         f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Add);
+        byte_length.store(f);
         unit.load(f);
         f.instruction(&Instruction::I32Const(0x800));
-        f.instruction(&Instruction::I32GeU);
-        f.instruction(&Instruction::I64ExtendI32U);
-        f.instruction(&Instruction::I64Add);
+        f.instruction(&Instruction::I32LtU);
+        self.emit_branch_if_to_target(count_next, f);
+        byte_length.load(f);
+        f.instruction(&Instruction::I64Const(1));
         f.instruction(&Instruction::I64Add);
         byte_length.store(f);
         // Both units in a surrogate pair already contribute one byte.
@@ -287,9 +291,9 @@ impl FunctionBuilder<'_> {
         let bytes = s
             .reserve_gc_local(f)
             .initialize(target.load(s, f).require_non_null(f), f);
-        // Every scalar is written at `written`. Before each ASCII run the
-        // array has a byte for every unread unit: the exact backing by its
-        // length, the scratch array by the growth below.
+        // Every scalar is written at `written`. The backing has at least
+        // one byte for every unread unit. Only a multi-byte scalar consumes
+        // any of the remaining space past that lower bound.
         f.instruction(&Instruction::I32Const(0));
         read.store(f);
         f.instruction(&Instruction::I32Const(0));
@@ -320,6 +324,55 @@ impl FunctionBuilder<'_> {
         count.load(f);
         f.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(encoded, f);
+        let slower = self.open_frame(ControlFrameKind::Block, f);
+        let mixed_next = self.open_frame(ControlFrameKind::Loop, f);
+        s.array_type::<CodeUnitArray>()
+            .read(&input.units, read, s, f)
+            .store(unit, f);
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(0x80));
+        f.instruction(&Instruction::I32GeU);
+        self.open_frame(ControlFrameKind::If, f);
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(0x800));
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(slower, f);
+        // A two-byte scalar spends one extra byte. The exact backing uses
+        // an unlimited sentinel because the sizing pass proved it fits.
+        written.load(f);
+        read.load(f);
+        f.instruction(&Instruction::I32Sub);
+        capacity.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(slower, f);
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(6));
+        f.instruction(&Instruction::I32ShrU);
+        f.instruction(&Instruction::I32Const(0xc0));
+        f.instruction(&Instruction::I32Or);
+        byte.store(f);
+        self.emit_text_encoder_put(&bytes, written, byte, f);
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(0x3f));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Const(0x80));
+        f.instruction(&Instruction::I32Or);
+        unit.store(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.emit_text_encoder_put(&bytes, written, unit, f);
+        encoder_increment(read, f);
+        read.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32LtU);
+        self.emit_branch_if_to_target(mixed_next, f);
+        self.emit_branch_to_target(encoded, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         // The scalar at `read` takes at most four bytes and at least one
         // unit, and each unit after it needs a byte for the next ASCII run.
         written.load(f);
@@ -357,31 +410,13 @@ impl FunctionBuilder<'_> {
         grown.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        s.array_type::<CodeUnitArray>()
-            .read(&input.units, read, s, f)
-            .store(unit, f);
-        encoder_increment(read, f);
+        // A two-byte scalar that reached this point ran out of scratch
+        // space. Retry from the same cursor after growing the backing.
         unit.load(f);
         f.instruction(&Instruction::I32Const(0x800));
         f.instruction(&Instruction::I32LtU);
-        self.open_frame(ControlFrameKind::If, f);
-        for (shift, prefix) in [(6, 0xc0), (0, 0x80)] {
-            unit.load(f);
-            if shift != 0 {
-                f.instruction(&Instruction::I32Const(shift));
-                f.instruction(&Instruction::I32ShrU);
-            } else {
-                f.instruction(&Instruction::I32Const(0x3f));
-                f.instruction(&Instruction::I32And);
-            }
-            f.instruction(&Instruction::I32Const(prefix));
-            f.instruction(&Instruction::I32Or);
-            byte.store(f);
-            self.emit_text_encoder_put(&bytes, written, byte, f);
-        }
-        self.emit_branch_to_target(encode_next, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
+        self.emit_branch_if_to_target(encode_next, f);
+        encoder_increment(read, f);
         unit.load(f);
         f.instruction(&Instruction::I32Const(0xf800));
         f.instruction(&Instruction::I32And);

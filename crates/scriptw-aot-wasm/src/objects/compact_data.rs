@@ -683,30 +683,74 @@ impl FunctionBuilder<'_> {
         self.emit_string_key_hash(key, hash, f);
         schema.release_i64_local(hash, f);
     }
+}
 
-    pub(in crate::objects) fn emit_compact_value_at(
+impl RuntimeSchema {
+    /// Both sealed layouts share the immutable shape prefix. Exact casts
+    /// avoid a runtime subtype query against the open compact base.
+    pub(crate) fn emit_compact_storage_or_branch(
+        &self,
+        base: &GcLocal<ObjectPropertyStorage>,
+        miss: crate::LabelDepth,
+        f: &mut Function,
+    ) -> GcStackReference<CompactDataStorage> {
+        let result = self.reference_type::<CompactDataStorage>(GcNullability::NonNullable);
+        f.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(result))));
+        let compact = ReferenceResultBlock::<CompactDataStorage>::opened(f.label_depth());
+        let source = self.reference_type::<ObjectPropertyStorage>(GcNullability::NonNullable);
+        let _ = base.load(self, f);
+        for layout in [
+            self.reference_type::<InlineCompactDataStorage>(GcNullability::NonNullable),
+            self.reference_type::<ArrayCompactDataStorage>(GcNullability::NonNullable),
+        ] {
+            f.instruction(&Instruction::BrOnCast {
+                relative_depth: 0,
+                from_ref_type: source,
+                to_ref_type: layout,
+            });
+        }
+        f.instruction(&Instruction::Drop);
+        f.branch_to_label(miss);
+        compact.close(f)
+    }
+
+    /// Reads a slot already proved by a key probe or cache for this shape.
+    pub(crate) fn emit_compact_recorded_value_at(
         &self,
         storage: &GcLocal<CompactDataStorage>,
         slot: I32Local,
         value: &ValueLocals,
         f: &mut Function,
     ) {
-        let schema = self.runtime_schema();
-        storage.is_subtype::<InlineCompactDataStorage>(schema, f);
+        self.emit_compact_slot_value(storage, slot, value, true, f);
+    }
+
+    fn emit_compact_slot_value(
+        &self,
+        storage: &GcLocal<CompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        slot_proved: bool,
+        f: &mut Function,
+    ) {
+        storage.is_subtype::<InlineCompactDataStorage>(self, f);
         f.instruction(&Instruction::If(BlockType::Empty));
-        let inline = schema.reserve_gc_local(f).initialize(
+        let inline = self.reserve_gc_local(f).initialize(
             storage
-                .load(schema, f)
-                .cast_subtype::<InlineCompactDataStorage>(schema, f),
+                .load(self, f)
+                .cast_subtype::<InlineCompactDataStorage>(self, f),
             f,
         );
-        self.emit_inline_compact_value_at(&inline, slot, value, f);
+        if !slot_proved {
+            self.emit_check_inline_compact_slot(&inline, slot, f);
+        }
+        self.emit_inline_compact_recorded_value_at(&inline, slot, value, f);
         inline.clear(f);
         f.instruction(&Instruction::Else);
-        let array = schema.reserve_gc_local(f).initialize(
+        let array = self.reserve_gc_local(f).initialize(
             storage
-                .load(schema, f)
-                .cast_subtype::<ArrayCompactDataStorage>(schema, f),
+                .load(self, f)
+                .cast_subtype::<ArrayCompactDataStorage>(self, f),
             f,
         );
         self.emit_array_compact_value_at(&array, slot, value, f);
@@ -722,7 +766,7 @@ impl FunctionBuilder<'_> {
         slot: I32Local,
         f: &mut Function,
     ) {
-        let schema = self.runtime_schema();
+        let schema = self;
         let shape = schema.reserve_gc_local(f).initialize(
             schema
                 .field(InlineCompactDataStorageSchema::SHAPE)
@@ -753,17 +797,6 @@ impl FunctionBuilder<'_> {
         shape.clear(f);
     }
 
-    fn emit_inline_compact_value_at(
-        &self,
-        storage: &GcLocal<InlineCompactDataStorage>,
-        slot: I32Local,
-        value: &ValueLocals,
-        f: &mut Function,
-    ) {
-        self.emit_check_inline_compact_slot(storage, slot, f);
-        self.emit_inline_compact_recorded_value_at(storage, slot, value, f);
-    }
-
     /// The value at a slot that a site record proves for this storage's
     /// shape: the record holds the slot it found by probing that very
     /// immutable shape, so the slot lies within the shape's extent and the
@@ -775,7 +808,7 @@ impl FunctionBuilder<'_> {
         value: &ValueLocals,
         f: &mut Function,
     ) {
-        let schema = self.runtime_schema();
+        let schema = self;
         schema
             .field(InlineCompactDataStorageSchema::PACKED_TAGS)
             .read(storage, schema, f)
@@ -846,7 +879,7 @@ impl FunctionBuilder<'_> {
         value: &ValueLocals,
         f: &mut Function,
     ) {
-        let schema = self.runtime_schema();
+        let schema = self;
         let tags = schema
             .field(ArrayCompactDataStorageSchema::TAGS)
             .read(storage, schema, f)
@@ -883,6 +916,53 @@ impl FunctionBuilder<'_> {
             .read_top(references, slot, f)
             .store_eq(value.reference(), f);
         f.instruction(&Instruction::End);
+    }
+}
+
+impl FunctionBuilder<'_> {
+    pub(in crate::objects) fn emit_compact_value_at(
+        &self,
+        storage: &GcLocal<CompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) {
+        self.runtime_schema()
+            .emit_compact_slot_value(storage, slot, value, false, f);
+    }
+
+    fn emit_inline_compact_value_at(
+        &self,
+        storage: &GcLocal<InlineCompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) {
+        self.runtime_schema()
+            .emit_check_inline_compact_slot(storage, slot, f);
+        self.emit_inline_compact_recorded_value_at(storage, slot, value, f);
+    }
+
+    fn emit_inline_compact_recorded_value_at(
+        &self,
+        storage: &GcLocal<InlineCompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) {
+        self.runtime_schema()
+            .emit_inline_compact_recorded_value_at(storage, slot, value, f);
+    }
+
+    fn emit_array_compact_value_at(
+        &self,
+        storage: &GcLocal<ArrayCompactDataStorage>,
+        slot: I32Local,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) {
+        self.runtime_schema()
+            .emit_array_compact_value_at(storage, slot, value, f);
     }
 
     /// Repeated literal/native metadata stores marshal only the original value
@@ -941,7 +1021,8 @@ impl FunctionBuilder<'_> {
         value: &ValueLocals,
         f: &mut Function,
     ) {
-        self.emit_check_inline_compact_slot(storage, slot, f);
+        self.runtime_schema()
+            .emit_check_inline_compact_slot(storage, slot, f);
         self.emit_inline_compact_recorded_store_at(storage, slot, value, f);
     }
 
@@ -1415,30 +1496,55 @@ impl FunctionBuilder<'_> {
         let schema = self.runtime_schema();
         f.instruction(&Instruction::I32Const(0));
         found.store(f);
-        let base = schema.reserve_gc_local(f).initialize(
+        let base = schema.reserve_non_null_gc_local(f).initialize(
             schema
                 .field(OrdinaryObjectSchema::PROPERTIES)
                 .read(object, schema, f)
                 .reference(),
             f,
         );
-        base.is_subtype::<CompactDataStorage>(schema, f);
-        self.open_frame(ControlFrameKind::If, f);
-        let compact = schema.reserve_gc_local(f).initialize(
-            base.load(schema, f)
-                .cast_subtype::<CompactDataStorage>(schema, f),
+        let done = self.open_frame(ControlFrameKind::Block, f);
+        let other_storage = self.open_frame(ControlFrameKind::Block, f);
+        let compact = schema.reserve_non_null_gc_local(f).initialize(
+            schema.emit_compact_storage_or_branch(&base, self.local_branch_label(other_storage), f),
             f,
         );
         let slot = schema.reserve_i32_local(f);
+        let matched = self.open_frame(ControlFrameKind::Block, f);
+        let probe = self.open_frame(ControlFrameKind::Block, f);
+        let name = schema.reserve_non_null_gc_local(f).initialize(
+            key.value().sealed_reference_or_branch::<StringValue>(
+                schema,
+                self.local_branch_label(probe),
+                f,
+            ),
+            f,
+        );
+        schema.emit_hinted_compact_index_or_branch(
+            &compact,
+            &name,
+            slot,
+            self.local_branch_label(probe),
+            f,
+        );
+        name.clear(f);
+        found.set_constant(1, f);
+        self.emit_branch_to_target(matched, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         self.emit_compact_slot_probe(&compact, key, slot, found, f)?;
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         found.load(f);
         self.open_frame(ControlFrameKind::If, f);
-        self.emit_compact_value_at(&compact, slot, output, f);
+        schema.emit_compact_recorded_value_at(&compact, slot, output, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         schema.release_i32_local(slot, f);
         compact.clear(f);
-        f.instruction(&Instruction::Else);
+        self.emit_branch_to_target(done, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         base.is_subtype::<IntrinsicPropertyStorage>(schema, f);
         self.open_frame(ControlFrameKind::If, f);
         let intrinsic = schema.reserve_gc_local(f).initialize(
@@ -1488,7 +1594,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::If);
+        self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         base.clear(f);
         Ok(())

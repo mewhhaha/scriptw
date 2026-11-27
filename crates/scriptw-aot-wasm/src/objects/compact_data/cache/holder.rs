@@ -14,6 +14,7 @@
 //! %Object.prototype%. Nothing invalidates a record from outside: a use that
 //! cannot prove every step falls through to the general Get.
 use super::*;
+use crate::emit::ControlTarget;
 use crate::functions::NonArrayRealmIntrinsicSlot;
 use crate::gc_types::{
     ArrayObject, ArrayObjectSchema, CodeUnitArray, FunctionObject, FunctionObjectSchema,
@@ -801,28 +802,38 @@ impl FunctionBuilder<'_> {
         found: I32Local,
         f: &mut Function,
     ) {
+        let missing = self.open_frame(ControlFrameKind::Block, f);
+        self.emit_materialized_intrinsic_group_or_branch(intrinsic, group_index, value, missing, f);
+        found.set_constant(1, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+    }
+
+    /// Read only already-materialized data. An empty group, deferred recipe
+    /// or out-of-range group branches away before writing `value`.
+    pub(super) fn emit_materialized_intrinsic_group_or_branch(
+        &self,
+        intrinsic: &GcLocal<IntrinsicPropertyStorage>,
+        group_index: I32Local,
+        value: &ValueLocals,
+        miss: ControlTarget,
+        f: &mut Function,
+    ) {
         let schema = self.runtime_schema();
-        let groups = schema
-            .reserve_gc_local::<IntrinsicPropertyValueCache, Nullable>(f)
-            .initialize(
-                schema
-                    .field(IntrinsicPropertyStorageSchema::CACHE)
-                    .read(intrinsic, schema, f)
-                    .reference(),
-                f,
-            );
-        groups.load(schema, f).is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        f.instruction(&Instruction::If(BlockType::Empty));
-        let materialized = schema
-            .reserve_gc_local(f)
-            .initialize(groups.load(schema, f).require_non_null(f), f);
+        let materialized = schema.reserve_non_null_gc_local(f).initialize(
+            schema
+                .field(IntrinsicPropertyStorageSchema::CACHE)
+                .read(intrinsic, schema, f)
+                .reference()
+                .non_null_or_branch(self.local_branch_label(miss), f),
+            f,
+        );
         group_index.load(f);
         schema
             .array_type::<IntrinsicPropertyValueCache>()
             .length(&materialized, schema, f);
-        f.instruction(&Instruction::I32LtU);
-        f.instruction(&Instruction::If(BlockType::Empty));
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(miss, f);
         let group = schema
             .reserve_gc_local::<PropertyValue, Nullable>(f)
             .initialize(
@@ -832,31 +843,14 @@ impl FunctionBuilder<'_> {
                     .reference(),
                 f,
             );
-        group.load(schema, f).is_null(f);
-        f.instruction(&Instruction::I32Eqz);
-        f.instruction(&Instruction::If(BlockType::Empty));
-        let present = schema
-            .reserve_gc_local(f)
-            .initialize(group.load(schema, f).require_non_null(f), f);
-        // A group still holding its recipe is left to the record path,
-        // which materializes it. One cast test proves the stored value.
-        f.instruction(&Instruction::Block(BlockType::Empty));
-        let recipe = f.label_depth();
-        let stored = schema.reserve_gc_local(f).initialize(
-            present.sealed_subtype_or_branch::<StoredValue>(schema, recipe, f),
+        materialized.clear(f);
+        let stored = schema.reserve_non_null_gc_local(f).initialize(
+            group.sealed_subtype_or_branch::<StoredValue>(schema, self.local_branch_label(miss), f),
             f,
         );
+        group.clear(f);
         self.emit_stored_value_to_locals(&stored, value, f);
         stored.clear(f);
-        found.set_constant(1, f);
-        f.instruction(&Instruction::End);
-        present.clear(f);
-        f.instruction(&Instruction::End);
-        group.clear(f);
-        f.instruction(&Instruction::End);
-        materialized.clear(f);
-        f.instruction(&Instruction::End);
-        groups.clear(f);
     }
 
     /// An own data property of a receiver on intrinsic storage. A layout is

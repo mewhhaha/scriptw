@@ -1,5 +1,6 @@
-//! R owns compact cache identity, current-value loads and closed negative tails.
+//! Compact cache identity, current-value loads and closed negative tails.
 use super::*;
+use crate::emit::ControlTarget;
 
 // Nonnegative slots are own data; null SHAPE is the uninitialized state.
 enum NegativeCacheMode {
@@ -113,6 +114,42 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         result.set_normal(&value, f);
         value.clear(f);
+    }
+
+    /// The short form of a recorded closed-tail proof for P. Only the
+    /// recorded null tail and the current Realm's protected
+    /// %Object.prototype% tail are answered here. Storage identity in the
+    /// protector proves the immutable rows still lack the recorded key.
+    pub(super) fn emit_inline_closed_tail_or_branch(
+        &mut self,
+        object: &GcLocal<OrdinaryObject>,
+        mode: I32Local,
+        miss: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let prototype = s.reserve_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(object, s, f)
+                .reference(),
+            f,
+        );
+        self.emit_is_object_prototype_tail_i32(mode, f);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_unchanged_object_prototype_or_branch(&prototype, miss, f);
+        f.instruction(&Instruction::Else);
+        mode.load(f);
+        f.instruction(&Instruction::I32Const(
+            NegativeCacheMode::NullPrototype.word(),
+        ));
+        f.instruction(&Instruction::I32Eq);
+        prototype.load(s, f).is_null(f);
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        prototype.clear(f);
     }
 
     /// Branches to `fail` unless the chain above `object` is the closed

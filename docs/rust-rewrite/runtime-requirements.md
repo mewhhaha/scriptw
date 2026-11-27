@@ -45,7 +45,7 @@ Its initial accessible backing is 32 MiB (a 4-MiB nursery and two nominal
 1 GiB. Reserving addresses does not commit 4 GiB of RAM. On the supported
 64-bit Wasmtime baseline this permits protected-page checks and a stable heap
 base; Wasm array bounds and null-reference traps remain. Native images bind
-these settings through configuration schema 8. Custom pooling allocators
+these settings through configuration schema 9. Custom pooling allocators
 require matching GC and linear-memory tunables; ordinary Scriptw uses on-demand
 allocation.
 
@@ -83,7 +83,7 @@ states what admits that image.
 
 ## Runtime ABI
 
-The runtime ABI is **95**. Portable bundles and native images built under an
+The runtime ABI is **96**. Portable bundles and native images built under an
 earlier ABI must be rebuilt. ABIs 58 to 77 added per-site read, write,
 `instanceof` and global read records, a dictionary position hint on Strings,
 further native call entries, one JSON output accumulator, compact shape
@@ -162,7 +162,18 @@ folding and single-word bitmap push, raises the initial copying-GC heap to
 32 MiB (`4 MiB` nursery) with near-limit growth fallback, and adds prepared
 `InstancePre` late-bound `SharedMemory` and positional R-to-P module linkage,
 single-entry cold-call GC root sinking, and `MAX_SPLITS_PER_SPILLSET = 4` in
-vendored Wasmtime 47 / Cranelift / Regalloc2. `LAYOUT_VERSION` in
+vendored Wasmtime 47 / Cranelift / Regalloc2. ABI 96 (configuration schema 9,
+`SCRWEP04`) makes precompiled `.swep` images native-first with a 126-byte footer
+and Unix `O_NONBLOCK` file-backed `mmap` deserialization (with `noexec` copy
+fallback), adds selective host-import registration, lazy remembered-slot
+allocation and tighter WeakMap/module metadata in Wasmtime 47, extends Cranelift
+cold-guard GC root sinking, adds straight-line own + closed-tail absent inline
+property reads, P-local `for…in` cursors with `hasOwnProperty`/computed hints,
+`%Object.prototype%` computed-write absence filters, 5-field direct compact
+literals, packed-array `StoredValue` reuse, plain `JSON.stringify` traversal,
+mixed ASCII + 2-byte UTF-8 codec loops, Promise/Streams/await fast paths,
+`instanceof` ladder reuse, lean direct local-argument calls, and shared empty
+locals / null-reference argument-projection sentinels. `LAYOUT_VERSION` in
 `crates/scriptw-aot-wasm/src/runtime_artifact.rs` records each step.
 
 ### Locals and GC roots

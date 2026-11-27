@@ -312,6 +312,20 @@ impl GcStore {
         Ok(raw)
     }
 
+    /// Expose a reference while its existing slot retains ownership.
+    #[cfg(feature = "gc")]
+    #[inline]
+    pub(crate) fn expose_borrowed_gc_ref_to_wasm(
+        &mut self,
+        gc_ref: &VMGcRef,
+    ) -> Result<NonZeroU32> {
+        if self.plain_refs || gc_ref.is_i31() {
+            return Ok(gc_ref.as_raw_non_zero_u32());
+        }
+        let gc_ref = self.clone_gc_ref(gc_ref);
+        self.expose_gc_ref_to_wasm(gc_ref)
+    }
+
     /// Allocate a new `externref`.
     ///
     /// Returns:

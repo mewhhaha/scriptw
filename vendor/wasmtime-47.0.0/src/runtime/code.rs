@@ -11,7 +11,7 @@ use core::ops::{Add, Range, Sub};
 use wasmtime_core::error::OutOfMemory;
 #[cfg(feature = "component-model")]
 use wasmtime_environ::component::ComponentTypes;
-use wasmtime_environ::{FuncKey, ModuleTypes, StaticModuleIndex};
+use wasmtime_environ::{FuncKey, StaticModuleIndex};
 
 macro_rules! define_pc_kind {
     ($ty:ident) => {
@@ -117,10 +117,8 @@ pub struct EngineCode {
     /// up corresponding to the lifetime of a `Component` or `Module`.
     signatures: TypeCollection,
 
-    /// Type information for the loaded object.
-    ///
-    /// This is either a `ModuleTypes` or a `ComponentTypes` depending on the
-    /// top-level creator of this code.
+    /// Component interface information, when this code is part of a component.
+    #[cfg(feature = "component-model")]
     types: Types,
 }
 
@@ -133,10 +131,13 @@ impl EngineCode {
         // The corresponding unregister for this is below in `Drop for
         // EngineCode`.
         crate::module::register_code(&mmap, mmap.raw_addr_range())?;
+        #[cfg(not(feature = "component-model"))]
+        let Types::Module = types;
 
         Ok(EngineCode {
             original_code: mmap,
             signatures,
+            #[cfg(feature = "component-model")]
             types,
         })
     }
@@ -144,10 +145,6 @@ impl EngineCode {
     #[cfg(feature = "component-model")]
     pub fn types(&self) -> &Types {
         &self.types
-    }
-
-    pub fn module_types(&self) -> &ModuleTypes {
-        self.types.module_types()
     }
 
     pub fn signatures(&self) -> &TypeCollection {
@@ -269,25 +266,9 @@ impl Drop for EngineCode {
 }
 
 pub enum Types {
-    Module(ModuleTypes),
+    Module,
     #[cfg(feature = "component-model")]
     Component(Arc<ComponentTypes>),
-}
-
-impl Types {
-    fn module_types(&self) -> &ModuleTypes {
-        match self {
-            Types::Module(m) => m,
-            #[cfg(feature = "component-model")]
-            Types::Component(c) => c.module_types(),
-        }
-    }
-}
-
-impl From<ModuleTypes> for Types {
-    fn from(types: ModuleTypes) -> Types {
-        Types::Module(types)
-    }
 }
 
 #[cfg(feature = "component-model")]

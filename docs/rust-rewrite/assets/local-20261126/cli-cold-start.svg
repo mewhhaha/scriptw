@@ -1,14 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="386" viewBox="0 0 760 386" role="img" aria-labelledby="title desc">
 <title id="title">CLI cold start: Scriptw vs Node 24.19.0</title>
-<desc id="desc">Warm-cache CLI cold-start medians across 5 fixtures: Scriptw 1.20–3.46 ms vs Node 24.19.0 15.65–16.85 ms (6.32x geomean faster).</desc>
+<desc id="desc">Warm-cache CLI cold-start medians across 5 fixtures: Scriptw wins 5/5 (5.79x geomean faster).</desc>
 <rect x="0.5" y="0.5" width="759" height="385" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
 <g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fill="#24292f">
 <text x="28" y="34" font-size="18" font-weight="650" fill="#24292f">CLI cold start — scriptw run vs Node 24.19.0</text>
-<text x="28" y="54" font-size="12" fill="#57606a">Lower is faster (ms, warm cache) · 5/5 faster · 6.32× geomean · fresh-Realm floor: 2.42 µs</text>
+<text x="28" y="54" font-size="12" fill="#57606a">Lower is faster (ms, warm cache) · 5/5 faster · 5.79× geomean · fresh-Realm floor: 2.41 µs</text>
 <rect x="28.0" y="66" width="11" height="11" rx="2.5" fill="#0969da"/>
-<text x="44.0" y="75.5" font-size="11.5" fill="#57606a">Scriptw (ABI 95)</text>
-<rect x="166.0" y="66" width="11" height="11" rx="2.5" fill="#d97724"/>
-<text x="182.0" y="75.5" font-size="11.5" fill="#57606a">Node 24 / V8</text>
+<text x="44.0" y="75.5" font-size="11.5" fill="#57606a">Scriptw (ABI 96)</text>
+<rect x="163.0" y="66" width="11" height="11" rx="2.5" fill="#d97724"/>
+<text x="179.0" y="75.5" font-size="11.5" fill="#57606a">Node 24 / V8</text>
 <line x1="165.0" y1="94" x2="165.0" y2="324" stroke="#eaeef2" stroke-width="1"/>
 <text x="165.0" y="340" text-anchor="middle" font-size="11" fill="#57606a">0 ms</text>
 <line x1="272.5" y1="94" x2="272.5" y2="324" stroke="#eaeef2" stroke-width="1"/>
@@ -21,40 +21,40 @@
 <text x="595.0" y="340" text-anchor="middle" font-size="11" fill="#57606a">20 ms</text>
 <line x1="165" y1="94" x2="165" y2="324" stroke="#d0d7de" stroke-width="1"/>
 <text x="153" y="121" text-anchor="end" font-size="12.5" font-weight="500">startup</text>
-<rect x="165" y="104" width="25.9" height="14" rx="3" fill="#0969da"/>
-<text x="197.9" y="115" font-size="11.5" font-weight="600" fill="#0969da">1.20 ms</text>
-<rect x="165" y="121" width="337.6" height="14" rx="3" fill="#d97724" opacity="0.88"/>
-<text x="509.6" y="132" font-size="11" fill="#57606a">15.70 ms</text>
+<rect x="165" y="104" width="30.0" height="14" rx="3" fill="#0969da"/>
+<text x="202.0" y="115" font-size="11.5" font-weight="600" fill="#0969da">1.39 ms</text>
+<rect x="165" y="121" width="342.2" height="14" rx="3" fill="#d97724" opacity="0.88"/>
+<text x="514.2" y="132" font-size="11" fill="#57606a">15.92 ms</text>
 <rect x="672" y="110" width="60" height="20" rx="10" fill="#ddf4ff"/>
-<text x="702" y="124" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">13.0×</text>
+<text x="702" y="124" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">11.4×</text>
 <text x="153" y="167" text-anchor="end" font-size="12.5" font-weight="500">numeric-loop-50000</text>
-<rect x="165" y="150" width="55.4" height="14" rx="3" fill="#0969da"/>
-<text x="227.4" y="161" font-size="11.5" font-weight="600" fill="#0969da">2.58 ms</text>
-<rect x="165" y="167" width="362.2" height="14" rx="3" fill="#d97724" opacity="0.88"/>
-<text x="534.2" y="178" font-size="11" fill="#57606a">16.85 ms</text>
+<rect x="165" y="150" width="58.4" height="14" rx="3" fill="#0969da"/>
+<text x="230.4" y="161" font-size="11.5" font-weight="600" fill="#0969da">2.72 ms</text>
+<rect x="165" y="167" width="351.6" height="14" rx="3" fill="#d97724" opacity="0.88"/>
+<text x="523.6" y="178" font-size="11" fill="#57606a">16.35 ms</text>
 <rect x="672" y="156" width="60" height="20" rx="10" fill="#ddf4ff"/>
-<text x="702" y="170" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">6.5×</text>
-<text x="153" y="213" text-anchor="end" font-size="12.5" font-weight="500">edge-router</text>
-<rect x="165" y="196" width="63.3" height="14" rx="3" fill="#0969da"/>
-<text x="235.3" y="207" font-size="11.5" font-weight="600" fill="#0969da">2.94 ms</text>
-<rect x="165" y="213" width="336.5" height="14" rx="3" fill="#d97724" opacity="0.88"/>
-<text x="508.5" y="224" font-size="11" fill="#57606a">15.65 ms</text>
+<text x="702" y="170" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">6.0×</text>
+<text x="153" y="213" text-anchor="end" font-size="12.5" font-weight="500">edge-json-api</text>
+<rect x="165" y="196" width="70.2" height="14" rx="3" fill="#0969da"/>
+<text x="242.2" y="207" font-size="11.5" font-weight="600" fill="#0969da">3.26 ms</text>
+<rect x="165" y="213" width="333.4" height="14" rx="3" fill="#d97724" opacity="0.88"/>
+<text x="505.4" y="224" font-size="11" fill="#57606a">15.51 ms</text>
 <rect x="672" y="202" width="60" height="20" rx="10" fill="#ddf4ff"/>
-<text x="702" y="216" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">5.3×</text>
-<text x="153" y="259" text-anchor="end" font-size="12.5" font-weight="500">edge-json-api</text>
-<rect x="165" y="242" width="72.7" height="14" rx="3" fill="#0969da"/>
-<text x="244.7" y="253" font-size="11.5" font-weight="600" fill="#0969da">3.38 ms</text>
-<rect x="165" y="259" width="337.3" height="14" rx="3" fill="#d97724" opacity="0.88"/>
-<text x="509.3" y="270" font-size="11" fill="#57606a">15.69 ms</text>
+<text x="702" y="216" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">4.8×</text>
+<text x="153" y="259" text-anchor="end" font-size="12.5" font-weight="500">edge-router</text>
+<rect x="165" y="242" width="76.0" height="14" rx="3" fill="#0969da"/>
+<text x="248.0" y="253" font-size="11.5" font-weight="600" fill="#0969da">3.53 ms</text>
+<rect x="165" y="259" width="351.8" height="14" rx="3" fill="#d97724" opacity="0.88"/>
+<text x="523.8" y="270" font-size="11" fill="#57606a">16.36 ms</text>
 <rect x="672" y="248" width="60" height="20" rx="10" fill="#ddf4ff"/>
 <text x="702" y="262" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">4.6×</text>
 <text x="153" y="305" text-anchor="end" font-size="12.5" font-weight="500">edge-html</text>
-<rect x="165" y="288" width="74.5" height="14" rx="3" fill="#0969da"/>
-<text x="246.5" y="299" font-size="11.5" font-weight="600" fill="#0969da">3.46 ms</text>
-<rect x="165" y="305" width="356.9" height="14" rx="3" fill="#d97724" opacity="0.88"/>
-<text x="528.9" y="316" font-size="11" fill="#57606a">16.60 ms</text>
+<rect x="165" y="288" width="93.0" height="14" rx="3" fill="#0969da"/>
+<text x="265.0" y="299" font-size="11.5" font-weight="600" fill="#0969da">4.33 ms</text>
+<rect x="165" y="305" width="399.9" height="14" rx="3" fill="#d97724" opacity="0.88"/>
+<text x="571.9" y="316" font-size="11" fill="#57606a">18.60 ms</text>
 <rect x="672" y="294" width="60" height="20" rx="10" fill="#ddf4ff"/>
-<text x="702" y="308" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">4.8×</text>
-<text x="28" y="370" font-size="11" fill="#57606a">2026-11-27 · ABI 95 (7ad9cb3d1577) · Ryzen 7 7800X3D (CPUs 6–7, 4 GiB) · medians of 15 runs (3 warmups excluded)</text>
+<text x="702" y="308" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">4.3×</text>
+<text x="28" y="370" font-size="11" fill="#57606a">2026-11-27 · ABI 96 (6612a6755754) · Ryzen 7 7800X3D (CPUs 6–7, 4 GiB) · medians of 15 interleaved runs (3 warmups excluded)</text>
 </g>
 </svg>

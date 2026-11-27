@@ -145,7 +145,15 @@ impl NativeSourceCompilerContext {
                     ))
                 })
         } else {
-            self.linker.get(&mut *store, module, name)
+            match self.linker.get(&mut *store, module, name) {
+                Err(_)
+                    if module == WASM_HOST_IMPORT_NAMESPACE
+                        && !self.linker.has_definition(module, name) =>
+                {
+                    host_imports::resolve_fixed(&mut *store, name)
+                }
+                export => export,
+            }
         }?;
         self.check_budget()?;
         Ok(export)

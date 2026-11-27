@@ -5,7 +5,6 @@
 
 use crate::Engine;
 use crate::error::OutOfMemory;
-use crate::hash_map::HashMap;
 use crate::prelude::*;
 use crate::sync::{OnceLock, RwLock};
 use crate::vm::{GcRuntime, TraceInfo};
@@ -93,8 +92,17 @@ pub struct TypeCollection {
     rec_groups: Arc<TryVec<RecGroupEntry>>,
     types: TryPrimaryMap<ModuleInternedTypeIndex, VMSharedTypeIndex>,
     trampolines: TrySecondaryMap<VMSharedTypeIndex, PackedOption<ModuleInternedTypeIndex>>,
-    trace_info: TryPrimaryMap<ModuleInternedTypeIndex, Option<OnceLock<TraceInfo>>>,
-    types_with_trace_info: HashMap<VMSharedTypeIndex, ModuleInternedTypeIndex>,
+    /// Out-of-line tracing data, sorted by engine type index.
+    trace_info: TryVec<ModuleTraceInfo>,
+}
+
+/// Index into a module's compact array of out-of-line trace info.
+#[derive(Clone, Copy)]
+pub(crate) struct TraceInfoIndex(usize);
+
+struct ModuleTraceInfo {
+    ty: VMSharedTypeIndex,
+    info: OnceLock<TraceInfo>,
 }
 
 impl Debug for TypeCollection {
@@ -105,7 +113,6 @@ impl Debug for TypeCollection {
             types,
             trampolines,
             trace_info: _,
-            types_with_trace_info: _,
         } = self;
         f.debug_struct("TypeCollection")
             .field("rec_groups", rec_groups)
@@ -121,7 +128,7 @@ impl Engine {
     #[must_use = "types are only registered as long as the `TypeCollection` is live"]
     pub(crate) fn register_and_canonicalize_types<'a, I>(
         &self,
-        module_types: &mut ModuleTypes,
+        module_types: &ModuleTypes,
         env_modules: I,
     ) -> Result<TypeCollection, OutOfMemory>
     where
@@ -144,7 +151,7 @@ impl Engine {
         let gc_runtime = engine.gc_runtime().map(|rt| &**rt);
 
         // First, register these types in this engine's registry.
-        let (rec_groups, types, trace_info) = registry
+        let (rec_groups, types) = registry
             .0
             .write()
             .register_module_types(gc_runtime, module_types)?;
@@ -161,26 +168,13 @@ impl Engine {
             }
         });
 
-        // Build up the map of vm indices to module indices for when types have
-        // trace info associated with them.
-        let trace_info_count = trace_info.iter().filter(|(_, info)| info.is_some()).count();
-        let mut types_with_trace_info = if trace_info_count > 0 {
-            TryHashMap::with_capacity(trace_info_count)?
-        } else {
-            TryHashMap::new()
-        };
-        for (module_ty, info) in trace_info.iter() {
-            if info.is_some() {
-                types_with_trace_info.insert(types[module_ty], module_ty)?;
-            }
-        }
-
-        // Then build our map from each function type's engine index to the
+        // Build our map from each function type's engine index to the
         // module-index of its trampoline. Trampoline functions are queried by
         // module-index in a compiled module, and doing this engine-to-module
         // resolution now means we don't need to do it on the function call hot
         // path.
         let mut trampolines = TrySecondaryMap::with_capacity(types.len())?;
+        let mut trace_info = TryVec::new();
         {
             let inner = registry.0.read();
             for (module_ty, module_trampoline_ty) in module_types.trampoline_types() {
@@ -188,16 +182,30 @@ impl Engine {
                 let trampoline_shared_ty = inner.trampoline_type(shared_ty);
                 trampolines.insert(trampoline_shared_ty, Some(module_trampoline_ty).into())?;
             }
+
+            // Keep lazy tracing data only for types whose objects can need
+            // it. Compiled and host allocations use the same inline layout.
+            if let Some(gc_runtime) = gc_runtime {
+                for &ty in types.values() {
+                    if let Some(Some(layout)) = inner.type_to_gc_layout.get(ty)
+                        && gc_runtime.needs_out_of_line_trace_info(layout)
+                    {
+                        trace_info.push(ModuleTraceInfo {
+                            ty,
+                            info: OnceLock::new(),
+                        })?;
+                    }
+                }
+            }
         }
+        trace_info.sort_unstable_by_key(|entry| entry.ty.bits());
 
         // Finally, to ensure that no matter which API from which layer
         // (`wasmtime::runtime::vm` vs `wasmtime_environ`, etc...) we use to
         // grab an entity's type, we will always end up with a type that has
         // `VMSharedTypeIndex` rather than `ModuleInternedTypeIndex` type
-        // references, we canonicalize both the `ModuleTypes` and
-        // `wasmtime_environ::Module`s for runtime usage. All our type-of-X APIs
-        // ultimately use one of these two structures.
-        module_types.canonicalize_for_runtime_usage(&mut |idx| types[idx]);
+        // references, we canonicalize all core modules for runtime usage.
+        // Components also keep their `ModuleTypes` for interface introspection.
         for module in env_modules {
             module.canonicalize_for_runtime_usage(&mut |idx| types[idx]);
         }
@@ -209,7 +217,6 @@ impl Engine {
             types,
             trampolines,
             trace_info,
-            types_with_trace_info: types_with_trace_info.into(),
         })
     }
 }
@@ -250,23 +257,26 @@ impl TypeCollection {
     /// Returns the `TraceInfo`, if any, for the `index` provided.
     #[inline]
     #[cfg(feature = "gc")]
-    pub fn trace_info(&self, index: ModuleInternedTypeIndex) -> Option<&TraceInfo> {
-        let info = self.trace_info.get(index)?.as_ref()?;
-        Some(info.get_or_init(|| {
+    pub fn trace_info(&self, index: TraceInfoIndex) -> Option<&TraceInfo> {
+        let entry = self.trace_info.get(index.0)?;
+        Some(entry.info.get_or_init(|| {
             // The collection holds the registration for this shared type.
-            let layout = self.engine.signatures().layout(self.types[index]).unwrap();
+            let layout = self.engine.signatures().layout(entry.ty).unwrap();
             TraceInfo::new(&layout)
         }))
     }
 
     /// If `index` has `TraceInfo` associated with it then the corresponding
-    /// `ModuleInternedTypeIndex` for `index` is returned.
+    /// slot in the module's out-of-line trace info is returned.
     #[inline]
     pub fn shared_type_with_trace_info(
         &self,
         index: VMSharedTypeIndex,
-    ) -> Option<ModuleInternedTypeIndex> {
-        self.types_with_trace_info.get(&index).copied()
+    ) -> Option<TraceInfoIndex> {
+        self.trace_info
+            .binary_search_by_key(&index.bits(), |entry| entry.ty.bits())
+            .ok()
+            .map(TraceInfoIndex)
     }
 }
 
@@ -1258,7 +1268,6 @@ impl TypeRegistryInner {
         (
             Arc<TryVec<RecGroupEntry>>,
             TryPrimaryMap<ModuleInternedTypeIndex, VMSharedTypeIndex>,
-            TryPrimaryMap<ModuleInternedTypeIndex, Option<OnceLock<TraceInfo>>>,
         ),
         OutOfMemory,
     > {
@@ -1272,7 +1281,6 @@ impl TypeRegistryInner {
         // The map from a module type index to an engine type index for these
         // module types.
         let mut map = TryPrimaryMap::<ModuleInternedTypeIndex, VMSharedTypeIndex>::new();
-        let mut trace_info = TryPrimaryMap::new();
 
         if let Err(e) = self.register_module_types_impl(
             gc_runtime,
@@ -1280,7 +1288,6 @@ impl TypeRegistryInner {
             entries_mut,
             prefix.as_deref().map(|entries| &entries[..]).unwrap_or(&[]),
             &mut map,
-            &mut trace_info,
         ) {
             for entry in entries_mut.iter() {
                 if entry.decref("register_module_types cleanup") {
@@ -1295,7 +1302,7 @@ impl TypeRegistryInner {
         }
         log::trace!("End registering module types");
 
-        Ok((entries, map, trace_info))
+        Ok((entries, map))
     }
 
     fn register_module_types_impl(
@@ -1305,11 +1312,9 @@ impl TypeRegistryInner {
         entries: &mut TryVec<RecGroupEntry>,
         mut prefix: &[RecGroupEntry],
         map: &mut TryPrimaryMap<ModuleInternedTypeIndex, VMSharedTypeIndex>,
-        trace_info: &mut TryPrimaryMap<ModuleInternedTypeIndex, Option<OnceLock<TraceInfo>>>,
     ) -> Result<(), OutOfMemory> {
         let num_types = types.len_types();
         map.reserve(num_types)?;
-        trace_info.reserve(num_types)?;
 
         // On a fresh registry, reserve for the whole module before the first
         // insertion. Other modules may share every type, so grow those arenas
@@ -1337,14 +1342,6 @@ impl TypeRegistryInner {
             {
                 let module_ty2 = map.push(*engine_ty).expect("reserved capacity");
                 assert_eq!(module_ty, module_ty2);
-
-                let info = self
-                    .type_to_gc_layout
-                    .get(*engine_ty)
-                    .and_then(|l| l.as_ref())
-                    .map(|_| OnceLock::new());
-                let module_ty3 = trace_info.push(info).expect("reserved capacity");
-                assert_eq!(module_ty, module_ty3);
             }
 
             entries.push(entry).expect("reserved capacity");

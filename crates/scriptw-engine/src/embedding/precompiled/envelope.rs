@@ -1,11 +1,15 @@
-//! Bounded framing detects damage; it grants no native-code authority.
+//! Native P, raw P, execution facts, then a fixed-size footer. Native P starts
+//! at offset zero so Wasmtime can map the exact native range without padding.
+//! The footer holds magic, compiler fingerprint, linked flag, runtime key,
+//! mode, raw/native/facts lengths (u64/u64/u32 LE), and a SHA-256 of all
+//! preceding bytes. The checksum detects damage and grants no native-code authority.
 use super::*;
 use sha2::{Digest, Sha256};
 
-const MAGIC: &[u8; 8] = b"SCRWEP03";
+const MAGIC: &[u8; 8] = b"SCRWEP04";
 const MAX_FACTS_BYTES: usize = foreign_facts::MAX_BYTES;
-const FRAME_BYTES: usize = 126;
-const MAX_BYTES: usize = 256 * 1024 * 1024;
+pub(super) const FOOTER_BYTES: usize = 126;
+pub(super) const MAX_BYTES: usize = 256 * 1024 * 1024;
 
 pub(super) struct Frame {
     pub(super) program: Range<usize>,
@@ -13,9 +17,10 @@ pub(super) struct Frame {
     pub(super) execution_facts: Range<usize>,
     pub(super) facts: ProgramExecutionFacts,
     pub(super) mode: WasmNativeCompilationMode,
+    pub(super) image_sha256: [u8; 32],
 }
 
-fn invalid() -> EngineError {
+pub(super) fn invalid() -> EngineError {
     EngineError::new("precompiled image failed bounded framing, source or checksum admission")
 }
 
@@ -51,12 +56,15 @@ pub(super) fn encode(
         .len()
         .checked_add(native.len())
         .and_then(|n| n.checked_add(registry.len()))
-        .and_then(|n| n.checked_add(FRAME_BYTES))
+        .and_then(|n| n.checked_add(FOOTER_BYTES))
         .ok_or_else(invalid)?;
     if length > MAX_BYTES {
         return Err(invalid());
     }
     let mut bytes = Vec::with_capacity(length);
+    bytes.extend_from_slice(native);
+    bytes.extend_from_slice(program);
+    bytes.extend_from_slice(&registry);
     bytes.extend_from_slice(MAGIC);
     bytes.extend_from_slice(
         compiler_identity::build_source_fingerprint()
@@ -73,31 +81,20 @@ pub(super) fn encode(
     bytes.extend_from_slice(&(program.len() as u64).to_le_bytes());
     bytes.extend_from_slice(&(native.len() as u64).to_le_bytes());
     bytes.extend_from_slice(&(registry.len() as u32).to_le_bytes());
-    bytes.extend_from_slice(&registry);
-    bytes.extend_from_slice(program);
-    bytes.extend_from_slice(native);
     bytes.extend_from_slice(&Sha256::digest(&bytes));
     Ok(bytes)
 }
 
 pub(super) fn decode(bytes: &[u8]) -> Result<Frame, EngineError> {
-    if bytes.len() > MAX_BYTES || bytes.len() < FRAME_BYTES {
+    if !(FOOTER_BYTES..=MAX_BYTES).contains(&bytes.len()) {
         return Err(invalid());
     }
-    let body_end = bytes.len().checked_sub(32).ok_or_else(invalid)?;
-    let (body, digest) = bytes.split_at(body_end);
-    if Sha256::digest(body).as_slice() != digest {
-        return Err(invalid());
-    }
-    let mut rest = body;
+    let (body, digest) = bytes.split_at(bytes.len() - 32);
+    let (payload, mut rest) = body.split_at(bytes.len() - FOOTER_BYTES);
     if take(&mut rest, 8)? != MAGIC {
         return Err(invalid());
     }
     let producer = take(&mut rest, 32)?;
-    let build = compiler_identity::build_source_fingerprint().map_err(EngineError::new)?;
-    if producer != build.as_bytes() {
-        return Err(source_mismatch(producer, build));
-    }
     let linked = take(&mut rest, 1)?[0];
     let key: [u8; 32] = take(&mut rest, 32)?.try_into().map_err(|_| invalid())?;
     let runtime_key = match linked {
@@ -119,14 +116,33 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Frame, EngineError> {
     let native_length = length()?;
     let registry_length: [u8; 4] = take(&mut rest, 4)?.try_into().map_err(|_| invalid())?;
     let registry_length = u32::from_le_bytes(registry_length) as usize;
-    if registry_length > MAX_FACTS_BYTES {
+    let registry_start = native_length
+        .checked_add(program_length)
+        .ok_or_else(invalid)?;
+    if program_length == 0
+        || native_length == 0
+        || registry_length > MAX_FACTS_BYTES
+        || registry_start.checked_add(registry_length) != Some(payload.len())
+    {
         return Err(invalid());
     }
-    let registry_start = body.len() - rest.len();
-    let execution_facts = registry_start..registry_start + registry_length;
-    let registry = take(&mut rest, registry_length)?;
+
+    let mut hash = Sha256::new();
+    hash.update(body);
+    if hash.clone().finalize().as_slice() != digest {
+        return Err(invalid());
+    }
+    // Reuse the verified body hash for callers that report the entire file's
+    // SHA-256, including the stored checksum.
+    hash.update(digest);
+    let image_sha256 = hash.finalize().into();
+    let build = compiler_identity::build_source_fingerprint().map_err(EngineError::new)?;
+    if producer != build.as_bytes() {
+        return Err(source_mismatch(producer, build));
+    }
+    let execution_facts = registry_start..payload.len();
     // The private codec checks exact tags/order/EOF and validated declarations.
-    let foreign = foreign_facts::decode(registry).ok_or_else(invalid)?;
+    let foreign = foreign_facts::decode(&payload[execution_facts.clone()]).ok_or_else(invalid)?;
     let facts = ProgramExecutionFacts {
         foreign,
         runtime: match runtime_key {
@@ -136,17 +152,12 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Frame, EngineError> {
             },
         },
     };
-    let start = body.len() - rest.len();
-    take(&mut rest, program_length)?;
-    take(&mut rest, native_length)?;
-    if program_length == 0 || native_length == 0 || !rest.is_empty() {
-        return Err(invalid());
-    }
     Ok(Frame {
-        program: start..start + program_length,
-        native: start + program_length..body_end,
+        program: native_length..registry_start,
+        native: 0..native_length,
         execution_facts,
         facts,
         mode,
+        image_sha256,
     })
 }

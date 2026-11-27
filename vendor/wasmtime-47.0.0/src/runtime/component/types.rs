@@ -1002,7 +1002,11 @@ impl Module {
             .map(|((namespace, name), ty)| {
                 (
                     (namespace.as_str(), name.as_str()),
-                    ExternType::from_wasmtime(engine, self.0.types.module_types(), ty),
+                    ExternType::from_wasmtime_with_module_types(
+                        engine,
+                        self.0.types.module_types(),
+                        ty,
+                    ),
                 )
             })
     }
@@ -1015,7 +1019,7 @@ impl Module {
         self.0.types[self.0.index].exports.iter().map(|(name, ty)| {
             (
                 name.as_str(),
-                ExternType::from_wasmtime(engine, self.0.types.module_types(), ty),
+                ExternType::from_wasmtime_with_module_types(engine, self.0.types.module_types(), ty),
             )
         })
     }

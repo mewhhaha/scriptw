@@ -221,6 +221,13 @@ callee-saved register or a spill slot from there. A home that nothing reads
 any more loses its store and its slot, so a function without calls is compiled
 as upstream compiles it.
 
+For cascaded cold guards, each collecting edge reloads its stack-map root
+after the safepoint. The join combines that reference with original SSA
+references from call-free edges. Those SSA parameters carry no assertion
+about the slot's contents. A regression runs the translated edge shape
+through forwarding and loop hoisting and checks that only the collecting
+edges load the slot.
+
 Why it is correct (the argument is in `frame_reloads.rs`): the pass handles
 only slots whose address is used as nothing but the address of whole-slot
 loads and stores of one type. Such a slot changes only at one of those stores and, for a

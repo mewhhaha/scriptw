@@ -141,10 +141,14 @@ The product's WeakMap and WeakSet imports are such functions.
   both exactly the objects two raw references name. It compares identities
   only and follows no reference, so it is safe; a retired entry matches
   nothing.
-- `GcEphemeron::value_raw` returns the surviving value as a raw reference for
-  a host function to return to Wasm at once, through `clone_gc_ref` and
-  `expose_gc_ref_to_wasm` as a rooted result is stored; zero for no value or
-  a retired entry.
+- `GcEphemeron::value_raw` returns the surviving raw reference for immediate
+  return to Wasm, or zero for no value or a retired entry. The copying
+  collector uses its plain-reference capability to return the raw value in
+  one step. Other heaps still run their clone and expose barriers.
+- The indexed WeakMap hit and overwrite use the typed ephemeron's exact
+  owner, key and value slot together after the Store and generation checks.
+  A successful overwrite marks the slot touched before installing the new
+  value. Lookups read the collector's current, possibly moved reference.
 - None of these enters a no-GC scope: registration, replacement and reads
   allocate no GC object and cannot collect. `insert` takes the `StoreOpaque`
   for that reason; the rooted constructors still hold their `AutoAssertNoGc`
@@ -440,12 +444,17 @@ The copying collector is generational when the GC heap starts at 2 MiB or more
   - Until that first collection the window's objects are kept, as promoted
     objects are until a full collection. A Store that allocates between one
     nursery and the window's end therefore holds up to about 3 MiB more.
-- The remembered-slot buffer (4,096 slots, doubling after an overflow up to
-  1 Mi) is published in `VMCopyingHeapData` after the funcref view, at the
-  offsets the vendored translator's `copying_heap_data` module defines.
-  Compiled stores record into it (see the translator's notes); host stores of
-  references into existing objects record through `GcHeap::write_barrier`
-  (`src/runtime/vm/gc/gc_ref.rs`).
+- The remembered-slot buffer is published in `VMCopyingHeapData` at the
+  existing `copying_heap_data` offsets. It starts with a null pointer and
+  zero length and capacity. The first host insertion tries to allocate
+  4,096 slots. Compiled barriers test `len < cap` before reading the buffer
+  pointer, so a zero-capacity barrier only sets the overflow flag. The next
+  minor collection scans the whole old space, while an open pretenuring
+  window still forces a full collection. Collection completion allocates
+  the initial buffer or grows it after overflow, up to 1 Mi slots. A host
+  allocation preserves any overflow flag already set. Allocation failure
+  leaves the old capacity available and further misses take the overflow
+  path. The compiled write barrier and its VMContext layout stay compatible.
 - The nursery's end is a function of `gc_heap_initial_size`, which the module
   compatibility check already compares, so a module compiled for another
   boundary is rejected. Below a 2 MiB initial heap there is no nursery and the
@@ -519,12 +528,45 @@ that copy-on-write memory images (`src/runtime/vm/cow.rs`) map their data from
 file. Whole-file mappings keep offset zero and their previous behavior. Unix
 hosts only (`cfg(all(feature = "std", unix, not(miri)))`).
 
-Scriptw maps its embedded native runtime images from the running executable
-through this entry
+An `Arc<File>` passed to the range entry shares the caller's open descriptor
+with the mapping and data-image owner. Scriptw uses it to map only native P
+at file offset zero in a `SCRWEP04` envelope. The caller of the unsafe file
+recovery entry keeps the inode immutable for the lifetime of all derived
+Wasmtime owners. Scriptw also maps its embedded runtime images through this entry
 ([contract](../../docs/rust-rewrite/contracts/runtime-byte-ownership.md#native-backing-storage)).
 Test: `embedded_runtime::native_backing::tests` in `scriptw-engine` runs code
 and reads a data segment from a module mapped at a nonzero offset of a larger
 file, and checks the rejected ranges.
+`embedding::precompiled::tests` exercises the admitted inode after pathname
+replacement and unlink, and verifies the offset and inode of both private
+native views on Linux.
+
+## Retained module metadata
+
+- `src/runtime/instantiate.rs` defers the atomic funcref text-offset cache
+  until a module first materializes an escaping defined function reference.
+  If allocation fails, lookup uses the immutable compiled function table.
+- `src/runtime/{module.rs,code.rs,types.rs,component/component.rs,component/types.rs}`
+  releases decoded core `ModuleTypes` after registration. Import and export
+  descriptors resolve canonical engine type IDs from the module and use the
+  registry for type contents. Components retain their canonicalized interface
+  metadata. Native serialization keeps the same format.
+- `src/runtime/{type_registry.rs,vm/gc/gc_runtime.rs,vm/gc/enabled/trace_infos.rs,vm/gc/enabled/copying.rs}`
+  keeps lazy trace cells only for types with out-of-line tracing. The copying
+  collector uses the same inline encoder as allocation and code generation.
+  The deferred reference-counting collector retains tracing data for all GC
+  layouts. The Store's trace cache keeps the owning module and its trace slot.
+
+## Root stores on cascaded cold guards
+
+The vendored Cranelift frontend sinks each eligible stack-map root to the
+first safepoint of each collecting cold arm. The arm reloads its moved root
+before passing it to the shared join. Call-free edges pass the original SSA
+value. The frontend requires single-entry arms and a call-free guard chain,
+and keeps eager spilling for roots that need a slot in or past the join.
+The translator's frame reload pass invalidates movable slot values at calls
+and keeps the edge-local relocation loads. The R native configuration schema
+is 9 for the changed code generation.
 
 ## Copy-on-write image beside an imported memory
 

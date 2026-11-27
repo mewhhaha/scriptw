@@ -5,7 +5,7 @@ use crate::function_entry::{
     LocalArgumentCallInputs, LocalArgumentsArity, LocalArgumentsCallableRole,
 };
 use crate::gc_types::{
-    CompletionLocals, ExecutableCode, ExecutableCodeKind, ExecutableCodeSchema, FunctionContext,
+    CompletionLocals, ExecutableCode, ExecutableCodeKind, ExecutableCodeSchema,
     FunctionContextSchema, FunctionLocal, FunctionObject, FunctionObjectSchema, GcI32Constant,
     GcLocal, I32Local, LocalArgumentsCallable, ValueLocals, WideLocalArgumentsCallable,
 };
@@ -102,6 +102,9 @@ impl FunctionBuilder<'_> {
         handled.load(function);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
+        if known_target.is_some() {
+            function.rarely_reached();
+        }
         let list = self.emit_pre_evaluated_arg_vector(&references, function);
         match continuation {
             CallContinuation::Continue => self.emit_site_call_with_argv(
@@ -209,6 +212,9 @@ impl FunctionBuilder<'_> {
         let handled = schema.reserve_i32_local(function);
         handled.set_constant(0, function);
         let fallback = self.open_frame(ControlFrameKind::Block, function);
+        if known_target.is_some() {
+            self.rarely_taken(fallback, function);
+        }
         callee.tag().load(function);
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Function.tag()));
         function.instruction(&Instruction::I32Ne);
@@ -228,16 +234,8 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
-        let context = schema.reserve_gc_local(function).initialize(
-            schema
-                .field(FunctionObjectSchema::CONTEXT)
-                .read(&callable, schema, function)
-                .reference(),
-            function,
-        );
         let target = LocalCallTarget {
             callable: &callable,
-            context: &context,
             receiver,
             arguments,
             handled,
@@ -245,7 +243,7 @@ impl FunctionBuilder<'_> {
         match known_target.and_then(|meta| {
             meta.entry
                 .local_arguments()
-                .filter(|entry| entry.is_source() && entry.arity() == R::ARITY)
+                .filter(|entry| entry.is_source())
                 .map(|planned| (meta, planned))
         }) {
             // Cross-P source IDs can collide. When this P owns a single cached
@@ -271,29 +269,47 @@ impl FunctionBuilder<'_> {
                     ));
                     function.instruction(&Instruction::I32Eq);
                     function.instruction(&Instruction::I32And);
+                    let context = schema
+                        .field(FunctionObjectSchema::CONTEXT)
+                        .read(target.callable, schema, function)
+                        .reference();
                     schema
                         .field(FunctionContextSchema::DEFINING_PROGRAM)
-                        .read(&context, schema, function);
+                        .read_top(context, function);
                     self.current_program().reference(schema, function);
                     function.instruction(&Instruction::RefEq);
                     function.instruction(&Instruction::I32And);
                 }
                 self.open_frame(ControlFrameKind::If, function);
-                self.emit_entered_local_argument_call::<R>(
-                    &target,
-                    LocalCallEntry::Planned(planned),
-                    continuation,
-                    result,
-                    function,
-                );
-                function.instruction(&Instruction::Else);
-                self.emit_published_local_argument_call::<R>(
-                    &target,
-                    &code,
-                    continuation,
-                    result,
-                    function,
-                );
+                match planned.arity() {
+                    LocalArgumentsArity::Narrow => {
+                        // A narrow source body cannot observe surplus lanes.
+                        // The fallback below still receives every actual.
+                        let narrow = LocalCallTarget {
+                            arguments: &target.arguments[..target
+                                .arguments
+                                .len()
+                                .min(LocalArgumentsArity::Narrow.slot_count())],
+                            ..target
+                        };
+                        self.emit_entered_local_argument_call::<LocalArgumentsCallable>(
+                            &narrow,
+                            LocalCallEntry::Planned(planned),
+                            continuation,
+                            result,
+                            function,
+                        );
+                    }
+                    LocalArgumentsArity::Wide => {
+                        self.emit_entered_local_argument_call::<WideLocalArgumentsCallable>(
+                            &target,
+                            LocalCallEntry::Planned(planned),
+                            continuation,
+                            result,
+                            function,
+                        );
+                    }
+                }
                 self.pop_control(ControlFrameKind::If);
                 function.instruction(&Instruction::End);
             }
@@ -305,7 +321,6 @@ impl FunctionBuilder<'_> {
                 function,
             ),
         }
-        context.clear(function);
         code.clear(function);
         callable.clear(function);
         self.pop_control(ControlFrameKind::Block);
@@ -357,7 +372,6 @@ impl FunctionBuilder<'_> {
                 );
             let narrow_target = LocalCallTarget {
                 callable: target.callable,
-                context: target.context,
                 receiver: target.receiver,
                 arguments: &target.arguments[..target.arguments.len().min(2)],
                 handled: target.handled,
@@ -415,23 +429,37 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) {
         let schema = self.runtime_schema();
+        let context = schema
+            .field(FunctionObjectSchema::CONTEXT)
+            .read(target.callable, schema, function)
+            .reference();
         let realm = schema.reserve_gc_local(function).initialize(
             schema
                 .field(FunctionContextSchema::REALM)
-                .read(target.context, schema, function)
+                .read_top(context, function)
                 .reference(),
             function,
         );
         let caller_realm = self.load_current_realm(function);
-        let undefined = schema.reserve_value_local(function);
-        undefined.set_undefined(function);
+        // The actual closure's Realm determines whether a direct source
+        // call can enter with the caller's ambient Realm already installed.
+        let realm_changed = if matches!(&entry, LocalCallEntry::Planned(_)) {
+            let changed = schema.reserve_i32_local(function);
+            caller_realm.load(schema, function);
+            realm.load(schema, function);
+            function.instruction(&Instruction::RefEq);
+            function.instruction(&Instruction::I32Eqz);
+            changed.store(function);
+            Some(changed)
+        } else {
+            None
+        };
         match continuation {
             CallContinuation::Continue => {
-                self.replace_current_realm(&realm, function);
+                self.emit_local_call_realm(&realm, realm_changed, function);
                 let inputs = LocalArgumentCallInputs::<R>::call(
                     target.receiver,
                     target.arguments,
-                    &undefined,
                     &caller_realm,
                     self.current_program(),
                 );
@@ -446,20 +474,34 @@ impl FunctionBuilder<'_> {
                     },
                     function,
                 );
-                self.replace_current_realm(&caller_realm, function);
+                // A strict same-Realm callee can tail-call a foreign-Realm
+                // function and return directly here, so recheck the live
+                // ambient Realm before skipping the restore write.
+                if realm_changed.is_some() {
+                    let live_realm = self.load_current_realm(function);
+                    live_realm.load(schema, function);
+                    caller_realm.load(schema, function);
+                    function.instruction(&Instruction::RefEq);
+                    function.instruction(&Instruction::I32Eqz);
+                    function.instruction(&Instruction::If(BlockType::Empty));
+                    function.rarely_reached();
+                    self.replace_current_realm(&caller_realm, function);
+                    function.instruction(&Instruction::End);
+                    live_realm.clear(function);
+                } else {
+                    self.replace_current_realm(&caller_realm, function);
+                }
             }
             CallContinuation::Return => {
-                // The P owner and Realm survive lexical unwind. Operand work
-                // and the actual typed-entry guard precede caller retirement.
-                let calling_program = self.capture_current_program(function);
+                // The frame-local program owner survives lexical unwind.
+                // Operand evaluation and the entry guard are complete.
                 self.emit_retire_tail_call_activation(function);
-                self.replace_current_realm(&realm, function);
+                self.emit_local_call_realm(&realm, realm_changed, function);
                 let inputs = LocalArgumentCallInputs::<R>::call(
                     target.receiver,
                     target.arguments,
-                    &undefined,
                     &caller_realm,
-                    &calling_program,
+                    self.current_program(),
                 );
                 match entry {
                     LocalCallEntry::Planned(planned) => {
@@ -469,21 +511,38 @@ impl FunctionBuilder<'_> {
                         inputs.emit_return_call(target.callable, published, schema, function)
                     }
                 }
-                calling_program.clear(function);
             }
         }
         // Only Throw or the returned value leaves this private scratch result.
         target.handled.set_constant(1, function);
-        undefined.clear(function);
+        if let Some(changed) = realm_changed {
+            schema.release_i32_local(changed, function);
+        }
         caller_realm.clear(function);
         realm.clear(function);
+    }
+
+    fn emit_local_call_realm(
+        &self,
+        realm: &GcLocal<crate::gc_types::RealmRecord>,
+        changed: Option<I32Local>,
+        function: &mut Function,
+    ) {
+        if let Some(changed) = changed {
+            changed.load(function);
+            function.instruction(&Instruction::If(BlockType::Empty));
+            function.rarely_reached();
+        }
+        self.replace_current_realm(realm, function);
+        if changed.is_some() {
+            function.instruction(&Instruction::End);
+        }
     }
 }
 
 /// The once-evaluated actual callee and operands of one guarded local call.
 struct LocalCallTarget<'a> {
     callable: &'a GcLocal<FunctionObject>,
-    context: &'a GcLocal<FunctionContext>,
     receiver: &'a ValueLocals,
     arguments: &'a [&'a ValueLocals],
     handled: I32Local,

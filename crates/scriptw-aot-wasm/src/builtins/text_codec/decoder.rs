@@ -646,9 +646,9 @@ impl FunctionBuilder<'_> {
         total.load(f);
         f.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(decoded, f);
-        // Once the BOM decision is made, count or widen a whole ASCII run
-        // from the current segment. The unusual retained fatal queue can
-        // use the scalar path.
+        // After the BOM decision, consume a run of ASCII and complete
+        // two-byte scalars in the current segment. A sequence that starts
+        // in the retained queue still goes through the scalar decoder.
         bom_seen.load(f);
         index.load(f);
         prior_length.load(f);
@@ -672,18 +672,9 @@ impl FunctionBuilder<'_> {
             .initialize(input.bytes.load(s, f).require_non_null(f), f);
         construction.widen_ascii_from(written, &current, position, end, base, s, f);
         current.clear(f);
+        self.emit_text_decoder_mixed_run(input, position, end, written, Some(&construction), f);
         f.instruction(&Instruction::Else);
-        let run_start = s.reserve_i32_local(f);
-        position.load(f);
-        run_start.store(f);
-        self.emit_text_decoder_count_ascii(input, position, end, f);
-        written.load(f);
-        position.load(f);
-        run_start.load(f);
-        f.instruction(&Instruction::I32Sub);
-        f.instruction(&Instruction::I32Add);
-        written.store(f);
-        s.release_i32_local(run_start, f);
+        self.emit_text_decoder_mixed_run(input, position, end, written, None, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         position.load(f);
@@ -960,28 +951,113 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    fn emit_text_decoder_count_ascii(
-        &self,
+    fn emit_text_decoder_mixed_run(
+        &mut self,
         input: &TextDecoderInput,
         position: I32Local,
         end: I32Local,
+        written: I32Local,
+        construction: Option<&StringConstruction>,
         f: &mut Function,
     ) {
         let s = self.runtime_schema();
-        f.instruction(&Instruction::Block(BlockType::Empty));
-        f.instruction(&Instruction::Loop(BlockType::Empty));
-        s.array_type::<ByteArray>()
-            .read(&input.bytes, position, s, f);
+        let lead = s.reserve_i32_local(f);
+        let trailing = s.reserve_i32_local(f);
+        let continuation = s.reserve_i32_local(f);
+        let sizing = construction.is_none().then(|| {
+            let start = s.reserve_i32_local(f);
+            let pairs = s.reserve_i32_local(f);
+            position.load(f);
+            start.store(f);
+            pairs.set_constant(0, f);
+            (start, pairs)
+        });
+        let stopped = self.open_frame(ControlFrameKind::Block, f);
+        position.load(f);
+        end.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(stopped, f);
+        let next = self.open_frame(ControlFrameKind::Loop, f);
+        let bytes = s.array_type::<ByteArray>();
+        bytes.read(&input.bytes, position, s, f).store(lead, f);
+        lead.load(f);
         f.instruction(&Instruction::I32Const(0x80));
         f.instruction(&Instruction::I32GeU);
-        f.instruction(&Instruction::BrIf(1));
+        self.open_frame(ControlFrameKind::If, f);
+        // Leave an invalid, incomplete, or longer sequence entirely for the
+        // scalar decoder. In particular it chooses whether to retain a short
+        // sequence and whether an invalid continuation is consumed.
+        lead.load(f);
+        f.instruction(&Instruction::I32Const(0xc2));
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Const(0xdf - 0xc2));
+        f.instruction(&Instruction::I32GtU);
+        self.emit_branch_if_to_target(stopped, f);
+        position.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        continuation.store(f);
+        continuation.load(f);
+        end.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(stopped, f);
+        bytes
+            .read(&input.bytes, continuation, s, f)
+            .store(trailing, f);
+        trailing.load(f);
+        f.instruction(&Instruction::I32Const(0xc0));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Const(0x80));
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(stopped, f);
+        continuation.load(f);
+        position.store(f);
+        if let Some((_, pairs)) = sizing {
+            increment_decoder_index(pairs, f);
+        } else {
+            lead.load(f);
+            f.instruction(&Instruction::I32Const(0x1f));
+            f.instruction(&Instruction::I32And);
+            f.instruction(&Instruction::I32Const(6));
+            f.instruction(&Instruction::I32Shl);
+            trailing.load(f);
+            f.instruction(&Instruction::I32Const(0x3f));
+            f.instruction(&Instruction::I32And);
+            f.instruction(&Instruction::I32Or);
+            lead.store(f);
+        }
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        if let Some(construction) = construction {
+            construction.write(written, lead, s, f);
+            increment_decoder_index(written, f);
+        }
         increment_decoder_index(position, f);
         position.load(f);
         end.load(f);
         f.instruction(&Instruction::I32LtU);
-        f.instruction(&Instruction::BrIf(0));
+        self.emit_branch_if_to_target(next, f);
+        self.pop_control(ControlFrameKind::Loop);
         f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
+        if let Some((start, pairs)) = sizing {
+            // Each byte contributes a code unit except the validated
+            // continuation bytes, which share their lead's unit.
+            written.load(f);
+            position.load(f);
+            start.load(f);
+            f.instruction(&Instruction::I32Sub);
+            pairs.load(f);
+            f.instruction(&Instruction::I32Sub);
+            f.instruction(&Instruction::I32Add);
+            written.store(f);
+            s.release_i32_local(pairs, f);
+            s.release_i32_local(start, f);
+        }
+        for local in [continuation, trailing, lead] {
+            s.release_i32_local(local, f);
+        }
     }
 }
 

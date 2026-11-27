@@ -11,7 +11,7 @@ use crate::vm::VMMemoryDefinition;
 use core::ptr::NonNull;
 use core::slice;
 use core::{alloc::Layout, any::Any, marker, mem, ops::Range, ptr};
-use wasmtime_environ::{GcArrayLayout, GcStructLayout, GcTypeLayouts, VMSharedTypeIndex};
+use wasmtime_environ::{GcArrayLayout, GcLayout, GcStructLayout, GcTypeLayouts, VMSharedTypeIndex};
 
 /// Trait for integrating a garbage collector with the runtime.
 ///
@@ -37,6 +37,12 @@ use wasmtime_environ::{GcArrayLayout, GcStructLayout, GcTypeLayouts, VMSharedTyp
 pub unsafe trait GcRuntime: 'static + Send + Sync {
     /// Get this collector's GC type layouts.
     fn layouts(&self) -> &dyn GcTypeLayouts;
+
+    /// Whether objects of this layout can require out-of-line tracing data,
+    /// including when allocated by this collector's compiler.
+    fn needs_out_of_line_trace_info(&self, _layout: &GcLayout) -> bool {
+        true
+    }
 
     /// Construct a new GC heap.
     #[cfg(feature = "gc")]

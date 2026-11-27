@@ -1844,27 +1844,21 @@ impl FunctionBuilder<'_> {
     /// object, function or Array; any other prototype, or null, branches to
     /// `miss`. Each keeps all its named own properties, other than an
     /// Array's indices and "length", in that header.
-    fn emit_prototype_header_or_branch(
+    pub(super) fn emit_prototype_header_or_branch(
         &mut self,
         prototype: &GcLocal<JavaScriptObject, Nullable>,
         miss: ControlTarget,
         f: &mut Function,
     ) -> GcLocal<OrdinaryObject> {
         let s = self.runtime_schema();
-        let header = s
-            .reserve_gc_local::<OrdinaryObject, Nullable>(f)
-            .initialize_null(s, f);
-        let done = self.open_frame(ControlFrameKind::Block, f);
-        let other = self.open_frame(ControlFrameKind::Block, f);
-        header.replace(
-            prototype
-                .sealed_subtype_or_branch::<OrdinaryObject>(s, self.local_branch_label(other), f)
-                .nullable(),
-            f,
-        );
-        self.emit_branch_to_target(done, f);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
+        let header = self.open_reference_block::<OrdinaryObject>(s, f);
+        let _ = prototype.load(s, f);
+        f.instruction(&Instruction::BrOnCast {
+            relative_depth: 0,
+            from_ref_type: s.reference_type::<JavaScriptObject>(GcNullability::Nullable),
+            to_ref_type: s.reference_type::<OrdinaryObject>(GcNullability::NonNullable),
+        });
+        f.instruction(&Instruction::Drop);
         let other = self.open_frame(ControlFrameKind::Block, f);
         let callable = s.reserve_gc_local(f).initialize(
             prototype.sealed_subtype_or_branch::<FunctionObject>(
@@ -1874,36 +1868,29 @@ impl FunctionBuilder<'_> {
             ),
             f,
         );
-        header.replace(
+        header.branch_with(
             s.field(FunctionObjectSchema::OBJECT)
                 .read(&callable, s, f)
-                .reference()
-                .nullable(),
+                .reference(),
             f,
         );
         callable.clear(f);
-        self.emit_branch_to_target(done, f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         let array = s.reserve_gc_local(f).initialize(
             prototype.sealed_subtype_or_branch::<ArrayObject>(s, self.local_branch_label(miss), f),
             f,
         );
-        header.replace(
+        header.branch_with(
             s.field(ArrayObjectSchema::OBJECT)
                 .read(&array, s, f)
-                .reference()
-                .nullable(),
+                .reference(),
             f,
         );
         array.clear(f);
+        let header = header.close(f);
         self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
-        let object = s
-            .reserve_non_null_gc_local(f)
-            .initialize(header.load(s, f).require_non_null(f), f);
-        header.clear(f);
-        object
+        s.reserve_non_null_gc_local(f).initialize(header, f)
     }
 
     /// The ordinary header of the current Realm's prototype in `slot` for a

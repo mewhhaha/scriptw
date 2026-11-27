@@ -85,6 +85,12 @@ enum PromiseReactionInitialization<'a> {
     },
 }
 
+#[derive(Clone, Copy)]
+struct SettledPromiseReaction<'a> {
+    settlement: PromiseSettlement,
+    argument: &'a GcLocal<StoredValue>,
+}
+
 pub(crate) enum AsyncGeneratorAwaitContinuation {
     Body,
     AwaitReturn,
@@ -397,13 +403,10 @@ impl<'a> FunctionBuilder<'a> {
         let current = schema
             .reserve_gc_local(function)
             .initialize(head.load(schema, function), function);
-        function.instruction(&Instruction::Block(BlockType::Empty));
-        function.instruction(&Instruction::Loop(BlockType::Empty));
-        current.load(schema, function);
-        function.instruction(&Instruction::RefIsNull);
-        function.instruction(&Instruction::BrIf(1));
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        let next_reaction = self.open_frame(ControlFrameKind::Loop, function);
         let reaction = schema.reserve_gc_local(function).initialize(
-            current.load(schema, function).require_non_null(function),
+            current.non_null_or_branch(self.local_branch_label(done), function),
             function,
         );
         let next = schema.reserve_gc_local(function).initialize(
@@ -424,8 +427,10 @@ impl<'a> FunctionBuilder<'a> {
         current.replace(next.load(schema, function), function);
         next.clear(function);
         reaction.clear(function);
-        function.instruction(&Instruction::Br(0));
+        self.emit_branch_to_target(next_reaction, function);
+        self.pop_control(ControlFrameKind::Loop);
         function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
         current.clear(function);
         Ok(())
@@ -449,6 +454,24 @@ impl<'a> FunctionBuilder<'a> {
             .initialize(resolved.realm().load(schema, function), function);
         self.release_resolved_function_realm_local(resolved, function);
         fallback.clear(function);
+        Ok(realm)
+    }
+
+    fn emit_promise_default_reaction_job_realm(
+        &mut self,
+        handler: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<GcLocal<RealmRecord, Nullable>, EmitError> {
+        let schema = self.runtime_schema();
+        let realm = schema
+            .reserve_gc_local::<RealmRecord, Nullable>(function)
+            .initialize_null(schema, function);
+        self.emit_is_callable_i32(handler, function)?;
+        function.instruction(&Instruction::If(BlockType::Empty));
+        let selected = self.emit_promise_job_callback_realm(handler, function)?;
+        realm.replace(selected.load(schema, function).nullable(), function);
+        selected.clear(function);
+        function.instruction(&Instruction::End);
         Ok(realm)
     }
 
@@ -488,12 +511,10 @@ impl<'a> FunctionBuilder<'a> {
                     schema
                         .struct_type::<StoredValue>()
                         .read_into(&stored, &handler, schema, function);
-                    self.emit_is_callable_i32(&handler, function)?;
-                    function.instruction(&Instruction::If(BlockType::Empty));
-                    let selected = self.emit_promise_job_callback_realm(&handler, function)?;
-                    realm.replace(selected.load(schema, function).nullable(), function);
+                    let selected =
+                        self.emit_promise_default_reaction_job_realm(&handler, function)?;
+                    realm.replace(selected.load(schema, function), function);
                     selected.clear(function);
-                    function.instruction(&Instruction::End);
                     handler.clear(function);
                     stored.clear(function);
                 }
@@ -554,37 +575,100 @@ impl<'a> FunctionBuilder<'a> {
         resolving_realm: &GcLocal<RealmRecord>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
-        let then = schema.reserve_completion(function);
-        then.initialize(function);
-        self.emit_is_heap_object_like_tag_i32(value.tag(), function);
-        function.instruction(&Instruction::If(BlockType::Empty));
-        value.reference().load(function);
-        promise.load(schema, function);
-        function.instruction(&Instruction::RefEq);
-        function.instruction(&Instruction::If(BlockType::Empty));
-        let prototype = schema.reserve_value_local(function);
-        self.emit_load_non_array_realm_intrinsic(
-            resolving_realm,
-            NonArrayRealmIntrinsicSlot::TypeErrorPrototype,
-            &prototype,
-            function,
-        );
-        self.emit_throw_runtime_error_with_prototype(
-            NativeErrorKind::TypeError,
-            RuntimeErrorMessage::PROMISE_CANNOT_RESOLVE_TO_ITSELF,
-            &prototype,
-            &then,
-            function,
-        )?;
-        self.emit_settle_promise_record(
+        self.emit_resolve_promise_record_with_result(
             promise,
-            PromiseSettlement::Reject,
-            then.value(),
+            value,
+            resolving_realm,
+            None,
+            function,
+        )
+    }
+
+    /// The result is freshly allocated by CreateIteratorResultObject and has
+    /// not escaped. Its only own keys are `value` and `done`.
+    pub(in crate::builtins) fn emit_resolve_fresh_iterator_result(
+        &mut self,
+        promise: &GcLocal<PromiseObject>,
+        object: &GcLocal<OrdinaryObject>,
+        resolving_realm: &GcLocal<RealmRecord>,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let value = schema.reserve_value_local(function);
+        value.set_reference(object, schema, function);
+        self.emit_resolve_promise_record_with_result(
+            promise,
+            &value,
+            resolving_realm,
+            Some(object),
             function,
         )?;
-        prototype.clear(function);
-        function.instruction(&Instruction::Else);
+        value.clear(function);
+        Ok(())
+    }
+
+    fn emit_resolve_promise_record_with_result(
+        &mut self,
+        promise: &GcLocal<PromiseObject>,
+        value: &ValueLocals,
+        resolving_realm: &GcLocal<RealmRecord>,
+        iterator_result: Option<&GcLocal<OrdinaryObject>>,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let resolved = self.open_frame(ControlFrameKind::Block, function);
+        let fulfill = self.open_frame(ControlFrameKind::Block, function);
+        let then = schema.reserve_completion(function);
+        if let Some(object) = iterator_result {
+            let prototype = schema.reserve_gc_local(function).initialize(
+                schema
+                    .field(OrdinaryObjectSchema::PROTOTYPE)
+                    .read(object, schema, function)
+                    .reference(),
+                function,
+            );
+            let lookup = self.open_frame(ControlFrameKind::Block, function);
+            // The baseline Object prototype layout has no `then`. The live
+            // rows and prototype identity also reject edits in another Realm.
+            self.emit_unchanged_object_prototype_or_branch(&prototype, lookup, function);
+            self.emit_branch_to_target(fulfill, function);
+            self.pop_control(ControlFrameKind::Block);
+            function.instruction(&Instruction::End);
+            prototype.clear(function);
+        } else {
+            self.emit_is_heap_object_like_tag_i32(value.tag(), function);
+            function.instruction(&Instruction::I32Eqz);
+            self.emit_branch_if_to_target(fulfill, function);
+            value.reference().load(function);
+            let _ = promise.load(schema, function);
+            function.instruction(&Instruction::RefEq);
+            self.open_frame(ControlFrameKind::If, function);
+            let prototype = schema.reserve_value_local(function);
+            self.emit_load_non_array_realm_intrinsic(
+                resolving_realm,
+                NonArrayRealmIntrinsicSlot::TypeErrorPrototype,
+                &prototype,
+                function,
+            );
+            self.emit_throw_runtime_error_with_prototype(
+                NativeErrorKind::TypeError,
+                RuntimeErrorMessage::PROMISE_CANNOT_RESOLVE_TO_ITSELF,
+                &prototype,
+                &then,
+                function,
+            )?;
+            self.emit_settle_promise_record(
+                promise,
+                PromiseSettlement::Reject,
+                then.value(),
+                function,
+            )?;
+            prototype.clear(function);
+            self.emit_branch_to_target(resolved, function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+        }
+        then.initialize(function);
         let key_string = schema.reserve_gc_local(function).initialize(
             self.emit_interned_string_reference("then", function)?,
             function,
@@ -598,29 +682,30 @@ impl<'a> FunctionBuilder<'a> {
             AccessorThrowRouting::LeaveInCompletion,
             function,
         )?;
+        key.clear(function);
+        key_string.clear(function);
         then.kind().load(function);
         function.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
         function.instruction(&Instruction::I32Eq);
-        function.instruction(&Instruction::If(BlockType::Empty));
+        self.open_frame(ControlFrameKind::If, function);
         self.emit_settle_promise_record(
             promise,
             PromiseSettlement::Reject,
             then.value(),
             function,
         )?;
-        function.instruction(&Instruction::Else);
+        self.emit_branch_to_target(resolved, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         self.emit_is_callable_i32(then.value(), function)?;
-        function.instruction(&Instruction::If(BlockType::Empty));
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(fulfill, function);
         self.emit_enqueue_promise_thenable_job(promise, value, then.value(), function)?;
-        function.instruction(&Instruction::Else);
+        self.emit_branch_to_target(resolved, function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
         self.emit_settle_promise_record(promise, PromiseSettlement::Fulfill, value, function)?;
-        function.instruction(&Instruction::End);
-        function.instruction(&Instruction::End);
-        key.clear(function);
-        key_string.clear(function);
-        function.instruction(&Instruction::End);
-        function.instruction(&Instruction::Else);
-        self.emit_settle_promise_record(promise, PromiseSettlement::Fulfill, value, function)?;
+        self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
         then.clear(function);
         Ok(())
@@ -1293,12 +1378,23 @@ impl<'a> FunctionBuilder<'a> {
     fn emit_initialize_promise_reaction(
         &mut self,
         initialization: &PromiseReactionInitialization<'_>,
-        settlement: Option<PromiseSettlement>,
+        settled: Option<SettledPromiseReaction<'_>>,
         function: &mut Function,
-    ) -> GcLocal<PendingJob> {
+    ) -> Result<GcLocal<PendingJob>, EmitError> {
         let schema = self.runtime_schema();
+        let argument = settled.map_or_else(
+            || GcOperand::null(schema),
+            |settled| GcOperand::nullable_reference(settled.argument, schema),
+        );
+        let settled_rejected = matches!(
+            settled,
+            Some(SettledPromiseReaction {
+                settlement: PromiseSettlement::Reject,
+                ..
+            })
+        );
         if let PromiseReactionInitialization::AsyncFunction { activation, realm } = initialization {
-            return schema.reserve_gc_local(function).initialize(
+            return Ok(schema.reserve_gc_local(function).initialize(
                 schema
                     .struct_type::<PromiseAwaitContinuation>()
                     .construct(
@@ -1306,14 +1402,14 @@ impl<'a> FunctionBuilder<'a> {
                             GcOperand::null(schema),
                             GcOperand::nullable_reference(*realm, schema),
                             GcOperand::reference(*activation, schema),
-                            GcOperand::null(schema),
-                            GcOperand::boolean(false),
+                            argument,
+                            GcOperand::boolean(settled_rejected),
                         ),
                         function,
                     )
                     .upcast(),
                 function,
-            );
+            ));
         }
 
         // Before settlement only ordinary reactions need two handler values.
@@ -1323,15 +1419,17 @@ impl<'a> FunctionBuilder<'a> {
         let reject_handler = schema
             .reserve_gc_local::<StoredValue, Nullable>(function)
             .initialize_null(schema, function);
+        let mut callback_realm = None;
         let (kind, capability, realm, generator, module, join, sync) = match initialization {
             PromiseReactionInitialization::Default {
                 fulfilled,
                 rejected,
                 capability,
             } => {
-                let selected = match settlement {
-                    Some(PromiseSettlement::Reject) => rejected,
-                    Some(PromiseSettlement::Fulfill) | None => fulfilled,
+                let selected = if settled_rejected {
+                    rejected
+                } else {
+                    fulfilled
                 };
                 handler.replace(
                     schema
@@ -1340,7 +1438,7 @@ impl<'a> FunctionBuilder<'a> {
                         .nullable(),
                     function,
                 );
-                if settlement.is_none() {
+                if settled.is_none() {
                     reject_handler.replace(
                         schema
                             .struct_type::<StoredValue>()
@@ -1348,11 +1446,17 @@ impl<'a> FunctionBuilder<'a> {
                             .nullable(),
                         function,
                     );
+                } else {
+                    callback_realm =
+                        Some(self.emit_promise_default_reaction_job_realm(selected, function)?);
                 }
                 (
                     PromiseReactionCallbackKind::Default,
                     GcOperand::reference(*capability, schema),
-                    GcOperand::null(schema),
+                    callback_realm.as_ref().map_or_else(
+                        || GcOperand::null(schema),
+                        |realm| GcOperand::reference(realm, schema),
+                    ),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
@@ -1413,8 +1517,8 @@ impl<'a> FunctionBuilder<'a> {
                     (
                         GcOperand::null(schema),
                         realm,
-                        GcOperand::null(schema),
-                        GcOperand::boolean(false),
+                        argument,
+                        GcOperand::boolean(settled_rejected),
                         GcOperand::constant(kind),
                         GcOperand::reference(&handler, schema),
                         GcOperand::reference(&reject_handler, schema),
@@ -1429,9 +1533,12 @@ impl<'a> FunctionBuilder<'a> {
                 .upcast(),
             function,
         );
+        if let Some(realm) = callback_realm {
+            realm.clear(function);
+        }
         reject_handler.clear(function);
         handler.clear(function);
-        reaction
+        Ok(reaction)
     }
 
     pub(crate) fn emit_perform_promise_then(
@@ -1570,7 +1677,10 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let state = schema.reserve_i32_local(function);
-        self.emit_load_promise_state_strict(promise, state, function);
+        schema
+            .field(PromiseObjectSchema::STATE)
+            .read(promise, schema, function)
+            .store(state, function);
         for selected in PromiseState::ALL {
             state.load(function);
             function.instruction(&Instruction::I32Const(GcI32Constant::encode(selected)));
@@ -1581,19 +1691,25 @@ impl<'a> FunctionBuilder<'a> {
                 PromiseState::Fulfilled => Some(PromiseSettlement::Fulfill),
                 PromiseState::Rejected => Some(PromiseSettlement::Reject),
             };
-            let reaction =
-                self.emit_initialize_promise_reaction(&initialization, settlement, function);
-            if let Some(settlement) = settlement {
-                let argument = schema.reserve_gc_local(function).initialize(
+            let argument = settlement.map(|_| {
+                schema.reserve_gc_local(function).initialize(
                     schema
                         .field(PromiseObjectSchema::RESULT)
                         .read(promise, schema, function)
                         .reference(),
                     function,
-                );
-                self.emit_queue_selected_promise_reaction(
-                    &reaction, settlement, &argument, function,
-                )?;
+                )
+            });
+            let settled = settlement
+                .zip(argument.as_ref())
+                .map(|(settlement, argument)| SettledPromiseReaction {
+                    settlement,
+                    argument,
+                });
+            let reaction =
+                self.emit_initialize_promise_reaction(&initialization, settled, function)?;
+            if let Some(argument) = argument {
+                self.emit_append_promise_job(&reaction, function);
                 argument.clear(function);
             } else {
                 self.emit_append_pending_promise_reaction(promise, &reaction, function);
@@ -1811,7 +1927,7 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        let context = self.emit_intrinsic_promise_resolve_realm_context(authority, function)?;
+        let context = self.emit_intrinsic_promise_resolve_realm_context(authority, function);
         let resolved = schema.reserve_completion(function);
         self.emit_intrinsic_promise_resolve_to_locals(&context, value, &resolved, function)?;
         // Await propagates synchronous PromiseResolve failure before it suspends.
@@ -1849,7 +1965,7 @@ impl<'a> FunctionBuilder<'a> {
         let context = self.emit_intrinsic_promise_resolve_realm_context(
             PromiseResolveRealmAuthority::AsyncExecution(&realm),
             function,
-        )?;
+        );
         self.emit_intrinsic_promise_resolve_to_locals(&context, value, result, function)?;
         result.kind().load(function);
         function.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
@@ -1909,15 +2025,8 @@ impl<'a> FunctionBuilder<'a> {
         let on_rejected = schema.reserve_value_local(function);
         self.emit_builtin_arg_to_value(0, &on_fulfilled, function);
         self.emit_builtin_arg_to_value(1, &on_rejected, function);
-        let species = self.emit_current_function_promise_species_realm_context(function);
-        self.emit_promise_species_constructor(species, &receiver, &pending, function)?;
-        self.completion().copy_from(&pending, function);
-        self.emit_propagate_current_throw_if_needed(function);
-        let executor =
-            self.emit_current_function_promise_internal_function_materialization_context(function);
         let capability =
-            self.emit_new_internal_promise_capability(&executor, pending.value(), function)?;
-        self.release_promise_internal_function_materialization_context(executor, function);
+            self.emit_promise_then_capability(&promise, &receiver, &pending, function)?;
         self.emit_perform_promise_then(
             &promise,
             &on_fulfilled,

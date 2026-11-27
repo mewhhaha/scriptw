@@ -1,6 +1,6 @@
 //! Ordinary data slots share immutable StoredValues; null alone represents a hole.
 use super::*;
-use crate::gc_types::{PackedValueTable, StoredValue};
+use crate::gc_types::{PackedValueTable, StoredValue, StoredValueSchema};
 
 /// The capacity that the first growth of an empty packed backing reaches.
 const FIRST_PACKED_CAPACITY: i32 = 4;
@@ -18,6 +18,12 @@ enum PackedArrayProbeResult<'a> {
         found: I32Local,
     },
     Stored(&'a GcLocal<StoredValue, Nullable>),
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum PackedArrayWriteValue<'a> {
+    Raw(&'a ValueLocals),
+    Stored(&'a GcLocal<StoredValue>),
 }
 
 impl FunctionBuilder<'_> {
@@ -395,23 +401,7 @@ impl FunctionBuilder<'_> {
         index.load(f);
         f.instruction(&Instruction::I32WrapI64);
         slot.store(f);
-        // The immutable wrapper is rooted while the old reference is inspected.
-        // Reuse the shared canonical `StoredValue` for `undefined` to avoid
-        // per-element allocation in mixed/sparse-undefined packed arrays.
-        let stored = s
-            .reserve_gc_local::<StoredValue, Nullable>(f)
-            .initialize_null(s, f);
-        value.tag().load(f);
-        f.instruction(&Instruction::I32Const(
-            WasmRuntimeValueTag::Undefined as i32,
-        ));
-        f.instruction(&Instruction::I32Eq);
-        self.open_frame(ControlFrameKind::If, f);
-        stored.replace(s.stored_undefined(f).nullable(), f);
-        f.instruction(&Instruction::Else);
-        stored.replace(s.struct_type::<StoredValue>().from_value(value, f).nullable(), f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
+        let stored = self.emit_packed_value_for_store(value, f);
         s.array_type::<PackedValueTable>()
             .read(&values, slot, s, f)
             .reference()
@@ -428,7 +418,7 @@ impl FunctionBuilder<'_> {
         s.array_type::<PackedValueTable>().write(
             &values,
             slot,
-            GcOperand::reference(&stored, s),
+            GcOperand::nullable_reference(&stored, s),
             s,
             f,
         );
@@ -516,26 +506,48 @@ impl FunctionBuilder<'_> {
         numbers.clear(f);
     }
 
-    /// Shared publication retains Number mode until a nonnumber ordinary value
-    /// is actually admitted by the same capacity/occupancy policy.
-    pub(super) fn packed_number_write(
+    /// With either packed mode proved, retain Number mode until a nonnumber
+    /// value is admitted by the same capacity and occupancy policy.
+    pub(super) fn emit_packed_array_write(
         &mut self,
         storage: &GcLocal<ArrayObject>,
         index: I64Local,
-        value: &ValueLocals,
+        value: PackedArrayWriteValue<'_>,
         f: &mut Function,
     ) -> I32Local {
         let s = self.runtime_schema();
-        let handled = self.packed_number_only_write(storage, index, value, f);
-        handled.load(f);
-        f.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, f);
-        s.array_storage_mode_is(storage, ArrayIndexedStorageMode::PackedNumbers, f);
-        value.tag().load(f);
+        let handled = s.reserve_i32_local(f);
+        handled.set_constant(0, f);
+        let done = self.open_frame(ControlFrameKind::Block, f);
+        let packed_values = self.open_frame(ControlFrameKind::Block, f);
+        s.array_storage_mode_is(storage, ArrayIndexedStorageMode::PackedValues, f);
+        self.emit_branch_if_to_target(packed_values, f);
+        match value {
+            PackedArrayWriteValue::Raw(value) => value.tag().load(f),
+            PackedArrayWriteValue::Stored(value) => {
+                s.field(StoredValueSchema::TAG).read(value, s, f);
+            }
+        }
         f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
-        f.instruction(&Instruction::I32Ne);
-        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
+        let bits = match value {
+            PackedArrayWriteValue::Raw(value) => value.scalar(),
+            PackedArrayWriteValue::Stored(value) => {
+                let stored_bits = s.reserve_i64_local(f);
+                s.field(StoredValueSchema::SCALAR)
+                    .read(value, s, f)
+                    .store_i64(stored_bits, f);
+                stored_bits
+            }
+        };
+        self.emit_packed_number_write(storage, index, bits, handled, f);
+        if matches!(value, PackedArrayWriteValue::Stored(_)) {
+            s.release_i64_local(bits, f);
+        }
+        self.emit_branch_to_target(done, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         // Promotion is useful only when the eventual write can remain packed.
         let (numbers, presence) = self.packed_backings(storage, f);
         let capacity = s.reserve_i32_local(f);
@@ -546,27 +558,22 @@ impl FunctionBuilder<'_> {
             .read(storage, s, f)
             .store_i64(count, f);
         self.emit_packed_capacity_admission(index, capacity, count, f);
-        self.open_frame(ControlFrameKind::If, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(done, f);
         self.promote_packed_numbers(storage, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
         s.release_i64_local(count, f);
         s.release_i32_local(capacity, f);
         presence.clear(f);
         numbers.clear(f);
-        self.pop_control(ControlFrameKind::If);
+        self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        s.array_storage_mode_is(storage, ArrayIndexedStorageMode::PackedValues, f);
-        self.open_frame(ControlFrameKind::If, f);
         self.write_packed_value(storage, index, value, handled, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::If);
+        self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         handled
     }
 
-    fn emit_packed_capacity_admission(
+    pub(super) fn emit_packed_capacity_admission(
         &self,
         index: I64Local,
         capacity: I32Local,
@@ -595,7 +602,7 @@ impl FunctionBuilder<'_> {
         &mut self,
         storage: &GcLocal<ArrayObject>,
         index: I64Local,
-        value: &ValueLocals,
+        value: PackedArrayWriteValue<'_>,
         handled: I32Local,
         f: &mut Function,
     ) {
@@ -662,10 +669,13 @@ impl FunctionBuilder<'_> {
         index.load(f);
         f.instruction(&Instruction::I32WrapI64);
         slot.store(f);
-        // The immutable wrapper is rooted while the old reference is inspected.
-        let stored = s
-            .reserve_gc_local(f)
-            .initialize(s.struct_type::<StoredValue>().from_value(value, f), f);
+        let mut fresh = None;
+        let edge = match value {
+            PackedArrayWriteValue::Raw(value) => {
+                fresh.insert(self.emit_packed_value_for_store(value, f))
+            }
+            PackedArrayWriteValue::Stored(value) => value,
+        };
         let old = s.reserve_gc_local(f).initialize(
             s.array_type::<PackedValueTable>()
                 .read(&values, slot, s, f)
@@ -685,19 +695,45 @@ impl FunctionBuilder<'_> {
         s.array_type::<PackedValueTable>().write(
             &values,
             slot,
-            GcOperand::nullable_reference(&stored, s),
+            GcOperand::nullable_reference(edge, s),
             s,
             f,
         );
         handled.set_constant(1, f);
         old.clear(f);
-        stored.clear(f);
+        if let Some(fresh) = fresh {
+            fresh.clear(f);
+        }
         s.release_i32_local(slot, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         s.release_i64_local(count, f);
         s.release_i32_local(capacity, f);
         values.clear(f);
+    }
+
+    /// Packed slots use null for holes and share immutable edges for present
+    /// values. Explicit undefined may use the canonical immutable edge.
+    pub(super) fn emit_packed_value_for_store(
+        &mut self,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) -> GcLocal<StoredValue> {
+        let s = self.runtime_schema();
+        let boxed = self.open_reference_block(s, f);
+        value.tag().load(f);
+        f.instruction(&Instruction::I32Const(
+            WasmRuntimeValueTag::Undefined as i32,
+        ));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        boxed.branch_with(s.stored_undefined(f), f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        boxed.branch_with(s.struct_type::<StoredValue>().from_value(value, f), f);
+        let stored = s.reserve_gc_local(f).initialize(boxed.close(f), f);
+        self.pop_control(ControlFrameKind::Block);
+        stored
     }
 
     pub(in crate::objects) fn emit_materialize_packed_array(

@@ -227,7 +227,7 @@ pub(crate) fn with_stable_loaded_executable<T>(
 
 fn executable_digest(mut image: impl Read) -> io::Result<CompilerDigest> {
     let mut hash = Sha256::new();
-    let mut buffer = [0; 64 * 1024];
+    let mut buffer = [0; 8 * 1024];
     loop {
         let count = image.read(&mut buffer)?;
         if count == 0 {

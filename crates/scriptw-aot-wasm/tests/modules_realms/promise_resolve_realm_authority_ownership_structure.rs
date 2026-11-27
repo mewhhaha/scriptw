@@ -195,16 +195,16 @@ fn three_factories_take_owned_authority_and_forward_it_once() {
     let resolve_context = lexically_normalized(PROMISE_RESOLVE_REALM_CONTEXT);
     let selector = bounded(
         &resolve_context,
-        "fnemit_promise_resolve_internal_function_materialization_context(",
+        "fnemit_promise_resolve_realm(",
         "fnemit_promise_resolve_operation_in_context(",
     );
     assert!(selector.starts_with(
-        "&mutself,authority:PromiseResolveRealmAuthority<'_>,function:&mutFunction,)->PromiseInternalFunctionMaterializationContext{matchauthority{"
+        "&mutself,authority:PromiseResolveRealmAuthority<'_>,function:&mutFunction,)->GcLocal<RealmRecord>{letschema=self.runtime_schema();letrealm=matchauthority{"
     ));
     for route in [
-        "PromiseResolveRealmAuthority::CurrentFunction=>self.emit_current_function_promise_internal_function_materialization_context(function)",
-        "PromiseResolveRealmAuthority::ExplicitRealm(realm)=>self.emit_promise_internal_function_materialization_context_from_realm(realm,function)",
-        "PromiseResolveRealmAuthority::AsyncExecution(context)=>self.emit_promise_internal_function_materialization_context_from_realm(context.realm(),function,)",
+        "PromiseResolveRealmAuthority::CurrentFunction=>{self.emit_current_function_realm(function)}",
+        "PromiseResolveRealmAuthority::ExplicitRealm(realm)=>realm.load(schema,function)",
+        "PromiseResolveRealmAuthority::AsyncExecution(context)=>{context.realm().load(schema,function)}",
     ] {
         assert_eq!(selector.matches(route).count(), 1, "`{route}`");
     }
@@ -221,13 +221,16 @@ fn three_factories_take_owned_authority_and_forward_it_once() {
         "fnemit_intrinsic_promise_resolve_realm_context(",
         "pub(super)fnemit_call_promise_resolve_operation(",
     );
+    assert!(operation.starts_with(
+        "&mutself,authority:PromiseResolveRealmAuthority<'_>,function:&mutFunction,)->Result<"
+    ));
+    assert!(intrinsic.starts_with(
+        "&mutself,authority:PromiseResolveRealmAuthority<'_>,function:&mutFunction,)->IntrinsicPromiseResolveRealmContext{"
+    ));
     for factory in [operation, intrinsic] {
-        assert!(factory.starts_with(
-            "&mutself,authority:PromiseResolveRealmAuthority<'_>,function:&mutFunction,)->Result<"
-        ));
         assert_eq!(
             factory
-                .matches("emit_promise_resolve_internal_function_materialization_context(authority,function)")
+                .matches("emit_promise_resolve_realm(authority,function)")
                 .count(),
             1
         );

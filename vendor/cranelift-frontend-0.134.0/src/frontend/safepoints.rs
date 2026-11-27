@@ -1025,79 +1025,105 @@ impl StackSlots {
     }
 }
 
-/// A single-entry cold arm that can be bypassed by a call-free fast arm.
-/// Both arms enter the same join, which has no other incoming edges.
+/// A call-free fast path through one or more guards to a common join.
+/// Each guard has a separate, single-entry cold arm that jumps to the join.
 struct ColdDiamond {
     source: Block,
-    fast: Block,
+    fast_path: SmallVec<[Block; 4]>,
+    cold_arms: SmallVec<[Block; 4]>,
     join: Block,
     fast_edge: Inst,
-    slow_edge: Inst,
-    first_slow_safepoint: Inst,
 }
 
 impl ColdDiamond {
-    fn find(func: &Function, liveness: &LivenessAnalysis, slow: Block) -> Option<Self> {
+    fn find(func: &Function, liveness: &LivenessAnalysis, join: Block) -> Option<Self> {
         let entry = func.layout.entry_block()?;
-        if slow == entry {
+        if join == entry {
             return None;
         }
         let predecessors = |block| &liveness.predecessors[liveness.block_to_index[block] as usize];
-        let &[source_index] = predecessors(slow).as_slice() else {
-            return None;
+        let only_predecessor = |block| {
+            let &[index] = predecessors(block).as_slice() else {
+                return None;
+            };
+            Some(liveness.post_order[index as usize])
         };
-        let source = liveness.post_order[source_index as usize];
-        let branch = func.layout.last_inst(source)?;
-        if func.layout.is_cold(source) || func.dfg.insts[branch].opcode() != ir::Opcode::Brif {
+        let join_predecessors = predecessors(join);
+        let mut fast_predecessors = join_predecessors
+            .iter()
+            .map(|&index| liveness.post_order[index as usize])
+            .filter(|&block| !func.layout.is_cold(block));
+        let fast = fast_predecessors.next()?;
+        if join_predecessors.len() < 2 || fast_predecessors.next().is_some() {
             return None;
         }
-        let mut targets = func.block_successors(source);
-        let fast = targets.find(|&block| block != slow)?;
-        if func.layout.is_cold(fast) || fast == source || fast == entry {
-            return None;
-        }
-        let slow_edge = func.layout.last_inst(slow)?;
-        if func.dfg.insts[slow_edge].opcode() != ir::Opcode::Jump {
-            return None;
-        }
-        let join = func.block_successors(slow).next().unwrap();
-        if join == source || join == slow || join == entry {
-            return None;
-        }
-        let (fast_predecessor, fast_edge) = if fast == join {
-            (source, branch)
-        } else {
-            let jump = func.layout.last_inst(fast)?;
-            if predecessors(fast).as_slice() != [source_index]
-                || func.dfg.insts[jump].opcode() != ir::Opcode::Jump
-                || func.block_successors(fast).next() != Some(join)
-                || func
-                    .layout
-                    .block_insts(fast)
-                    .any(|inst| liveness.safepoint_live(inst).is_some())
+
+        // Walk from the fast exit back through the guards. Every intermediate
+        // block has one predecessor, and each guard accounts for a distinct
+        // cold edge of the join. This rules out side entries and backedges
+        // into the region below its source.
+        let mut fast_path = SmallVec::new();
+        let mut cold_arms = SmallVec::new();
+        let fast_edge = func.layout.last_inst(fast)?;
+        let (mut guard, mut target) = match func.dfg.insts[fast_edge].opcode() {
+            ir::Opcode::Brif => (fast, join),
+            ir::Opcode::Jump => {
+                fast_path.push(fast);
+                (only_predecessor(fast)?, fast)
+            }
+            _ => return None,
+        };
+        let cold_count = join_predecessors.len() - 1;
+        loop {
+            let branch = func.layout.last_inst(guard)?;
+            if guard == join
+                || func.layout.is_cold(guard)
+                || func.dfg.insts[branch].opcode() != ir::Opcode::Brif
             {
                 return None;
             }
-            (fast, jump)
-        };
-        let predecessors = predecessors(join);
-        if predecessors.len() != 2
-            || !predecessors.contains(&liveness.block_to_index[fast_predecessor])
-            || !predecessors.contains(&liveness.block_to_index[slow])
-        {
+            let mut successors = func.block_successors(guard);
+            let (first, second) = (successors.next()?, successors.next()?);
+            let slow = if first == target && second != target {
+                second
+            } else if second == target && first != target {
+                first
+            } else {
+                return None;
+            };
+            let jump = func.layout.last_inst(slow)?;
+            if slow == join
+                || slow == entry
+                || !func.layout.is_cold(slow)
+                || only_predecessor(slow)? != guard
+                || func.dfg.insts[jump].opcode() != ir::Opcode::Jump
+                || func.block_successors(slow).next() != Some(join)
+            {
+                return None;
+            }
+            cold_arms.push(slow);
+            if cold_arms.len() == cold_count {
+                break;
+            }
+            fast_path.push(guard);
+            target = guard;
+            guard = only_predecessor(guard)?;
+        }
+        if fast_path.iter().any(|&block| {
+            block == entry
+                || func
+                    .layout
+                    .block_insts(block)
+                    .any(|inst| liveness.safepoint_live(inst).is_some())
+        }) {
             return None;
         }
-        let first_slow_safepoint = func
-            .layout
-            .block_insts(slow)
-            .find(|&inst| liveness.safepoint_live(inst).is_some())?;
         Some(Self {
-            source,
-            fast,
+            source: guard,
+            fast_path,
+            cold_arms,
             join,
             fast_edge,
-            slow_edge,
-            first_slow_safepoint,
         })
     }
 }
@@ -1115,8 +1141,9 @@ pub(super) struct SafepointSpiller {
     // The current SSA value for a root, valid only in the tagged block segment.
     available: SecondaryMap<Value, (u32, PackedOption<Value>)>,
     block_insts: Vec<Inst>,
-    // Stores that can be sunk from their definition block into a cold arm.
-    sunk_spills: SecondaryMap<Value, PackedOption<Inst>>,
+    // A range in `spill_sites` for each root whose stores were sunk.
+    sunk_spills: SecondaryMap<Value, (u32, u32)>,
+    spill_sites: Vec<Inst>,
     // SSA values to use when entering blocks on the paths of a sunk spill.
     incoming: SecondaryMap<Block, Vec<(Value, Value)>>,
 
@@ -1142,6 +1169,7 @@ impl SafepointSpiller {
             available,
             block_insts,
             sunk_spills,
+            spill_sites,
             incoming,
             make_alias_region: _,
         } = self;
@@ -1150,6 +1178,7 @@ impl SafepointSpiller {
         available.clear();
         block_insts.clear();
         sunk_spills.clear();
+        spill_sites.clear();
         incoming.clear();
     }
 
@@ -1183,22 +1212,21 @@ impl SafepointSpiller {
         );
     }
 
-    /// When only a cold arm can collect while a root is live, keep it in SSA
-    /// on the fast path and spill it just before the cold arm's first call.
+    /// When only cold arms can collect while a root is live, keep it in SSA
+    /// on the fast path and spill before each cold arm's first live call.
     ///
-    /// The cold arm's only entry comes from the definition block, so every
-    /// cycle through the store also passes through the definition block. The
-    /// source has no safepoint between the definition and the branch.
-    /// When the join uses the root, it takes the original value on the fast
-    /// edge and a reload on the slow edge. The root is dead on exit from the
-    /// join, and no join safepoint can observe it: a root defined outside the
-    /// join and live at any such safepoint would also be live at the first.
-    /// The original eager-spill rules still apply outside this shape,
-    /// including exceptional terminators and joins with additional entries.
+    /// The source defines the root after its last safepoint, and every cycle
+    /// back to an arm must pass through the source. A cold arm can't define
+    /// that root, so if it lives across any arm safepoint, it also lives
+    /// across the first. A join use gets the original value on the fast edge
+    /// and a reload on each edge where a call could have moved it. The root
+    /// must die before the join's first safepoint and before the join's exit.
+    /// The eager-spill rules cover other shapes, including exceptional
+    /// terminators and joins with additional entries.
     ///
-    /// Examine each cold block once, using existing CFG and liveness data.
-    /// There is no per-root traversal. Explicit edge uses added for a join
-    /// were already live-out through that join, preserving slot allocation.
+    /// Examine each candidate join once, then use the existing liveness sets
+    /// to place stores and SSA inputs. Explicit join arguments were already
+    /// live out through the join, preserving slot allocation.
     fn prepare_sunk_spills(&mut self, func: &mut Function) {
         let liveness = &self.liveness;
         if !liveness
@@ -1211,33 +1239,38 @@ impl SafepointSpiller {
 
         // Liveness only records reachable predecessors, but an inserted join
         // parameter would need a well-typed argument on unreachable edges too.
-        let mut targets_of_unreachable_edges = EntitySet::new();
+        let mut checked_joins = EntitySet::new();
         for block in func.layout.blocks() {
             if liveness.block_to_index[block] == u32::MAX {
-                for target in func.block_successors(block) {
-                    targets_of_unreachable_edges.insert(target);
-                }
+                checked_joins.extend(func.block_successors(block));
             }
         }
 
+        let mut stores = Vec::new();
         for &slow in &liveness.post_order {
             if !func.layout.is_cold(slow) {
                 continue;
             }
+            let Some(jump) = func.layout.last_inst(slow) else {
+                continue;
+            };
+            if func.dfg.insts[jump].opcode() != ir::Opcode::Jump {
+                continue;
+            }
+            let join = func.block_successors(slow).next().unwrap();
+            if !checked_joins.insert(join) {
+                continue;
+            }
             let Some(ColdDiamond {
                 source,
-                fast,
+                fast_path,
+                cold_arms,
                 join,
                 fast_edge,
-                slow_edge,
-                first_slow_safepoint,
-            }) = ColdDiamond::find(func, liveness, slow)
+            }) = ColdDiamond::find(func, liveness, join)
             else {
                 continue;
             };
-            if targets_of_unreachable_edges.contains(join) {
-                continue;
-            }
             let last_source_safepoint = func
                 .layout
                 .block_insts(source)
@@ -1250,38 +1283,68 @@ impl SafepointSpiller {
                 .unwrap_or_default();
             let join_index = liveness.block_to_index[join] as usize;
 
-            for &root in liveness.safepoint_live(first_slow_safepoint).unwrap() {
-                let defined_after_source_safepoints = match func.dfg.value_def(root) {
-                    ir::ValueDef::Result(inst, _) => {
-                        func.layout.inst_block(inst) == Some(source)
-                            && last_source_safepoint
-                                .is_none_or(|last| !func.layout.pp_cmp(inst, last).is_lt())
-                    }
-                    ir::ValueDef::Param(block, _) => {
-                        block == source && last_source_safepoint.is_none()
-                    }
-                    ir::ValueDef::Union(..) => false,
+            stores.clear();
+            for &arm in &cold_arms {
+                let Some((safepoint, live)) = func
+                    .layout
+                    .block_insts(arm)
+                    .find_map(|inst| liveness.safepoint_live(inst).map(|live| (inst, live)))
+                else {
+                    continue;
                 };
-                if !defined_after_source_safepoints
-                    || join_safepoint_live.binary_search(&root).is_ok()
-                {
-                    continue;
+                for &root in live {
+                    let defined_after_source_safepoints = match func.dfg.value_def(root) {
+                        ir::ValueDef::Result(inst, _) => {
+                            func.layout.inst_block(inst) == Some(source)
+                                && last_source_safepoint
+                                    .is_none_or(|last| !func.layout.pp_cmp(inst, last).is_lt())
+                        }
+                        ir::ValueDef::Param(block, _) => {
+                            block == source && last_source_safepoint.is_none()
+                        }
+                        ir::ValueDef::Union(..) => false,
+                    };
+                    let index = liveness.dense.get(root).unwrap();
+                    if defined_after_source_safepoints
+                        && join_safepoint_live.binary_search(&root).is_err()
+                        && liveness.live_outs[join_index].binary_search(&index).is_err()
+                    {
+                        stores.push((root, safepoint));
+                    }
                 }
-                let index = liveness.dense.get(root).unwrap();
-                if liveness.live_outs[join_index].binary_search(&index).is_ok() {
-                    continue;
+            }
+            if stores.is_empty() {
+                continue;
+            }
+            stores.sort_unstable();
+            for &block in fast_path.iter().chain(&cold_arms) {
+                let block_index = liveness.block_to_index[block] as usize;
+                for &index in &liveness.live_ins[block_index] {
+                    let root = liveness.dense.values[index as usize];
+                    if stores.binary_search_by_key(&root, |&(root, _)| root).is_ok() {
+                        self.incoming[block].push((root, root));
+                    }
                 }
+            }
+            for sites in stores.chunk_by(|(left, _), (right, _)| left == right) {
+                let root = sites[0].0;
+                let start = u32::try_from(self.spill_sites.len()).unwrap();
+                self.spill_sites.extend(sites.iter().map(|&(_, inst)| inst));
+                let end = u32::try_from(self.spill_sites.len()).unwrap();
+                debug_assert_eq!(self.sunk_spills[root], (0, 0));
+                self.sunk_spills[root] = (start, end);
 
-                self.sunk_spills[root] = first_slow_safepoint.into();
-                self.incoming[slow].push((root, root));
-                if fast != join {
-                    self.incoming[fast].push((root, root));
-                }
+                let index = liveness.dense.get(root).unwrap();
                 if liveness.live_ins[join_index].binary_search(&index).is_ok() {
                     let ty = func.dfg.value_type(root);
                     let parameter = func.dfg.append_block_param(join, ty);
                     self.incoming[join].push((root, parameter));
-                    for edge in [fast_edge, slow_edge] {
+                    for edge_index in 0..=cold_arms.len() {
+                        let edge = if edge_index == 0 {
+                            fast_edge
+                        } else {
+                            func.layout.last_inst(cold_arms[edge_index - 1]).unwrap()
+                        };
                         let dfg = &mut func.dfg;
                         let destination = dfg.insts[edge]
                             .branch_destination_mut(&mut dfg.jump_tables, &mut dfg.exception_tables)
@@ -1300,7 +1363,7 @@ impl SafepointSpiller {
     ///
     /// The cursor points just after the definition. A local spill can be sunk
     /// as far as the first following safepoint if the root is live there, or
-    /// into a cold arm when `prepare_sunk_spills` proved the slot is unused
+    /// into cold arms when `prepare_sunk_spills` proved the slot is unused
     /// along the fast path.
     fn rewrite_def(
         &mut self,
@@ -1313,37 +1376,43 @@ impl SafepointSpiller {
         if let Some(slot) = self.stack_slots.get(val) {
             let ty = pos.func.dfg.value_type(val);
             let def_position = pos.position();
-            let spill_before = self.sunk_spills[val].expand().or_else(|| {
-                spill_before.filter(|&inst| {
-                    self.liveness
-                        .safepoint_live(inst)
-                        .unwrap()
-                        .binary_search(&val)
-                        .is_ok()
-                })
-            });
-            let mut spill = if let Some(inst) = spill_before {
-                FuncCursor::new(pos.func).at_inst(inst)
-            } else {
-                FuncCursor::new(pos.func).at_position(def_position)
-            };
-
             let mut flags = ir::MemFlagsData::trusted();
             flags.set_notrap();
             if let Some(make_alias_region) = &self.make_alias_region {
                 if let Some(region) =
-                    make_alias_region(&mut spill.func.dfg.alias_regions, ty, slot, 0)
+                    make_alias_region(&mut pos.func.dfg.alias_regions, ty, slot, 0)
                 {
                     flags.set_alias_region(Some(region));
                 }
             }
 
-            let addr = spill.ins().stack_addr(pointer_type, slot, 0);
-            let inst = spill.ins().store(flags, val, addr, 0);
-            log::trace!(
-                "rewriting:   spilling {val:?} to {slot:?}: {}",
-                spill.func.dfg.display_inst(inst)
-            );
+            let mut emit = |before| {
+                let mut spill = if let Some(inst) = before {
+                    FuncCursor::new(pos.func).at_inst(inst)
+                } else {
+                    FuncCursor::new(pos.func).at_position(def_position)
+                };
+                let addr = spill.ins().stack_addr(pointer_type, slot, 0);
+                let inst = spill.ins().store(flags, val, addr, 0);
+                log::trace!(
+                    "rewriting:   spilling {val:?} to {slot:?}: {}",
+                    spill.func.dfg.display_inst(inst)
+                );
+            };
+            let (start, end) = self.sunk_spills[val];
+            if start == end {
+                emit(spill_before.filter(|&inst| {
+                    self.liveness
+                        .safepoint_live(inst)
+                        .unwrap()
+                        .binary_search(&val)
+                        .is_ok()
+                }));
+            } else {
+                for &site in &self.spill_sites[start as usize..end as usize] {
+                    emit(Some(site));
+                }
+            }
 
             // Now that we've defined this value, there cannot be any more uses
             // of it, and therefore this stack slot is now available for reuse.
@@ -3969,6 +4038,140 @@ block10:
                 );
             }
         }
+    }
+
+    #[test]
+    fn cascaded_cold_guards_spill_each_root_only_where_it_is_live() {
+        use ir::types::I32;
+
+        let mut sig = Signature::new(CallConv::SystemV);
+        sig.params.extend([AbiParam::new(I32), AbiParam::new(I32)]);
+        sig.returns.push(AbiParam::new(I32));
+        let mut func =
+            Function::with_name_signature(ir::UserFuncName::testcase("cold_guards"), sig);
+        let mut context = FunctionBuilderContext::new();
+        let mut builder = FunctionBuilder::new(&mut func, &mut context);
+        let source = builder.create_block();
+        let second_guard = builder.create_block();
+        let third_guard = builder.create_block();
+        let first_slow = builder.create_block();
+        let second_slow = builder.create_block();
+        let no_call = builder.create_block();
+        let join = builder.create_block();
+        let callee = import_func(&mut builder, [I32], []);
+        builder.append_block_params_for_function_params(source);
+        let &[common, first_only] = builder.block_params(source) else {
+            unreachable!()
+        };
+        builder.declare_value_needs_stack_map(common);
+        builder.declare_value_needs_stack_map(first_only);
+        builder.switch_to_block(source);
+        let condition = builder.ins().icmp_imm(IntCC::Equal, common, 1);
+        builder.ins().brif(condition, first_slow, &[], second_guard, &[]);
+
+        builder.switch_to_block(second_guard);
+        let condition = builder.ins().icmp_imm(IntCC::NotEqual, common, 2);
+        builder.ins().brif(condition, third_guard, &[], second_slow, &[]);
+
+        builder.switch_to_block(third_guard);
+        let condition = builder.ins().icmp_imm(IntCC::Equal, common, 3);
+        let fast_branch = builder.ins().brif(condition, no_call, &[], join, &[]);
+
+        builder.switch_to_block(first_slow);
+        builder.set_cold_block(first_slow);
+        let trap = builder.ins().trapz(common, ir::TrapCode::unwrap_user(1));
+        let first_call = builder.ins().call(callee, &[common]);
+        let after_first = builder.ins().call(callee, &[first_only]);
+        let first_jump = builder.ins().jump(join, &[]);
+
+        builder.switch_to_block(second_slow);
+        builder.set_cold_block(second_slow);
+        // Call operands alone need no stack-map entry in the caller.
+        let second_call = builder.ins().call(callee, &[first_only]);
+        let second_jump = builder.ins().jump(join, &[]);
+
+        builder.switch_to_block(no_call);
+        builder.set_cold_block(no_call);
+        let no_call_jump = builder.ins().jump(join, &[]);
+
+        builder.switch_to_block(join);
+        let ret = builder.ins().return_(&[common]);
+        builder.seal_all_blocks();
+        builder.finalize(systemv_frontend_config());
+
+        let flags =
+            cranelift_codegen::settings::Flags::new(cranelift_codegen::settings::builder());
+        if let Err(errors) = cranelift_codegen::verifier::verify_function(&func, &flags) {
+            panic!("{errors}\n{}", func.display());
+        }
+        let dfg = &func.dfg;
+        let [common_entry, first_only_entry] = dfg.user_stack_map_entries(first_call).unwrap()
+        else {
+            panic!("expected both roots at the first call");
+        };
+        for call in [after_first, second_call] {
+            assert_eq!(
+                dfg.user_stack_map_entries(call),
+                Some(core::slice::from_ref(common_entry))
+            );
+        }
+        assert_ne!(common_entry.slot, first_only_entry.slot);
+        assert_eq!(dfg.inst_args(trap), &[common]);
+        assert_eq!(dfg.inst_args(second_call), &[first_only]);
+
+        let slot_of = |address| dfg.insts[dfg.value_def(address).unwrap_inst()].stack_slot();
+        for block in func.layout.blocks() {
+            let roots: Vec<_> = func
+                .layout
+                .block_insts(block)
+                .filter(|&inst| dfg.insts[inst].opcode() == ir::Opcode::Store)
+                .map(|store| {
+                    let &[value, address] = dfg.inst_args(store) else {
+                        unreachable!()
+                    };
+                    if block == first_slow {
+                        assert!(func.layout.pp_cmp(trap, store).is_lt());
+                        assert!(func.layout.pp_cmp(store, first_call).is_lt());
+                    }
+                    (value, slot_of(address).unwrap())
+                })
+                .collect();
+            if block == first_slow {
+                assert_eq!(roots.len(), 2);
+                assert!(roots.contains(&(common, common_entry.slot)));
+                assert!(roots.contains(&(first_only, first_only_entry.slot)));
+            } else if block == second_slow {
+                assert_eq!(roots, [(common, common_entry.slot)]);
+            } else {
+                assert!(roots.is_empty());
+            }
+        }
+
+        let joined_argument = |edge: Inst| {
+            dfg.insts[edge]
+                .branch_destination(&dfg.jump_tables, &dfg.exception_tables)
+                .iter()
+                .find(|target| target.block(&dfg.value_lists) == join)
+                .unwrap()
+                .args(&dfg.value_lists)
+                .next()
+                .unwrap()
+                .as_value()
+                .unwrap()
+        };
+        assert_eq!(joined_argument(fast_branch), common);
+        assert_eq!(joined_argument(no_call_jump), common);
+        for (block, edge, call) in [
+            (first_slow, first_jump, after_first),
+            (second_slow, second_jump, second_call),
+        ] {
+            let reload = dfg.value_def(joined_argument(edge)).unwrap_inst();
+            assert_eq!(func.layout.inst_block(reload), Some(block));
+            assert!(func.layout.pp_cmp(call, reload).is_lt());
+            assert_eq!(dfg.insts[reload].opcode(), ir::Opcode::Load);
+            assert_eq!(slot_of(dfg.inst_args(reload)[0]), Some(common_entry.slot));
+        }
+        assert_eq!(dfg.inst_args(ret), dfg.block_params(join));
     }
 
     #[test]

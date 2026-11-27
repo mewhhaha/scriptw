@@ -20,6 +20,100 @@
 //! answering those cases first changes no order.
 use super::*;
 use crate::gc_types::{ArrayObject, JavaScriptObject};
+use crate::intrinsics::{IntrinsicKey, IntrinsicPropertyLayoutId};
+
+impl RuntimeSchema {
+    /// Dynamic source operands are already evaluated. A concrete ordinary
+    /// object and String need no coercion or observation before own lookup.
+    pub(crate) fn emit_hinted_compact_own_key_from_values_or_branch(
+        &self,
+        target: &ValueLocals,
+        key: &ValueLocals,
+        miss: crate::LabelDepth,
+        f: &mut Function,
+    ) {
+        key.tag().load(f);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String.tag()));
+        f.instruction(&Instruction::I32Ne);
+        f.branch_if_to_label(miss);
+        let key = self.reserve_non_null_gc_local(f).initialize(
+            key.sealed_reference_or_branch::<StringValue>(self, miss, f),
+            f,
+        );
+        let object = self.reserve_non_null_gc_local(f).initialize(
+            target.sealed_reference_or_branch::<OrdinaryObject>(self, miss, f),
+            f,
+        );
+        self.emit_hinted_compact_own_key_or_branch(&object, &key, miss, f);
+        object.clear(f);
+        key.clear(f);
+    }
+
+    pub(crate) fn emit_hinted_compact_own_key_or_branch(
+        &self,
+        object: &GcLocal<OrdinaryObject>,
+        key: &GcLocal<StringValue>,
+        miss: crate::LabelDepth,
+        f: &mut Function,
+    ) {
+        let base = self.reserve_non_null_gc_local(f).initialize(
+            self.field(OrdinaryObjectSchema::PROPERTIES)
+                .read(object, self, f)
+                .reference(),
+            f,
+        );
+        let storage = self
+            .reserve_non_null_gc_local(f)
+            .initialize(self.emit_compact_storage_or_branch(&base, miss, f), f);
+        base.clear(f);
+        let index = self.reserve_i32_local(f);
+        self.emit_hinted_compact_index_or_branch(&storage, key, index, miss, f);
+        self.release_i32_local(index, f);
+        storage.clear(f);
+    }
+
+    /// The String's mutable ordinal is a hint. Bounds and exact reference
+    /// equality prove which immutable key occupies that slot in live storage.
+    /// A stale hint or an equal String with another identity is a miss.
+    pub(super) fn emit_hinted_compact_index_or_branch(
+        &self,
+        storage: &GcLocal<CompactDataStorage>,
+        key: &GcLocal<StringValue>,
+        index: I32Local,
+        miss: crate::LabelDepth,
+        f: &mut Function,
+    ) {
+        self.field(StringValueSchema::ENTRY_HINT)
+            .read(key, self, f)
+            .store(index, f);
+        index.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32LtS);
+        f.branch_if_to_label(miss);
+        let shape = self
+            .field(CompactDataStorageSchema::SHAPE)
+            .read(storage, self, f)
+            .reference();
+        let keys = self.reserve_non_null_gc_local(f).initialize(
+            self.field(CompactDataShapeSchema::KEYS)
+                .read_top(shape, f)
+                .reference(),
+            f,
+        );
+        index.load(f);
+        self.array_type::<CompactShapeKeys>().length(&keys, self, f);
+        f.instruction(&Instruction::I32GeU);
+        f.branch_if_to_label(miss);
+        self.array_type::<CompactShapeKeys>()
+            .read(&keys, index, self, f)
+            .reference();
+        key.load(self, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32Eqz);
+        f.branch_if_to_label(miss);
+        keys.clear(f);
+    }
+}
 
 impl FunctionBuilder<'_> {
     pub(crate) fn compile_computed_property_write_helper(&mut self) -> Result<Function, EmitError> {
@@ -229,7 +323,7 @@ impl FunctionBuilder<'_> {
             .read(&object, s, f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(general, f);
-        self.emit_computed_chain_absence_or_branch(&object, &name, hash, general, f);
+        self.emit_computed_chain_absence_or_branch(&object, &name, hash, general, f)?;
         let define = self.open_frame(ControlFrameKind::Block, f);
         let next = s.reserve_gc_local(f).initialize(
             child.non_null_or_branch(self.local_branch_label(define), f),
@@ -370,8 +464,22 @@ impl FunctionBuilder<'_> {
         hash: I64Local,
         general: crate::emit::ControlTarget,
         f: &mut Function,
-    ) {
+    ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
+        // Derive the filter from the same validated rows used to publish
+        // %Object.prototype%. A hash bucket with no row proves absence,
+        // while collisions still go through the complete chain check.
+        let layout = IntrinsicPropertyLayoutId::ObjectPrototype.layout()?;
+        let mut name_buckets = 0u64;
+        for property in layout.properties() {
+            if let IntrinsicKey::Name(name) = property.key {
+                if !name.is_ascii() {
+                    name_buckets = u64::MAX;
+                    break;
+                }
+                name_buckets |= 1 << ((super::chain::raw_ascii_hash(name) as u64) >> 58);
+            }
+        }
         let prototype = s
             .reserve_gc_local::<JavaScriptObject, Nullable>(f)
             .initialize(
@@ -380,9 +488,24 @@ impl FunctionBuilder<'_> {
                     .reference(),
                 f,
             );
+        let absent = self.open_frame(ControlFrameKind::Block, f);
         prototype.load(s, f).is_null(f);
+        self.emit_branch_if_to_target(absent, f);
+        let walk = self.open_frame(ControlFrameKind::Block, f);
+        f.instruction(&Instruction::I64Const(1));
+        hash.load(f);
+        f.instruction(&Instruction::I64Const(58));
+        f.instruction(&Instruction::I64ShrU);
+        f.instruction(&Instruction::I64Rotl);
+        f.instruction(&Instruction::I64Const(name_buckets as i64));
+        f.instruction(&Instruction::I64And);
+        f.instruction(&Instruction::I64Eqz);
         f.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, f);
+        self.emit_branch_if_to_target(walk, f);
+        self.emit_unchanged_object_prototype_or_branch(&prototype, walk, f);
+        self.emit_branch_to_target(absent, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         let named = s.reserve_i32_local(f);
         let first = self.open_reference_block(s, f);
         let classify = self.open_frame(ControlFrameKind::Block, f);
@@ -427,8 +550,9 @@ impl FunctionBuilder<'_> {
         scratch.clear(f);
         first.clear(f);
         s.release_i32_local(named, f);
-        self.pop_control(ControlFrameKind::If);
+        self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         prototype.clear(f);
+        Ok(())
     }
 }

@@ -211,7 +211,9 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 95 includes the Wave 8A layout changes and replaces eager global
 // builtin publication with immutable rows, sparse original entries and an
 // append dictionary. Rooted snapshots gain a typed global-row projection.
-const LAYOUT_VERSION: u32 = 95;
+// ABI 96 invalidates older artifacts after the Wave 9 property, for-in, and
+// packed array emission changes.
+const LAYOUT_VERSION: u32 = 96;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

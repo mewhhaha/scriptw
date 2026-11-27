@@ -1,50 +1,22 @@
-//! The hot entry of SerializeJSONProperty for a plain context.
+//! SerializeJSONProperty for calls with no replacer function, no property
+//! list and an empty gap. Values arrive after their member Get.
 //!
-//! A JSON.stringify call is in a plain context when it has no replacer
-//! function, no property list and an empty gap; the entry decides this once
-//! and every value of the call then enters here, already fetched (no holder
-//! is observable without a replacer function). Only two kinds of value are
-//! serialized in this body:
+//! Packed Arrays and ordered compact ordinary objects can share a live
+//! cursor and a bounded active path when their own storage and Realm
+//! protectors prove that "toJSON" is absent. The continuation preserves the
+//! original Array length or object keys and the current member across a Get
+//! or general serialization. A separate call-free prototype walk admits
+//! other Array and ordinary object layouts.
 //!
-//! - an actual Array (`ArrayObject`), whose `IsArray` is true and whose
-//!   "length" is its own data property;
-//! - an actual ordinary object (`OrdinaryObject`), which is neither callable,
-//!   nor an Array, nor a Proxy, a primitive wrapper or a raw JSON object;
-//!
-//! and only when the call-free chain walk proves, before anything else is
-//! observed, that the value and every object on its prototype chain lack
-//! "toJSON". That walk reads each object's live storage and runs nothing,
-//! so its answer is exactly what Get(value, "toJSON") would return
-//! (undefined), and steps 2 to 4 of SerializeJSONProperty have no effect:
-//! no toJSON call, no replacer, no unboxing. The intrinsic prototypes are
-//! walked like any other object; a protector that answers for an unchanged
-//! %Object.prototype% / %Array.prototype% can replace the walk's last hops
-//! at `emit_json_plain_to_json_absent_or_branch` without changing anything
-//! else here.
-//!
-//! Every other value (a primitive root, a value with "toJSON" anywhere on
-//! its chain or a chain the walk cannot prove, a Proxy, a wrapper, a
-//! BigInt, a raw JSON object, a function, any exotic object) is handed
-//! whole, by a tail call and before anything is observed, to the general
-//! helper, which performs every step itself and hands its own members back
-//! here. Member Gets, getter calls, enumeration order, the cycle TypeError
-//! and every exception are the general walk's: this body is that walk with
-//! the replacer, property-list and gap cases removed.
+//! A value declined before traversal goes whole to the general helper by
+//! tail call. Once traversal begins, only the current member can enter the
+//! general helper. Member order, abrupt completions and the ancestor cycle
+//! check use the same rules throughout.
 use super::*;
 use crate::objects::{ChainAnswer, ChainKey};
 use crate::runtime_helpers::{JsonStringifyPlainValueArguments, JsonStringifyPlainValueParameters};
 
-#[derive(Clone, Copy)]
-enum JsonPlainObjectContext<'a> {
-    Root {
-        realm: &'a GcLocal<RealmRecord>,
-        accumulator: &'a GcLocal<StringAccumulator>,
-    },
-    Nested {
-        context: &'a GcLocal<JsonStringifyContext>,
-        indent: I64Local,
-    },
-}
+mod traversal;
 
 impl FunctionBuilder<'_> {
     /// Whether this JSON.stringify call is in a plain context: the replacer
@@ -128,6 +100,19 @@ impl FunctionBuilder<'_> {
         let s = self.runtime_schema();
         let general = self.open_frame(ControlFrameKind::Block, &mut f);
         self.rarely_taken(general, &mut f);
+        let serialized = self.open_frame(ControlFrameKind::Block, &mut f);
+        let fallback = self.open_frame(ControlFrameKind::Block, &mut f);
+        self.rarely_taken(fallback, &mut f);
+        self.emit_json_plain_traversal_or_branch(
+            &parameters.value,
+            &parameters.context,
+            parameters.indent,
+            fallback,
+            &mut f,
+        )?;
+        self.emit_branch_to_target(serialized, &mut f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         self.emit_json_plain_container_or_branch(
             &parameters.value,
             &parameters.context,
@@ -135,6 +120,8 @@ impl FunctionBuilder<'_> {
             general,
             &mut f,
         )?;
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         let appended = s.reserve_value_local(&mut f);
         appended.set_scalar(ScalarValue::Boolean(true), &mut f);
         self.completion().set_normal(&appended, &mut f);
@@ -232,13 +219,7 @@ impl FunctionBuilder<'_> {
         self.emit_json_plain_array_elements(value, &array, context, indent, f)?;
         array.clear(f);
         f.instruction(&Instruction::Else);
-        self.emit_json_plain_object_members(
-            value,
-            &header,
-            &captured_compact,
-            JsonPlainObjectContext::Nested { context, indent },
-            f,
-        )?;
+        self.emit_json_plain_object_members(value, &header, &captured_compact, context, indent, f)?;
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         captured_compact.clear(f);
@@ -495,10 +476,9 @@ impl FunctionBuilder<'_> {
         found.load(f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
-        let text = s.reserve_gc_local(f).initialize(
-            self.emit_number_to_string_payload(key_value.scalar(), f)?,
-            f,
-        );
+        let text = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_json_index_string(key_value.scalar(), f)?, f);
         self.emit_json_get(value, &text, &entry, f)?;
         text.clear(f);
         self.pop_control(ControlFrameKind::If);
@@ -536,16 +516,18 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    /// A compact root with call-free members needs no cycle stack. A nested
-    /// serializer receives the root as the first enclosing container.
+    /// Small scalar-only roots can finish without a context or active path.
+    /// Every member read here is from proved compact data storage, so an
+    /// opaque member can discard the speculative output and enter the
+    /// shared traversal before the root has made any observable reads.
     pub(super) fn emit_json_compact_root_or_branch(
         &mut self,
         value: &ValueLocals,
-        realm: &GcLocal<RealmRecord>,
         accumulator: &GcLocal<StringAccumulator>,
         general: ControlTarget,
         f: &mut Function,
     ) -> Result<(), EmitError> {
+        const SCALAR_ROOT_MAX_MEMBERS: i32 = 4;
         let s = self.runtime_schema();
         let header = s.reserve_gc_local(f).initialize(
             value.sealed_reference_or_branch::<OrdinaryObject>(
@@ -559,17 +541,88 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local::<CompactDataStorage, Nullable>(f)
             .initialize_null(s, f);
         self.emit_json_plain_to_json_absent_or_branch(&header, &captured, general, f)?;
-        captured.load(s, f).is_null(f);
-        self.emit_branch_if_to_target(general, f);
-        self.emit_json_plain_object_members(
-            value,
-            &header,
-            &captured,
-            JsonPlainObjectContext::Root { realm, accumulator },
+        let storage = s.reserve_gc_local(f).initialize(
+            captured.non_null_or_branch(self.local_branch_label(general), f),
             f,
-        )?;
+        );
         captured.clear(f);
+        let keys = self.emit_compact_shape_keys(&storage, f);
+        let count = s.reserve_i32_local(f);
+        s.array_type::<CompactShapeKeys>().length(&keys, s, f);
+        count.store(f);
+        count.load(f);
+        f.instruction(&Instruction::I32Const(SCALAR_ROOT_MAX_MEMBERS));
+        f.instruction(&Instruction::I32GtU);
+        self.emit_branch_if_to_target(general, f);
+
+        let output = StringAccumulatorCursor::open(accumulator, s, f);
+        let mark = s.reserve_i32_local(f);
+        output.length().load(f);
+        mark.store(f);
+        output.push_literal(accumulator, "{", s, f);
+        let member = s.reserve_value_local(f);
+        let index = s.reserve_i32_local(f);
+        let emitted = s.reserve_i32_local(f);
+        index.set_constant(0, f);
+        emitted.set_constant(0, f);
+        let finished = self.open_frame(ControlFrameKind::Block, f);
+        let next = self.open_frame(ControlFrameKind::Loop, f);
+        index.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32Eq);
+        self.emit_branch_if_to_target(finished, f);
+        self.emit_plain_data_header_value_or_branch(&header, &storage, index, &member, finished, f);
+        let omit = self.open_frame(ControlFrameKind::Block, f);
+        self.emit_json_tag_test(&member, WasmRuntimeValueTag::Undefined, f);
+        self.emit_json_tag_test(&member, WasmRuntimeValueTag::Symbol, f);
+        f.instruction(&Instruction::I32Or);
+        self.emit_branch_if_to_target(omit, f);
+        self.emit_json_serializable_primitive_i32(&member, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(finished, f);
+        let key = s.reserve_gc_local(f).initialize(
+            s.array_type::<CompactShapeKeys>()
+                .read(&keys, index, s, f)
+                .reference(),
+            f,
+        );
+        self.emit_json_quote_into_cursor(accumulator, &output, &key, Some(emitted), f);
+        key.clear(f);
+        self.emit_json_serialize_primitive_into_cursor(&member, accumulator, &output, f)?;
+        emitted.set_constant(1, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        Self::emit_json_advance_member(index, f);
+        self.emit_branch_to_target(next, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+
+        let complete = s.reserve_i32_local(f);
+        index.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32Eq);
+        complete.store(f);
+        complete.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        output.push_literal(accumulator, "}", s, f);
+        f.instruction(&Instruction::Else);
+        output.truncate(mark, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        output.close(accumulator, s, f);
+        member.clear(f);
+        keys.clear(f);
+        storage.clear(f);
         header.clear(f);
+        for local in [mark, index, emitted, count] {
+            s.release_i32_local(local, f);
+        }
+        complete.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(general, f);
+        s.release_i32_local(complete, f);
         Ok(())
     }
 
@@ -765,18 +818,15 @@ impl FunctionBuilder<'_> {
         value: &ValueLocals,
         header: &GcLocal<OrdinaryObject>,
         captured: &GcLocal<CompactDataStorage, Nullable>,
-        context: JsonPlainObjectContext<'_>,
+        context: &GcLocal<JsonStringifyContext>,
+        indent: I64Local,
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
         let accumulator = s.reserve_gc_local(f).initialize(
-            match context {
-                JsonPlainObjectContext::Root { accumulator, .. } => accumulator.load(s, f),
-                JsonPlainObjectContext::Nested { context, .. } => s
-                    .field(JsonStringifyContextSchema::OUTPUT)
-                    .read(context, s, f)
-                    .reference(),
-            },
+            s.field(JsonStringifyContextSchema::OUTPUT)
+                .read(context, s, f)
+                .reference(),
             f,
         );
         self.emit_json_append_literal(&accumulator, "{", f);
@@ -790,24 +840,21 @@ impl FunctionBuilder<'_> {
         let plain = s
             .reserve_gc_local::<CompactDataStorage, Nullable>(f)
             .initialize(captured.load(s, f), f);
-        let needs_snapshot = matches!(context, JsonPlainObjectContext::Nested { .. });
-        if needs_snapshot {
-            // A slow toJSON proof might leave an ordinary object without
-            // its compact enumeration proof.
-            plain.load(s, f).is_null(f);
-            self.open_frame(ControlFrameKind::If, f);
-            let probed = self.emit_plain_data_object_storage(value, f);
-            plain.replace(probed.load(s, f), f);
-            probed.clear(f);
-            self.pop_control(ControlFrameKind::If);
-            f.instruction(&Instruction::End);
-            plain.load(s, f).is_null(f);
-            self.open_frame(ControlFrameKind::If, f);
-            let snapshot = self.emit_json_enumerable_key_table(value, count, f)?;
-            keys.replace(snapshot.load(s, f).nullable(), f);
-            snapshot.clear(f);
-            f.instruction(&Instruction::Else);
-        }
+        // A slow toJSON proof might leave an ordinary object without
+        // its compact enumeration proof.
+        plain.load(s, f).is_null(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let probed = self.emit_plain_data_object_storage(value, f);
+        plain.replace(probed.load(s, f), f);
+        probed.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        plain.load(s, f).is_null(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let snapshot = self.emit_json_enumerable_key_table(value, count, f)?;
+        keys.replace(snapshot.load(s, f).nullable(), f);
+        snapshot.clear(f);
+        f.instruction(&Instruction::Else);
         let storage = s
             .reserve_gc_local(f)
             .initialize(plain.load(s, f).require_non_null(f), f);
@@ -817,28 +864,14 @@ impl FunctionBuilder<'_> {
         plain_keys.replace(shape_keys.load(s, f).nullable(), f);
         shape_keys.clear(f);
         storage.clear(f);
-        if needs_snapshot {
-            self.pop_control(ControlFrameKind::If);
-            f.instruction(&Instruction::End);
-        }
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
 
         let child_depth = s.reserve_i64_local(f);
-        if let JsonPlainObjectContext::Nested { indent, .. } = context {
-            indent.load(f);
-            f.instruction(&Instruction::I64Const(1));
-            f.instruction(&Instruction::I64Add);
-            child_depth.store(f);
-        } else {
-            child_depth.set_constant(1, f);
-        }
-        let root_context = if let JsonPlainObjectContext::Root { .. } = context {
-            Some(
-                s.reserve_gc_local::<JsonStringifyContext, Nullable>(f)
-                    .initialize_null(s, f),
-            )
-        } else {
-            None
-        };
+        indent.load(f);
+        f.instruction(&Instruction::I64Const(1));
+        f.instruction(&Instruction::I64Add);
+        child_depth.store(f);
         let item = s.reserve_i32_local(f);
         let emitted = s.reserve_i32_local(f);
         let mark = s.reserve_i32_local(f);
@@ -857,11 +890,9 @@ impl FunctionBuilder<'_> {
         count.load(f);
         f.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(interrupted, f);
-        if needs_snapshot {
-            plain_keys.load(s, f).is_null(f);
-            f.instruction(&Instruction::I32Eqz);
-            self.open_frame(ControlFrameKind::If, f);
-        }
+        plain_keys.load(s, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
         let shape_keys = s
             .reserve_gc_local(f)
             .initialize(plain_keys.load(s, f).require_non_null(f), f);
@@ -874,30 +905,26 @@ impl FunctionBuilder<'_> {
         key_value.set_reference(&name, s, f);
         name.clear(f);
         shape_keys.clear(f);
-        if needs_snapshot {
-            f.instruction(&Instruction::Else);
-            let table = s
-                .reserve_gc_local(f)
-                .initialize(keys.load(s, f).require_non_null(f), f);
-            let stored = s.reserve_gc_local(f).initialize(
-                s.array_type::<PropertyKeyTable>()
-                    .read(&table, item, s, f)
-                    .reference(),
-                f,
-            );
-            s.struct_type::<StoredValue>()
-                .read_into(&stored, &key_value, s, f);
-            stored.clear(f);
-            table.clear(f);
-            self.pop_control(ControlFrameKind::If);
-            f.instruction(&Instruction::End);
-        }
+        f.instruction(&Instruction::Else);
+        let table = s
+            .reserve_gc_local(f)
+            .initialize(keys.load(s, f).require_non_null(f), f);
+        let stored = s.reserve_gc_local(f).initialize(
+            s.array_type::<PropertyKeyTable>()
+                .read(&table, item, s, f)
+                .reference(),
+            f,
+        );
+        s.struct_type::<StoredValue>()
+            .read_into(&stored, &key_value, s, f);
+        stored.clear(f);
+        table.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         let got = self.open_frame(ControlFrameKind::Block, f);
         let changed = self.open_frame(ControlFrameKind::Block, f);
-        if needs_snapshot {
-            plain.load(s, f).is_null(f);
-            self.emit_branch_if_to_target(changed, f);
-        }
+        plain.load(s, f).is_null(f);
+        self.emit_branch_if_to_target(changed, f);
         let storage = s
             .reserve_gc_local(f)
             .initialize(plain.load(s, f).require_non_null(f), f);
@@ -950,50 +977,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(done, f);
 
-        match context {
-            JsonPlainObjectContext::Root { realm, .. } => {
-                let cached = root_context
-                    .as_ref()
-                    .expect("the root can allocate its context");
-                cached.load(s, f).is_null(f);
-                self.open_frame(ControlFrameKind::If, f);
-                let gap = self.emit_json_string("", f)?;
-                let created = self.emit_json_default_stringify_context(
-                    realm,
-                    &gap,
-                    &accumulator,
-                    Some(value),
-                    f,
-                );
-                cached.replace(created.load(s, f).nullable(), f);
-                created.clear(f);
-                gap.clear(f);
-                self.pop_control(ControlFrameKind::If);
-                f.instruction(&Instruction::End);
-                let active = s
-                    .reserve_gc_local(f)
-                    .initialize(cached.load(s, f).require_non_null(f), f);
-                self.emit_json_stringify_plain_call(
-                    &entry,
-                    &key_value,
-                    &active,
-                    child_depth,
-                    &result,
-                    f,
-                )?;
-                active.clear(f);
-            }
-            JsonPlainObjectContext::Nested { context, .. } => {
-                self.emit_json_stringify_plain_call(
-                    &entry,
-                    &key_value,
-                    context,
-                    child_depth,
-                    &result,
-                    f,
-                )?;
-            }
-        }
+        self.emit_json_stringify_plain_call(&entry, &key_value, context, child_depth, &result, f)?;
         self.emit_json_tag_test(&result, WasmRuntimeValueTag::Undefined, f);
         self.open_frame(ControlFrameKind::If, f);
         let output = StringAccumulatorCursor::open(&accumulator, s, f);
@@ -1013,9 +997,6 @@ impl FunctionBuilder<'_> {
         result.clear(f);
         entry.clear(f);
         key_value.clear(f);
-        if let Some(cached) = root_context {
-            cached.clear(f);
-        }
         s.release_i32_local(primitive, f);
         s.release_i32_local(mark, f);
         s.release_i32_local(emitted, f);

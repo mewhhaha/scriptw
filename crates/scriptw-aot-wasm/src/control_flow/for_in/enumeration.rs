@@ -1,10 +1,54 @@
 //! The sole native ForIn creation/advance algorithm, shared by eager and resumable consumers.
 
+use super::compact::LocalCompactForInCursor;
 use super::*;
 use crate::gc_types::{ForInEnumerationRecord, ForInEnumerationRecordSchema, SetObject};
 use crate::runtime_helpers::{
     ForInAdvanceArguments, ForInAdvanceParameters, HelperParameters, RuntimeHelperId,
 };
+
+/// An eager loop owns the cursor locals for its entire lifetime. Resumable
+/// consumers publish the record before their first advance and later pass
+/// that retained record back directly.
+pub(crate) struct LocalForInEnumerator<'schema> {
+    schema: &'schema RuntimeSchema,
+    record: GcLocal<ForInEnumerationRecord>,
+    compact: Option<LocalCompactForInCursor>,
+}
+
+impl LocalForInEnumerator<'_> {
+    pub(crate) fn clear(self, function: &mut Function) {
+        if let Some(compact) = self.compact {
+            compact.clear(self.schema, function);
+        }
+        self.record.clear(function);
+    }
+}
+
+impl std::ops::Deref for LocalForInEnumerator<'_> {
+    type Target = GcLocal<ForInEnumerationRecord>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.record
+    }
+}
+
+pub(crate) enum ForInEnumeratorRef<'a, 'schema> {
+    Local(&'a LocalForInEnumerator<'schema>),
+    Retained(&'a GcLocal<ForInEnumerationRecord>),
+}
+
+impl<'a, 'schema> From<&'a LocalForInEnumerator<'schema>> for ForInEnumeratorRef<'a, 'schema> {
+    fn from(cursor: &'a LocalForInEnumerator<'schema>) -> Self {
+        Self::Local(cursor)
+    }
+}
+
+impl<'a> From<&'a GcLocal<ForInEnumerationRecord>> for ForInEnumeratorRef<'a, '_> {
+    fn from(record: &'a GcLocal<ForInEnumerationRecord>) -> Self {
+        Self::Retained(record)
+    }
+}
 
 /// Only String keys enter this private, unpublished canonical Set. Its identity
 /// stays rooted in the cursor while the collection owner grows its storage.
@@ -59,14 +103,14 @@ impl ForInVisitedKeys {
     }
 }
 
-impl FunctionBuilder<'_> {
+impl<'schema> FunctionBuilder<'schema> {
     /// Box a nonnull source once; nullish sources publish a completed cursor.
     /// No prototype-level OwnPropertyKeys observation occurs during creation.
     pub(crate) fn emit_create_for_in_enumerator(
         &mut self,
         source: &ValueLocals,
         function: &mut Function,
-    ) -> Result<GcLocal<ForInEnumerationRecord>, EmitError> {
+    ) -> Result<LocalForInEnumerator<'schema>, EmitError> {
         let schema = self.runtime_schema();
         let current = schema.reserve_value_local(function);
         current.set_scalar(ScalarValue::Null, function);
@@ -101,20 +145,45 @@ impl FunctionBuilder<'_> {
             ),
             function,
         );
+        let compact = self.emit_prepare_local_compact_for_in(&current, function)?;
         stored.clear(function);
         current.clear(function);
-        Ok(record)
+        Ok(LocalForInEnumerator {
+            schema,
+            record,
+            compact,
+        })
     }
 
-    /// Source consumers retain their StatementList completion while R advances
-    /// the cursor. Only an abrupt result replaces the caller's completion.
-    pub(crate) fn emit_advance_for_in_enumerator(
+    /// Advance in P while its borrowed shape remains valid, otherwise in R.
+    /// Only an abrupt result replaces the caller's StatementList completion.
+    pub(crate) fn emit_advance_for_in_enumerator<'a>(
         &mut self,
-        record: &GcLocal<ForInEnumerationRecord>,
+        cursor: impl Into<ForInEnumeratorRef<'a, 'schema>>,
         output: &CompletionLocals,
         function: &mut Function,
-    ) -> Result<(), EmitError> {
+    ) -> Result<(), EmitError>
+    where
+        'schema: 'a,
+    {
         let schema = self.runtime_schema();
+        let (record, local_done) = match cursor.into() {
+            ForInEnumeratorRef::Local(cursor) => {
+                let done = cursor.compact.as_ref().map(|compact| {
+                    let done = self.open_frame(ControlFrameKind::Block, function);
+                    self.emit_advance_local_compact_for_in(
+                        &cursor.record,
+                        compact,
+                        output,
+                        done,
+                        function,
+                    );
+                    done
+                });
+                (&cursor.record, done)
+            }
+            ForInEnumeratorRef::Retained(record) => (record, None),
+        };
         let realm = self.emit_execution_realm(function);
         schema
             .call_helper(
@@ -137,6 +206,10 @@ impl FunctionBuilder<'_> {
         self.emit_propagate_current_throw(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
+        if local_done.is_some() {
+            self.pop_control(ControlFrameKind::Block);
+            function.instruction(&Instruction::End);
+        }
         Ok(())
     }
 

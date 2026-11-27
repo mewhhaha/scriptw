@@ -90,8 +90,7 @@ fn expose_ephemeron_value(gc: &mut GcStore, value: Option<VMGcRef>) -> Result<u3
     let Some(value) = value else {
         return Ok(0);
     };
-    let value = gc.clone_gc_ref(&value);
-    Ok(gc.expose_gc_ref_to_wasm(value)?.get())
+    Ok(gc.expose_borrowed_gc_ref_to_wasm(&value)?.get())
 }
 
 /// A weak target whose entry is retired when its owner dies.
@@ -432,14 +431,12 @@ impl RawGcEphemerons<'_> {
         let Some(gc) = self.gc.as_deref_mut() else {
             return Ok(None);
         };
-        let Some(edge) = gc.weak_gc.live(entry.handle.slot) else {
+        let Some(value) = gc
+            .weak_gc
+            .live(entry.handle.slot)
+            .and_then(|edge| edge.ephemeron_value_if_matches_raw(owner, key))
+        else {
             return Ok(None);
-        };
-        if !edge.matches_ephemeron_raw(owner, key) {
-            return Ok(None);
-        }
-        let WeakGcEdge::Ephemeron { value, .. } = edge else {
-            unreachable!("matched edge is an ephemeron")
         };
         let value = value.as_ref().map(VMGcRef::unchecked_copy);
         Ok(Some(expose_ephemeron_value(gc, value)?))

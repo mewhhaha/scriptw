@@ -24,13 +24,23 @@ impl WeakGcEdge {
     /// Only compares identities. Neither raw operand is dereferenced.
     #[inline]
     pub(crate) fn matches_ephemeron_raw(&self, owner: u32, key: u32) -> bool {
+        self.ephemeron_value_if_matches_raw(owner, key).is_some()
+    }
+
+    /// The value slot of a matching ephemeron, which may contain null.
+    #[inline]
+    pub(crate) fn ephemeron_value_if_matches_raw(
+        &self,
+        owner: u32,
+        key: u32,
+    ) -> Option<&Option<VMGcRef>> {
         match self {
             Self::Ephemeron {
                 owner: edge_owner,
                 key: Some(edge_key),
-                ..
-            } => edge_owner.as_raw_u32() == owner && edge_key.as_raw_u32() == key,
-            Self::Ephemeron { key: None, .. } => false,
+                value,
+            } if edge_owner.as_raw_u32() == owner && edge_key.as_raw_u32() == key => Some(value),
+            Self::Ephemeron { .. } => None,
             Self::Target { .. } => unreachable!("typed ephemeron handle cannot name target"),
         }
     }
@@ -142,15 +152,19 @@ impl WeakGcRegistry {
         let Some(edge) = slot.edge.as_mut() else {
             return Ok(None);
         };
-        if !edge.matches_ephemeron_raw(owner, key) {
-            return Ok(Some(false));
+        match edge {
+            WeakGcEdge::Ephemeron {
+                owner: edge_owner,
+                key: Some(edge_key),
+                value: current,
+            } if edge_owner.as_raw_u32() == owner && edge_key.as_raw_u32() == key => {
+                Self::touch_slot(&mut self.touched, &mut slot.touched, id.index)?;
+                *current = VMGcRef::from_raw_u32(value);
+                Ok(Some(true))
+            }
+            WeakGcEdge::Ephemeron { .. } => Ok(Some(false)),
+            WeakGcEdge::Target { .. } => unreachable!("typed ephemeron handle cannot name target"),
         }
-        let WeakGcEdge::Ephemeron { value: current, .. } = edge else {
-            unreachable!("matched edge is an ephemeron")
-        };
-        Self::touch_slot(&mut self.touched, &mut slot.touched, id.index)?;
-        *current = VMGcRef::from_raw_u32(value);
-        Ok(Some(true))
     }
 
     /// Remember a new or changed edge for the next minor collection before

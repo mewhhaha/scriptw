@@ -287,11 +287,15 @@ impl Engine {
             );
             // Rotate through the guarded specialisations so every adversarial
             // seed emits a real profiled guard even on one-site ordinary reads
-            // (which already prove OwnCompact layouts inline without a guard).
+            // (which already prove OwnCompact and AbsentClosedTail inline without a guard).
             let kinds: Vec<_> = scriptw_aot_wasm::ReadSpecialisation::ALL
                 .into_iter()
                 .filter(|kind| {
-                    !matches!(kind, scriptw_aot_wasm::ReadSpecialisation::OwnCompact(_))
+                    !matches!(
+                        kind,
+                        scriptw_aot_wasm::ReadSpecialisation::OwnCompact(_)
+                            | scriptw_aot_wasm::ReadSpecialisation::AbsentClosedTail(_)
+                    )
                 })
                 .collect();
             for (index, site) in site_map.read_sites().enumerate() {

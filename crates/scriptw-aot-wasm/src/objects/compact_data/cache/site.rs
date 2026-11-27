@@ -2,12 +2,10 @@
 //!
 //! Each site keeps its record in a global of the module that compiles it, so
 //! the site reaches the record with one global read; R allocates the record
-//! on the site's first use and alone fills it. A site whose base may be an
-//! actual OrdinaryObject answers inline what is commonest and cheapest to
-//! prove from the record's shape: an own data value or a store to an existing
-//! writable own slot. Absence and prototype places go to the hit entry.
-//! Measured on the retained RSC request, inline proofs of those cases would
-//! add more code to every site than their hits save.
+//! on the site's first use and alone fills it. Sites on compact ordinary
+//! objects can answer the head record's own slot, closed tail or live
+//! prototype data slot inline. Only R scans the rest of an unprofiled site's
+//! chain. A write site can replace an existing writable own slot inline.
 use super::*;
 use crate::emit::ControlTarget;
 use crate::gc_types::SiteRecordGlobal;
@@ -77,11 +75,16 @@ impl FunctionBuilder<'_> {
         let s = self.runtime_schema();
         let (global, site) =
             self.next_profiled_site_record(crate::profile::SiteKind::PropertyRead)?;
-        // A site whose base may be ordinary already proves an own slot of
-        // either compact layout inline, right after the guard: guarding those
-        // kinds too would only repeat the proof.
+        // A site whose base may be ordinary already proves an own compact slot
+        // or a closed-tail absence inline, right after the guard: guarding
+        // those kinds too would only repeat the proof.
         let specialisation = self.functions.read_specialisation(&site).filter(|kind| {
-            !(may_be_ordinary && matches!(kind, crate::profile::ReadSpecialisation::OwnCompact(_)))
+            !(may_be_ordinary
+                && matches!(
+                    kind,
+                    crate::profile::ReadSpecialisation::OwnCompact(_)
+                        | crate::profile::ReadSpecialisation::AbsentClosedTail(_)
+                ))
         });
         let record = self.emit_site_record(global, SiteKey::Literal(name), f)?;
         let done = (may_be_ordinary || specialisation.is_some())
@@ -91,7 +94,7 @@ impl FunctionBuilder<'_> {
         }
         if let (true, Some(done)) = (may_be_ordinary, done) {
             let miss = self.open_frame(ControlFrameKind::Block, f);
-            self.emit_own_compact_record_hit(base, &record, value, miss, f);
+            self.emit_compact_record_hit(base, &record, value, miss, f);
             self.emit_branch_to_target(done, f);
             self.pop_control(ControlFrameKind::Block);
             f.instruction(&Instruction::End);
@@ -239,15 +242,14 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    /// Falls through with `value` when the record proves an own data
-    /// property of `base` as the hit entry does: an actual OrdinaryObject
-    /// whose current storage is inline- or array-layout compact with the
-    /// record's shape, which has the key at the record's nonnegative slot. A
-    /// shape is immutable, so that slot holds the property's value whatever
-    /// happened since the record was made. Every other record or receiver is
-    /// the entry's: this branches to `miss` having observed nothing, written
-    /// no part of `value` and retaining no temporary root.
-    fn emit_own_compact_record_hit(
+    /// The first record can prove a compact own slot or absence above a closed
+    /// null or protected `%Object.prototype%` tail. Own data hits stay on the
+    /// straight-line fall-through path so hot functions do not jump over cold
+    /// inherited or intrinsic lookup code; inherited hits and misses route to
+    /// R's single shared `CachedPropertyRead` entry. Neither the shape checks
+    /// nor the live prototype checks run JavaScript, and `value` may share
+    /// locals with `base`.
+    fn emit_compact_record_hit(
         &mut self,
         base: &ValueLocals,
         record: &GcLocal<OwnDataReadCache>,
@@ -256,43 +258,49 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) {
         let s = self.runtime_schema();
-        // A negative slot proves no own property. A null recorded shape
-        // cannot equal either concrete storage's non-null shape.
+        let object = s.reserve_non_null_gc_local(f).initialize(
+            base.sealed_reference_or_branch::<OrdinaryObject>(s, self.local_branch_label(miss), f),
+            f,
+        );
+        let properties = s.reserve_non_null_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROPERTIES)
+                .read(&object, s, f)
+                .reference(),
+            f,
+        );
+        let storage = s.reserve_non_null_gc_local(f).initialize(
+            s.emit_compact_storage_or_branch(&properties, self.local_branch_label(miss), f),
+            f,
+        );
+        properties.clear(f);
+        s.field(CompactDataStorageSchema::SHAPE)
+            .read(&storage, s, f);
+        s.field(OwnDataReadCacheSchema::SHAPE).read(record, s, f);
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, f);
         let slot = s.reserve_i32_local(f);
         s.field(OwnDataReadCacheSchema::SLOT)
             .read(record, s, f)
             .store(slot, f);
+
+        let loaded = self.open_frame(ControlFrameKind::Block, f);
+        let absent_hit = self.open_frame(ControlFrameKind::Block, f);
         slot.load(f);
         f.instruction(&Instruction::I32Const(0));
         f.instruction(&Instruction::I32LtS);
-        self.emit_branch_if_to_target(miss, f);
-        self.emit_own_compact_storage_or_branch(
-            base,
-            miss,
-            f,
-            |builder, inline, hit, f| {
-                let s = builder.runtime_schema();
-                s.field(InlineCompactDataStorageSchema::SHAPE)
-                    .read(inline, s, f);
-                s.field(OwnDataReadCacheSchema::SHAPE).read(record, s, f);
-                f.instruction(&Instruction::RefEq);
-                f.instruction(&Instruction::If(BlockType::Empty));
-                builder.emit_inline_compact_recorded_value_at(inline, slot, value, f);
-                hit.set_constant(1, f);
-                f.instruction(&Instruction::End);
-            },
-            |builder, array, hit, f| {
-                let s = builder.runtime_schema();
-                s.field(ArrayCompactDataStorageSchema::SHAPE)
-                    .read(array, s, f);
-                s.field(OwnDataReadCacheSchema::SHAPE).read(record, s, f);
-                f.instruction(&Instruction::RefEq);
-                f.instruction(&Instruction::If(BlockType::Empty));
-                builder.emit_array_compact_value_at(array, slot, value, f);
-                hit.set_constant(1, f);
-                f.instruction(&Instruction::End);
-            },
-        );
+        self.emit_branch_if_to_target(absent_hit, f);
+        s.emit_compact_recorded_value_at(&storage, slot, value, f);
+        self.emit_branch_to_target(loaded, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+
+        self.emit_inline_closed_tail_or_branch(&object, slot, miss, f);
+        value.set_undefined(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        object.clear(f);
+        storage.clear(f);
         s.release_i32_local(slot, f);
     }
 

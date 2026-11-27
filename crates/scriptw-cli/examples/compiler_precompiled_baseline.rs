@@ -36,11 +36,10 @@ fn prepare_scriptw(fixtures: &Path, output: &Path) -> Result<Value, String> {
         let name = case["file"].as_str().ok_or("missing producer file")?;
         let wasm_name = format!("{name}.wasm");
         let image_name = case["image"].as_str().ok_or("missing producer image")?;
-        let bytes = fs::read(output.join(image_name)).map_err(|e| e.to_string())?;
-        // SAFETY: these are the exact bytes just written above by this process's
-        // EmbeddedRuntime::precompile, not an external or digest-based authority.
-        let image =
-            unsafe { PrecompiledEmbeddedProgram::from_bytes(&bytes) }.map_err(|e| e.to_string())?;
+        // SAFETY: this process just wrote the image in its own directory and
+        // keeps the inode unchanged while extracting raw P.
+        let image = unsafe { PrecompiledEmbeddedProgram::from_file(&output.join(image_name)) }
+            .map_err(|e| e.to_string())?;
         write_new(&output.join(&wasm_name), image.program_wasm())?;
         case["wasm"] = json!(wasm_name);
     }

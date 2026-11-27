@@ -158,18 +158,14 @@ impl FunctionBuilder<'_> {
                 .from_value(new_target, function),
             function,
         );
-        let undefined = schema.reserve_value_local(function);
-        undefined.set_undefined(function);
-        let empty = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<StoredValue>()
-                .from_value(&undefined, function),
-            function,
-        );
-        let locals = schema.reserve_gc_local(function).initialize(
-            schema.array_type::<ValueArray>().fixed([], function),
-            function,
-        );
+        // Stored Undefined is immutable. The shared empty array has no
+        // writable element, and a growing frame replaces its LOCALS reference.
+        let empty = schema
+            .reserve_gc_local(function)
+            .initialize(schema.stored_undefined(function), function);
+        let locals = schema
+            .reserve_gc_local(function)
+            .initialize(schema.empty_value_array(function), function);
         let private_argument_lists = schema.reserve_gc_local(function).initialize(
             schema
                 .array_type::<crate::gc_types::PrivateArgumentListTable>()
@@ -202,7 +198,6 @@ impl FunctionBuilder<'_> {
         private_argument_lists.clear(function);
         locals.clear(function);
         empty.clear(function);
-        undefined.clear(function);
         stored_new_target.clear(function);
         stored_this.clear(function);
         frame
@@ -232,12 +227,9 @@ impl FunctionBuilder<'_> {
                     arguments,
                     function,
                 );
-                let initial = schema.reserve_gc_local(function).initialize(
-                    schema
-                        .struct_type::<StoredValue>()
-                        .from_value(&undefined, function),
-                    function,
-                );
+                let initial = schema
+                    .reserve_gc_local(function)
+                    .initialize(schema.stored_undefined(function), function);
                 let activation = schema.reserve_gc_local(function).initialize(
                     schema.struct_type::<GeneratorActivation>().construct(
                         (
@@ -337,12 +329,9 @@ impl FunctionBuilder<'_> {
                     arguments,
                     function,
                 );
-                let initial = schema.reserve_gc_local(function).initialize(
-                    schema
-                        .struct_type::<StoredValue>()
-                        .from_value(&undefined, function),
-                    function,
-                );
+                let initial = schema
+                    .reserve_gc_local(function)
+                    .initialize(schema.stored_undefined(function), function);
                 let activation = schema.reserve_gc_local(function).initialize(
                     schema.struct_type::<AsyncGeneratorActivation>().construct(
                         (
@@ -449,12 +438,9 @@ impl FunctionBuilder<'_> {
                     arguments,
                     function,
                 );
-                let initial = schema.reserve_gc_local(function).initialize(
-                    schema
-                        .struct_type::<StoredValue>()
-                        .from_value(&undefined, function),
-                    function,
-                );
+                let initial = schema
+                    .reserve_gc_local(function)
+                    .initialize(schema.stored_undefined(function), function);
                 let activation = schema.reserve_gc_local(function).initialize(
                     schema.struct_type::<AsyncActivation>().construct(
                         (

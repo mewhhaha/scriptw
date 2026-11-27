@@ -278,7 +278,11 @@ impl EmbeddedRuntime {
         if let Some(linker) = self.host_linker.get() {
             return Ok(linker);
         }
-        let built = host_imports::build(&self.engine, self.modules.host())?;
+        let built = host_imports::build(
+            &self.engine,
+            self.modules.host(),
+            self.modules.additional_host_imports(),
+        )?;
         Ok(self.host_linker.get_or_init(|| Arc::new(built)))
     }
 
@@ -377,7 +381,11 @@ impl EmbeddedRuntime {
         self.check(store, linker, StorePhase::Fresh)?;
         store.data_mut().embedding.as_mut().unwrap().phase = StorePhase::Failed;
         if !linker.try_extend_from_shared(self.cached_host_linker()?) {
-            host_imports::register(linker, self.modules.host())?;
+            host_imports::register(
+                linker,
+                self.modules.host(),
+                self.modules.additional_host_imports(),
+            )?;
         }
         // R defines its own private memory; instantiation links it into P.
         if let crate::host_memory_imports::PrivateMemory::Imported(ty) =

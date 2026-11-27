@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="588" viewBox="0 0 760 588" role="img" aria-labelledby="title desc">
+<title id="title">Wasm runtimes: Wasmtime 47 vs wtime</title>
+<desc id="desc">Log-scale execution comparison across Wasmtime 47 AOT and wtime-runtime v0.1.8 on Scriptw Portable Wasm-GC and Porffor Wasm.</desc>
+<rect x="0.5" y="0.5" width="759" height="587" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
+<g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fill="#24292f">
+<text x="28" y="34" font-size="18" font-weight="650" fill="#24292f">Wasm runtimes — Wasmtime 47 (AOT) vs ../wtime (interpreter)</text>
+<text x="28" y="54" font-size="12" fill="#57606a">Lower is faster (log scale, execution time) · ../wtime passes 18/18 Scriptw Wasm-GC &amp; 6/6 Edge workloads</text>
+<rect x="28.0" y="66" width="11" height="11" rx="2.5" fill="#0969da"/>
+<text x="44.0" y="75.5" font-size="11.5" fill="#57606a">Scriptw (Wasmtime 47)</text>
+<rect x="195.5" y="66" width="11" height="11" rx="2.5" fill="#2da44e"/>
+<text x="211.5" y="75.5" font-size="11.5" fill="#57606a">Porffor (Wasmtime 47)</text>
+<rect x="363.0" y="66" width="11" height="11" rx="2.5" fill="#8250df"/>
+<text x="379.0" y="75.5" font-size="11.5" fill="#57606a">Scriptw (wtime Decoded)</text>
+<rect x="543.5" y="66" width="11" height="11" rx="2.5" fill="#bf3989"/>
+<text x="559.5" y="75.5" font-size="11.5" fill="#57606a">Porffor (wtime Register)</text>
+<line x1="205.1" y1="94" x2="205.1" y2="526" stroke="#eaeef2" stroke-width="1"/>
+<text x="205.1" y="542" text-anchor="middle" font-size="11" fill="#57606a">1 µs</text>
+<line x1="281.8" y1="94" x2="281.8" y2="526" stroke="#eaeef2" stroke-width="1"/>
+<text x="281.8" y="542" text-anchor="middle" font-size="11" fill="#57606a">10 µs</text>
+<line x1="358.4" y1="94" x2="358.4" y2="526" stroke="#eaeef2" stroke-width="1"/>
+<text x="358.4" y="542" text-anchor="middle" font-size="11" fill="#57606a">100 µs</text>
+<line x1="435.1" y1="94" x2="435.1" y2="526" stroke="#eaeef2" stroke-width="1"/>
+<text x="435.1" y="542" text-anchor="middle" font-size="11" fill="#57606a">1 ms</text>
+<line x1="511.8" y1="94" x2="511.8" y2="526" stroke="#eaeef2" stroke-width="1"/>
+<text x="511.8" y="542" text-anchor="middle" font-size="11" fill="#57606a">10 ms</text>
+<line x1="588.4" y1="94" x2="588.4" y2="526" stroke="#eaeef2" stroke-width="1"/>
+<text x="588.4" y="542" text-anchor="middle" font-size="11" fill="#57606a">100 ms</text>
+<line x1="165.0" y1="94" x2="165.0" y2="526" stroke="#d0d7de" stroke-width="1"/>
+<text x="155" y="126" text-anchor="end" font-size="12" font-weight="600">startup (standalone)</text>
+<rect x="165.0" y="100" width="71.0" height="9.5" rx="2" fill="#0969da"/>
+<text x="241.0" y="108.5" font-size="10.2" font-weight="650" fill="#0969da">2.53 µs</text>
+<rect x="165.0" y="111.5" width="39.8" height="9.5" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="209.8" y="120" font-size="10" fill="#1a7f37">0.99 µs</text>
+<rect x="165.0" y="123" width="11.2" height="9.5" rx="2" fill="#8250df"/>
+<text x="181.2" y="131.5" font-size="10.2" font-weight="600" fill="#8250df">0.42 µs</text>
+<rect x="165.0" y="134.5" width="184.4" height="9.5" rx="2" fill="#bf3989" opacity="0.88"/>
+<text x="354.4" y="143" font-size="10" fill="#bf3989">76.2 µs</text>
+<text x="155" y="179" text-anchor="end" font-size="12" font-weight="600">numeric-loop-50000</text>
+<rect x="165.0" y="153" width="95.8" height="9.5" rx="2" fill="#0969da"/>
+<text x="265.8" y="161.5" font-size="10.2" font-weight="650" fill="#0969da">5.33 µs</text>
+<rect x="165.0" y="164.5" width="173.0" height="9.5" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="343.0" y="173" font-size="10" fill="#1a7f37">54.2 µs</text>
+<rect x="165.0" y="176" width="223.5" height="9.5" rx="2" fill="#8250df"/>
+<text x="393.5" y="184.5" font-size="10.2" font-weight="600" fill="#8250df">247 µs</text>
+<rect x="165.0" y="187.5" width="265.6" height="9.5" rx="2" fill="#bf3989" opacity="0.88"/>
+<text x="435.6" y="196" font-size="10" fill="#bf3989">873 µs</text>
+<text x="155" y="232" text-anchor="end" font-size="12" font-weight="600">join-small-1024</text>
+<rect x="165.0" y="206" width="101.2" height="9.5" rx="2" fill="#0969da"/>
+<text x="271.2" y="214.5" font-size="10.2" font-weight="650" fill="#0969da">6.27 µs</text>
+<rect x="165.0" y="217.5" width="222.7" height="9.5" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="392.7" y="226" font-size="10" fill="#1a7f37">241 µs</text>
+<rect x="165.0" y="229" width="235.0" height="9.5" rx="2" fill="#8250df"/>
+<text x="405.0" y="237.5" font-size="10.2" font-weight="600" fill="#8250df">349 µs</text>
+<rect x="165.0" y="240.5" width="319.7" height="9.5" rx="2" fill="#bf3989" opacity="0.88"/>
+<text x="489.7" y="249" font-size="10" fill="#bf3989">4.44 ms</text>
+<text x="155" y="285" text-anchor="end" font-size="12" font-weight="600">sort-reverse-128</text>
+<rect x="165.0" y="259" width="113.3" height="9.5" rx="2" fill="#0969da"/>
+<text x="283.3" y="267.5" font-size="10.2" font-weight="650" fill="#0969da">9.01 µs</text>
+<rect x="165.0" y="270.5" width="191.0" height="9.5" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="361.0" y="279" font-size="10" fill="#1a7f37">92.9 µs</text>
+<rect x="165.0" y="282" width="271.1" height="9.5" rx="2" fill="#8250df"/>
+<text x="441.1" y="290.5" font-size="10.2" font-weight="600" fill="#8250df">1.03 ms</text>
+<rect x="165.0" y="293.5" width="335.7" height="9.5" rx="2" fill="#bf3989" opacity="0.88"/>
+<text x="505.7" y="302" font-size="10" fill="#bf3989">7.18 ms</text>
+<text x="155" y="338" text-anchor="end" font-size="12" font-weight="600">sort-reverse-512</text>
+<rect x="165.0" y="312" width="145.4" height="9.5" rx="2" fill="#0969da"/>
+<text x="315.4" y="320.5" font-size="10.2" font-weight="650" fill="#0969da">23.7 µs</text>
+<rect x="165.0" y="323.5" width="275.9" height="9.5" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="445.9" y="332" font-size="10" fill="#1a7f37">1.19 ms</text>
+<rect x="165.0" y="335" width="319.1" height="9.5" rx="2" fill="#8250df"/>
+<text x="489.1" y="343.5" font-size="10.2" font-weight="600" fill="#8250df">4.36 ms</text>
+<rect x="165.0" y="346.5" width="427.3" height="9.5" rx="2" fill="#bf3989" opacity="0.88"/>
+<text x="597.3" y="355" font-size="10" fill="#bf3989">112.2 ms</text>
+<text x="155" y="391" text-anchor="end" font-size="12" font-weight="600">objects</text>
+<rect x="165.0" y="365" width="144.7" height="9.5" rx="2" fill="#0969da"/>
+<text x="314.7" y="373.5" font-size="10.2" font-weight="650" fill="#0969da">23.1 µs</text>
+<rect x="165.0" y="376.5" width="194.3" height="9.5" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="364.3" y="385" font-size="10" fill="#1a7f37">103 µs</text>
+<rect x="165.0" y="388" width="321.8" height="9.5" rx="2" fill="#8250df"/>
+<text x="491.8" y="396.5" font-size="10.2" font-weight="600" fill="#8250df">4.73 ms</text>
+<rect x="165.0" y="399.5" width="286.2" height="9.5" rx="2" fill="#bf3989" opacity="0.88"/>
+<text x="456.2" y="408" font-size="10" fill="#bf3989">1.62 ms</text>
+<text x="155" y="444" text-anchor="end" font-size="12" font-weight="600">dynamic-string-4096</text>
+<rect x="165.0" y="418" width="154.8" height="9.5" rx="2" fill="#0969da"/>
+<text x="324.8" y="426.5" font-size="10.2" font-weight="650" fill="#0969da">31.4 µs</text>
+<rect x="165.0" y="429.5" width="191.1" height="9.5" rx="2" fill="#2da44e" opacity="0.88"/>
+<text x="361.1" y="438" font-size="10" fill="#1a7f37">93.4 µs</text>
+<rect x="165.0" y="441" width="335.2" height="9.5" rx="2" fill="#8250df"/>
+<text x="505.2" y="449.5" font-size="10.2" font-weight="600" fill="#8250df">7.08 ms</text>
+<rect x="165.0" y="452.5" width="307.7" height="9.5" rx="2" fill="#bf3989" opacity="0.88"/>
+<text x="477.7" y="461" font-size="10" fill="#bf3989">3.09 ms</text>
+<text x="155" y="497" text-anchor="end" font-size="12" font-weight="600">retained-objects</text>
+<rect x="165.0" y="471" width="258.6" height="9.5" rx="2" fill="#0969da"/>
+<text x="428.6" y="479.5" font-size="10.2" font-weight="650" fill="#0969da">709 µs</text>
+<text x="170.0" y="491" font-size="9.8" fill="#57606a">Porffor fails on Wasmtime &amp; wtime</text>
+<rect x="165.0" y="494" width="442.9" height="9.5" rx="2" fill="#8250df"/>
+<text x="612.9" y="502.5" font-size="10.2" font-weight="600" fill="#8250df">179.7 ms</text>
+<text x="28" y="572" font-size="11" fill="#57606a">2026-11-27 · ABI 96 (6612a6755754) · wtime-runtime v0.1.8 (95c854c) · 5×21 fresh runs (10w) · benchmark-only peer</text>
+</g>
+</svg>

@@ -438,7 +438,7 @@ impl Component {
         // and core wasm types found within this component, both for the
         // component and for all included core wasm modules.
         let signatures = engine.register_and_canonicalize_types(
-            types.module_types_mut(),
+            types.module_types(),
             static_modules.iter_mut().map(|(_, m)| &mut m.module),
         )?;
         types.canonicalize_for_runtime_usage(&mut |idx| signatures.shared_type(idx).unwrap());
@@ -502,7 +502,7 @@ impl Component {
             crate::code::Types::Component(types) => types,
             // The only creator of a `Component` is itself which uses the other
             // variant, so this shouldn't be possible.
-            crate::code::Types::Module(_) => unreachable!(),
+            crate::code::Types::Module => unreachable!(),
         }
     }
 

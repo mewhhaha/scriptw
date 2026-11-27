@@ -11,23 +11,41 @@ use std::mem::MaybeUninit;
 use wasmtime::{FuncType, ValRaw, ValType};
 
 type Arguments = [MaybeUninit<ValRaw>];
+type LookupArguments = [MaybeUninit<ValRaw>; 4];
 
-/// The collection and key in the first two parameters and their identities
-/// in the two starting at `identities`.
+#[inline]
+fn operands(
+    owner: ValRaw,
+    key: ValRaw,
+    owner_id: ValRaw,
+    key_id: ValRaw,
+) -> wasmtime::Result<Operands> {
+    Operands::new(
+        owner.get_anyref(),
+        key.get_anyref(),
+        owner_id.get_i64(),
+        key_id.get_i64(),
+    )
+}
+
+/// Check the lookup frame once for both the parameters and the result.
+#[inline]
+fn lookup_arguments(arguments: &mut Arguments) -> &mut LookupArguments {
+    arguments
+        .first_chunk_mut()
+        .expect("weak lookup takes four parameters")
+}
+
+/// Read the two references and their identities.
 ///
 /// # Safety
 ///
-/// The import's type gives those four parameters these types.
-unsafe fn operands(arguments: &Arguments, identities: usize) -> wasmtime::Result<Operands> {
+/// Wasmtime initialized the parameters of a lookup import.
+#[inline]
+unsafe fn lookup_operands(arguments: &LookupArguments) -> wasmtime::Result<Operands> {
     // SAFETY: Wasmtime initialized every parameter of the import's type.
-    unsafe {
-        Operands::new(
-            arguments[0].assume_init().get_anyref(),
-            arguments[1].assume_init().get_anyref(),
-            arguments[identities].assume_init().get_i64(),
-            arguments[identities + 1].assume_init().get_i64(),
-        )
-    }
+    let [owner, key, owner_id, key_id] = arguments.map(|argument| unsafe { argument.assume_init() });
+    operands(owner, key, owner_id, key_id)
 }
 
 /// Defines `row` with exactly the type the emitter declares for it, which
@@ -68,13 +86,15 @@ fn put(
     mut caller: WasmtimeCaller<'_, WasmHostState>,
     arguments: &mut Arguments,
 ) -> wasmtime::Result<()> {
-    // SAFETY: the import's type, and references passed by the compiled code
-    // that is calling.
-    unsafe {
-        let at = operands(arguments, 3)?;
-        let value = arguments[2].assume_init().get_anyref();
-        Entries::put(&mut caller, at, value)
-    }
+    let arguments = arguments
+        .first_chunk::<5>()
+        .expect("weak put takes five parameters");
+    // SAFETY: Wasmtime initialized every parameter of this import.
+    let [owner, key, value, owner_id, key_id] =
+        arguments.map(|argument| unsafe { argument.assume_init() });
+    let at = operands(owner, key, owner_id, key_id)?;
+    // SAFETY: compiled code passed these raw operands to this host call.
+    unsafe { Entries::put(&mut caller, at, value.get_anyref()) }
 }
 
 /// `(owner, key, owner identity, key identity) -> value`, null without an
@@ -83,8 +103,9 @@ fn get(
     mut caller: WasmtimeCaller<'_, WasmHostState>,
     arguments: &mut Arguments,
 ) -> wasmtime::Result<()> {
+    let arguments = lookup_arguments(arguments);
     // SAFETY: the import's type.
-    let at = unsafe { operands(arguments, 2)? };
+    let at = unsafe { lookup_operands(arguments)? };
     let value = Entries::get(&mut caller, at)?;
     arguments[0].write(ValRaw::anyref(value));
     Ok(())
@@ -96,8 +117,9 @@ fn has(
     caller: WasmtimeCaller<'_, WasmHostState>,
     arguments: &mut Arguments,
 ) -> wasmtime::Result<()> {
+    let arguments = lookup_arguments(arguments);
     // SAFETY: the import's type.
-    let at = unsafe { operands(arguments, 2)? };
+    let at = unsafe { lookup_operands(arguments)? };
     let present = caller.data().weak.index.find(&caller, at)?.is_some();
     arguments[0].write(ValRaw::i32(i32::from(present)));
     Ok(())
@@ -109,8 +131,9 @@ fn delete(
     mut caller: WasmtimeCaller<'_, WasmHostState>,
     arguments: &mut Arguments,
 ) -> wasmtime::Result<()> {
+    let arguments = lookup_arguments(arguments);
     // SAFETY: the import's type.
-    let at = unsafe { operands(arguments, 2)? };
+    let at = unsafe { lookup_operands(arguments)? };
     let entry = caller.data().weak.index.find(&caller, at)?;
     if let Some(entry) = entry {
         // The index keeps the retired handle until it next rebuilds; it can

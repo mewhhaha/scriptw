@@ -6,13 +6,14 @@
 
 use crate::hash_map::{Entry, HashMap};
 use crate::module::RegisteredModuleId;
+use crate::type_registry::TraceInfoIndex;
 use crate::vm::{GcStoreTraceState, NopHasher, TraceInfo};
-use wasmtime_environ::{ModuleInternedTypeIndex, VMSharedTypeIndex};
+use wasmtime_environ::VMSharedTypeIndex;
 
 #[derive(Clone, Copy)]
 enum TraceInfoLoc {
     HostType(VMSharedTypeIndex),
-    Module(RegisteredModuleId, ModuleInternedTypeIndex),
+    Module(RegisteredModuleId, TraceInfoIndex),
 }
 
 /// A map from GC type indices to where their tracing information can be found.

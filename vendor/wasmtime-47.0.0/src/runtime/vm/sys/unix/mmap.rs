@@ -88,7 +88,10 @@ impl Mmap {
             .metadata()
             .context("failed to get file metadata")?
             .len();
-        let len = usize::try_from(len).map_err(|_| crate::format_err!("file too large to map"))?;
+        let len = usize::try_from(len)
+            .ok()
+            .filter(|&len| len <= isize::MAX as usize)
+            .ok_or_else(|| crate::format_err!("file too large to map"))?;
         let ptr = unsafe {
             rustix::mm::mmap(
                 ptr::null_mut(),
@@ -119,7 +122,7 @@ impl Mmap {
             .ok()
             .and_then(|len| offset.checked_add(len))
             .ok_or_else(|| crate::format_err!("file range overflows"))?;
-        if len == 0 || end > file_len {
+        if len == 0 || len > isize::MAX as usize || end > file_len {
             crate::bail!("file range {offset:#x}+{len:#x} is empty or outside the file");
         }
         if offset % (crate::runtime::vm::host_page_size() as u64) != 0 {

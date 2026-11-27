@@ -52,13 +52,10 @@ pub(super) fn run_with_config(
     }
     let after_engine = residency::snapshot()?;
     let started = Instant::now();
-    let bytes = fs::read(path).map_err(|e| e.to_string())?;
-    // SAFETY: this opt-in diagnostic consumes only the exact native image from
-    // its separately recorded `prepare` process. The outer measurement driver
-    // binds that producer/file authority. This command is not an untrusted-code
-    // loader; a checksum alone cannot satisfy this native-origin requirement.
+    // SAFETY: the measurement driver supplies the exact image from its trusted
+    // `prepare` process and keeps its inode unchanged throughout execution.
     let image =
-        unsafe { PrecompiledEmbeddedProgram::from_bytes(&bytes) }.map_err(|e| e.to_string())?;
+        unsafe { PrecompiledEmbeddedProgram::from_file(path) }.map_err(|e| e.to_string())?;
     let image_read_ns = started.elapsed().as_nanos();
     let after_image_read = residency::snapshot()?;
     let ((runtime, admission_ns), native_load_process_memory) = residency::measure_loading(|| {
@@ -68,16 +65,15 @@ pub(super) fn run_with_config(
         Ok((runtime, started.elapsed().as_nanos()))
     })?;
     let after_admission = residency::snapshot()?;
-    let image_sha256 = hash(&bytes);
-    let image_bytes = bytes.len();
+    let image_sha256 = hash_key(&image.image_sha256());
+    let image_bytes = image.as_bytes().len();
     let program_wasm_sha256 = hash(image.program_wasm());
     let runtime_key = image.runtime_key().map(hash_key);
     let execution_facts_bytes = image.serialized_execution_facts().len();
     let execution_facts_sha256 = hash(image.serialized_execution_facts());
-    // Both native Modules own their mappings. The execution floor therefore
-    // retains neither transport copy; load endpoints above include both.
+    // The native modules own their executable mappings. Release the transport
+    // view before measuring execution.
     drop(image);
-    drop(bytes);
     let after_transport_drop = residency::snapshot()?;
     let load_total_ns = total_started.elapsed().as_nanos();
     barriers.after_transport_drop()?;

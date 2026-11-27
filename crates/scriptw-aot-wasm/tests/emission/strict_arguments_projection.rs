@@ -83,18 +83,16 @@ fn check_projection(body: &[Operator<'_>], arguments: u32, stored: u32, vector_e
     } else {
         assert!(projected_entry(body, arguments).is_none(), "wide local entry carries count directly without an argv length snapshot");
     }
-    // Each read tests whether the real object exists (its local's tag
-    // against Undefined) before answering from the local lanes or vector.
+    // Each read tests whether the real object exists (its local's null
+    // reference sentinel) before answering from the local lanes or vector.
     let mut guards = std::collections::BTreeMap::<u32, Vec<usize>>::new();
-    for (index, ops) in body.windows(3).enumerate() {
-        if let [Operator::LocalGet { local_index }, Operator::I32Const { .. }, Operator::I32Eq] =
-            ops
-        {
-            if let Some(offset) = body[index + 3..(index + 8).min(body.len())]
+    for (index, ops) in body.windows(2).enumerate() {
+        if let [Operator::LocalGet { local_index }, Operator::RefIsNull] = ops {
+            if let Some(offset) = body[index + 2..(index + 8).min(body.len())]
                 .iter()
                 .position(|op| matches!(op, Operator::If { .. }))
             {
-                let start = index + 3 + offset;
+                let start = index + 2 + offset;
                 if let (_, Some(slow)) = if_parts(body, start) {
                     if allocations(slow, arguments) == 1 {
                         guards.entry(*local_index).or_default().push(start);

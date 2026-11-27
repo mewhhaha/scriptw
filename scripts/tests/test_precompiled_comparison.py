@@ -94,14 +94,13 @@ class PrecompiledComparisonTests(unittest.TestCase):
                 native = b'INERT UNIT TEST BYTES; NEVER DESERIALIZE'
                 fingerprint = bytes.fromhex(self.report['source_fingerprint'])
                 if runtime == 'scriptw':
-                    body = b'SCRWEP03' + fingerprint + b'\x01' + b'\x09' * 32 + b'\x01'
-                else:
-                    body = b'SCRWWA01' + fingerprint
-                body += len(wasm).to_bytes(8, 'little') + len(native).to_bytes(8, 'little')
-                if runtime == 'scriptw':
                     registry = binary_registry(dict(abi_version=2, error_tag=None, modules=[]))
-                    body += len(registry).to_bytes(4, 'little') + registry
-                body += wasm + native
+                    body = (native + wasm + registry + b'SCRWEP04' + fingerprint + b'\x01' + b'\x09' * 32 + b'\x01'
+                            + len(wasm).to_bytes(8, 'little') + len(native).to_bytes(8, 'little')
+                            + len(registry).to_bytes(4, 'little'))
+                else:
+                    body = (b'SCRWWA01' + fingerprint + len(wasm).to_bytes(8, 'little')
+                            + len(native).to_bytes(8, 'little') + wasm + native)
                 image = comparison.image_metadata(body + hashlib.sha256(body).digest(), runtime,
                                                   self.report['source_fingerprint'])
                 image['file'] = 'images/' + runtime + '/' + case['file'] + '.cwasm'
@@ -196,7 +195,7 @@ class PrecompiledComparisonTests(unittest.TestCase):
             samples=7, warmups=10, image_sha256=image['sha256'], image_bytes=image['bytes'],
             program_wasm_sha256=image['program_wasm_sha256'], wasm_sha256=image['program_wasm_sha256'],
             **({key: image[key] for key in ('execution_facts_bytes', 'execution_facts_sha256')}
-               if image.get('magic') in ('SCRWEP02', 'SCRWEP03') else {}),
+               if image.get('magic') in ('SCRWEP02', 'SCRWEP03', 'SCRWEP04') else {}),
             runtime_key=image['runtime_key'], load_phases_ns=dict(engine=100, image_read_and_envelope_admission=200,
                 native_admission_and_deserialization=300, process_total=1000),
             native_serialized_bytes=image['native_serialized_bytes'],
@@ -589,6 +588,33 @@ class PrecompiledComparisonTests(unittest.TestCase):
             with self.subTest(registry=registry):
                 with self.assertRaises(ValueError):
                     comparison._binary_execution_registry(binary_registry(registry))
+
+
+    def test_sw04_native_first_footer_roundtrip_validation_and_archive_exclusion(self):
+        registry = dict(abi_version=2, error_tag=None, modules=[dict(specifier='m', functions=[
+            dict(export='f', module='h', name='n', mode='sync', parameters=['number', 'utf16', 'bytes'], result='void')])])
+        canonical = binary_registry(registry)
+        wasm, native = b'\0asm\x01\0\0\0', b'INERT; NEVER DESERIALIZE'
+        def frame(facts, *, mode=b'\x01', linked=b'\x00', key=bytes(32), program=wasm, native_bytes=native):
+            body = (native_bytes + program + facts + b'SCRWEP04' + b'\x02' * 32 + linked + key + mode
+                    + len(program).to_bytes(8, 'little') + len(native_bytes).to_bytes(8, 'little')
+                    + len(facts).to_bytes(4, 'little'))
+            return body + hashlib.sha256(body).digest()
+        valid = frame(canonical)
+        admitted = comparison.image_metadata(valid, 'scriptw', '02' * 32)
+        self.assertEqual(admitted['magic'], 'SCRWEP04')
+        self.assertEqual(admitted['program_wasm_sha256'], hashlib.sha256(wasm).hexdigest())
+        self.assertEqual(admitted['native_sha256'], hashlib.sha256(native).hexdigest())
+        self.assertEqual(admitted['execution_facts_sha256'], hashlib.sha256(canonical).hexdigest())
+        self.assertIsNone(admitted['runtime_key'])
+        for broken in [valid[:-1], valid + b'\0', frame(canonical, mode=b'\x00'),
+                       frame(canonical, linked=b'\x00', key=b'\x01' * 32),
+                       frame(canonical, program=b'not-wasm'), frame(canonical[:-1])]:
+            with self.assertRaises(ValueError):
+                comparison.image_metadata(broken, 'scriptw', '02' * 32)
+        self.write('hidden/sw04-image', valid)
+        with self.assertRaisesRegex(ValueError, 'native binary/image'):
+            comparison.load_report(self.save())
 
 
 if __name__ == '__main__':

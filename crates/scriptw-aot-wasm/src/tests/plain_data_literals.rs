@@ -130,8 +130,7 @@ fn literal_definition_calls(
 #[test]
 fn bounded_static_data_literals_reach_the_compact_allocator() {
     let control = source_body_definition_calls("input");
-    // 1..=4 fields construct InlineCompactDataStorage directly without calling
-    // the runtime allocator helper.
+    // Up to five fields publish storage directly in P.
     assert_eq!(
         literal_definition_calls("({first: input, last: input})", control),
         (0, 0, 0)
@@ -140,7 +139,7 @@ fn bounded_static_data_literals_reach_the_compact_allocator() {
     assert_eq!(literal_definition_calls("({})", control), (0, 0, 0));
     assert_eq!(
         literal_definition_calls("({a: input, b: input, c: input, d: input, e: input})", control),
-        (0, 0, 1)
+        (0, 0, 0)
     );
     let sixteen = (0..16)
         .map(|index| format!("key{index}: input"))

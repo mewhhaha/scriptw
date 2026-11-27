@@ -1,9 +1,10 @@
 //! SerializeJSONProperty is owned by two registered recursive runtime
 //! helpers: this general one, which performs every step for every context,
 //! and the hot entry of a plain context (`stringify_plain`), which serializes
-//! actual Arrays and ordinary objects whose chains provably lack "toJSON"
-//! and hands every other value here by a tail call. In a plain context the
-//! general container walk hands its members back to the hot entry.
+//! actual Arrays and ordinary objects whose chains provably lack "toJSON".
+//! A declined entry tail-calls this helper. A traversal can also call it
+//! for one fetched member, then resume from the same output cursor. In a
+//! plain context the general container walk hands its members to the hot entry.
 //!
 //! Every property serialization appends straight into the one output
 //! accumulator of its JSON.stringify call; the helper result says only
@@ -21,12 +22,14 @@
 //! appended in place, and only the remaining values enter the helper.
 use super::*;
 
+pub(super) const JSON_INITIAL_PATH_CAPACITY: i32 = 8;
+
 impl FunctionBuilder<'_> {
     /// Calls SerializeJSONProperty and leaves the appended flag in `out`:
     /// Undefined when nothing was appended. With `fetched` set, `holder` is
     /// already the result of Get(holder, key), which only a caller without a
     /// replacer function may pass.
-    fn emit_json_stringify_call(
+    pub(super) fn emit_json_stringify_call(
         &mut self,
         holder: &ValueLocals,
         key: &ValueLocals,
@@ -426,12 +429,11 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(index, f);
         s.release_i32_local(count, f);
     }
-    pub(super) fn emit_json_default_stringify_context(
+    fn emit_json_default_stringify_context(
         &self,
         realm: &GcLocal<RealmRecord>,
         gap: &GcLocal<StringValue>,
         accumulator: &GcLocal<StringAccumulator>,
-        enclosing_root: Option<&ValueLocals>,
         f: &mut Function,
     ) -> GcLocal<JsonStringifyContext> {
         let s = self.runtime_schema();
@@ -440,22 +442,13 @@ impl FunctionBuilder<'_> {
             .initialize_null(s, f);
         let replacement = s.reserve_gc_local(f).initialize(s.stored_undefined(f), f);
         let stack_length = s.reserve_i32_local(f);
-        stack_length.set_constant(8, f);
+        stack_length.set_constant(JSON_INITIAL_PATH_CAPACITY, f);
         let stack = s.reserve_gc_local(f).initialize(
             s.array_type::<JsonStringifyStack>()
                 .filled(GcOperand::null_eq(), stack_length, f),
             f,
         );
         s.release_i32_local(stack_length, f);
-        if let Some(root) = enclosing_root {
-            s.array_type::<JsonStringifyStack>().write(
-                &stack,
-                GcIndex::Constant(0),
-                GcOperand::eq_reference(root.reference()),
-                s,
-                f,
-            );
-        }
         let context = s.reserve_gc_local(f).initialize(
             s.struct_type::<JsonStringifyContext>().construct(
                 (
@@ -512,15 +505,14 @@ impl FunctionBuilder<'_> {
         accumulator_opt.replace(accumulator.load(s, f).nullable(), f);
         let root_done = self.open_frame(ControlFrameKind::Block, f);
         let general_root = self.open_frame(ControlFrameKind::Block, f);
-        self.emit_json_compact_root_or_branch(&value, &realm, &accumulator, general_root, f)?;
+        self.emit_json_compact_root_or_branch(&value, &accumulator, general_root, f)?;
         appended.set_scalar(ScalarValue::Boolean(true), f);
         self.emit_branch_to_target(root_done, f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         let empty = self.emit_json_string("", f)?;
         key.set_reference(&empty, s, f);
-        let context =
-            self.emit_json_default_stringify_context(&realm, &empty, &accumulator, None, f);
+        let context = self.emit_json_default_stringify_context(&realm, &empty, &accumulator, f);
         self.emit_json_stringify_plain_call(&value, &key, &context, indent, &appended, f)?;
         context.clear(f);
         empty.clear(f);
@@ -603,7 +595,7 @@ impl FunctionBuilder<'_> {
             .initialize(StringAccumulatorCursor::allocate(s, 128, f), f);
         accumulator_opt.replace(accumulator.load(s, f).nullable(), f);
         let stack_length = s.reserve_i32_local(f);
-        json_i32(stack_length, 8, f);
+        json_i32(stack_length, JSON_INITIAL_PATH_CAPACITY, f);
         let stack = s.reserve_gc_local(f).initialize(
             s.array_type::<JsonStringifyStack>()
                 .filled(GcOperand::null_eq(), stack_length, f),
@@ -708,7 +700,7 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, f);
         let text = s
             .reserve_gc_local(f)
-            .initialize(self.emit_number_to_string_payload(key.scalar(), f)?, f);
+            .initialize(self.emit_json_index_string(key.scalar(), f)?, f);
         out.set_reference(&text, s, f);
         text.clear(f);
         self.pop_control(ControlFrameKind::If);
@@ -751,7 +743,7 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, f);
         let text = s
             .reserve_gc_local(f)
-            .initialize(self.emit_number_to_string_payload(key.scalar(), f)?, f);
+            .initialize(self.emit_json_index_string(key.scalar(), f)?, f);
         self.emit_json_get(holder, &text, out, f)?;
         text.clear(f);
         self.pop_control(ControlFrameKind::If);
@@ -776,6 +768,64 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(found, f);
         Ok(())
     }
+
+    /// The numeric form of a property key is used only for Array indices.
+    pub(super) fn emit_json_index_string(
+        &mut self,
+        bits: I64Local,
+        f: &mut Function,
+    ) -> Result<GcStackReference<StringValue>, EmitError> {
+        let s = self.runtime_schema();
+        let index = s.reserve_i32_local(f);
+        let unit = s.reserve_i32_local(f);
+        let text = s
+            .reserve_gc_local::<StringValue, Nullable>(f)
+            .initialize_null(s, f);
+        bits.load(f);
+        f.instruction(&Instruction::F64ReinterpretI64);
+        f.instruction(&Instruction::I32TruncSatF64U);
+        index.store(f);
+        index.load(f);
+        f.instruction(&Instruction::I32Const(100));
+        f.instruction(&Instruction::I32LtU);
+        self.open_frame(ControlFrameKind::If, f);
+        index.load(f);
+        f.instruction(&Instruction::I32Const(10));
+        f.instruction(&Instruction::I32RemU);
+        f.instruction(&Instruction::I32Const(i32::from(b'0')));
+        f.instruction(&Instruction::I32Add);
+        unit.store(f);
+        index.load(f);
+        f.instruction(&Instruction::I32Const(10));
+        f.instruction(&Instruction::I32LtU);
+        self.open_frame(ControlFrameKind::If, f);
+        let construction = StringConstruction::from_code_unit(s, s.reserve_gc_local(f), unit, f);
+        text.replace(construction.publish(s, f).nullable(), f);
+        f.instruction(&Instruction::Else);
+        let tens = s.reserve_i32_local(f);
+        index.load(f);
+        f.instruction(&Instruction::I32Const(10));
+        f.instruction(&Instruction::I32DivU);
+        f.instruction(&Instruction::I32Const(i32::from(b'0')));
+        f.instruction(&Instruction::I32Add);
+        tens.store(f);
+        let construction =
+            StringConstruction::from_code_unit_pair(s, s.reserve_gc_local(f), tens, unit, f);
+        text.replace(construction.publish(s, f).nullable(), f);
+        s.release_i32_local(tens, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::Else);
+        text.replace(self.emit_number_to_string_payload(bits, f)?.nullable(), f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(unit, f);
+        s.release_i32_local(index, f);
+        let result = text.load(s, f).require_non_null(f);
+        text.clear(f);
+        Ok(result)
+    }
+
     fn emit_json_serialize_property(
         &mut self,
         holder: &ValueLocals,
@@ -1032,7 +1082,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(0));
         f.instruction(&Instruction::I32GeS);
         self.open_frame(ControlFrameKind::If, f);
-        output.push_decimal(accumulator, integer, s, f);
+        self.emit_json_append_small_decimal(accumulator, output, integer, f);
         f.instruction(&Instruction::Else);
         let text = s
             .reserve_gc_local(f)
@@ -1066,6 +1116,48 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         Ok(())
+    }
+
+    fn emit_json_append_small_decimal(
+        &mut self,
+        accumulator: &GcLocal<StringAccumulator>,
+        output: &StringAccumulatorCursor,
+        integer: I32Local,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        integer.load(f);
+        f.instruction(&Instruction::I32Const(100));
+        f.instruction(&Instruction::I32LtU);
+        self.open_frame(ControlFrameKind::If, f);
+        let unit = s.reserve_i32_local(f);
+        unit.set_constant(2, f);
+        output.reserve(accumulator, unit, s, f);
+        integer.load(f);
+        f.instruction(&Instruction::I32Const(10));
+        f.instruction(&Instruction::I32GeU);
+        self.open_frame(ControlFrameKind::If, f);
+        integer.load(f);
+        f.instruction(&Instruction::I32Const(10));
+        f.instruction(&Instruction::I32DivU);
+        f.instruction(&Instruction::I32Const(i32::from(b'0')));
+        f.instruction(&Instruction::I32Add);
+        unit.store(f);
+        output.push(unit, s, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        integer.load(f);
+        f.instruction(&Instruction::I32Const(10));
+        f.instruction(&Instruction::I32RemU);
+        f.instruction(&Instruction::I32Const(i32::from(b'0')));
+        f.instruction(&Instruction::I32Add);
+        unit.store(f);
+        output.push(unit, s, f);
+        s.release_i32_local(unit, f);
+        f.instruction(&Instruction::Else);
+        output.push_decimal(accumulator, integer, s, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
     }
     pub(super) fn emit_json_append_literal(
         &mut self,
@@ -1106,7 +1198,6 @@ impl FunctionBuilder<'_> {
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
         let depth = s.reserve_i32_local(f);
-        let scan_index = s.reserve_i32_local(f);
         let capacity = s.reserve_i32_local(f);
         indent.load(f);
         f.instruction(&Instruction::I32WrapI64);
@@ -1118,45 +1209,7 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
-        // The enclosing containers occupy exactly the first `indent` slots.
-        json_i32(scan_index, 0, f);
-        let scan_done = self.open_frame(ControlFrameKind::Block, f);
-        let scan = self.open_frame(ControlFrameKind::Loop, f);
-        scan_index.load(f);
-        depth.load(f);
-        f.instruction(&Instruction::I32GeU);
-        self.emit_branch_if_to_target(scan_done, f);
-        let _ = s
-            .array_type::<JsonStringifyStack>()
-            .read(&stack, scan_index, s, f);
-        value.reference().load(f);
-        f.instruction(&Instruction::RefEq);
-        self.open_frame(ControlFrameKind::If, f);
-        let realm = s.reserve_gc_local(f).initialize(
-            s.struct_type::<JsonStringifyContext>()
-                .field(JsonStringifyContextSchema::REALM)
-                .read(context, s, f)
-                .reference(),
-            f,
-        );
-        self.emit_json_error(
-            &realm,
-            NativeErrorKind::TypeError,
-            RuntimeErrorMessage::CONVERTING_CIRCULAR_STRUCTURE_TO_JSON,
-            f,
-        )?;
-        realm.clear(f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        scan_index.load(f);
-        f.instruction(&Instruction::I32Const(1));
-        f.instruction(&Instruction::I32Add);
-        scan_index.store(f);
-        self.emit_branch_to_target(scan, f);
-        self.pop_control(ControlFrameKind::Loop);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
+        self.emit_json_cycle_check(value, context, &stack, depth, f)?;
         s.array_type::<JsonStringifyStack>().length(&stack, s, f);
         capacity.store(f);
         depth.load(f);
@@ -1200,8 +1253,61 @@ impl FunctionBuilder<'_> {
         );
         stack.clear(f);
         s.release_i32_local(capacity, f);
-        s.release_i32_local(scan_index, f);
         s.release_i32_local(depth, f);
+        Ok(())
+    }
+
+    /// Compares the candidate with the active prefix, nearest parent first.
+    pub(super) fn emit_json_cycle_check(
+        &mut self,
+        value: &ValueLocals,
+        context: &GcLocal<JsonStringifyContext>,
+        stack: &GcLocal<JsonStringifyStack>,
+        depth: I32Local,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let index = s.reserve_i32_local(f);
+        depth.load(f);
+        index.store(f);
+        let clear = self.open_frame(ControlFrameKind::Block, f);
+        index.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(clear, f);
+        let cycle = self.open_frame(ControlFrameKind::Block, f);
+        let scan = self.open_frame(ControlFrameKind::Loop, f);
+        index.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Sub);
+        index.store(f);
+        s.array_type::<JsonStringifyStack>()
+            .read(stack, index, s, f);
+        value.reference().load(f);
+        f.instruction(&Instruction::RefEq);
+        self.emit_branch_if_to_target(cycle, f);
+        index.load(f);
+        self.emit_branch_if_to_target(scan, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.emit_branch_to_target(clear, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let realm = s.reserve_gc_local(f).initialize(
+            s.field(JsonStringifyContextSchema::REALM)
+                .read(context, s, f)
+                .reference(),
+            f,
+        );
+        self.emit_json_error(
+            &realm,
+            NativeErrorKind::TypeError,
+            RuntimeErrorMessage::CONVERTING_CIRCULAR_STRUCTURE_TO_JSON,
+            f,
+        )?;
+        realm.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(index, f);
         Ok(())
     }
     /// SerializeJSONObject and SerializeJSONArray share the cycle check, the

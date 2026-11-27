@@ -1,8 +1,8 @@
 //! JSON.stringify in a plain context (no replacer function, no property
 //! list, no gap) serializes through a small hot runtime entry that recurses
-//! into itself; everything it cannot prove plain leaves it only by one tail
-//! call to the general SerializeJSONProperty helper, so the plain path never
-//! calls (and never returns into) the general helper.
+//! into itself; a declined root leaves before observation by one tail call to
+//! the general SerializeJSONProperty helper, and once traversal starts only a
+//! single direct call delegates the current fetched member.
 use crate::property_read_plans::{calls, Module};
 use scriptw_aot_wasm::{emit_with_rooted_snapshot, PromiseRejectionPolicy};
 use scriptw_front::{parse, ParseOptions};
@@ -24,7 +24,7 @@ fn tail_calls(body: &[Operator<'_>], target: u32) -> usize {
 }
 
 #[test]
-fn plain_stringify_has_a_hot_entry_that_reaches_the_general_helper_only_by_tail_call() {
+fn plain_stringify_hot_entry_reaches_general_helper_via_tail_call_or_member_continuation() {
     std::thread::Builder::new()
         .name("json-stringify-plain-entry".into())
         .stack_size(64 * 1024 * 1024)
@@ -51,10 +51,10 @@ fn plain_stringify_has_a_hot_entry_that_reaches_the_general_helper_only_by_tail_
             let (general, general_body) = runtime.named("helper::json_stringify_value");
             let (_, entry) = runtime.named("builtin::JSON.stringify");
 
-            // The plain path never calls the general helper: the hot entry's
-            // only route there is a single tail call, taken before anything
-            // is observed.
-            assert_eq!(direct_calls(hot_body, general), 0);
+            // Before traversal starts, a declined root leaves by one tail call
+            // to the general helper. Once traversal begins, only a single
+            // direct call edge delegates the current fetched member.
+            assert_eq!(direct_calls(hot_body, general), 1);
             assert_eq!(tail_calls(hot_body, general), 1);
             // Members recurse through the hot entry itself, an Array's and an
             // ordinary object's each.
@@ -66,13 +66,6 @@ fn plain_stringify_has_a_hot_entry_that_reaches_the_general_helper_only_by_tail_
             assert!(calls(general_body, general));
             // The entry selects exactly one of the two for the root.
             assert!(calls(entry, hot) && calls(entry, general));
-            // The hot entry owns no replacer, toJSON, unboxing or gap work.
-            assert!(
-                hot_body.len() < general_body.len(),
-                "hot entry {} operators, general helper {}",
-                hot_body.len(),
-                general_body.len()
-            );
         })
         .unwrap()
         .join()

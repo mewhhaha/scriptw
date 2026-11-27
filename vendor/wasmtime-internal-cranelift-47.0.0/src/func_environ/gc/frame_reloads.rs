@@ -10,8 +10,9 @@
 //!   and reloads once per safepoint-separated segment inside each block. The
 //!   collector moves objects, so a reference has to be read again after a
 //!   call. It does not have to be read again across blocks or loops without a
-//!   call. For a single-entry cold-call diamond, the frontend can keep the
-//!   original SSA value on the fast edge and pass a reload on the cold edge.
+//!   call. For a chain of cold guards to one join, the frontend can keep the
+//!   original SSA value on the fast edge and pass a reload on each edge
+//!   whose call could have relocated it.
 //! * **Home slots** (`base_home`): the GC heap base and the `vmctx`, each
 //!   stored once by the entry block and loaded at every use.
 //!
@@ -92,8 +93,13 @@
 //! constant with no other store after it, calls allowed.
 //!
 //! The stores to stack-map slots and the stack maps are untouched, so the
-//! collector sees what it saw before. A home's store is removed only when
-//! no load of the home is left in the function, reachable or not. If the
+//! collector sees what it saw before. A slot whose stores were sunk into
+//! cold arms may be unknown on the fast path. The frontend joins the
+//! reference as an SSA value, which does not establish a fact about the
+//! slot. Any reload of the sunk root is after its arm's store and call, so
+//! the loop-hoisting search cannot propagate that reload out of the arm.
+//! A home's store is removed only when no load of the home is left in the
+//! function, reachable or not. If the
 //! equations are not solved within [`MAX_ROUNDS`] rounds, or their answer
 //! would hold more than [`MAX_KNOWN_PER_BLOCK`] entries per block on average
 //! over the function's reachable blocks, the function is left as it was:
@@ -1098,6 +1104,76 @@ mod tests {
                     .block_insts(block)
                     .all(|inst| { harness.func.dfg.insts[inst].opcode() != ir::Opcode::Store })
             );
+        }
+    }
+
+    #[test]
+    fn cascaded_cold_guards_keep_reloads_on_the_collecting_edges() {
+        let mut harness = Harness::new();
+        let mut body = harness.body();
+        let root = body.first;
+        let entry = body.builder.current_block().unwrap();
+        let second_guard = body.block();
+        let fast = body.block();
+        let first_slow = body.block();
+        let second_slow = body.block();
+        let join = body.block();
+        body.builder.set_cold_block(first_slow);
+        body.builder.set_cold_block(second_slow);
+        body.builder
+            .ins()
+            .brif(body.condition, first_slow, &[], second_guard, &[]);
+        body.switch_to(second_guard);
+        body.check(root);
+        body.builder
+            .ins()
+            .brif(body.second, fast, &[], second_slow, &[]);
+        body.switch_to(fast);
+        body.builder.ins().jump(join, &[]);
+
+        let safepoints = [first_slow, second_slow].map(|block| {
+            body.switch_to(block);
+            body.call();
+            let safepoint = body.builder.func.layout.last_inst(block).unwrap();
+            body.builder.ins().jump(join, &[]);
+            safepoint
+        });
+        body.switch_to(join);
+        let sum = body.sum(root, root);
+        body.call();
+        body.finish(sum);
+
+        assert_eq!(harness.forward(), 0);
+        assert_eq!(harness.reloads(), 2);
+        assert_eq!(harness.arguments(fast, join), [root]);
+        let [joined] = harness.func.dfg.block_params(join) else {
+            panic!("expected a joined root");
+        };
+        assert_eq!(harness.operands(sum), [*joined, *joined]);
+        let mut slots = safepoints.into_iter().map(|call| {
+            let [entry] = harness.func.dfg.user_stack_map_entries(call).unwrap() else {
+                panic!("expected one live root");
+            };
+            entry.slot
+        });
+        let slot = slots.next().unwrap();
+        assert_eq!(slots.next(), Some(slot));
+        assert_eq!(stores_to(&harness.func, slot), 2);
+        for block in [first_slow, second_slow] {
+            let [value] = harness.arguments(block, join)[..] else {
+                panic!("expected one relocated root");
+            };
+            let reload = harness.func.dfg.value_def(value).unwrap_inst();
+            assert_eq!(harness.func.layout.inst_block(reload), Some(block));
+            assert_eq!(harness.reload(value), Some(slot));
+        }
+        for block in [entry, second_guard, fast, join] {
+            assert!(harness.func.layout.block_insts(block).all(|inst| {
+                !matches!(
+                    harness.func.dfg.insts[inst].opcode(),
+                    ir::Opcode::Load | ir::Opcode::Store
+                )
+            }));
         }
     }
 

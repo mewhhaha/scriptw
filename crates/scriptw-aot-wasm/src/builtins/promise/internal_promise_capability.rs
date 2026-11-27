@@ -93,7 +93,7 @@ impl FunctionBuilder<'_> {
         Ok(capability)
     }
 
-    fn emit_alloc_internal_intrinsic_promise_capability(
+    pub(super) fn emit_alloc_internal_intrinsic_promise_capability(
         &mut self,
         realm: &GcLocal<RealmRecord>,
         function: &mut Function,

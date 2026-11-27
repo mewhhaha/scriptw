@@ -7,6 +7,7 @@ use crate::code::EngineCode;
 use crate::prelude::*;
 use crate::profiling_agent::ProfilingAgent;
 use crate::runtime::vm::CompiledModuleId;
+use crate::sync::OnceLock;
 use alloc::sync::Arc;
 use core::ops::Range;
 use core::str;
@@ -27,9 +28,9 @@ pub struct CompiledModule {
     /// Sorted list, by function index, of names we have for this module.
     func_names: Vec<FunctionName>,
     /// Where each escaping defined function's code starts in the text
-    /// section, indexed by `FuncRefIndex` and filled when an instance first
-    /// initializes that function's `VMFuncRef` (see `func_ref_text`).
-    func_ref_text: Box<[CachedFuncRefText]>,
+    /// section, indexed by `FuncRefIndex`. The table is allocated on demand,
+    /// and each entry is filled when an instance first asks for those offsets.
+    func_ref_text: OnceLock<TryVec<CachedFuncRefText>>,
 }
 
 /// The text-section offsets a defined function's `VMFuncRef` points at.
@@ -80,20 +81,15 @@ impl CompiledModule {
         index: Arc<CompiledFunctionsTable>,
         profiler: &dyn ProfilingAgent,
     ) -> Result<Self> {
-        let mut func_ref_text = Vec::new();
-        func_ref_text.try_reserve_exact(info.module.num_escaped_funcs)?;
-        func_ref_text.resize_with(info.module.num_escaped_funcs, || CachedFuncRefText {
-            array_call: AtomicU32::new(CachedFuncRefText::UNKNOWN),
-            wasm_call: AtomicU32::new(CachedFuncRefText::UNKNOWN),
-        });
+        let func_names = info.func_names;
         let mut ret = Self {
             unique_id: CompiledModuleId::new(),
             engine_code,
             module: try_new::<Arc<_>>(info.module)?,
             meta: info.meta,
             index,
-            func_names: info.func_names,
-            func_ref_text: func_ref_text.into_boxed_slice(),
+            func_names,
+            func_ref_text: OnceLock::new(),
         };
         ret.register_profiling(profiler)?;
 
@@ -177,7 +173,21 @@ impl CompiledModule {
     /// does for its `VMFuncRef` slot.
     pub fn func_ref_text(&self, index: DefinedFuncIndex) -> FuncRefText {
         let func_ref = self.module.functions[self.module.func_index(index)].func_ref;
-        let cached = &self.func_ref_text[usize::try_from(func_ref.as_u32()).unwrap()];
+        let slot = usize::try_from(func_ref.as_u32()).unwrap();
+        let num_escaped_funcs = self.module.num_escaped_funcs;
+        assert!(slot < num_escaped_funcs);
+        let Ok(cache) = self.func_ref_text.get_or_try_init(|| {
+            let mut cache = TryVec::new();
+            cache.reserve_exact(num_escaped_funcs)?;
+            cache.resize_with(num_escaped_funcs, || CachedFuncRefText {
+                array_call: AtomicU32::new(CachedFuncRefText::UNKNOWN),
+                wasm_call: AtomicU32::new(CachedFuncRefText::UNKNOWN),
+            })?;
+            Ok::<_, OutOfMemory>(cache)
+        }) else {
+            return self.locate_func_ref_text(index);
+        };
+        let cached = &cache[slot];
         let text = FuncRefText {
             array_call: cached.array_call.load(Ordering::Relaxed),
             wasm_call: cached.wasm_call.load(Ordering::Relaxed),

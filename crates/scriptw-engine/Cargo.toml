@@ -20,6 +20,9 @@ wasmparser = "0.245.1"
 wasmtime = { version = "=47.0.0", default-features = false, features = ["cache", "cranelift", "gc", "gc-copying", "incremental-cache", "parallel-compilation", "pooling-allocator", "runtime", "std", "threads"] }
 wasmtime-fiber = { package = "wasmtime-internal-fiber", version = "=47.0.0", features = ["std"] }
 
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "=1.1.4", features = ["fs", "mm"] }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 rustix = { version = "=1.1.4", features = ["fs", "time"] }
 

@@ -30,38 +30,48 @@ CI releases and Test262 publication use `--release`.
 Compare engines within one cohort only. Full numbers, methods and limits live in
 [benchmark details](docs/rust-rewrite/benchmarks.md).
 
-### Cold start & edge workloads (2026-11-27, Runtime ABI 95)
+### Cold start & edge workloads (2026-11-27, Runtime ABI 96)
 
-Local `--release` build (`7ad9cb3d1577`) vs **Node 24.19.0** (`V8 13.6.233.17-node.51`)
+Local `--release` build (`6612a6755754`, `SCRWEP04`) vs **Node 24.19.0** (`V8 13.6.233.17-node.51`)
 on AMD Ryzen 7 7800X3D (CPUs 6–7, 4 GiB cap, exact stdout verified;
-[full tables](docs/rust-rewrite/benchmarks.md#2026-11-27-local-benchmarks-edge-cold-start-and-porffor)).
+[full tables](docs/rust-rewrite/benchmarks.md#2026-11-27-local-benchmarks-runtime-abi-96-process-density-warm-rsc-and-wtime)).
 
 ![CLI cold start: Scriptw vs Node 24.19.0](docs/rust-rewrite/assets/local-20261126/cli-cold-start.svg)
 
 ![Edge workloads: Scriptw vs V8 (80w)](docs/rust-rewrite/assets/local-20261126/edge-kernels.svg)
 
-### Runtime kernels vs V8 (2026-11-27, Runtime ABI 95)
+### Runtime kernels vs V8 (2026-11-27, Runtime ABI 96)
 
 ![Runtime kernels: Scriptw speedup over Node 24 / V8 (80w)](docs/rust-rewrite/assets/local-20261126/runtime-kernels-v8.svg)
 
-### Scriptw vs Porffor 0.61.13 (2026-11-27, Runtime ABI 95)
+### Scriptw vs Porffor 0.61.13 (2026-11-27, Runtime ABI 96)
 
 ![Scriptw vs Porffor 0.61.13 runtime kernels](docs/rust-rewrite/assets/local-20261126/porffor-comparison.svg)
 
 ![JS to Wasm compilation: Scriptw vs Porffor 0.61.13](docs/rust-rewrite/assets/local-20261126/porffor-compile.svg)
 
-### Process density (2026-11-25)
+### Wasm runtimes: Wasmtime 47 vs `../wtime` (2026-11-27, Runtime ABI 96)
+
+Benchmark-only peer comparison against `../wtime` (`wtime-runtime v0.1.8`, `Decoded` and `Register` interpreters)
+via standalone `scripts/wasm_peer_wtime/`; vendored **Wasmtime 47** remains the sole product backend.
+
+![Wasm runtimes: Wasmtime 47 vs wtime](docs/rust-rewrite/assets/local-20261126/wtime-runtimes.svg)
+
+![Scriptw Portable vs Porffor on wtime Register](docs/rust-rewrite/assets/local-20261126/wtime-scriptw-vs-porffor.svg)
+
+### Process density (2026-11-27, Runtime ABI 96)
 
 ![Process density: memory per added process](docs/rust-rewrite/assets/local-20261126/process-density.svg)
 
-[Method and limits](docs/rust-rewrite/benchmarks.md#process-density) ·
-[data](docs/rust-rewrite/process-density-current.json).
+[2026-11-27 density table](docs/rust-rewrite/benchmarks.md#process-density-scrwep04-n--1-8-32) ·
+[earlier 2026-11-25 method and limits](docs/rust-rewrite/benchmarks.md#process-density) ·
+[earlier data](docs/rust-rewrite/process-density-current.json).
 
-### React Server Components (2026-11-27, Runtime ABI 95)
+### React Server Components (2026-11-27, Runtime ABI 96)
 
-![React 19.3.1 Server Components: Scriptw ABI 95 vs Node 24 / V8](docs/rust-rewrite/assets/local-20261126/rsc-runtime.svg)
+![React 19.3.1 Server Components: Scriptw ABI 96 vs Node 24 / V8](docs/rust-rewrite/assets/local-20261126/rsc-runtime.svg)
 
-[Full 2026-11-27 RSC table](docs/rust-rewrite/benchmarks.md#react-1931-server-components-retained-flight-vs-node-24190) ·
+[Full 2026-11-27 ABI 96 RSC table](docs/rust-rewrite/benchmarks.md#react-1931-server-components-warm-retained-and-scrwep04-precompiled) ·
 [earlier 2026-11-17 cloud RSC panel](docs/rust-rewrite/benchmarks.md#react-server-components) ·
 [cloud data](docs/rust-rewrite/rsc-current.json).
 
@@ -144,7 +154,7 @@ affected Rust suites and pinned Test262 subtrees ([current work](docs/rust-rewri
   itself has no internal memory limit or deadline — compile untrusted input under
   an OS memory cap and timeout
   ([limits](docs/rust-rewrite/runtime-requirements.md#implementation-limits)).
-- **Runtime ABI 95:** Rebuild Portable bundles and native images built under an
+- **Runtime ABI 96:** Rebuild Portable bundles and native images built under an
   earlier ABI ([details](docs/rust-rewrite/runtime-requirements.md#runtime-abi)).
 
 [Development and verification](CONTRIBUTING.md) ·

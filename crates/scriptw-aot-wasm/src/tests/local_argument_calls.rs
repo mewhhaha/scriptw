@@ -579,13 +579,18 @@ fn inspect_known_source_call(tail: bool, wide: bool) {
                 "actual defining program identity guards the direct arm"
             );
             assert!(
-                operators[direct + 1..].iter().any(|op| match op {
-                    Operator::CallRef { type_index } if !tail => *type_index == target_signature,
-                    Operator::ReturnCallRef { type_index } if tail =>
-                        *type_index == target_signature,
-                    _ => false,
-                }),
-                "an identity miss still calls the actual typed source entry"
+                operators[direct + 1..].iter().any(|op| matches!(
+                    op,
+                    Operator::Call { .. } | Operator::ReturnCall { .. }
+                )),
+                "an identity miss falls back to generic argv dispatch without duplicating indirect call_ref entries"
+            );
+            assert!(
+                !operators[direct + 1..].iter().any(|op| matches!(
+                    op,
+                    Operator::CallRef { .. } | Operator::ReturnCallRef { .. }
+                )),
+                "a planned direct call does not duplicate published call_ref dispatch inline"
             );
             inspected = true;
         }

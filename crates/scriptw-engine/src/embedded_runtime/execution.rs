@@ -166,9 +166,24 @@ impl CargoExecutionRuntime {
     pub(crate) fn load(
         &self,
         engine: &Engine,
-        key: scriptw_aot_wasm::RuntimeArtifactKey,
+        key: RuntimeArtifactKey,
         mode: WasmNativeCompilationMode,
     ) -> Result<Module, EngineError> {
+        self.check_precompiled(key, mode)?;
+        let mut timings = Default::default();
+        self.native.load_admitted(engine, mode, &mut timings).ok_or_else(|| {
+            EngineError::new(format!(
+                "matching Cargo {:?} native runtime is unavailable or incompatible; no compiler fallback",
+                self.profile()
+            ))
+        })
+    }
+
+    pub(crate) fn check_precompiled(
+        &self,
+        key: RuntimeArtifactKey,
+        mode: WasmNativeCompilationMode,
+    ) -> Result<(), EngineError> {
         if key.as_bytes() != &self.receipt.key {
             return Err(EngineError::new(
                 "precompiled program requires a different Cargo runtime key",
@@ -179,13 +194,7 @@ impl CargoExecutionRuntime {
                 "Cargo execution mode is unavailable; no compiler fallback",
             ));
         }
-        let mut timings = Default::default();
-        self.native.load_admitted(engine, mode, &mut timings).ok_or_else(|| {
-            EngineError::new(format!(
-                "matching Cargo {:?} native runtime is unavailable or incompatible; no compiler fallback",
-                self.profile()
-            ))
-        })
+        Ok(())
     }
 
     pub(crate) fn load_native(

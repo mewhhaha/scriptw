@@ -193,8 +193,9 @@ Commands:
                                         precompiled native image (default policy:
                                         speed; global --jobs sets compiler threads);
                                         writes a read-only file by atomic rename.
-                                        Load it with PrecompiledEmbeddedProgram on
-                                        the same Scriptw build and CPU features
+                                        Load it with PrecompiledEmbeddedProgram::from_file
+                                        on the same Scriptw build and CPU features.
+                                        Keep the file inode unchanged during execution
   cache status                          report bounded Scriptw caches and the
                                         legacy global Wasmtime cache
   cache prune [--legacy-wasmtime]       delete Scriptw caches; optionally delete

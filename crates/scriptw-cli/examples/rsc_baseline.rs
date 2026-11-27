@@ -420,15 +420,25 @@ fn run() -> Result<Value> {
     // A precompiled image runs no front end or emitter: that stage stays null.
     let mut front_and_emit_high_water = Value::Null;
     let mut artifact_directory = None;
+    enum ProgramWasmEvidence {
+        Owned(Vec<u8>),
+        Precompiled(PrecompiledEmbeddedProgram),
+    }
+    impl ProgramWasmEvidence {
+        fn as_slice(&self) -> &[u8] {
+            match self {
+                Self::Owned(bytes) => bytes,
+                Self::Precompiled(image) => image.program_wasm(),
+            }
+        }
+    }
     let (native, runtime, configuration, program_wasm, runtime_identity) = if let Some(path) =
         &precompiled_image
     {
         load_started = Instant::now();
-        let bytes = fs::read(path)?;
-        // SAFETY: this diagnostic's operator supplies an unchanged image that
-        // this build's `scriptw precompile` produced.
-        let image = unsafe { PrecompiledEmbeddedProgram::from_bytes(&bytes) }?;
-        drop(bytes);
+        // SAFETY: the operator supplies this build's trusted precompile output
+        // and keeps its inode unchanged throughout execution.
+        let image = unsafe { PrecompiledEmbeddedProgram::from_file(path) }?;
         phases.insert(
             "image_read_and_admission".into(),
             json!(load_started.elapsed().as_nanos()),
@@ -446,7 +456,7 @@ fn run() -> Result<Value> {
         );
         let configuration = json!({
             "wasmtime":"47.0.0","precompiled_image":path,
-            "precompiled_image_sha256":hash(image.as_bytes()),
+            "precompiled_image_sha256":image.image_sha256().iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
             "precompiled_image_bytes":image.as_bytes().len(),
             "native_policy":"chosen by scriptw precompile; native-mode names it",
             "compiler_enabled":false,"target":native.get_target(),
@@ -465,7 +475,7 @@ fn run() -> Result<Value> {
             native,
             runtime,
             configuration,
-            image.program_wasm().to_vec(),
+            ProgramWasmEvidence::Precompiled(image),
             runtime_identity,
         )
     } else {
@@ -616,7 +626,7 @@ fn run() -> Result<Value> {
             native,
             runtime,
             configuration,
-            artifact.bytes,
+            ProgramWasmEvidence::Owned(artifact.bytes),
             runtime_identity,
         )
     };
@@ -781,7 +791,7 @@ fn run() -> Result<Value> {
             "source_bytes":original.len(),"wrapper":WRAPPER,"adapted_source_sha256":hash(source.as_bytes()),
             "adapted_source_bytes":source.len(),"support":support_path,"support_sha256":hash(&support_bytes),
             "versions":support["versions"]},
-        "program_wasm_sha256":hash(&program_wasm),"program_wasm_bytes":program_wasm.len(),
+        "program_wasm_sha256":hash(program_wasm.as_slice()),"program_wasm_bytes":program_wasm.as_slice().len(),
         "runtime":runtime_identity,
         "phases_ns":phases,
         "load_to_first_request_ns":load_to_first_request_ns,

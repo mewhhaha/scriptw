@@ -1,32 +1,23 @@
-//! Consecutive `instanceof` sites on one binding walk its chain once.
+//! Share a receiver's prototype walk across guards in a statement list.
 //!
-//! An `instanceof` run is a prefix of a statement list in which every
-//! statement is `if (x instanceof G) S`, with no else, the same declarative
-//! binding x (a Wasm local or an environment cell: reading either runs no
-//! code), a read of a global binding G, and an S that never completes
-//! normally.
-//! A later site is then reached only from the previous site's false answer:
-//! S leaves the list, no other statement runs between the sites, and a
-//! site's record path reads x, G's records and C's edges without observing
-//! anything. The sites share the proof that their Global Environment
-//! Record has no declarative names and that @@hasInstance has no hash.
-//! The run's first site, once its record's proof holds, walks V's
-//! [[Prototype]] chain into the run's slots; a later site, after its own
-//! record's proof, answers from those slots when it meets that very V.
-//! [[GetPrototypeOf]] of the ordinary, function and Array objects the walk
-//! admits observes nothing and their edges change only through code that
-//! no fast path runs. Every site's slow path invalidates both the shared
-//! proof and the slots before it may run user code. The run starts with
-//! neither on every entry to its statement list.
+//! Every path between participating sites either evaluates only inert guards
+//! and guarded `instanceof` sites, or exits the run. A site's record can
+//! answer its global read and `@@hasInstance` check without running user
+//! code. Its slow path forgets the walk and shared proof before either read
+//! can run user code. Ordinary objects, functions and Arrays have inert
+//! [[GetPrototypeOf]]. Their edges stay stable through fast answers and
+//! inert tests. Each entry to the statement list starts with no proof.
 use super::*;
 use crate::emit::BindingStorage;
-use crate::gc_types::{Environment, EnvironmentSchema};
+use crate::gc_types::{
+    Environment, EnvironmentSchema, InstanceofSiteRecord, InstanceofSiteRecordSchema,
+};
 
 /// The prefix of V's chain the first site keeps: an ordinary object, a
 /// class instance and a subclass instance end within it at %Object.prototype%.
 const CHAIN_SLOTS: usize = 3;
 
-/// A run of at least two `instanceof` statements.
+/// A statement-list prefix containing at least two participating sites.
 struct InstanceofRun<'a> {
     statements: &'a [StatementIr],
     sites: Vec<*const TypedExpr>,
@@ -37,49 +28,204 @@ impl<'a> InstanceofRun<'a> {
         if !builder.has_source_execution_environment() {
             return None;
         }
-        let mut local = None;
-        let mut sites = Vec::new();
+        let mut scan = RunScan {
+            builder,
+            binding: None,
+            sites: Vec::new(),
+        };
+        let mut length = 0;
         for statement in statements {
-            let Some((lhs, id)) = run_site(builder, statement) else {
-                break;
-            };
-            if *local.get_or_insert(id) != id {
+            let checkpoint = (scan.binding, scan.sites.len());
+            if !scan.statement(statement, false) {
+                scan.binding = checkpoint.0;
+                scan.sites.truncate(checkpoint.1);
+                // A final if or expression can end in arbitrary code along
+                // a branch. No later site in this run can see its effects.
+                scan.statement(statement, true);
+                length += usize::from(scan.sites.len() > checkpoint.1);
                 break;
             }
-            sites.push(lhs as *const TypedExpr);
+            length += 1;
+            if scan.sites.is_empty() {
+                return None;
+            }
+            if never_completes_normally(statement) {
+                break;
+            }
         }
-        (sites.len() >= 2).then(|| Self {
-            statements: &statements[..sites.len()],
-            sites,
+        (scan.sites.len() >= 2).then(|| Self {
+            statements: &statements[..length],
+            sites: scan.sites,
         })
     }
 }
 
-/// `if (x instanceof G) S` with a declarative binding x, a global read G and
-/// an S that never completes normally: x's operand node and binding. A site
-/// answers from the slots only for the very V they were walked for, so x's
-/// identity matters only in that its read runs no code.
-fn run_site<'a>(
-    builder: &FunctionBuilder<'_>,
-    statement: &'a StatementIr,
-) -> Option<(&'a TypedExpr, BindingStorage)> {
-    let StatementIr::If {
-        condition,
-        then_branch,
-        else_branch: None,
-    } = statement
-    else {
-        return None;
-    };
-    let ExprIr::InstanceOf { lhs, rhs } = &condition.expr else {
-        return None;
-    };
-    let ExprIr::Identifier(name) = &lhs.expr else {
-        return None;
-    };
-    let id = builder.lookup_binding(name)?;
-    GlobalReadOperand::of(rhs)?;
-    never_completes_normally(then_branch).then_some((lhs, id))
+struct RunScan<'a, 'source> {
+    builder: &'a FunctionBuilder<'source>,
+    binding: Option<BindingStorage>,
+    sites: Vec<*const TypedExpr>,
+}
+
+impl RunScan<'_, '_> {
+    /// With `tail`, a branch may execute arbitrary code when exiting the run.
+    fn statement(&mut self, statement: &StatementIr, tail: bool) -> bool {
+        match statement {
+            StatementIr::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                if !self.test(condition) {
+                    if tail {
+                        self.tail_expression(condition);
+                    }
+                    return tail;
+                }
+                self.statement(then_branch, tail)
+                    && else_branch
+                        .as_deref()
+                        .is_none_or(|branch| self.statement(branch, tail))
+            }
+            StatementIr::Return(value) | StatementIr::Throw(value) => {
+                self.tail_expression(value);
+                true
+            }
+            StatementIr::Expression(value) if tail => {
+                self.tail_expression(value);
+                true
+            }
+            StatementIr::Expression(value) => self.test(value),
+            StatementIr::Empty => true,
+            _ => tail || never_completes_normally(statement),
+        }
+    }
+
+    /// Roll back a rejected test so a sibling branch can keep scanning
+    /// with the proof available when the branches diverged.
+    fn test(&mut self, expression: &TypedExpr) -> bool {
+        let checkpoint = (self.binding, self.sites.len());
+        if self.guard(expression) {
+            return true;
+        }
+        self.binding = checkpoint.0;
+        self.sites.truncate(checkpoint.1);
+        false
+    }
+
+    /// An arbitrary leaf is permitted once control cannot reach another
+    /// participating site. Short-circuit and conditional arms retain their
+    /// original evaluation and run only after an admitted prefix.
+    fn tail_expression(&mut self, expression: &TypedExpr) {
+        match &expression.expr {
+            ExprIr::Conditional {
+                condition,
+                then_expr,
+                else_expr,
+            } => {
+                if self.test(condition) {
+                    self.tail_expression(then_expr);
+                    self.tail_expression(else_expr);
+                } else {
+                    self.tail_expression(condition);
+                }
+            }
+            ExprIr::LogicalShortCircuit { lhs, rhs, .. } | ExprIr::Comma { lhs, rhs } => {
+                if self.test(lhs) {
+                    self.tail_expression(rhs);
+                } else {
+                    self.tail_expression(lhs);
+                }
+            }
+            _ => {
+                self.test(expression);
+            }
+        }
+    }
+
+    fn guard(&mut self, expression: &TypedExpr) -> bool {
+        match &expression.expr {
+            ExprIr::InstanceOf { lhs, rhs } => {
+                let ExprIr::Identifier(name) = &lhs.expr else {
+                    return false;
+                };
+                let Some(binding) = self.builder.lookup_binding(name) else {
+                    return false;
+                };
+                if GlobalReadOperand::of(rhs).is_none()
+                    || self.binding.is_some_and(|previous| previous != binding)
+                {
+                    return false;
+                }
+                self.binding = Some(binding);
+                self.sites.push(lhs.as_ref() as *const TypedExpr);
+                true
+            }
+            ExprIr::Identifier(name) => self.builder.lookup_binding(name).is_some(),
+            ExprIr::EnvironmentIdentifier(identifier) => {
+                matches!(
+                    identifier.resolution_start(),
+                    scriptw_ir::EnvironmentIdentifierResolutionStart::Cell(_)
+                ) && matches!(
+                    identifier.operation,
+                    scriptw_ir::EnvironmentIdentifierOperationIr::Read
+                        | scriptw_ir::EnvironmentIdentifierOperationIr::Typeof
+                )
+            }
+            ExprIr::Undefined
+            | ExprIr::Null
+            | ExprIr::Boolean(_)
+            | ExprIr::Number(_)
+            | ExprIr::String(_) => true,
+            ExprIr::TypeOf { expr } | ExprIr::LogicalNot { expr } | ExprIr::Void { expr } => {
+                self.guard(expr)
+            }
+            ExprIr::StrictEquality { lhs, rhs, .. }
+            | ExprIr::LogicalShortCircuit { lhs, rhs, .. }
+            | ExprIr::Comma { lhs, rhs } => self.guard(lhs) && self.guard(rhs),
+            ExprIr::LooseEquality { lhs, rhs, .. } => {
+                loose_guard_is_inert(lhs, rhs) && self.guard(lhs) && self.guard(rhs)
+            }
+            ExprIr::Conditional {
+                condition,
+                then_expr,
+                else_expr,
+            } => self.guard(condition) && self.guard(then_expr) && self.guard(else_expr),
+            ExprIr::SpecOperation {
+                operation,
+                operands,
+            } => {
+                let inert = match operation {
+                    SpecOperationIr::IsLooselyEqual => {
+                        matches!(operands.as_slice(), [lhs, rhs] if loose_guard_is_inert(lhs, rhs))
+                    }
+                    SpecOperationIr::StrictEqualityComparison
+                    | SpecOperationIr::SameValue
+                    | SpecOperationIr::SameValueZero
+                    | SpecOperationIr::IsCallable
+                    | SpecOperationIr::IsConstructor
+                    | SpecOperationIr::IsPropertyKey
+                    | SpecOperationIr::ToBoolean => true,
+                    _ => false,
+                };
+                inert && operands.iter().all(|operand| self.guard(operand))
+            }
+            _ => false,
+        }
+    }
+}
+
+fn loose_guard_is_inert(lhs: &TypedExpr, rhs: &TypedExpr) -> bool {
+    fn nullish(value: &TypedExpr) -> bool {
+        matches!(
+            value.expr,
+            ExprIr::Null | ExprIr::Undefined | ExprIr::Void { .. }
+        )
+    }
+    fn string(value: &TypedExpr) -> bool {
+        matches!(value.expr, ExprIr::TypeOf { .. } | ExprIr::String(_))
+    }
+    // Nullish loose equality uses a tag/IsHTMLDDA test without coercion.
+    nullish(lhs) || nullish(rhs) || (string(lhs) && string(rhs))
 }
 
 /// A `return` or `throw`, or a block that ends with one: every completion
@@ -96,10 +242,9 @@ fn never_completes_normally(statement: &StatementIr) -> bool {
     }
 }
 
-/// V's chain as the run's first site walked it: OWNER is that V (undefined
-/// while nothing is kept), the slots hold the chain's first objects in order
-/// and null after its end, and COMPLETE says that the chain ends within them,
-/// at null or at an object whose [[Prototype]] is immutably null.
+/// The owner is V, or undefined for an empty cache. The slots hold the
+/// chain's first objects in order, with nulls after its end. A complete
+/// chain reaches null or an object whose [[Prototype]] is immutably null.
 pub(crate) struct WalkedChain {
     owner: ValueLocals,
     slots: [GcLocal<JavaScriptObject, Nullable>; CHAIN_SLOTS],
@@ -141,8 +286,8 @@ impl ActiveInstanceofRun {
     }
 }
 
-/// The first site walks V's chain into the slots; every later site reuses
-/// them for the same V.
+/// The first site starts with empty slots. Later sites check the owner before
+/// deciding whether to reuse or fill them.
 #[derive(Clone, Copy)]
 enum RunRole {
     Walk,
@@ -156,16 +301,15 @@ pub(super) struct RunSite<'a> {
 }
 
 /// What a usable record's answer hands to a run site: an Object-tagged V,
-/// C's "prototype", the record's TERMINAL, the walk's locals and its exits.
+/// C's "prototype", the record, the walk's locals and its exits.
 pub(super) struct ChainWalk<'a> {
     pub(super) object: &'a ValueLocals,
     pub(super) prototype: &'a GcLocal<JavaScriptObject, Nullable>,
-    pub(super) terminal: &'a GcLocal<JavaScriptObject, Nullable>,
+    pub(super) record: &'a GcLocal<InstanceofSiteRecord, Nullable>,
     pub(super) next: &'a GcLocal<JavaScriptObject, Nullable>,
     pub(super) current: &'a GcLocal<JavaScriptObject, Nullable>,
     pub(super) answer: I32Local,
     pub(super) answered: ControlTarget,
-    pub(super) candidates: ControlTarget,
     pub(super) slow: ControlTarget,
 }
 
@@ -253,13 +397,9 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
     }
 
-    /// The candidates of a run site's walk: the first site walks V's chain
-    /// into the slots; a later site that meets the slots' V reads them, and
-    /// one that meets another V walks as a lone site would. A slot holding
-    /// C's "prototype" answers true, and a chain that ends within the slots
-    /// without it answers false. Otherwise the walk goes on from the last
-    /// slot. Every step only reads, and any other layout on the chain goes
-    /// to the slow path, which forgets the slots.
+    /// The first reached usable site fills the slots. Other sites reuse
+    /// them for the same receiver, including after a conditional skip or
+    /// a slow path that invalidated the earlier proof.
     pub(super) fn emit_run_chain_candidates(
         &mut self,
         site: RunSite<'_>,
@@ -268,56 +408,55 @@ impl FunctionBuilder<'_> {
     ) {
         let s = self.runtime_schema();
         let chain = site.chain;
-        match site.role {
-            RunRole::Walk => {
-                self.emit_chain_prototype_or_branch(
-                    CandidateObject::Reference(walk.object.reference()),
-                    walk.next,
-                    walk.slow,
-                    f,
-                );
-                let (first, rest) = chain.slots.split_first().expect("the run keeps a slot");
-                first.replace(walk.next.load(s, f), f);
-                for slot in rest {
-                    slot.set_null(s, f);
-                }
-                chain.complete.set_constant(1, f);
-                let filled = self.open_frame(ControlFrameKind::Block, f);
-                for slot in rest {
-                    emit_chain_ends_i32(walk.next, walk.terminal, s, f);
-                    self.emit_branch_if_to_target(filled, f);
-                    walk.current.replace(walk.next.load(s, f), f);
-                    self.emit_chain_prototype_or_branch(
-                        CandidateObject::Prototype(walk.current),
-                        walk.next,
-                        walk.slow,
-                        f,
-                    );
-                    slot.replace(walk.next.load(s, f), f);
-                }
-                emit_chain_ends_i32(walk.next, walk.terminal, s, f);
-                self.emit_branch_if_to_target(filled, f);
-                chain.complete.set_constant(0, f);
-                self.pop_control(ControlFrameKind::Block);
-                f.instruction(&Instruction::End);
-                chain.owner.copy_from(walk.object, f);
-            }
-            RunRole::Reuse => {
-                chain.owner.reference().load(f);
-                walk.object.reference().load(f);
-                f.instruction(&Instruction::RefEq);
-                f.instruction(&Instruction::I32Eqz);
-                self.open_frame(ControlFrameKind::If, f);
-                self.emit_chain_prototype_or_branch(
-                    CandidateObject::Reference(walk.object.reference()),
-                    walk.next,
-                    walk.slow,
-                    f,
-                );
-                self.emit_branch_to_target(walk.candidates, f);
-                self.pop_control(ControlFrameKind::If);
-                f.instruction(&Instruction::End);
-            }
+        if matches!(site.role, RunRole::Reuse) {
+            chain.owner.reference().load(f);
+            walk.object.reference().load(f);
+            f.instruction(&Instruction::RefEq);
+            f.instruction(&Instruction::I32Eqz);
+            self.open_frame(ControlFrameKind::If, f);
+            f.rarely_reached();
+        }
+        self.emit_chain_prototype_or_branch(
+            CandidateObject::Reference(walk.object.reference()),
+            walk.next,
+            walk.slow,
+            f,
+        );
+        let (first, rest) = chain.slots.split_first().expect("the run keeps a slot");
+        first.replace(walk.next.load(s, f), f);
+        for slot in rest {
+            slot.set_null(s, f);
+        }
+        let terminal = s.reserve_gc_local(f).initialize(
+            s.field(InstanceofSiteRecordSchema::TERMINAL)
+                .read(walk.record, s, f)
+                .reference(),
+            f,
+        );
+        chain.complete.set_constant(1, f);
+        let filled = self.open_frame(ControlFrameKind::Block, f);
+        for slot in rest {
+            emit_chain_ends_i32(walk.next, &terminal, s, f);
+            self.emit_branch_if_to_target(filled, f);
+            walk.current.replace(walk.next.load(s, f), f);
+            self.emit_chain_prototype_or_branch(
+                CandidateObject::Prototype(walk.current),
+                walk.next,
+                walk.slow,
+                f,
+            );
+            slot.replace(walk.next.load(s, f), f);
+        }
+        emit_chain_ends_i32(walk.next, &terminal, s, f);
+        self.emit_branch_if_to_target(filled, f);
+        chain.complete.set_constant(0, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        terminal.clear(f);
+        chain.owner.copy_from(walk.object, f);
+        if matches!(site.role, RunRole::Reuse) {
+            self.pop_control(ControlFrameKind::If);
+            f.instruction(&Instruction::End);
         }
         // Null slots never equal C's "prototype", an object.
         for (index, slot) in chain.slots.iter().enumerate() {

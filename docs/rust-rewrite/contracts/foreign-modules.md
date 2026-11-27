@@ -441,9 +441,16 @@ ID set and native snapshot, including timeouts. Full affected native commands
 and all selected IDs are retained in the JSON rather than a permissive filter
 or expected-failure suppression.
 
-Precompiled native program frames use `SCRWEP03`. Their private binary execution facts
-are minted after successful Portable compilation, including inert initialization,
-foreign declarations and the exact Cargo Minimal Portable runtime requirement.
+Precompiled native program frames use `SCRWEP04` (native-first with a fixed
+126-byte footer). Native P starts at byte offset zero so Wasmtime can map the
+native range directly from an open file (`PrecompiledEmbeddedProgram::from_file`
+on Unix via `Module::deserialize_open_file_range`) without copying the native
+image into anonymous heap memory, followed by raw P, private binary execution
+facts, and the fixed footer (magic, compiler source fingerprint, linked flag,
+runtime key, compilation mode, program/native/facts lengths, and SHA-256 of all
+preceding bytes). The private binary execution facts are minted after successful
+Portable compilation, including inert initialization, foreign declarations and
+the exact Cargo Minimal Portable runtime requirement.
 Facts carry the foreign ABI, optional error tag, ordered modules/functions,
 explicit value/mode tags and length-prefixed UTF-8 names. Counts are bounded
 before allocation, and existing declaration constructors validate each entry.
@@ -453,10 +460,12 @@ Consumers decode these bounded facts without parsing raw P again or
 reconstructing compiler planning data for R. Actual deserialized foreign function
 types, exception Tag identity, Engine/Store ownership and lifecycle checks remain.
 The unsafe recovery contract requires the whole unchanged producer envelope,
-including execution facts and raw/native correspondence. Checksums and decoded
+including execution facts and raw/native correspondence; file-backed loading
+additionally requires the underlying inode to remain immutable for the lifetime
+of the loaded module. Checksums and decoded
 facts grant no authority to deserialize caller-supplied native code. Rebuild
 older native frames; the read-only benchmark evidence reader retains historical
-SW01/SW02 support independently of the product loader.
+SW01/SW02/SW03 support independently of the product loader.
 
 Canonical foreign execution facts are bounded at 1 MiB, and the complete native
 program envelope at 256 MiB. Oversized or noncanonical facts are rejected.
