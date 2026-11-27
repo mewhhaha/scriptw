@@ -1,8 +1,6 @@
 //! Exact deterministic export of every payload consumed by the closed calendars.
 
-use icu_calendar::provider::{
-    Baked, CalendarChineseV1, CalendarDangiV1, CalendarHijriUmmAlQuraV1, CalendarJapaneseModernV1,
-};
+use icu_calendar::provider::{Baked, CalendarJapaneseModernV1};
 use icu_provider::dynutil::UpcastDataPayload;
 use icu_provider::export::{DataExporter, ExportMarker, FlushMetadata};
 use icu_provider::prelude::*;
@@ -21,10 +19,7 @@ pub fn export() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
                 exporter.flush(<$marker>::INFO, FlushMetadata::default())?;
             };
         }
-        singleton!(CalendarChineseV1);
-        singleton!(CalendarDangiV1);
         singleton!(CalendarJapaneseModernV1);
-        singleton!(CalendarHijriUmmAlQuraV1);
         exporter.close()?;
     }
     if bytes.is_empty() {

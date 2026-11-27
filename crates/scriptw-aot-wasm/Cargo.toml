@@ -5,8 +5,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-icu_calendar = { version = "=2.0.6", default-features = false, features = ["compiled_data"] }
-icu_normalizer = { version = "=2.0.1", default-features = false, features = ["compiled_data"] }
+icu_calendar = { version = "2.0.6", default-features = false, features = ["compiled_data"] }
+icu_normalizer = { version = "2.0.1", default-features = false, features = ["compiled_data"] }
 icu_properties = "2.0.2"
 memchr = { version = "2.8.0", default-features = false, features = ["std"] }
 scriptw-ir = { path = "../scriptw-ir" }
@@ -26,8 +26,8 @@ wasmparser = "0.245.1"
 wasmtime-environ = { version = "=47.0.0", default-features = false, features = ["gc-copying", "std"] }
 
 [build-dependencies]
-icu_calendar = { version = "=2.0.6", default-features = false, features = ["compiled_data"] }
-icu_normalizer = { version = "=2.0.1", default-features = false, features = ["compiled_data"] }
+icu_calendar = { version = "2.0.6", default-features = false, features = ["compiled_data"] }
+icu_normalizer = { version = "2.0.1", default-features = false, features = ["compiled_data"] }
 
 [lib]
 path = "src/lib.rs"

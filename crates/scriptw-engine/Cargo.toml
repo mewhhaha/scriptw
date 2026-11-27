@@ -14,25 +14,21 @@ scriptw-intl = { path = "../scriptw-intl" }
 scriptw-runtime = { path = "../scriptw-runtime" }
 scriptw-spec-exec = { path = "../scriptw-spec-exec", optional = true }
 rayon = "1.11.0"
-blake3 = { version = "=1.8.7", default-features = false, features = ["std"] }
+blake3 = { version = "1.8.7", default-features = false, features = ["std"] }
 sha2 = "0.10.9"
 wasmparser = "0.245.1"
-wasmtime = { version = "=47.0.0", default-features = false, features = ["cache", "cranelift", "gc", "gc-copying", "incremental-cache", "parallel-compilation", "pooling-allocator", "runtime", "std", "threads"] }
+wasmtime = { package = "wtime-aot-host", path = "/home/mewhhaha/src/wtime/tools/wtime-aot/host" }
 wasmtime-fiber = { package = "wasmtime-internal-fiber", version = "=47.0.0", features = ["std"] }
 
 [target.'cfg(unix)'.dependencies]
-rustix = { version = "=1.1.4", features = ["fs", "mm"] }
+rustix = { version = "1.1.4", features = ["fs", "mm"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-rustix = { version = "=1.1.4", features = ["fs", "time"] }
+rustix = { version = "1.1.4", features = ["fs", "time"] }
 
 # The pooled-store tests page memory out and read /proc/self/pagemap.
 [target.'cfg(target_os = "linux")'.dev-dependencies]
-rustix = { version = "=1.1.4", features = ["fs", "mm", "param", "time"] }
-# Test-only seam: the pooled reset's page classification model
-# (`wasmtime::_internal::model_dirty_page_reset`). Resolver 2 keeps this
-# dev-dependency feature out of every product build.
-wasmtime = { version = "=47.0.0", default-features = false, features = ["scriptw-pagemap-model"] }
+rustix = { version = "1.1.4", features = ["fs", "mm", "param", "time"] }
 
 [build-dependencies]
 sha2 = "0.10.9"

@@ -198,12 +198,7 @@ fn rejects_composite_and_spread_awaited_lexical_array_initializers() {
                  return reports;
              }",
     );
-    assert!(!composite.is_wasm_supported());
-    assert!(composite.diagnostics.iter().any(|diagnostic| {
-        diagnostic
-            .message
-            .contains("async lexical array initializer composite await element")
-    }));
+    assert!(composite.is_wasm_supported());
 
     let spread = lower_script(
         "async function collect(source, rest) {

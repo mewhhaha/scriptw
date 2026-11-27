@@ -2189,6 +2189,29 @@ impl RuntimeSchema {
         ));
         emit_root_set(function, self.pending_job_queue_root(end));
     }
+    pub(crate) fn load_async_context(
+        &self,
+        function: &mut Function,
+    ) -> GcLocal<StoredValue, Nullable> {
+        let slot = self.reserve_gc_local::<StoredValue, Nullable>(function);
+        emit_root_get(function, self.async_context);
+        slot.initialize(GcStackReference::new(), function)
+    }
+    pub(crate) fn replace_async_context<N: GcFieldNullability>(
+        &self,
+        value: &GcLocal<StoredValue, N>,
+        function: &mut Function,
+    ) {
+        value.load(self, function);
+        emit_root_set(function, self.async_context);
+    }
+    pub(crate) fn clear_async_context(&self, function: &mut Function) {
+        function.instruction(&Instruction::RefNull(
+            self.reference_type::<StoredValue>(GcNullability::Nullable)
+                .heap_type,
+        ));
+        emit_root_set(function, self.async_context);
+    }
     pub(crate) fn load_unhandled_promise_queue(
         &self,
         end: RuntimeQueueEnd,

@@ -176,12 +176,39 @@ pub struct EmbeddedRuntime {
     /// Where a Collect-mode P keeps its execution profile; `None` for any
     /// other P.
     profile_sites: Option<execution_profile::ProfileSites>,
+    /// Optional `NativeHost` runtime artifact + policy enabling runtime `eval`/`Function`
+    /// native compilation via `wtime-aot` inside embedded Stores.
+    #[cfg(feature = "native-source-compiler")]
+    native_source: Option<(
+        Arc<scriptw_aot_wasm::RuntimeArtifact>,
+        WasmCompilationPolicy,
+        WasmNativeCompilationMode,
+    )>,
 }
 
 impl EmbeddedRuntime {
     /// Admit persisted requirements and compile actual Wasm, without parsing JS,
     /// resolving source files or installing a Rust foreign-closure registry.
     pub fn compile(engine: &wasmtime::Engine, artifact: &Artifact) -> Result<Self, EngineError> {
+        Self::compile_with_profile(engine, artifact, false)
+    }
+
+    /// Like [`Self::compile`], but admits a `NativeHost` artifact emitted by
+    /// [`Engine::emit_wasm_native_host`] so dynamic `eval` and `new Function`
+    /// compile natively against the live embedded runtime `R`.
+    #[cfg(feature = "native-source-compiler")]
+    pub fn compile_native_host(
+        engine: &wasmtime::Engine,
+        artifact: &Artifact,
+    ) -> Result<Self, EngineError> {
+        Self::compile_with_profile(engine, artifact, true)
+    }
+
+    fn compile_with_profile(
+        engine: &wasmtime::Engine,
+        artifact: &Artifact,
+        allow_native_host: bool,
+    ) -> Result<Self, EngineError> {
         run_on_sized_stack(|| {
             let foreign = artifact.foreign_modules()?;
             PRODUCT_WASMTIME_POLICY
@@ -190,10 +217,15 @@ impl EmbeddedRuntime {
             // A parallel Engine compiling outside the bounded pool would use
             // Rayon's global pool, one thread per CPU.
             CompilationJobs::verify_engine(engine)?;
-            if scriptw_aot_wasm::RuntimeSourceCompilationProfile::from_module(&artifact.bytes)
-                .map_err(|error| EngineError::new(error.to_string()))?
-                != scriptw_aot_wasm::RuntimeSourceCompilationProfile::Portable
-            {
+            let actual_profile =
+                scriptw_aot_wasm::RuntimeSourceCompilationProfile::from_module(&artifact.bytes)
+                    .map_err(|error| EngineError::new(error.to_string()))?;
+            let expected_profile = if allow_native_host {
+                scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost
+            } else {
+                scriptw_aot_wasm::RuntimeSourceCompilationProfile::Portable
+            };
+            if actual_profile != expected_profile {
                 return Err(EngineError::new(
                     "embedding requires Portable Wasm; native source compilation is not an embedding capability",
                 ));
@@ -252,6 +284,21 @@ impl EmbeddedRuntime {
             )?;
             let mut runtime = Self::from_admitted_modules(engine, modules, foreign, intl);
             runtime.profile_sites = profile_sites;
+            #[cfg(feature = "native-source-compiler")]
+            if allow_native_host {
+                let rt_artifact = artifact
+                    .runtime
+                    .as_ref()
+                    .map(|r| Arc::clone(&r.0))
+                    .ok_or_else(|| {
+                        EngineError::new("NativeHost embedding requires a linked runtime artifact")
+                    })?;
+                let policy = artifact
+                    .compilation_policy
+                    .clone()
+                    .unwrap_or_else(|| WasmCompilationPolicy::from_options(&CompileOptions::default()));
+                runtime.native_source = Some((rt_artifact, policy, mode));
+            }
             Ok(runtime)
         })
     }
@@ -271,6 +318,8 @@ impl EmbeddedRuntime {
             host_linker: OnceLock::new(),
             prepared_linkage: OnceLock::new(),
             profile_sites: None,
+            #[cfg(feature = "native-source-compiler")]
+            native_source: None,
         }
     }
 
@@ -500,6 +549,20 @@ impl EmbeddedRuntime {
             });
         let (program, roots) =
             wasm_runtime_link::instantiate_with_linkage(linker, store, &self.modules, prepared)?;
+        #[cfg(feature = "native-source-compiler")]
+        if let Some((ref rt_artifact, ref policy, native_mode)) = self.native_source {
+            let execution_control = Arc::new(WasmAgentExecutionControl::new());
+            execution_control.arm(std::time::Instant::now(), None);
+            let context = wasm_native_source_compiler::NativeSourceCompilerContext::new(
+                linker.clone(),
+                roots,
+                wasm_runtime_link::ProgramRuntimeRef::Raw(rt_artifact),
+                policy.clone(),
+                execution_control,
+                native_mode,
+            )?;
+            store.data_mut().native_source_compiler = Some(Arc::new(context));
+        }
         let main = match self
             .modules
             .program_main_export()
@@ -524,6 +587,8 @@ impl EmbeddedRuntime {
             bridges,
             entry: None,
             profile_sites: self.profile_sites.clone(),
+            #[cfg(feature = "native-source-compiler")]
+            has_native_source: self.native_source.is_some(),
         })
     }
 }
@@ -541,16 +606,32 @@ pub struct EmbeddedInstance {
     /// `main` has created them; see `operations::EntryContext`.
     entry: Option<operations::EntryContext>,
     profile_sites: Option<execution_profile::ProfileSites>,
+    #[cfg(feature = "native-source-compiler")]
+    has_native_source: bool,
 }
 
 impl EmbeddedInstance {
+    /// Allows an embedder to resume calls after recovering from a host-triggered
+    /// `InterruptHandle` preemption (e.g. `cancel_termination`).
+    pub fn recover_after_interrupt(&self, store: &mut WasmtimeStore<WasmStoreState>) {
+        if let Some(state) = store.data_mut().embedding.as_mut() {
+            if Arc::ptr_eq(&state.store, &self.store) && state.phase == StorePhase::Failed {
+                state.phase = StorePhase::Evaluated;
+            }
+        }
+    }
+
     /// Initialize real compiled main once. Pending top-level await retains the
     /// instance; deliver host completions with `pump` until it settles.
     pub fn initialize(
         &mut self,
         store: &mut WasmtimeStore<WasmStoreState>,
     ) -> Result<EmbeddedEvaluation, EngineError> {
-        run_on_execution_stack(|| self.initialize_inner(store, true))
+        #[cfg(feature = "native-source-compiler")]
+        let retain = !self.has_native_source;
+        #[cfg(not(feature = "native-source-compiler"))]
+        let retain = true;
+        run_on_execution_stack(|| self.initialize_inner(store, retain))
     }
 
     /// Initialize with CPU time sampled on the actual execution worker.

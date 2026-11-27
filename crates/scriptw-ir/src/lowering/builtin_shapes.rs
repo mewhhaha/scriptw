@@ -5167,6 +5167,12 @@ impl<'a> ScriptLowerer<'a> {
                 None,
                 ValueInfo::undefined(),
             ),
+            StandardBuiltinId::EmbedAsyncContext => (
+                ValueKind::Dynamic,
+                KindSet::all_runtime_tags(),
+                None,
+                ValueInfo::undefined(),
+            ),
             StandardBuiltinId::SetTimeout => (
                 ValueKind::Number,
                 KindSet::from_kind(ValueKind::Number),

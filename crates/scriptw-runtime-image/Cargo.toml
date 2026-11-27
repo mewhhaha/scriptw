@@ -15,7 +15,7 @@ sha2 = "0.10.9"
 scriptw-aot-wasm = { path = "../scriptw-aot-wasm" }
 scriptw-intl = { path = "../scriptw-intl" }
 scriptw-ir = { path = "../scriptw-ir" }
-wasmtime = { version = "=47.0.0", default-features = false, features = ["all-arch", "cache", "cranelift", "gc", "gc-copying", "incremental-cache", "parallel-compilation", "runtime", "std", "threads"] }
+wasmtime = { package = "wtime-aot-host", path = "/home/mewhhaha/src/wtime/tools/wtime-aot/host" }
 
 # Contains audited unsafe code, so it cannot inherit the workspace
 # `unsafe_code = "forbid"`; it keeps the workspace `unused_must_use` denial.

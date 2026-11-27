@@ -25,6 +25,174 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
+    pub(crate) fn emit_embed_async_context_builtin(
+        &mut self,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        self.emit_builtin_arg_is_present_i32(1, f);
+        self.open_frame(ControlFrameKind::If, f);
+        // 2-arg private runtime inspection modes:
+        // mode 1: extract OrdinaryObject property header from Array/TypedArray (skipping dense indices)
+        // mode 2: read native PromiseObject state (-1=not promise, 0=pending, 1=fulfilled, 2=rejected)
+        // mode 3: read native PromiseObject settled result value
+        let mode_val = s.reserve_value_local(f);
+        let target = s.reserve_value_local(f);
+        self.emit_builtin_arg_to_value(0, &mode_val, f);
+        self.emit_builtin_arg_to_value(1, &target, f);
+        let mode = s.reserve_i32_local(f);
+        mode_val.scalar().load(f);
+        f.instruction(&Instruction::F64ReinterpretI64);
+        f.instruction(&Instruction::I32TruncSatF64S);
+        mode.store(f);
+        self.completion().initialize(f);
+
+        // mode == 1: OrdinaryObject header projection for ArrayObject / TypedArrayObject
+        mode.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        target.reference().load(f);
+        f.instruction(&Instruction::RefTestNonNull(
+            s.reference_type::<ArrayObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        target.reference().load(f);
+        f.instruction(&Instruction::RefTestNonNull(
+            s.reference_type::<TypedArrayObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        f.instruction(&Instruction::I32Or);
+        self.open_frame(ControlFrameKind::If, f);
+        let header = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_object_header_projection(&target, f), f);
+        let out = s.reserve_value_local(f);
+        out.set_reference(&header, s, f);
+        self.completion().set_normal(&out, f);
+        out.clear(f);
+        header.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::Else);
+
+        // mode == 2: native Promise state (-1 / 0 / 1 / 2) without mutating HANDLED
+        mode.load(f);
+        f.instruction(&Instruction::I32Const(2));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        let state = s.reserve_i32_local(f);
+        state.set_constant(-1, f);
+        target.reference().load(f);
+        f.instruction(&Instruction::RefTestNonNull(
+            s.reference_type::<PromiseObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, f);
+        let promise = s
+            .reserve_gc_local(f)
+            .initialize(target.cast_reference::<PromiseObject>(s, f), f);
+        self.emit_load_promise_state_strict(&promise, state, f);
+        promise.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        state.load(f);
+        f.instruction(&Instruction::F64ConvertI32S);
+        f.instruction(&Instruction::I64ReinterpretF64);
+        let bits = s.reserve_i64_local(f);
+        bits.store(f);
+        self.completion().value().set_number(bits, f);
+        s.release_i64_local(bits, f);
+        s.release_i32_local(state, f);
+        f.instruction(&Instruction::Else);
+
+        // mode == 3: native Promise settled result value
+        mode.load(f);
+        f.instruction(&Instruction::I32Const(3));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        target.reference().load(f);
+        f.instruction(&Instruction::RefTestNonNull(
+            s.reference_type::<PromiseObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        self.open_frame(ControlFrameKind::If, f);
+        let promise = s
+            .reserve_gc_local(f)
+            .initialize(target.cast_reference::<PromiseObject>(s, f), f);
+        let stored = s.reserve_gc_local(f).initialize(
+            s.field(PromiseObjectSchema::RESULT)
+                .read(&promise, s, f)
+                .reference(),
+            f,
+        );
+        let out = s.reserve_value_local(f);
+        s.struct_type::<StoredValue>()
+            .read_into(&stored, &out, s, f);
+        self.completion().set_normal(&out, f);
+        out.clear(f);
+        stored.clear(f);
+        promise.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(mode, f);
+        target.clear(f);
+        mode_val.clear(f);
+        f.instruction(&Instruction::Else);
+
+        self.emit_builtin_arg_is_present_i32(0, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let value = s.reserve_value_local(f);
+        self.emit_builtin_arg_to_value(0, &value, f);
+        value.tag().load(f);
+        f.instruction(&Instruction::I32Const(
+            WasmRuntimeValueTag::Undefined.tag(),
+        ));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        s.clear_async_context(f);
+        f.instruction(&Instruction::Else);
+        let stored = s
+            .reserve_gc_local(f)
+            .initialize(s.struct_type::<StoredValue>().from_value(&value, f), f);
+        s.replace_async_context(&stored, f);
+        stored.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.completion().initialize(f);
+        value.clear(f);
+        f.instruction(&Instruction::Else);
+        let current = s.load_async_context(f);
+        self.completion().initialize(f);
+        current.load(s, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let nonnull = s
+            .reserve_gc_local(f)
+            .initialize(current.load(s, f).require_non_null(f), f);
+        let out = s.reserve_value_local(f);
+        s.struct_type::<StoredValue>()
+            .read_into(&nonnull, &out, s, f);
+        self.completion().set_normal(&out, f);
+        out.clear(f);
+        nonnull.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        current.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        Ok(())
+    }
+
     pub(crate) fn emit_queue_microtask_builtin(
         &mut self,
         f: &mut Function,
@@ -141,6 +309,7 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
+        let async_context = s.load_async_context(f);
         let task = s.reserve_gc_local(f).initialize(
             s.struct_type::<TimerTask>().construct(
                 (
@@ -152,11 +321,13 @@ impl FunctionBuilder<'_> {
                     GcOperand::i64_local(nesting),
                     GcOperand::boolean(false),
                     GcOperand::reference(&head, s),
+                    GcOperand::reference(&async_context, s),
                 ),
                 f,
             ),
             f,
         );
+        async_context.clear(f);
         s.field(TimerQueueSchema::HEAD).write(
             &queue,
             GcOperand::nullable_reference(&task, s),
@@ -350,6 +521,7 @@ impl FunctionBuilder<'_> {
         let saved = s.reserve_completion(f);
         saved.copy_from(self.completion(), f);
         let saved_realm = self.load_current_realm(f);
+        let saved_async_context = s.load_async_context(f);
         let saved_name = s.load_throw_diagnostic(ThrowDiagnosticRole::Name, f);
         let saved_message = s.load_throw_diagnostic(ThrowDiagnosticRole::Message, f);
         let saved_constructor = s.load_throw_diagnostic(ThrowDiagnosticRole::ConstructorName, f);
@@ -476,6 +648,14 @@ impl FunctionBuilder<'_> {
             f,
         );
         self.replace_current_realm(&realm, f);
+        let task_async_context = s.reserve_gc_local(f).initialize(
+            s.field(TimerTaskSchema::ASYNC_CONTEXT)
+                .read(&task, s, f)
+                .reference(),
+            f,
+        );
+        s.replace_async_context(&task_async_context, f);
+        task_async_context.clear(f);
         s.field(TimerTaskSchema::NESTING)
             .read(&task, s, f)
             .store_i64(nesting, f);
@@ -533,6 +713,7 @@ impl FunctionBuilder<'_> {
         s.field(TimerQueueSchema::NESTING)
             .write(&queue, GcOperand::i64(0), s, f);
         self.replace_current_realm(&saved_realm, f);
+        s.replace_async_context(&saved_async_context, f);
         self.completion().copy_from(&saved, f);
         s.replace_throw_diagnostic(ThrowDiagnosticRole::Name, &saved_name, f);
         s.replace_throw_diagnostic(ThrowDiagnosticRole::Message, &saved_message, f);
@@ -548,6 +729,7 @@ impl FunctionBuilder<'_> {
         selected.clear(f);
         previous.clear(f);
         current.clear(f);
+        saved_async_context.clear(f);
         saved_realm.clear(f);
         saved.clear(f);
         queue.clear(f);

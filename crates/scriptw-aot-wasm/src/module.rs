@@ -852,6 +852,7 @@ pub(crate) fn standard_builtin_constructor_realm_slot(
         | StandardBuiltinId::QueueMicrotask
         | StandardBuiltinId::SetTimeout
         | StandardBuiltinId::ClearTimeout
+        | StandardBuiltinId::EmbedAsyncContext
         | StandardBuiltinId::AtomicsXor
         | StandardBuiltinId::AtomicsIsLockFree
         | StandardBuiltinId::Escape

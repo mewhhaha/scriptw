@@ -141,6 +141,13 @@ standard_builtin_catalog! {
         installer: None,
         native: "clearTimeout",
     }
+    EmbedAsyncContext {
+        function: FunctionOrdinal(974) => "$builtin.embedAsyncContext",
+        debug: "embedAsyncContext",
+        flags: [],
+        installer: None,
+        native: "embedAsyncContext",
+    }
     TextEncoderConstructor {
         function: FunctionOrdinal(914) => "$builtin.TextEncoderConstructor",
         global: GlobalOrdinal(55),

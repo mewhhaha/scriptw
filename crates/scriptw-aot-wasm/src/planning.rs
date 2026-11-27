@@ -425,6 +425,7 @@ impl RuntimeBootstrapPlan {
             StandardBuiltinId::TypeErrorConstructor,
             StandardBuiltinId::URIErrorConstructor,
             StandardBuiltinId::ReferenceErrorConstructor,
+            StandardBuiltinId::EmbedAsyncContext,
         ] {
             self.require_standard_builtin(builtin);
         }
@@ -1015,7 +1016,8 @@ impl RuntimeBootstrapPlan {
             }
             StandardBuiltinId::QueueMicrotask
             | StandardBuiltinId::SetTimeout
-            | StandardBuiltinId::ClearTimeout => {}
+            | StandardBuiltinId::ClearTimeout
+            | StandardBuiltinId::EmbedAsyncContext => {}
             StandardBuiltinId::IntlSupportedValuesOf
             | StandardBuiltinId::IntlGetCanonicalLocales
             | StandardBuiltinId::IntlLocaleConstructor
@@ -4537,6 +4539,7 @@ pub(crate) fn function_length(params: &[FunctionParamIr]) -> u64 {
 pub(crate) fn standard_builtin_length(builtin: StandardBuiltinId) -> u64 {
     match builtin {
         StandardBuiltinId::QueueMicrotask | StandardBuiltinId::ClearTimeout => 1,
+        StandardBuiltinId::EmbedAsyncContext => 0,
         StandardBuiltinId::SetTimeout => 1,
         StandardBuiltinId::FunctionConstructor
         | StandardBuiltinId::FunctionPrototypeSymbolHasInstance

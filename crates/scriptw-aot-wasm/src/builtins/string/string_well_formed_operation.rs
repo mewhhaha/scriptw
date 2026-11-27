@@ -40,15 +40,6 @@ impl FunctionBuilder<'_> {
             length.load(f);
             f.instruction(&Instruction::I32WrapI64);
             allocation_length.store(f);
-            let construction = match &operation {
-                StringWellFormedOperation::IsWellFormed => None,
-                StringWellFormedOperation::ToWellFormed => Some(StringConstruction::allocate(
-                    s,
-                    s.reserve_gc_local(f),
-                    allocation_length,
-                    f,
-                )),
-            };
             f.instruction(&Instruction::I32Const(1));
             valid.store(f);
             f.instruction(&Instruction::I64Const(0));
@@ -96,8 +87,7 @@ impl FunctionBuilder<'_> {
             b.open_frame(ControlFrameKind::If, f);
             f.instruction(&Instruction::I32Const(0));
             valid.store(f);
-            f.instruction(&Instruction::I32Const(0xfffd));
-            unit.store(f);
+            b.emit_branch_to_target(done, f);
             b.pop_control(ControlFrameKind::If);
             f.instruction(&Instruction::End);
             f.instruction(&Instruction::Else);
@@ -111,26 +101,13 @@ impl FunctionBuilder<'_> {
             b.open_frame(ControlFrameKind::If, f);
             f.instruction(&Instruction::I32Const(0));
             valid.store(f);
-            f.instruction(&Instruction::I32Const(0xfffd));
-            unit.store(f);
+            b.emit_branch_to_target(done, f);
             b.pop_control(ControlFrameKind::If);
             f.instruction(&Instruction::End);
             b.pop_control(ControlFrameKind::If);
             f.instruction(&Instruction::End);
-            if let Some(construction) = &construction {
-                index.load(f);
-                f.instruction(&Instruction::I32WrapI64);
-                ordinal.store(f);
-                construction.write(ordinal, unit, s, f);
-            }
             pair.load(f);
             b.open_frame(ControlFrameKind::If, f);
-            if let Some(construction) = &construction {
-                next_index.load(f);
-                f.instruction(&Instruction::I32WrapI64);
-                ordinal.store(f);
-                construction.write(ordinal, following, s, f);
-            }
             next_index.load(f);
             index.store(f);
             b.pop_control(ControlFrameKind::If);
@@ -147,14 +124,108 @@ impl FunctionBuilder<'_> {
             match operation {
                 StringWellFormedOperation::IsWellFormed => result.set_boolean(valid, f),
                 StringWellFormedOperation::ToWellFormed => {
-                    let repaired = s.reserve_gc_local(f).initialize(
-                        construction
-                            .expect("ToWellFormed owns its complete construction")
-                            .publish(s, f),
+                    valid.load(f);
+                    b.open_frame(ControlFrameKind::If, f);
+                    result.set_reference(string, s, f);
+                    f.instruction(&Instruction::Else);
+                    let construction = StringConstruction::allocate(
+                        s,
+                        s.reserve_gc_local(f),
+                        allocation_length,
                         f,
                     );
+                    f.instruction(&Instruction::I64Const(0));
+                    index.store(f);
+                    let repair_done = b.open_frame(ControlFrameKind::Block, f);
+                    let repair_next = b.open_frame(ControlFrameKind::Loop, f);
+                    index.load(f);
+                    length.load(f);
+                    f.instruction(&Instruction::I64GeU);
+                    b.emit_branch_if_to_target(repair_done, f);
+                    b.emit_gc_string_code_unit_i32(string, index, f);
+                    unit.store(f);
+                    f.instruction(&Instruction::I32Const(0));
+                    pair.store(f);
+                    unit.load(f);
+                    f.instruction(&Instruction::I32Const(0xd800));
+                    f.instruction(&Instruction::I32GeU);
+                    unit.load(f);
+                    f.instruction(&Instruction::I32Const(0xdbff));
+                    f.instruction(&Instruction::I32LeU);
+                    f.instruction(&Instruction::I32And);
+                    b.open_frame(ControlFrameKind::If, f);
+                    index.load(f);
+                    f.instruction(&Instruction::I64Const(1));
+                    f.instruction(&Instruction::I64Add);
+                    next_index.store(f);
+                    next_index.load(f);
+                    length.load(f);
+                    f.instruction(&Instruction::I64LtU);
+                    b.open_frame(ControlFrameKind::If, f);
+                    b.emit_gc_string_code_unit_i32(string, next_index, f);
+                    following.store(f);
+                    following.load(f);
+                    f.instruction(&Instruction::I32Const(0xdc00));
+                    f.instruction(&Instruction::I32GeU);
+                    following.load(f);
+                    f.instruction(&Instruction::I32Const(0xdfff));
+                    f.instruction(&Instruction::I32LeU);
+                    f.instruction(&Instruction::I32And);
+                    pair.store(f);
+                    b.pop_control(ControlFrameKind::If);
+                    f.instruction(&Instruction::End);
+                    pair.load(f);
+                    f.instruction(&Instruction::I32Eqz);
+                    b.open_frame(ControlFrameKind::If, f);
+                    f.instruction(&Instruction::I32Const(0xfffd));
+                    unit.store(f);
+                    b.pop_control(ControlFrameKind::If);
+                    f.instruction(&Instruction::End);
+                    f.instruction(&Instruction::Else);
+                    unit.load(f);
+                    f.instruction(&Instruction::I32Const(0xdc00));
+                    f.instruction(&Instruction::I32GeU);
+                    unit.load(f);
+                    f.instruction(&Instruction::I32Const(0xdfff));
+                    f.instruction(&Instruction::I32LeU);
+                    f.instruction(&Instruction::I32And);
+                    b.open_frame(ControlFrameKind::If, f);
+                    f.instruction(&Instruction::I32Const(0xfffd));
+                    unit.store(f);
+                    b.pop_control(ControlFrameKind::If);
+                    f.instruction(&Instruction::End);
+                    b.pop_control(ControlFrameKind::If);
+                    f.instruction(&Instruction::End);
+                    index.load(f);
+                    f.instruction(&Instruction::I32WrapI64);
+                    ordinal.store(f);
+                    construction.write(ordinal, unit, s, f);
+                    pair.load(f);
+                    b.open_frame(ControlFrameKind::If, f);
+                    next_index.load(f);
+                    f.instruction(&Instruction::I32WrapI64);
+                    ordinal.store(f);
+                    construction.write(ordinal, following, s, f);
+                    next_index.load(f);
+                    index.store(f);
+                    b.pop_control(ControlFrameKind::If);
+                    f.instruction(&Instruction::End);
+                    index.load(f);
+                    f.instruction(&Instruction::I64Const(1));
+                    f.instruction(&Instruction::I64Add);
+                    index.store(f);
+                    b.emit_branch_to_target(repair_next, f);
+                    b.pop_control(ControlFrameKind::Loop);
+                    f.instruction(&Instruction::End);
+                    b.pop_control(ControlFrameKind::Block);
+                    f.instruction(&Instruction::End);
+                    let repaired = s
+                        .reserve_gc_local(f)
+                        .initialize(construction.publish(s, f), f);
                     result.set_reference(&repaired, s, f);
                     repaired.clear(f);
+                    b.pop_control(ControlFrameKind::If);
+                    f.instruction(&Instruction::End);
                 }
             }
             output.set_normal(&result, f);

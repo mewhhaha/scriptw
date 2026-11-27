@@ -2254,6 +2254,13 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         let finished = self.open_frame(ControlFrameKind::Block, f);
+        let general = self.open_frame(ControlFrameKind::Block, f);
+        self.emit_packed_array_fill_empty_prefix_or_branch(
+            &receiver, index, end, &value, general, f,
+        );
+        self.emit_branch_to_target(finished, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         let next = self.open_frame(ControlFrameKind::Loop, f);
         index.load(f);
         end.load(f);

@@ -94,7 +94,7 @@ impl SegmenterImageProvider {
                     <$marker>::INFO,
                 )
                 .map_err(IntlDataImageError::consumer)?;
-                if ids.is_empty()
+                if (ids.is_empty() && <$marker>::INFO != SegmenterBreakWordOverrideV1::INFO)
                     || (<$marker>::INFO.is_singleton
                         && (ids.len() != 1
                             || !ids.iter().all(|id| {

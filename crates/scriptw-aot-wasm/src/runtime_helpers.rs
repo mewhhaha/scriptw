@@ -1193,6 +1193,7 @@ runtime_helper_domain! {
     EmbeddingBytesRead / EmbeddingBytesReadArguments / EmbeddingBytesReadParameters / "embedding_bytes_read" { value:Value } => (Ref ByteArray Nullable);
     EmbeddingPromise / EmbeddingPromiseArguments / EmbeddingPromiseParameters / "embedding_promise" { value:Value } => StatusCompletion;
     EmbeddingCancel / EmbeddingCancelArguments / EmbeddingCancelParameters / "embedding_cancel" { caller_execution_realm:(Ref RealmRecord NonNullable),caller_program:Program } => Completion;
+    EmbeddingAsyncContext / EmbeddingAsyncContextArguments / EmbeddingAsyncContextParameters / "embedding_async_context" { caller_execution_realm:(Ref RealmRecord NonNullable),caller_program:Program } => Completion;
     TransientByteAlloc / TransientByteAllocArguments / TransientByteAllocParameters / "transient_byte_alloc" { size:I64 } => I64;
     ArrayIndexedPublishDefaultData / ArrayIndexedPublishDefaultDataArguments / ArrayIndexedPublishDefaultDataParameters / "array_indexed_publish_default_data" { array:(Ref ArrayObject NonNullable),index:I64,value:Value } => Void;
     ArrayPackedJoin / ArrayPackedJoinArguments / ArrayPackedJoinParameters / "array_packed_join" { receiver:Value,length:I64,separator:(Ref StringValue NonNullable) } => (Ref StringValue Nullable);
@@ -1405,7 +1406,8 @@ impl RuntimeHelperId {
             | Self::EmbeddingBytes
             | Self::EmbeddingBytesRead
             | Self::EmbeddingPromise
-            | Self::EmbeddingCancel => HelperOwner::Runtime,
+            | Self::EmbeddingCancel
+            | Self::EmbeddingAsyncContext => HelperOwner::Runtime,
             Self::TransientByteAlloc => HelperOwner::Runtime,
             Self::ArrayIndexedPublishDefaultData => HelperOwner::Runtime,
             Self::ArrayPackedJoin => HelperOwner::Runtime,
@@ -1601,7 +1603,8 @@ impl RuntimeHelperId {
             | Self::EmbeddingBytes
             | Self::EmbeddingBytesRead
             | Self::EmbeddingPromise
-            | Self::EmbeddingCancel => true,
+            | Self::EmbeddingCancel
+            | Self::EmbeddingAsyncContext => true,
             Self::TransientByteAlloc => true,
             Self::ArrayIndexedPublishDefaultData => true,
             Self::ArrayPackedJoin => true,

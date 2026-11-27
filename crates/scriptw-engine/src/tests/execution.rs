@@ -325,6 +325,7 @@ fn wasm_backend_characterization_matrix_locks_public_surface_and_outcomes() {
             [
                 "main",
                 "memory",
+                scriptw_aot_wasm::EMBEDDING_ASYNC_CONTEXT,
                 scriptw_aot_wasm::EMBEDDING_BYTES,
                 scriptw_aot_wasm::EMBEDDING_BYTES_READ,
                 scriptw_aot_wasm::EMBEDDING_CALL,

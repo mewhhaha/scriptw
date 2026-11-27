@@ -62,7 +62,8 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::EmbeddingBytes
             | RuntimeHelperId::EmbeddingBytesRead
             | RuntimeHelperId::EmbeddingPromise
-            | RuntimeHelperId::EmbeddingCancel => {}
+            | RuntimeHelperId::EmbeddingCancel
+            | RuntimeHelperId::EmbeddingAsyncContext => {}
             // These storage kernels have no inline facade to disable. The
             // cached read and write parameter owners bind their caller's
             // ProgramInstance and Environment before the body; allocation

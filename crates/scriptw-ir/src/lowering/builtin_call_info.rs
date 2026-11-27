@@ -84,6 +84,7 @@ impl<'a> ScriptLowerer<'a> {
             StandardBuiltinId::QueueMicrotask | StandardBuiltinId::ClearTimeout => {
                 Some(ValueInfo::undefined())
             }
+            StandardBuiltinId::EmbedAsyncContext => Some(unknown_runtime_value_info()),
             StandardBuiltinId::SetTimeout => Some(ValueInfo::new(ValueKind::Number)),
             StandardBuiltinId::FunctionConstructor => Some(Self::empty_dynamic_function_info(
                 DynamicFunctionKind::Ordinary,

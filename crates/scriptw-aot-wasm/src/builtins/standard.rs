@@ -3273,6 +3273,9 @@ impl<'a> FunctionBuilder<'a> {
             StandardBuiltinId::QueueMicrotask => self.emit_queue_microtask_builtin(function)?,
             StandardBuiltinId::SetTimeout => self.emit_set_timeout_builtin(function)?,
             StandardBuiltinId::ClearTimeout => self.emit_clear_timeout_builtin(function)?,
+            StandardBuiltinId::EmbedAsyncContext => {
+                self.emit_embed_async_context_builtin(function)?
+            }
             StandardBuiltinId::AtomicsAnd => self.emit_atomics_and_builtin(function)?,
             StandardBuiltinId::AtomicsCompareExchange => {
                 self.emit_atomics_compare_exchange_builtin(function)?

@@ -763,6 +763,31 @@ impl EmbeddedInstance {
         self.check_store(store)?;
         Ok(store.data().output_events.take())
     }
+
+    /// Return a private realm-bound function `fn()` (get) / `fn(v)` (set) for
+    /// continuation-preserved embedder data (`AsyncContext`), without exposing
+    /// any property on `globalThis`.
+    pub fn async_context_accessor(
+        &self,
+        store: &mut WasmtimeStore<WasmStoreState>,
+    ) -> Result<JsValue, EngineError> {
+        self.check_ready(store)?;
+        run_on_execution_stack(|| {
+            let mut roots = wasmtime::RootScope::new(store);
+            let (realm, _, program) = self.context(&mut roots)?;
+            let factory =
+                self.function(&mut roots, scriptw_aot_wasm::EMBEDDING_ASYNC_CONTEXT, false)?;
+            let results = self.execute(
+                &mut roots,
+                factory,
+                &[
+                    Val::AnyRef(Some(realm.to_anyref())),
+                    Val::AnyRef(Some(program.to_anyref())),
+                ],
+            )?;
+            Ok(dynamic_completion(&mut roots, &results)?.into_value())
+        })
+    }
 }
 
 fn context_arguments(

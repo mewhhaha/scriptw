@@ -257,6 +257,99 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
+    /// Fast path for `Array.prototype.fill(value, 0, end)` on an empty
+    /// extensible packed `ArrayObject` whose length is at least `end` and
+    /// whose prototype chain has no indexed properties. Allocates one exact-size
+    /// `PackedValueTable` filled with a single shared immutable `StoredValue`.
+    pub(crate) fn emit_packed_array_fill_empty_prefix_or_branch(
+        &mut self,
+        receiver: &ValueLocals,
+        start: I64Local,
+        end: I64Local,
+        value: &ValueLocals,
+        general: crate::emit::ControlTarget,
+        f: &mut Function,
+    ) {
+        const PACKED_FILL_MAX_ELEMENTS: i64 = 1 << 24;
+        let s = self.runtime_schema();
+        start.load(f);
+        f.instruction(&Instruction::I64Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(general, f);
+        end.load(f);
+        f.instruction(&Instruction::I64Eqz);
+        self.emit_branch_if_to_target(general, f);
+        end.load(f);
+        f.instruction(&Instruction::I64Const(PACKED_FILL_MAX_ELEMENTS));
+        f.instruction(&Instruction::I64GtU);
+        self.emit_branch_if_to_target(general, f);
+        let array = s.reserve_gc_local(f).initialize(
+            receiver.sealed_reference_or_branch::<ArrayObject>(
+                s,
+                self.local_branch_label(general),
+                f,
+            ),
+            f,
+        );
+        s.array_storage_is_packed(&array, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(general, f);
+        s.field(ArrayObjectSchema::COUNT).read(&array, s, f);
+        f.instruction(&Instruction::I64Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(general, f);
+        s.field(ArrayObjectSchema::LENGTH).read(&array, s, f);
+        end.load(f);
+        f.instruction(&Instruction::I64LtU);
+        self.emit_branch_if_to_target(general, f);
+        let header = s.reserve_gc_local(f).initialize(
+            s.field(ArrayObjectSchema::OBJECT)
+                .read(&array, s, f)
+                .reference(),
+            f,
+        );
+        s.field(OrdinaryObjectSchema::EXTENSIBLE)
+            .read(&header, s, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(general, f);
+        let prototype = s.reserve_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROTOTYPE)
+                .read(&header, s, f)
+                .reference(),
+            f,
+        );
+        header.clear(f);
+        self.emit_array_prototype_chain_without_indices_or_branch(&prototype, general, f);
+        prototype.clear(f);
+        let stored = self.emit_packed_value_for_store(value, f);
+        let fill_len = s.reserve_i32_local(f);
+        end.load(f);
+        f.instruction(&Instruction::I32WrapI64);
+        fill_len.store(f);
+        let values = s.reserve_gc_local(f).initialize(
+            s.array_type::<PackedValueTable>().filled(
+                GcOperand::nullable_reference(&stored, s),
+                fill_len,
+                f,
+            ),
+            f,
+        );
+        s.release_i32_local(fill_len, f);
+        stored.clear(f);
+        self.clear_packed_backings(&array, f);
+        s.field(ArrayObjectSchema::VALUES).write(
+            &array,
+            GcOperand::nullable_reference(&values, s),
+            s,
+            f,
+        );
+        s.field(ArrayObjectSchema::COUNT)
+            .write(&array, GcOperand::i64_local(end), s, f);
+        s.set_array_storage_mode(&array, ArrayIndexedStorageMode::PackedValues, f);
+        values.clear(f);
+        array.clear(f);
+    }
+
     /// Appends to a result whose existing elements form a dense prefix.
     /// The caller proves an array index and owns length publication.
     pub(crate) fn emit_dense_packed_value_append_or_branch(

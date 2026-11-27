@@ -4,8 +4,8 @@
 use super::format::*;
 use icu_calendar::{
     cal::{Chinese, Dangi},
-    types::CyclicYear,
-    AsCalendar, Calendar, Date, DateDuration, Ref,
+    types::{CyclicYear, DateDuration},
+    AsCalendar, Calendar, Date, Ref,
 };
 use std::{fmt, panic::catch_unwind};
 
@@ -195,7 +195,16 @@ impl ValidatedYear {
             if days == 30 {
                 mask |= 1 << u32::from(ordinal - 1);
             }
-            let last = date.added(DateDuration::new(0, 0, 0, i32::from(days) - 1));
+            let last = date
+                .try_added_with_options(
+                    DateDuration::for_days(i32::from(days) - 1),
+                    Default::default(),
+                )
+                .map_err(|error| CatalogError::Date {
+                    calendar,
+                    year,
+                    message: error.to_string(),
+                })?;
             if last.cyclic_year().related_iso != year
                 || last.month().ordinal != ordinal
                 || last.month().standard_code != month.standard_code
@@ -210,7 +219,13 @@ impl ValidatedYear {
                 ));
             }
             next_start += i64::from(days);
-            date.add(DateDuration::new(0, 1, 0, 0));
+            date = date
+                .try_added_with_options(DateDuration::for_months(1), Default::default())
+                .map_err(|error| CatalogError::Date {
+                    calendar,
+                    year,
+                    message: error.to_string(),
+                })?;
         }
         if next_regular != 13 || month_count != 12 + u8::from(leap_ordinal != 0) {
             return Err(invalid_year(

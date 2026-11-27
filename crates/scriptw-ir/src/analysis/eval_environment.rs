@@ -483,7 +483,18 @@ impl AnalysisBuilder<'_> {
                     } else {
                         return None;
                     };
-                    let mode = environment.binding_modes[storage_name];
+                    let mode = match environment.binding_modes.get(storage_name).copied() {
+                        Some(mode) => mode,
+                        None if storage_name == LEXICAL_ARGUMENTS_NAME => BindingMode::Var,
+                        None if matches!(
+                            environment.kind,
+                            EnvironmentKind::Activation | EnvironmentKind::FunctionParameters
+                        ) && parameter_names.contains(&source_name) =>
+                        {
+                            BindingMode::Var
+                        }
+                        None => return None,
+                    };
                     if matches!(
                         environment.kind,
                         EnvironmentKind::Activation | EnvironmentKind::FunctionParameters

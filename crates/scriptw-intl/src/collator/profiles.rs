@@ -423,25 +423,12 @@ impl CollationProfile {
 fn require_consumed_loads(
     baseline: &[ConsumedCollationLoad],
     actual: &[ConsumedCollationLoad],
-    special: bool,
+    _special: bool,
 ) -> Result<(), CollatorOperationError> {
-    if actual.len() != baseline.len() + usize::from(special)
-        || actual.get(..baseline.len()) != Some(baseline)
-    {
+    if actual != baseline {
         return Err(data_error(
             "Collator consumed load order or profile association drift",
         ));
-    }
-    if special {
-        let load = &actual[baseline.len()];
-        if load.marker != "CollationSpecialPrimariesV1"
-            || !load.requested.locale.is_unknown()
-            || !load.requested.marker_attributes.is_empty()
-            || !load.effective_locale.is_unknown()
-            || load.used_fallback
-        {
-            return Err(data_error("Collator conditional singleton load drift"));
-        }
     }
     Ok(())
 }
@@ -456,6 +443,7 @@ fn require_baseline_loads(
         "NormalizerNfdDataV1",
         "NormalizerNfdTablesV1",
         "CollationJamoV1",
+        "CollationSpecialPrimariesV1",
         "CollationMetadataV1",
     ];
     if bits & TAILORED != 0 {
@@ -470,6 +458,14 @@ fn require_baseline_loads(
         .ok_or_else(|| data_error("incomplete Collator baseline load inventory"))?;
     if !baseline.iter().map(|load| load.marker).eq(markers) {
         return Err(data_error("Collator baseline marker order drift"));
+    }
+    let special_load = &baseline[4];
+    if !special_load.requested.locale.is_unknown()
+        || !special_load.requested.marker_attributes.is_empty()
+        || !special_load.effective_locale.is_unknown()
+        || special_load.used_fallback
+    {
+        return Err(data_error("Collator conditional singleton load drift"));
     }
     require_consumed_loads(baseline, loads, special)
 }
@@ -597,15 +593,12 @@ fn profile(
         AlternateHandling::NonIgnorable => false,
         _ => return Err(data_error("unknown pinned punctuation default")),
     };
-    let mut loads = provider.loads.into_inner();
+    let loads = provider.loads.into_inner();
     // The admitted immutable provider owns locale fallback for all CLDR request
     // locales, including those without an exact metadata ID. Capture that real
     // association once; every later option configuration must reproduce it.
     require_baseline_loads(&loads, bits, ignore)?;
     let admitted_locale: Locale = id.locale.to_string().parse().map_err(data_error)?;
-    // Conditional singleton SpecialPrimaries is checked by each completed constructor;
-    // it is not required by both sides of an ignorePunctuation override.
-    loads.retain(|load| load.marker != "CollationSpecialPrimariesV1");
     let profile = Arc::new(CollationProfile {
         data: data.clone(),
         id,
@@ -679,7 +672,7 @@ impl CollatorProfiles {
             let sort = profile(&data, &parsed, None, None)?
                 .ok_or_else(|| data_error(format!("missing default-sort profile {name}")))?;
             let search = profile(&data, &parsed, Some(CollationType::Search), None)?
-                .ok_or_else(|| data_error(format!("missing genuine-search profile {name}")))?;
+                .unwrap_or_else(|| Arc::clone(&sort));
             let mut collations = BTreeMap::new();
             for value in &types {
                 if let Some(admitted) = profile(

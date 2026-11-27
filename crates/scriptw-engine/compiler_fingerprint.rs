@@ -11,7 +11,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 pub(crate) const FINGERPRINT_SCHEME: &str = "scriptw-program-cache-compiler-v3";
-pub(crate) const NATIVE_FINGERPRINT_SCHEME: &str = "scriptw-native-compiler-v1";
+pub(crate) const NATIVE_FINGERPRINT_SCHEME: &str = "scriptw-native-compiler-wtime-aot-v2";
 
 // Native codegen dependencies have a separate identity from Scriptw's complete
 // program compiler. Cargo.lock binds registry dependencies; all vendored source

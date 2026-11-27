@@ -106,22 +106,24 @@ where
         metadata: Default::default(),
     };
     DataProvider::<SegmenterDictionaryAutoV1>::load(provider, req).map_err(data_error)?;
-    // These tailored rows must be present, rather than treated as an absent
-    // optional locale override by the otherwise genuine ICU constructors.
+    // Optional locale word-break overrides (empty in ICU4X 2.3 / CLDR 47+).
     for language in ["fi", "sv"] {
         if !locales.contains(&language) {
             continue;
         }
         let language: LanguageIdentifier = language.parse().map_err(data_error)?;
         let locale = DataLocale::from(&language);
-        DataProvider::<SegmenterBreakWordOverrideV1>::load(
+        match DataProvider::<SegmenterBreakWordOverrideV1>::load(
             provider,
             DataRequest {
                 id: DataIdentifierBorrowed::for_locale(&locale),
                 metadata: Default::default(),
             },
-        )
-        .map_err(data_error)?;
+        ) {
+            Ok(_) => {}
+            Err(err) if err.kind == DataErrorKind::IdentifierNotFound => {}
+            Err(err) => return Err(data_error(err)),
+        }
     }
     if locales.contains(&"el") {
         let language: LanguageIdentifier = "el".parse().map_err(data_error)?;

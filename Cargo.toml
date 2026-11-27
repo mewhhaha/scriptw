@@ -109,6 +109,24 @@ opt-level = 2
 # debug assertions remain active. Cranelift's compiled-in SSA/debug traversals
 # otherwise run inside every cold native compilation, even with its separate
 # configurable verifier disabled. Keep dev and test dependency graphs equal.
+[profile.dev.package.wtime-aot]
+opt-level = 3
+debug-assertions = false
+overflow-checks = false
+[profile.test.package.wtime-aot]
+opt-level = 3
+debug-assertions = false
+overflow-checks = false
+[profile.dev.package.wtime-aot-host]
+opt-level = 3
+debug-assertions = false
+overflow-checks = false
+[profile.test.package.wtime-aot-host]
+opt-level = 3
+debug-assertions = false
+overflow-checks = false
+[profile.dev.build-override]
+opt-level = 2
 [profile.dev.package.wasmtime]
 opt-level = 3
 debug-assertions = false

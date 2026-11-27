@@ -16,6 +16,7 @@ pub const EMBEDDING_BYTES: &str = "scriptw.embed.bytes";
 pub const EMBEDDING_BYTES_READ: &str = "scriptw.embed.bytes.read";
 pub const EMBEDDING_PROMISE: &str = "scriptw.embed.promise";
 pub const EMBEDDING_CANCEL: &str = "scriptw.embed.cancel";
+pub const EMBEDDING_ASYNC_CONTEXT: &str = "scriptw.embed.async_context";
 
 impl FunctionBuilder<'_> {
     /// A returned intrinsic Promise has crossed to a host observer before the
@@ -257,6 +258,41 @@ impl FunctionBuilder<'_> {
         )?;
         self.completion().set_normal(&error, &mut function);
         error.clear(&mut function);
+        self.completion().emit(&mut function);
+        self.clear_helper_execution_realm(&mut function);
+        parameters.release(&mut function);
+        function.instruction(&Instruction::End);
+        Ok(self.finish_function(function))
+    }
+
+    pub(crate) fn compile_embedding_async_context(&mut self) -> Result<Function, EmitError> {
+        let mut function = self.begin_helper_body(RuntimeHelperId::EmbeddingAsyncContext);
+        let parameters = self.helper_parameters::<EmbeddingAsyncContextParameters>(&mut function);
+        self.replace_current_realm(&parameters.caller_execution_realm, &mut function);
+        let meta = self
+            .functions
+            .get(&StandardBuiltinId::EmbedAsyncContext.function_id())
+            .ok_or_else(|| {
+                EmitError::unsupported(
+                    "EmbedAsyncContext builtin requires compiled runtime metadata",
+                )
+            })?
+            .clone();
+        let context = self.emit_realm_function_materialization_context_from_realm(
+            &parameters.caller_execution_realm,
+            &mut function,
+        );
+        let schema = self.runtime_schema();
+        let func_obj = schema.reserve_gc_local(&mut function).initialize(
+            self.emit_function_value_payload_in_realm(&meta, &context, &mut function)?,
+            &mut function,
+        );
+        let value = schema.reserve_value_local(&mut function);
+        value.set_reference(&func_obj, schema, &mut function);
+        self.completion().set_normal(&value, &mut function);
+        value.clear(&mut function);
+        func_obj.clear(&mut function);
+        context.clear(&mut function);
         self.completion().emit(&mut function);
         self.clear_helper_execution_realm(&mut function);
         parameters.release(&mut function);

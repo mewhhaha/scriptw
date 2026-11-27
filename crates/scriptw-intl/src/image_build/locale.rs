@@ -1,8 +1,11 @@
 //! Deterministic singleton export from the exact locked ICU Locale provider.
 
 use icu_locale::provider::{
-    Baked, LocaleAliasesV1, LocaleLikelySubtagsExtendedV1, LocaleLikelySubtagsLanguageV1,
-    LocaleLikelySubtagsScriptRegionV1, LocaleParentsV1,
+    Baked as LocaleBaked, LocaleAliasesV1, LocaleLikelySubtagsExtendedV1,
+    LocaleLikelySubtagsScriptRegionV1,
+};
+use icu_locale_fallback::provider::{
+    Baked as FallbackBaked, LocaleLikelySubtagsLanguageV1, LocaleParentsV1,
 };
 use icu_provider::dynutil::UpcastDataPayload;
 use icu_provider::export::{DataExporter, ExportMarker, FlushMetadata};
@@ -14,19 +17,19 @@ pub fn export() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     {
         let mut exporter = BlobExporter::new_with_sink(Box::new(&mut bytes));
         macro_rules! singleton {
-            ($marker:ty) => {
-                let response = DataProvider::<$marker>::load(&Baked, Default::default())?;
+            ($provider:expr, $marker:ty) => {
+                let response = DataProvider::<$marker>::load(&$provider, Default::default())?;
                 let payload: DataPayload<ExportMarker> =
                     UpcastDataPayload::upcast(response.payload);
                 exporter.put_payload(<$marker>::INFO, Default::default(), &payload)?;
                 exporter.flush(<$marker>::INFO, FlushMetadata::default())?;
             };
         }
-        singleton!(LocaleAliasesV1);
-        singleton!(LocaleLikelySubtagsExtendedV1);
-        singleton!(LocaleLikelySubtagsLanguageV1);
-        singleton!(LocaleLikelySubtagsScriptRegionV1);
-        singleton!(LocaleParentsV1);
+        singleton!(LocaleBaked, LocaleAliasesV1);
+        singleton!(LocaleBaked, LocaleLikelySubtagsExtendedV1);
+        singleton!(FallbackBaked, LocaleLikelySubtagsLanguageV1);
+        singleton!(LocaleBaked, LocaleLikelySubtagsScriptRegionV1);
+        singleton!(FallbackBaked, LocaleParentsV1);
         exporter.close()?;
     }
     if bytes.is_empty() {

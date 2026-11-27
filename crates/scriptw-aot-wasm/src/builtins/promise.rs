@@ -1393,14 +1393,16 @@ impl<'a> FunctionBuilder<'a> {
                 ..
             })
         );
+        let async_context = schema.load_async_context(function);
         if let PromiseReactionInitialization::AsyncFunction { activation, realm } = initialization {
-            return Ok(schema.reserve_gc_local(function).initialize(
+            let job = schema.reserve_gc_local(function).initialize(
                 schema
                     .struct_type::<PromiseAwaitContinuation>()
                     .construct(
                         (
                             GcOperand::null(schema),
                             GcOperand::nullable_reference(*realm, schema),
+                            GcOperand::reference(&async_context, schema),
                             GcOperand::reference(*activation, schema),
                             argument,
                             GcOperand::boolean(settled_rejected),
@@ -1409,7 +1411,9 @@ impl<'a> FunctionBuilder<'a> {
                     )
                     .upcast(),
                 function,
-            ));
+            );
+            async_context.clear(function);
+            return Ok(job);
         }
 
         // Before settlement only ordinary reactions need two handler values.
@@ -1517,6 +1521,7 @@ impl<'a> FunctionBuilder<'a> {
                     (
                         GcOperand::null(schema),
                         realm,
+                        GcOperand::reference(&async_context, schema),
                         argument,
                         GcOperand::boolean(settled_rejected),
                         GcOperand::constant(kind),
@@ -1538,6 +1543,7 @@ impl<'a> FunctionBuilder<'a> {
         }
         reject_handler.clear(function);
         handler.clear(function);
+        async_context.clear(function);
         Ok(reaction)
     }
 

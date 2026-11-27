@@ -1597,6 +1597,7 @@ fn emit_script_module_with_factory(
             EmbeddingBytesRead, compile_embedding_bytes_read;
             EmbeddingPromise, compile_embedding_promise;
             EmbeddingCancel, compile_embedding_cancel;
+            EmbeddingAsyncContext, compile_embedding_async_context;
         );
     }
     if compile_program_helpers {

@@ -47,6 +47,7 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
+        let async_context = schema.load_async_context(function);
         let job = schema.reserve_gc_local(function).initialize(
             schema
                 .struct_type::<StreamFulfillmentJob>()
@@ -54,6 +55,7 @@ impl FunctionBuilder<'_> {
                     (
                         GcOperand::null(schema),
                         GcOperand::nullable_reference(&realm, schema),
+                        GcOperand::reference(&async_context, schema),
                         GcOperand::reference(controller, schema),
                         GcOperand::boolean(matches!(fulfillment, StreamFulfillment::Start)),
                     ),
@@ -64,6 +66,7 @@ impl FunctionBuilder<'_> {
         );
         self.emit_append_promise_job(&job, function);
         job.clear(function);
+        async_context.clear(function);
         realm.clear(function);
         Ok(())
     }
@@ -248,6 +251,7 @@ impl FunctionBuilder<'_> {
                 self.emit_promise_job_callback_realm(method, function)?,
             ),
         };
+        let async_context = schema.load_async_context(function);
         let job = schema.reserve_gc_local(function).initialize(
             schema
                 .struct_type::<PromiseCallbackJob>()
@@ -255,6 +259,7 @@ impl FunctionBuilder<'_> {
                     (
                         GcOperand::null(schema),
                         GcOperand::nullable_reference(&realm, schema),
+                        GcOperand::reference(&async_context, schema),
                         GcOperand::constant(kind),
                         thenable.map_or_else(
                             || GcOperand::null(schema),
@@ -276,6 +281,7 @@ impl FunctionBuilder<'_> {
         );
         self.emit_append_promise_job(&job, function);
         job.clear(function);
+        async_context.clear(function);
         realm.clear(function);
         if let Some(callback) = callback {
             callback.clear(function);
@@ -321,6 +327,16 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
+        let saved_async_context = schema.load_async_context(function);
+        let job_async_context = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(PendingJobSchema::ASYNC_CONTEXT)
+                .read(job, schema, function)
+                .reference(),
+            function,
+        );
+        schema.replace_async_context(&job_async_context, function);
+        job_async_context.clear(function);
         job.is_subtype::<PromiseAwaitContinuation>(schema, function);
         function.instruction(&Instruction::If(BlockType::Empty));
         let continuation = schema.reserve_gc_local(function).initialize(
@@ -391,6 +407,8 @@ impl FunctionBuilder<'_> {
         for _ in 0..3 {
             function.instruction(&Instruction::End);
         }
+        schema.replace_async_context(&saved_async_context, function);
+        saved_async_context.clear(function);
         Ok(())
     }
 

@@ -1690,10 +1690,12 @@ gc_layout_registry! {
         struct PendingJob => PendingJobSchema {
             NEXT: GcRef<PendingJob>, Mutable, Nullable;
             REALM: GcRef<RealmRecord>, Mutable, Nullable;
+            ASYNC_CONTEXT: GcRef<StoredValue>, Mutable, Nullable;
         }
         struct PromiseReaction: PendingJob => PromiseReactionSchema {
             NEXT: GcRef<PendingJob>, Mutable, Nullable;
             REALM: GcRef<RealmRecord>, Mutable, Nullable;
+            ASYNC_CONTEXT: GcRef<StoredValue>, Mutable, Nullable;
             ARGUMENT: GcRef<StoredValue>, Mutable, Nullable;
             REJECTED: bool, Mutable, NonNullable;
             CALLBACK_KIND: crate::heap::PromiseReactionCallbackKind, Immutable, NonNullable;
@@ -1708,6 +1710,7 @@ gc_layout_registry! {
         struct PromiseAwaitContinuation: PendingJob => PromiseAwaitContinuationSchema {
             NEXT: GcRef<PendingJob>, Mutable, Nullable;
             REALM: GcRef<RealmRecord>, Mutable, Nullable;
+            ASYNC_CONTEXT: GcRef<StoredValue>, Mutable, Nullable;
             ACTIVATION: GcRef<AsyncActivation>, Immutable, NonNullable;
             ARGUMENT: GcRef<StoredValue>, Mutable, Nullable;
             REJECTED: bool, Mutable, NonNullable;
@@ -1715,12 +1718,14 @@ gc_layout_registry! {
         struct StreamFulfillmentJob: PendingJob => StreamFulfillmentJobSchema {
             NEXT: GcRef<PendingJob>, Mutable, Nullable;
             REALM: GcRef<RealmRecord>, Mutable, Nullable;
+            ASYNC_CONTEXT: GcRef<StoredValue>, Mutable, Nullable;
             CONTROLLER: GcRef<ReadableByteStreamControllerObject>, Immutable, NonNullable;
             START: bool, Immutable, NonNullable;
         }
         struct PromiseCallbackJob: PendingJob => PromiseCallbackJobSchema {
             NEXT: GcRef<PendingJob>, Mutable, Nullable;
             REALM: GcRef<RealmRecord>, Mutable, Nullable;
+            ASYNC_CONTEXT: GcRef<StoredValue>, Mutable, Nullable;
             KIND: crate::heap::PromiseJobKind, Immutable, NonNullable;
             THENABLE: GcRef<PromiseThenableJob>, Immutable, Nullable;
             REGISTRY: GcRef<FinalizationRegistryObject>, Immutable, Nullable;
@@ -1735,6 +1740,7 @@ gc_layout_registry! {
             NESTING: I64Value, Immutable, NonNullable;
             CANCELLED: bool, Mutable, NonNullable;
             NEXT: GcRef<TimerTask>, Mutable, Nullable;
+            ASYNC_CONTEXT: GcRef<StoredValue>, Mutable, Nullable;
         }
         struct TimerQueue => TimerQueueSchema {
             HEAD: GcRef<TimerTask>, Mutable, Nullable;

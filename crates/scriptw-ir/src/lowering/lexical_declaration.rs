@@ -144,7 +144,10 @@ impl ScriptLowerer<'_> {
                                     await_expression.target(),
                                     ContainsSymbol::AwaitExpression,
                                 ),
-                                _ => contains(element, ContainsSymbol::AwaitExpression),
+                                _ => {
+                                    contains(element, ContainsSymbol::AwaitExpression)
+                                        && !self.async_initializer_is_stageable(element)
+                                }
                             }
                         }) {
                             self.unsupported(
@@ -165,7 +168,15 @@ impl ScriptLowerer<'_> {
                             let Expression::Await(await_expression) =
                                 Self::unwrap_parenthesized_expr(element)
                             else {
-                                let value = self.lower_expression(element);
+                                let value = if contains(element, ContainsSymbol::AwaitExpression) {
+                                    let (prefix, staged) = self
+                                        .lower_async_prefixed_expression(element)
+                                        .expect("stageable async array element must stage");
+                                    statements.extend(prefix);
+                                    staged
+                                } else {
+                                    self.lower_expression(element)
+                                };
                                 let element_name = self.alloc_suspension_owned_binding(
                                     "async.array.element.",
                                     value.value_info(),

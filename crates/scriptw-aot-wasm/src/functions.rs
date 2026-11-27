@@ -100,6 +100,10 @@ impl RealmFunctionMaterializationContext {
     ) -> &crate::gc_types::GcLocal<crate::gc_types::FunctionObject> {
         &self.function_prototype
     }
+    pub(crate) fn clear(self, function: &mut Function) {
+        self.function_prototype.clear(function);
+        self.realm.clear(function);
+    }
 }
 
 /// A realm-intrinsic slot whose representation is not constrained by the

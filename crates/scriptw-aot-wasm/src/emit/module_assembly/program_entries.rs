@@ -134,6 +134,7 @@ impl ProgramExports {
                 (EMBEDDING_BYTES_READ, RuntimeHelperId::EmbeddingBytesRead),
                 (EMBEDDING_PROMISE, RuntimeHelperId::EmbeddingPromise),
                 (EMBEDDING_CANCEL, RuntimeHelperId::EmbeddingCancel),
+                (EMBEDDING_ASYNC_CONTEXT, RuntimeHelperId::EmbeddingAsyncContext),
             ] {
                 exports.export(name, ExportKind::Func, helper.index(base));
             }

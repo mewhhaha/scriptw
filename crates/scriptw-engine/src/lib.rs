@@ -3467,6 +3467,20 @@ impl Engine {
         run_on_sized_stack(|| self.emit_wasm_on_current_thread(unit))
     }
 
+    /// Emits a `NativeHost` Wasm artifact capable of runtime `eval` / `Function`
+    /// native compilation when admitted via [`EmbeddedRuntime::compile_native_host`].
+    #[cfg(feature = "native-source-compiler")]
+    pub fn emit_wasm_native_host(&self, unit: &CompilationUnit) -> Result<Artifact, EngineError> {
+        run_on_sized_stack(|| {
+            let cache = program_wasm_cache();
+            self.emit_wasm_with_cache_on_current_thread(
+                unit,
+                cache.as_deref(),
+                scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost,
+            )
+        })
+    }
+
     fn emit_wasm_on_current_thread(&self, unit: &CompilationUnit) -> Result<Artifact, EngineError> {
         let cache = program_wasm_cache();
         self.emit_wasm_with_cache_on_current_thread(
