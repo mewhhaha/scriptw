@@ -180,7 +180,7 @@ pub struct EmbeddedRuntime {
     /// native compilation via `wtime-aot` inside embedded Stores.
     #[cfg(feature = "native-source-compiler")]
     native_source: Option<(
-        Arc<scriptw_aot_wasm::RuntimeArtifact>,
+        wasm_runtime_link::ProgramRuntime,
         WasmCompilationPolicy,
         WasmNativeCompilationMode,
     )>,
@@ -202,6 +202,93 @@ impl EmbeddedRuntime {
         artifact: &Artifact,
     ) -> Result<Self, EngineError> {
         Self::compile_with_profile(engine, artifact, true)
+    }
+
+    /// Compiles a `NativeHost` artifact into serialized native program bytes
+    /// suitable for build-time embedding and later loading via
+    /// [`Self::from_precompiled_native_host_program`].
+    #[cfg(feature = "native-source-compiler")]
+    pub fn precompile_native_host_program(
+        engine: &wasmtime::Engine,
+        artifact: &Artifact,
+    ) -> Result<Vec<u8>, EngineError> {
+        let runtime = Self::compile_native_host(engine, artifact)?;
+        runtime.modules.program.serialize().map_err(|error| {
+            EngineError::new(format!(
+                "precompiled native-host program serialization failed: {error:#}"
+            ))
+        })
+    }
+
+    /// Loads a build-time precompiled `NativeHost` program module directly against
+    /// the Cargo-embedded `NativeHost` runtime `R` without running JS lowering,
+    /// Wasm emission, or AOT compilation.
+    ///
+    /// # Safety
+    ///
+    /// `serialized_program` must be the exact unchanged output of
+    /// [`Self::precompile_native_host_program`] produced by this same compiler
+    /// build and target architecture.
+    #[cfg(feature = "native-source-compiler")]
+    pub unsafe fn from_precompiled_native_host_program(
+        engine: &wasmtime::Engine,
+        serialized_program: &[u8],
+        foreign: ForeignModuleRegistry,
+    ) -> Result<Self, EngineError> {
+        run_on_sized_stack(|| {
+            PRODUCT_WASMTIME_POLICY
+                .verify_engine(engine)
+                .map_err(EngineError::new)?;
+            let mode = match engine.get_cranelift_opt_level() {
+                Some(wasmtime::OptLevel::None) => WasmNativeCompilationMode::Fast,
+                Some(wasmtime::OptLevel::Speed) => WasmNativeCompilationMode::Speed,
+                Some(wasmtime::OptLevel::SpeedAndSize) => WasmNativeCompilationMode::SizeOptimized,
+                Some(other) => {
+                    return Err(EngineError::new(format!(
+                        "unsupported embedding optimization level: {other:?}"
+                    )));
+                }
+                None => {
+                    return Err(EngineError::new(
+                        "NativeHost embedding requires a supported native compiler Engine",
+                    ));
+                }
+            };
+            let owner = embedded_runtime::CargoExecutionRuntime::native_host()
+                .transpose()?
+                .ok_or_else(|| {
+                    EngineError::new("Cargo NativeHost embedded runtime is unavailable")
+                })?;
+            let mut loading = WasmRuntimeModuleLoading::default();
+            let started = std::time::Instant::now();
+            let runtime_module = owner.load(engine, owner.key(), mode)?;
+            loading.runtime = started.elapsed();
+            loading.runtime_cache = Some(WasmRuntimeModuleCacheOutcome::Bypassed);
+            let intl = intl_data_images::WasmIntlKernel::cargo_minimal(Arc::clone(owner));
+            let started = std::time::Instant::now();
+            // SAFETY: caller upholds the `precompile_native_host_program` provenance contract.
+            let program = unsafe { WasmtimeModule::deserialize(engine, serialized_program) }
+                .map_err(|error| {
+                    EngineError::new(format!(
+                        "precompiled native-host program is incompatible: {error:#}"
+                    ))
+                })?;
+            loading.program = started.elapsed();
+            let modules = wasm_runtime_link::WasmModules::new(
+                program,
+                Some(runtime_module),
+                WasmModuleMemoryCacheOutcome::Bypassed,
+                WasmRuntimeMatchedImageCacheOutcome::NotAccessed,
+                loading,
+            )?;
+            let mut runtime = Self::from_admitted_modules(engine, modules, foreign, intl);
+            runtime.native_source = Some((
+                wasm_runtime_link::ProgramRuntime::Cargo(owner),
+                WasmCompilationPolicy::from_options(&CompileOptions::default()),
+                mode,
+            ));
+            Ok(runtime)
+        })
     }
 
     fn compile_with_profile(
@@ -296,7 +383,11 @@ impl EmbeddedRuntime {
                 let policy = artifact.compilation_policy.clone().unwrap_or_else(|| {
                     WasmCompilationPolicy::from_options(&CompileOptions::default())
                 });
-                runtime.native_source = Some((rt_artifact, policy, mode));
+                runtime.native_source = Some((
+                    wasm_runtime_link::ProgramRuntime::Raw(rt_artifact),
+                    policy,
+                    mode,
+                ));
             }
             Ok(runtime)
         })
@@ -549,13 +640,13 @@ impl EmbeddedRuntime {
         let (program, roots) =
             wasm_runtime_link::instantiate_with_linkage(linker, store, &self.modules, prepared)?;
         #[cfg(feature = "native-source-compiler")]
-        if let Some((ref rt_artifact, ref policy, native_mode)) = self.native_source {
+        if let Some((ref rt_runtime, ref policy, native_mode)) = self.native_source {
             let execution_control = Arc::new(WasmAgentExecutionControl::new());
             execution_control.arm(std::time::Instant::now(), None);
             let context = wasm_native_source_compiler::NativeSourceCompilerContext::new(
                 linker.clone(),
                 roots,
-                wasm_runtime_link::ProgramRuntimeRef::Raw(rt_artifact),
+                rt_runtime.as_ref(),
                 policy.clone(),
                 execution_control,
                 native_mode,
@@ -819,4 +910,69 @@ pub fn throw_foreign_error<R>(
     let mut roots = wasmtime::RootScope::new(&mut caller);
     let exception = ExnRef::new(&mut roots, &allocator, &tag, &[WasmtimeVal::I32(code)])?;
     roots.as_context_mut().throw(exception)
+}
+
+#[cfg(all(test, feature = "native-source-compiler"))]
+mod native_host_precompile_tests {
+    use super::*;
+
+    #[test]
+    fn precompile_native_host_program_round_trips_with_dynamic_eval() {
+        let mut config = wasmtime::Config::new();
+        configure_wasm_runtime(
+            &mut config,
+            NativeCompilationPolicy::default(),
+            CompilationJobs::current(),
+        );
+        config.cranelift_opt_level(wasmtime::OptLevel::SpeedAndSize);
+        let engine = wasmtime::Engine::new(&config).expect("engine");
+        let compiler = Engine::new(RealmBuilder::new().build());
+        let artifact = compiler
+            .compile_and_emit_module_native_host_cached(
+                "export function run(x) { return eval('x + 22'); }",
+                CompileOptions::default(),
+            )
+            .expect("emit native host");
+        let bytes = EmbeddedRuntime::precompile_native_host_program(&engine, &artifact)
+            .expect("precompile native host");
+        assert!(!bytes.is_empty());
+
+        let runtime = unsafe {
+            EmbeddedRuntime::from_precompiled_native_host_program(
+                &engine,
+                &bytes,
+                ForeignModuleRegistry::default(),
+            )
+        }
+        .expect("load precompiled native host");
+
+        let state = runtime
+            .new_state(RealmBuilder::new().build(), ())
+            .expect("state");
+        let mut store = wasmtime::Store::new(&engine, state);
+        let mut linker = wasmtime::Linker::new(&engine);
+        runtime.register(&mut store, &mut linker).expect("register");
+        let mut instance = runtime
+            .instantiate(&mut store, &mut linker)
+            .expect("instantiate");
+        assert!(matches!(
+            instance.initialize(&mut store).expect("init"),
+            EmbeddedEvaluation::Settled(JsCompletion::Normal(_))
+        ));
+        let run_fn = match instance.get_export(&mut store, "run").expect("get run") {
+            JsCompletion::Normal(v) => v,
+            other => panic!("unexpected export: {other:?}"),
+        };
+        let arg = instance
+            .value(&mut store, ForeignValue::Number(20.0))
+            .expect("arg");
+        let out = match instance
+            .call(&mut store, &run_fn, None, &[arg])
+            .expect("call run")
+        {
+            JsCompletion::Normal(v) => v,
+            other => panic!("unexpected call outcome: {other:?}"),
+        };
+        assert_eq!(out.as_number(), Some(42.0));
+    }
 }
