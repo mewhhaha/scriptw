@@ -3,11 +3,10 @@
 //! A codec or a search that runs one of these loops inside its own large
 //! body pays for that body's spilled locals on every unit. Each loop here is
 //! the whole body of a registered runtime helper whose only operands are its
-//! arrays and a few indices, so its state stays in registers. Every loop
-//! leaves on the stack the source index at which it stopped: `end`, or the
-//! first unit it does not handle, which the caller's complete algorithm then
-//! consumes. A loop writes only inside the range its caller reserved, and the
-//! engine's array bounds checks still guard every access.
+//! arrays and a few indices, so its state stays in registers. Scans return
+//! the first index they did not handle, or `end`. Equality returns whether
+//! the scan reached the end of the range. A loop writes only inside the range
+//! its caller reserved, and the engine's array bounds checks guard every access.
 use super::*;
 
 /// The scratch unit of one kernel loop.
@@ -187,6 +186,63 @@ fn emit_json_plain_run_kernel(
     increment(at, function);
     close_scan(start, end, function);
     unit.release(schema, function);
+}
+
+/// Leaves the first control unit, quote, or backslash in `source[start..end]`,
+/// or `end`. Surrogates are ordinary code units when parsing a JSON string.
+pub(crate) fn emit_json_parse_plain_run_kernel(
+    source: &GcLocal<CodeUnitArray>,
+    start: I32Local,
+    end: I32Local,
+    schema: &RuntimeSchema,
+    function: &mut Function,
+) {
+    let unit = KernelUnit::reserve(schema, function);
+    open_scan(start, end, function);
+    schema
+        .array_type::<CodeUnitArray>()
+        .read(source, start, schema, function)
+        .store(unit.0, function);
+    unit.0.load(function);
+    function.instruction(&Instruction::I32Const(0x20));
+    function.instruction(&Instruction::I32LtU);
+    function.instruction(&Instruction::BrIf(1));
+    for escaped in [0x22, 0x5c] {
+        unit.0.load(function);
+        function.instruction(&Instruction::I32Const(escaped));
+        function.instruction(&Instruction::I32Eq);
+        function.instruction(&Instruction::BrIf(1));
+    }
+    increment(start, function);
+    close_scan(start, end, function);
+    unit.release(schema, function);
+}
+
+/// Leaves `1` if the first `length` units match and `0` at a mismatch.
+pub(crate) fn emit_code_unit_equal_kernel(
+    left: &GcLocal<CodeUnitArray>,
+    right: &GcLocal<CodeUnitArray>,
+    length: I32Local,
+    schema: &RuntimeSchema,
+    function: &mut Function,
+) {
+    let index = schema.reserve_i32_local(function);
+    function.instruction(&Instruction::I32Const(0));
+    index.store(function);
+    open_scan(index, length, function);
+    let _ = schema
+        .array_type::<CodeUnitArray>()
+        .read(left, index, schema, function);
+    let _ = schema
+        .array_type::<CodeUnitArray>()
+        .read(right, index, schema, function);
+    function.instruction(&Instruction::I32Ne);
+    function.instruction(&Instruction::BrIf(1));
+    increment(index, function);
+    close_scan(index, length, function);
+    length.load(function);
+    function.instruction(&Instruction::I32Eq);
+    schema.release_i32_local(index, function);
 }
 
 /// The two kernels that write code units, as helper bodies. Their callers are

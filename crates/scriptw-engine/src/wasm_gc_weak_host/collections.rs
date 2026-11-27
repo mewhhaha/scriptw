@@ -1,14 +1,13 @@
-//! WeakMap and WeakSet entries: collector ephemerons behind raw host calls.
+//! WeakMap table registration and WeakSet entry operations.
 //!
-//! These imports take their references unrooted. A lookup allocates nothing
-//! and cannot collect, and a store only registers a collector edge, so the
-//! raw references compiled code passes stay valid for the whole call; no
-//! operand is rooted, type-checked again or upgraded.
+//! These imports cannot collect, so the raw references compiled code passes
+//! stay valid throughout each call. WeakMap registers its backing array when
+//! allocating it. WeakSet registers and looks up individual collector edges.
 use super::*;
 
 use super::collection_index::{Entries, Operands};
 use std::mem::MaybeUninit;
-use wasmtime::{FuncType, ValRaw, ValType};
+use wasmtime::{FuncType, GcEphemeron, ValRaw, ValType};
 
 type Arguments = [MaybeUninit<ValRaw>];
 type LookupArguments = [MaybeUninit<ValRaw>; 4];
@@ -80,8 +79,18 @@ unsafe fn define(
         .map_err(bind_error)
 }
 
-/// `(owner, key, value, owner identity, key identity)`: stores the value, or
-/// with a null value a WeakSet's membership.
+/// `(array)`: gives the collector the array of WeakMap key/value pairs.
+fn register_table(
+    mut caller: WasmtimeCaller<'_, WasmHostState>,
+    arguments: &mut Arguments,
+) -> wasmtime::Result<()> {
+    // SAFETY: the import type supplies this reference, and the Store has not
+    // collected since entering the host call.
+    unsafe { GcEphemeron::register_table_raw(&mut caller, arguments[0].assume_init().get_anyref()) }
+}
+
+/// `(owner, key, value, owner identity, key identity)`: stores a WeakSet's
+/// membership entry (with a null value).
 fn put(
     mut caller: WasmtimeCaller<'_, WasmHostState>,
     arguments: &mut Arguments,
@@ -95,20 +104,6 @@ fn put(
     let at = operands(owner, key, owner_id, key_id)?;
     // SAFETY: compiled code passed these raw operands to this host call.
     unsafe { Entries::put(&mut caller, at, value.get_anyref()) }
-}
-
-/// `(owner, key, owner identity, key identity) -> value`, null without an
-/// entry.
-fn get(
-    mut caller: WasmtimeCaller<'_, WasmHostState>,
-    arguments: &mut Arguments,
-) -> wasmtime::Result<()> {
-    let arguments = lookup_arguments(arguments);
-    // SAFETY: the import's type.
-    let at = unsafe { lookup_operands(arguments)? };
-    let value = Entries::get(&mut caller, at)?;
-    arguments[0].write(ValRaw::anyref(value));
-    Ok(())
 }
 
 /// `(owner, key, owner identity, key identity) -> i32`: whether the entry
@@ -157,7 +152,13 @@ pub(super) fn link(linker: &mut FixedHostFunctions<'_, '_>) -> Result<(), Engine
             &[],
             put,
         )?;
-        define(linker, GcHostImport::WeakEntryGet, &LOOKUP, &[EQ], get)?;
+        define(
+            linker,
+            GcHostImport::WeakMapRegisterTable,
+            &[EQ],
+            &[],
+            register_table,
+        )?;
         define(
             linker,
             GcHostImport::WeakEntryHas,

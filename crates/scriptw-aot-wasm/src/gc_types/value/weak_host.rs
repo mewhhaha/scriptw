@@ -1,5 +1,5 @@
 //! Typed weak host calls. References travel as references; the identities
-//! beside a weak collection entry's references only say where to look.
+//! beside a WeakSet entry's references only say where to look.
 use super::*;
 mod finalization;
 
@@ -29,7 +29,6 @@ fn bind_resource(
 
 /// The objects that own weak collection entries.
 pub(crate) trait WeakCollectionObject: GcHeapType {}
-impl WeakCollectionObject for WeakMapObject {}
 impl WeakCollectionObject for WeakSetObject {}
 
 /// The stable identities of a weak collection and of a key, in that order:
@@ -47,8 +46,7 @@ impl WeakEntryIdentities {
 }
 
 impl DeclaredGcHostImport {
-    /// `WeakMap.prototype.set`'s store, or with no value a WeakSet's `add`.
-    /// Both identities must already be minted.
+    /// WeakSet's store. Both identities must already be minted.
     pub(crate) fn put_weak_entry<Owner: WeakCollectionObject>(
         self,
         owner: &GcLocal<Owner>,
@@ -75,25 +73,16 @@ impl DeclaredGcHostImport {
         identities.load(f);
         self.emit_call_instruction(f);
     }
-    /// The stored value of a WeakMap entry, or null without one.
-    pub(crate) fn get_weak_entry(
+    /// Register the private Wasm array that holds interleaved WeakMap key/value pairs.
+    pub(crate) fn register_weak_map_table(
         self,
-        owner: &GcLocal<WeakMapObject>,
-        key: &ValueLocals,
-        identities: WeakEntryIdentities,
+        references: &GcLocal<CompactReferenceArray>,
         s: &RuntimeSchema,
         f: &mut Function,
-    ) -> GcStackReference<StoredValue, Nullable> {
-        assert_eq!(self.import(), GcHostImport::WeakEntryGet);
-        owner.load(s, f);
-        key.reference().load(f);
-        identities.load(f);
+    ) {
+        assert_eq!(self.import(), GcHostImport::WeakMapRegisterTable);
+        references.load(s, f);
         self.emit_call_instruction(f);
-        f.instruction(&Instruction::RefCastNullable(
-            s.reference_type::<StoredValue>(GcNullability::Nullable)
-                .heap_type,
-        ));
-        GcStackReference::new()
     }
     /// Whether a weak collection has the key, for `has`, or had it before
     /// this call removed it, for `delete`.

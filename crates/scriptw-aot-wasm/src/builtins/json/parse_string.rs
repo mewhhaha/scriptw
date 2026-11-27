@@ -47,6 +47,28 @@ impl FunctionBuilder<'_> {
     fn emit_json_string_run(&mut self, cursor: &JsonCursor<'_>, unit: I32Local, f: &mut Function) {
         let s = self.runtime_schema();
         let done = self.open_frame(ControlFrameKind::Block, f);
+        if let Some(base) = self.runtime_helper_base {
+            cursor.end.load(f);
+            cursor.at.load(f);
+            f.instruction(&Instruction::I32Sub);
+            f.instruction(&Instruction::I32Const(8));
+            f.instruction(&Instruction::I32GeU);
+            self.open_frame(ControlFrameKind::If, f);
+            s.call_helper(
+                crate::runtime_helpers::JsonParsePlainRunArguments::new(
+                    &cursor.units,
+                    cursor.at,
+                    cursor.end,
+                ),
+                base,
+                f,
+            )
+            .store(cursor.at, f);
+            cursor.peek(unit, s, f);
+            self.emit_branch_to_target(done, f);
+            self.pop_control(ControlFrameKind::If);
+            f.instruction(&Instruction::End);
+        }
         let next = self.open_frame(ControlFrameKind::Loop, f);
         cursor.at.load(f);
         cursor.end.load(f);

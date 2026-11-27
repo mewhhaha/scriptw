@@ -2761,29 +2761,13 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let activation = self.control_flow_async_activation(function)?;
-        let awaited = schema.reserve_value_local(function);
         let resumed = schema.reserve_value_local(function);
         let kind = schema.reserve_i32_local(function);
         let row = schema.struct_type::<AsyncActivation>();
         self.emit_resumable_state_equals(suspend_state, function)?;
         self.open_frame(ControlFrameKind::If, function);
         self.emit_checkpoint_generator_statement_list_value(function);
-        self.compile_expr_to_value(value, &awaited, function)?;
-        self.emit_propagate_current_throw_if_needed(function);
-        self.emit_set_resumable_resume_point(resume_state, function)?;
-        if matches!(
-            value.expr,
-            ExprIr::ModuleEvaluate(_) | ExprIr::ModuleDeferredImportEvaluate(_)
-        ) {
-            let promise = schema.reserve_gc_local(function).initialize(
-                awaited.cast_reference::<PromiseObject>(schema, function),
-                function,
-            );
-            self.emit_module_import_await_reactions(&activation, &promise, function)?;
-            promise.clear(function);
-        } else {
-            self.emit_async_await_reactions(&activation, &awaited, function)?;
-        }
+        self.emit_plain_async_await_suspend(&activation, value, resume_state, function)?;
         self.emit_propagate_current_throw_if_needed(function);
         self.emit_return_async_suspension(function)?;
         self.pop_control(ControlFrameKind::If);
@@ -2837,7 +2821,6 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::End);
         schema.release_i32_local(kind, function);
         resumed.clear(function);
-        awaited.clear(function);
         activation.clear(function);
         Ok(())
     }

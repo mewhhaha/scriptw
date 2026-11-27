@@ -128,9 +128,10 @@ pub(super) fn translate_read_interned_func_ref(
 /// end: one compare against a value hoisted per function, taken only by old
 /// targets. Such a store of a nursery reference (a non-null, non-`i31` value
 /// below the end) records the slot's heap index in the remembered-slot buffer
-/// the runtime publishes, or flags the buffer's overflow. Initializing stores
-/// into new objects need none: compiled code allocates them in the nursery,
-/// and the runtime remembers any it allocates in the old space whole.
+/// the runtime publishes, or flags the buffer's overflow. Fresh objects need
+/// none: they are in the nursery, in the pretenuring window (the next
+/// collection must be full), or registered for a whole-object scan by the
+/// slow allocator. This exemption expires at the first potential safepoint.
 pub(super) fn emit_old_to_young_barrier(
     func_env: &mut FuncEnvironment<'_>,
     builder: &mut FunctionBuilder,
@@ -450,7 +451,8 @@ impl CopyingCompiler {
         let constant_size = FuncEnvironment::value_as_const_int(builder, size)
             .and_then(|size| (size as u32).checked_next_multiple_of(ALIGN));
 
-        let (fits, end_of_object, object_size) = if let Some(size) = constant_size {
+        let narrow_size = constant_size.filter(|_| pointer_type == ir::types::I32);
+        let (fits, end_of_object, object_size) = if let Some(size) = narrow_size {
             // The runtime publishes bump <= limit and inline allocation
             // preserves it. Checking the remaining capacity first makes the
             // subsequent i32 addition non-wrapping on the fast edge.
@@ -464,9 +466,13 @@ impl CopyingCompiler {
             let size = builder.ins().iconst(ir::types::I32, i64::from(size));
             (fits, end, size)
         } else {
-            // Keep dynamic rounding and addition wide enough to detect any
-            // object end that cannot be represented as a heap index.
-            let aligned_size = Self::aligned_size(builder, size);
+            // Compare the end we will store directly with the limit. Both
+            // start and limit are unsigned 32-bit indices, so the wide add
+            // also rules out overflow without a separate capacity subtraction.
+            let aligned_size = match constant_size {
+                Some(size) => builder.ins().iconst(ir::types::I64, i64::from(size)),
+                None => Self::aligned_size(builder, size),
+            };
             let bump = builder.ins().uextend(ir::types::I64, bump_ptr);
             let end = builder.ins().iadd(bump, aligned_size);
             let limit = builder.ins().uextend(ir::types::I64, active_space_end);
@@ -558,8 +564,73 @@ impl CopyingCompiler {
         let ptr_to_object = builder.append_block_param(merge_block, pointer_type);
         builder.seal_block(merge_block);
         builder.declare_value_needs_stack_map(gc_ref);
+        func_env.fresh_gc_allocation = Some(FreshAllocation::new(builder, gc_ref));
 
         Ok((gc_ref, ptr_to_object))
+    }
+
+    fn emit_array_alloc(
+        &mut self,
+        func_env: &mut FuncEnvironment<'_>,
+        builder: &mut FunctionBuilder<'_>,
+        ty: ModuleInternedTypeIndex,
+        len: ir::Value,
+        size: ir::Value,
+        layout: &GcArrayLayout,
+    ) -> WasmResult<(ir::Value, ir::Value)> {
+        let (reference, address) = self.emit_inline_alloc(
+            func_env,
+            builder,
+            VMGcKind::ArrayRef,
+            ty,
+            size,
+            InlineTraceInfo::array(layout).encode(),
+        )?;
+        let flags = func_env.gc_memflags(&mut builder.func);
+        let len_offset = i32::try_from(self.layouts.array_length_field_offset()).unwrap();
+        builder.ins().store(flags, len, address, len_offset);
+        Ok((reference, address))
+    }
+
+    pub(super) fn try_alloc_fixed_array(
+        &mut self,
+        func_env: &mut FuncEnvironment<'_>,
+        builder: &mut FunctionBuilder<'_>,
+        ty: ModuleInternedTypeIndex,
+        elem_ty: WasmStorageType,
+        elems: &[ir::Value],
+    ) -> WasmResult<Option<ir::Value>> {
+        // The raw address below is valid until a safepoint. Only lower
+        // element types whose initializing stores cannot call the runtime.
+        if let WasmStorageType::Val(WasmValType::Ref(ty)) = elem_ty
+            && matches!(
+                ty.heap_type.top(),
+                WasmHeapTopType::Func | WasmHeapTopType::Cont
+            )
+        {
+            return Ok(None);
+        }
+
+        let layout = func_env.array_layout(ty)?.clone();
+        let len = u32::try_from(elems.len()).unwrap();
+        let Some(size) = layout.size_for_len(len) else {
+            return Ok(None);
+        };
+        let len = builder.ins().iconst(ir::types::I32, i64::from(len));
+        let size = builder.ins().iconst(ir::types::I32, i64::from(size));
+        let (reference, address) =
+            self.emit_array_alloc(func_env, builder, ty, len, size, &layout)?;
+
+        // Each element lies in the freshly reserved object: size_for_len
+        // checked base_size + len * elem_size. The allocator has already
+        // checked or allocated that range on both the fast and slow edges.
+        let mut offset = u64::from(layout.base_size);
+        for &elem in elems {
+            let field = builder.ins().iadd_imm_u(address, i64::try_from(offset).unwrap());
+            self.init_field(func_env, builder, elem_ty, field, elem)?;
+            offset += u64::from(layout.elem_size);
+        }
+        Ok(Some(reference))
     }
 }
 
@@ -582,27 +653,10 @@ impl GcCompiler for CopyingCompiler {
         let interned_type_index =
             func_env.module.types[array_type_index].unwrap_module_type_index();
 
-        let len_offset = gc_compiler(func_env)?.layouts().array_length_field_offset();
         let array_layout = func_env.array_layout(interned_type_index)?.clone();
-        let reserved_bits = InlineTraceInfo::array(&array_layout).encode();
-
-        // First, compute the array's total size.
         let size = emit_array_size(func_env, builder, &array_layout, len);
-
-        // Allocate inline (with fallback to libcall).
-        let (array_ref, object_addr) = self.emit_inline_alloc(
-            func_env,
-            builder,
-            VMGcKind::ArrayRef,
-            interned_type_index,
-            size,
-            reserved_bits,
-        )?;
-        let flags = func_env.gc_memflags(&mut builder.func);
-        builder
-            .ins()
-            .store(flags, len, object_addr, i32::try_from(len_offset).unwrap());
-
+        let (array_ref, _) =
+            self.emit_array_alloc(func_env, builder, interned_type_index, len, size, &array_layout)?;
         Ok(array_ref)
     }
 

@@ -523,6 +523,15 @@ pub trait ABIMachineSpec {
         frame_layout: &FrameLayout,
     ) -> SmallInstVec<Self::I>;
 
+    /// Probe strategy for this calling convention. The default respects the
+    /// requested strategy.
+    fn probestack_strategy(
+        _call_conv: isa::CallConv,
+        flags: &settings::Flags,
+    ) -> ProbestackStrategy {
+        flags.probestack_strategy()
+    }
+
     /// Generate a probestack call.
     fn gen_probestack(insts: &mut SmallInstVec<Self::I>, frame_size: u32);
 
@@ -2267,7 +2276,7 @@ impl<M: ABIMachineSpec> Callee<M> {
 
             if self.flags.enable_probestack() {
                 let guard_size = 1 << self.flags.probestack_size_log2();
-                match self.flags.probestack_strategy() {
+                match M::probestack_strategy(self.call_conv, &self.flags) {
                     ProbestackStrategy::Inline => M::gen_inline_probestack(
                         &mut insts,
                         self.call_conv,

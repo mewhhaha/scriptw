@@ -213,7 +213,10 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // append dictionary. Rooted snapshots gain a typed global-row projection.
 // ABI 96 invalidates older artifacts after the Wave 9 property, for-in, and
 // packed array emission changes.
-const LAYOUT_VERSION: u32 = 96;
+// ABI 97 replaces WeakMap host entry calls with in-Wasm GC ephemeron tables
+// (importing weak_map_register_table), adds Stage 1 async/stream/codec fast paths,
+// and adds the JSON parse plain-run and code-unit equality packed-array leaf helpers.
+const LAYOUT_VERSION: u32 = 97;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.

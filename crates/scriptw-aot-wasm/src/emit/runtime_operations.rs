@@ -155,9 +155,8 @@ impl<'a> FunctionBuilder<'a> {
         Ok(self.finish_function(function))
     }
 
-    /// The four leaf loops of `gc_types::value::code_unit_kernels`, each the
-    /// whole body of its registered helper: its arrays, their indices and
-    /// the stop index as the sole I32 result.
+    /// Compiles the ASCII narrowing leaf kernel with its stop index as the
+    /// sole I32 result.
     pub(super) fn compile_ascii_narrow_helper(&mut self) -> Result<Function, EmitError> {
         let mut function = self.begin_helper_body(RuntimeHelperId::AsciiNarrow);
         let schema = self.runtime_schema();
@@ -212,6 +211,40 @@ impl<'a> FunctionBuilder<'a> {
         let parameters =
             self.helper_parameters::<crate::runtime_helpers::JsonPlainRunParameters>(&mut function);
         crate::gc_types::emit_json_plain_run_helper_body(&parameters, schema, &mut function);
+        parameters.release(&mut function);
+        function.instruction(&Instruction::End);
+        Ok(self.finish_function(function))
+    }
+
+    pub(super) fn compile_json_parse_plain_run_helper(&mut self) -> Result<Function, EmitError> {
+        let mut function = self.begin_helper_body(RuntimeHelperId::JsonParsePlainRun);
+        let schema = self.runtime_schema();
+        let parameters = self
+            .helper_parameters::<crate::runtime_helpers::JsonParsePlainRunParameters>(&mut function);
+        crate::gc_types::emit_json_parse_plain_run_kernel(
+            &parameters.source,
+            parameters.start,
+            parameters.end,
+            schema,
+            &mut function,
+        );
+        parameters.release(&mut function);
+        function.instruction(&Instruction::End);
+        Ok(self.finish_function(function))
+    }
+
+    pub(super) fn compile_code_unit_equal_helper(&mut self) -> Result<Function, EmitError> {
+        let mut function = self.begin_helper_body(RuntimeHelperId::CodeUnitEqual);
+        let schema = self.runtime_schema();
+        let parameters =
+            self.helper_parameters::<crate::runtime_helpers::CodeUnitEqualParameters>(&mut function);
+        crate::gc_types::emit_code_unit_equal_kernel(
+            &parameters.left,
+            &parameters.right,
+            parameters.length,
+            schema,
+            &mut function,
+        );
         parameters.release(&mut function);
         function.instruction(&Instruction::End);
         Ok(self.finish_function(function))

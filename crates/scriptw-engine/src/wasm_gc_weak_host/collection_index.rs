@@ -1,6 +1,6 @@
 //! One Store's weak collection entries, found by stable identities.
 //!
-//! An entry is a collector ephemeron owned by its WeakMap or WeakSet. The
+//! An entry is a collector ephemeron owned by its WeakSet. The
 //! index only finds it: it holds no reference, keeps nothing alive and needs
 //! no rebuilding when objects move. Compiled code mints one stable nonzero
 //! identity per object or Symbol (`KEY_HASH_ID`) before it stores an entry;
@@ -124,20 +124,6 @@ impl Entries {
             } else {
                 Candidate::Mismatch
             })
-        })
-    }
-
-    pub(super) fn get(
-        caller: &mut WasmtimeCaller<'_, WasmHostState>,
-        at: Operands,
-    ) -> wasmtime::Result<u32> {
-        GcEphemeron::with_raw_access(caller, |state, ephemerons| {
-            let value = state.weak.index.probe(at, None, |entry| {
-                Ok(ephemerons
-                    .value_if_matches_raw(entry, at.owner, at.key)?
-                    .map_or(Candidate::Mismatch, Candidate::Match))
-            })?;
-            Ok(value.unwrap_or(0))
         })
     }
 

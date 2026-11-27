@@ -272,10 +272,10 @@ fn wasm_backend_characterization_matrix_locks_public_surface_and_outcomes() {
                 "scriptw_host::system_time_zone_snapshot",
                 "scriptw_host::wall_clock_millis",
                 "scriptw_host::weak_entry_delete",
-                "scriptw_host::weak_entry_get",
                 "scriptw_host::weak_entry_has",
                 "scriptw_host::weak_entry_put",
                 "scriptw_host::weak_job_finish",
+                "scriptw_host::weak_map_register_table",
                 "scriptw_host::weak_ref_allocate",
                 "scriptw_host::weak_ref_deref",
             ],
@@ -4706,4 +4706,30 @@ fn wasm_backend_resumes_template_interpolations_in_evaluation_order() {
         )
         .unwrap_or_else(|err| panic!("generator template interpolation should resume: {err:?}"));
     assert!(outcome.note.contains("boolean(true)"), "{}", outcome.note);
+}
+
+#[test]
+fn wasm_backend_sloppy_mapped_arguments_replace_parameter_aliased_function_declaration() {
+    let source = r#"
+        function make(tag, f, previous) {
+            function f(x) { "use strict"; return tag; }
+            if (previous === undefined) return f;
+            arguments[1] = previous;
+            return f(0);
+        }
+        let result;
+        for (const tag of ["old", "new"]) result = make(tag, null, result);
+        result;
+    "#;
+    let outcome = engine()
+        .run_script(
+            source,
+            CompileOptions::default(),
+            RunOptions {
+                backend: ExecutionBackend::WasmAot,
+                ..RunOptions::default()
+            },
+        )
+        .unwrap_or_else(|err| panic!("mapped arguments replacement should run: {err:?}"));
+    assert!(outcome.note.contains("string(old)"), "{}", outcome.note);
 }

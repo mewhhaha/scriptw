@@ -1681,7 +1681,12 @@ impl<'a> FunctionBuilder<'a> {
             .field(PromiseObjectSchema::STATE)
             .read(promise, schema, function)
             .store(state, function);
-        for selected in PromiseState::ALL {
+        let states = if matches!(initialization, PromiseReactionInitialization::AsyncFunction { .. }) {
+            [PromiseState::Fulfilled, PromiseState::Pending, PromiseState::Rejected]
+        } else {
+            PromiseState::ALL
+        };
+        for selected in states {
             state.load(function);
             function.instruction(&Instruction::I32Const(GcI32Constant::encode(selected)));
             function.instruction(&Instruction::I32Eq);
@@ -1718,7 +1723,7 @@ impl<'a> FunctionBuilder<'a> {
             function.instruction(&Instruction::Else);
         }
         function.instruction(&Instruction::Unreachable);
-        for _ in PromiseState::ALL {
+        for _ in states {
             function.instruction(&Instruction::End);
         }
         schema.field(PromiseObjectSchema::HANDLED).write(
@@ -1803,12 +1808,11 @@ impl<'a> FunctionBuilder<'a> {
         AsyncExecutionRealmContext { realm }
     }
 
-    fn emit_async_await_reactions_inner(
+    fn emit_save_async_await_environment(
         &mut self,
         activation: &GcLocal<AsyncActivation>,
-        value: &ValueLocals,
         function: &mut Function,
-    ) -> Result<(), EmitError> {
+    ) {
         let schema = self.runtime_schema();
         let frame = schema.reserve_gc_local(function).initialize(
             schema
@@ -1827,6 +1831,63 @@ impl<'a> FunctionBuilder<'a> {
                 schema,
                 function,
             );
+        frame.clear(function);
+    }
+
+    fn emit_enqueue_fulfilled_async_await(
+        &mut self,
+        initialization: &PromiseReactionInitialization<'_>,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let argument = schema.reserve_gc_local(function).initialize(
+            schema.struct_type::<StoredValue>().from_value(value, function),
+            function,
+        );
+        let job = self.emit_initialize_promise_reaction(
+            initialization,
+            Some(SettledPromiseReaction {
+                settlement: PromiseSettlement::Fulfill,
+                argument: &argument,
+            }),
+            function,
+        )?;
+        self.emit_append_promise_job(&job, function);
+        job.clear(function);
+        argument.clear(function);
+        Ok(())
+    }
+
+    pub(crate) fn emit_fulfilled_async_await(
+        &mut self,
+        activation: &GcLocal<AsyncActivation>,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        self.emit_save_async_await_environment(activation, function);
+        let realm =
+            self.emit_async_function_execution_realm_context_from_activation(activation, function);
+        self.emit_enqueue_fulfilled_async_await(
+            &PromiseReactionInitialization::AsyncFunction {
+                activation,
+                realm: realm.realm(),
+            },
+            value,
+            function,
+        )?;
+        self.completion().initialize(function);
+        self.release_async_execution_realm_context(realm, function);
+        Ok(())
+    }
+
+    fn emit_async_await_reactions_inner(
+        &mut self,
+        activation: &GcLocal<AsyncActivation>,
+        value: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        self.emit_save_async_await_environment(activation, function);
         let realm =
             self.emit_async_function_execution_realm_context_from_activation(activation, function);
         let initialization = PromiseReactionInitialization::AsyncFunction {
@@ -1840,7 +1901,6 @@ impl<'a> FunctionBuilder<'a> {
             function,
         )?;
         self.release_async_execution_realm_context(realm, function);
-        frame.clear(function);
         Ok(())
     }
     fn emit_async_generator_await_with_continuation_inner(
@@ -1928,6 +1988,14 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let context = self.emit_intrinsic_promise_resolve_realm_context(authority, function);
+        self.emit_is_primitive_tag_i32(value.tag(), function);
+        self.open_frame(ControlFrameKind::If, function);
+        // PromiseResolve on a primitive fulfills immediately with no observable
+        // hooks. Enqueue the same reaction job that PerformPromiseThen would
+        // schedule without allocating a throwaway PromiseObject.
+        self.emit_enqueue_fulfilled_async_await(&initialization, value, function)?;
+        self.completion().initialize(function);
+        function.instruction(&Instruction::Else);
         let resolved = schema.reserve_completion(function);
         self.emit_intrinsic_promise_resolve_to_locals(&context, value, &resolved, function)?;
         // Await propagates synchronous PromiseResolve failure before it suspends.
@@ -1948,6 +2016,8 @@ impl<'a> FunctionBuilder<'a> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         resolved.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         self.release_intrinsic_promise_resolve_realm_context(context, function);
         Ok(())
     }
@@ -3518,7 +3588,35 @@ impl<'a> FunctionBuilder<'a> {
         );
         let value = schema.reserve_value_local(function);
         self.emit_builtin_arg_to_value(0, &value, function);
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        if matches!(settlement, PromiseSettlement::Fulfill) {
+            let generic = self.open_frame(ControlFrameKind::Block, function);
+            self.emit_is_primitive_tag_i32(value.tag(), function);
+            function.instruction(&Instruction::I32Eqz);
+            self.emit_branch_if_to_target(generic, function);
+            let realm = schema
+                .reserve_gc_local(function)
+                .initialize(self.emit_current_function_realm(function), function);
+            self.emit_is_intrinsic_promise_constructor_i32(&realm, &constructor, function);
+            function.instruction(&Instruction::I32Eqz);
+            self.emit_branch_if_to_target(generic, function);
+            // Outside an elided await, the Promise escapes. With the actual
+            // intrinsic constructor and a primitive, only it and its result
+            // are needed; the private capability has no observable effects.
+            let promise = self.emit_alloc_promise_in_realm(&realm, function)?;
+            self.emit_settle_promise_record(&promise, PromiseSettlement::Fulfill, &value, function)?;
+            self.completion().value().set_reference(&promise, schema, function);
+            self.completion().set_kind(CompletionKind::Normal, function);
+            self.completion().target().set_constant(0, function);
+            promise.clear(function);
+            realm.clear(function);
+            self.emit_branch_to_target(done, function);
+            self.pop_control(ControlFrameKind::Block);
+            function.instruction(&Instruction::End);
+        }
         self.emit_promise_settle_value(settlement, &constructor, &value, function)?;
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
         value.clear(function);
         constructor.clear(function);
         Ok(())

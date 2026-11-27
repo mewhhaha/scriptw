@@ -1,100 +1,100 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="624" viewBox="0 0 760 624" role="img" aria-labelledby="title desc">
 <title id="title">Scriptw Portable vs Porffor on wtime Register</title>
-<desc id="desc">All 18 kernels head-to-head on wtime-runtime Register: Scriptw passes 18/18 and wins 1.94x geomean over Porffor on passing original17 kernels.</desc>
+<desc id="desc">All 18 kernels head-to-head on wtime-runtime Register: Scriptw passes 18/18 and wins 2.00x geomean over Porffor on passing original17 kernels.</desc>
 <rect x="0.5" y="0.5" width="759" height="623" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
 <g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fill="#24292f">
 <text x="28" y="34" font-size="18" font-weight="650" fill="#24292f">On ../wtime (Register) — Scriptw Portable vs Porffor 0.61.13</text>
-<text x="28" y="54" font-size="12" fill="#57606a">Right of 1× = Scriptw faster · Scriptw passes 18/18 (Porffor fails 4/18) · 1.94× geomean on original17 (8/13 + startup)</text>
+<text x="28" y="54" font-size="12" fill="#57606a">Right of 1× = Scriptw faster · Scriptw passes 18/18 (Porffor fails 4/18) · 2.00× geomean on original17 (7/13 + startup)</text>
 <rect x="28.0" y="66" width="11" height="11" rx="2.5" fill="#8250df"/>
 <text x="44.0" y="75.5" font-size="11.5" fill="#57606a">Scriptw Portable faster on wtime</text>
 <rect x="267.0" y="66" width="11" height="11" rx="2.5" fill="#2da44e"/>
 <text x="283.0" y="75.5" font-size="11.5" fill="#57606a">Porffor faster on wtime</text>
-<line x1="192.9" y1="94" x2="192.9" y2="562" stroke="#eaeef2" stroke-width="1"/>
-<text x="192.9" y="578" text-anchor="middle" font-size="11" fill="#57606a">0.2×</text>
-<line x1="249.8" y1="94" x2="249.8" y2="562" stroke="#eaeef2" stroke-width="1"/>
-<text x="249.8" y="578" text-anchor="middle" font-size="11" fill="#57606a">0.5×</text>
-<line x1="292.8" y1="94" x2="292.8" y2="562" stroke="#6e7781" stroke-width="1.4" stroke-dasharray="3,2"/>
-<text x="292.8" y="578" text-anchor="middle" font-size="11" fill="#57606a">1×</text>
-<line x1="335.9" y1="94" x2="335.9" y2="562" stroke="#eaeef2" stroke-width="1"/>
-<text x="335.9" y="578" text-anchor="middle" font-size="11" fill="#57606a">2×</text>
-<line x1="392.8" y1="94" x2="392.8" y2="562" stroke="#eaeef2" stroke-width="1"/>
-<text x="392.8" y="578" text-anchor="middle" font-size="11" fill="#57606a">5×</text>
-<line x1="435.8" y1="94" x2="435.8" y2="562" stroke="#eaeef2" stroke-width="1"/>
-<text x="435.8" y="578" text-anchor="middle" font-size="11" fill="#57606a">10×</text>
-<line x1="521.9" y1="94" x2="521.9" y2="562" stroke="#eaeef2" stroke-width="1"/>
-<text x="521.9" y="578" text-anchor="middle" font-size="11" fill="#57606a">40×</text>
+<line x1="192.5" y1="94" x2="192.5" y2="562" stroke="#eaeef2" stroke-width="1"/>
+<text x="192.5" y="578" text-anchor="middle" font-size="11" fill="#57606a">0.2×</text>
+<line x1="248.3" y1="94" x2="248.3" y2="562" stroke="#eaeef2" stroke-width="1"/>
+<text x="248.3" y="578" text-anchor="middle" font-size="11" fill="#57606a">0.5×</text>
+<line x1="290.6" y1="94" x2="290.6" y2="562" stroke="#6e7781" stroke-width="1.4" stroke-dasharray="3,2"/>
+<text x="290.6" y="578" text-anchor="middle" font-size="11" fill="#57606a">1×</text>
+<line x1="332.8" y1="94" x2="332.8" y2="562" stroke="#eaeef2" stroke-width="1"/>
+<text x="332.8" y="578" text-anchor="middle" font-size="11" fill="#57606a">2×</text>
+<line x1="388.6" y1="94" x2="388.6" y2="562" stroke="#eaeef2" stroke-width="1"/>
+<text x="388.6" y="578" text-anchor="middle" font-size="11" fill="#57606a">5×</text>
+<line x1="430.8" y1="94" x2="430.8" y2="562" stroke="#eaeef2" stroke-width="1"/>
+<text x="430.8" y="578" text-anchor="middle" font-size="11" fill="#57606a">10×</text>
+<line x1="515.3" y1="94" x2="515.3" y2="562" stroke="#eaeef2" stroke-width="1"/>
+<text x="515.3" y="578" text-anchor="middle" font-size="11" fill="#57606a">40×</text>
 <text x="163" y="111.0" text-anchor="end" font-size="11.8" font-weight="500">startup</text>
-<rect x="292.8" y="100.0" width="229.3" height="14" rx="2.5" fill="#8250df"/>
-<text x="528.1" y="111.0" font-size="11" font-weight="650" fill="#8250df">40.1×</text>
-<text x="736" y="111.0" text-anchor="end" font-size="10.5" fill="#57606a">1.90 µs vs 76.2 µs</text>
-<text x="163" y="136.5" text-anchor="end" font-size="11.8" font-weight="500">to-sorted-512</text>
-<rect x="292.8" y="125.5" width="211.5" height="14" rx="2.5" fill="#8250df"/>
-<text x="510.3" y="136.5" font-size="11" font-weight="650" fill="#8250df">30.1×</text>
-<text x="736" y="136.5" text-anchor="end" font-size="10.5" fill="#57606a">3.67 ms vs 110.5 ms</text>
-<text x="163" y="162.0" text-anchor="end" font-size="11.8" font-weight="500">sort-reverse-512</text>
-<rect x="292.8" y="151.0" width="198.3" height="14" rx="2.5" fill="#8250df"/>
-<text x="497.1" y="162.0" font-size="11" font-weight="650" fill="#8250df">24.4×</text>
-<text x="736" y="162.0" text-anchor="end" font-size="10.5" fill="#57606a">4.61 ms vs 112.2 ms</text>
+<rect x="290.6" y="100.0" width="225.8" height="14" rx="2.5" fill="#8250df"/>
+<text x="522.3" y="111.0" font-size="11" font-weight="650" fill="#8250df">40.7×</text>
+<text x="736" y="111.0" text-anchor="end" font-size="10.5" fill="#57606a">1.93 µs vs 78.5 µs</text>
+<text x="163" y="136.5" text-anchor="end" font-size="11.8" font-weight="500">sort-reverse-512</text>
+<rect x="290.6" y="125.5" width="223.4" height="14" rx="2.5" fill="#8250df"/>
+<text x="519.9" y="136.5" font-size="11" font-weight="650" fill="#8250df">39.1×</text>
+<text x="736" y="136.5" text-anchor="end" font-size="10.5" fill="#57606a">2.91 ms vs 113.7 ms</text>
+<text x="163" y="162.0" text-anchor="end" font-size="11.8" font-weight="500">to-sorted-512</text>
+<rect x="290.6" y="151.0" width="207.9" height="14" rx="2.5" fill="#8250df"/>
+<text x="504.4" y="162.0" font-size="11" font-weight="650" fill="#8250df">30.3×</text>
+<text x="736" y="162.0" text-anchor="end" font-size="10.5" fill="#57606a">3.74 ms vs 113.4 ms</text>
 <text x="163" y="187.5" text-anchor="end" font-size="11.8" font-weight="500">join-small-1024</text>
-<rect x="292.8" y="176.5" width="148.9" height="14" rx="2.5" fill="#8250df"/>
-<text x="447.7" y="187.5" font-size="11" font-weight="650" fill="#8250df">11.0×</text>
-<text x="736" y="187.5" text-anchor="end" font-size="10.5" fill="#57606a">404 µs vs 4.44 ms</text>
+<rect x="290.6" y="176.5" width="148.8" height="14" rx="2.5" fill="#8250df"/>
+<text x="445.3" y="187.5" font-size="11" font-weight="650" fill="#8250df">11.5×</text>
+<text x="736" y="187.5" text-anchor="end" font-size="10.5" fill="#57606a">423 µs vs 4.86 ms</text>
 <text x="163" y="213.0" text-anchor="end" font-size="11.8" font-weight="500">sort-reverse-128</text>
-<rect x="292.8" y="202.0" width="115.4" height="14" rx="2.5" fill="#8250df"/>
-<text x="414.2" y="213.0" font-size="11" font-weight="650" fill="#8250df">6.41×</text>
-<text x="736" y="213.0" text-anchor="end" font-size="10.5" fill="#57606a">1.12 ms vs 7.18 ms</text>
+<rect x="290.6" y="202.0" width="112.3" height="14" rx="2.5" fill="#8250df"/>
+<text x="408.9" y="213.0" font-size="11" font-weight="650" fill="#8250df">6.32×</text>
+<text x="736" y="213.0" text-anchor="end" font-size="10.5" fill="#57606a">1.13 ms vs 7.17 ms</text>
 <text x="163" y="238.5" text-anchor="end" font-size="11.8" font-weight="500">join-singleton-1024</text>
-<rect x="292.8" y="227.5" width="102.6" height="14" rx="2.5" fill="#8250df"/>
-<text x="401.4" y="238.5" font-size="11" font-weight="650" fill="#8250df">5.22×</text>
-<text x="736" y="238.5" text-anchor="end" font-size="10.5" fill="#57606a">384 µs vs 2.00 ms</text>
-<text x="163" y="264.0" text-anchor="end" font-size="11.8" font-weight="500">join-empty-1024</text>
-<rect x="292.8" y="253.0" width="66.7" height="14" rx="2.5" fill="#8250df"/>
-<text x="365.5" y="264.0" font-size="11" font-weight="650" fill="#8250df">2.93×</text>
-<text x="736" y="264.0" text-anchor="end" font-size="10.5" fill="#57606a">371 µs vs 1.09 ms</text>
-<text x="163" y="289.5" text-anchor="end" font-size="11.8" font-weight="500">numeric-loop-50000</text>
-<rect x="292.8" y="278.5" width="66.5" height="14" rx="2.5" fill="#8250df"/>
-<text x="365.3" y="289.5" font-size="11" font-weight="650" fill="#8250df">2.92×</text>
-<text x="736" y="289.5" text-anchor="end" font-size="10.5" fill="#57606a">300 µs vs 873 µs</text>
+<rect x="290.6" y="227.5" width="102.4" height="14" rx="2.5" fill="#8250df"/>
+<text x="398.9" y="238.5" font-size="11" font-weight="650" fill="#8250df">5.37×</text>
+<text x="736" y="238.5" text-anchor="end" font-size="10.5" fill="#57606a">403 µs vs 2.16 ms</text>
+<text x="163" y="264.0" text-anchor="end" font-size="11.8" font-weight="500">numeric-loop-50000</text>
+<rect x="290.6" y="253.0" width="66.6" height="14" rx="2.5" fill="#8250df"/>
+<text x="363.2" y="264.0" font-size="11" font-weight="650" fill="#8250df">2.99×</text>
+<text x="736" y="264.0" text-anchor="end" font-size="10.5" fill="#57606a">309 µs vs 924 µs</text>
+<text x="163" y="289.5" text-anchor="end" font-size="11.8" font-weight="500">join-empty-1024</text>
+<rect x="290.6" y="278.5" width="61.5" height="14" rx="2.5" fill="#8250df"/>
+<text x="358.1" y="289.5" font-size="11" font-weight="650" fill="#8250df">2.75×</text>
+<text x="736" y="289.5" text-anchor="end" font-size="10.5" fill="#57606a">411 µs vs 1.13 ms</text>
 <text x="163" y="315.0" text-anchor="end" font-size="11.8" font-weight="500">numeric-loop-10000</text>
-<rect x="275.1" y="304.0" width="17.7" height="14" rx="2.5" fill="#2da44e" opacity="0.88"/>
-<text x="298.8" y="315.0" font-size="11" font-weight="600" fill="#1a7f37">0.75×</text>
-<text x="736" y="315.0" text-anchor="end" font-size="10.5" fill="#57606a">311 µs vs 234 µs</text>
+<rect x="268.0" y="304.0" width="22.6" height="14" rx="2.5" fill="#2da44e" opacity="0.88"/>
+<text x="296.6" y="315.0" font-size="11" font-weight="600" fill="#1a7f37">0.69×</text>
+<text x="736" y="315.0" text-anchor="end" font-size="10.5" fill="#57606a">294 µs vs 203 µs</text>
 <text x="163" y="340.5" text-anchor="end" font-size="11.8" font-weight="500">dynamic-string-4096</text>
-<rect x="238.5" y="329.5" width="54.4" height="14" rx="2.5" fill="#2da44e" opacity="0.88"/>
-<text x="298.8" y="340.5" font-size="11" font-weight="600" fill="#1a7f37">0.42×</text>
-<text x="736" y="340.5" text-anchor="end" font-size="10.5" fill="#57606a">7.42 ms vs 3.09 ms</text>
+<rect x="236.6" y="329.5" width="53.9" height="14" rx="2.5" fill="#2da44e" opacity="0.88"/>
+<text x="296.6" y="340.5" font-size="11" font-weight="600" fill="#1a7f37">0.41×</text>
+<text x="736" y="340.5" text-anchor="end" font-size="10.5" fill="#57606a">7.68 ms vs 3.17 ms</text>
 <text x="163" y="366.0" text-anchor="end" font-size="11.8" font-weight="500">folded-string-4096</text>
-<rect x="225.8" y="355.0" width="67.1" height="14" rx="2.5" fill="#2da44e" opacity="0.88"/>
-<text x="298.8" y="366.0" font-size="11" font-weight="600" fill="#1a7f37">0.34×</text>
-<text x="736" y="366.0" text-anchor="end" font-size="10.5" fill="#57606a">7.61 ms vs 2.58 ms</text>
+<rect x="226.4" y="355.0" width="64.2" height="14" rx="2.5" fill="#2da44e" opacity="0.88"/>
+<text x="296.6" y="366.0" font-size="11" font-weight="600" fill="#1a7f37">0.35×</text>
+<text x="736" y="366.0" text-anchor="end" font-size="10.5" fill="#57606a">7.56 ms vs 2.64 ms</text>
 <text x="163" y="391.5" text-anchor="end" font-size="11.8" font-weight="500">objects</text>
-<rect x="223.5" y="380.5" width="69.3" height="14" rx="2.5" fill="#2da44e" opacity="0.88"/>
-<text x="298.8" y="391.5" font-size="11" font-weight="600" fill="#1a7f37">0.33×</text>
-<text x="736" y="391.5" text-anchor="end" font-size="10.5" fill="#57606a">4.95 ms vs 1.62 ms</text>
+<rect x="222.2" y="380.5" width="68.3" height="14" rx="2.5" fill="#2da44e" opacity="0.88"/>
+<text x="296.6" y="391.5" font-size="11" font-weight="600" fill="#1a7f37">0.33×</text>
+<text x="736" y="391.5" text-anchor="end" font-size="10.5" fill="#57606a">5.20 ms vs 1.69 ms</text>
 <text x="163" y="417.0" text-anchor="end" font-size="11.8" font-weight="500">sort-sorted-512</text>
-<rect x="219.4" y="406.0" width="73.4" height="14" rx="2.5" fill="#2da44e" opacity="0.88"/>
-<text x="298.8" y="417.0" font-size="11" font-weight="600" fill="#1a7f37">0.31×</text>
-<text x="736" y="417.0" text-anchor="end" font-size="10.5" fill="#57606a">2.80 ms vs 859 µs</text>
+<rect x="218.3" y="406.0" width="72.3" height="14" rx="2.5" fill="#2da44e" opacity="0.88"/>
+<text x="296.6" y="417.0" font-size="11" font-weight="600" fill="#1a7f37">0.31×</text>
+<text x="736" y="417.0" text-anchor="end" font-size="10.5" fill="#57606a">2.88 ms vs 881 µs</text>
 <text x="163" y="442.5" text-anchor="end" font-size="11.8" font-weight="500">join-mixed-1024</text>
-<rect x="198.0" y="431.5" width="94.9" height="14" rx="2.5" fill="#2da44e" opacity="0.88"/>
-<text x="298.8" y="442.5" font-size="11" font-weight="600" fill="#1a7f37">0.22×</text>
-<text x="736" y="442.5" text-anchor="end" font-size="10.5" fill="#57606a">5.99 ms vs 1.30 ms</text>
+<rect x="197.4" y="431.5" width="93.2" height="14" rx="2.5" fill="#2da44e" opacity="0.88"/>
+<text x="296.6" y="442.5" font-size="11" font-weight="600" fill="#1a7f37">0.22×</text>
+<text x="736" y="442.5" text-anchor="end" font-size="10.5" fill="#57606a">6.07 ms vs 1.32 ms</text>
 <text x="163" y="468.0" text-anchor="end" font-size="11.8" font-weight="500">join-1024</text>
-<rect x="296.8" y="456.0" width="150" height="16" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="0.8"/>
-<text x="371.8" y="467.5" text-anchor="middle" font-size="10.2" fill="#57606a">Porffor wrong output</text>
-<text x="736" y="468.0" text-anchor="end" font-size="10.5" fill="#8250df">Scriptw: 5.80 ms</text>
+<rect x="294.6" y="456.0" width="150" height="16" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="0.8"/>
+<text x="369.6" y="467.5" text-anchor="middle" font-size="10.2" fill="#57606a">Porffor wrong output</text>
+<text x="736" y="468.0" text-anchor="end" font-size="10.5" fill="#8250df">Scriptw: 6.08 ms</text>
 <text x="163" y="493.5" text-anchor="end" font-size="11.8" font-weight="500">join-4096</text>
-<rect x="296.8" y="481.5" width="150" height="16" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="0.8"/>
-<text x="371.8" y="493.0" text-anchor="middle" font-size="10.2" fill="#57606a">Porffor wrong output</text>
-<text x="736" y="493.5" text-anchor="end" font-size="10.5" fill="#8250df">Scriptw: 21.3 ms</text>
+<rect x="294.6" y="481.5" width="150" height="16" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="0.8"/>
+<text x="369.6" y="493.0" text-anchor="middle" font-size="10.2" fill="#57606a">Porffor wrong output</text>
+<text x="736" y="493.5" text-anchor="end" font-size="10.5" fill="#8250df">Scriptw: 22.2 ms</text>
 <text x="163" y="519.0" text-anchor="end" font-size="11.8" font-weight="500">integer</text>
-<rect x="296.8" y="507.0" width="150" height="16" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="0.8"/>
-<text x="371.8" y="518.5" text-anchor="middle" font-size="10.2" fill="#57606a">Porffor wrong output</text>
-<text x="736" y="519.0" text-anchor="end" font-size="10.5" fill="#8250df">Scriptw: 445 µs</text>
+<rect x="294.6" y="507.0" width="150" height="16" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="0.8"/>
+<text x="369.6" y="518.5" text-anchor="middle" font-size="10.2" fill="#57606a">Porffor wrong output</text>
+<text x="736" y="519.0" text-anchor="end" font-size="10.5" fill="#8250df">Scriptw: 476 µs</text>
 <text x="163" y="544.5" text-anchor="end" font-size="11.8" font-weight="500">retained-objects</text>
-<rect x="296.8" y="532.5" width="150" height="16" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="0.8"/>
-<text x="371.8" y="544.0" text-anchor="middle" font-size="10.2" fill="#57606a">Porffor throws on wtime</text>
-<text x="736" y="544.5" text-anchor="end" font-size="10.5" fill="#8250df">Scriptw: 189.1 ms</text>
-<text x="28" y="608" font-size="11" fill="#57606a">2026-11-27 · ABI 96 (6612a6755754) · wtime-runtime v0.1.8 --policy register · 5×21 runs · Decoded policy 1.10× faster on Scriptw</text>
+<rect x="294.6" y="532.5" width="150" height="16" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="0.8"/>
+<text x="369.6" y="544.0" text-anchor="middle" font-size="10.2" fill="#57606a">Porffor throws on wtime</text>
+<text x="736" y="544.5" text-anchor="end" font-size="10.5" fill="#8250df">Scriptw: 201.6 ms</text>
+<text x="28" y="608" font-size="11" fill="#57606a">2026-11-27 · ABI 97 (1fa26b5a03c7) · wtime-runtime v0.1.11 (91d6cfe) --policy register · 5×21 runs · Decoded 1.10× faster on Scriptw</text>
 </g>
 </svg>

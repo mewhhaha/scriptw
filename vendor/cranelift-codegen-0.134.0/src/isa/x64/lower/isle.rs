@@ -344,7 +344,6 @@ impl Context for IsleContext<'_, '_, MInst, X64Backend> {
         Box::new(ReturnCallInfo {
             dest,
             uses,
-            tmp: self.lower_ctx.temp_writable_gpr(),
             new_stack_arg_size,
         })
     }
@@ -363,7 +362,6 @@ impl Context for IsleContext<'_, '_, MInst, X64Backend> {
         Box::new(ReturnCallInfo {
             dest,
             uses,
-            tmp: self.lower_ctx.temp_writable_gpr(),
             new_stack_arg_size,
         })
     }

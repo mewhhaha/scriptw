@@ -240,9 +240,11 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::JsonStringifyPlainValue
             | RuntimeHelperId::AsciiNarrow
             | RuntimeHelperId::AsciiWiden
+            | RuntimeHelperId::CodeUnitEqual
             | RuntimeHelperId::CodeUnitFind
             | RuntimeHelperId::StringSplitJoin
             | RuntimeHelperId::JsonPlainRun
+            | RuntimeHelperId::JsonParsePlainRun
             | RuntimeHelperId::CompactArrayLiteral
             | RuntimeHelperId::InitializeInstanceElements
             | RuntimeHelperId::NativeDirectEvalFactory => {}

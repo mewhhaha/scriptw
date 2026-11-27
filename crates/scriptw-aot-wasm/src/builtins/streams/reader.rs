@@ -151,7 +151,7 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, f);
         let undefined = s.reserve_value_local(f);
         undefined.set_undefined(f);
-        self.emit_resolve_promise_record(&closed, &undefined, f)?;
+        self.emit_settle_promise_record(&closed, PromiseSettlement::Fulfill, &undefined, f)?;
         undefined.clear(f);
         self.stream_end_if(f);
         self.stream_is_state(&stream, ReadableStreamState::Errored, f);
@@ -219,6 +219,131 @@ impl FunctionBuilder<'_> {
         maybe.clear(f);
         Ok(stream)
     }
+
+    /// The caller already evaluated the member call's receiver and callee. A miss
+    /// before dequeue can call that saved method normally. After dequeue, any
+    /// failed guard must instead materialize the Promise for this exact read.
+    pub(crate) fn emit_await_stream_reader_read_or_branch(
+        &mut self,
+        callee: &ValueLocals,
+        receiver: &ValueLocals,
+        output: &ValueLocals,
+        fulfilled: I32Local,
+        slow: ControlTarget,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let builtin = StandardBuiltinId::ReadableStreamDefaultReaderRead;
+        if self.functions.get(&builtin.function_id()).is_none() {
+            self.emit_branch_to_target(slow, f);
+            return Ok(());
+        }
+        let s = self.runtime_schema();
+        let handled = s.reserve_i32_local(f);
+        handled.set_constant(0, f);
+        self.emit_with_current_native_builtin(callee, builtin, f, |builder, f| {
+            let miss = builder.open_frame(ControlFrameKind::Block, f);
+            let reader = s.reserve_gc_local(f).initialize(
+                receiver.sealed_reference_or_branch::<ReadableStreamDefaultReaderObject>(
+                    s,
+                    builder.local_branch_label(miss),
+                    f,
+                ),
+                f,
+            );
+            let maybe_stream = s.reserve_gc_local(f).initialize(
+                s.field(ReadableStreamDefaultReaderObjectSchema::STREAM)
+                    .read(&reader, s, f)
+                    .reference(),
+                f,
+            );
+            reader.clear(f);
+            maybe_stream.load(s, f).is_null(f);
+            builder.emit_branch_if_to_target(miss, f);
+            let stream = s
+                .reserve_gc_local(f)
+                .initialize(maybe_stream.load(s, f).require_non_null(f), f);
+            maybe_stream.clear(f);
+            builder.stream_is_state(&stream, ReadableStreamState::Errored, f);
+            builder.emit_branch_if_to_target(miss, f);
+
+            let value = s.reserve_value_local(f);
+            value.set_undefined(f);
+            let done = s.reserve_i32_local(f);
+            builder.stream_is_state(&stream, ReadableStreamState::Closed, f);
+            done.store(f);
+            done.load(f);
+            f.instruction(&Instruction::I32Eqz);
+            builder.open_frame(ControlFrameKind::If, f);
+            let controller = builder.stream_controller(&stream, f);
+            let head = s.reserve_gc_local(f).initialize(
+                s.field(ReadableByteStreamControllerObjectSchema::QUEUE_HEAD)
+                    .read(&controller, s, f)
+                    .reference(),
+                f,
+            );
+            head.load(s, f).is_null(f);
+            builder.emit_branch_if_to_target(miss, f);
+            let chunk = builder.stream_take_queued_chunk(&stream, &controller, &head, f)?;
+            value.set_reference(&chunk, s, f);
+            chunk.clear(f);
+            head.clear(f);
+            controller.clear(f);
+            builder.stream_end_if(f);
+            stream.clear(f);
+
+            // The exact native call runs in this Realm. Any pull/close above
+            // may have run JS, so check the live prototypes after those effects.
+            let realm = builder.load_current_realm(f);
+            let object = builder.emit_iterator_result_object_in_realm(&realm, &value, done, f)?;
+            let resolved = builder.open_frame(ControlFrameKind::Block, f);
+            let materialize = builder.open_frame(ControlFrameKind::Block, f);
+            let prototype = s.reserve_gc_local(f).initialize(
+                s.field(OrdinaryObjectSchema::PROTOTYPE)
+                    .read(&object, s, f)
+                    .reference(),
+                f,
+            );
+            builder.emit_unchanged_object_prototype_or_branch(&prototype, materialize, f);
+            prototype.clear(f);
+            builder.emit_intrinsic_fresh_promise_prototype_or_branch(&realm, materialize, f)?;
+            output.set_reference(&object, s, f);
+            fulfilled.set_constant(1, f);
+            builder.emit_branch_to_target(resolved, f);
+            builder.stream_end_block(f);
+
+            // If the result's inherited then is observable, that getter runs
+            // behind the same native caller boundary as an ordinary read.
+            let caller = s
+                .reserve_gc_local(f)
+                .initialize(s.load_active_source_function(f), f);
+            let read = s
+                .reserve_gc_local(f)
+                .initialize(callee.cast_reference::<FunctionObject>(s, f), f);
+            s.replace_active_source_function(&read, f);
+            let promise = builder.emit_alloc_promise_in_realm(&realm, f)?;
+            builder.emit_resolve_fresh_iterator_result(&promise, &object, &realm, f)?;
+            s.replace_active_source_function(&caller, f);
+            read.clear(f);
+            caller.clear(f);
+            output.set_reference(&promise, s, f);
+            fulfilled.set_constant(0, f);
+            promise.clear(f);
+            builder.stream_end_block(f);
+            object.clear(f);
+            realm.clear(f);
+            s.release_i32_local(done, f);
+            value.clear(f);
+            handled.set_constant(1, f);
+            builder.stream_end_block(f);
+            Ok(())
+        })?;
+        handled.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        s.release_i32_local(handled, f);
+        self.emit_branch_if_to_target(slow, f);
+        Ok(())
+    }
+
     pub(super) fn emit_stream_reader_read(&mut self, f: &mut Function) -> Result<(), EmitError> {
         let s = self.runtime_schema();
         let promise = self.stream_new_promise(f)?;
@@ -254,61 +379,12 @@ impl FunctionBuilder<'_> {
         self.stream_append_read(&reader, &promise, f);
         self.stream_call_pull(&controller, f)?;
         f.instruction(&Instruction::Else);
-        let next = s.reserve_gc_local(f).initialize(
-            s.field(StreamByteChunkSchema::NEXT)
-                .read(&head, s, f)
-                .reference(),
-            f,
-        );
-        s.field(ReadableByteStreamControllerObjectSchema::QUEUE_HEAD)
-            .write(&controller, GcOperand::reference(&next, s), s, f);
-        next.load(s, f).is_null(f);
-        self.open_frame(ControlFrameKind::If, f);
-        s.field(ReadableByteStreamControllerObjectSchema::QUEUE_TAIL)
-            .write(&controller, GcOperand::null(s), s, f);
-        self.stream_end_if(f);
-        let count = s.reserve_i64_local(f);
-        let length = s.reserve_i64_local(f);
-        s.field(ReadableByteStreamControllerObjectSchema::QUEUE_BYTES)
-            .read(&controller, s, f)
-            .store_i64(count, f);
-        s.field(StreamByteChunkSchema::BYTE_LENGTH)
-            .read(&head, s, f)
-            .store_i64(length, f);
-        count.load(f);
-        length.load(f);
-        f.instruction(&Instruction::I64Sub);
-        count.store(f);
-        s.field(ReadableByteStreamControllerObjectSchema::QUEUE_BYTES)
-            .write(&controller, GcOperand::i64_local(count), s, f);
-        let closing = s.reserve_i32_local(f);
-        s.field(ReadableByteStreamControllerObjectSchema::CLOSE_REQUESTED)
-            .read(&controller, s, f)
-            .store(closing, f);
-        count.load(f);
-        f.instruction(&Instruction::I64Eqz);
-        closing.load(f);
-        f.instruction(&Instruction::I32And);
-        self.open_frame(ControlFrameKind::If, f);
-        self.stream_finish(&stream, None, f)?;
-        f.instruction(&Instruction::Else);
-        self.stream_call_pull(&controller, f)?;
-        self.stream_end_if(f);
-        let chunk = s.reserve_gc_local(f).initialize(
-            s.field(StreamByteChunkSchema::VALUE)
-                .read(&head, s, f)
-                .reference(),
-            f,
-        );
+        let chunk = self.stream_take_queued_chunk(&stream, &controller, &head, f)?;
         let value = s.reserve_value_local(f);
         value.set_reference(&chunk, s, f);
         self.stream_resolve_read(&promise, &value, false, f)?;
         value.clear(f);
         chunk.clear(f);
-        s.release_i32_local(closing, f);
-        s.release_i64_local(length, f);
-        s.release_i64_local(count, f);
-        next.clear(f);
         self.stream_end_if(f);
         head.clear(f);
         controller.clear(f);

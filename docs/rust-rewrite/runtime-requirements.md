@@ -45,7 +45,7 @@ Its initial accessible backing is 32 MiB (a 4-MiB nursery and two nominal
 1 GiB. Reserving addresses does not commit 4 GiB of RAM. On the supported
 64-bit Wasmtime baseline this permits protected-page checks and a stable heap
 base; Wasm array bounds and null-reference traps remain. Native images bind
-these settings through configuration schema 9. Custom pooling allocators
+these settings through configuration schema 10. Custom pooling allocators
 require matching GC and linear-memory tunables; ordinary Scriptw uses on-demand
 allocation.
 
@@ -83,7 +83,7 @@ states what admits that image.
 
 ## Runtime ABI
 
-The runtime ABI is **96**. Portable bundles and native images built under an
+The runtime ABI is **97**. Portable bundles and native images built under an
 earlier ABI must be rebuilt. ABIs 58 to 77 added per-site read, write,
 `instanceof` and global read records, a dictionary position hint on Strings,
 further native call entries, one JSON output accumulator, compact shape
@@ -173,7 +173,22 @@ property reads, P-local `for…in` cursors with `hasOwnProperty`/computed hints,
 literals, packed-array `StoredValue` reuse, plain `JSON.stringify` traversal,
 mixed ASCII + 2-byte UTF-8 codec loops, Promise/Streams/await fast paths,
 `instanceof` ladder reuse, lean direct local-argument calls, and shared empty
-locals / null-reference argument-projection sentinels. `LAYOUT_VERSION` in
+locals / null-reference argument-projection sentinels. ABI 97 (configuration
+schema 10) widens the vendored x86-64 Cranelift Tail ABI to 8 integer argument
+registers, adds 64-bit copying-GC bump-end reuse, direct `array.new_fixed`,
+fresh-allocation write-barrier omission, checked `v128` SIMD lowering for the
+six packed GC-array leaf kernels (baseline SSE2 on x86-64 / NEON on
+little-endian AArch64; ordinary Wasmtime baseline without making SIMD an
+external requirement), and a Linux 7.3+ `PAGEMAP_SCAN` dirty-page reset fix;
+replaces host-called `WeakMap` steady-state operations with an in-Wasm
+open-addressing table tracked by copying-GC ephemerons (`weak_map_register_table`
+host registration only on table allocation/rehash); adds zero-Promise primitive
+`await`, `await Promise.resolve(prim)`, `await reader.read()`, guarded
+`{stream}` `TextDecoder` / single-pass ASCII `TextDecoder`/`TextEncoder` fast
+paths, `0..=127` decimal string caching, bounded inlining of stable closed-local
+source calls, `Array.from` packed preallocation, `JsonParsePlainRun` /
+`CodeUnitEqual` leaf kernels, and `O(1)` `EnvironmentSchema::DEFINING_REALM`
+propagation. `LAYOUT_VERSION` in
 `crates/scriptw-aot-wasm/src/runtime_artifact.rs` records each step.
 
 ### Locals and GC roots

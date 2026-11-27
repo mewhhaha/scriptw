@@ -50,19 +50,7 @@ impl FunctionBuilder<'_> {
         let header = s
             .reserve_gc_local(f)
             .initialize(self.emit_object_header_projection(key, f), f);
-        s.struct_type::<OrdinaryObject>()
-            .field(OrdinaryObjectSchema::KEY_HASH_ID)
-            .read(&header, s, f)
-            .store_i64(hash, f);
-        hash.load(f);
-        f.instruction(&Instruction::I64Eqz);
-        self.open_frame(ControlFrameKind::If, f);
-        s.emit_next_collection_key_hash_id(hash, f);
-        s.struct_type::<OrdinaryObject>()
-            .field(OrdinaryObjectSchema::KEY_HASH_ID)
-            .write(&header, GcOperand::i64_local(hash), s, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
+        self.emit_ordinary_collection_identity(&header, hash, true, f);
         header.clear(f);
         f.instruction(&Instruction::Else);
         key.tag().load(f);
@@ -146,6 +134,46 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.emit_key_hash_tag_mix(key, hash, f);
     }
+    pub(crate) fn emit_ordinary_collection_identity(
+        &mut self,
+        header: &GcLocal<OrdinaryObject>,
+        identity: I64Local,
+        mint: bool,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        s.struct_type::<OrdinaryObject>()
+            .field(OrdinaryObjectSchema::KEY_HASH_ID)
+            .read(header, s, f)
+            .store_i64(identity, f);
+        if mint {
+            identity.load(f);
+            f.instruction(&Instruction::I64Eqz);
+            self.open_frame(ControlFrameKind::If, f);
+            s.emit_next_collection_key_hash_id(identity, f);
+            s.struct_type::<OrdinaryObject>()
+                .field(OrdinaryObjectSchema::KEY_HASH_ID)
+                .write(header, GcOperand::i64_local(identity), s, f);
+            self.pop_control(ControlFrameKind::If);
+            f.instruction(&Instruction::End);
+        }
+    }
+
+    pub(crate) fn emit_object_collection_identity(
+        &mut self,
+        object: &ValueLocals,
+        identity: I64Local,
+        mint: bool,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let header = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_object_header_projection(object, f), f);
+        self.emit_ordinary_collection_identity(&header, identity, mint, f);
+        header.clear(f);
+    }
+
     pub(super) fn emit_collection_hash_bucket(
         &self,
         table: &GcLocal<CollectionHashTable>,

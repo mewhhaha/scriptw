@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="356" viewBox="0 0 760 356" role="img" aria-labelledby="title desc">
-<title id="title">React 19.3.1 Server Components: Scriptw ABI 96 vs Node 24 / V8</title>
-<desc id="desc">Retained React 19.3.1 RSC Flight medians (8 fresh procs x 100w x 101 calls): Sync SCRWEP04 0.168 ms vs V8 0.164 ms (1.02x), Async 0.189 ms vs V8 0.173 ms (1.09x).</desc>
+<title id="title">React 19.3.1 Server Components: Scriptw ABI 97 vs Node 24 / V8</title>
+<desc id="desc">Retained React 19.3.1 RSC Flight medians (8 fresh procs x 100w x 101 calls): Sync SCRWEP04 0.164 ms vs V8 0.168 ms (0.98x), Async 0.187 ms vs V8 0.180 ms (1.03x).</desc>
 <rect x="0.5" y="0.5" width="759" height="355" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="1"/>
 <g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fill="#24292f">
 <text x="28" y="34" font-size="18" font-weight="650" fill="#24292f">React 19.3.1 Server Components — retained Flight requests</text>
-<text x="28" y="54" font-size="12" fill="#57606a">Lower is faster (ms, after 100 warmups) · Scriptw SCRWEP04 within 1.02–1.09× of Node 24 / V8 JIT · 40.6 MiB RSS</text>
+<text x="28" y="54" font-size="12" fill="#57606a">Lower is faster (ms, after 100 warmups) · Scriptw beats V8 JIT on Sync (0.163/0.164 vs 0.168 ms) · 38.7 MiB RSS</text>
 <rect x="28.0" y="66" width="11" height="11" rx="2.5" fill="#0969da"/>
 <text x="44.0" y="75.5" font-size="11.5" fill="#57606a">Scriptw SCRWEP04 Speed</text>
 <rect x="202.0" y="66" width="11" height="11" rx="2.5" fill="#54aeff"/>
@@ -31,31 +31,31 @@
 <text x="560.0" y="302" text-anchor="middle" font-size="11" fill="#57606a">0.7 ms</text>
 <line x1="130.0" y1="94" x2="130.0" y2="286" stroke="#d0d7de" stroke-width="1"/>
 <text x="118" y="142" text-anchor="end" font-size="13" font-weight="600">Sync Flight</text>
-<rect x="130.0" y="104" width="103.0" height="14" rx="3" fill="#0969da"/>
-<text x="240.0" y="115" font-size="11.2" font-weight="650" fill="#0969da">0.168 ms</text>
-<rect x="130.0" y="122" width="104.4" height="14" rx="3" fill="#54aeff"/>
-<text x="241.4" y="133" font-size="11.2" font-weight="500" fill="#0969da">0.170 ms</text>
-<rect x="130.0" y="140" width="101.0" height="14" rx="3" fill="#d97724" opacity="0.92"/>
-<text x="238.0" y="151" font-size="11.2" font-weight="600" fill="#d97724">0.164 ms</text>
-<rect x="130.0" y="158" width="330.2" height="14" rx="3" fill="#b6e3ff"/>
-<text x="467.2" y="169" font-size="11.2" font-weight="400" fill="#57606a">0.538 ms</text>
-<rect x="640" y="116" width="94" height="22" rx="11" fill="#ddf4ff"/>
-<text x="687" y="131" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">1.02× V8</text>
-<text x="734" y="152" text-anchor="end" font-size="10.5" fill="#57606a">mean: 0.177 vs 0.177 ms</text>
-<text x="734" y="167" text-anchor="end" font-size="10.5" fill="#57606a">40.6 MiB RSS · 9.3 MiB dirty</text>
+<rect x="130.0" y="104" width="100.9" height="14" rx="3" fill="#0969da"/>
+<text x="237.9" y="115" font-size="11.2" font-weight="650" fill="#0969da">0.164 ms</text>
+<rect x="130.0" y="122" width="100.3" height="14" rx="3" fill="#54aeff"/>
+<text x="237.3" y="133" font-size="11.2" font-weight="500" fill="#0969da">0.163 ms</text>
+<rect x="130.0" y="140" width="103.0" height="14" rx="3" fill="#d97724" opacity="0.92"/>
+<text x="240.0" y="151" font-size="11.2" font-weight="600" fill="#d97724">0.168 ms</text>
+<rect x="130.0" y="158" width="312.2" height="14" rx="3" fill="#b6e3ff"/>
+<text x="449.2" y="169" font-size="11.2" font-weight="400" fill="#57606a">0.508 ms</text>
+<rect x="640" y="116" width="94" height="22" rx="11" fill="#dafbe1"/>
+<text x="687" y="131" text-anchor="middle" font-size="11.5" font-weight="650" fill="#1a7f37">0.98× V8</text>
+<text x="734" y="152" text-anchor="end" font-size="10.5" fill="#57606a">mean: 0.179 vs 0.178 ms</text>
+<text x="734" y="167" text-anchor="end" font-size="10.5" fill="#57606a">38.7 MiB RSS · 9.1 MiB dirty</text>
 <text x="118" y="238" text-anchor="end" font-size="13" font-weight="600">Async Flight</text>
-<rect x="130.0" y="200" width="115.8" height="14" rx="3" fill="#0969da"/>
-<text x="252.8" y="211" font-size="11.2" font-weight="650" fill="#0969da">0.189 ms</text>
-<rect x="130.0" y="218" width="117.9" height="14" rx="3" fill="#54aeff"/>
-<text x="254.9" y="229" font-size="11.2" font-weight="500" fill="#0969da">0.192 ms</text>
-<rect x="130.0" y="236" width="106.5" height="14" rx="3" fill="#d97724" opacity="0.92"/>
-<text x="243.5" y="247" font-size="11.2" font-weight="600" fill="#d97724">0.173 ms</text>
-<rect x="130.0" y="254" width="358.4" height="14" rx="3" fill="#b6e3ff"/>
-<text x="495.4" y="265" font-size="11.2" font-weight="400" fill="#57606a">0.584 ms</text>
+<rect x="130.0" y="200" width="114.6" height="14" rx="3" fill="#0969da"/>
+<text x="251.6" y="211" font-size="11.2" font-weight="650" fill="#0969da">0.187 ms</text>
+<rect x="130.0" y="218" width="111.7" height="14" rx="3" fill="#54aeff"/>
+<text x="248.7" y="229" font-size="11.2" font-weight="500" fill="#0969da">0.182 ms</text>
+<rect x="130.0" y="236" width="110.7" height="14" rx="3" fill="#d97724" opacity="0.92"/>
+<text x="247.7" y="247" font-size="11.2" font-weight="600" fill="#d97724">0.180 ms</text>
+<rect x="130.0" y="254" width="336.4" height="14" rx="3" fill="#b6e3ff"/>
+<text x="473.4" y="265" font-size="11.2" font-weight="400" fill="#57606a">0.548 ms</text>
 <rect x="640" y="212" width="94" height="22" rx="11" fill="#ddf4ff"/>
-<text x="687" y="227" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">1.09× V8</text>
-<text x="734" y="248" text-anchor="end" font-size="10.5" fill="#57606a">mean: 0.197 vs 0.187 ms</text>
-<text x="734" y="263" text-anchor="end" font-size="10.5" fill="#57606a">40.7 MiB RSS · 9.5 MiB dirty</text>
-<text x="28" y="340" font-size="11" fill="#57606a">2026-11-27 · ABI 96 (6612a6755754) · Ryzen 7 7800X3D (CPUs 6–7, 4 GiB) · 8 procs × 101 calls · exact Flight SHA-256</text>
+<text x="687" y="227" text-anchor="middle" font-size="11.5" font-weight="650" fill="#0969da">1.03× V8</text>
+<text x="734" y="248" text-anchor="end" font-size="10.5" fill="#57606a">mean: 0.204 vs 0.197 ms</text>
+<text x="734" y="263" text-anchor="end" font-size="10.5" fill="#57606a">39.4 MiB RSS · 9.3 MiB dirty</text>
+<text x="28" y="340" font-size="11" fill="#57606a">2026-11-27 · ABI 97 (1fa26b5a03c7) · Ryzen 7 7800X3D (CPUs 6–7, 4 GiB) · 8 procs × 101 calls · exact Flight SHA-256</text>
 </g>
 </svg>

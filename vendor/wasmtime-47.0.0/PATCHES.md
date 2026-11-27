@@ -122,13 +122,39 @@ These are in `src/runtime/vm/{libcalls.rs,instance.rs,gc/func_ref.rs}`.
   by size instead of a `memmove` call; larger objects still call it. The
   semi-spaces are disjoint, and an overlap keeps `memmove` semantics.
 
+## Wasm WeakMap tables
+
+Scriptw registers a private Wasm GC array when a WeakMap allocates or
+replaces its table. `GcEphemeron::register_table_raw` validates that it has
+an even number of mutable nullable `eqref` elements. Each pair contains a
+key and its value. The array itself must be independently reachable for any
+of its pairs to participate in marking. Registration records its identity
+outside the root census.
+
+The copying collector marks registered arrays in a previously unused bit of
+the inline array trace encoding. This excludes their elements from ordinary
+array scanning while preserving the array type and its layout. Registered
+array ranges likewise exclude their elements from remembered-slot tracing.
+Full collections prepare all registered pairs. Minor collections prepare
+pairs in young and directly allocated old arrays and pairs reached through
+remembered slots, scanning all arrays on overflow. The pretenure window
+still forces a full collection.
+
+Array pairs share the dependency index with handle ephemerons. A live array
+and key mark their value, and any newly marked object can open other gates.
+After the fixed point, the collector relocates surviving pair references,
+clears both references for a dead key, and removes registrations for dead
+arrays. Scriptw uses the cleared key as a tombstone in the Wasm hash table.
+Scratch is reserved before evacuation, and the collector processes weak
+updates in increments.
+
 ## Raw weak operands
 
 `src/runtime/gc/enabled/weakref.rs`: a host function made with
 `Func::new_unchecked` receives each GC reference as the raw `u32` of a
 `ValRaw`. Until that call returns or the Store collects, the raw value is the
 reference itself, so an operation that cannot collect needs no root for it.
-The product's WeakMap and WeakSet imports are such functions.
+The product's WeakMap registration and WeakSet entry imports are such functions.
 
 - `GcEphemeron::new_raw` and `set_value_raw` register and replace from raw
   operands. They are `unsafe`: the caller promises references that Wasm passed
@@ -145,7 +171,7 @@ The product's WeakMap and WeakSet imports are such functions.
   return to Wasm, or zero for no value or a retired entry. The copying
   collector uses its plain-reference capability to return the raw value in
   one step. Other heaps still run their clone and expose barriers.
-- The indexed WeakMap hit and overwrite use the typed ephemeron's exact
+- The former indexed WeakMap hit and overwrite use the typed ephemeron's exact
   owner, key and value slot together after the Store and generation checks.
   A successful overwrite marks the slot touched before installing the new
   value. Lookups read the collector's current, possibly moved reference.
@@ -342,13 +368,17 @@ guard above must hold on such a slot too.
   or a THP collapse was migrating, is a swap entry at that moment (`SWAPPED`,
   `WRITTEN`): it matched nothing, lay before the scan's end, and so was
   neither zeroed nor decommitted, and the next Store on the slot read the
-  previous Store's bytes. The scan now takes written pages that are present
-  *or* swapped (`category_anyof_mask`), returns the `SWAPPED` category, zeroes
-  present regions in place and decommits swapped ones (no swap-in to
-  overwrite them). Dropping `PRESENT` alone would be wrong: this 6.18 kernel
-  reports never-populated pages as `WRITTEN` too, so every page of the range
-  would be zeroed and populated. Which kernels do that is also why the five
-  upstream `pagemap::tests` that expect holes to be unwritten fail here. The
+  previous Store's bytes. The scan now takes pages that are present *or*
+  swapped (`category_anyof_mask`) and neither the shared zero page nor a clean
+  file page (`PFNZERO | FILE` inverted, without requiring `WRITTEN`: Linux 7.x
+  kernels such as 7.3 stop setting `PAGE_IS_WRITTEN` on non-`uffd-wp` VMAs, so
+  requiring `WRITTEN` skipped every dirty page in pooled slots). It returns the
+  `SWAPPED` category, zeroes present regions in place and decommits swapped
+  ones (no swap-in to overwrite them). Dropping `PRESENT` alone would be wrong:
+  6.18 kernels report never-populated pages as `WRITTEN` too, while `PRESENT |
+  SWAPPED` excludes holes on both 6.x and 7.x kernels (and Linux 7.3+ leaves
+  `PAGE_IS_WRITTEN` clear on non-`uffd-wp` VMAs, which is why upstream
+  `pagemap::tests` asserting `Categories::WRITTEN` fail on 6.18 and 7.3+). The
   scan's filter and its region handling are `DirtyPageScan` and
   `reset_regions`; `wasmtime::_internal::model_dirty_page_reset` runs that
   handling on given page categories, with the kernel's selection modelled. The
@@ -409,7 +439,7 @@ The copying collector is generational when the GC heap starts at 2 MiB or more
   weak epoch, since young keys move.
 - Scans of inline struct fields and reference arrays check the field range
   against the validated object extent before visiting individual slots.
-  Remembered slots still check their own heap range. Each heap reuses four
+  Remembered slots still check their own heap range. Each heap reuses its
   ephemeron scratch buffers, retaining up to 256 KiB per buffer between
   collections. Ephemerons reach their fixed point before weak slots clear.
 - A heap's first full nursery does not collect
@@ -629,3 +659,19 @@ Collector tests exercise actual reachability and moving references. JavaScript
 weak builtins require additional compiler, host and job integration before the
 product capability can be enabled. See the
 [collector contract](../../docs/rust-rewrite/contracts/collector-weak-edges.md).
+
+## Stage 1A native codegen contract
+
+Native modules compiled with the vendored `cranelift-codegen` and
+`wasmtime-internal-cranelift` crates rely on two additional codegen contracts
+that invalidate prior compiled native artifacts (`CONFIGURATION_SCHEMA` bumped
+to 10):
+
+- x86-64 `CallConv::Tail` widens integer argument registers from 6 to 8
+  (`rax` and `r10` added; stack probes and indirect tail jumps move to `r11`).
+- The copying collector's inline bump allocation reuses the checked 64-bit end
+  pointer, `array.new_fixed` writes directly into the reserved range for
+  non-calling element stores, and same-block `struct.set`/`array.set` stores
+  into an exact fresh allocation before any safepoint omit the remembered-slot
+  write barrier (covering nursery, pretenuring full-GC window, and `direct_old`
+  full-payload minor scanning).

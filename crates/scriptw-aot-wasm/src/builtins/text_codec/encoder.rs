@@ -105,15 +105,16 @@ impl FunctionBuilder<'_> {
     /// both constructors' "prototype" properties are non-writable and
     /// non-configurable, and the fresh view is unobservable until returned.
     ///
-    /// Short and very large inputs are sized before encoding so they can
-    /// write into the exact final backing. Intermediate inputs use a growing
-    /// scratch array and copy the bytes written into the final backing. The
-    /// write loop copies an ASCII prefix through a leaf kernel and encodes
-    /// mixed ASCII and two-byte scalars in one pass before handling a wider
-    /// scalar or growing the scratch array.
+    /// Nonempty ASCII inputs up to 64 KiB are narrowed into the final backing.
+    /// The fallback sizes short and very large inputs for exact allocation.
+    /// Intermediate inputs use a growing scratch array and copy the bytes
+    /// written into the final backing. The write loop copies an ASCII prefix
+    /// through a leaf kernel and encodes groups of four ASCII and two-byte
+    /// scalars before handling a wider scalar or growing the scratch array.
     pub(crate) fn emit_text_encoder_encode(&mut self, f: &mut Function) -> Result<(), EmitError> {
         // Two passes over a short input avoid the scratch allocation and
         // copy. Mid-sized inputs still benefit from single-pass encoding.
+        const OPTIMISTIC_ASCII_ENCODE_UNITS: i32 = 65_536;
         const SHORT_EXACT_ENCODE_UNITS: i32 = 256;
         const MAX_SCRATCH_ENCODE_UNITS: i32 = 1 << 20;
         let s = self.runtime_schema();
@@ -144,6 +145,8 @@ impl FunctionBuilder<'_> {
         let read = s.reserve_i32_local(f);
         let written = s.reserve_i32_local(f);
         let unit = s.reserve_i32_local(f);
+        let lanes = std::array::from_fn(|_| s.reserve_i32_local(f));
+        let combined = s.reserve_i32_local(f);
         let next_unit = s.reserve_i32_local(f);
         let byte = s.reserve_i32_local(f);
         let exact = s.reserve_i32_local(f);
@@ -172,6 +175,62 @@ impl FunctionBuilder<'_> {
         let allocated = s
             .reserve_gc_local::<ArrayBuffer, Nullable>(f)
             .initialize_null(s, f);
+        let wrap = self.open_frame(ControlFrameKind::Block, f);
+        count.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32GtU);
+        count.load(f);
+        f.instruction(&Instruction::I32Const(OPTIMISTIC_ASCII_ENCODE_UNITS));
+        f.instruction(&Instruction::I32LeU);
+        f.instruction(&Instruction::I32And);
+        let fallback = self.open_frame(ControlFrameKind::If, f);
+        count.load(f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        byte_length.store(f);
+        // If the backing allocator reports OOM, let the ordinary path make
+        // the final allocation decision. The private completion stays local.
+        let buffer = self.emit_binary_allocate_array_buffer(
+            &buffer_prototype,
+            byte_length,
+            byte_length,
+            fixed,
+            false,
+            &pending,
+            fallback,
+            f,
+        )?;
+        let bytes = s.reserve_gc_local(f).initialize(
+            s.field(ArrayBufferSchema::BYTES)
+                .read(&buffer, s, f)
+                .reference()
+                .require_non_null(f),
+            f,
+        );
+        s.call_helper(
+            crate::runtime_helpers::AsciiNarrowArguments::new(
+                &input.units,
+                zero,
+                count,
+                &bytes,
+                zero,
+            ),
+            base,
+            f,
+        )
+        .store(unit, f);
+        bytes.clear(f);
+        unit.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        allocated.replace(buffer.load(s, f).nullable(), f);
+        buffer.clear(f);
+        self.emit_branch_to_target(wrap, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+
         let target = s
             .reserve_gc_local::<ByteArray, Nullable>(f)
             .initialize_null(s, f);
@@ -198,6 +257,31 @@ impl FunctionBuilder<'_> {
         count.load(f);
         f.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(counted, f);
+        let count_scalar = self.open_frame(ControlFrameKind::Block, f);
+        self.emit_text_encoder_short_quad(
+            &input.units,
+            read,
+            count,
+            lanes,
+            combined,
+            count_scalar,
+            f,
+        );
+        combined.load(f);
+        f.instruction(&Instruction::I32Const(0x80));
+        f.instruction(&Instruction::I32GeU);
+        self.open_frame(ControlFrameKind::If, f);
+        byte_length.load(f);
+        emit_two_byte_count(lanes, f);
+        f.instruction(&Instruction::I64ExtendI32U);
+        f.instruction(&Instruction::I64Add);
+        byte_length.store(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        encoder_advance(read, 4, f);
+        self.emit_branch_to_target(count_next, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         s.array_type::<CodeUnitArray>()
             .read(&input.units, read, s, f)
             .store(unit, f);
@@ -326,6 +410,58 @@ impl FunctionBuilder<'_> {
         self.emit_branch_if_to_target(encoded, f);
         let slower = self.open_frame(ControlFrameKind::Block, f);
         let mixed_next = self.open_frame(ControlFrameKind::Loop, f);
+        let encode_scalar = self.open_frame(ControlFrameKind::Block, f);
+        self.emit_text_encoder_short_quad(
+            &input.units,
+            read,
+            count,
+            lanes,
+            combined,
+            encode_scalar,
+            f,
+        );
+        combined.load(f);
+        f.instruction(&Instruction::I32Const(0x80));
+        f.instruction(&Instruction::I32LtU);
+        self.open_frame(ControlFrameKind::If, f);
+        for lane in lanes {
+            self.emit_text_encoder_put(&bytes, written, lane, f);
+        }
+        f.instruction(&Instruction::Else);
+        // The existing invariant reserves one byte per unread code unit.
+        // One capacity check covers up to four second bytes. Near the end
+        // of the scratch space, the scalar path charges each byte exactly.
+        written.load(f);
+        read.load(f);
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Const(4));
+        f.instruction(&Instruction::I32Add);
+        capacity.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32GtU);
+        self.emit_branch_if_to_target(encode_scalar, f);
+        for lane in lanes {
+            lane.load(f);
+            f.instruction(&Instruction::I32Const(0x80));
+            f.instruction(&Instruction::I32GeU);
+            self.open_frame(ControlFrameKind::If, f);
+            self.emit_text_encoder_put_two_bytes(&bytes, written, lane, byte, f);
+            f.instruction(&Instruction::Else);
+            self.emit_text_encoder_put(&bytes, written, lane, f);
+            self.pop_control(ControlFrameKind::If);
+            f.instruction(&Instruction::End);
+        }
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        encoder_advance(read, 4, f);
+        read.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32LtU);
+        self.emit_branch_if_to_target(mixed_next, f);
+        self.emit_branch_to_target(encoded, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         s.array_type::<CodeUnitArray>()
             .read(&input.units, read, s, f)
             .store(unit, f);
@@ -347,22 +483,11 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Sub);
         f.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(slower, f);
-        unit.load(f);
-        f.instruction(&Instruction::I32Const(6));
-        f.instruction(&Instruction::I32ShrU);
-        f.instruction(&Instruction::I32Const(0xc0));
-        f.instruction(&Instruction::I32Or);
-        byte.store(f);
-        self.emit_text_encoder_put(&bytes, written, byte, f);
-        unit.load(f);
-        f.instruction(&Instruction::I32Const(0x3f));
-        f.instruction(&Instruction::I32And);
-        f.instruction(&Instruction::I32Const(0x80));
-        f.instruction(&Instruction::I32Or);
-        unit.store(f);
+        self.emit_text_encoder_put_two_bytes(&bytes, written, unit, byte, f);
+        f.instruction(&Instruction::Else);
+        self.emit_text_encoder_put(&bytes, written, unit, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        self.emit_text_encoder_put(&bytes, written, unit, f);
         encoder_increment(read, f);
         read.load(f);
         count.load(f);
@@ -531,6 +656,9 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         bytes.clear(f);
+        target.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         let buffer = s
             .reserve_gc_local(f)
             .initialize(allocated.load(s, f).require_non_null(f), f);
@@ -573,15 +701,18 @@ impl FunctionBuilder<'_> {
         prototype.clear(f);
         owner.clear(f);
         buffer.clear(f);
-        target.clear(f);
         allocated.clear(f);
         buffer_prototype.clear(f);
         realm.clear(f);
         s.release_i64_local(byte_length, f);
         for local in [
-            fixed, zero, needed, capacity, exact, byte, next_unit, unit, written, read, count,
+            fixed, zero, needed, capacity, exact, byte, next_unit, combined, unit, written, read,
+            count,
         ] {
             s.release_i32_local(local, f);
+        }
+        for lane in lanes {
+            s.release_i32_local(lane, f);
         }
         input.clear(s, f);
         self.pop_control(ControlFrameKind::Block);
@@ -591,6 +722,77 @@ impl FunctionBuilder<'_> {
         pending.clear(f);
         argument.clear(f);
         Ok(())
+    }
+
+    /// Read only complete groups whose code units each encode independently
+    /// into one or two bytes. Leave the source cursor untouched on a miss.
+    fn emit_text_encoder_short_quad(
+        &self,
+        units: &GcLocal<CodeUnitArray>,
+        read: I32Local,
+        count: I32Local,
+        lanes: [I32Local; 4],
+        combined: I32Local,
+        scalar: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        count.load(f);
+        read.load(f);
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Const(4));
+        f.instruction(&Instruction::I32LtU);
+        self.emit_branch_if_to_target(scalar, f);
+        let at = s.reserve_i32_local(f);
+        for (offset, lane) in lanes.into_iter().enumerate() {
+            let index = if offset == 0 {
+                read
+            } else {
+                read.load(f);
+                f.instruction(&Instruction::I32Const(offset as i32));
+                f.instruction(&Instruction::I32Add);
+                at.store(f);
+                at
+            };
+            s.array_type::<CodeUnitArray>()
+                .read(units, index, s, f)
+                .store(lane, f);
+        }
+        s.release_i32_local(at, f);
+        lanes[0].load(f);
+        for lane in &lanes[1..] {
+            lane.load(f);
+            f.instruction(&Instruction::I32Or);
+        }
+        combined.store(f);
+        combined.load(f);
+        f.instruction(&Instruction::I32Const(0x800));
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(scalar, f);
+    }
+
+    fn emit_text_encoder_put_two_bytes(
+        &self,
+        bytes: &GcLocal<ByteArray>,
+        written: I32Local,
+        unit: I32Local,
+        byte: I32Local,
+        f: &mut Function,
+    ) {
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(6));
+        f.instruction(&Instruction::I32ShrU);
+        f.instruction(&Instruction::I32Const(0xc0));
+        f.instruction(&Instruction::I32Or);
+        byte.store(f);
+        self.emit_text_encoder_put(bytes, written, byte, f);
+        unit.load(f);
+        f.instruction(&Instruction::I32Const(0x3f));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Const(0x80));
+        f.instruction(&Instruction::I32Or);
+        byte.store(f);
+        self.emit_text_encoder_put(bytes, written, byte, f);
     }
 
     fn emit_text_encoder_put(
@@ -785,8 +987,23 @@ impl FunctionBuilder<'_> {
 }
 
 fn encoder_increment(local: I32Local, f: &mut Function) {
+    encoder_advance(local, 1, f);
+}
+
+fn encoder_advance(local: I32Local, count: i32, f: &mut Function) {
     local.load(f);
-    f.instruction(&Instruction::I32Const(1));
+    f.instruction(&Instruction::I32Const(count));
     f.instruction(&Instruction::I32Add);
     local.store(f);
+}
+
+fn emit_two_byte_count(lanes: [I32Local; 4], f: &mut Function) {
+    for (index, lane) in lanes.into_iter().enumerate() {
+        lane.load(f);
+        f.instruction(&Instruction::I32Const(0x80));
+        f.instruction(&Instruction::I32GeU);
+        if index != 0 {
+            f.instruction(&Instruction::I32Add);
+        }
+    }
 }

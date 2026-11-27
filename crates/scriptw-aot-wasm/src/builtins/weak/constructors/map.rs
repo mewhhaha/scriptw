@@ -40,7 +40,7 @@ impl FunctionBuilder<'_> {
         );
         let record = s.reserve_gc_local(f).initialize(
             s.struct_type::<WeakMapObject>()
-                .construct((GcOperand::reference(&header, s),), f),
+                .construct((GcOperand::reference(&header, s), GcOperand::null(s)), f),
             f,
         );
         receiver.set_reference(&record, s, f);

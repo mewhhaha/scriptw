@@ -6533,6 +6533,25 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::Br(0));
         function.instruction(&Instruction::End);
         function.instruction(&Instruction::Else);
+        if let Some(base) = self.runtime_helper_base {
+            left_length.load(function);
+            function.instruction(&Instruction::I32Const(8));
+            function.instruction(&Instruction::I32GeU);
+            function.instruction(&Instruction::If(BlockType::Empty));
+            schema
+                .call_helper(
+                    crate::runtime_helpers::CodeUnitEqualArguments::new(
+                        &left_units,
+                        &right_units,
+                        left_length,
+                    ),
+                    base,
+                    function,
+                )
+                .store(result, function);
+            function.instruction(&Instruction::Br(2));
+            function.instruction(&Instruction::End);
+        }
         function.instruction(&Instruction::Loop(BlockType::Empty));
         index.load(function);
         left_length.load(function);

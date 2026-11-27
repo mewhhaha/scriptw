@@ -736,6 +736,23 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> GcLocal<Environment> {
         let schema = self.runtime_schema();
+        let defining_realm = schema
+            .reserve_gc_local::<RealmRecord, Nullable>(function)
+            .initialize_null(schema, function);
+        let parent_absent = self.open_frame(ControlFrameKind::Block, function);
+        let parent_reference = parent
+            .load(schema, function)
+            .non_null_or_branch(self.local_branch_label(parent_absent), function);
+        defining_realm.replace(
+            schema
+                .struct_type::<Environment>()
+                .field(EnvironmentSchema::DEFINING_REALM)
+                .read_top(parent_reference, function)
+                .reference(),
+            function,
+        );
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
         let declarative = schema
             .reserve_gc_local::<DeclarativeEnvironment, NonNullable>(function)
             .initialize(
@@ -749,7 +766,7 @@ impl<'a> FunctionBuilder<'a> {
             .initialize(
                 schema.struct_type::<Environment>().construct(
                     (
-                        GcOperand::<crate::gc_types::GcRef<RealmRecord>, Nullable>::null(schema),
+                        GcOperand::reference(&defining_realm, schema),
                         GcOperand::reference(named_bindings, schema),
                         GcOperand::i32(kind.code() as i32),
                         GcOperand::reference(parent, schema),
@@ -764,6 +781,7 @@ impl<'a> FunctionBuilder<'a> {
                 function,
             );
         declarative.clear(function);
+        defining_realm.clear(function);
         environment
     }
 

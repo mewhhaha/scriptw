@@ -449,10 +449,12 @@ fn inspect_known_source_call(tail: bool, wide: bool) {
     } else {
         format!("var value=frame({actuals}); return value;")
     };
+    // The catch keeps the source body out of the small-function specializer
+    // while admitting the canonical local-argument entry.
     let program = lower(
         &parse(
             &format!(
-                "function frame({formals}){{return row.x;}} export function run(row){{{ending}}}"
+                "function frame({formals}){{try{{return row.x;}}catch(e){{throw e;}}}} export function run(row){{{ending}}}"
             ),
             ParseOptions::module(),
         )
@@ -462,6 +464,14 @@ fn inspect_known_source_call(tail: bool, wide: bool) {
     expect_valid_module(&artifact, 2);
     let signatures = declarations(&artifact);
     let names = function_names(&artifact);
+    let vector_adapters: BTreeSet<_> = names
+        .iter()
+        .filter_map(|(index, name)| {
+            name.starts_with("js-arguments-adapter::frame#")
+                .then_some(*index)
+        })
+        .collect();
+    assert!(!vector_adapters.is_empty());
     let mut targets = BTreeSet::new();
     let mut callers = BTreeSet::new();
     // The lowerer can create exact-context specializations with distinct IDs
@@ -591,6 +601,14 @@ fn inspect_known_source_call(tail: bool, wide: bool) {
                     Operator::CallRef { .. } | Operator::ReturnCallRef { .. }
                 )),
                 "a planned direct call does not duplicate published call_ref dispatch inline"
+            );
+            assert!(
+                !operators[direct + 1..].iter().any(|op| matches!(
+                    op,
+                    Operator::Call { function_index } | Operator::ReturnCall { function_index }
+                        if vector_adapters.contains(function_index)
+                )),
+                "the missed identity guard does not retry the same target through its vector adapter"
             );
             inspected = true;
         }

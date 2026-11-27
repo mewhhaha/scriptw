@@ -6,8 +6,12 @@ fn source_body<'a>(artifact: &'a WasmArtifact, name: &str) -> Vec<Operator<'a>> 
         .into_iter()
         .find_map(|(index, actual)| actual.starts_with(&format!("js::{name}#")).then_some(index))
         .expect("actual named source function");
-    let mut next = imported_function_count(artifact);
-    for payload in Parser::new(0).parse_all(&artifact.bytes) {
+    body_operators(&artifact.bytes, index)
+}
+
+fn body_operators(bytes: &[u8], index: u32) -> Vec<Operator<'_>> {
+    let mut next = imported_function_count_in_bytes(bytes);
+    for payload in Parser::new(0).parse_all(bytes) {
         if let Payload::CodeSectionEntry(body) = payload.unwrap() {
             if next == index {
                 return crate::tests::emitted_operators(&body);
@@ -15,7 +19,7 @@ fn source_body<'a>(artifact: &'a WasmArtifact, name: &str) -> Vec<Operator<'a>> 
             next += 1;
         }
     }
-    panic!("named source body exists");
+    panic!("named function body exists");
 }
 
 fn imported_helper(artifact: &WasmArtifact, requested: &str) -> Option<u32> {
@@ -73,6 +77,106 @@ fn then_branch<'a>(operators: &'a [Operator<'a>], start: usize) -> &'a [Operator
         }
     }
     panic!("String guard has a complete structured branch");
+}
+
+#[test]
+fn empty_string_number_concat_reuses_the_pooled_decimal_payload() {
+    use crate::gc_types::{GcNullability, GlobalLedger, PooledStringTable, RuntimeModuleTypes};
+
+    let artifact = emit_script("var a = [1]; print(String(a[0]), '' + a[0]);")
+        .expect("runtime String usage emits");
+    let runtime = artifact.runtime().expect("String conversion links R");
+    let names = function_names_in_bytes(runtime.bytes());
+    let index = |requested| {
+        names
+            .iter()
+            .find_map(|(index, name)| (name == requested).then_some(*index))
+            .expect("named runtime helper")
+    };
+    let decimal = index("helper::number_to_string");
+    let resolve = index("helper::pooled_string_resolve");
+    let integer_decimal = index("helper::integer_decimal_string");
+    let concat = index("helper::string_concat_string_number");
+    let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Runtime(
+        crate::RuntimeSourceCompilationProfile::Portable,
+    ))
+    .finalize_globals(GlobalLedger::new(), false, 0);
+    let wasm_encoder::HeapType::Concrete(table) = registered
+        .globals()
+        .schema()
+        .reference_type::<PooledStringTable>(GcNullability::NonNullable)
+        .heap_type
+    else {
+        panic!("the String cache uses the registered pooled-string table type");
+    };
+    let allocates = |op: &Operator<'_>| {
+        matches!(
+            op,
+            Operator::ArrayNew { .. }
+                | Operator::ArrayNewDefault { .. }
+                | Operator::ArrayNewFixed { .. }
+                | Operator::ArrayNewData { .. }
+                | Operator::StructNew { .. }
+                | Operator::StructNewDefault { .. }
+        )
+    };
+
+    let decimal_ops = body_operators(runtime.bytes(), decimal);
+    assert!(decimal_ops.windows(2).any(|ops| matches!(
+        ops,
+        [Operator::I32Const { value: 128 }, Operator::I32LtU]
+    )));
+    let read = decimal_ops
+        .iter()
+        .position(|op| matches!(op, Operator::ArrayGet { array_type_index } if *array_type_index == table))
+        .expect("NumberToString reads the runtime pooled-string table");
+    let hit = decimal_ops[read + 1..]
+        .iter()
+        .position(|op| matches!(op, Operator::BrOnNonNull { relative_depth: 0 }))
+        .expect("cache hit keeps the pooled String on the operand stack")
+        + read
+        + 1;
+    assert!(!decimal_ops[..hit].iter().any(allocates));
+    assert!(
+        decimal_ops[hit + 1..]
+            .iter()
+            .take_while(|op| !matches!(op, Operator::End))
+            .any(
+                |op| matches!(op, Operator::Call { function_index } if *function_index == resolve)
+            ),
+        "only a missing slot enters the pooled-string resolver"
+    );
+    let extend = decimal_ops.iter().position(|op| matches!(op, Operator::ArrayCopy { .. }))
+        .expect("lazy cache growth preserves all existing literal entries");
+    let extended_hit = decimal_ops[extend + 1..]
+        .iter()
+        .position(|op| matches!(op, Operator::BrOnNonNull { relative_depth: 0 }))
+        .map(|offset| extend + 1 + offset)
+        .expect("extended cache has an allocation-free hit");
+    assert!(decimal_ops[extended_hit + 1..]
+        .iter()
+        .take_while(|op| !matches!(op, Operator::End))
+        .any(|op| matches!(op, Operator::Call { function_index } if *function_index == integer_decimal)));
+
+    let concat_ops = body_operators(runtime.bytes(), concat);
+    let empty = concat_ops
+        .windows(3)
+        .position(|ops| {
+            matches!(
+                ops,
+                [
+                    Operator::LocalGet { .. },
+                    Operator::I32Eqz,
+                    Operator::If { .. }
+                ]
+            )
+        })
+        .expect("String + Number checks for an empty prefix");
+    let empty_arm = then_branch(&concat_ops, empty + 3);
+    assert!(!empty_arm.iter().any(allocates));
+    assert!(empty_arm
+        .iter()
+        .any(|op| matches!(op, Operator::Call { function_index } if *function_index == decimal)));
 }
 
 fn primitive_length_branches<'a>(

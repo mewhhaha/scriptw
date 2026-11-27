@@ -1,6 +1,10 @@
 //! Every producer calls the shared packed/default-data publication owner.
 use super::*;
-use crate::gc_types::{GcNullability, GlobalLedger, NumberBitsI64Array, RuntimeModuleTypes};
+use crate::gc_types::{
+    GcFunctionRole, GcNullability, GlobalLedger, LocalArgumentsCallable, NumberBitsI64Array,
+    NumberPresenceU64Array, PackedValueTable, RuntimeModuleTypes, ValueArray,
+    WideLocalArgumentsCallable,
+};
 
 fn named_body<'a>(bytes: &'a [u8], requested: &str) -> (u32, Vec<Operator<'a>>) {
     let names = function_names_in_bytes(bytes)
@@ -210,4 +214,84 @@ fn integer_decimal_helper_keeps_private_unsigned_domain_without_float_rounding()
         calls(&push, formatter),
         "private index publication shares the exact unsigned formatter"
     );
+}
+
+#[test]
+fn array_callback_builtins_use_typed_entries_and_array_from_reserves_packed_storage() {
+    let artifact = emit_script(
+        "const a = Array.from({length: 129}, (_, i) => i); a.map(x => x); \
+         a.find(x => x); a.findIndex(x => x);",
+    )
+    .unwrap();
+    let bytes = artifact.runtime().unwrap().bytes();
+    Validator::new_with_features(crate::runtime_artifact::program_validation_features())
+        .validate_all(bytes)
+        .expect("the runtime validates both packed and callback dispatch branches");
+    let registered = RuntimeModuleTypes::register(crate::tests::standalone_kind())
+        .finalize_globals(GlobalLedger::new(), false, 0);
+    let schema = registered.globals().schema();
+    let concrete = |heap| {
+        let wasm_encoder::HeapType::Concrete(index) = heap else {
+            panic!("a typed backing must use a concrete GC type");
+        };
+        index
+    };
+    let vector = concrete(
+        schema
+            .reference_type::<ValueArray>(GcNullability::NonNullable)
+            .heap_type,
+    );
+    for (name, arguments, mapper_sites) in [
+        ("builtin::Array.from", 2, 2),
+        ("builtin::Array.prototype.map", 3, 1),
+        ("builtin::Array.prototype.find", 3, 1),
+        ("builtin::Array.prototype.findIndex", 3, 1),
+    ] {
+        let (_, body) = named_body(bytes, name);
+        let mut dispatch = body.split(|op| {
+            matches!(op, Operator::ArrayNewFixed { array_type_index, array_size }
+                if *array_type_index == vector && *array_size == arguments)
+        });
+        for _ in 0..mapper_sites {
+            let before_fallback = dispatch.next().expect("callback argv fallback");
+            for signature in [
+                LocalArgumentsCallable::SIGNATURE.type_index(),
+                WideLocalArgumentsCallable::SIGNATURE.type_index(),
+            ] {
+                assert!(
+                    before_fallback.iter().any(|op| matches!(op,
+                    Operator::CallRef { type_index } if *type_index == signature)),
+                    "{name} must attempt the typed callback before allocating its argv"
+                );
+            }
+        }
+        assert!(
+            dispatch.next().is_some(),
+            "{name} retains its argv fallback"
+        );
+        assert!(dispatch.next().is_none(), "{name} emits one argv per miss");
+    }
+    let (_, array_from) = named_body(bytes, "builtin::Array.from");
+    for heap in [
+        schema
+            .reference_type::<NumberBitsI64Array>(GcNullability::NonNullable)
+            .heap_type,
+        schema
+            .reference_type::<NumberPresenceU64Array>(GcNullability::NonNullable)
+            .heap_type,
+        schema
+            .reference_type::<PackedValueTable>(GcNullability::NonNullable)
+            .heap_type,
+    ] {
+        let backing = concrete(heap);
+        assert_eq!(
+            array_from
+                .iter()
+                .filter(|op| matches!(op,
+                    Operator::ArrayNew { array_type_index } if *array_type_index == backing))
+                .count(),
+            1,
+            "Array.from reserves each possible backing at a single site"
+        );
+    }
 }

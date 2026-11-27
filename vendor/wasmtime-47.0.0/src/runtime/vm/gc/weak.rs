@@ -1,6 +1,12 @@
 //! Collector-owned weak edges. No entry is added to the ordinary root census.
 use crate::prelude::*;
 use crate::vm::VMGcRef;
+use crate::{ArrayType, AsContextMut, GcEphemeron, StorageType, ValType};
+use wasmtime_environ::VMGcKind;
+
+/// Reserved header bit marking an array whose elements are weak `[key, value]`
+/// ephemeron pairs. Copied with the header across evacuations.
+pub(crate) const WEAK_ARRAY_ELEMENTS: u32 = 1 << 4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct WeakGcSlotId {
@@ -56,12 +62,69 @@ pub(crate) struct WeakGcSlot {
 #[derive(Default)]
 pub(crate) struct WeakGcRegistry {
     pub(crate) slots: Vec<WeakGcSlot>,
+    /// Arrays of alternating weak keys and conditional values. The collector
+    /// relocates this registration only if the array is independently live.
+    pub(crate) table_arrays: Vec<VMGcRef>,
     free: Vec<u32>,
     pub(crate) epoch: u64,
     /// Slots whose edges were set since the last collection. Every other edge
     /// names only objects that collection left in the old generation, so a
     /// minor collection processes just these.
     pub(crate) touched: Vec<u32>,
+}
+
+impl GcEphemeron {
+    /// Register a Wasm array as an ephemeron table in a copying-GC Store.
+    ///
+    /// The array must have an even number of mutable `eqref` elements, with
+    /// each key followed by its value, and must be freshly allocated / empty
+    /// (containing no pre-existing un-remembered entries). The array and key
+    /// must both be live before the collector marks a value. A dead key clears
+    /// both elements. Registration neither roots the array nor allocates a GC
+    /// object.
+    ///
+    /// # Safety
+    ///
+    /// `raw` must be a reference passed by Wasm to the currently running host
+    /// call, and the Store must not have collected since the call began.
+    pub unsafe fn register_table_raw(mut store: impl AsContextMut, raw: u32) -> Result<()> {
+        let store = store.as_context_mut().0;
+        let array = VMGcRef::from_raw_u32(raw)
+            .filter(|reference| !reference.is_i31())
+            .ok_or_else(|| format_err!("ephemeron table requires an array reference"))?;
+        let gc = store.unwrap_gc_store();
+        ensure!(
+            gc.gc_heap.supports_weak_refs(),
+            "selected collector has no weak/ephemeron facility"
+        );
+        let header = gc.header(&array)?;
+        ensure!(
+            header.kind().matches(VMGcKind::ArrayRef),
+            "ephemeron table requires an array reference"
+        );
+        let index = header
+            .ty()
+            .ok_or_else(|| format_err!("ephemeron table array has no type"))?;
+        let already_registered = header.reserved_u26() & WEAK_ARRAY_ELEMENTS != 0;
+        let ty = ArrayType::from_shared_type_index(store.engine(), index);
+        ensure!(
+            ty.mutability().is_var()
+                && StorageType::eq(&ty.element_type(), &StorageType::ValType(ValType::EQREF)),
+            "ephemeron table requires mutable nullable eqref elements"
+        );
+        ensure!(
+            gc.array_len(array.as_arrayref_unchecked())? % 2 == 0,
+            "ephemeron table requires an even number of elements"
+        );
+        ensure!(!already_registered, "ephemeron table already registered");
+        let gc_store = store.unwrap_gc_store_mut();
+        gc_store.weak_gc.table_arrays.try_reserve(1)?;
+        let header = gc_store.gc_heap.header_mut(&array)?;
+        let reserved = header.reserved_u26();
+        header.set_reserved_u26(reserved | WEAK_ARRAY_ELEMENTS);
+        gc_store.weak_gc.table_arrays.push(array);
+        Ok(())
+    }
 }
 
 impl WeakGcRegistry {

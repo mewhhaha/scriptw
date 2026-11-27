@@ -36,6 +36,21 @@ fn calls(body: &[Operator<'_>], target: u32) -> bool {
 }
 
 #[test]
+fn plain_string_scans_call_packed_code_unit_helpers() {
+    let artifact = emit_script(r#"JSON.parse('"a long JSON string"');"#).expect("JSON.parse emits");
+    expect_valid_module(&artifact, 1);
+    let bytes = artifact.runtime().expect("JSON.parse links R").bytes();
+
+    let (_, parse) = runtime_body(bytes, "builtin::JSON.parse");
+    let (parse_run, _) = runtime_body(bytes, "helper::json_parse_plain_run");
+    assert!(calls(&parse, parse_run));
+
+    let (_, equality) = runtime_body(bytes, "helper::string_equality");
+    let (equal_units, _) = runtime_body(bytes, "helper::code_unit_equal");
+    assert!(calls(&equality, equal_units));
+}
+
+#[test]
 fn json_parse_grows_compact_objects_and_converts_short_numbers_inline() {
     let artifact = emit_script("JSON.parse('{\"a\":[1.5,\"b\"]}');").expect("JSON.parse emits");
     expect_valid_module(&artifact, 1);

@@ -116,7 +116,7 @@ fn exact_function_target_authority_is_independent_from_heap_shape() {
     ));
     assert_eq!(
         target_domain,
-        "Exact(BTreeSet<FunctionId>),Open(BTreeSet<FunctionId>),}"
+        "Exact(BTreeSet<FunctionId>),Open(BTreeSet<FunctionId>),ClosedLocalCall(ClosedLocalCallTargetIr),}"
     );
     let normalized_ir = normalized(IR_SOURCE);
     for compatibility_escape_hatch in [

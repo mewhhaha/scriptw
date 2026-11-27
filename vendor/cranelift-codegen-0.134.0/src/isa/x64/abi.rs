@@ -53,9 +53,8 @@ impl X64ABIMachineSpec {
     ) {
         // We have to use a caller-saved register since clobbering only
         // happens after stack probing.
-        // `r11` is caller saved on both Fastcall and SystemV, and not used
-        // for argument passing, so it's pretty much free. It is also not
-        // used by the stacklimit mechanism.
+        // `r11` is caller-saved and carries no arguments in Fastcall, SystemV
+        // or Tail. The stack-limit check has already finished using it.
         let tmp = regs::r11();
         debug_assert!({
             let real_reg = tmp.to_real_reg().unwrap();
@@ -498,14 +497,19 @@ impl ABIMachineSpec for X64ABIMachineSpec {
         }
     }
 
-    fn get_stacklimit_reg(_call_conv: isa::CallConv) -> Reg {
+    fn get_stacklimit_reg(call_conv: isa::CallConv) -> Reg {
         // As per comment on trait definition, we must return a caller-save
         // register that is not used as an argument here.
+        let scratch = if call_conv == CallConv::Tail {
+            regs::r11()
+        } else {
+            regs::r10()
+        };
         debug_assert!(!is_callee_save_systemv(
-            regs::r10().to_real_reg().unwrap(),
+            scratch.to_real_reg().unwrap(),
             false
         ));
-        regs::r10()
+        scratch
     }
 
     fn gen_load_base_offset(into_reg: Writable<Reg>, base: Reg, offset: i32, ty: Type) -> Self::I {
@@ -608,6 +612,19 @@ impl ABIMachineSpec for X64ABIMachineSpec {
             asm::inst::retq_i::new(stack_bytes_to_pop).into()
         };
         smallvec![Inst::External { inst }]
+    }
+
+    fn probestack_strategy(
+        call_conv: CallConv,
+        flags: &settings::Flags,
+    ) -> settings::ProbestackStrategy {
+        // Outline probes take their frame size in rax before the
+        // register allocator's argument moves execute.
+        if call_conv == CallConv::Tail {
+            settings::ProbestackStrategy::Inline
+        } else {
+            flags.probestack_strategy()
+        }
     }
 
     fn gen_probestack(insts: &mut SmallInstVec<Self::I>, frame_size: u32) {
@@ -1032,6 +1049,8 @@ fn get_intreg_for_arg(call_conv: CallConv, idx: usize, arg_idx: usize) -> Option
         (3, false) => Some(regs::rcx()),
         (4, false) => Some(regs::r8()),
         (5, false) => Some(regs::r9()),
+        (6, false) if call_conv == CallConv::Tail => Some(regs::rax()),
+        (7, false) if call_conv == CallConv::Tail => Some(regs::r10()),
         (0, true) => Some(regs::rcx()),
         (1, true) => Some(regs::rdx()),
         (2, true) => Some(regs::r8()),

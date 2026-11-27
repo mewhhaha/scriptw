@@ -490,12 +490,9 @@ impl FunctionBuilder<'_> {
         self.emit_builtin_arg_to_value(0, &argument, f);
         self.emit_text_decoder_input_brand(&argument, &output, exit, f)?;
         self.emit_builtin_arg_to_value(1, &options, f);
-        self.emit_text_codec_validate_options(&options, &output, exit, f)?;
-        self.emit_text_codec_option(&options, "stream", &pending, f)?;
-        self.emit_uint8_codec_abrupt_exit(&pending, &output, exit, f);
-        self.emit_to_boolean_payload_from_tagged_locals(pending.value(), f)?;
-        f.instruction(&Instruction::I32WrapI64);
-        stream.store(f);
+        self.emit_text_decoder_stream_option(&options, &pending, stream, &output, exit, f)?;
+        // The generic dictionary read can mutate, resize or detach the input.
+        // Acquire the backing only after the complete dictionary conversion.
         let input = self.emit_text_decoder_input(&argument, &output, exit, f)?;
         self.emit_text_decoder_utf8(&decoder, &input, stream, &output, exit, f)?;
         input.clear(s, f);
@@ -508,6 +505,103 @@ impl FunctionBuilder<'_> {
         argument.clear(f);
         pending.clear(f);
         output.clear(f);
+        Ok(())
+    }
+
+    fn emit_text_decoder_stream_option(
+        &mut self,
+        options: &ValueLocals,
+        pending: &CompletionLocals,
+        stream: I32Local,
+        output: &CompletionLocals,
+        exit: ControlTarget,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let parsed = self.open_frame(ControlFrameKind::Block, f);
+        stream.set_constant(0, f);
+        self.compile_nullish_tagged_i32(options.tag(), f)?;
+        self.emit_branch_if_to_target(parsed, f);
+
+        // Common one-property dictionary literals (`{stream: true}`) have an
+        // own Boolean data property in slot zero of inline compact storage.
+        let generic = self.open_frame(ControlFrameKind::Block, f);
+        let properties = s.reserve_gc_local(f).initialize(
+            s.field(OrdinaryObjectSchema::PROPERTIES)
+                .read_top(
+                    options.sealed_reference_or_branch::<OrdinaryObject>(
+                        s,
+                        self.local_branch_label(generic),
+                        f,
+                    ),
+                    f,
+                )
+                .reference(),
+            f,
+        );
+        let inline = s.reserve_gc_local(f).initialize(
+            properties.sealed_nested_subtype_or_branch::<CompactDataStorage, InlineCompactDataStorage>(
+                s,
+                self.local_branch_label(generic),
+                f,
+            ),
+            f,
+        );
+        s.field(InlineCompactDataStorageSchema::PACKED_TAGS)
+            .read(&inline, s, f);
+        f.instruction(&Instruction::I32Const(0xff));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Boolean.tag()));
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(generic, f);
+        let keys = s.reserve_gc_local(f).initialize(
+            s.field(CompactDataShapeSchema::KEYS)
+                .read_top(
+                    s.field(InlineCompactDataStorageSchema::SHAPE)
+                        .read(&inline, s, f)
+                        .reference(),
+                    f,
+                )
+                .reference(),
+            f,
+        );
+        let key_array = s.array_type::<CompactShapeKeys>();
+        key_array.length(&keys, s, f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(generic, f);
+        let key = s.reserve_gc_local(f).initialize(
+            key_array.read(&keys, GcIndex::Constant(0), s, f).reference(),
+            f,
+        );
+        let name = s
+            .reserve_gc_local(f)
+            .initialize(self.emit_interned_string_reference("stream", f)?, f);
+        // The same spelling can have distinct pooled references across P/R.
+        self.emit_string_payload_equality_i32(&key, &name, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(generic, f);
+        s.field(InlineCompactDataStorageSchema::SCALAR0)
+            .read(&inline, s, f);
+        f.instruction(&Instruction::I32WrapI64);
+        stream.store(f);
+        self.emit_branch_to_target(parsed, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+
+        self.emit_text_codec_validate_options(options, output, exit, f)?;
+        self.emit_text_codec_option(options, "stream", pending, f)?;
+        self.emit_uint8_codec_abrupt_exit(pending, output, exit, f);
+        self.emit_to_boolean_payload_from_tagged_locals(pending.value(), f)?;
+        f.instruction(&Instruction::I32WrapI64);
+        stream.store(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        name.clear(f);
+        key.clear(f);
+        keys.clear(f);
+        inline.clear(f);
+        properties.clear(f);
         Ok(())
     }
 
@@ -621,6 +715,70 @@ impl FunctionBuilder<'_> {
             total,
         };
 
+        const OPTIMISTIC_ASCII_DECODE_BYTES: i32 = 65_536;
+        prior_length.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        input.length.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32GtU);
+        f.instruction(&Instruction::I32And);
+        // Bound the speculative two-bytes-per-byte backing so a large
+        // multibyte input cannot exhaust the heap before the exact sizing pass.
+        input.length.load(f);
+        f.instruction(&Instruction::I32Const(OPTIMISTIC_ASCII_DECODE_BYTES));
+        f.instruction(&Instruction::I32LeU);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        let position = s.reserve_i32_local(f);
+        let end = s.reserve_i32_local(f);
+        input.start.load(f);
+        position.store(f);
+        input.start.load(f);
+        input.length.load(f);
+        f.instruction(&Instruction::I32Add);
+        end.store(f);
+        written.set_constant(0, f);
+        let current = s
+            .reserve_gc_local(f)
+            .initialize(input.bytes.load(s, f).require_non_null(f), f);
+        let fast = StringConstruction::allocate(s, s.reserve_gc_local(f), input.length, f);
+        fast.widen_ascii_from(written, &current, position, end, base, s, f);
+        current.clear(f);
+        // Reaching the end proves every byte is ASCII, including the first.
+        // Decoder state is committed only after that check.
+        position.load(f);
+        end.load(f);
+        f.instruction(&Instruction::I32Eq);
+        s.release_i32_local(end, f);
+        s.release_i32_local(position, f);
+        self.open_frame(ControlFrameKind::If, f);
+        prior_capacity.load(f);
+        f.instruction(&Instruction::I32Const(CARRY_BYTES + 1));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        s.array_type::<ByteArray>().write(
+            &bytes.prior,
+            GcIndex::Constant(0),
+            GcOperand::i32(0),
+            s,
+            f,
+        );
+        f.instruction(&Instruction::Else);
+        bytes.retain_tail(decoder, total, self, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.field(TextDecoderObjectSchema::BOM_SEEN)
+            .write(decoder, GcOperand::boolean(true), s, f);
+        let text = s.reserve_gc_local(f).initialize(fast.publish(s, f), f);
+        output.value().set_reference(&text, s, f);
+        output.set_kind(CompletionKind::Normal, f);
+        text.clear(f);
+        self.emit_branch_to_target(exit, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+
         let slot = s.reserve_gc_local(f);
         slot.hold_null_until_initialized(s, f);
         written.set_constant(0, f);
@@ -630,6 +788,20 @@ impl FunctionBuilder<'_> {
         let pass = self.open_frame(ControlFrameKind::Loop, f);
         rendering.load(f);
         self.open_frame(ControlFrameKind::If, f);
+        written.load(f);
+        f.instruction(&Instruction::I32Const(
+            i32::try_from(crate::gc_types::MAX_STRING_LENGTH).expect("the String limit is an i32"),
+        ));
+        f.instruction(&Instruction::I32GtU);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_throw_current_function_realm_range_error(
+            RuntimeErrorMessage::STRING_LENGTH_EXCEEDS_IMPLEMENTATION_LIMIT,
+            output,
+            f,
+        )?;
+        self.emit_branch_to_target(exit, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         let construction = StringConstruction::allocate(s, slot, written, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -961,8 +1133,8 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) {
         let s = self.runtime_schema();
-        let lead = s.reserve_i32_local(f);
-        let trailing = s.reserve_i32_local(f);
+        let lanes = std::array::from_fn(|_| s.reserve_i32_local(f));
+        let [lead, trailing, _, _] = lanes;
         let continuation = s.reserve_i32_local(f);
         let sizing = construction.is_none().then(|| {
             let start = s.reserve_i32_local(f);
@@ -979,6 +1151,92 @@ impl FunctionBuilder<'_> {
         self.emit_branch_if_to_target(stopped, f);
         let next = self.open_frame(ControlFrameKind::Loop, f);
         let bytes = s.array_type::<ByteArray>();
+        let single = self.open_frame(ControlFrameKind::Block, f);
+        end.load(f);
+        position.load(f);
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Const(4));
+        f.instruction(&Instruction::I32LtU);
+        self.emit_branch_if_to_target(single, f);
+        for (offset, lane) in lanes.into_iter().enumerate() {
+            let at = if offset == 0 {
+                position
+            } else {
+                position.load(f);
+                f.instruction(&Instruction::I32Const(offset as i32));
+                f.instruction(&Instruction::I32Add);
+                continuation.store(f);
+                continuation
+            };
+            bytes.read(&input.bytes, at, s, f).store(lane, f);
+        }
+        lanes[0].load(f);
+        for lane in &lanes[1..] {
+            lane.load(f);
+            f.instruction(&Instruction::I32Or);
+        }
+        f.instruction(&Instruction::I32Const(0x80));
+        f.instruction(&Instruction::I32LtU);
+        self.open_frame(ControlFrameKind::If, f);
+        if let Some(construction) = construction {
+            for lane in lanes {
+                construction.write(written, lane, s, f);
+                increment_decoder_index(written, f);
+            }
+        }
+        advance_decoder_index(position, 4, f);
+        f.instruction(&Instruction::Else);
+        // Each consecutive pair can be two ASCII bytes or one two-byte
+        // scalar. Commit only a complete pair. A miss in the second pair
+        // keeps progress from the first and leaves the current lead intact.
+        for [first, second] in [[lanes[0], lanes[1]], [lanes[2], lanes[3]]] {
+            first.load(f);
+            second.load(f);
+            f.instruction(&Instruction::I32Or);
+            f.instruction(&Instruction::I32Const(0x80));
+            f.instruction(&Instruction::I32LtU);
+            self.open_frame(ControlFrameKind::If, f);
+            if let Some(construction) = construction {
+                construction.write(written, first, s, f);
+                increment_decoder_index(written, f);
+                construction.write(written, second, s, f);
+                increment_decoder_index(written, f);
+            }
+            f.instruction(&Instruction::Else);
+            first.load(f);
+            f.instruction(&Instruction::I32Const(0xc2));
+            f.instruction(&Instruction::I32Sub);
+            f.instruction(&Instruction::I32Const(0xdf - 0xc2));
+            f.instruction(&Instruction::I32GtU);
+            second.load(f);
+            f.instruction(&Instruction::I32Const(0xc0));
+            f.instruction(&Instruction::I32And);
+            f.instruction(&Instruction::I32Const(0x80));
+            f.instruction(&Instruction::I32Ne);
+            f.instruction(&Instruction::I32Or);
+            self.emit_branch_if_to_target(single, f);
+            if let Some((_, pairs)) = sizing {
+                increment_decoder_index(pairs, f);
+            }
+            if let Some(construction) = construction {
+                emit_decode_two_byte_scalar(first, second, f);
+                construction.write(written, first, s, f);
+                increment_decoder_index(written, f);
+            }
+            self.pop_control(ControlFrameKind::If);
+            f.instruction(&Instruction::End);
+            advance_decoder_index(position, 2, f);
+        }
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        position.load(f);
+        end.load(f);
+        f.instruction(&Instruction::I32LtU);
+        self.emit_branch_if_to_target(next, f);
+        self.emit_branch_to_target(stopped, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+
         bytes.read(&input.bytes, position, s, f).store(lead, f);
         lead.load(f);
         f.instruction(&Instruction::I32Const(0x80));
@@ -1015,16 +1273,7 @@ impl FunctionBuilder<'_> {
         if let Some((_, pairs)) = sizing {
             increment_decoder_index(pairs, f);
         } else {
-            lead.load(f);
-            f.instruction(&Instruction::I32Const(0x1f));
-            f.instruction(&Instruction::I32And);
-            f.instruction(&Instruction::I32Const(6));
-            f.instruction(&Instruction::I32Shl);
-            trailing.load(f);
-            f.instruction(&Instruction::I32Const(0x3f));
-            f.instruction(&Instruction::I32And);
-            f.instruction(&Instruction::I32Or);
-            lead.store(f);
+            emit_decode_two_byte_scalar(lead, trailing, f);
         }
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -1055,15 +1304,33 @@ impl FunctionBuilder<'_> {
             s.release_i32_local(pairs, f);
             s.release_i32_local(start, f);
         }
-        for local in [continuation, trailing, lead] {
+        s.release_i32_local(continuation, f);
+        for local in lanes {
             s.release_i32_local(local, f);
         }
     }
 }
 
 fn increment_decoder_index(local: I32Local, f: &mut Function) {
+    advance_decoder_index(local, 1, f);
+}
+
+fn advance_decoder_index(local: I32Local, amount: i32, f: &mut Function) {
     local.load(f);
-    f.instruction(&Instruction::I32Const(1));
+    f.instruction(&Instruction::I32Const(amount));
     f.instruction(&Instruction::I32Add);
     local.store(f);
+}
+
+fn emit_decode_two_byte_scalar(lead: I32Local, trailing: I32Local, f: &mut Function) {
+    lead.load(f);
+    f.instruction(&Instruction::I32Const(0x1f));
+    f.instruction(&Instruction::I32And);
+    f.instruction(&Instruction::I32Const(6));
+    f.instruction(&Instruction::I32Shl);
+    trailing.load(f);
+    f.instruction(&Instruction::I32Const(0x3f));
+    f.instruction(&Instruction::I32And);
+    f.instruction(&Instruction::I32Or);
+    lead.store(f);
 }

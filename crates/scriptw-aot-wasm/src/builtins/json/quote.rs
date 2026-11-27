@@ -255,7 +255,7 @@ impl FunctionBuilder<'_> {
 
     /// Short ASCII spans copy directly to the already reserved output. The
     /// first special unit stays at the current index for the full escape
-    /// loop. Long ordinary prefixes retain the bulk copy.
+    /// loop. The packed helper scans and copies long prefixes in one pass.
     fn emit_json_quote_plain_prefix(
         &mut self,
         output: &StringAccumulatorCursor,
@@ -265,14 +265,18 @@ impl FunctionBuilder<'_> {
         unit: I32Local,
         f: &mut Function,
     ) {
-        const BULK_MIN: i32 = 16;
         let s = self.runtime_schema();
         let done = self.open_frame(ControlFrameKind::Block, f);
-        let long = self.open_frame(ControlFrameKind::Block, f);
-        length.load(f);
-        f.instruction(&Instruction::I32Const(BULK_MIN));
-        f.instruction(&Instruction::I32GeU);
-        self.emit_branch_if_to_target(long, f);
+        if let Some(base) = self.runtime_helper_base {
+            length.load(f);
+            f.instruction(&Instruction::I32Const(8));
+            f.instruction(&Instruction::I32GeU);
+            self.open_frame(ControlFrameKind::If, f);
+            output.append_json_plain_run(units, index, length, base, s, f);
+            self.emit_branch_to_target(done, f);
+            self.pop_control(ControlFrameKind::If);
+            f.instruction(&Instruction::End);
+        }
         length.load(f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(done, f);
@@ -303,52 +307,6 @@ impl FunctionBuilder<'_> {
         self.emit_branch_if_to_target(short, f);
         self.pop_control(ControlFrameKind::Loop);
         f.instruction(&Instruction::End);
-        self.emit_branch_to_target(done, f);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
-        let span = s.reserve_i32_local(f);
-        span.set_constant(0, f);
-        let scanned = self.open_frame(ControlFrameKind::Block, f);
-        let scan = self.open_frame(ControlFrameKind::Loop, f);
-        s.array_type::<CodeUnitArray>()
-            .read(units, span, s, f)
-            .store(unit, f);
-        for (op, limit) in [
-            (Instruction::I32LtU, 0x20),
-            (Instruction::I32Eq, 34),
-            (Instruction::I32Eq, 92),
-        ] {
-            unit.load(f);
-            f.instruction(&Instruction::I32Const(limit));
-            f.instruction(&op);
-            self.emit_branch_if_to_target(scanned, f);
-        }
-        unit.load(f);
-        f.instruction(&Instruction::I32Const(0xd800));
-        f.instruction(&Instruction::I32Sub);
-        f.instruction(&Instruction::I32Const(0x800));
-        f.instruction(&Instruction::I32LtU);
-        self.emit_branch_if_to_target(scanned, f);
-        span.load(f);
-        f.instruction(&Instruction::I32Const(1));
-        f.instruction(&Instruction::I32Add);
-        span.store(f);
-        span.load(f);
-        length.load(f);
-        f.instruction(&Instruction::I32LtU);
-        self.emit_branch_if_to_target(scan, f);
-        self.pop_control(ControlFrameKind::Loop);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
-        span.load(f);
-        f.instruction(&Instruction::I32Const(BULK_MIN));
-        f.instruction(&Instruction::I32LtU);
-        self.emit_branch_if_to_target(done, f);
-        output.append_reserved_units_range(units, index, span, s, f);
-        span.load(f);
-        index.store(f);
-        s.release_i32_local(span, f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
     }

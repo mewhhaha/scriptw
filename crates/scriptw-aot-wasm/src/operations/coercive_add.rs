@@ -645,9 +645,9 @@ impl FunctionBuilder<'_> {
         Ok(self.finish_function(function))
     }
 
-    /// Concatenation of a String prefix and a Number: formats nonnegative u32
-    /// integers directly into one allocation without an intermediate String,
-    /// returning null when the combined length exceeds `MAX_STRING_LENGTH`.
+    /// An empty prefix returns the Number's String directly. A nonempty
+    /// prefix and a u32 are written into one String, with null signaling
+    /// that the combined length exceeds `MAX_STRING_LENGTH`.
     pub(crate) fn compile_string_concat_string_number_helper(
         &mut self,
     ) -> Result<Function, EmitError> {
@@ -670,6 +670,19 @@ impl FunctionBuilder<'_> {
         s.array_type::<CodeUnitArray>()
             .length(&left_units, s, &mut f);
         left_len.store(&mut f);
+
+        let done = self.open_frame(ControlFrameKind::Block, &mut f);
+        left_len.load(&mut f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        output.replace(
+            self.emit_number_to_string_payload(p.right_bits, &mut f)?
+                .nullable(),
+            &mut f,
+        );
+        self.emit_branch_to_target(done, &mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
 
         let small = s.reserve_i32_local(&mut f);
         p.right_bits.load(&mut f);
@@ -726,14 +739,8 @@ impl FunctionBuilder<'_> {
             total,
             &mut f,
         );
-        left_len.load(&mut f);
-        f.instruction(&Instruction::I32Const(0));
-        f.instruction(&Instruction::I32Ne);
-        self.open_frame(ControlFrameKind::If, &mut f);
         cursor.set_constant(0, &mut f);
         text.copy_concatenated_units_from(cursor, &left_units, left_len, s, &mut f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
         small.load(&mut f);
         f.instruction(&Instruction::I32Const(10));
         f.instruction(&Instruction::I32LtU);
@@ -812,6 +819,8 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         s.release_i32_local(small, &mut f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         s.release_i32_local(left_len, &mut f);
         left_units.clear(&mut f);
         output.load(s, &mut f);

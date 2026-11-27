@@ -1,5 +1,7 @@
 //! One return boundary for an activation with a committed Await continuation.
 
+mod await_operand;
+
 use super::*;
 use crate::function_entry::ResumableEntryLocals;
 

@@ -188,11 +188,67 @@ pub trait GcCompiler {
 
 mod base_home;
 mod copying;
+mod packed_kernels;
 mod frame_reloads;
 mod drc;
 mod null;
 
 pub(crate) use base_home::FrameHome;
+
+/// The most recent copying-GC allocation's merge-block parameter.
+pub(super) struct FreshAllocation {
+    reference: ir::Value,
+    block: ir::Block,
+    checked_through: Option<ir::Inst>,
+}
+
+impl FreshAllocation {
+    fn new(builder: &FunctionBuilder<'_>, reference: ir::Value) -> Self {
+        let ir::ValueDef::Param(block, _) = builder.func.dfg.value_def(reference) else {
+            unreachable!("the allocation result is a merge-block parameter");
+        };
+        debug_assert_eq!(builder.current_block(), Some(block));
+        debug_assert!(builder.func.layout.first_inst(block).is_none());
+        Self {
+            reference,
+            block,
+            checked_through: None,
+        }
+    }
+}
+
+impl FuncEnvironment<'_> {
+    fn is_fresh_gc_object(&mut self, builder: &FunctionBuilder<'_>, object: ir::Value) -> bool {
+        let Some(mut fresh) = self.fresh_gc_allocation.take() else {
+            return false;
+        };
+        if builder.current_block() != Some(fresh.block) {
+            return false;
+        }
+        if builder.func.dfg.resolve_aliases(object) != fresh.reference {
+            self.fresh_gc_allocation = Some(fresh);
+            return false;
+        }
+        // Only inspect instructions appended since the previous proof. A call
+        // in this block may promote this object or retire its whole-object
+        // remembered entry. A branch into another block requires a new proof.
+        let last = builder.func.layout.last_inst(fresh.block);
+        let mut inst = last;
+        while inst != fresh.checked_through {
+            let Some(current) = inst else {
+                // The checked prefix must still be present.
+                return false;
+            };
+            if builder.func.dfg.insts[current].opcode().is_safepoint() {
+                return false;
+            }
+            inst = builder.func.layout.prev_inst(current);
+        }
+        fresh.checked_through = last;
+        self.fresh_gc_allocation = Some(fresh);
+        true
+    }
+}
 
 /// Get the default GC compiler.
 pub fn gc_compiler(func_env: &mut FuncEnvironment<'_>) -> WasmResult<Box<dyn GcCompiler>> {
@@ -605,8 +661,21 @@ pub fn write_field_at_addr(
     value_ty: Option<WasmRefType>,
 ) -> WasmResult<()> {
     write_or_init_moving_field_at_addr(
-        func_env, builder, field_ty, field_addr, null_trap, new_val, value_ty, false,
+        func_env,
+        builder,
+        field_ty,
+        field_addr,
+        null_trap,
+        new_val,
+        value_ty,
+        FieldWrite::Update { object: None },
     )
+}
+
+#[derive(Clone, Copy)]
+enum FieldWrite {
+    Update { object: Option<ir::Value> },
+    InitAfterSafepoint,
 }
 
 /// Initialize an uninitialized slot in a moving GC object that may already have
@@ -622,7 +691,14 @@ pub fn init_moving_field_at_addr(
     value_ty: Option<WasmRefType>,
 ) -> WasmResult<()> {
     write_or_init_moving_field_at_addr(
-        func_env, builder, field_ty, field_addr, None, new_val, value_ty, true,
+        func_env,
+        builder,
+        field_ty,
+        field_addr,
+        None,
+        new_val,
+        value_ty,
+        FieldWrite::InitAfterSafepoint,
     )
 }
 
@@ -634,7 +710,7 @@ fn write_or_init_moving_field_at_addr(
     null_trap: Option<ir::TrapCode>,
     new_val: ir::Value,
     value_ty: Option<WasmRefType>,
-    store_before_barrier: bool,
+    write: FieldWrite,
 ) -> WasmResult<()> {
     // Data inside GC objects is always little endian. An access that is its
     // reference's null check carries that check's trap code; a `funcref` is
@@ -659,12 +735,16 @@ fn write_or_init_moving_field_at_addr(
                 write_func_ref_at_addr(func_env, builder, r, flags, field_addr, new_val)?
             }
             WasmHeapTopType::Extern | WasmHeapTopType::Any | WasmHeapTopType::Exn => {
+                let store_before_barrier = matches!(write, FieldWrite::InitAfterSafepoint);
                 if store_before_barrier {
                     gc_compiler(func_env)?.translate_write_gc_reference(
                         func_env, builder, r, field_addr, new_val, flags,
                     )?;
                 }
-                if func_env.tunables.collector == Some(Collector::Copying) {
+                if func_env.tunables.collector == Some(Collector::Copying)
+                    && !matches!(write, FieldWrite::Update { object: Some(object) }
+                        if func_env.is_fresh_gc_object(builder, object))
+                {
                     // The validator may know more about the operand than the
                     // destination field requires. Use it only for the barrier.
                     copying::emit_old_to_young_barrier(
@@ -843,8 +923,17 @@ pub fn translate_struct_set(
         },
     );
 
-    write_field_at_addr(
-        func_env, builder, field_ty, field_addr, null_trap, new_val, value_ty,
+    write_or_init_moving_field_at_addr(
+        func_env,
+        builder,
+        field_ty,
+        field_addr,
+        null_trap,
+        new_val,
+        value_ty,
+        FieldWrite::Update {
+            object: Some(struct_ref),
+        },
     )?;
 
     log::trace!("translate_struct_set: finished");
@@ -1025,27 +1114,27 @@ pub fn translate_array_new_fixed(
     elems: &[ir::Value],
 ) -> WasmResult<ir::Value> {
     log::trace!("translate_array_new_fixed({array_type_index:?}, {elems:?})");
+    let ty = func_env.module.types[array_type_index].unwrap_module_type_index();
+    let elem_ty = func_env.types.unwrap_array(ty)?.0.element_type;
+    if func_env.tunables.collector == Some(Collector::Copying)
+        && let Some(result) = copying::CopyingCompiler::default()
+            .try_alloc_fixed_array(func_env, builder, ty, elem_ty, elems)?
+    {
+        func_env.needs_gc_heap = true;
+        return Ok(result);
+    }
     let len = builder
         .ins()
         .iconst(ir::types::I32, i64::try_from(elems.len()).unwrap());
     let result =
         gc_compiler(func_env)?.alloc_uninit_array(func_env, builder, array_type_index, len)?;
     log::trace!("translate_array_new_fixed(..) -> {result:?}");
-    let ty = func_env.module.types[array_type_index].unwrap_module_type_index();
-    let array_ty = func_env.types.unwrap_array(ty)?;
-
     for (i, elem) in elems.iter().enumerate() {
         let index = builder
             .ins()
             .iconst(ir::types::I32, i64::try_from(i).unwrap());
         let addr = array_elem_addr(func_env, builder, ty, result, true, index)?;
-        gc_compiler(func_env)?.init_field(
-            func_env,
-            builder,
-            array_ty.0.element_type,
-            addr,
-            *elem,
-        )?;
+        gc_compiler(func_env)?.init_field(func_env, builder, elem_ty, addr, *elem)?;
     }
     Ok(result)
 }
@@ -1284,7 +1373,18 @@ pub fn translate_array_set(
     let array_ty = func_env.types.unwrap_array(array_type_index)?;
     let elem_ty = array_ty.0.element_type;
 
-    write_field_at_addr(func_env, builder, elem_ty, elem_addr, None, value, value_ty)?;
+    write_or_init_moving_field_at_addr(
+        func_env,
+        builder,
+        elem_ty,
+        elem_addr,
+        None,
+        value,
+        value_ty,
+        FieldWrite::Update {
+            object: Some(array_ref),
+        },
+    )?;
 
     log::trace!("translate_array_set: finished");
     Ok(())

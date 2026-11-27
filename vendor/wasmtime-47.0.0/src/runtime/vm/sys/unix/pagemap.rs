@@ -137,7 +137,6 @@ impl PageMap {
 /// for pages that:
 ///
 /// * Are present, or swapped out (which includes migration entries).
-/// * Have been written.
 /// * Are NOT backed by the "zero" page.
 /// * Are NOT backed by a "file" page.
 ///
@@ -175,15 +174,10 @@ impl PageMap {
 ///   left nothing there. A dirty page is not necessarily present at the moment
 ///   of the scan: reclaim may have swapped it out, and compaction, NUMA
 ///   balancing or a THP collapse may be migrating it. The kernel reports both
-///   of those as a swap entry (`SWAPPED`, `WRITTEN` unless uffd-wp), so both
-///   categories are searched (Scriptw patch; upstream required `PRESENT` and
-///   skipped such pages, leaving a previous Store's bytes in the slot). The
-///   "any of" mask matters: some kernels (6.18 among them) also report
-///   unpopulated pages as `WRITTEN`, so `WRITTEN` alone would select every
-///   page of the range.
-///
-/// * `Categories::WRITTEN` - if a page was only read by the guest no need to
-///   take a look at it as the contents aren't changed from the initial image.
+///   of those as a swap entry (`SWAPPED`), so both categories are searched
+///   (Scriptw patch; upstream required `PRESENT` and `WRITTEN`, which skipped
+///   swapped/migrating pages and also skipped all dirty pages on Linux 7.x
+///   non-uffd-wp VMAs where `PAGE_IS_WRITTEN` is 0).
 ///
 /// * `!Categories::PFNZERO` - if a page is mapped to the zero page then it's
 ///   guaranteed to be readonly and it means that wasm read the memory but
@@ -357,27 +351,30 @@ pub unsafe fn reset_with_pagemap(
     bytes_resident
 }
 
-/// The `PAGEMAP_SCAN` filter of the reset: written pages that are present or
+/// The `PAGEMAP_SCAN` filter of the reset: private pages that are present or
 /// swapped and are not the zero page or a file page.
 ///
-/// * `WRITTEN` with `PFNZERO | FILE` inverted: the dirty pages. A page only
-///   read maps the zero page or the file page, which `WRITTEN` alone does not
-///   exclude without uffd write protection.
+/// * `PFNZERO | FILE` inverted (Scriptw patch; upstream also required
+///   `WRITTEN`): on Linux 6.x non-uffd VMAs reported `WRITTEN` on read-only
+///   pages too, and on Linux 7.x (e.g. 7.3) non-uffd VMAs report `WRITTEN = 0`
+///   even on dirty private pages, so requiring `WRITTEN` skipped every dirty
+///   page and left the previous Store's bytes in the slot. For Wasmtime's
+///   private anonymous and CoW file-backed mappings, a page only read maps the
+///   shared zero page (`PFNZERO`) or the clean page-cache page (`FILE`), while
+///   any written page is an anonymous private page (`!PFNZERO && !FILE`).
 /// * `PRESENT | SWAPPED`, any of (Scriptw patch; upstream required
 ///   `PRESENT`): a dirty page that reclaim swapped out, or that compaction,
 ///   NUMA balancing or a THP collapse is migrating, is a swap entry when the
 ///   scan runs, and upstream skipped it, leaving a previous Store's bytes in
 ///   the slot. A never-populated page is neither; some kernels (6.18 among
-///   them) still report it `WRITTEN`, so `WRITTEN` alone would select every
-///   page of the range.
+///   them) still report it `WRITTEN`, so `PRESENT | SWAPPED` excludes holes on
+///   both 6.x and 7.x kernels.
 /// * Only `SWAPPED` is returned, which decides how a region is reset.
 struct DirtyPageScan;
 
 impl DirtyPageScan {
     const INVERTED: Categories = Categories::PFNZERO.union(Categories::FILE);
-    const MASK: Categories = Categories::WRITTEN
-        .union(Categories::PFNZERO)
-        .union(Categories::FILE);
+    const MASK: Categories = Categories::PFNZERO.union(Categories::FILE);
     const ANY_OF: Categories = Categories::PRESENT.union(Categories::SWAPPED);
     const RETURNED: Categories = Categories::SWAPPED;
 }

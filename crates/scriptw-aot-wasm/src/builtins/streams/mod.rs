@@ -308,25 +308,6 @@ impl FunctionBuilder<'_> {
         capture.clear(f);
         controller
     }
-    fn stream_call_pull(
-        &mut self,
-        controller: &GcLocal<ReadableByteStreamControllerObject>,
-        f: &mut Function,
-    ) -> Result<(), EmitError> {
-        let s = self.runtime_schema();
-        let callback =
-            self.stream_callback(controller, StandardBuiltinId::ReadableStreamPullIfNeeded, f)?;
-        let undefined = s.reserve_value_local(f);
-        undefined.set_undefined(f);
-        let argv = self.emit_pre_evaluated_arg_vector(&[], f);
-        let pending = s.reserve_completion(f);
-        self.emit_function_or_proxy_call_with_argv(&callback, &undefined, &argv, &pending, f)?;
-        pending.clear(f);
-        argv.clear(f);
-        undefined.clear(f);
-        callback.clear(f);
-        Ok(())
-    }
     fn stream_observe(
         &mut self,
         controller: &GcLocal<ReadableByteStreamControllerObject>,

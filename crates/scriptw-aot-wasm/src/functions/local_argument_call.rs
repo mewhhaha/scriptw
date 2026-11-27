@@ -3,11 +3,12 @@
 use super::*;
 use crate::function_entry::{
     LocalArgumentCallInputs, LocalArgumentsArity, LocalArgumentsCallableRole,
+    PlannedLocalArgumentsEntry,
 };
 use crate::gc_types::{
-    CompletionLocals, ExecutableCode, ExecutableCodeKind, ExecutableCodeSchema,
-    FunctionContextSchema, FunctionLocal, FunctionObject, FunctionObjectSchema, GcI32Constant,
-    GcLocal, I32Local, LocalArgumentsCallable, ValueLocals, WideLocalArgumentsCallable,
+    CompletionLocals, ExecutableCode, FunctionContextSchema, FunctionLocal, FunctionObject,
+    FunctionObjectSchema, GcI32Constant, GcLocal, I32Local, LocalArgumentsCallable, ValueLocals,
+    WideLocalArgumentsCallable,
 };
 
 impl FunctionBuilder<'_> {
@@ -35,48 +36,10 @@ impl FunctionBuilder<'_> {
         }) {
             return Ok(false);
         }
-        let arity = LocalArgumentsArity::for_actuals(arguments.len()).map(|arity| {
-            if known_entry.is_some_and(|entry| entry.arity() == LocalArgumentsArity::Wide) {
-                LocalArgumentsArity::Wide
-            } else {
-                arity
-            }
-        });
-        match arity {
-            Some(LocalArgumentsArity::Narrow) => self
-                .emit_local_argument_call::<LocalArgumentsCallable>(
-                    callee,
-                    receiver,
-                    arguments,
-                    known_target,
-                    continuation,
-                    output,
-                    function,
-                ),
-            Some(LocalArgumentsArity::Wide) => self
-                .emit_local_argument_call::<WideLocalArgumentsCallable>(
-                    callee,
-                    receiver,
-                    arguments,
-                    known_target,
-                    continuation,
-                    output,
-                    function,
-                ),
-            None => Ok(false),
+        if LocalArgumentsArity::for_actuals(arguments.len()).is_none() {
+            return Ok(false);
         }
-    }
 
-    fn emit_local_argument_call<R: LocalArgumentsCallableRole>(
-        &mut self,
-        callee: &ValueLocals,
-        receiver: &ValueLocals,
-        arguments: &[TypedExpr],
-        known_target: Option<&WasmFunctionMeta>,
-        continuation: &CallContinuation,
-        output: &ValueLocals,
-        function: &mut Function,
-    ) -> Result<bool, EmitError> {
         let schema = self.runtime_schema();
         let mut values = Vec::with_capacity(arguments.len());
         for argument in arguments {
@@ -89,54 +52,152 @@ impl FunctionBuilder<'_> {
         }
         let result = schema.reserve_completion(function);
         let references: Vec<_> = values.iter().collect();
-        let handled = self.emit_local_argument_call_values::<R>(
-            callee,
-            receiver,
-            &references,
-            known_target,
-            continuation,
-            &result,
-            function,
-        )?;
-
-        handled.load(function);
-        function.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, function);
-        if known_target.is_some() {
-            function.rarely_reached();
-        }
-        let list = self.emit_pre_evaluated_arg_vector(&references, function);
-        match continuation {
-            CallContinuation::Continue => self.emit_site_call_with_argv(
+        if let Some((meta, planned)) =
+            known_target.zip(known_entry.filter(|entry| entry.is_source()))
+        {
+            self.emit_planned_local_argument_call(
                 callee,
                 receiver,
-                &list,
-                known_target,
+                &references,
+                meta,
+                planned,
+                continuation,
                 &result,
                 function,
-            )?,
-            CallContinuation::Return => {
-                self.emit_site_tail_call_with_argv(
-                    callee,
-                    receiver,
-                    &list,
-                    known_target,
-                    function,
-                )?;
-            }
+            )?;
+        } else {
+            let handled = self.emit_local_argument_call_values_for_count(
+                callee,
+                receiver,
+                &references,
+                continuation,
+                &result,
+                function,
+            )?;
+            handled.load(function);
+            function.instruction(&Instruction::I32Eqz);
+            self.open_frame(ControlFrameKind::If, function);
+            self.emit_local_argument_call_fallback(
+                callee,
+                receiver,
+                &references,
+                continuation,
+                &result,
+                function,
+            )?;
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+            schema.release_i32_local(handled, function);
         }
-        list.clear(function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
 
-        self.emit_propagate_pending_throw(&result, &[], function);
-        output.copy_from(result.value(), function);
-        schema.release_i32_local(handled, function);
+        if matches!(continuation, CallContinuation::Continue) {
+            self.emit_propagate_pending_throw(&result, &[], function);
+            output.copy_from(result.value(), function);
+        } else {
+            // Both the typed entry and the argv fallback tail-call.
+            function.instruction(&Instruction::Unreachable);
+        }
         result.clear(function);
         for value in values.into_iter().rev() {
             value.clear(function);
         }
         Ok(true)
+    }
+
+    fn emit_planned_local_argument_call(
+        &mut self,
+        callee: &ValueLocals,
+        receiver: &ValueLocals,
+        arguments: &[&ValueLocals],
+        meta: &WasmFunctionMeta,
+        planned: &PlannedLocalArgumentsEntry,
+        continuation: &CallContinuation,
+        result: &CompletionLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        let fallback = self.open_frame(ControlFrameKind::Block, function);
+        self.rarely_taken(fallback, function);
+        let callable = self.emit_local_argument_callable_or_branch(callee, fallback, function);
+        let code = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(FunctionObjectSchema::CODE)
+                .read(&callable, schema, function)
+                .reference(),
+            function,
+        );
+        self.emit_source_code_identity_test(meta, &callable, &code, function)?;
+        code.clear(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(fallback, function);
+        // A narrow source body cannot observe surplus lanes. Every operand
+        // was evaluated already, and the fallback gets the full argument list.
+        let target = LocalCallTarget {
+            callable: &callable,
+            receiver,
+            arguments: &arguments[..arguments.len().min(planned.arity().slot_count())],
+        };
+        match planned.arity() {
+            LocalArgumentsArity::Narrow => self
+                .emit_entered_local_argument_call::<LocalArgumentsCallable>(
+                    &target,
+                    LocalCallEntry::Planned(planned),
+                    continuation,
+                    result,
+                    function,
+                ),
+            LocalArgumentsArity::Wide => self
+                .emit_entered_local_argument_call::<WideLocalArgumentsCallable>(
+                    &target,
+                    LocalCallEntry::Planned(planned),
+                    continuation,
+                    result,
+                    function,
+                ),
+        }
+        callable.clear(function);
+        if matches!(continuation, CallContinuation::Continue) {
+            self.emit_branch_to_target(done, function);
+        }
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+
+        // This guard and the vector entry use the same source identity. A
+        // miss goes straight to general dispatch with the evaluated callable.
+        function.rarely_reached();
+        self.emit_local_argument_call_fallback(
+            callee,
+            receiver,
+            arguments,
+            continuation,
+            result,
+            function,
+        )?;
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        Ok(())
+    }
+
+    fn emit_local_argument_call_fallback(
+        &mut self,
+        callee: &ValueLocals,
+        receiver: &ValueLocals,
+        arguments: &[&ValueLocals],
+        continuation: &CallContinuation,
+        result: &CompletionLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let list = self.emit_pre_evaluated_arg_vector(arguments, function);
+        match continuation {
+            CallContinuation::Continue => self
+                .emit_function_or_proxy_call_with_argv(callee, receiver, &list, result, function)?,
+            CallContinuation::Return => {
+                self.emit_prepared_tail_call(callee, receiver, &list, function)?;
+            }
+        }
+        list.clear(function);
+        Ok(())
     }
 
     /// Borrow once-evaluated values. The owner chooses fallback allocation and
@@ -175,7 +236,6 @@ impl FunctionBuilder<'_> {
                     callee,
                     receiver,
                     arguments,
-                    None,
                     continuation,
                     result,
                     function,
@@ -185,7 +245,6 @@ impl FunctionBuilder<'_> {
                     callee,
                     receiver,
                     arguments,
-                    None,
                     continuation,
                     result,
                     function,
@@ -203,7 +262,6 @@ impl FunctionBuilder<'_> {
         callee: &ValueLocals,
         receiver: &ValueLocals,
         arguments: &[&ValueLocals],
-        known_target: Option<&WasmFunctionMeta>,
         continuation: &CallContinuation,
         result: &CompletionLocals,
         function: &mut Function,
@@ -212,21 +270,7 @@ impl FunctionBuilder<'_> {
         let handled = schema.reserve_i32_local(function);
         handled.set_constant(0, function);
         let fallback = self.open_frame(ControlFrameKind::Block, function);
-        if known_target.is_some() {
-            self.rarely_taken(fallback, function);
-        }
-        callee.tag().load(function);
-        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Function.tag()));
-        function.instruction(&Instruction::I32Ne);
-        self.emit_branch_if_to_target(fallback, function);
-        let callable = schema.reserve_non_null_gc_local(function).initialize(
-            callee.sealed_reference_or_branch::<FunctionObject>(
-                schema,
-                self.local_branch_label(fallback),
-                function,
-            ),
-            function,
-        );
+        let callable = self.emit_local_argument_callable_or_branch(callee, fallback, function);
         let code = schema.reserve_gc_local(function).initialize(
             schema
                 .field(FunctionObjectSchema::CODE)
@@ -238,89 +282,15 @@ impl FunctionBuilder<'_> {
             callable: &callable,
             receiver,
             arguments,
-            handled,
         };
-        match known_target.and_then(|meta| {
-            meta.entry
-                .local_arguments()
-                .filter(|entry| entry.is_source())
-                .map(|planned| (meta, planned))
-        }) {
-            // Cross-P source IDs can collide. When this P owns a single cached
-            // immutable ExecutableCode global for the planned entry, ref.eq
-            // against that P-private global proves source identity, JS kind,
-            // and defining program in one check; otherwise check all three.
-            Some((meta, planned)) => {
-                if let Some(cached_global) = self.cached_executable_code_global(meta)? {
-                    code.load(schema, function);
-                    cached_global.load(schema, function);
-                    function.instruction(&Instruction::RefEq);
-                } else {
-                    schema
-                        .field(ExecutableCodeSchema::SOURCE_ID)
-                        .read(&code, schema, function);
-                    function.instruction(&Instruction::I64Const(meta.entry.source_id()));
-                    function.instruction(&Instruction::I64Eq);
-                    schema
-                        .field(ExecutableCodeSchema::KIND)
-                        .read(&code, schema, function);
-                    function.instruction(&Instruction::I32Const(
-                        ExecutableCodeKind::JavaScript.encode(),
-                    ));
-                    function.instruction(&Instruction::I32Eq);
-                    function.instruction(&Instruction::I32And);
-                    let context = schema
-                        .field(FunctionObjectSchema::CONTEXT)
-                        .read(target.callable, schema, function)
-                        .reference();
-                    schema
-                        .field(FunctionContextSchema::DEFINING_PROGRAM)
-                        .read_top(context, function);
-                    self.current_program().reference(schema, function);
-                    function.instruction(&Instruction::RefEq);
-                    function.instruction(&Instruction::I32And);
-                }
-                self.open_frame(ControlFrameKind::If, function);
-                match planned.arity() {
-                    LocalArgumentsArity::Narrow => {
-                        // A narrow source body cannot observe surplus lanes.
-                        // The fallback below still receives every actual.
-                        let narrow = LocalCallTarget {
-                            arguments: &target.arguments[..target
-                                .arguments
-                                .len()
-                                .min(LocalArgumentsArity::Narrow.slot_count())],
-                            ..target
-                        };
-                        self.emit_entered_local_argument_call::<LocalArgumentsCallable>(
-                            &narrow,
-                            LocalCallEntry::Planned(planned),
-                            continuation,
-                            result,
-                            function,
-                        );
-                    }
-                    LocalArgumentsArity::Wide => {
-                        self.emit_entered_local_argument_call::<WideLocalArgumentsCallable>(
-                            &target,
-                            LocalCallEntry::Planned(planned),
-                            continuation,
-                            result,
-                            function,
-                        );
-                    }
-                }
-                self.pop_control(ControlFrameKind::If);
-                function.instruction(&Instruction::End);
-            }
-            None => self.emit_published_local_argument_call::<R>(
-                &target,
-                &code,
-                continuation,
-                result,
-                function,
-            ),
-        }
+        self.emit_published_local_argument_call::<R>(
+            &target,
+            &code,
+            handled,
+            continuation,
+            result,
+            function,
+        );
         code.clear(function);
         callable.clear(function);
         self.pop_control(ControlFrameKind::Block);
@@ -329,11 +299,33 @@ impl FunctionBuilder<'_> {
         Ok(handled)
     }
 
+    fn emit_local_argument_callable_or_branch(
+        &self,
+        callee: &ValueLocals,
+        fallback: ControlTarget,
+        function: &mut Function,
+    ) -> GcLocal<FunctionObject> {
+        let schema = self.runtime_schema();
+        callee.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Function.tag()));
+        function.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(fallback, function);
+        schema.reserve_non_null_gc_local(function).initialize(
+            callee.sealed_reference_or_branch::<FunctionObject>(
+                schema,
+                self.local_branch_label(fallback),
+                function,
+            ),
+            function,
+        )
+    }
+
     /// The published typed entry is the guard for an unplanned actual callee.
     fn emit_published_local_argument_call<R: LocalArgumentsCallableRole>(
         &mut self,
         target: &LocalCallTarget<'_>,
         code: &GcLocal<ExecutableCode>,
+        handled: I32Local,
         continuation: &CallContinuation,
         result: &CompletionLocals,
         function: &mut Function,
@@ -353,6 +345,7 @@ impl FunctionBuilder<'_> {
             result,
             function,
         );
+        handled.set_constant(1, function);
         entry.clear(function);
         if R::ARITY == LocalArgumentsArity::Wide {
             // A narrow local-arguments entry proves args >= 2 are unobservable,
@@ -373,8 +366,10 @@ impl FunctionBuilder<'_> {
             let narrow_target = LocalCallTarget {
                 callable: target.callable,
                 receiver: target.receiver,
-                arguments: &target.arguments[..target.arguments.len().min(2)],
-                handled: target.handled,
+                arguments: &target.arguments[..target
+                    .arguments
+                    .len()
+                    .min(LocalArgumentsArity::Narrow.slot_count())],
             };
             self.emit_entered_local_argument_call::<LocalArgumentsCallable>(
                 &narrow_target,
@@ -383,6 +378,7 @@ impl FunctionBuilder<'_> {
                 result,
                 function,
             );
+            handled.set_constant(1, function);
             narrow_entry.clear(function);
             self.pop_control(ControlFrameKind::If);
             function.instruction(&Instruction::End);
@@ -410,6 +406,7 @@ impl FunctionBuilder<'_> {
                 result,
                 function,
             );
+            handled.set_constant(1, function);
             wide_entry.clear(function);
             self.pop_control(ControlFrameKind::If);
             function.instruction(&Instruction::End);
@@ -513,8 +510,6 @@ impl FunctionBuilder<'_> {
                 }
             }
         }
-        // Only Throw or the returned value leaves this private scratch result.
-        target.handled.set_constant(1, function);
         if let Some(changed) = realm_changed {
             schema.release_i32_local(changed, function);
         }
@@ -545,12 +540,11 @@ struct LocalCallTarget<'a> {
     callable: &'a GcLocal<FunctionObject>,
     receiver: &'a ValueLocals,
     arguments: &'a [&'a ValueLocals],
-    handled: I32Local,
 }
 
 enum LocalCallEntry<'a, R: LocalArgumentsCallableRole> {
     /// Proven by the actual code's source identity and defining program.
-    Planned(&'a crate::function_entry::PlannedLocalArgumentsEntry),
+    Planned(&'a PlannedLocalArgumentsEntry),
     /// Read from the actual code record and checked non-null.
     Published(&'a FunctionLocal<R>),
 }

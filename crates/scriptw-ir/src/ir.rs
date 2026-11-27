@@ -1,4 +1,6 @@
 mod async_for_of_iterator;
+mod small_inline_body;
+pub use small_inline_body::{SmallInlineBodyIr, SmallInlineEffects, SmallInlineInitializationIr};
 pub use async_for_of_iterator::{
     AsyncFunctionForAwaitOfIteratorIr, AsyncFunctionForOfIteratorExecutionIr,
     AsyncFunctionForOfIteratorPlanIr, AsyncFunctionForOfSynchronousIteratorIr,
@@ -460,6 +462,7 @@ pub struct ValueInfo {
 pub enum FunctionTargetKnowledge {
     Exact(BTreeSet<FunctionId>),
     Open(BTreeSet<FunctionId>),
+    ClosedLocalCall(ClosedLocalCallTargetIr),
 }
 
 impl FunctionTargetKnowledge {
@@ -483,6 +486,7 @@ impl FunctionTargetKnowledge {
         match self {
             Self::Exact(targets) => Some(targets),
             Self::Open(_) => None,
+            Self::ClosedLocalCall(target) => Some(&target.0),
         }
     }
 
@@ -497,17 +501,25 @@ impl FunctionTargetKnowledge {
     pub fn known_targets(&self) -> &BTreeSet<FunctionId> {
         match self {
             Self::Exact(targets) | Self::Open(targets) => targets,
+            Self::ClosedLocalCall(target) => &target.0,
+        }
+    }
+
+    pub fn proves_closed_local_call(&self) -> bool {
+        matches!(self, Self::ClosedLocalCall(_))
+    }
+
+    fn into_known_targets(self) -> BTreeSet<FunctionId> {
+        match self {
+            Self::Exact(targets) | Self::Open(targets) => targets,
+            Self::ClosedLocalCall(target) => target.0,
         }
     }
 
     pub fn join(self, other: Self) -> Self {
-        let exact = matches!(self, Self::Exact(_)) && matches!(other, Self::Exact(_));
-        let mut targets = match self {
-            Self::Exact(targets) | Self::Open(targets) => targets,
-        };
-        targets.extend(match other {
-            Self::Exact(targets) | Self::Open(targets) => targets,
-        });
+        let exact = self.exact_targets().is_some() && other.exact_targets().is_some();
+        let mut targets = self.into_known_targets();
+        targets.extend(other.into_known_targets());
         if exact {
             Self::Exact(targets)
         } else {
@@ -516,9 +528,7 @@ impl FunctionTargetKnowledge {
     }
 
     pub fn widen_for_possible_replacement(&mut self) {
-        *self = match std::mem::replace(self, Self::unknown()) {
-            Self::Exact(targets) | Self::Open(targets) => Self::Open(targets),
-        };
+        *self = Self::Open(std::mem::replace(self, Self::unknown()).into_known_targets());
     }
 
     pub fn replace_with_unknown(&mut self) {
@@ -533,7 +543,20 @@ impl FunctionTargetKnowledge {
         match self {
             Self::Exact(targets) => Self::Exact(targets.into_iter().map(map).collect()),
             Self::Open(targets) => Self::Open(targets.into_iter().map(map).collect()),
+            Self::ClosedLocalCall(target) => Self::Exact(target.0.into_iter().map(map).collect()),
         }
+    }
+}
+
+/// The direct identifier Reference of one call. Lowering has proved both
+/// the binding's source function and lexical agreement for its captures.
+/// Value-flow joins and target remapping discard the call-site proof.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClosedLocalCallTargetIr(BTreeSet<FunctionId>);
+
+impl ClosedLocalCallTargetIr {
+    pub(crate) fn new(id: FunctionId) -> Self {
+        Self(BTreeSet::from([id]))
     }
 }
 

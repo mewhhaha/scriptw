@@ -1255,7 +1255,7 @@ survived collection, since the active space is the same size as the idle space",
                 }
             }
             InlineTraceInfo::Array { elems_are_gc_refs } => {
-                if elems_are_gc_refs {
+                if elems_are_gc_refs && !header.has_weak_array_elements() {
                     let len = self.object::<VMCopyingArrayHeader>(start)?.length;
                     if len == 0 {
                         return Ok(size);
@@ -1940,8 +1940,10 @@ impl CopyingCollection<'_, '_> {
             }
         } else {
             for i in 0..len {
-                let slot = usize::try_from(evacuation.heap.remembered[i])?;
-                evacuation.scan_remembered_slot(slot, &mut self.marking)?;
+                let slot = evacuation.heap.remembered[i];
+                if !self.marking.arrays.should_skip_remembered(slot) {
+                    evacuation.scan_remembered_slot(usize::try_from(slot)?, &mut self.marking)?;
+                }
             }
             for i in 0..evacuation.heap.direct_old.len() {
                 let index = evacuation.heap.direct_old[i];
@@ -1968,16 +1970,8 @@ impl CopyingCollection<'_, '_> {
 
         // Complete every allocation and the checked cache epoch change before
         // moving any object. Collection-local indices do not retain referents.
+        self.prepare_weak_marking()?;
         if self.heap.collecting_minor {
-            // Old owners and keys are live for a minor collection.
-            let nursery_end = self.heap.nursery_end;
-            let weak = &*self.trace_state.weak_gc;
-            self.marking.prepare(
-                weak,
-                weak.touched.iter().map(|&slot| slot as usize),
-                |raw| raw >= nursery_end,
-            )?;
-            self.trace_state.weak_gc.advance_epoch()?;
             // Promoted objects are copied after the old space's objects and
             // scanned from there.
             let old_end = self.heap.bump_ptr();
@@ -1985,9 +1979,6 @@ impl CopyingCollection<'_, '_> {
             self.process_roots()?;
             self.process_remembered(old_end)?;
         } else {
-            let weak = &*self.trace_state.weak_gc;
-            self.marking.prepare(weak, 0..weak.slots.len(), |_| false)?;
-            self.trace_state.weak_gc.advance_epoch()?;
             self.heap.flip();
             self.heap.initialize_worklist();
             self.process_roots()?;

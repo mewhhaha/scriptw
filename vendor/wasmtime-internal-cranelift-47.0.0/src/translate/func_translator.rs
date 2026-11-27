@@ -58,7 +58,7 @@ impl FuncTranslator {
         environ: &mut FuncEnvironment<'_>,
     ) -> WasmResult<()> {
         let _tt = timing::wasm_translate_function();
-        let mut reader = body.get_binary_reader();
+        let reader = body.get_binary_reader();
         log::trace!(
             "translate({} bytes, {}{})",
             reader.bytes_remaining(),
@@ -84,38 +84,9 @@ impl FuncTranslator {
 
         let num_params = declare_wasm_parameters(&mut builder, entry_block, environ);
 
-        // Set up the translation state with a single pushed control block representing the whole
-        // function and its return values.
-        let exit_block = builder.create_block();
-        environ
-            .stacks
-            .initialize(&builder.func.signature, exit_block);
-
-        parse_local_decls(&mut reader, &mut builder, num_params, environ, validator)?;
-
-        // Represent the function's return values as `Variable`s, exactly like
-        // Wasm block parameters, rather than as real CLIF block parameters.
-        //
-        // Note this must happen *after* `parse_local_decls`: the Wasm locals'
-        // `Variable`s must be indexed contiguously after the parameters, so we
-        // can only declare these additional variables once all locals exist.
-        let return_types: SmallVec<[ir::Type; 6]> = builder
-            .func
-            .signature
-            .returns
-            .iter()
-            .map(|ret| ret.value_type)
-            .collect();
-        let return_vars: SmallVec<[Variable; 6]> = return_types
-            .iter()
-            .map(|ty| builder.declare_var(*ty))
-            .collect();
-        environ
-            .stacks
-            .block_param_vars
-            .insert(exit_block, return_vars);
-
-        parse_function_body(validator, reader, &mut builder, environ)?;
+        if !environ.try_translate_packed_kernel(validator, &body, &mut builder)? {
+            translate_scalar_body(validator, reader, &mut builder, num_params, environ)?;
+        }
 
         builder.finalize(environ.target_config());
         environ.place_frame_loads(func);
@@ -146,6 +117,47 @@ impl FuncTranslator {
         crate::alias_region::debug_assert_all_mem_insts_have_alias_regions(func);
         Ok(())
     }
+}
+
+fn translate_scalar_body(
+    validator: &mut FuncValidator<impl WasmModuleResources>,
+    mut reader: BinaryReader<'_>,
+    builder: &mut FunctionBuilder<'_>,
+    num_params: usize,
+    environ: &mut FuncEnvironment<'_>,
+) -> WasmResult<()> {
+    // Set up the translation state with a single pushed control block representing the whole
+    // function and its return values.
+    let exit_block = builder.create_block();
+    environ
+        .stacks
+        .initialize(&builder.func.signature, exit_block);
+
+    parse_local_decls(&mut reader, builder, num_params, environ, validator)?;
+
+    // Represent the function's return values as `Variable`s, exactly like
+    // Wasm block parameters, rather than as real CLIF block parameters.
+    //
+    // Note this must happen *after* `parse_local_decls`: the Wasm locals'
+    // `Variable`s must be indexed contiguously after the parameters, so we
+    // can only declare these additional variables once all locals exist.
+    let return_types: SmallVec<[ir::Type; 6]> = builder
+        .func
+        .signature
+        .returns
+        .iter()
+        .map(|ret| ret.value_type)
+        .collect();
+    let return_vars: SmallVec<[Variable; 6]> = return_types
+        .iter()
+        .map(|ty| builder.declare_var(*ty))
+        .collect();
+    environ
+        .stacks
+        .block_param_vars
+        .insert(exit_block, return_vars);
+
+    parse_function_body(validator, reader, builder, environ)
 }
 
 /// Declare local variables for the signature parameters that correspond to WebAssembly locals.

@@ -1414,7 +1414,8 @@ gc_layout_registry! {
             SLOT: RegExpLegacySlot, Immutable, NonNullable;
         }
         struct Environment => EnvironmentSchema {
-            // Only a global Environment carries this defining-Realm edge.
+            // The Global Environment sets this edge and child Environments
+            // inherit it. A null PARENT identifies the Global Environment.
             DEFINING_REALM: GcRef<RealmRecord>, Immutable, Nullable;
             NAMED_BINDINGS: GcRef<NamedBindingTable>, Mutable, Nullable;
             KIND: I32Value, Immutable, NonNullable;
@@ -1839,11 +1840,20 @@ gc_layout_registry! {
             NEXT_ORDINAL: I64Value, Mutable, NonNullable;
             VERSION: I64Value, Mutable, NonNullable;
         }
-        // A weak collection holds nothing: its entries are collector
-        // ephemerons it owns, found by its header's KEY_HASH_ID and the key's.
         struct WeakMapObject: JavaScriptObject => WeakMapObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
+            TABLE: GcRef<WeakMapTable>, Mutable, Nullable;
         }
+        // The registered reference array holds interleaved ephemeron key/value pairs.
+        // A zero hash is unused; a nonzero hash with a null key is a tombstone.
+        struct WeakMapTable => WeakMapTableSchema {
+            HASHES: GcRef<NumberBitsI64Array>, Immutable, NonNullable;
+            TAGS: GcRef<CompactTagArray>, Immutable, NonNullable;
+            SCALARS: GcRef<CompactScalarArray>, Immutable, NonNullable;
+            REFERENCES: GcRef<CompactReferenceArray>, Immutable, NonNullable;
+            USED: I32Value, Mutable, NonNullable;
+        }
+        // WeakSet entries remain collector ephemerons looked up by the host.
         struct WeakSetObject: JavaScriptObject => WeakSetObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
         }

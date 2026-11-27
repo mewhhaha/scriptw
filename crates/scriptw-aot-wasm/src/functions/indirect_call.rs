@@ -1,8 +1,15 @@
 use super::*;
-use crate::gc_types::{FunctionContext, ValueLocals};
+use crate::gc_types::{
+    ExecutableCodeSchema, FunctionContext, FunctionContextSchema, FunctionObject,
+    FunctionObjectSchema, GcNullability, SourceDepthOverflow, ValueLocals,
+};
+use scriptw_ir::{SmallInlineBodyIr, SmallInlineEffects, SmallInlineInitializationIr};
 
 /// Indexed member-call callees per body that get the inline probe.
 const INLINE_INDEXED_CALLEE_SITES: u32 = 32;
+/// Source bodies and indexed callee probes share the per-body code-size budget.
+const INLINE_SMALL_SOURCE_SITES: u32 = 8;
+const INLINE_SMALL_SOURCE_MAX_ARGUMENTS: usize = 6;
 
 impl FunctionBuilder<'_> {
     pub(crate) fn emit_indirect_call(
@@ -145,6 +152,52 @@ impl FunctionBuilder<'_> {
                 callee.clear(function);
                 return Ok(());
             }
+            if let Some(plan) = meta
+                .constant_leaf
+                .as_ref()
+                .and_then(|plan| plan.small_source())
+            {
+                if matches!(callee_expression.expr, ExprIr::Identifier(_))
+                    && this_expression.is_none()
+                    && callee_expression
+                        .function_targets
+                        .proves_closed_local_call()
+                    && (plan.effects() == SmallInlineEffects::Closed
+                        || (self.planned_entry().is_some_and(|entry| {
+                            matches!(
+                                entry.source_body_owner(),
+                                Some(crate::function_layout::SourceBodyOwner::Program)
+                            )
+                        }) && (matches!(continuation, CallContinuation::Continue)
+                            || (self.strict && self.source_activation.is_some()))))
+                    && self.inline_indexed_callee_sites < INLINE_SMALL_SOURCE_SITES
+                    && arguments.len() <= INLINE_SMALL_SOURCE_MAX_ARGUMENTS
+                    && arguments.iter().all(|argument| {
+                        !matches!(
+                            argument.expr,
+                            ExprIr::SpreadArgument(_) | ExprIr::CapturedArgumentList(_)
+                        )
+                    })
+                {
+                    self.inline_indexed_callee_sites += 1;
+                    self.emit_small_source_call(
+                        meta,
+                        plan,
+                        &callee,
+                        &receiver,
+                        arguments,
+                        continuation,
+                        output,
+                        function,
+                    )?;
+                    receiver.clear(function);
+                    callee.clear(function);
+                    if plan.effects() == SmallInlineEffects::StrictActivation {
+                        self.emit_propagate_current_throw_if_needed(function);
+                    }
+                    return Ok(());
+                }
+            }
         }
         let packed_push_candidate = targets.iter().any(|id| {
             StandardBuiltinId::from_function_id(id) == Some(StandardBuiltinId::ArrayPrototypePush)
@@ -219,12 +272,16 @@ impl FunctionBuilder<'_> {
                 || callee_reads_static_property(callee_expression, name)
         })
         .map(|(builtin, _)| builtin);
-        let string_constructor_candidate = targets.iter().any(|id| {
-            StandardBuiltinId::from_function_id(id) == Some(StandardBuiltinId::StringConstructor)
-        }) || callee_nominates_identifier(callee_expression, "String");
-        let number_constructor_candidate = targets.iter().any(|id| {
-            StandardBuiltinId::from_function_id(id) == Some(StandardBuiltinId::NumberConstructor)
-        }) || callee_nominates_identifier(callee_expression, "Number");
+        let string_constructor_candidate =
+            targets.iter().any(|id| {
+                StandardBuiltinId::from_function_id(id)
+                    == Some(StandardBuiltinId::StringConstructor)
+            }) || callee_nominates_identifier(callee_expression, "String");
+        let number_constructor_candidate =
+            targets.iter().any(|id| {
+                StandardBuiltinId::from_function_id(id)
+                    == Some(StandardBuiltinId::NumberConstructor)
+            }) || callee_nominates_identifier(callee_expression, "Number");
         // `x.call(...)` syntax or target knowledge only nominates the
         // forwarding guard; the actual callee's code identity decides, with
         // these once-evaluated operands.
@@ -310,6 +367,200 @@ impl FunctionBuilder<'_> {
         }
         receiver.clear(function);
         callee.clear(function);
+        Ok(())
+    }
+
+    /// Hold the actual operands across the identity, Realm and depth checks
+    /// so the same arguments reach either arm. Observable strict activations
+    /// still own their source depth and caller identity across nested effects.
+    #[allow(clippy::too_many_arguments)]
+    fn emit_small_source_call(
+        &mut self,
+        meta: &WasmFunctionMeta,
+        plan: &SmallInlineBodyIr,
+        callee: &ValueLocals,
+        receiver: &ValueLocals,
+        arguments: &[TypedExpr],
+        continuation: &CallContinuation,
+        output: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let mut values = Vec::with_capacity(arguments.len());
+        for argument in arguments {
+            let value = schema.reserve_value_local(function);
+            self.compile_expr_to_value(argument, &value, function)?;
+            self.emit_propagate_current_throw_if_needed(function);
+            values.push(value);
+        }
+
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        let miss = self.open_frame(ControlFrameKind::Block, function);
+        callee.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Function.tag()));
+        function.instruction(&Instruction::I32Eq);
+        callee.reference().load(function);
+        function.instruction(&Instruction::RefTestNonNull(
+            schema
+                .reference_type::<FunctionObject>(GcNullability::NonNullable)
+                .heap_type,
+        ));
+        function.instruction(&Instruction::I32And);
+        schema.emit_source_activation_admission_test(function);
+        function.instruction(&Instruction::I32And);
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, function);
+
+        let callable = schema.reserve_gc_local(function).initialize(
+            callee.cast_reference::<FunctionObject>(schema, function),
+            function,
+        );
+        let code = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(FunctionObjectSchema::CODE)
+                .read(&callable, schema, function)
+                .reference(),
+            function,
+        );
+        self.emit_source_code_identity_test(meta, &callable, &code, function)?;
+        code.clear(function);
+        let caller_realm = self.emit_execution_realm(function);
+        let context = schema
+            .field(FunctionObjectSchema::CONTEXT)
+            .read(&callable, schema, function)
+            .reference();
+        schema
+            .field(FunctionContextSchema::REALM)
+            .read_top(context, function);
+        caller_realm.load(schema, function);
+        function.instruction(&Instruction::RefEq);
+        function.instruction(&Instruction::I32And);
+        caller_realm.clear(function);
+        callable.clear(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, function);
+
+        match plan.effects() {
+            SmallInlineEffects::Closed => {
+                self.emit_small_source_body(plan, &values, output, function)?;
+            }
+            SmallInlineEffects::StrictActivation => {
+                let callable = schema.reserve_gc_local(function).initialize(
+                    callee.cast_reference::<FunctionObject>(schema, function),
+                    function,
+                );
+                let depth = if matches!(continuation, CallContinuation::Continue) {
+                    let realm = self.load_current_realm(function);
+                    let base = self.runtime_helper_base()?;
+                    // The same depth was just admitted, before any body effect.
+                    let depth = schema.enter_source_activation_depth(function, |function| {
+                        Ok::<_, EmitError>(SourceDepthOverflow::ProgramHelper(
+                            schema.return_call_source_depth_overflow(&realm, base, function),
+                        ))
+                    })?;
+                    realm.clear(function);
+                    Some(depth)
+                } else {
+                    // Both bodies are strict. A proper tail call replaces the
+                    // caller's opaque activation at the same source depth.
+                    None
+                };
+                let previous = schema
+                    .reserve_gc_local(function)
+                    .initialize(schema.load_active_source_function(function), function);
+                schema.replace_active_source_function(&callable, function);
+                callable.clear(function);
+                self.emit_small_source_body(plan, &values, output, function)?;
+                schema.replace_active_source_function(&previous, function);
+                previous.clear(function);
+                if let Some(depth) = depth {
+                    depth.restore(function);
+                    depth.clear(function);
+                }
+            }
+        }
+        self.emit_branch_to_target(done, function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+
+        let references: Vec<_> = values.iter().collect();
+        let argv = self.emit_pre_evaluated_arg_vector(&references, function);
+        self.emit_indirect_call_with_argv_to_value(
+            callee,
+            receiver,
+            &argv,
+            continuation,
+            output,
+            function,
+        )?;
+        argv.clear(function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        for value in values.into_iter().rev() {
+            value.clear(function);
+        }
+        Ok(())
+    }
+
+    fn emit_small_source_body(
+        &mut self,
+        plan: &SmallInlineBodyIr,
+        arguments: &[ValueLocals],
+        output: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let value = schema.reserve_value_local(function);
+        value.set_undefined(function);
+        self.push_scope();
+        let mut bindings = Vec::new();
+        for (index, name) in plan.parameters().iter().enumerate() {
+            let argument = arguments.get(index).unwrap_or(&value);
+            bindings.push(self.retain_expression_operand(name, argument, function).1);
+        }
+        for initialization in plan.initializations() {
+            let names = match initialization {
+                SmallInlineInitializationIr::Binding { name, .. } => std::slice::from_ref(name),
+                SmallInlineInitializationIr::ObjectPattern { names, .. } => names.as_slice(),
+            };
+            for name in names {
+                bindings.push(self.retain_expression_operand(name, &value, function).1);
+            }
+        }
+        // Retire these explicit roots even if a getter or coercion throws.
+        let cleanup = (plan.effects() == SmallInlineEffects::StrictActivation)
+            .then(|| self.open_frame(ControlFrameKind::Block, function));
+        if let Some(cleanup) = cleanup {
+            self.throw_handler_stack.push(cleanup);
+        }
+        for initialization in plan.initializations() {
+            match initialization {
+                SmallInlineInitializationIr::Binding {
+                    name,
+                    value: expression,
+                } => {
+                    self.compile_expr_to_value(expression, &value, function)?;
+                    let storage = self
+                        .lookup_current_scope_binding(name)
+                        .expect("inline binding was reserved");
+                    self.write_binding_from_locals(storage, &value, function);
+                }
+                SmallInlineInitializationIr::ObjectPattern { expression, .. } => {
+                    self.compile_expr_to_value(expression, &value, function)?;
+                }
+            }
+        }
+        self.compile_expr_to_value(plan.result(), output, function)?;
+        if cleanup.is_some() {
+            self.throw_handler_stack.pop();
+            self.pop_control(ControlFrameKind::Block);
+            function.instruction(&Instruction::End);
+        }
+        self.pop_scope();
+        for binding in bindings.into_iter().rev() {
+            self.release_local_binding(binding, function);
+        }
+        value.clear(function);
         Ok(())
     }
 

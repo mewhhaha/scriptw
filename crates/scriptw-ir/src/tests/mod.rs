@@ -9,6 +9,7 @@ include!("environment_analysis.rs");
 include!("strict_parameter_storage.rs");
 include!("entry_and_modules.rs");
 include!("call_references.rs");
+include!("closed_local_calls.rs");
 include!("array_expression.rs");
 include!("operators.rs");
 include!("destructuring.rs");

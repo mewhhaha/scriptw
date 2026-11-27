@@ -1,3 +1,4 @@
+mod closed_local_call;
 mod non_property_call;
 
 use super::call_candidate_analysis::DynamicSourceCallAdmission;

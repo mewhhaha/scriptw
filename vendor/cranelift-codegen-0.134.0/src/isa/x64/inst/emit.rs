@@ -1877,8 +1877,6 @@ fn emit_return_call_common_sequence<T>(
                  but the current implementation relies on them being present"
     );
 
-    let tmp = call_info.tmp.to_writable_reg();
-
     for inst in
         X64ABIMachineSpec::gen_clobber_restore(CallConv::Tail, &info.flags, state.frame_layout())
     {
@@ -1896,21 +1894,16 @@ fn emit_return_call_common_sequence<T>(
 
     let incoming_args_diff = state.frame_layout().tail_args_size - call_info.new_stack_arg_size;
     if incoming_args_diff > 0 {
-        // Move the saved return address up by `incoming_args_diff`.
-        let addr = Amode::imm_reg(0, regs::rsp());
-        asm::inst::movq_rm::new(tmp, addr).emit(sink, info, state);
-        asm::inst::movq_mr::new(
-            Amode::imm_reg(i32::try_from(incoming_args_diff).unwrap(), regs::rsp()),
-            Gpr::unwrap_new(tmp.to_reg()),
-        )
-        .emit(sink, info, state);
-
-        // Increment the stack pointer to shrink the argument area for the new
-        // call.
-        let rsp = Writable::from_reg(regs::rsp());
-        let incoming_args_diff = i32::try_from(incoming_args_diff)
+        // Both argument areas are aligned to 16 bytes, so a nonzero shrink
+        // leaves room to pop the return address out of its old slot. POP
+        // computes an rsp-relative destination after incrementing rsp by
+        // eight, so the address is stored at the final stack pointer without
+        // clobbering any outgoing argument or the target in r11.
+        debug_assert_eq!(incoming_args_diff % 16, 0);
+        let remaining = i32::try_from(incoming_args_diff - 8)
             .expect("`incoming_args_diff` is too large to fit in a 32-bit signed immediate");
-        Inst::addq_mi(rsp, incoming_args_diff).emit(sink, info, state);
+        asm::inst::popq_m::new(Amode::imm_reg(remaining, regs::rsp())).emit(sink, info, state);
+        Inst::addq_mi(Writable::from_reg(regs::rsp()), remaining).emit(sink, info, state);
     }
 }
 

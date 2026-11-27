@@ -1372,6 +1372,8 @@ runtime_helper_domain! {
     CodeUnitFind / CodeUnitFindArguments / CodeUnitFindParameters / "code_unit_find" { units:(Ref CodeUnitArray NonNullable),start:I32,end:I32,unit:I32 } => I32;
     StringSplitJoin / StringSplitJoinArguments / StringSplitJoinParameters / "string_split_join" { input:(Ref StringValue NonNullable),separator:(Ref StringValue NonNullable),replacement:(Ref StringValue NonNullable),chain:(Ref PooledStringTable Nullable) } => (Ref StringValue Nullable);
     JsonPlainRun / JsonPlainRunArguments / JsonPlainRunParameters / "json_plain_run" { source:(Ref CodeUnitArray NonNullable),start:I32,end:I32,target:(Ref CodeUnitArray NonNullable),at:I32 } => I32;
+    JsonParsePlainRun / JsonParsePlainRunArguments / JsonParsePlainRunParameters / "json_parse_plain_run" { source:(Ref CodeUnitArray NonNullable),start:I32,end:I32 } => I32;
+    CodeUnitEqual / CodeUnitEqualArguments / CodeUnitEqualParameters / "code_unit_equal" { left:(Ref CodeUnitArray NonNullable),right:(Ref CodeUnitArray NonNullable),length:I32 } => I32;
     WellKnownSymbolResolve / WellKnownSymbolResolveArguments / WellKnownSymbolResolveParameters / "well_known_symbol_resolve" { ordinal:I32 } => (Ref SymbolValue NonNullable);
     JsonStringifyValue / JsonStringifyValueArguments / JsonStringifyValueParameters / "json_stringify_value" { holder:Value,key:Value,fetched:I32,context:(Ref JsonStringifyContext NonNullable),indent:I64,caller_program:Program } => Completion;
     JsonStringifyPlainValue / JsonStringifyPlainValueArguments / JsonStringifyPlainValueParameters / "json_stringify_plain_value" { value:Value,key:Value,context:(Ref JsonStringifyContext NonNullable),indent:I64,caller_program:Program } => Completion;
@@ -1580,11 +1582,11 @@ impl RuntimeHelperId {
             Self::GlobalVarDeclarationInstall => HelperOwner::Runtime,
             Self::AsciiNarrow
             | Self::AsciiWiden
+            | Self::CodeUnitEqual
             | Self::CodeUnitFind
             | Self::StringSplitJoin
-            | Self::JsonPlainRun => {
-                HelperOwner::Runtime
-            }
+            | Self::JsonPlainRun
+            | Self::JsonParsePlainRun => HelperOwner::Runtime,
             Self::JsonStringifyValue | Self::JsonStringifyPlainValue => HelperOwner::Runtime,
             Self::CompactArrayLiteral => HelperOwner::Program,
             Self::InitializeInstanceElements => HelperOwner::ContextHook,
@@ -1772,9 +1774,11 @@ impl RuntimeHelperId {
             Self::GlobalVarDeclarationInstall => true,
             Self::AsciiNarrow
             | Self::AsciiWiden
+            | Self::CodeUnitEqual
             | Self::CodeUnitFind
             | Self::StringSplitJoin
-            | Self::JsonPlainRun => true,
+            | Self::JsonPlainRun
+            | Self::JsonParsePlainRun => true,
             Self::JsonStringifyValue | Self::JsonStringifyPlainValue => {
                 emission.holds(RuntimeHelperFact::UsesJsonStringify)
             }

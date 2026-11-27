@@ -54,6 +54,54 @@ impl FunctionBuilder<'_> {
         realm.clear(f);
         Ok(())
     }
+    pub(super) fn stream_take_queued_chunk(
+        &mut self,
+        stream: &GcLocal<ReadableStreamObject>,
+        controller: &GcLocal<ReadableByteStreamControllerObject>,
+        head: &GcLocal<StreamByteChunk, Nullable>,
+        f: &mut Function,
+    ) -> Result<GcLocal<TypedArrayObject>, EmitError> {
+        let s = self.runtime_schema();
+        let next = s.reserve_gc_local(f).initialize(
+            s.field(StreamByteChunkSchema::NEXT)
+                .read(head, s, f)
+                .reference(),
+            f,
+        );
+        s.field(ReadableByteStreamControllerObjectSchema::QUEUE_HEAD)
+            .write(controller, GcOperand::reference(&next, s), s, f);
+        next.load(s, f).is_null(f);
+        self.open_frame(ControlFrameKind::If, f);
+        s.field(ReadableByteStreamControllerObjectSchema::QUEUE_TAIL)
+            .write(controller, GcOperand::null(s), s, f);
+        self.stream_end_if(f);
+        next.clear(f);
+        let count = s.reserve_i64_local(f);
+        s.field(ReadableByteStreamControllerObjectSchema::QUEUE_BYTES)
+            .read(controller, s, f);
+        s.field(StreamByteChunkSchema::BYTE_LENGTH).read(head, s, f);
+        f.instruction(&Instruction::I64Sub);
+        count.store(f);
+        s.field(ReadableByteStreamControllerObjectSchema::QUEUE_BYTES)
+            .write(controller, GcOperand::i64_local(count), s, f);
+        count.load(f);
+        f.instruction(&Instruction::I64Eqz);
+        s.field(ReadableByteStreamControllerObjectSchema::CLOSE_REQUESTED)
+            .read(controller, s, f);
+        f.instruction(&Instruction::I32And);
+        s.release_i64_local(count, f);
+        self.open_frame(ControlFrameKind::If, f);
+        self.stream_finish(stream, None, f)?;
+        f.instruction(&Instruction::Else);
+        self.stream_call_pull(controller, f)?;
+        self.stream_end_if(f);
+        Ok(s.reserve_gc_local(f).initialize(
+            s.field(StreamByteChunkSchema::VALUE)
+                .read(head, s, f)
+                .reference(),
+            f,
+        ))
+    }
     pub(super) fn stream_shift_read(
         &self,
         reader: &GcLocal<ReadableStreamDefaultReaderObject>,
@@ -143,7 +191,7 @@ impl FunctionBuilder<'_> {
                 .write(&closed, GcOperand::boolean(true), s, f);
             self.emit_settle_promise_record(&closed, PromiseSettlement::Reject, error, f)?;
         } else {
-            self.emit_resolve_promise_record(&closed, &undefined, f)?;
+            self.emit_settle_promise_record(&closed, PromiseSettlement::Fulfill, &undefined, f)?;
         }
         // Detach the entire request list before resolving a result. Resolving
         // can synchronously observe Object.prototype.then and reenter releaseLock.

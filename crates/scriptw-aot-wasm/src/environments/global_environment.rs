@@ -65,8 +65,8 @@ impl FunctionBuilder<'_> {
     ) -> GcLocal<Environment> {
         assert!(self.has_source_execution_environment());
         let schema = self.runtime_schema();
-        // A source body's environments share one root, so the walk runs at
-        // most once per invocation; later uses read the memoized root.
+        // A source body's environments share one root. Resolve it at most
+        // once per invocation and memoize it for later uses.
         function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(
             schema.reference_type::<Environment>(crate::gc_types::GcNullability::NonNullable),
         ))));
@@ -94,13 +94,32 @@ impl FunctionBuilder<'_> {
             .initialize(result, function)
     }
 
-    /// Walk the explicitly supplied source chain, never the active Realm fallback.
+    /// Resolve the root of the explicitly supplied source chain.
     pub(crate) fn emit_global_environment_from(
         &mut self,
         source: &GcLocal<Environment>,
         function: &mut Function,
     ) -> GcLocal<Environment> {
         let schema = self.runtime_schema();
+        let result = self.open_reference_block::<Environment>(schema, function);
+        let walk = self.open_frame(ControlFrameKind::Block, function);
+        let realm = schema
+            .struct_type::<Environment>()
+            .field(EnvironmentSchema::DEFINING_REALM)
+            .read(source, schema, function)
+            .reference()
+            .non_null_or_branch(self.local_branch_label(walk), function);
+        result.branch_with(
+            schema
+                .struct_type::<RealmRecord>()
+                .field(RealmRecordSchema::GLOBAL_ENVIRONMENT)
+                .read_top(realm, function)
+                .reference()
+                .require_non_null(function),
+            function,
+        );
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
         let environment = schema
             .reserve_gc_local(function)
             .initialize(source.load(schema, function), function);
@@ -130,28 +149,38 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
         parent.clear(function);
-        environment
+        let root = environment.load(schema, function);
+        environment.clear(function);
+        result.branch_with(root, function);
+        let root = result.close(function);
+        self.pop_control(ControlFrameKind::Block);
+        schema.reserve_gc_local(function).initialize(root, function)
     }
 
     pub(crate) fn emit_source_execution_realm_to_local(
         &mut self,
         function: &mut Function,
     ) -> GcLocal<RealmRecord> {
+        assert!(self.has_source_execution_environment());
         let schema = self.runtime_schema();
+        function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(
+            schema.reference_type::<RealmRecord>(crate::gc_types::GcNullability::NonNullable),
+        ))));
+        let defining_realm = schema
+            .struct_type::<Environment>()
+            .field(EnvironmentSchema::DEFINING_REALM);
+        let _ = defining_realm
+            .read(self.current_environment(), schema, function)
+            .reference();
+        function.instruction(&Instruction::BrOnNonNull(0));
         let environment = self.emit_source_global_environment_to_local(function);
-        let realm = schema
-            .reserve_gc_local::<RealmRecord, NonNullable>(function)
-            .initialize(
-                schema
-                    .struct_type::<Environment>()
-                    .field(EnvironmentSchema::DEFINING_REALM)
-                    .read(&environment, schema, function)
-                    .reference()
-                    .require_non_null(function),
-                function,
-            );
+        let realm = defining_realm
+            .read(&environment, schema, function)
+            .reference()
+            .require_non_null(function);
         environment.clear(function);
-        realm
+        function.instruction(&Instruction::End);
+        schema.reserve_gc_local(function).initialize(realm, function)
     }
 
     fn emit_execution_realm_to_local(&mut self, function: &mut Function) -> GcLocal<RealmRecord> {

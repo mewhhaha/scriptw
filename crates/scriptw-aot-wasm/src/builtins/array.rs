@@ -5,7 +5,7 @@ use crate::gc_types::{
     ArrayObject, ArrayObjectSchema, BindingCell, BindingCellSchema, CompactDataShapeSchema,
     CompactDataStorage, CompletionLocals, GcLocal, GcOperand, I32Local, I64Local,
     InlineCompactDataStorage, InlineCompactDataStorageSchema, OrdinaryObject, OrdinaryObjectSchema,
-    ScalarValue, StoredValue, ValueLocals,
+    ProxyObject, ScalarValue, StoredValue, ValueLocals,
 };
 use scriptw_ir::{ArrayAccumulationElementIr, ArrayAccumulationIr, ArrayAccumulationTargetIr};
 
@@ -13,6 +13,7 @@ mod callback_iteration;
 mod copy_within;
 mod find_via_predicate;
 mod flat;
+mod from_storage;
 mod literal;
 mod numeric_sort;
 mod packed_join;
@@ -609,6 +610,23 @@ impl FunctionBuilder<'_> {
         let s = self.runtime_schema();
         self.emit_is_constructor_i32(constructor, f);
         f.instruction(&Instruction::I32Eqz);
+        self.emit_array_from_is_intrinsic_constructor(constructor, f);
+        f.instruction(&Instruction::I32Or);
+        target.reference().load(f);
+        f.instruction(&Instruction::RefTestNonNull(
+            s.reference_type::<ArrayObject>(crate::gc_types::GcNullability::NonNullable)
+                .heap_type,
+        ));
+        f.instruction(&Instruction::I32And);
+        fresh.store(f);
+    }
+
+    fn emit_array_from_is_intrinsic_constructor(
+        &mut self,
+        constructor: &ValueLocals,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
         let realm = s
             .reserve_gc_local(f)
             .initialize(self.emit_current_function_realm(f), f);
@@ -626,14 +644,6 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::RefIsNull);
         f.instruction(&Instruction::I32Eqz);
         f.instruction(&Instruction::I32And);
-        f.instruction(&Instruction::I32Or);
-        target.reference().load(f);
-        f.instruction(&Instruction::RefTestNonNull(
-            s.reference_type::<ArrayObject>(crate::gc_types::GcNullability::NonNullable)
-                .heap_type,
-        ));
-        f.instruction(&Instruction::I32And);
-        fresh.store(f);
         canonical.clear(f);
         realm.clear(f);
     }
@@ -887,8 +897,31 @@ impl FunctionBuilder<'_> {
         value.copy_from(pending.value(), f);
         self.emit_to_length_i64_from_value_locals(&value, length, &pending, f)?;
         self.emit_array_native_propagate(&pending, f);
+        let reserve_packed = s.reserve_i32_local(f);
+        length.load(f);
+        f.instruction(&Instruction::I64Const(from_storage::PACKED_LENGTH_LIMIT));
+        f.instruction(&Instruction::I64LeU);
+        source.reference().load(f);
+        f.instruction(&Instruction::RefTestNonNull(
+            s.reference_type::<ProxyObject>(crate::gc_types::GcNullability::NonNullable)
+                .heap_type,
+        ));
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32And);
+        self.emit_array_from_is_intrinsic_constructor(&constructor, f);
+        f.instruction(&Instruction::I32And);
+        reserve_packed.store(f);
+        reserve_packed.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        // Construct(%Array%, « length ») uses its immutable own prototype.
+        // The source and mapper never receive the fresh result.
+        self.emit_array_native_create(length, &target, f)?;
+        fresh.set_constant(1, f);
+        f.instruction(&Instruction::Else);
         self.emit_array_native_target(&constructor, Some(length), &target, f)?;
         self.emit_array_from_fresh_target(&constructor, &target, fresh, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         f.instruction(&Instruction::I64Const(0));
         index.store(f);
         let finished = self.open_frame(ControlFrameKind::Block, f);
@@ -912,6 +945,14 @@ impl FunctionBuilder<'_> {
         self.emit_array_from_mapper(mapping, &mapper, &this_arg, index, &value, &pending, f)?;
         self.emit_array_native_propagate(&pending, f);
         value.copy_from(pending.value(), f);
+        reserve_packed.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        // Choose the backing from the first successful value. An empty
+        // result or an abrupt first read or callback needs no backing.
+        self.emit_array_from_reserve_packed(&target, length, &value, f);
+        reserve_packed.set_constant(0, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         // ArrayCreate(len) made `length` already `len` on a fresh result.
         self.emit_array_from_define(fresh, &target, index, &value, false, &pending, f)?;
         self.emit_array_native_propagate(&pending, f);
@@ -924,6 +965,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
+        s.release_i32_local(reserve_packed, f);
         self.emit_array_native_set_length(
             &target,
             length,

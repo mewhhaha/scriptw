@@ -50,6 +50,7 @@ fn plain_stringify_hot_entry_reaches_general_helper_via_tail_call_or_member_cont
             let (hot, hot_body) = runtime.named("helper::json_stringify_plain_value");
             let (general, general_body) = runtime.named("helper::json_stringify_value");
             let (_, entry) = runtime.named("builtin::JSON.stringify");
+            let (quote_run, _) = runtime.named("helper::json_plain_run");
 
             // Before traversal starts, a declined root leaves by one tail call
             // to the general helper. Once traversal begins, only a single
@@ -66,6 +67,9 @@ fn plain_stringify_hot_entry_reaches_general_helper_via_tail_call_or_member_cont
             assert!(calls(general_body, general));
             // The entry selects exactly one of the two for the root.
             assert!(calls(entry, hot) && calls(entry, general));
+            // Both paths use the packed scan and copy when quoting long strings.
+            assert!(calls(hot_body, quote_run));
+            assert!(calls(general_body, quote_run));
         })
         .unwrap()
         .join()

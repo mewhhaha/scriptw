@@ -37,7 +37,8 @@ impl<'a> ScriptLowerer<'a> {
         callee: &Expression,
         args: &[Expression],
     ) -> TypedExpr {
-        let callee = self.lower_expression(callee);
+        let source_callee = callee;
+        let callee = self.lower_expression(source_callee);
         let callee = match callee {
             TypedExpr {
                 expr: ExprIr::OptionalPropertyChain { target, mut chain },
@@ -77,6 +78,7 @@ impl<'a> ScriptLowerer<'a> {
             }
             callee => callee,
         };
+        let closed_call = self.prove_closed_local_call(source_callee, &callee);
         let lower_generic_indirect_call = |this: &mut Self, mut callee: TypedExpr| {
             let lowered_args = this
                 .lower_call_args_expanding_spread(args)
@@ -90,6 +92,9 @@ impl<'a> ScriptLowerer<'a> {
             let CallCandidateAnalysis::Accepted { result, effects } = analysis else {
                 return TypedExpr::undefined();
             };
+            if let Some(target) = &closed_call {
+                callee.function_targets = FunctionTargetKnowledge::ClosedLocalCall(target.clone());
+            }
             let result = TypedExpr::from_info(
                 result,
                 ExprIr::CallIndirect {
@@ -195,7 +200,7 @@ impl<'a> ScriptLowerer<'a> {
         // the source expression already creates that function object here.
         // Replacing an identifier/property callee would discard the original
         // closure object's captured environment and function identity.
-        let callee = if effective_function_id != function_id
+        let mut callee = if effective_function_id != function_id
             && matches!(&callee.expr, ExprIr::FunctionValue(_))
         {
             self.function_value_expr(effective_function_id.clone())
@@ -204,6 +209,9 @@ impl<'a> ScriptLowerer<'a> {
         };
         let static_regexp_compilation =
             self.static_regexp_compilation_for_direct_call(&callee, &effective_function_id, &args);
+        if let Some(target) = &closed_call {
+            callee.function_targets = FunctionTargetKnowledge::ClosedLocalCall(target.clone());
+        }
         let call = TypedExpr::from_info(
             info,
             ExprIr::CallIndirect {

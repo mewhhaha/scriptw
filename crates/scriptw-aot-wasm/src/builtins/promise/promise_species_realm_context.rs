@@ -95,6 +95,51 @@ impl FunctionBuilder<'_> {
         dictionary.clear(function);
         self.emit_branch_if_to_target(slow, function);
 
+        let prototype = self.emit_intrinsic_promise_prototype(realm, slow, function);
+        schema
+            .field(OrdinaryObjectSchema::PROTOTYPE)
+            .read(&object, schema, function);
+        object.clear(function);
+        let _ = prototype.load(schema, function);
+        function.instruction(&Instruction::RefEq);
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(slow, function);
+        self.emit_untouched_promise_intrinsic_layout_or_branch(
+            &prototype,
+            IntrinsicPropertyLayoutId::PromisePrototype,
+            slow,
+            function,
+        )?;
+        prototype.clear(function);
+        Ok(())
+    }
+
+    /// A fresh intrinsic Promise inherits both `constructor` and `then` from
+    /// this prototype. The original rows prove that neither was edited.
+    pub(crate) fn emit_intrinsic_fresh_promise_prototype_or_branch(
+        &mut self,
+        realm: &GcLocal<RealmRecord>,
+        slow: ControlTarget,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let prototype = self.emit_intrinsic_promise_prototype(realm, slow, function);
+        self.emit_untouched_promise_intrinsic_layout_or_branch(
+            &prototype,
+            IntrinsicPropertyLayoutId::PromisePrototype,
+            slow,
+            function,
+        )?;
+        prototype.clear(function);
+        Ok(())
+    }
+
+    fn emit_intrinsic_promise_prototype(
+        &mut self,
+        realm: &GcLocal<RealmRecord>,
+        slow: ControlTarget,
+        function: &mut Function,
+    ) -> GcLocal<OrdinaryObject> {
+        let schema = self.runtime_schema();
         let value = schema.reserve_value_local(function);
         self.emit_load_non_array_realm_intrinsic(
             realm,
@@ -102,14 +147,6 @@ impl FunctionBuilder<'_> {
             &value,
             function,
         );
-        schema
-            .field(OrdinaryObjectSchema::PROTOTYPE)
-            .read(&object, schema, function);
-        object.clear(function);
-        value.reference().load(function);
-        function.instruction(&Instruction::RefEq);
-        function.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(slow, function);
         let prototype = schema.reserve_gc_local(function).initialize(
             value.sealed_reference_or_branch::<OrdinaryObject>(
                 schema,
@@ -119,14 +156,7 @@ impl FunctionBuilder<'_> {
             function,
         );
         value.clear(function);
-        self.emit_untouched_promise_intrinsic_layout_or_branch(
-            &prototype,
-            IntrinsicPropertyLayoutId::PromisePrototype,
-            slow,
-            function,
-        )?;
-        prototype.clear(function);
-        Ok(())
+        prototype
     }
 
     pub(super) fn emit_intrinsic_promise_species_or_branch(

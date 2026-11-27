@@ -1,32 +1,31 @@
 use super::*;
 
 impl FunctionBuilder<'_> {
-    pub(super) fn emit_stream_pull_if_needed(&mut self, f: &mut Function) -> Result<(), EmitError> {
+    pub(super) fn stream_call_pull(
+        &mut self,
+        controller: &GcLocal<ReadableByteStreamControllerObject>,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
-        let controller = self.stream_capture(f);
+        // A skipped pull has no observable callback entry. Check eligibility
+        // and update its serialization flags before allocating the native
+        // callback and argument vector that invoke the source algorithm.
         let stream = s.reserve_gc_local(f).initialize(
             s.field(ReadableByteStreamControllerObjectSchema::STREAM)
-                .read(&controller, s, f)
+                .read(controller, s, f)
                 .reference(),
             f,
         );
-        let pending = s.reserve_completion(f);
-        pending.initialize(f);
-        let flag = s.reserve_i32_local(f);
         let exit = self.open_frame(ControlFrameKind::Block, f);
         self.stream_is_state(&stream, ReadableStreamState::Readable, f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(exit, f);
         s.field(ReadableByteStreamControllerObjectSchema::STARTED)
-            .read(&controller, s, f)
-            .store(flag, f);
-        flag.load(f);
+            .read(controller, s, f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(exit, f);
         s.field(ReadableByteStreamControllerObjectSchema::CLOSE_REQUESTED)
-            .read(&controller, s, f)
-            .store(flag, f);
-        flag.load(f);
+            .read(controller, s, f);
         self.emit_branch_if_to_target(exit, f);
         let should_pull = s.reserve_i32_local(f);
         should_pull.set_constant(0, f);
@@ -50,33 +49,48 @@ impl FunctionBuilder<'_> {
         should_pull.store(f);
         request.clear(f);
         self.stream_end_if(f);
-        let hwm = s.reserve_f64_local(f);
+        reader.clear(f);
         s.field(ReadableByteStreamControllerObjectSchema::HIGH_WATER_MARK)
-            .read(&controller, s, f)
-            .store_f64(hwm, f);
-        let bytes = s.reserve_i64_local(f);
+            .read(controller, s, f);
         s.field(ReadableByteStreamControllerObjectSchema::QUEUE_BYTES)
-            .read(&controller, s, f)
-            .store_i64(bytes, f);
-        hwm.load(f);
-        bytes.load(f);
+            .read(controller, s, f);
         f.instruction(&Instruction::F64ConvertI64U);
         f.instruction(&Instruction::F64Gt);
         should_pull.load(f);
         f.instruction(&Instruction::I32Or);
+        s.release_i32_local(should_pull, f);
         f.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(exit, f);
         s.field(ReadableByteStreamControllerObjectSchema::PULLING)
-            .read(&controller, s, f)
-            .store(flag, f);
-        flag.load(f);
+            .read(controller, s, f);
         self.open_frame(ControlFrameKind::If, f);
         s.field(ReadableByteStreamControllerObjectSchema::PULL_AGAIN)
-            .write(&controller, GcOperand::boolean(true), s, f);
+            .write(controller, GcOperand::boolean(true), s, f);
         self.emit_branch_to_target(exit, f);
         self.stream_end_if(f);
         s.field(ReadableByteStreamControllerObjectSchema::PULLING)
-            .write(&controller, GcOperand::boolean(true), s, f);
+            .write(controller, GcOperand::boolean(true), s, f);
+        let callback =
+            self.stream_callback(controller, StandardBuiltinId::ReadableStreamPullIfNeeded, f)?;
+        let undefined = s.reserve_value_local(f);
+        undefined.set_undefined(f);
+        let argv = self.emit_pre_evaluated_arg_vector(&[], f);
+        let pending = s.reserve_completion(f);
+        self.emit_function_or_proxy_call_with_argv(&callback, &undefined, &argv, &pending, f)?;
+        pending.clear(f);
+        argv.clear(f);
+        undefined.clear(f);
+        callback.clear(f);
+        self.stream_end_block(f);
+        stream.clear(f);
+        Ok(())
+    }
+
+    pub(super) fn emit_stream_pull_if_needed(&mut self, f: &mut Function) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let controller = self.stream_capture(f);
+        let pending = s.reserve_completion(f);
+        pending.initialize(f);
         let source = s.reserve_value_local(f);
         let pull = s.reserve_value_local(f);
         let source_stored = s.reserve_gc_local(f).initialize(
@@ -118,16 +132,8 @@ impl FunctionBuilder<'_> {
         source_stored.clear(f);
         pull.clear(f);
         source.clear(f);
-        s.release_i64_local(bytes, f);
-        s.release_f64_local(hwm, f);
-        reader.clear(f);
-        s.release_i32_local(should_pull, f);
-        self.stream_end_block(f);
-        self.completion().value().set_undefined(f);
-        self.completion().set_kind(CompletionKind::Normal, f);
-        s.release_i32_local(flag, f);
+        self.completion().initialize(f);
         pending.clear(f);
-        stream.clear(f);
         controller.clear(f);
         Ok(())
     }

@@ -493,6 +493,9 @@ fn string_symbol_hooks_have_arbitrary_results_in_direct_and_spread_calls() {
                 FunctionTargetKnowledge::Exact(_) => assert_eq!(
                     callee.function_targets.exact_single_target(), Some(&builtin.function_id())),
                 FunctionTargetKnowledge::Open(_) => {},
+                FunctionTargetKnowledge::ClosedLocalCall(_) => {
+                    panic!("an observable property Get cannot prove a closed lexical call")
+                }
             }
             assert_eq!(result.kind, ValueKind::Dynamic, "{source}: {result:?}");
             assert_eq!(result.possible_kinds, KindSet::all_runtime_tags());

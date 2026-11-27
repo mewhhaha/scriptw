@@ -178,6 +178,9 @@ pub struct FuncEnvironment<'module_environment> {
     /// where (see `gc::ProvenReferences`).
     proven_references: gc::ProvenReferences,
 
+    /// Copying-GC allocation whose result may still be fresh in this block.
+    fresh_gc_allocation: Option<gc::FreshAllocation>,
+
     /// The tests of one `i32` against constants among the function's values
     /// so far (see `set_tests`).
     pub(crate) set_tests: set_tests::SetTests,
@@ -304,6 +307,7 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
             gc_heap_base_home: None,
             type_ids_home: None,
             proven_references: gc::ProvenReferences::default(),
+            fresh_gc_allocation: None,
             set_tests: set_tests::SetTests::default(),
 
             heaps: PrimaryMap::default(),

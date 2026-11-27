@@ -5,6 +5,8 @@ use crate::gc_types::{
     ExecutableCodeKind, ExecutableCodeSchema, FunctionContextSchema, FunctionObject,
     FunctionObjectSchema, GcI32Constant, GcNullability, ScalarValue, StringValue, ValueLocals,
 };
+use scriptw_ir::SmallInlineBodyIr;
+use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 enum ConstantLeafValue {
@@ -13,6 +15,7 @@ enum ConstantLeafValue {
     Boolean(bool),
     Number(u64),
     String(String),
+    SmallSource(Arc<SmallInlineBodyIr>),
 }
 
 /// A complete zero-formal-argument ordinary body with no activation observer.
@@ -24,6 +27,13 @@ pub(crate) struct ConstantLeafPlan {
 
 impl ConstantLeafPlan {
     pub(crate) fn for_function(function: &FunctionIr) -> Option<Self> {
+        if !function.params.is_empty() && (function.is_nested || function.is_expression) {
+            if let Some(body) = SmallInlineBodyIr::for_function(function) {
+                return Some(Self {
+                    value: ConstantLeafValue::SmallSource(Arc::new(body)),
+                });
+            }
+        }
         // A call site that answers for the body skips its builtin entry guard.
         if function.builtin_entry.is_some() {
             return None;
@@ -54,6 +64,13 @@ impl ConstantLeafPlan {
         Some(Self { value })
     }
 
+    pub(super) fn small_source(&self) -> Option<&SmallInlineBodyIr> {
+        match &self.value {
+            ConstantLeafValue::SmallSource(body) => Some(body),
+            _ => None,
+        }
+    }
+
     fn emit(
         &self,
         builder: &FunctionBuilder<'_>,
@@ -82,6 +99,9 @@ impl ConstantLeafPlan {
                 output.set_reference(&literal, schema, function);
                 literal.clear(function);
             }
+            ConstantLeafValue::SmallSource(_) => {
+                unreachable!("small source bodies bind already evaluated arguments")
+            }
         }
         Ok(())
     }
@@ -101,7 +121,7 @@ impl FunctionBuilder<'_> {
     ) -> Result<bool, EmitError> {
         // A tail continuation admits the same route (see the numeric leaf):
         // only stack depth could tell it from the tail call a miss keeps.
-        if !arguments.is_empty() {
+        if !arguments.is_empty() || plan.small_source().is_some() {
             // Decline before any argument evaluation. An accepted candidate
             // owns both its guarded route and the once-evaluated fallback.
             return Ok(false);

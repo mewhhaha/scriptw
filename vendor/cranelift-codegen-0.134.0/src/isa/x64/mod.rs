@@ -27,6 +27,8 @@ mod inst;
 mod lower;
 pub mod settings;
 #[cfg(test)]
+mod tail_abi_tests;
+#[cfg(test)]
 mod zero_extension_tests;
 
 #[cfg(feature = "unwind")]

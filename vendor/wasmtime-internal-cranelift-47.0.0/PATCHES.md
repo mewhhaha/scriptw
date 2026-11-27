@@ -680,3 +680,113 @@ dependent load more. The entry block now stores the base once
 struct type is `test edx,1; jne <trap>`, the heap base, then the header id
 load `mov eax,[r10+r11+4]`, which faults for reference 0, and the compare:
 no null test. Not yet measured with Callgrind.
+
+## Stage 1A copying-GC allocation and stores
+
+`src/func_environ/gc/copying.rs` compares an allocation's widened end
+directly with the widened bump limit on 64-bit targets, including when the
+size is constant. The fast path reuses the checked end for the bump store.
+The unsigned comparison excludes both capacity overruns and 32-bit
+wraparound. The dynamic path still rounds the size in 64 bits. The
+constant-size path on 32-bit targets still checks remaining capacity.
+
+`array.new_fixed` uses the freshly allocated object's address to initialize
+elements whose stores cannot call out. The checked fixed layout size bounds
+every offset, and both allocation paths reserve the entire range before any
+element write. Initializing stores use the GC heap alias region and
+little-endian storage as before. Funcref and continuation element types keep
+the general path and compute each slot separately.
+Regular array reads and writes still perform their Wasm bounds checks.
+
+`src/func_environ{.rs,/gc.rs}` carries the last allocation result within
+its merge block. A `struct.set` or `array.set` through that exact SSA
+reference may omit the remembered-slot update when the emitted CLIF since
+allocation contains no safepoint. The proof stops at a block change or
+safepoint, including host calls, polling and stack switching. Allocation's
+own slow call occurs before the merge and returns a fresh object. A nursery
+object has no old-to-young edge to record. An object in the initial
+pretenuring window is covered by the required full collection, including
+after the window closes. An object allocated directly in old space by
+`allocate_with_nursery` is in `direct_old`, so a minor collection scans
+its whole payload. A collection may expire that registration or promote a
+young object, hence the safepoint cutoff. Bulk stores and initialization
+loops that may poll retain their barriers. Heaps without a nursery
+have no remembered-set work.
+
+`src/compiler/translation_tests.rs` covers barrier omission for fresh
+struct and array updates, retention after a call, and the absence of array
+length loads and bounds traps during fixed packed-array initialization.
+
+Grouped bump allocation needs an explicit call-free initialization region
+and a fallback that still performs each allocation in order with its
+original operands and traps. In the current lowering each allocation has
+its own slow safepoint, and intervening initialization can call or poll.
+Grouping needs that proof across operators before their allocation
+diamonds are emitted.
+
+## Stage 1A layout and packed-array audit
+
+Wasmtime 47 already emits its native trampolines and module-startup
+functions after the Wasm-defined bodies. Clustering Scriptw's Wasm-defined
+fallbacks, initialization and adapters requires an independent native-PC
+index in `wasmtime-environ`'s `CompiledFunctionsTable`. The builder
+currently requires increasing `FuncKey` and `FunctionLoc` order in the
+same vector. After separating those indexes, the native emitter can
+partition the functions stably, map each original relocation target to
+its append ordinal, and return symbol IDs and locations in original
+key order. Address maps, traps, unwind and stack maps must follow the
+native offsets. Cold classifications should use original Wasm names
+before object-symbol sanitization and truncation.
+
+Cranelift places marked-cold blocks at the end of each function today.
+Moving those blocks out of their function's text range would require
+cross-fragment branch fixups before MachBuffer finalization and a PC
+index mapping several ranges to one logical Wasm function. The current
+`FunctionLoc` and System V FDE cover a single contiguous range. A
+separate fragment needs unwind state at its entry, plus remapping of
+traps, stack maps, address maps and debug ranges. The exception table
+builder currently adds a single function base to both return PCs and
+landing-pad offsets, which also needs to change for disjoint fragments.
+
+### Stage 2C checked packed GC-array SIMD
+
+`func_environ/gc/packed_kernels.rs` probes for six complete Wasm leaf
+functions by signature, concrete packed storage type, and operator
+sequence. These are ASCII narrow and widen, UTF-16 find and equality,
+and JSON stringify and parse plain runs. Each uses the unsigned
+empty-range check and loop backedge. The JSON stringify matcher uses
+Scriptw's folded unsigned control/surrogate check and the parse matcher
+accepts surrogates. Equality explicitly starts its local index at zero
+and returns whether that index reached the requested length.
+
+Scriptw binds array parameters directly. Its array accessors emit
+`local.get` without a null refinement, and the helper setup and local
+releases emit no prologue or epilogue. The code sink can fuse adjacent
+`local.set` and `local.get` into `local.tee` for a loaded unit or the
+incremented scan index. The matcher accepts either form, unused local
+declarations, redundant `ref.as_non_null` on statically non-null
+parameters, and dead constant clears after the result is on the stack.
+The original body, including declarations and clears, must pass
+`FuncValidator` before any SIMD lowering. Unmatched bodies use the
+ordinary validating translator.
+
+The native path requires the copying collector's contiguous `i8` or
+`i16` layout and baseline SIMD on x86-64 or little-endian AArch64.
+Fuel, epoch interruption, guest debugging, and Pulley use normal scalar
+translation. The vector loop has no GC safepoint. It bounds the
+prefix by the requested length and the space remaining in every
+participating array, computes addresses in native width, and uses
+`emit_defensive_array_bounds_check` once per span before vector
+accesses. Every packed access is little-endian, unaligned-capable, and
+tagged with the GC heap alias region. These are native GC heap accesses.
+Wasm `v128.load` and `v128.store` address linear memory.
+
+ASCII copies process sixteen elements at a time and then try an
+eight-element chunk. A rejecting chunk makes no stores. JSON stringify
+also falls back for an aliased source and target so overlapping copies
+keep their forward scalar semantics. Find and JSON parse identify the
+first set lane in a mask, and equality can return at the first unequal
+in-bounds chunk. The scalar loop resumes at the first unprocessed
+element and uses the normal checked array operations. A null operand
+selects this loop before any length load, preserving skipped accesses,
+partial writes, and Wasm trap order.

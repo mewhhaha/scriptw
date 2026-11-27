@@ -519,8 +519,12 @@ mod tests {
             assert_eq!(profiled.site_map(), unprofiled.site_map());
             let guards = guards(&steps);
             // `probe`'s base may be ordinary, so its own inline hit already
-            // proves an own compact slot of either layout and those kinds take no guard.
-            let guarded = if matches!(kind, ReadSpecialisation::OwnCompact(_)) {
+            // proves an own compact slot or closed-tail absence of either
+            // layout and those kinds take no guard.
+            let guarded = if matches!(
+                kind,
+                ReadSpecialisation::OwnCompact(_) | ReadSpecialisation::AbsentClosedTail(_)
+            ) {
                 0
             } else {
                 reads
@@ -563,7 +567,10 @@ mod tests {
             wasmparser::Validator::new_with_features(wasmparser::WasmFeatures::all())
                 .validate_all(&profiled.bytes)
                 .unwrap_or_else(|error| panic!("{kind:?}: {error}"));
-            if matches!(kind, ReadSpecialisation::OwnCompact(_)) {
+            if matches!(
+                kind,
+                ReadSpecialisation::OwnCompact(_) | ReadSpecialisation::AbsentClosedTail(_)
+            ) {
                 assert_eq!(profiled.bytes, unprofiled.bytes, "{kind:?}");
             } else {
                 assert!(size(&profiled, "js::probe#") > size(&unprofiled, "js::probe#"));

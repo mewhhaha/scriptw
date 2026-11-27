@@ -536,18 +536,22 @@ fn the_reset_releases_swapped_dirty_pages_and_zeroes_present_ones() {
         // Never populated: 6.18 still says WRITTEN.
         (WRITTEN, Untouched),
         (0, Untouched),
-        // Written and present.
+        // Written and present (6.x sets WRITTEN; 7.x omits WRITTEN without uffd-wp).
         (PRESENT | WRITTEN, Zeroed),
-        (PRESENT | WRITTEN, Zeroed),
+        (PRESENT, Zeroed),
         // Written, then swapped out or being migrated.
         (SWAPPED | WRITTEN, Decommitted),
-        (SWAPPED | WRITTEN, Decommitted),
+        (SWAPPED, Decommitted),
         (PRESENT | WRITTEN | HUGE, Zeroed),
+        (PRESENT | HUGE, Zeroed),
         // Only read: the zero page, an image's page-cache page (present or
         // being migrated).
         (PRESENT | WRITTEN | PFNZERO, Untouched),
+        (PRESENT | PFNZERO, Untouched),
         (PRESENT | WRITTEN | FILE, Untouched),
+        (PRESENT | FILE, Untouched),
         (SWAPPED | WRITTEN | FILE, Untouched),
+        (SWAPPED | FILE, Untouched),
         (SWAPPED | WRITTEN, Decommitted),
     ];
     let reset = model_dirty_page_reset(&pages.map(|(bits, _)| bits));

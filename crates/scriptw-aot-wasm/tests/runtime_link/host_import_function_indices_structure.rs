@@ -460,7 +460,7 @@ fn authority_has_twenty_six_scalar_roles_and_one_required_role_plus_gc_imports()
         "SystemTimeZoneSnapshot=>(\"system_time_zone_snapshot\",HostSystemTimeZoneSnapshot)",
         "SharedBufferWait=>(\"shared_buffer_wait\",HostSharedBufferWait)",
         "WeakEntryPut=>(\"weak_entry_put\",HostWeakEntryPut)",
-        "WeakEntryGet=>(\"weak_entry_get\",HostWeakEntryGet)",
+        "WeakMapRegisterTable=>(\"weak_map_register_table\",HostWeakMapRegisterTable)",
         "WeakEntryHas=>(\"weak_entry_has\",HostWeakEntryHas)",
         "WeakEntryDelete=>(\"weak_entry_delete\",HostWeakEntryDelete)",
         "WeakRefAllocate=>(\"weak_ref_allocate\",HostWeakRefAllocate)",

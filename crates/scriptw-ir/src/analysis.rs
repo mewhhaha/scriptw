@@ -2,6 +2,7 @@ use super::*;
 mod arguments_reference;
 mod binding_inference;
 pub(crate) use binding_inference::{BindingInferenceRecipe, OwnerBindingInference};
+mod closed_inline_bindings;
 mod direct_eval_capture;
 mod environment_binding;
 mod eval_environment;
@@ -299,6 +300,7 @@ impl AnalysisAllocationState {
 #[derive(Debug, Clone)]
 pub(crate) struct Analysis<'a> {
     pub(crate) binding_inference: OwnerBindingInference<'a>,
+    pub(crate) closed_inline_bindings: closed_inline_bindings::InlineBindings,
     pub(crate) module_local_candidates: BTreeMap<FunctionId, BTreeSet<String>>,
     pub(crate) module_cell_owners: ModuleCellOwners,
     pub(crate) template_source: Option<TemplateSourceIr>,
@@ -509,6 +511,7 @@ impl<'a> AnalysisBuilder<'a> {
         // binding and exposes nothing else. Module reuse requires named
         // nonlocals but cannot expose private strict-function locals; actual eval
         // or Annex-B binding creation still disables both static storage paths.
+        let dynamically_visible = self.eval_visible;
         let static_module_bindings = self.realm_reusable_module_environments && !self.eval_visible;
         self.eval_visible |= self.realm_reusable_module_environments;
         self.source_identifiers = eval_environment::source_identifiers(script, interner);
@@ -671,8 +674,9 @@ impl<'a> AnalysisBuilder<'a> {
             &self.function_plans,
             interner,
         );
-        Analysis {
+        let mut analysis = Analysis {
             binding_inference,
+            closed_inline_bindings: BTreeMap::new(),
             module_local_candidates: self.module_local_candidates,
             module_cell_owners,
             function_global_hints: Default::default(),
@@ -718,7 +722,11 @@ impl<'a> AnalysisBuilder<'a> {
             function_order: self.function_order,
             script_root_functions,
             script_items: script.statements().statements(),
-        }
+        };
+        analysis.closed_inline_bindings =
+            closed_inline_bindings::collect(&analysis, script, interner, dynamically_visible);
+        closed_inline_bindings::retain_shared_captures(&mut analysis);
+        analysis
     }
 
     fn alloc_function_id(&mut self) -> FunctionId {

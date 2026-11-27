@@ -1557,9 +1557,11 @@ fn emit_script_module_with_factory(
         register_runtime_helper!(
             AsciiNarrow, compile_ascii_narrow_helper;
             AsciiWiden, compile_ascii_widen_helper;
+            CodeUnitEqual, compile_code_unit_equal_helper;
             CodeUnitFind, compile_code_unit_find_helper;
             StringSplitJoin, compile_string_split_join_helper;
-            JsonPlainRun, compile_json_plain_run_helper
+            JsonPlainRun, compile_json_plain_run_helper;
+            JsonParsePlainRun, compile_json_parse_plain_run_helper
         );
         register_runtime_helper!(
             IntegerDecimalString, compile_integer_decimal_string_helper;

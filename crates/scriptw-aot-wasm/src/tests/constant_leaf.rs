@@ -164,3 +164,31 @@ fn constant_call_specialization_declines_extra_arguments_and_nonliteral_bodies()
         assert_eq!(shape.depth_admissions, 0, "{source}: {shape:?}");
     }
 }
+
+#[test]
+fn bounded_source_substitution_has_a_depth_guard_and_ordinary_fallback() {
+    let pure = call_shape(
+        "function outer(value, extra) {
+            const pack = value => ({value});
+            return pack(value, extra());
+        }
+        outer(1, () => 2);",
+        "outer",
+    );
+    assert!(pure.depth_admissions > 0);
+    assert!(pure.reference_equalities > 0);
+    assert!(pure.calls > 0, "the extra argument and guard miss still call");
+
+    let strict = call_shape(
+        "'use strict';
+        function outer(input) {
+            function pack(value) { var ref = value.ref; return {ref}; }
+            const result = pack(input);
+            return result;
+        }
+        outer({ref: 1});",
+        "outer",
+    );
+    assert!(strict.depth_admissions > 0);
+    assert!(strict.reference_equalities > 0);
+}

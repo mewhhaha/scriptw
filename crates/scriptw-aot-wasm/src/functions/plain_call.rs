@@ -8,9 +8,9 @@
 use super::*;
 use crate::function_entry::{EntryArguments, OrdinaryBodyInputs, PlannedBodyEntry};
 use crate::gc_types::{
-    CompletionLocals, ExecutableCodeKind, ExecutableCodeSchema, FunctionContextSchema,
-    FunctionObject, FunctionObjectSchema, GcI32Constant, GcLocal, GcNullability, I32Local,
-    ValueArray, ValueLocals,
+    CompletionLocals, ExecutableCode, ExecutableCodeKind, ExecutableCodeSchema,
+    FunctionContextSchema, FunctionObject, FunctionObjectSchema, GcI32Constant, GcLocal,
+    GcNullability, I32Local, ValueArray, ValueLocals,
 };
 
 /// A known source target whose ordinary body this site may call by index.
@@ -131,7 +131,7 @@ impl FunctionBuilder<'_> {
             &planned,
             SiteCallRoute::Continue { result, entered },
             function,
-        );
+        )?;
         entered.load(function);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
@@ -159,7 +159,7 @@ impl FunctionBuilder<'_> {
                 &planned,
                 SiteCallRoute::Return,
                 function,
-            );
+            )?;
         }
         self.emit_prepared_tail_call(callee, receiver, arguments, function)
     }
@@ -172,7 +172,7 @@ impl FunctionBuilder<'_> {
         planned: &PlannedSourceCall<'_>,
         route: SiteCallRoute<'_>,
         function: &mut Function,
-    ) {
+    ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         callee.tag().load(function);
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Function.tag()));
@@ -189,13 +189,6 @@ impl FunctionBuilder<'_> {
             callee.cast_reference::<FunctionObject>(schema, function),
             function,
         );
-        let context = schema.reserve_gc_local(function).initialize(
-            schema
-                .field(FunctionObjectSchema::CONTEXT)
-                .read(&callable, schema, function)
-                .reference(),
-            function,
-        );
         let code = schema.reserve_gc_local(function).initialize(
             schema
                 .field(FunctionObjectSchema::CODE)
@@ -203,47 +196,14 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
-        // Cross-P source IDs can collide. The actual code and its defining
-        // program must both agree before the hint becomes a direct call; that
-        // pair also proves this code record published the planned entry.
-        let source = schema.reserve_i64_local(function);
-        let kind = schema.reserve_i32_local(function);
-        schema
-            .field(ExecutableCodeSchema::SOURCE_ID)
-            .read(&code, schema, function)
-            .store_i64(source, function);
-        schema
-            .field(ExecutableCodeSchema::KIND)
-            .read(&code, schema, function)
-            .store(kind, function);
-        let owner = schema.reserve_gc_local(function).initialize(
-            schema
-                .field(FunctionContextSchema::DEFINING_PROGRAM)
-                .read(&context, schema, function)
-                .reference(),
-            function,
-        );
-        source.load(function);
-        function.instruction(&Instruction::I64Const(planned.meta.entry.source_id()));
-        function.instruction(&Instruction::I64Eq);
-        kind.load(function);
-        function.instruction(&Instruction::I32Const(
-            ExecutableCodeKind::JavaScript.encode(),
-        ));
-        function.instruction(&Instruction::I32Eq);
-        function.instruction(&Instruction::I32And);
-        owner.load(schema, function);
-        self.current_program().reference(schema, function);
-        function.instruction(&Instruction::RefEq);
-        function.instruction(&Instruction::I32And);
+        self.emit_source_code_identity_test(planned.meta, &callable, &code, function)?;
+        code.clear(function);
         if planned.converts_receiver {
             // ToObject(object) is identity; undefined/null become the callee
             // Realm's globalThis inline. Other primitives keep the general helper.
             self.emit_object_value_i32(receiver, function);
             receiver.tag().load(function);
-            function.instruction(&Instruction::I32Const(
-                WasmRuntimeValueTag::Undefined.tag(),
-            ));
+            function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Undefined.tag()));
             function.instruction(&Instruction::I32Eq);
             function.instruction(&Instruction::I32Or);
             receiver.tag().load(function);
@@ -252,28 +212,26 @@ impl FunctionBuilder<'_> {
             function.instruction(&Instruction::I32Or);
             function.instruction(&Instruction::I32And);
         }
-        owner.clear(function);
-        schema.release_i32_local(kind, function);
-        schema.release_i64_local(source, function);
-        code.clear(function);
         self.open_frame(ControlFrameKind::If, function);
         let PlannedBodyEntry::Ordinary(entry) = planned.meta.entry.body() else {
             unreachable!("planned source call admits only an ordinary body");
         };
         // PrepareForOrdinaryCall's Realm switch around the entered body.
+        let context = schema
+            .field(FunctionObjectSchema::CONTEXT)
+            .read(&callable, schema, function)
+            .reference();
         let realm = schema.reserve_gc_local(function).initialize(
             schema
                 .field(FunctionContextSchema::REALM)
-                .read(&context, schema, function)
+                .read_top(context, function)
                 .reference(),
             function,
         );
         let bound_receiver = planned.converts_receiver.then(|| {
             let bound = schema.reserve_value_local(function);
             receiver.tag().load(function);
-            function.instruction(&Instruction::I32Const(
-                WasmRuntimeValueTag::Undefined.tag(),
-            ));
+            function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Undefined.tag()));
             function.instruction(&Instruction::I32Eq);
             receiver.tag().load(function);
             function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Null.tag()));
@@ -297,7 +255,9 @@ impl FunctionBuilder<'_> {
             bound.copy_from(receiver, function);
             function.instruction(&Instruction::Else);
             let present = schema.reserve_gc_local(function).initialize(
-                global_this.load(schema, function).require_non_null(function),
+                global_this
+                    .load(schema, function)
+                    .require_non_null(function),
                 function,
             );
             schema
@@ -361,9 +321,53 @@ impl FunctionBuilder<'_> {
         realm.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        context.clear(function);
         callable.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
+        Ok(())
+    }
+
+    /// Emits the identity predicate shared by planned local and vector calls.
+    /// The checked executable still enters with this actual closure's context.
+    pub(super) fn emit_source_code_identity_test(
+        &mut self,
+        meta: &WasmFunctionMeta,
+        callable: &GcLocal<FunctionObject>,
+        code: &GcLocal<ExecutableCode>,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        if let Some(cached_global) = self.cached_executable_code_global(meta)? {
+            // The P-private immutable code object names its source and P.
+            code.load(schema, function);
+            cached_global.load(schema, function);
+            function.instruction(&Instruction::RefEq);
+        } else {
+            // Source IDs can collide across P or with native code.
+            schema
+                .field(ExecutableCodeSchema::SOURCE_ID)
+                .read(code, schema, function);
+            function.instruction(&Instruction::I64Const(meta.entry.source_id()));
+            function.instruction(&Instruction::I64Eq);
+            schema
+                .field(ExecutableCodeSchema::KIND)
+                .read(code, schema, function);
+            function.instruction(&Instruction::I32Const(
+                ExecutableCodeKind::JavaScript.encode(),
+            ));
+            function.instruction(&Instruction::I32Eq);
+            function.instruction(&Instruction::I32And);
+            let context = schema
+                .field(FunctionObjectSchema::CONTEXT)
+                .read(callable, schema, function)
+                .reference();
+            schema
+                .field(FunctionContextSchema::DEFINING_PROGRAM)
+                .read_top(context, function);
+            self.current_program().reference(schema, function);
+            function.instruction(&Instruction::RefEq);
+            function.instruction(&Instruction::I32And);
+        }
+        Ok(())
     }
 }

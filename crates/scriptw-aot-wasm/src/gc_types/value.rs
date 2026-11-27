@@ -19,8 +19,8 @@ mod prototype_reference;
 mod string_accumulator;
 mod tag_set;
 pub(crate) use code_unit_kernels::{
-    emit_ascii_narrow_kernel, emit_ascii_widen_helper_body, emit_code_unit_find_kernel,
-    emit_json_plain_run_helper_body,
+    emit_ascii_narrow_kernel, emit_ascii_widen_helper_body, emit_code_unit_equal_kernel,
+    emit_code_unit_find_kernel, emit_json_parse_plain_run_kernel, emit_json_plain_run_helper_body,
 };
 pub(crate) use packed_value_list::PackedValueListConstruction;
 pub(crate) use program_instance::{
@@ -4026,30 +4026,6 @@ fn emit_code_unit_array_new(length: I32Local, schema: &RuntimeSchema, function: 
     length.load(function);
     function.instruction(&Instruction::ArrayNew(array));
     function.instruction(&Instruction::End);
-}
-
-/// Copies `length` units from `source[source_index..]` (index zero when
-/// absent) to `destination[destination_index..]`. Both ranges are checked by
-/// the engine's array bounds checks.
-fn emit_bulk_code_unit_copy(
-    destination: &GcLocal<CodeUnitArray>,
-    destination_index: I32Local,
-    source: &GcLocal<CodeUnitArray>,
-    source_index: I32Local,
-    length: I32Local,
-    schema: &RuntimeSchema,
-    function: &mut Function,
-) {
-    let type_index = schema.array_type::<CodeUnitArray>().type_index().raw();
-    destination.load(schema, function);
-    destination_index.load(function);
-    source.load(schema, function);
-    source_index.load(function);
-    length.load(function);
-    function.instruction(&Instruction::ArrayCopy {
-        array_type_index_dst: type_index,
-        array_type_index_src: type_index,
-    });
 }
 
 fn emit_code_unit_copy(

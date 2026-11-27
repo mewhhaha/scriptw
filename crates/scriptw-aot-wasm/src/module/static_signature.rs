@@ -117,13 +117,12 @@ static_signature_domain! {
     // One native FIFO owns blocking and asynchronous waiters on each byte resource.
     HostSharedBufferWait => ([ExternRef(NonNullable), I64, I32, I64, I64], [I32]),
 
-    // Weak operands cross as real eqrefs and native slot resources. A weak
-    // collection entry is named by its collection and key, each with the
-    // stable identity compiled code minted for it (owner's, then key's); the
-    // host finds the entry by the identities and confirms it by the
-    // references. A WeakSet's entry has a null value.
+    // Weak operands cross as real eqrefs and native slot resources. WeakMap
+    // registers its reference array on allocation. For WeakSet, the host
+    // finds an entry by the stable owner and key identities and confirms it
+    // by the references. Its value operand is null.
     HostWeakEntryPut => ([EqRef, EqRef, EqRef, I64, I64], []),
-    HostWeakEntryGet => ([EqRef, EqRef, I64, I64], [EqRef]),
+    HostWeakMapRegisterTable => ([EqRef], []),
     HostWeakEntryHas => ([EqRef, EqRef, I64, I64], [I32]),
     HostWeakEntryDelete => ([EqRef, EqRef, I64, I64], [I32]),
     HostWeakRefAllocate => ([EqRef, EqRef], [ExternRef(NonNullable)]),

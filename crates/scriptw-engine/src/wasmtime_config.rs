@@ -4,7 +4,7 @@
 use crate::wasmtime_policy::PRODUCT_WASMTIME_POLICY;
 use wasmtime::{Config, ModuleVersionStrategy, OptLevel, RegallocAlgorithm, WasmBacktraceDetails};
 
-pub(crate) const CONFIGURATION_SCHEMA: u32 = 9;
+pub(crate) const CONFIGURATION_SCHEMA: u32 = 10;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum WasmNativeCompilationMode {
