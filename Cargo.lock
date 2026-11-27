@@ -3351,8 +3351,8 @@ dependencies = [
 
 [[package]]
 name = "wtime-aot"
-version = "0.1.11"
-source = "git+https://github.com/mewhhaha/wtime.git?branch=feat%2Faarch64-store-ci#157ecb4a81aa2f609493111767687313bfc892a1"
+version = "0.1.12"
+source = "git+https://github.com/mewhhaha/wtime.git?tag=v0.1.12#73ccd99bd030b26ac63aab1aa163c7929af6a05c"
 dependencies = [
  "wtime-types",
  "wtime-validate",
@@ -3360,8 +3360,8 @@ dependencies = [
 
 [[package]]
 name = "wtime-aot-host"
-version = "0.1.11"
-source = "git+https://github.com/mewhhaha/wtime.git?branch=feat%2Faarch64-store-ci#157ecb4a81aa2f609493111767687313bfc892a1"
+version = "0.1.12"
+source = "git+https://github.com/mewhhaha/wtime.git?tag=v0.1.12#73ccd99bd030b26ac63aab1aa163c7929af6a05c"
 dependencies = [
  "libc",
  "wtime-aot",
@@ -3371,21 +3371,21 @@ dependencies = [
 
 [[package]]
 name = "wtime-decode"
-version = "0.1.11"
-source = "git+https://github.com/mewhhaha/wtime.git?branch=feat%2Faarch64-store-ci#157ecb4a81aa2f609493111767687313bfc892a1"
+version = "0.1.12"
+source = "git+https://github.com/mewhhaha/wtime.git?tag=v0.1.12#73ccd99bd030b26ac63aab1aa163c7929af6a05c"
 dependencies = [
  "wtime-types",
 ]
 
 [[package]]
 name = "wtime-types"
-version = "0.1.11"
-source = "git+https://github.com/mewhhaha/wtime.git?branch=feat%2Faarch64-store-ci#157ecb4a81aa2f609493111767687313bfc892a1"
+version = "0.1.12"
+source = "git+https://github.com/mewhhaha/wtime.git?tag=v0.1.12#73ccd99bd030b26ac63aab1aa163c7929af6a05c"
 
 [[package]]
 name = "wtime-validate"
-version = "0.1.11"
-source = "git+https://github.com/mewhhaha/wtime.git?branch=feat%2Faarch64-store-ci#157ecb4a81aa2f609493111767687313bfc892a1"
+version = "0.1.12"
+source = "git+https://github.com/mewhhaha/wtime.git?tag=v0.1.12#73ccd99bd030b26ac63aab1aa163c7929af6a05c"
 dependencies = [
  "wtime-decode",
  "wtime-types",

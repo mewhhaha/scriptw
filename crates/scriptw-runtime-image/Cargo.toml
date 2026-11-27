@@ -15,7 +15,7 @@ sha2 = "0.10.9"
 scriptw-aot-wasm = { path = "../scriptw-aot-wasm" }
 scriptw-intl = { path = "../scriptw-intl" }
 scriptw-ir = { path = "../scriptw-ir" }
-wasmtime = { package = "wtime-aot-host", git = "https://github.com/mewhhaha/wtime.git", branch = "feat/aarch64-store-ci" }
+wasmtime = { package = "wtime-aot-host", git = "https://github.com/mewhhaha/wtime.git", tag = "v0.1.12" }
 
 # Contains audited unsafe code, so it cannot inherit the workspace
 # `unsafe_code = "forbid"`; it keeps the workspace `unused_must_use` denial.
