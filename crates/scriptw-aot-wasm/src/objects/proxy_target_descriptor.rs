@@ -2,7 +2,7 @@
 //! descriptors; ForIn reads its two scalar predicates before further work.
 
 use super::*;
-use crate::gc_types::{I32Local, RuntimeSchema};
+use crate::gc_types::{GlobalBuiltinBacking, I32Local, RuntimeSchema};
 
 #[must_use = "a completed descriptor root must be consumed and cleared"]
 pub(crate) struct CompletedProxyTargetDescriptor {
@@ -153,13 +153,20 @@ impl CompletedProxyTargetDescriptor {
 }
 
 // Storage references must not escape as completed snapshots. The scalar form
-// consumes the two predicates immediately, before any later callback can run.
+// consumes the requested predicates immediately, before any later callback.
+#[derive(Clone, Copy)]
+enum OwnDescriptorSnapshot {
+    Complete,
+    ProxyGetOrSetInvariant,
+}
+
 #[derive(Clone, Copy)]
 enum OwnDescriptorObservation<'a> {
-    Snapshot(&'a GcLocal<PropertyDescriptor, Nullable>),
-    Enumerability {
+    Snapshot(&'a GcLocal<PropertyDescriptor, Nullable>, OwnDescriptorSnapshot),
+    Attribute {
+        mask: DescriptorMask,
         found: I32Local,
-        enumerable: I32Local,
+        attribute: I32Local,
     },
 }
 
@@ -171,10 +178,10 @@ impl OwnDescriptorObservation<'_> {
         function: &mut Function,
     ) {
         match self {
-            Self::Snapshot(output) => {
+            Self::Snapshot(output, _) => {
                 builder.emit_completed_descriptor_snapshot(source, output, function);
             }
-            Self::Enumerability { .. } => self.completed(source, builder, function),
+            Self::Attribute { .. } => self.completed(source, builder, function),
         }
     }
 
@@ -186,16 +193,16 @@ impl OwnDescriptorObservation<'_> {
     ) {
         let schema = builder.runtime_schema();
         match self {
-            Self::Snapshot(output) => {
+            Self::Snapshot(output, _) => {
                 output.replace(source.load(schema, function), function);
                 source.clear(function);
             }
-            Self::Enumerability { found, enumerable } => {
+            Self::Attribute { mask, found, attribute } => {
                 let source = CompletedProxyTargetDescriptor { descriptor: source };
                 source.emit_found_i32(schema, function);
                 found.store(function);
-                source.emit_enumerable_i32(schema, function);
-                enumerable.store(function);
+                source.emit_flag_i32(mask, schema, function);
+                attribute.store(function);
                 source.clear(function);
             }
         }
@@ -303,6 +310,16 @@ impl FunctionBuilder<'_> {
         key: &PropertyKeyLocals,
         function: &mut Function,
     ) -> Result<CompletedProxyTargetDescriptor, EmitError> {
+        self.emit_proxy_target_own_snapshot(target, key, OwnDescriptorSnapshot::Complete, function)
+    }
+
+    fn emit_proxy_target_own_snapshot(
+        &mut self,
+        target: &ValueLocals,
+        key: &PropertyKeyLocals,
+        kind: OwnDescriptorSnapshot,
+        function: &mut Function,
+    ) -> Result<CompletedProxyTargetDescriptor, EmitError> {
         let schema = self.runtime_schema();
         let descriptor = schema
             .reserve_gc_local::<PropertyDescriptor, Nullable>(function)
@@ -310,7 +327,7 @@ impl FunctionBuilder<'_> {
         self.emit_own_descriptor_observation(
             target,
             key,
-            OwnDescriptorObservation::Snapshot(&descriptor),
+            OwnDescriptorObservation::Snapshot(&descriptor, kind),
             function,
         )?;
         Ok(CompletedProxyTargetDescriptor { descriptor })
@@ -329,9 +346,74 @@ impl FunctionBuilder<'_> {
         self.emit_own_descriptor_observation(
             target,
             key,
-            OwnDescriptorObservation::Enumerability { found, enumerable },
+            OwnDescriptorObservation::Attribute {
+                mask: DescriptorMask::ENUMERABLE,
+                found,
+                attribute: enumerable,
+            },
             function,
         )
+    }
+
+    pub(crate) fn emit_own_property_configurability(
+        &mut self,
+        target: &ValueLocals,
+        key: &PropertyKeyLocals,
+        found: I32Local,
+        configurable: I32Local,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        self.emit_own_descriptor_observation(
+            target,
+            key,
+            OwnDescriptorObservation::Attribute {
+                mask: DescriptorMask::CONFIGURABLE,
+                found,
+                attribute: configurable,
+            },
+            function,
+        )
+    }
+
+    /// A Proxy Get or Set invariant only needs a snapshot of a nonconfigurable
+    /// accessor or frozen data property. For the global backing the flags are
+    /// available without resolving the original property's value recipe.
+    fn emit_global_proxy_invariant_skip(
+        &mut self,
+        object: &GcLocal<OrdinaryObject>,
+        key: &PropertyKeyLocals,
+        exit: crate::emit::ControlTarget,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let base = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(OrdinaryObjectSchema::PROPERTIES)
+                .read(object, schema, function)
+                .reference(),
+            function,
+        );
+        base.is_subtype::<GlobalBuiltinBacking>(schema, function);
+        self.open_frame(ControlFrameKind::If, function);
+        let backing = schema.reserve_gc_local(function).initialize(
+            base.load(schema, function)
+                .cast_subtype::<GlobalBuiltinBacking>(schema, function),
+            function,
+        );
+        let flags = self.emit_global_builtin_own_flags(&backing, key, function)?;
+        flags.load(function);
+        function.instruction(&Instruction::I32Const(
+            DescriptorMask::CONFIGURABLE.union(DescriptorMask::WRITABLE).as_i32(),
+        ));
+        // The absent sentinel also has these bits set.
+        function.instruction(&Instruction::I32And);
+        self.emit_branch_if_to_target(exit, function);
+        schema.release_i32_local(flags, function);
+        backing.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        base.clear(function);
+        Ok(())
     }
 
     fn emit_own_descriptor_observation(
@@ -354,13 +436,25 @@ impl FunctionBuilder<'_> {
             function,
         );
         match observation {
-            OwnDescriptorObservation::Snapshot(_) => {
+            OwnDescriptorObservation::Snapshot(_, kind) => {
+                let skip = match kind {
+                    OwnDescriptorSnapshot::Complete => None,
+                    OwnDescriptorSnapshot::ProxyGetOrSetInvariant => {
+                        let exit = self.open_frame(ControlFrameKind::Block, function);
+                        self.emit_global_proxy_invariant_skip(&object, key, exit, function)?;
+                        Some(exit)
+                    }
+                };
                 let source = self.emit_ordinary_own_descriptor_reference(&object, key, function)?;
                 observation.storage(source, self, function);
+                if skip.is_some() {
+                    self.pop_control(ControlFrameKind::Block);
+                    function.instruction(&Instruction::End);
+                }
             }
-            OwnDescriptorObservation::Enumerability { found, enumerable } => {
-                self.emit_ordinary_own_property_enumerability(
-                    &object, key, found, enumerable, function,
+            OwnDescriptorObservation::Attribute { mask, found, attribute } => {
+                self.emit_ordinary_own_property_attribute(
+                    &object, key, mask, found, attribute, function,
                 )?;
             }
         }
@@ -411,7 +505,9 @@ impl FunctionBuilder<'_> {
         key: &PropertyKeyLocals,
         function: &mut Function,
     ) -> Result<CompletedProxyTargetDescriptor, EmitError> {
-        self.emit_proxy_target_own_descriptor(target, key, function)
+        self.emit_proxy_target_own_snapshot(
+            target, key, OwnDescriptorSnapshot::ProxyGetOrSetInvariant, function,
+        )
     }
     pub(super) fn emit_direct_own_descriptor_for_proxy_set(
         &mut self,
@@ -419,7 +515,9 @@ impl FunctionBuilder<'_> {
         key: &PropertyKeyLocals,
         function: &mut Function,
     ) -> Result<CompletedProxyTargetDescriptor, EmitError> {
-        self.emit_proxy_target_own_descriptor(target, key, function)
+        self.emit_proxy_target_own_snapshot(
+            target, key, OwnDescriptorSnapshot::ProxyGetOrSetInvariant, function,
+        )
     }
     pub(super) fn emit_proxy_target_descriptor_fact(
         &mut self,

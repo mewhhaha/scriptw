@@ -77,14 +77,17 @@ impl FunctionBuilder<'_> {
         let previous = s
             .reserve_gc_local::<CompactDataShape, Nullable>(f)
             .initialize_null(s, f);
+        let header = s
+            .reserve_gc_local::<OrdinaryObject, Nullable>(f)
+            .initialize_null(s, f);
         self.emit_recorded_write(
             &p.target,
             &p.receiver,
-            &key,
             &p.value,
             cache,
             handled,
             &previous,
+            &header,
             f,
         )?;
         handled.load(f);
@@ -108,12 +111,17 @@ impl FunctionBuilder<'_> {
         let parent = s
             .reserve_gc_local(f)
             .initialize(previous.load(s, f).require_non_null(f), f);
-        self.emit_write_record_refresh(&p.target, &key, cache, &parent, f)?;
+        let object = s
+            .reserve_non_null_gc_local(f)
+            .initialize(header.load(s, f).require_non_null(f), f);
+        self.emit_write_record_refresh(&p.target, &object, &key, cache, &parent, f)?;
+        object.clear(f);
         parent.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        header.clear(f);
         previous.clear(f);
         s.release_i32_local(handled, f);
         key.clear(f);
@@ -152,17 +160,18 @@ impl FunctionBuilder<'_> {
 
     /// Performs the write and sets `handled` when the record applies to the
     /// live receiver. Otherwise, for a compact receiver that is the target,
-    /// leaves its current shape in `previous` for the refresh.
+    /// leaves its admitted `header` and current shape in `previous` for
+    /// the refresh after OrdinarySet.
     #[allow(clippy::too_many_arguments)]
     fn emit_recorded_write(
         &mut self,
         target: &ValueLocals,
         receiver: &ValueLocals,
-        key: &PropertyKeyLocals,
         value: &ValueLocals,
         cache: &GcLocal<OwnDataReadCache>,
         handled: I32Local,
         previous: &GcLocal<CompactDataShape, Nullable>,
+        header: &GcLocal<OrdinaryObject, Nullable>,
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
@@ -170,19 +179,20 @@ impl FunctionBuilder<'_> {
         // OrdinarySet(O, P, V, O): an actual OrdinaryObject answers
         // [[GetOwnProperty]], [[GetPrototypeOf]] and [[DefineOwnProperty]]
         // ordinarily from its header.
+        let miss = self.open_frame(ControlFrameKind::Block, f);
         target.reference().load(f);
         receiver.reference().load(f);
         f.instruction(&Instruction::RefEq);
-        target.reference().load(f);
-        f.instruction(&Instruction::RefTestNonNull(
-            s.reference_type::<OrdinaryObject>(GcNullability::NonNullable)
-                .heap_type,
-        ));
-        f.instruction(&Instruction::I32And);
-        self.open_frame(ControlFrameKind::If, f);
-        let object = s
-            .reserve_gc_local(f)
-            .initialize(target.cast_reference::<OrdinaryObject>(s, f), f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, f);
+        let object = s.reserve_non_null_gc_local(f).initialize(
+            target.sealed_reference_or_branch::<OrdinaryObject>(
+                s,
+                self.local_branch_label(miss),
+                f,
+            ),
+            f,
+        );
         let base = s.reserve_gc_local(f).initialize(
             s.field(OrdinaryObjectSchema::PROPERTIES)
                 .read(&object, s, f)
@@ -200,10 +210,6 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
-        s.field(OwnDataReadCacheSchema::KEY).read(cache, s, f);
-        key.value().reference().load(f);
-        f.instruction(&Instruction::RefEq);
-        self.open_frame(ControlFrameKind::If, f);
         // Existing own data: the shape has the key at the recorded slot and
         // its one attribute word is writable data, so OrdinarySet performs
         // [[DefineOwnProperty]] with only [[Value]] on O itself.
@@ -231,22 +237,10 @@ impl FunctionBuilder<'_> {
             .read(&object, s, f);
         f.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, f);
-        let tail = self.emit_recorded_add_chain_tail(
-            target,
-            &object,
-            key,
-            cache,
-            DictionaryAbsence::Lookup,
-            f,
-        )?;
-        tail.load(f);
-        s.field(OwnDataReadCacheSchema::ADD_TAIL).read(cache, s, f);
-        f.instruction(&Instruction::I32Eq);
-        tail.load(f);
-        f.instruction(&Instruction::I32Eqz);
-        f.instruction(&Instruction::I32Eqz);
-        f.instruction(&Instruction::I32And);
-        s.release_i32_local(tail, f);
+        let matches =
+            self.emit_recorded_add_chain_matches(&object, cache, DictionaryAbsence::Lookup, f)?;
+        matches.load(f);
+        s.release_i32_local(matches, f);
         self.open_frame(ControlFrameKind::If, f);
         let recorded = s
             .reserve_gc_local::<CompactDataShape, Nullable>(f)
@@ -278,12 +272,11 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
         handled.load(f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
         previous.replace(shape.load(s, f).nullable(), f);
+        header.replace(object.load(s, f).nullable(), f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
@@ -294,24 +287,25 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         base.clear(f);
         object.clear(f);
-        self.pop_control(ControlFrameKind::If);
+        self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         Ok(())
     }
 
-    /// The live closed-tail word that ends the receiver's chain by the
-    /// record's holder rule, or 0 when the live chain does not follow it.
-    pub(super) fn emit_recorded_add_chain_tail(
+    /// Prove that the live chain follows the recorded holder and closed tail.
+    pub(super) fn emit_recorded_add_chain_matches(
         &mut self,
-        target: &ValueLocals,
         object: &GcLocal<OrdinaryObject>,
-        key: &PropertyKeyLocals,
         cache: &GcLocal<OwnDataReadCache>,
         absence: DictionaryAbsence,
         f: &mut Function,
     ) -> Result<I32Local, EmitError> {
         let s = self.runtime_schema();
-        let tail = s.reserve_i32_local(f);
+        let matches = s.reserve_i32_local(f);
+        matches.set_constant(0, f);
+        let terminal = s
+            .reserve_gc_local::<OrdinaryObject, Nullable>(f)
+            .initialize_null(s, f);
         let rule = s.reserve_i32_local(f);
         s.field(OwnDataReadCacheSchema::ADD_HOLDER)
             .read(cache, s, f)
@@ -320,12 +314,8 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(AddHolder::None.word()));
         f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
-        let mode = self.emit_negative_cache_mode(target, object, None, f)?;
-        mode.load(f);
-        tail.store(f);
-        s.release_i32_local(mode, f);
+        terminal.replace(object.load(s, f).nullable(), f);
         f.instruction(&Instruction::Else);
-        tail.set_constant(0, f);
         let holder = self.emit_ordinary_prototype(object, f);
         holder.load(s, f).is_null(f);
         f.instruction(&Instruction::I32Eqz);
@@ -364,7 +354,17 @@ impl FunctionBuilder<'_> {
         // A dictionary holder answers by a live lookup of its own entries.
         base.is_subtype::<OrdinaryPropertyStorage>(s, f);
         self.open_frame(ControlFrameKind::If, f);
-        let absent = self.emit_dictionary_holder_lacks_key_i32(&present, &base, key, absence, f)?;
+        let name = s.reserve_gc_local(f).initialize(
+            s.field(OwnDataReadCacheSchema::KEY)
+                .read(cache, s, f)
+                .reference(),
+            f,
+        );
+        let key = PropertyKeyLocals::from_string(s, &name, f);
+        let absent =
+            self.emit_dictionary_holder_lacks_key_i32(&present, &base, &key, absence, f)?;
+        key.clear(f);
+        name.clear(f);
         absent.load(f);
         lacks.store(f);
         s.release_i32_local(absent, f);
@@ -375,13 +375,7 @@ impl FunctionBuilder<'_> {
         base.clear(f);
         lacks.load(f);
         self.open_frame(ControlFrameKind::If, f);
-        let holder_value = s.reserve_value_local(f);
-        holder_value.set_reference(&present, s, f);
-        let mode = self.emit_negative_cache_mode(&holder_value, &present, None, f)?;
-        holder_value.clear(f);
-        mode.load(f);
-        tail.store(f);
-        s.release_i32_local(mode, f);
+        terminal.replace(present.load(s, f).nullable(), f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         s.release_i32_local(lacks, f);
@@ -392,7 +386,23 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         s.release_i32_local(rule, f);
-        Ok(tail)
+        let done = self.open_frame(ControlFrameKind::Block, f);
+        let holder = s.reserve_non_null_gc_local(f).initialize(
+            terminal.non_null_or_branch(self.local_branch_label(done), f),
+            f,
+        );
+        let mode = s.reserve_i32_local(f);
+        s.field(OwnDataReadCacheSchema::ADD_TAIL)
+            .read(cache, s, f)
+            .store(mode, f);
+        self.emit_recorded_closed_tail_or_branch(&holder, mode, done, f)?;
+        matches.set_constant(1, f);
+        s.release_i32_local(mode, f);
+        holder.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        terminal.clear(f);
+        Ok(matches)
     }
 
     /// Whether `holder`, whose storage `base` is a dictionary, has no own
@@ -476,17 +486,13 @@ impl FunctionBuilder<'_> {
     fn emit_write_record_refresh(
         &mut self,
         target: &ValueLocals,
+        object: &GcLocal<OrdinaryObject>,
         key: &PropertyKeyLocals,
         cache: &GcLocal<OwnDataReadCache>,
         parent: &GcLocal<CompactDataShape>,
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
-        // The write front leaves `parent` only for an actual OrdinaryObject
-        // target whose record key is this key.
-        let object = s
-            .reserve_gc_local(f)
-            .initialize(target.cast_reference::<OrdinaryObject>(s, f), f);
         let name = s
             .reserve_gc_local(f)
             .initialize(key.value().cast_reference::<StringValue>(s, f), f);
@@ -496,7 +502,7 @@ impl FunctionBuilder<'_> {
         let found = s.reserve_i32_local(f);
         let base = s.reserve_gc_local(f).initialize(
             s.field(OrdinaryObjectSchema::PROPERTIES)
-                .read(&object, s, f)
+                .read(object, s, f)
                 .reference(),
             f,
         );
@@ -569,7 +575,7 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(count, f);
         child.load(s, f).is_null(f);
         self.emit_branch_if_to_target(done, f);
-        let mode = self.emit_negative_cache_mode(target, &object, Some(key), f)?;
+        let mode = self.emit_negative_cache_mode(target, object, Some(key), f)?;
         mode.load(f);
         tail.store(f);
         s.release_i32_local(mode, f);
@@ -577,7 +583,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
         // One ordinary holder between the receiver and a closed tail.
-        let holder = self.emit_ordinary_prototype(&object, f);
+        let holder = self.emit_ordinary_prototype(object, f);
         holder.load(s, f).is_null(f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
@@ -690,7 +696,6 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(slot, f);
         s.release_i64_local(hash, f);
         name.clear(f);
-        object.clear(f);
         Ok(())
     }
 }

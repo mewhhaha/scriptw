@@ -655,7 +655,7 @@ macro_rules! gc_layout_registry {
             /// Open layouts are the declared sums. Their schemas have no
             /// allocating constructor, so every instance has a sealed layout.
             const fn is_final(self) -> bool {
-                !matches!(self, Self::ObjectPropertyStorage | Self::CompactDataStorage | Self::PropertyValue | Self::JavaScriptObject)
+                !matches!(self, Self::ObjectPropertyStorage | Self::CompactDataStorage | Self::PropertyValue | Self::JavaScriptObject | Self::PendingJob)
             }
             const fn parent(self) -> Option<Self> {
                 match self { $(Self::$owner => gc_layout_registry!(@parent $($parent)?)),+ }
@@ -740,6 +740,16 @@ macro_rules! gc_layout_registry {
         impl GcStructHeapType for PropertyValue { const FIELD_COUNT: u32 = 0; }
         // The fieldless sum has no allocating constructor.
         pub(crate) type PropertyValueSchema = GcStructType<PropertyValue>;
+    };
+    (@schema struct PendingJob PendingJobSchema; $($fields:tt)+) => {
+        impl sealed::Struct for PendingJob {}
+        impl GcStructHeapType for PendingJob {
+            const FIELD_COUNT: u32 = gc_layout_registry!(@field_count $($fields)+);
+        }
+        pub(crate) type PendingJobSchema = GcStructType<PendingJob>;
+        impl GcStructType<PendingJob> {
+            gc_layout_registry!(@fields PendingJob 0; $($fields)+);
+        }
     };
     (@schema struct CompactDataStorage CompactDataStorageSchema; $($fields:tt)+) => {
         impl sealed::Struct for CompactDataStorage {}
@@ -986,6 +996,15 @@ gc_layout_registry! {
             INDEX_ADDRESS: I32Value, Immutable, NonNullable;
             INDEX_MASK: I32Value, Immutable, NonNullable;
             CACHE: GcRef<IntrinsicPropertyValueCache>, Mutable, Nullable;
+        }
+        // Live original rows keep table order. Deleted originals never return;
+        // a later definition of the same key belongs to the append dictionary.
+        struct GlobalBuiltinBacking: ObjectPropertyStorage => GlobalBuiltinBackingSchema {
+            ROWS: GcRef<IntrinsicPropertyStorage>, Immutable, NonNullable;
+            ENTRIES: GcRef<PropertyTable>, Mutable, Nullable;
+            DELETED_LOW: I64Value, Mutable, NonNullable;
+            DELETED_HIGH: I64Value, Mutable, NonNullable;
+            APPEND: GcRef<OrdinaryPropertyStorage>, Mutable, Nullable;
         }
         array IntrinsicPropertyValueCache => IntrinsicPropertyValueCacheSchema {
             ELEMENT: GcRef<PropertyValue>, Mutable, Nullable;
@@ -1646,8 +1665,8 @@ gc_layout_registry! {
         struct PromiseObject: JavaScriptObject => PromiseObjectSchema {
             OBJECT: GcRef<OrdinaryObject>, Immutable, NonNullable;
             RESULT: GcRef<StoredValue>, Mutable, NonNullable;
-            FULFILL_REACTIONS: GcRef<PromiseReaction>, Mutable, Nullable;
-            REJECT_REACTIONS: GcRef<PromiseReaction>, Mutable, Nullable;
+            REACTIONS_HEAD: GcRef<PendingJob>, Mutable, Nullable;
+            REACTIONS_TAIL: GcRef<PendingJob>, Mutable, Nullable;
             STATE: crate::heap::PromiseState, Mutable, NonNullable;
             HANDLED: bool, Mutable, NonNullable;
             REALM: GcRef<RealmRecord>, Immutable, NonNullable;
@@ -1658,6 +1677,8 @@ gc_layout_registry! {
             PROMISE: GcRef<StoredValue>, Immutable, NonNullable;
             RESOLVE: GcRef<StoredValue>, Immutable, NonNullable;
             REJECT: GcRef<StoredValue>, Immutable, NonNullable;
+            INTRINSIC_PROMISE: GcRef<PromiseObject>, Immutable, Nullable;
+            ALREADY_RESOLVED: bool, Mutable, NonNullable;
         }
         struct AsyncFromSyncIteratorContinuation => AsyncFromSyncIteratorContinuationSchema {
             PROMISE: GcRef<PromiseObject>, Immutable, NonNullable;
@@ -1666,27 +1687,44 @@ gc_layout_registry! {
             DONE: bool, Immutable, NonNullable;
             CLOSE_ON_REJECTION: bool, Immutable, NonNullable;
         }
-        struct PromiseReaction => PromiseReactionSchema {
-            TYPE: crate::heap::PromiseReactionType, Immutable, NonNullable;
+        struct PendingJob => PendingJobSchema {
+            NEXT: GcRef<PendingJob>, Mutable, Nullable;
+            REALM: GcRef<RealmRecord>, Mutable, Nullable;
+        }
+        struct PromiseReaction: PendingJob => PromiseReactionSchema {
+            NEXT: GcRef<PendingJob>, Mutable, Nullable;
+            REALM: GcRef<RealmRecord>, Mutable, Nullable;
+            ARGUMENT: GcRef<StoredValue>, Mutable, Nullable;
+            REJECTED: bool, Mutable, NonNullable;
             CALLBACK_KIND: crate::heap::PromiseReactionCallbackKind, Immutable, NonNullable;
-            HANDLER: GcRef<StoredValue>, Immutable, NonNullable;
+            HANDLER: GcRef<StoredValue>, Mutable, Nullable;
+            REJECT_HANDLER: GcRef<StoredValue>, Mutable, Nullable;
             CAPABILITY: GcRef<PromiseCapability>, Immutable, Nullable;
-            REALM: GcRef<RealmRecord>, Immutable, Nullable;
-            ASYNC_ACTIVATION: GcRef<AsyncActivation>, Immutable, Nullable;
             ASYNC_GENERATOR: GcRef<AsyncGeneratorActivation>, Immutable, Nullable;
             MODULE: GcRef<ModuleRecord>, Immutable, Nullable;
             MODULE_JOIN: GcRef<ModuleJoin>, Immutable, Nullable;
             ASYNC_FROM_SYNC: GcRef<AsyncFromSyncIteratorContinuation>, Immutable, Nullable;
-            NEXT: GcRef<PromiseReaction>, Mutable, Nullable;
         }
-        struct PendingJob => PendingJobSchema {
+        struct PromiseAwaitContinuation: PendingJob => PromiseAwaitContinuationSchema {
+            NEXT: GcRef<PendingJob>, Mutable, Nullable;
+            REALM: GcRef<RealmRecord>, Mutable, Nullable;
+            ACTIVATION: GcRef<AsyncActivation>, Immutable, NonNullable;
+            ARGUMENT: GcRef<StoredValue>, Mutable, Nullable;
+            REJECTED: bool, Mutable, NonNullable;
+        }
+        struct StreamFulfillmentJob: PendingJob => StreamFulfillmentJobSchema {
+            NEXT: GcRef<PendingJob>, Mutable, Nullable;
+            REALM: GcRef<RealmRecord>, Mutable, Nullable;
+            CONTROLLER: GcRef<ReadableByteStreamControllerObject>, Immutable, NonNullable;
+            START: bool, Immutable, NonNullable;
+        }
+        struct PromiseCallbackJob: PendingJob => PromiseCallbackJobSchema {
+            NEXT: GcRef<PendingJob>, Mutable, Nullable;
+            REALM: GcRef<RealmRecord>, Mutable, Nullable;
             KIND: crate::heap::PromiseJobKind, Immutable, NonNullable;
-            REACTION: GcRef<PromiseReaction>, Immutable, Nullable;
             THENABLE: GcRef<PromiseThenableJob>, Immutable, Nullable;
             REGISTRY: GcRef<FinalizationRegistryObject>, Immutable, Nullable;
-            ARGUMENT: GcRef<StoredValue>, Immutable, NonNullable;
-            REALM: GcRef<RealmRecord>, Immutable, Nullable;
-            NEXT: GcRef<PendingJob>, Mutable, Nullable;
+            CALLBACK: GcRef<StoredValue>, Immutable, Nullable;
         }
         struct TimerTask => TimerTaskSchema {
             CALLBACK: GcRef<StoredValue>, Immutable, NonNullable;

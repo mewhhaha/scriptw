@@ -1,13 +1,13 @@
 //! A plain assignment to a computed key, `o[k] = v`, calls one R kernel with
 //! the raw base, the raw key and the value. The kernel is PutValue's [[Set]]:
-//! it first answers the cases whose outcome the live storage proves, before
-//! any key conversion, and otherwise runs the general steps in their order.
+//! it answers packed numeric indices without converting them and prepares
+//! other keys once in PutValue order before consulting live storage.
 //!
 //! - A Number key that is an array index on a concrete packed Array stores
 //!   the element without a decimal key; an absent element is created only
 //!   when no prototype has the index.
-//! - A String key on an ordinary object replaces an existing writable own
-//!   data property in place. An absent key is added as OrdinarySet's
+//! - An already-converted String key on an ordinary object replaces an
+//!   existing writable own data property in place. An absent key is added as OrdinarySet's
 //!   CreateDataProperty when the call-free walk proves that no object on the
 //!   receiver's chain has it, so no setter, read-only property or Proxy can
 //!   intervene; the compact define kernel adds it by shape transition or
@@ -39,12 +39,6 @@ impl FunctionBuilder<'_> {
         self.emit_branch_to_target(exit, f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        let general_set = self.open_frame(ControlFrameKind::Block, f);
-        self.emit_computed_named_set_or_branch(&p.target, &p.key, &p.value, general_set, f)?;
-        self.emit_object_boolean_result(succeeded, &result, f);
-        self.emit_branch_to_target(exit, f);
-        self.pop_control(ControlFrameKind::Block);
-        f.instruction(&Instruction::End);
         // PutValue: the base must be coercible, ToObject precedes the key's
         // conversion, and the Set keeps the original base as receiver.
         self.compile_nullish_tagged_i32(p.target.tag(), f)?;
@@ -60,11 +54,23 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         let pending = s.reserve_completion(f);
         let lookup = s.reserve_value_local(f);
+        self.emit_is_heap_object_like_tag_i32(p.target.tag(), f);
+        self.open_frame(ControlFrameKind::If, f);
+        lookup.copy_from(&p.target, f);
+        f.instruction(&Instruction::Else);
         self.emit_value_to_object_locals(&p.target, &pending, f)?;
         self.emit_object_operation_abrupt_exit(&pending, &result, exit, f);
         lookup.copy_from(pending.value(), f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         pending.clear(f);
         let key = self.emit_value_to_property_key_locals_or_branch(&p.key, &result, exit, f)?;
+        let general_set = self.open_frame(ControlFrameKind::Block, f);
+        self.emit_computed_named_set_or_branch(&p.target, &key, &p.value, general_set, f)?;
+        self.emit_object_boolean_result(succeeded, &result, f);
+        self.emit_branch_to_target(exit, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
         s.call_helper(
             crate::runtime_helpers::OrdinarySetArguments::new(
                 &lookup,
@@ -145,13 +151,13 @@ impl FunctionBuilder<'_> {
     fn emit_computed_named_set_or_branch(
         &mut self,
         target: &ValueLocals,
-        key: &ValueLocals,
+        key: &PropertyKeyLocals,
         value: &ValueLocals,
         general: crate::emit::ControlTarget,
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
-        key.tag().load(f);
+        key.value().tag().load(f);
         f.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
         f.instruction(&Instruction::I32Ne);
         self.emit_branch_if_to_target(general, f);
@@ -165,7 +171,7 @@ impl FunctionBuilder<'_> {
         );
         let name = s
             .reserve_gc_local(f)
-            .initialize(key.cast_reference::<StringValue>(s, f), f);
+            .initialize(key.value().cast_reference::<StringValue>(s, f), f);
         let set = self.open_frame(ControlFrameKind::Block, f);
         let base = s.reserve_gc_local(f).initialize(
             s.field(OrdinaryObjectSchema::PROPERTIES)
@@ -240,27 +246,40 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         child.clear(f);
-        s.release_i32_local(count, f);
 
-        // The shared define handles other children, new transitions and bounds.
-        let property = PropertyKeyLocals::from_string(s, &name, f);
-        let handled = self.emit_compact_data_define_call(&object, &property, value, f)?;
-        property.clear(f);
-        handled.load(f);
-        f.instruction(&Instruction::I32Eqz);
-        s.release_i32_local(handled, f);
-        self.emit_branch_if_to_target(general, f);
-        self.emit_branch_to_target(set, f);
+        // The live shape probe already established own absence. Look up or
+        // create its canonical child with the same converted key and hash.
+        let keys = s.reserve_non_null_gc_local(f).initialize(
+            s.field(CompactDataShapeSchema::KEYS)
+                .read(&shape, s, f)
+                .reference(),
+            f,
+        );
+        s.array_type::<CompactShapeKeys>().length(&keys, s, f);
+        count.store(f);
+        let child = self.emit_compact_shape_child(&shape, &keys, count, &name, hash, key, f)?;
+        keys.clear(f);
+        let next = s.reserve_non_null_gc_local(f).initialize(
+            child.non_null_or_branch(self.local_branch_label(general), f),
+            f,
+        );
+        child.clear(f);
+        s.return_call_helper(
+            crate::runtime_helpers::CachedPropertyAddArguments::new(
+                &object, &compact, &next, count, value,
+            ),
+            self.runtime_helper_base()?,
+            f,
+        );
+        next.clear(f);
+        s.release_i32_local(count, f);
         s.release_i64_local(hash, f);
         shape.clear(f);
         compact.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         base.clear(f);
-        let property = PropertyKeyLocals::from_string(s, &name, f);
-        let dictionary =
-            self.emit_dictionary_existing_data_write(target, target, &property, value, f)?;
-        property.clear(f);
+        let dictionary = self.emit_dictionary_existing_data_write(target, target, key, value, f)?;
         dictionary.load(f);
         f.instruction(&Instruction::I32Eqz);
         s.release_i32_local(dictionary, f);

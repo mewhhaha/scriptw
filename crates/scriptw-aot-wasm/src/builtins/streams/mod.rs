@@ -14,6 +14,12 @@ mod controller;
 mod queue;
 mod reader;
 
+#[derive(Clone, Copy)]
+pub(super) enum StreamFulfillment {
+    Start,
+    Pull,
+}
+
 pub(crate) const STREAM_BUILTINS: &[StandardBuiltinId] = &[
     StandardBuiltinId::ReadableStreamConstructor,
     StandardBuiltinId::ReadableStreamGetReader,
@@ -324,46 +330,46 @@ impl FunctionBuilder<'_> {
     fn stream_observe(
         &mut self,
         controller: &GcLocal<ReadableByteStreamControllerObject>,
-        value: &ValueLocals,
-        start: bool,
-        output: &CompletionLocals,
+        promise_realm: &GcLocal<RealmRecord>,
+        completion: &CompletionLocals,
+        fulfillment: StreamFulfillment,
         f: &mut Function,
     ) -> Result<(), EmitError> {
-        let promise = self.stream_new_promise(f)?;
-        self.emit_resolve_promise_record(&promise, value, f)?;
-        self.stream_observe_promise(controller, &promise, start, f)?;
-        promise.clear(f);
-        output.initialize(f);
-        Ok(())
-    }
-    fn stream_observe_promise(
-        &mut self,
-        controller: &GcLocal<ReadableByteStreamControllerObject>,
-        promise: &GcLocal<PromiseObject>,
-        start: bool,
-        f: &mut Function,
-    ) -> Result<(), EmitError> {
-        let fulfilled = self.stream_callback(
-            controller,
-            if start {
-                StandardBuiltinId::ReadableStreamStartFulfilled
-            } else {
-                StandardBuiltinId::ReadableStreamPullFulfilled
-            },
-            f,
-        )?;
-        let rejected = self.stream_callback(
-            controller,
-            if start {
-                StandardBuiltinId::ReadableStreamStartRejected
-            } else {
-                StandardBuiltinId::ReadableStreamPullRejected
-            },
-            f,
-        )?;
-        self.emit_perform_promise_then_without_capability(promise, &fulfilled, &rejected, f)?;
+        // Resolving with a primitive fulfills immediately. The fulfillment
+        // job ignores the value and enters the same queue as a Promise reaction.
+        completion.kind().load(f);
+        f.instruction(&Instruction::I32Const(CompletionKind::Normal.code() as i32));
+        f.instruction(&Instruction::I32Eq);
+        self.emit_is_heap_object_like_tag_i32(completion.value().tag(), f);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_enqueue_stream_fulfilled_job(controller, fulfillment, f)?;
+        f.instruction(&Instruction::Else);
+        let (promise, fulfilled_builtin, rejected_builtin) = match fulfillment {
+            StreamFulfillment::Start => {
+                // A throwing start callback exits the constructor before observation.
+                let promise = self.emit_alloc_promise_in_realm(promise_realm, f)?;
+                self.emit_resolve_promise_record(&promise, completion.value(), f)?;
+                (
+                    promise,
+                    StandardBuiltinId::ReadableStreamStartFulfilled,
+                    StandardBuiltinId::ReadableStreamStartRejected,
+                )
+            }
+            StreamFulfillment::Pull => (
+                self.stream_callback_promise(promise_realm, completion, f)?,
+                StandardBuiltinId::ReadableStreamPullFulfilled,
+                StandardBuiltinId::ReadableStreamPullRejected,
+            ),
+        };
+        let fulfilled = self.stream_callback(controller, fulfilled_builtin, f)?;
+        let rejected = self.stream_callback(controller, rejected_builtin, f)?;
+        self.emit_perform_promise_then_without_capability(&promise, &fulfilled, &rejected, f)?;
         rejected.clear(f);
         fulfilled.clear(f);
+        promise.clear(f);
+        self.stream_end_if(f);
         Ok(())
     }
     /// Capture the callback Realm before invocation: a callable Proxy can revoke

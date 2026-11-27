@@ -75,6 +75,7 @@ struct NativeSnapshot<'a, S: AsContextMut<Data = WasmHostState>> {
     witnesses: Vec<(L, HeapType)>,
     resolve_property_value: wasmtime::Func,
     ensure_property_storage: wasmtime::Func,
+    global_builtin_row: wasmtime::Func,
     entry: Rooted<EqRef>,
     realms: Vec<Rooted<EqRef>>,
     symbols: Rooted<EqRef>,
@@ -125,10 +126,14 @@ impl<'a, S: AsContextMut<Data = WasmHostState>> NativeSnapshot<'a, S> {
                 scriptw_aot_wasm::SNAPSHOT_ENSURE_PROPERTY_STORAGE_EXPORT,
             )
             .ok_or_else(|| invariant("snapshot property storage resolver absent"))?;
+        let global_builtin_row = instance
+            .get_func(&mut *store, L::GLOBAL_BUILTIN_ROW_EXPORT)
+            .ok_or_else(|| invariant("snapshot global builtin row projection absent"))?;
         let mut backend = Self {
             store,
             resolve_property_value,
             ensure_property_storage,
+            global_builtin_row,
             witnesses,
             entry,
             realms: Vec::new(),
@@ -919,6 +924,63 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
             storage = eq_reference(self.store, results[0].clone())?
                 .ok_or_else(|| invariant("property storage resolver returned null"))?;
         }
+        let mut ordinary_storage = Some(storage);
+        let mut ordinary_ordinal_offset = usize::from(array.is_some());
+        if self.has_layout(storage, L::GlobalBuiltinBacking)? {
+            if array.is_some() {
+                return Err(invariant("global builtin backing on Array header"));
+            }
+            let rows = self.required_reference(storage, F::GlobalBuiltinRows)?;
+            let count = u32::try_from(self.integer(rows, F::IntrinsicCount)?)
+                .map_err(|_| invariant("invalid global builtin row extent"))?;
+            if count > L::GLOBAL_BUILTIN_ROW_LIMIT {
+                return Err(invariant("global builtin row extent exceeds deletion mask"));
+            }
+            let low = self.integer(storage, F::GlobalBuiltinDeletedLow)? as u64;
+            let high = self.integer(storage, F::GlobalBuiltinDeletedHigh)? as u64;
+            let deleted = u128::from(low) | (u128::from(high) << 64);
+            if deleted.checked_shr(count).is_some_and(|bits| bits != 0) {
+                return Err(invariant("global builtin deletion outside row extent"));
+            }
+            if (count - deleted.count_ones()) as usize > remaining {
+                return Err(cap(SnapshotBudgetDimension::Properties));
+            }
+            budget.work(count as usize)?;
+            for ordinal in 0..count {
+                if deleted & (1_u128 << ordinal) != 0 {
+                    continue;
+                }
+                let mut results = [WasmtimeVal::AnyRef(None), WasmtimeVal::AnyRef(None)];
+                self.global_builtin_row
+                    .call(
+                        &mut *self.store,
+                        &[
+                            WasmtimeVal::AnyRef(Some(storage.to_anyref())),
+                            WasmtimeVal::I32(ordinal as i32),
+                        ],
+                        &mut results,
+                    )
+                    .map_err(invariant)?;
+                let [key, descriptor] = results;
+                let key = eq_reference(self.store, key)?
+                    .ok_or_else(|| invariant("missing global builtin key"))?;
+                let key = self.string(key, budget)?;
+                let index = array_index(key.units());
+                let descriptor = eq_reference(self.store, descriptor)?
+                    .ok_or_else(|| invariant("missing global builtin descriptor"))?;
+                ordered.push((
+                    if index.is_some() { 0 } else { 1 },
+                    index.unwrap_or(0),
+                    ordinal as usize,
+                    SnapshotRawProperty {
+                        key: SnapshotRawKey::String(key),
+                        descriptor: self.descriptor(descriptor, budget)?,
+                    },
+                ));
+            }
+            ordinary_storage = self.reference(storage, F::GlobalBuiltinAppend)?;
+            ordinary_ordinal_offset = count as usize;
+        }
         let compact_kind = if self.has_layout(storage, L::ArrayCompactStorage)? {
             Some(NativeCompactStorageKind::Arrays)
         } else if self.has_layout(storage, L::InlineCompactStorage)? {
@@ -1081,7 +1143,7 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                     },
                 ));
             }
-        } else {
+        } else if let Some(storage) = ordinary_storage {
             let length = match self.field(storage, F::PropertiesLength)? {
                 WasmtimeVal::I32(extent) => extent as u32,
                 _ => return Err(invariant("invalid ordinary property extent")),
@@ -1141,7 +1203,7 @@ impl<S: AsContextMut<Data = WasmHostState>> SnapshotBackend for NativeSnapshot<'
                 ordered.push((
                     group,
                     index,
-                    ordinal as usize + usize::from(array.is_some()),
+                    ordinal as usize + ordinary_ordinal_offset,
                     property,
                 ));
             }

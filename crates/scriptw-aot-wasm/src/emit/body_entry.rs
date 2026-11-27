@@ -79,7 +79,8 @@ impl<'a> FunctionBuilder<'a> {
             | RuntimeHelperId::CompactShapeIndex
             | RuntimeHelperId::IntrinsicDataPublish
             | RuntimeHelperId::IntrinsicAccessorPublish
-            | RuntimeHelperId::FreshDataPropertiesPublish
+            | RuntimeHelperId::GlobalBuiltinAppendFind
+            | RuntimeHelperId::SnapshotGlobalBuiltinRow
             | RuntimeHelperId::IntrinsicAccessorAllocate
             | RuntimeHelperId::IntrinsicConstructorAllocate
             | RuntimeHelperId::DeferredIntrinsicInstall

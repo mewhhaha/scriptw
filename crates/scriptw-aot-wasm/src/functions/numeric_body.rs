@@ -50,7 +50,8 @@ struct Planner<'a> {
 
 impl NumericBodyPlan {
     pub(crate) fn admit(source: &FunctionIr) -> Option<Self> {
-        crate::function_entry::LocalArgumentsPlan::for_function(source)?;
+        crate::function_entry::LocalArgumentsPlan::for_function(source)
+            .filter(|plan| !plan.projects_arguments())?;
         if source.eval_environment.is_some()
             || !source.owned_env_bindings.is_empty()
             || source.body.lexical_environment.is_some()
@@ -549,7 +550,8 @@ mod tests {
                 observed
             );
             assert_eq!(
-                crate::function_entry::LocalArgumentsPlan::for_function(source).is_some(),
+                crate::function_entry::LocalArgumentsPlan::for_function(source)
+                    .is_some_and(|plan| !plan.projects_arguments()),
                 !observed
             );
             assert_eq!(NumericBodyPlan::admit(source).is_some(), !observed);

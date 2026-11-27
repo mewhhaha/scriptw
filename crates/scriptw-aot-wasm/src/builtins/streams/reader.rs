@@ -438,9 +438,7 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
-        let constructor = self.emit_current_function_realm_intrinsic_promise_constructor(f);
-        let capability =
-            self.emit_new_current_function_realm_intrinsic_promise_capability(constructor, f)?;
+        let capability = self.emit_new_internal_current_realm_promise_capability(f)?;
         let output = s.reserve_completion(f);
         output.initialize(f);
         let pending = s.reserve_completion(f);
@@ -473,7 +471,7 @@ impl FunctionBuilder<'_> {
         };
         self.stream_is_state(&stream, ReadableStreamState::Closed, f);
         self.open_frame(ControlFrameKind::If, f);
-        self.emit_call_promise_capability(
+        self.emit_call_internal_promise_capability(
             &capability,
             PromiseSettlement::Fulfill,
             &undefined,
@@ -485,7 +483,7 @@ impl FunctionBuilder<'_> {
         self.stream_is_state(&stream, ReadableStreamState::Errored, f);
         self.open_frame(ControlFrameKind::If, f);
         let error = self.stream_stored_error(&stream, f);
-        self.emit_call_promise_capability(
+        self.emit_call_internal_promise_capability(
             &capability,
             PromiseSettlement::Reject,
             &error,
@@ -545,7 +543,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
         f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
-        self.emit_call_promise_capability(
+        self.emit_call_internal_promise_capability(
             &capability,
             PromiseSettlement::Reject,
             output.value(),

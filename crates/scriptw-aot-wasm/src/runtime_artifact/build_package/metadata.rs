@@ -14,7 +14,7 @@ mod encode;
 #[cfg(test)]
 mod tests;
 
-const METADATA_MAGIC: &[u8; 8] = b"SCRWRM02";
+const METADATA_MAGIC: &[u8; 8] = b"SCRWRM03";
 const MAX_METADATA_BYTES: usize = 1024 * 1024;
 
 pub(in crate::runtime_artifact) struct BuildIdentity {
@@ -40,7 +40,7 @@ struct SpanDigest {
     digest: [u8; 32],
 }
 
-pub(in crate::runtime_artifact) struct BuildMetadata {
+pub(in crate::runtime_artifact) struct BuildMetadata<'receipt> {
     package: &'static [u8],
     package_digest: [u8; 32],
     wasm: Range<usize>,
@@ -50,6 +50,7 @@ pub(in crate::runtime_artifact) struct BuildMetadata {
     intl_identity: Box<str>,
     profile: RuntimeSourceCompilationProfile,
     layout: RuntimeLayout,
+    compiler_prefix: Option<&'receipt [u8]>,
     largest_body: usize,
     data: [SpanDigest; RUNTIME_DATA_SEGMENT_COUNT],
     frames: Vec<(IntlDataComponent, SpanDigest)>,
@@ -61,12 +62,25 @@ pub(in crate::runtime_artifact) struct BuildAdmission {
     package: &'static [u8],
     package_digest: [u8; 32],
     pub(in crate::runtime_artifact) largest_body: usize,
+    pub(in crate::runtime_artifact) compiler_prefix: Option<&'static [u8]>,
     data: [SpanDigest; RUNTIME_DATA_SEGMENT_COUNT],
 }
 
 impl BuildAdmission {
     pub(in crate::runtime_artifact) fn package_digest(&self, package: &[u8]) -> Option<[u8; 32]> {
         std::ptr::eq(self.package, package).then_some(self.package_digest)
+    }
+
+    pub(in crate::runtime_artifact) fn pool_segments(
+        &self,
+    ) -> (
+        &'static [u8],
+        [&'static [u8]; RUNTIME_STATIC_SEGMENT_ORDER.len()],
+    ) {
+        (
+            &self.package[self.data[0].span.clone()],
+            RUNTIME_STATIC_SEGMENT_ORDER.map(|index| &self.package[self.data[index].span.clone()]),
+        )
     }
 
     pub(in crate::runtime_artifact) fn matches_pool(&self, utf16: &[u8], data: &[u8]) -> bool {
@@ -94,7 +108,7 @@ impl BuildAdmission {
     }
 }
 
-impl BuildMetadata {
+impl BuildMetadata<'_> {
     pub(in crate::runtime_artifact) fn frames(&self) -> Vec<(IntlDataComponent, &'static [u8])> {
         self.frames
             .iter()
@@ -124,7 +138,9 @@ impl BuildMetadata {
             },
         )))
     }
+}
 
+impl BuildMetadata<'static> {
     pub(in crate::runtime_artifact) fn into_runtime(
         &self,
         identity: &cache::RuntimeIdentity,
@@ -147,6 +163,7 @@ impl BuildMetadata {
                 package: self.package,
                 package_digest: self.package_digest,
                 largest_body: self.largest_body,
+                compiler_prefix: self.compiler_prefix,
                 data: self.data.clone(),
             }),
         })

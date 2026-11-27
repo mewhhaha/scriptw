@@ -6,8 +6,8 @@ use super::*;
 use crate::functions::NonArrayRealmIntrinsicSlot as Slot;
 use crate::gc_types::{
     DeferredDateConstructor, DeferredIntrinsicValue, FinalizedRuntimeModule, GcNullability,
-    GcSnapshotField, GlobalLedger, IntrinsicTable, NonNullable, PropertyDescriptor, RealmRecord,
-    RealmRecordSchema, RuntimeModuleTypes, StoredValue,
+    GcSnapshotField, GlobalLedger, IntrinsicPropertyStorage, IntrinsicTable, NonNullable,
+    RealmRecord, RealmRecordSchema, RuntimeModuleTypes, StoredValue,
 };
 use crate::heap::DateInitializationState;
 
@@ -128,15 +128,7 @@ fn origin(ops: &[Operator<'_>], before: usize, root: u32) -> Origin {
     }
 }
 
-fn installation_rows(
-    bytes: &[u8],
-    ops: &[Operator<'_>],
-    install_run: u32,
-) -> Vec<(usize, Vec<[u32; 4]>)> {
-    let positions = calls(ops, install_run);
-    if positions.is_empty() {
-        return Vec::new();
-    }
+fn runtime_static_segments(bytes: &[u8]) -> Vec<(u32, &[u8])> {
     let mut segments = Vec::new();
     for payload in Parser::new(0).parse_all(bytes) {
         if let Payload::DataSection(entries) = payload.unwrap() {
@@ -157,6 +149,19 @@ fn installation_rows(
             }
         }
     }
+    segments
+}
+
+fn installation_rows(
+    bytes: &[u8],
+    ops: &[Operator<'_>],
+    install_run: u32,
+) -> Vec<(usize, Vec<[u32; 4]>)> {
+    let positions = calls(ops, install_run);
+    if positions.is_empty() {
+        return Vec::new();
+    }
+    let segments = runtime_static_segments(bytes);
     positions
         .into_iter()
         .map(|position| {
@@ -511,10 +516,31 @@ fn date_global_and_resolver_use_the_defining_realm_recipe_and_utc_alias_keeps_on
     let schema = registered.globals().schema();
     let recipe_type = type_index::<DeferredDateConstructor>(schema);
     let publish = named(&names, "helper::intrinsic_data_publish");
-    let publish_row = named(&names, "helper::fresh_data_properties_publish");
-    let descriptor_type = type_index::<PropertyDescriptor>(schema);
-    // Both runtime Realm producers publish an unread Date recipe in a fresh
-    // descriptor, with its original ordered row and data attributes.
+    let storage_type = type_index::<IntrinsicPropertyStorage>(schema);
+    let catalog = crate::data::StringPool::global_builtin_catalog(false);
+    let date_rank = catalog
+        .iter()
+        .position(|binding| binding.name == "Date")
+        .expect("the created Realm retains Date");
+    let recipe = crate::FunctionBuilder::encode_global_builtin_recipe(
+        &scriptw_ir::GlobalPropertyInitializerIr::BuiltinFunction(
+            StandardBuiltinId::DateConstructor,
+        ),
+    )
+    .unwrap();
+    let flags = crate::heap::StoredPropertyAttributes::Data {
+        writable: true,
+        enumerable: false,
+        configurable: true,
+    }
+    .descriptor_word()
+    .bits();
+    let hash = "Date".encode_utf16().fold(14695981039346656037u64, |acc, unit| {
+        (acc ^ u64::from(unit)).wrapping_mul(1099511628211)
+    });
+    let segments = runtime_static_segments(bytes);
+    // Both runtime Realm producers point to the immutable Date row without
+    // creating its deferred value or entering Date initialization.
     for publisher in [
         format!("host::{}", scriptw_ir::HostBuiltinId::CreateRealm.as_str()),
         format!(
@@ -523,45 +549,79 @@ fn date_global_and_resolver_use_the_defining_realm_recipe_and_utc_alias_keeps_on
         ),
     ] {
         let initial = body(bytes, named(&names, &publisher));
-        let markers: Vec<_> = initial.iter().enumerate().filter_map(|(position, op)|
-            matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == recipe_type).then_some(position)).collect();
+        let storage = initial
+            .iter()
+            .position(|op| matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == storage_type))
+            .expect("the Realm producer constructs its immutable table reference");
+        let [
+            Operator::I32Const { value: address },
+            Operator::I32Const { value: count },
+            ..,
+            Operator::RefNull { .. },
+        ] = &initial[storage - 6..storage]
+        else {
+            panic!("global layout storage has a sealed extent and a null value cache");
+        };
+        assert_eq!(*count as usize, catalog.len());
+        let row_bytes = crate::data::RPropertyLayoutRows::ROW_BYTES;
+        let (address, end) = (*address as u32, *address as u32 + *count as u32 * row_bytes);
+        let (base, data) = segments
+            .iter()
+            .find(|(base, data)| address >= *base && end as u64 <= *base as u64 + data.len() as u64)
+            .expect("the full global table belongs to active runtime data");
+        let offset = (address - *base + date_rank as u32 * row_bytes) as usize;
+        let row: [u32; 10] = std::array::from_fn(|index| {
+            let word = offset + index * 4;
+            u32::from_le_bytes(data[word..word + 4].try_into().unwrap())
+        });
+        assert_eq!(row[0], 0, "Date has a string key");
         assert_eq!(
-            markers.len(),
-            1,
-            "{publisher} publishes one ordinary Date data recipe"
+            &row[2..7],
+            &[flags, date_rank as u32, recipe[0], recipe[1], recipe[2]]
         );
-        let descriptors: Vec<_> = calls(&initial, publish_row)
-            .into_iter()
-            .filter_map(|position| {
-                let args = arguments(&initial, position, 8);
-                let Origin::Operation(descriptor) = origin(&initial, position, local(args[2]))
-                else {
-                    return None;
-                };
-                assert!(matches!(initial[descriptor], Operator::StructNew { struct_type_index }
-                    if struct_type_index == descriptor_type));
-                let value = arguments(&initial, descriptor, 4)[1];
-                (origin(&initial, descriptor, local(value)) == Origin::Operation(markers[0]))
-                    .then_some(descriptor)
-            })
-            .collect();
-        assert_eq!(descriptors.len(), 1, "{publisher} publishes one Date descriptor");
-        assert_eq!(
-            constant(&initial, descriptors[0], arguments(&initial, descriptors[0], 4)[0]),
-            crate::heap::StoredPropertyAttributes::Data {
-                writable: true,
-                enumerable: false,
-                configurable: true,
-            }
-            .descriptor_word()
-            .as_i32(),
-            "Date stays writable, non-enumerable and configurable"
-        );
+        assert_eq!(&row[8..], &[hash as u32, (hash >> 32) as u32]);
         assert!(
-            calls(&initial, ensure_index).is_empty(),
-            "{publisher} publishes the marker without observing it"
+            !initial
+                .iter()
+                .any(|op| matches!(op, Operator::StructNew { struct_type_index }
+                    if *struct_type_index == recipe_type))
+                && calls(&initial, ensure_index).is_empty(),
+            "{publisher} leaves the Date value untouched"
         );
     }
+    let values = body(bytes, named(&names, "helper::intrinsic_property_value"));
+    let markers: Vec<_> = values
+        .iter()
+        .enumerate()
+        .filter_map(|(position, op)| {
+            matches!(op, Operator::StructNew { struct_type_index }
+                if *struct_type_index == recipe_type)
+            .then_some(position)
+        })
+        .collect();
+    assert_eq!(
+        markers.len(),
+        1,
+        "only the Date row path creates the Date recipe"
+    );
+    let marker = markers[0];
+    let Origin::Operation(defining_realm) =
+        origin(&values, marker, local(arguments(&values, marker, 1)[0]))
+    else {
+        panic!("the row recipe captures the table's defining Realm");
+    };
+    assert!(
+        matches!(values[defining_realm], Operator::StructGet { struct_type_index, .. }
+            if struct_type_index == storage_type)
+    );
+    assert_eq!(
+        origin(
+            &values,
+            defining_realm,
+            local(arguments(&values, defining_realm, 1)[0])
+        ),
+        Origin::Parameter(0)
+    );
     let heap = wasmparser::HeapType::Concrete(wasmparser::UnpackedIndex::Module(recipe_type));
     let branch = resolve
         .windows(2)

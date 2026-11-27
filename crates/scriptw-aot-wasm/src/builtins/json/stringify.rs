@@ -426,6 +426,55 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(index, f);
         s.release_i32_local(count, f);
     }
+    pub(super) fn emit_json_default_stringify_context(
+        &self,
+        realm: &GcLocal<RealmRecord>,
+        gap: &GcLocal<StringValue>,
+        accumulator: &GcLocal<StringAccumulator>,
+        enclosing_root: Option<&ValueLocals>,
+        f: &mut Function,
+    ) -> GcLocal<JsonStringifyContext> {
+        let s = self.runtime_schema();
+        let property_list = s
+            .reserve_gc_local::<ValueArray, Nullable>(f)
+            .initialize_null(s, f);
+        let replacement = s.reserve_gc_local(f).initialize(s.stored_undefined(f), f);
+        let stack_length = s.reserve_i32_local(f);
+        stack_length.set_constant(8, f);
+        let stack = s.reserve_gc_local(f).initialize(
+            s.array_type::<JsonStringifyStack>()
+                .filled(GcOperand::null_eq(), stack_length, f),
+            f,
+        );
+        s.release_i32_local(stack_length, f);
+        if let Some(root) = enclosing_root {
+            s.array_type::<JsonStringifyStack>().write(
+                &stack,
+                GcIndex::Constant(0),
+                GcOperand::eq_reference(root.reference()),
+                s,
+                f,
+            );
+        }
+        let context = s.reserve_gc_local(f).initialize(
+            s.struct_type::<JsonStringifyContext>().construct(
+                (
+                    GcOperand::reference(realm, s),
+                    GcOperand::reference(&replacement, s),
+                    GcOperand::reference(&property_list, s),
+                    GcOperand::reference(gap, s),
+                    GcOperand::reference(accumulator, s),
+                    GcOperand::reference(&stack, s),
+                ),
+                f,
+            ),
+            f,
+        );
+        stack.clear(f);
+        replacement.clear(f);
+        property_list.clear(f);
+        context
+    }
     pub(super) fn emit_json_stringify_entry(&mut self, f: &mut Function) -> Result<(), EmitError> {
         let s = self.runtime_schema();
         let value = s.reserve_value_local(f);
@@ -457,45 +506,27 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Eq);
         f.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, f);
-        let property_list = s
-            .reserve_gc_local::<ValueArray, Nullable>(f)
-            .initialize_null(s, f);
-        let replacement = s.reserve_gc_local(f).initialize(s.stored_undefined(f), f);
-        let empty = self.emit_json_string("", f)?;
-        key.set_reference(&empty, s, f);
         let accumulator = s
             .reserve_gc_local(f)
             .initialize(StringAccumulatorCursor::allocate(s, 128, f), f);
         accumulator_opt.replace(accumulator.load(s, f).nullable(), f);
-        let stack_length = s.reserve_i32_local(f);
-        json_i32(stack_length, 8, f);
-        let stack = s.reserve_gc_local(f).initialize(
-            s.array_type::<JsonStringifyStack>()
-                .filled(GcOperand::null_eq(), stack_length, f),
-            f,
-        );
-        s.release_i32_local(stack_length, f);
-        let context = s.reserve_gc_local(f).initialize(
-            s.struct_type::<JsonStringifyContext>().construct(
-                (
-                    GcOperand::reference(&realm, s),
-                    GcOperand::reference(&replacement, s),
-                    GcOperand::reference(&property_list, s),
-                    GcOperand::reference(&empty, s),
-                    GcOperand::reference(&accumulator, s),
-                    GcOperand::reference(&stack, s),
-                ),
-                f,
-            ),
-            f,
-        );
+        let root_done = self.open_frame(ControlFrameKind::Block, f);
+        let general_root = self.open_frame(ControlFrameKind::Block, f);
+        self.emit_json_compact_root_or_branch(&value, &realm, &accumulator, general_root, f)?;
+        appended.set_scalar(ScalarValue::Boolean(true), f);
+        self.emit_branch_to_target(root_done, f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        let empty = self.emit_json_string("", f)?;
+        key.set_reference(&empty, s, f);
+        let context =
+            self.emit_json_default_stringify_context(&realm, &empty, &accumulator, None, f);
         self.emit_json_stringify_plain_call(&value, &key, &context, indent, &appended, f)?;
         context.clear(f);
-        stack.clear(f);
-        accumulator.clear(f);
         empty.clear(f);
-        replacement.clear(f);
-        property_list.clear(f);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        accumulator.clear(f);
         f.instruction(&Instruction::Else);
         let holder = s.reserve_value_local(f);
         let callable = s.reserve_i32_local(f);
@@ -912,12 +943,53 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
+        self.emit_json_serializable_primitive_i32(value, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let output = StringAccumulatorCursor::open(accumulator, s, f);
+        self.emit_json_serialize_primitive_into_cursor(value, accumulator, &output, f)?;
+        output.close(accumulator, s, f);
+        self.emit_branch_to_target(serialized, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        Ok(())
+    }
+
+    /// The four scalar/string kinds that append JSON without a property lookup.
+    pub(super) fn emit_json_serializable_primitive_i32(
+        &self,
+        value: &ValueLocals,
+        f: &mut Function,
+    ) {
+        const FIRST: i32 = WasmRuntimeValueTag::Null as i32;
+        const LAST: i32 = WasmRuntimeValueTag::String as i32;
+        const _: () = {
+            assert!(WasmRuntimeValueTag::Boolean as i32 == FIRST + 1);
+            assert!(WasmRuntimeValueTag::Number as i32 == FIRST + 2);
+            assert!(LAST == FIRST + 3);
+        };
+        value.tag().load(f);
+        f.instruction(&Instruction::I32Const(FIRST));
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Const(LAST - FIRST));
+        f.instruction(&Instruction::I32LeU);
+    }
+
+    /// Appends an admitted String, Number, null or Boolean using the live cursor.
+    pub(super) fn emit_json_serialize_primitive_into_cursor(
+        &mut self,
+        value: &ValueLocals,
+        accumulator: &GcLocal<StringAccumulator>,
+        output: &StringAccumulatorCursor,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        let serialized = self.open_frame(ControlFrameKind::Block, f);
         self.emit_json_tag_test(value, WasmRuntimeValueTag::String, f);
         self.open_frame(ControlFrameKind::If, f);
         let text = s
             .reserve_gc_local(f)
             .initialize(value.cast_reference::<StringValue>(s, f), f);
-        self.emit_json_quote_into(accumulator, &text, f)?;
+        self.emit_json_quote_into_cursor(accumulator, output, &text, None, f);
         text.clear(f);
         self.emit_branch_to_target(serialized, f);
         self.pop_control(ControlFrameKind::If);
@@ -960,22 +1032,18 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(0));
         f.instruction(&Instruction::I32GeS);
         self.open_frame(ControlFrameKind::If, f);
-        let output = StringAccumulatorCursor::open(accumulator, s, f);
         output.push_decimal(accumulator, integer, s, f);
-        output.close(accumulator, s, f);
         f.instruction(&Instruction::Else);
         let text = s
             .reserve_gc_local(f)
             .initialize(self.emit_number_to_string_payload(value.scalar(), f)?, f);
-        let output = StringAccumulatorCursor::open(accumulator, s, f);
         output.append_string(accumulator, &text, s, f);
-        output.close(accumulator, s, f);
         text.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         s.release_i32_local(integer, f);
         f.instruction(&Instruction::Else);
-        self.emit_json_append_literal(accumulator, "null", f);
+        output.push_literal(accumulator, "null", s, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.emit_branch_to_target(serialized, f);
@@ -983,22 +1051,19 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.emit_json_tag_test(value, WasmRuntimeValueTag::Null, f);
         self.open_frame(ControlFrameKind::If, f);
-        self.emit_json_append_literal(accumulator, "null", f);
+        output.push_literal(accumulator, "null", s, f);
         self.emit_branch_to_target(serialized, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        self.emit_json_tag_test(value, WasmRuntimeValueTag::Boolean, f);
-        self.open_frame(ControlFrameKind::If, f);
         value.scalar().load(f);
         f.instruction(&Instruction::I64Eqz);
         self.open_frame(ControlFrameKind::If, f);
-        self.emit_json_append_literal(accumulator, "false", f);
+        output.push_literal(accumulator, "false", s, f);
         f.instruction(&Instruction::Else);
-        self.emit_json_append_literal(accumulator, "true", f);
+        output.push_literal(accumulator, "true", s, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        self.emit_branch_to_target(serialized, f);
-        self.pop_control(ControlFrameKind::If);
+        self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         Ok(())
     }

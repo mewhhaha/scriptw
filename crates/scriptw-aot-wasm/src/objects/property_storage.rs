@@ -10,20 +10,8 @@ pub(super) struct PreparedOrdinaryPropertyKey<'key> {
     pub(super) hash: I64Local,
 }
 
-/// Pre-sized empty dictionary state owned by `FreshDataPropertiesPublish`,
-/// avoiding per-row length/table/bucket reloads and tombstone checks while
-/// keeping `emit_ordinary_insert_in_dictionary` the sole `PropertyEntry` creator.
-pub(super) struct FreshDictionaryCursor<'a> {
-    pub(super) table: &'a GcLocal<PropertyTable>,
-    pub(super) buckets: &'a GcLocal<OrdinaryPropertyIndex>,
-    pub(super) bucket: I32Local,
-    pub(super) position: I32Local,
-    pub(super) string_key: &'a GcLocal<crate::gc_types::StringValue>,
-}
-
 pub(super) enum DictionaryInsertKey<'a> {
     Absent(&'a PropertyKeyLocals),
-    Fresh(FreshDictionaryCursor<'a>),
 }
 
 /// One ordinary definition owns its object/key pairing, lookup result and
@@ -34,7 +22,7 @@ pub(super) struct PreparedOrdinaryDefinition<'key> {
     object: &'key GcLocal<OrdinaryObject>,
     prepared: PreparedOrdinaryPropertyKey<'key>,
     hash_ready: I32Local,
-    /// The property's entry and the descriptor it holds, or both null.
+    /// An original global row can have a descriptor before it has an entry.
     entry: GcLocal<PropertyEntry, Nullable>,
     current: GcLocal<PropertyDescriptor, Nullable>,
 }
@@ -70,6 +58,31 @@ impl FunctionBuilder<'_> {
         let entry =
             self.emit_captured_ordinary_property_entry(object, &prepared, hash_ready, function)?;
         let current = self.emit_ordinary_entry_descriptor_reference(&entry, function);
+        let backing = self.emit_global_builtin_backing(object, function);
+        current.load(schema, function).is_null(function);
+        backing.load(schema, function).is_null(function);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, function);
+        let global = schema.reserve_gc_local(function).initialize(
+            backing.load(schema, function).require_non_null(function),
+            function,
+        );
+        let index = self.emit_global_builtin_find(&global, key, function)?;
+        index.load(function);
+        function.instruction(&Instruction::I32Const(0));
+        function.instruction(&Instruction::I32GeS);
+        self.open_frame(ControlFrameKind::If, function);
+        let original = self.emit_global_builtin_row_descriptor(&global, index, function)?;
+        current.replace(original.load(schema, function).nullable(), function);
+        original.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(index, function);
+        global.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        backing.clear(function);
         Ok(PreparedOrdinaryDefinition {
             object,
             prepared,
@@ -88,7 +101,7 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) {
         let schema = self.runtime_schema();
-        lookup.current.load(schema, function).is_null(function);
+        lookup.entry.load(schema, function).is_null(function);
         self.open_frame(ControlFrameKind::If, function);
         lookup.hash_ready.load(function);
         function.instruction(&Instruction::I32Eqz);
@@ -183,7 +196,8 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    /// The caller has already proved absence without invoking user code.
+    /// The caller has excluded a stable entry. An untouched original row
+    /// keeps its rank, while every genuinely absent key appends.
     fn emit_ordinary_insert_prepared_property(
         &mut self,
         object: &GcLocal<OrdinaryObject>,
@@ -191,6 +205,39 @@ impl FunctionBuilder<'_> {
         descriptor: &GcLocal<PropertyDescriptor>,
         function: &mut Function,
     ) {
+        let schema = self.runtime_schema();
+        let exit = self.open_frame(ControlFrameKind::Block, function);
+        let backing = self.emit_global_builtin_backing(object, function);
+        backing.load(schema, function).is_null(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        let global = schema.reserve_gc_local(function).initialize(
+            backing.load(schema, function).require_non_null(function),
+            function,
+        );
+        let index = self
+            .emit_global_builtin_find(&global, prepared.key, function)
+            .expect("global builtin definitions require registered runtime kernels");
+        index.load(function);
+        function.instruction(&Instruction::I32Const(0));
+        function.instruction(&Instruction::I32GeS);
+        self.open_frame(ControlFrameKind::If, function);
+        let entry = self.emit_global_builtin_install_entry(
+            &global,
+            index,
+            prepared.key,
+            descriptor,
+            function,
+        );
+        entry.clear(function);
+        self.emit_branch_to_target(exit, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(index, function);
+        global.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        backing.clear(function);
         let storage = self.emit_dictionary_property_storage(object, function);
         self.emit_ordinary_insert_in_dictionary(
             &storage,
@@ -200,6 +247,8 @@ impl FunctionBuilder<'_> {
             function,
         );
         storage.clear(function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
     }
 
     pub(super) fn emit_ordinary_insert_in_dictionary(
@@ -211,93 +260,61 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) {
         let schema = self.runtime_schema();
-        let fresh = match &key {
-            DictionaryInsertKey::Fresh(cursor) => Some(cursor),
-            DictionaryInsertKey::Absent(_) => None,
-        };
-        let (table_owned, buckets_owned, length_owned, new_length_owned) = match fresh {
-            Some(_) => (None, None, None, None),
-            None => {
-                let length = schema.reserve_i32_local(function);
-                let new_length = schema.reserve_i32_local(function);
-                schema
-                    .field(OrdinaryPropertyStorageSchema::LENGTH)
-                    .read(storage, schema, function)
-                    .store(length, function);
-                let table = schema.reserve_gc_local(function).initialize(
-                    schema
-                        .field(OrdinaryPropertyStorageSchema::ENTRIES)
-                        .read(storage, schema, function)
-                        .reference(),
-                    function,
-                );
-                let entries = schema.array_type::<PropertyTable>();
-                length.load(function);
-                entries.length(&table, schema, function);
-                function.instruction(&Instruction::I32GeU);
-                self.open_frame(ControlFrameKind::If, function);
-                schema
-                    .call_helper(
-                        crate::runtime_helpers::OrdinaryPropertyPrepareArguments::new(
-                            storage, length,
-                        ),
-                        self.runtime_helper_base()
-                            .expect("dictionary mutation requires registered runtime kernels"),
-                        function,
-                    )
-                    .store(length, function);
-                // Preparation may compact or replace storage. Retain the original
-                // rooted table when there is room; reload only after that mutation.
-                table.replace(
-                    schema
-                        .field(OrdinaryPropertyStorageSchema::ENTRIES)
-                        .read(storage, schema, function)
-                        .reference(),
-                    function,
-                );
-                self.pop_control(ControlFrameKind::If);
-                function.instruction(&Instruction::End);
-                let buckets = schema.reserve_gc_local(function).initialize(
-                    schema
-                        .field(OrdinaryPropertyStorageSchema::INDEX)
-                        .read(storage, schema, function)
-                        .reference(),
-                    function,
-                );
-                length.load(function);
-                function.instruction(&Instruction::I32Const(1));
-                function.instruction(&Instruction::I32Add);
-                new_length.store(function);
-                (Some(table), Some(buckets), Some(length), Some(new_length))
-            }
-        };
-        let table = match fresh {
-            Some(cursor) => cursor.table,
-            None => table_owned.as_ref().expect("owned table"),
-        };
-        let buckets = match fresh {
-            Some(cursor) => cursor.buckets,
-            None => buckets_owned.as_ref().expect("owned buckets"),
-        };
-        let position = match fresh {
-            Some(cursor) => cursor.position,
-            None => length_owned.expect("owned length"),
-        };
-        let stored_key_slot = schema.reserve_gc_local(function);
-        let stored_key = match &key {
-            DictionaryInsertKey::Fresh(cursor) => stored_key_slot.initialize(
-                schema
-                    .struct_type::<StoredValue>()
-                    .from_string(cursor.string_key, schema, function),
+        let length = schema.reserve_i32_local(function);
+        let new_length = schema.reserve_i32_local(function);
+        schema
+            .field(OrdinaryPropertyStorageSchema::LENGTH)
+            .read(storage, schema, function)
+            .store(length, function);
+        let table = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(OrdinaryPropertyStorageSchema::ENTRIES)
+                .read(storage, schema, function)
+                .reference(),
+            function,
+        );
+        let entries = schema.array_type::<PropertyTable>();
+        length.load(function);
+        entries.length(&table, schema, function);
+        function.instruction(&Instruction::I32GeU);
+        self.open_frame(ControlFrameKind::If, function);
+        schema
+            .call_helper(
+                crate::runtime_helpers::OrdinaryPropertyPrepareArguments::new(storage, length),
+                self.runtime_helper_base()
+                    .expect("dictionary mutation requires registered runtime kernels"),
                 function,
-            ),
-            DictionaryInsertKey::Absent(key) => stored_key_slot.initialize(
-                schema
-                    .struct_type::<StoredValue>()
-                    .from_value(key.value(), function),
-                function,
-            ),
-        };
+            )
+            .store(length, function);
+        // Preparation may compact or replace storage. Retain the original
+        // rooted table when there is room; reload only after that mutation.
+        table.replace(
+            schema
+                .field(OrdinaryPropertyStorageSchema::ENTRIES)
+                .read(storage, schema, function)
+                .reference(),
+            function,
+        );
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        let buckets = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(OrdinaryPropertyStorageSchema::INDEX)
+                .read(storage, schema, function)
+                .reference(),
+            function,
+        );
+        length.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Add);
+        new_length.store(function);
+        let DictionaryInsertKey::Absent(key) = key;
+        let stored_key = schema.reserve_gc_local(function).initialize(
+            schema
+                .struct_type::<StoredValue>()
+                .from_value(key.value(), function),
+            function,
+        );
         let entry_slot = schema.reserve_gc_local(function);
         let entry = entry_slot.initialize(
             schema.struct_type::<PropertyEntry>().construct(
@@ -305,7 +322,7 @@ impl FunctionBuilder<'_> {
                     GcOperand::reference(&stored_key, schema),
                     GcOperand::reference(descriptor, schema),
                     GcOperand::i64_local(hash),
-                    GcOperand::i32_local(position),
+                    GcOperand::i32_local(length),
                     GcOperand::boolean(false),
                 ),
                 function,
@@ -313,52 +330,25 @@ impl FunctionBuilder<'_> {
             function,
         );
         schema.array_type::<PropertyTable>().write(
-            table,
-            position,
+            &table,
+            length,
             GcOperand::nullable_reference(&entry, schema),
             schema,
             function,
         );
-        if let Some(cursor) = fresh {
-            // The publication plan already probed these same hashes in order.
-            // FreshDataPropertiesPublish commits the length after the last row.
-            let ordinal = schema.reserve_i32_local(function);
-            position.load(function);
-            function.instruction(&Instruction::I32Const(1));
-            function.instruction(&Instruction::I32Add);
-            ordinal.store(function);
-            schema.array_type::<OrdinaryPropertyIndex>().write(
-                buckets,
-                cursor.bucket,
-                GcOperand::i32_local(ordinal),
-                schema,
-                function,
-            );
-            schema.release_i32_local(ordinal, function);
-        } else {
-            self.emit_ordinary_property_index_publish(buckets, table, hash, position, function);
-            let final_length = new_length_owned.expect("owned new_length");
-            schema.field(OrdinaryPropertyStorageSchema::LENGTH).write(
-                storage,
-                GcOperand::i32_local(final_length),
-                schema,
-                function,
-            );
-        }
+        self.emit_ordinary_property_index_publish(&buckets, &table, hash, length, function);
+        schema.field(OrdinaryPropertyStorageSchema::LENGTH).write(
+            storage,
+            GcOperand::i32_local(new_length),
+            schema,
+            function,
+        );
         entry.clear(function);
         stored_key.clear(function);
-        if let Some(new_length) = new_length_owned {
-            schema.release_i32_local(new_length, function);
-        }
-        if let Some(length) = length_owned {
-            schema.release_i32_local(length, function);
-        }
-        if let Some(buckets) = buckets_owned {
-            buckets.clear(function);
-        }
-        if let Some(table) = table_owned {
-            table.clear(function);
-        }
+        schema.release_i32_local(new_length, function);
+        schema.release_i32_local(length, function);
+        buckets.clear(function);
+        table.clear(function);
     }
 
     /// Sole physical table-compaction body. No JS callback can observe its

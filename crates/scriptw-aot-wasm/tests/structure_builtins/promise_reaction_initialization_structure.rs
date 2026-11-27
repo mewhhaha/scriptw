@@ -202,10 +202,13 @@ fn module_reactions_accept_owned_intrinsic_records_and_keep_raw_rejection_and_re
             "owned module reaction observed {forbidden}"
         );
     }
-    assert_eq!(raw.matches("&initialization").count(), 2);
-    assert!(raw.contains("PromiseReactionType::Fulfill"));
-    assert!(raw.contains("PromiseReactionType::Reject"));
-    assert!(raw.contains("emit_route_promise_reaction_pair"));
+    assert_eq!(raw.matches("&initialization").count(), 1);
+    assert!(raw.contains("PromiseState::ALL"));
+    assert!(raw.contains("PromiseSettlement::Fulfill"));
+    assert!(raw.contains("PromiseSettlement::Reject"));
+    assert!(raw.contains("emit_initialize_promise_reaction"));
+    assert!(raw.contains("emit_append_pending_promise_reaction"));
+    assert!(raw.contains("emit_queue_selected_promise_reaction"));
     let module = bounded(
         PROMISE_SOURCE,
         "    pub(crate) fn emit_module_promise_reactions(",

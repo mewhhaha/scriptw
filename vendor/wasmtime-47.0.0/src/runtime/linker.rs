@@ -1,6 +1,6 @@
 use crate::error::OutOfMemory;
 use crate::func::HostFunc;
-use crate::instance::InstancePre;
+use crate::instance::{InstancePre, LateImports, ModuleExportBindings, SharedMemorySlot};
 use crate::store::StoreOpaque;
 use crate::{
     AsContext, AsContextMut, Caller, Engine, Extern, ExternType, Func, FuncType, ImportType,
@@ -85,6 +85,10 @@ pub struct Linker<T> {
     engine: Engine,
     pool: StringPool,
     map: TryHashMap<ImportKey, Definition>,
+    // A single immutable definition table can be shared between linkers
+    // that add their own Store-local definitions.
+    base: Option<Arc<Self>>,
+    base_can_be_shadowed: bool,
     allow_shadowing: bool,
     allow_unknown_exports: bool,
     _marker: marker::PhantomData<fn() -> T>,
@@ -102,6 +106,8 @@ impl<T> Clone for Linker<T> {
             engine: self.engine.clone(),
             pool: self.pool.clone_panic_on_oom(),
             map: self.map.clone_panic_on_oom(),
+            base: self.base.clone(),
+            base_can_be_shadowed: self.base_can_be_shadowed,
             allow_shadowing: self.allow_shadowing,
             allow_unknown_exports: self.allow_unknown_exports,
             _marker: self._marker,
@@ -162,6 +168,8 @@ impl<T> Linker<T> {
             engine: engine.clone(),
             map: TryHashMap::new(),
             pool: StringPool::new(),
+            base: None,
+            base_can_be_shadowed: false,
             allow_shadowing: false,
             allow_unknown_exports: false,
             _marker: marker::PhantomData,
@@ -200,6 +208,7 @@ impl<T> Linker<T> {
     /// ```
     pub fn allow_shadowing(&mut self, allow: bool) -> &mut Self {
         self.allow_shadowing = allow;
+        self.base_can_be_shadowed |= allow && self.base.is_some();
         self
     }
 
@@ -1001,9 +1010,8 @@ impl<T> Linker<T> {
         as_module: &str,
         as_name: &str,
     ) -> Result<&mut Self> {
-        let src = self.import_key(module, Some(name))?;
         let dst = self.import_key(as_module, Some(as_name))?;
-        match self.map.get(&src).cloned() {
+        match self._get(module, name).cloned() {
             Some(item) => self.insert(dst, item)?,
             None => bail!("no item named `{module}::{name}` defined"),
         }
@@ -1024,14 +1032,30 @@ impl<T> Linker<T> {
     /// memory allocation fails. See the `OutOfMemory` type's documentation for
     /// details on Wasmtime's out-of-memory handling.
     pub fn alias_module(&mut self, module: &str, as_module: &str) -> Result<()> {
+        let source = module;
         let module = self.pool.insert(module)?;
         let as_module = self.pool.insert(as_module)?;
-        let items: TryVec<_> = self
+        let mut items: TryVec<_> = self
             .map
             .iter()
             .filter(|(key, _def)| key.module == module)
             .map(|(key, def)| Ok((key.name, def.clone())))
             .try_collect::<_, Error>()?;
+        if let Some(base) = &self.base {
+            if let Some(base_module) = base.pool.get_atom(source) {
+                for (key, definition) in
+                    base.map.iter().filter(|(key, _)| key.module == base_module)
+                {
+                    let name = key
+                        .name
+                        .map(|name| self.pool.insert(&base.pool[name]))
+                        .transpose()?;
+                    if !self.map.contains_key(&ImportKey { module, name }) {
+                        items.push((name, definition.clone()))?;
+                    }
+                }
+            }
+        }
         for (name, item) in items {
             self.insert(
                 ImportKey {
@@ -1045,11 +1069,19 @@ impl<T> Linker<T> {
     }
 
     fn insert(&mut self, key: ImportKey, item: Definition) -> Result<()> {
-        if !self.allow_shadowing && self.map.contains_key(&key) {
+        if !self.allow_shadowing {
             let module = &self.pool[key.module];
-            match key.name.and_then(|n| self.pool.get(n)) {
-                Some(name) => bail!("import of `{module}::{name}` defined twice"),
-                None => bail!("import of `{module}` defined twice"),
+            let name = key.name.and_then(|n| self.pool.get(n));
+            if self.map.contains_key(&key)
+                || self
+                    .base
+                    .as_ref()
+                    .is_some_and(|base| base.definition(module, name).is_some())
+            {
+                match name {
+                    Some(name) => bail!("import of `{module}::{name}` defined twice"),
+                    None => bail!("import of `{module}` defined twice"),
+                }
             }
         }
 
@@ -1206,6 +1238,122 @@ impl<T> Linker<T> {
         self._instantiate_pre(module, None)
     }
 
+    /// Prepares this module with a single shared memory import to be supplied
+    /// to [`InstancePre::instantiate_with_shared_memory`].
+    ///
+    /// The designated import must occur exactly once and have no definition
+    /// in the linker. All other imports must be linker-defined host functions.
+    pub fn instantiate_pre_with_shared_memory(
+        &self,
+        module: &Module,
+        namespace: &str,
+        name: &str,
+    ) -> Result<InstancePre<T>>
+    where
+        T: 'static,
+    {
+        self.instantiate_pre_with_late_imports(module, None, Some((namespace, name)))
+    }
+
+    /// Prepares this module with positional imports from an instance of
+    /// `source` and optionally linker-defined host functions.
+    ///
+    /// Entries in `exports` correspond to [`Module::imports`] in order. A
+    /// `Some` entry must identify an export of `source`. The optional
+    /// `shared_memory` name designates an import to bind at instantiation
+    /// and must correspond to a `None` entry. All remaining `None` entries
+    /// must be linker-defined host functions. The resulting plan can be used
+    /// in each store with [`InstancePre::instantiate_with_module_exports`].
+    pub fn instantiate_pre_with_module_exports(
+        &self,
+        module: &Module,
+        source: &Module,
+        exports: &[Option<crate::ModuleExport>],
+        shared_memory: Option<(&str, &str)>,
+    ) -> Result<InstancePre<T>>
+    where
+        T: 'static,
+    {
+        self.instantiate_pre_with_late_imports(module, Some((source, exports)), shared_memory)
+    }
+
+    fn instantiate_pre_with_late_imports(
+        &self,
+        module: &Module,
+        module_exports: Option<(&Module, &[Option<crate::ModuleExport>])>,
+        shared_memory: Option<(&str, &str)>,
+    ) -> Result<InstancePre<T>>
+    where
+        T: 'static,
+    {
+        ensure!(
+            Engine::same(self.engine(), module.engine()),
+            "module belongs to a different engine"
+        );
+        let imports = module.imports();
+        let mut late = LateImports::default();
+        if let Some((source, exports)) = module_exports {
+            ensure!(
+                imports.len() == exports.len(),
+                "wrong number of import bindings"
+            );
+            let mut bindings = TryVec::with_capacity(exports.len())?;
+            for export in exports {
+                bindings.push(*export)?;
+            }
+            late.module_exports = Some(ModuleExportBindings {
+                source: source.clone(),
+                exports: try_new::<Arc<_>>(bindings)?,
+            });
+        }
+        if let Some((namespace, name)) = shared_memory {
+            ensure!(
+                self._get(namespace, name).is_none(),
+                "import of `{namespace}::{name}` already defined"
+            );
+        }
+
+        let mut fixed = TryVec::new();
+        for (position, import) in imports.enumerate() {
+            let namespace = import.module();
+            let name = import.name();
+            let mapped_export =
+                module_exports.is_some_and(|(_, exports)| exports[position].is_some());
+            if shared_memory == Some((namespace, name)) {
+                ensure!(
+                    late.shared_memory.is_none(),
+                    "multiple imports of `{namespace}::{name}`"
+                );
+                ensure!(
+                    !mapped_export,
+                    "`{namespace}::{name}` also mapped to a source export"
+                );
+                let ExternType::Memory(ty) = import.ty() else {
+                    bail!("`{namespace}::{name}` is not a memory import");
+                };
+                late.shared_memory = Some(SharedMemorySlot { position, ty });
+            } else if !mapped_export {
+                let definition = self._get_by_import(&import)?;
+                let Definition::HostFunc(ref func) = definition else {
+                    bail!("`{namespace}::{name}` is not a linker-defined host function");
+                };
+                ensure!(
+                    func.asyncness() == crate::store::Asyncness::No,
+                    "`{namespace}::{name}` requires async instantiation"
+                );
+                fixed.push(definition)?;
+            }
+        }
+        if let Some((namespace, name)) = shared_memory {
+            ensure!(
+                late.shared_memory.is_some(),
+                "missing import of `{namespace}::{name}`"
+            );
+        }
+        // SAFETY: all fixed definitions come from this Linker<T>.
+        unsafe { InstancePre::new(module, fixed, late) }
+    }
+
     /// This is split out to optionally take a `store` so that when the
     /// `.instantiate` API is used we can get fresh up-to-date type information
     /// for memories and their current size, if necessary.
@@ -1234,7 +1382,7 @@ impl<T> Linker<T> {
                 import.update_size(store);
             }
         }
-        unsafe { InstancePre::new(module, imports) }
+        unsafe { InstancePre::new(module, imports, LateImports::default()) }
     }
 
     /// Returns an iterator over all items defined in this `Linker`, in
@@ -1258,11 +1406,17 @@ impl<T> Linker<T> {
     where
         T: 'static,
     {
-        self.map.iter().map(move |(key, item)| {
+        let local = self.local_definitions();
+        let inherited = self
+            .base
+            .iter()
+            .flat_map(|base| base.local_definitions())
+            .filter(|(module, name, _)| self.local_definition(module, *name).is_none());
+        local.chain(inherited).map(move |(module, name, item)| {
             let store = store.as_context_mut();
             (
-                &self.pool[key.module],
-                &self.pool[key.name.unwrap()],
+                module,
+                name.unwrap(),
                 // Should be safe since `T` is connecting the linker and store
                 unsafe { item.to_extern(store.0).panic_on_oom() },
             )
@@ -1305,13 +1459,54 @@ impl<T> Linker<T> {
     /// Scriptw patch: returns true when this linker has no registered items
     /// and retains default `allow_shadowing` / `allow_unknown_exports` flags.
     pub fn is_pristine(&self) -> bool {
-        self.map.is_empty() && !self.allow_shadowing && !self.allow_unknown_exports
+        self.map.is_empty()
+            && self.base.as_ref().is_none_or(|base| base.map.is_empty())
+            && !self.allow_shadowing
+            && !self.allow_unknown_exports
+    }
+
+    /// Share an immutable, flat linker definition table, keeping this linker's
+    /// existing definitions and options. Returns false if the engines differ,
+    /// either linker already inherits definitions, shadowing is enabled here,
+    /// or a name occurs in both tables.
+    pub fn try_extend_from_shared(&mut self, base: &Arc<Self>) -> bool {
+        if !Engine::same(self.engine(), base.engine())
+            || self.base.is_some()
+            || base.base.is_some()
+            || self.allow_shadowing
+            || self
+                .local_definitions()
+                .any(|(module, name, _)| base.local_definition(module, name).is_some())
+        {
+            return false;
+        }
+        self.base = Some(Arc::clone(base));
+        true
+    }
+
+    /// Whether the given shared definitions are still in effect and the
+    /// linker's own definitions have never been allowed to replace each other
+    /// since the shared table was attached.
+    pub fn has_unshadowed_shared_definitions(&self, base: &Arc<Self>) -> bool {
+        !self.base_can_be_shadowed
+            && self
+                .base
+                .as_ref()
+                .is_some_and(|actual| Arc::ptr_eq(actual, base))
     }
 
     /// Scriptw patch: returns true when `module` actually has at least one
     /// registered definition in this linker (O(1) fast miss via string pool,
     /// exact module-key verification on pool hit).
     pub fn has_module(&self, module: &str) -> bool {
+        self.has_local_module(module)
+            || self
+                .base
+                .as_ref()
+                .is_some_and(|base| base.has_local_module(module))
+    }
+
+    fn has_local_module(&self, module: &str) -> bool {
         let Some(atom) = self.pool.get_atom(module) else {
             return false;
         };
@@ -1325,11 +1520,33 @@ impl<T> Linker<T> {
     }
 
     fn _get(&self, module: &str, name: &str) -> Option<&Definition> {
+        self.definition(module, Some(name))
+    }
+
+    fn definition(&self, module: &str, name: Option<&str>) -> Option<&Definition> {
+        self.local_definition(module, name)
+            .or_else(|| self.base.as_ref()?.local_definition(module, name))
+    }
+
+    fn local_definition(&self, module: &str, name: Option<&str>) -> Option<&Definition> {
         let key = ImportKey {
             module: self.pool.get_atom(module)?,
-            name: Some(self.pool.get_atom(name)?),
+            name: match name {
+                Some(name) => Some(self.pool.get_atom(name)?),
+                None => None,
+            },
         };
         self.map.get(&key)
+    }
+
+    fn local_definitions(&self) -> impl Iterator<Item = (&str, Option<&str>, &Definition)> {
+        self.map.iter().map(|(key, definition)| {
+            (
+                &self.pool[key.module],
+                key.name.and_then(|name| self.pool.get(name)),
+                definition,
+            )
+        })
     }
 
     /// Looks up a value in this `Linker` which matches the `import` type
@@ -1616,3 +1833,59 @@ impl fmt::Display for UnknownImportError {
 }
 
 impl core::error::Error for UnknownImportError {}
+
+#[cfg(test)]
+mod shared_definition_tests {
+    use super::{Arc, Linker};
+    use crate::{Engine, Result, Store};
+
+    #[test]
+    fn shared_definitions_preserve_duplicates_aliases_and_local_shadowing() -> Result<()> {
+        let engine = Engine::default();
+        let mut base = Linker::new(&engine);
+        base.func_wrap("host", "fixed", || 1i32)?;
+        base.func_wrap("host", "inherited", || 2i32)?;
+        let base = Arc::new(base);
+
+        let mut first = Linker::new(&engine);
+        let mut second = Linker::new(&engine);
+        first.func_wrap("foreign", "local", || 3i32)?;
+        assert!(first.try_extend_from_shared(&base));
+        assert!(second.try_extend_from_shared(&base));
+        assert!(first.has_unshadowed_shared_definitions(&base));
+        assert!(first.func_wrap("host", "fixed", || 4i32).is_err());
+        assert!(first.has_definition("foreign", "local"));
+        assert!(!second.has_module("foreign"));
+
+        first.allow_shadowing(true);
+        first.func_wrap("host", "fixed", || 4i32)?;
+        first.allow_shadowing(false);
+        assert!(!first.has_unshadowed_shared_definitions(&base));
+        assert!(second.has_unshadowed_shared_definitions(&base));
+        first.alias_module("host", "alias")?;
+
+        let mut store = Store::new(&engine, ());
+        for (linker, namespace, name, expected) in [
+            (&first, "alias", "fixed", 4),
+            (&first, "alias", "inherited", 2),
+            (&second, "host", "fixed", 1),
+        ] {
+            let func = linker
+                .get(&mut store, namespace, name)?
+                .into_func()
+                .unwrap();
+            assert_eq!(
+                func.typed::<(), i32>(&store)?.call(&mut store, ())?,
+                expected
+            );
+        }
+        assert_eq!(
+            first
+                .iter(&mut store)
+                .filter(|(module, _, _)| *module == "host")
+                .count(),
+            2
+        );
+        Ok(())
+    }
+}

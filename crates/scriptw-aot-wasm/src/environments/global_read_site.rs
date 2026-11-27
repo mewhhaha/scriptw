@@ -2,17 +2,16 @@
 //!
 //! A read that starts at the Global Environment Record keeps a record in a
 //! global of the module that compiles it, made by R for the record's global
-//! object: the dictionary entry that holds the name's property. Three facts
+//! object: the entry that holds the name's property. Three facts
 //! make that entry enough to answer the read without a call.
 //!
 //! - A Global Environment Record keeps its Realm, and a Realm its global
 //!   object, for life, so the same Environment means the same object.
-//! - An ordinary header whose storage is a dictionary keeps that dictionary,
-//!   and a property keeps its one entry record while it lives: compaction
-//!   moves the record, redefinition changes the record's descriptor in
-//!   place or replaces it in the record.
-//! - Deletion, the only way a live entry leaves its table, replaces the
-//!   record's descriptor with an accessor descriptor that no property owns.
+//! - A property keeps its one entry record while it lives. Dictionary
+//!   compaction moves the record; a live builtin row realizes the record
+//!   on demand. Redefinition updates the descriptor in the record.
+//! - Deletion replaces the record's descriptor with an accessor descriptor
+//!   that no property owns.
 //!
 //! So an entry record whose descriptor is a data descriptor is the live own
 //! data property of that global object, and its current value is the
@@ -26,13 +25,11 @@
 //! runtime, having observed nothing: every step only reads.
 //!
 //! A `typeof` site also answers a name that is nowhere: its record then
-//! holds a witness that the global object's dictionary had no entry for the
-//! name at one table and insertion length, that its [[Prototype]] was one
-//! ordinary object without the property and with a null [[Prototype]]. An
-//! insertion grows a dictionary's length or replaces its table, a property
-//! never joins immutable intrinsic rows, and both edges are read again, so
-//! while the witness holds HasProperty finds nothing, observes nothing, and
-//! the operand is an unresolvable Reference: `typeof` reads undefined.
+//! holds a witness that the global object and its sole ordinary prototype
+//! both lacked the key. A missing or deleted builtin row cannot become
+//! live again. Insertion creates the append dictionary, grows a dictionary's
+//! extent, or replaces its table. The witness checks both dictionary
+//! observations and the prototype edges before answering undefined.
 //!
 //! A site whose record misses asks for a new one, a bounded number of times,
 //! so a name defined after the site first ran, or deleted and defined again,
@@ -41,7 +38,8 @@ use super::environment_reference::EnvironmentIdentifierRead;
 use super::*;
 use crate::emit::ControlTarget;
 use crate::gc_types::{
-    GcOperand, GlobalAbsenceWitness, GlobalAbsenceWitnessSchema, GlobalReadSiteRecord,
+    GcOperand, GlobalAbsenceWitness, GlobalAbsenceWitnessSchema, GlobalBuiltinBacking,
+    GlobalBuiltinBackingSchema, GlobalReadSiteRecord,
     GlobalReadSiteRecordSchema, IntrinsicPropertyStorage, JavaScriptObject, ObjectPropertyStorage,
     OrdinaryObject, OrdinaryObjectSchema, OrdinaryPropertyStorage, OrdinaryPropertyStorageSchema,
     PropertyDescriptor, PropertyDescriptorSchema, PropertyEntry, PropertyEntrySchema,
@@ -65,6 +63,11 @@ pub(crate) enum GlobalDeclarativeNames {
     Unknown,
     /// The caller proved that none of them is the name read.
     ProvedOther,
+}
+
+enum AbsenceDictionarySide {
+    Global,
+    Parent,
 }
 
 impl FunctionBuilder<'_> {
@@ -260,7 +263,7 @@ impl FunctionBuilder<'_> {
     /// Answers undefined into `value`, sets `found` and branches to `done`
     /// when the record's witness still proves the name absent from the
     /// Global Environment Record `global`; otherwise falls through. A
-    /// witness holds every object it reads, so its checks need no order.
+    /// witness holds the ordinary headers it reads.
     fn emit_global_absence_site(
         &mut self,
         record: &GcLocal<GlobalReadSiteRecord, Nullable>,
@@ -301,36 +304,7 @@ impl FunctionBuilder<'_> {
             .is_null(function);
         function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::I32Or);
-        // The global object's dictionary: the same table, nothing inserted.
-        let dictionary = schema
-            .reserve_gc_local::<OrdinaryPropertyStorage, Nullable>(function)
-            .initialize(
-                schema
-                    .field(GlobalAbsenceWitnessSchema::DICTIONARY)
-                    .read(&witness, schema, function)
-                    .reference(),
-                function,
-            );
-        let _ = schema
-            .field(OrdinaryPropertyStorageSchema::ENTRIES)
-            .read(&dictionary, schema, function)
-            .reference();
-        let _ = schema
-            .field(GlobalAbsenceWitnessSchema::TABLE)
-            .read(&witness, schema, function)
-            .reference();
-        function.instruction(&Instruction::RefEq);
-        function.instruction(&Instruction::I32Eqz);
-        function.instruction(&Instruction::I32Or);
-        schema
-            .field(OrdinaryPropertyStorageSchema::LENGTH)
-            .read(&dictionary, schema, function);
-        schema
-            .field(GlobalAbsenceWitnessSchema::LENGTH)
-            .read(&witness, schema, function);
-        function.instruction(&Instruction::I32Ne);
-        function.instruction(&Instruction::I32Or);
-        dictionary.clear(function);
+        self.emit_branch_if_to_target(unproved, function);
         // Its [[Prototype]] is still the witnessed parent, whose storage is
         // the witnessed one and whose own [[Prototype]] is still null.
         let header = schema
@@ -351,6 +325,22 @@ impl FunctionBuilder<'_> {
                     .reference(),
                 function,
             );
+        let storage = schema
+            .reserve_gc_local::<ObjectPropertyStorage, Nullable>(function)
+            .initialize(
+                schema.field(OrdinaryObjectSchema::PROPERTIES)
+                    .read(&header, schema, function)
+                    .reference()
+                    .nullable(),
+                function,
+            );
+        let dictionary =
+            self.emit_absence_dictionary_or_branch(&storage, false, unproved, function);
+        storage.clear(function);
+        self.emit_check_absence_dictionary_unchanged(
+            &dictionary, &witness, AbsenceDictionarySide::Global, unproved, function,
+        );
+        dictionary.clear(function);
         let _ = schema
             .field(OrdinaryObjectSchema::PROTOTYPE)
             .read(&header, schema, function)
@@ -358,12 +348,17 @@ impl FunctionBuilder<'_> {
         let _ = parent.load(schema, function);
         function.instruction(&Instruction::RefEq);
         function.instruction(&Instruction::I32Eqz);
-        function.instruction(&Instruction::I32Or);
         header.clear(function);
-        let _ = schema
-            .field(OrdinaryObjectSchema::PROPERTIES)
-            .read(&parent, schema, function)
-            .reference();
+        let parent_storage = schema
+            .reserve_gc_local::<ObjectPropertyStorage, Nullable>(function)
+            .initialize(
+                schema.field(OrdinaryObjectSchema::PROPERTIES)
+                    .read(&parent, schema, function)
+                    .reference()
+                    .nullable(),
+                function,
+            );
+        let _ = parent_storage.load(schema, function);
         let _ = schema
             .field(GlobalAbsenceWitnessSchema::PARENT_STORAGE)
             .read(&witness, schema, function)
@@ -380,42 +375,13 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I32Or);
         parent.clear(function);
         self.emit_branch_if_to_target(unproved, function);
-        // A parent dictionary: the same table, nothing inserted. Intrinsic
-        // rows never change under the same storage.
-        let dictionary = schema
-            .reserve_gc_local::<OrdinaryPropertyStorage, Nullable>(function)
-            .initialize(
-                schema
-                    .field(GlobalAbsenceWitnessSchema::PARENT_DICTIONARY)
-                    .read(&witness, schema, function)
-                    .reference(),
-                function,
-            );
-        dictionary.load(schema, function).is_null(function);
-        function.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, function);
-        let _ = schema
-            .field(OrdinaryPropertyStorageSchema::ENTRIES)
-            .read(&dictionary, schema, function)
-            .reference();
-        let _ = schema
-            .field(GlobalAbsenceWitnessSchema::PARENT_TABLE)
-            .read(&witness, schema, function)
-            .reference();
-        function.instruction(&Instruction::RefEq);
-        function.instruction(&Instruction::I32Eqz);
-        schema
-            .field(OrdinaryPropertyStorageSchema::LENGTH)
-            .read(&dictionary, schema, function);
-        schema
-            .field(GlobalAbsenceWitnessSchema::PARENT_LENGTH)
-            .read(&witness, schema, function);
-        function.instruction(&Instruction::I32Ne);
-        function.instruction(&Instruction::I32Or);
-        self.emit_branch_if_to_target(unproved, function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        dictionary.clear(function);
+        let parent_dictionary =
+            self.emit_absence_dictionary_or_branch(&parent_storage, true, unproved, function);
+        parent_storage.clear(function);
+        self.emit_check_absence_dictionary_unchanged(
+            &parent_dictionary, &witness, AbsenceDictionarySide::Parent, unproved, function,
+        );
+        parent_dictionary.clear(function);
         witness.clear(function);
         value.set_undefined(function);
         found.set_constant(1, function);
@@ -424,14 +390,132 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::End);
     }
 
-    /// Makes a global read site's record for `name` in the Global
-    /// Environment Record the site runs for: the entry record of the name's
-    /// own property when the Realm's global object is an ordinary object
-    /// whose storage is a dictionary that holds one; a witness of absence
-    /// when neither that dictionary nor its one ordinary prototype has the
-    /// name; and a declined record, with neither, otherwise. Other storage
-    /// is left as it is, so making a record changes nothing but the name's
-    /// remembered position.
+    fn emit_check_absence_dictionary_unchanged(
+        &mut self,
+        dictionary: &GcLocal<OrdinaryPropertyStorage, Nullable>,
+        witness: &GcLocal<GlobalAbsenceWitness, Nullable>,
+        side: AbsenceDictionarySide,
+        unproved: ControlTarget,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let (dictionary_field, table_field, length_field) = match side {
+            AbsenceDictionarySide::Global => (
+                GlobalAbsenceWitnessSchema::DICTIONARY,
+                GlobalAbsenceWitnessSchema::TABLE,
+                GlobalAbsenceWitnessSchema::LENGTH,
+            ),
+            AbsenceDictionarySide::Parent => (
+                GlobalAbsenceWitnessSchema::PARENT_DICTIONARY,
+                GlobalAbsenceWitnessSchema::PARENT_TABLE,
+                GlobalAbsenceWitnessSchema::PARENT_LENGTH,
+            ),
+        };
+        let _ = dictionary.load(s, f);
+        let _ = s.field(dictionary_field).read(witness, s, f).reference();
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(unproved, f);
+        dictionary.load(s, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        let _ = s.field(OrdinaryPropertyStorageSchema::ENTRIES)
+            .read(dictionary, s, f).reference();
+        let _ = s.field(table_field).read(witness, s, f).reference();
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32Eqz);
+        s.field(OrdinaryPropertyStorageSchema::LENGTH).read(dictionary, s, f);
+        s.field(length_field).read(witness, s, f);
+        f.instruction(&Instruction::I32Ne);
+        f.instruction(&Instruction::I32Or);
+        self.emit_branch_if_to_target(unproved, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+    }
+
+    /// Project the mutable portion of a storage that supports a negative
+    /// witness. An intrinsic layout has no mutable portion while it remains
+    /// installed. A global backing may acquire its first append dictionary.
+    fn emit_absence_dictionary_or_branch(
+        &mut self,
+        storage: &GcLocal<ObjectPropertyStorage, Nullable>,
+        intrinsic_allowed: bool,
+        declined: ControlTarget,
+        f: &mut Function,
+    ) -> GcLocal<OrdinaryPropertyStorage, Nullable> {
+        let s = self.runtime_schema();
+        let dictionary = s
+            .reserve_gc_local::<OrdinaryPropertyStorage, Nullable>(f)
+            .initialize_null(s, f);
+        storage.is_subtype::<GlobalBuiltinBacking>(s, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let backing = s.reserve_gc_local(f).initialize(
+            storage.load(s, f).cast_subtype::<GlobalBuiltinBacking>(s, f),
+            f,
+        );
+        dictionary.replace(
+            s.field(GlobalBuiltinBackingSchema::APPEND)
+                .read(&backing, s, f)
+                .reference(),
+            f,
+        );
+        backing.clear(f);
+        f.instruction(&Instruction::Else);
+        if intrinsic_allowed {
+            storage.is_subtype::<IntrinsicPropertyStorage>(s, f);
+            f.instruction(&Instruction::I32Eqz);
+            self.open_frame(ControlFrameKind::If, f);
+        }
+        dictionary.replace(
+            storage
+                .sealed_subtype_or_branch::<OrdinaryPropertyStorage>(
+                    s,
+                    self.local_branch_label(declined),
+                    f,
+                )
+                .nullable(),
+            f,
+        );
+        if intrinsic_allowed {
+            self.pop_control(ControlFrameKind::If);
+            f.instruction(&Instruction::End);
+        }
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        dictionary
+    }
+
+    fn emit_absence_dictionary_extent(
+        &mut self,
+        dictionary: &GcLocal<OrdinaryPropertyStorage, Nullable>,
+        f: &mut Function,
+    ) -> (GcLocal<PropertyTable, Nullable>, I32Local) {
+        let s = self.runtime_schema();
+        let table = s
+            .reserve_gc_local::<PropertyTable, Nullable>(f)
+            .initialize_null(s, f);
+        let length = s.reserve_i32_local(f);
+        length.set_constant(0, f);
+        dictionary.load(s, f).is_null(f);
+        f.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, f);
+        table.replace(
+            s.field(OrdinaryPropertyStorageSchema::ENTRIES)
+                .read(dictionary, s, f)
+                .reference()
+                .nullable(),
+            f,
+        );
+        s.field(OrdinaryPropertyStorageSchema::LENGTH)
+            .read(dictionary, s, f)
+            .store(length, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        (table, length)
+    }
+
+    /// Cache an own property's stable entry, or record a closed chain that
+    /// lacks the key. Other lookups leave a declined record.
     pub(crate) fn compile_global_read_record_helper(&mut self) -> Result<Function, EmitError> {
         let mut body = self.begin_helper_body(RuntimeHelperId::GlobalReadRecord);
         let p = self.helper_parameters::<GlobalReadRecordParameters>(&mut body);
@@ -479,17 +563,38 @@ impl FunctionBuilder<'_> {
                     .nullable(),
                 f,
             );
-        let dictionary = s
-            .reserve_gc_local::<OrdinaryPropertyStorage, Nullable>(f)
-            .initialize(
-                storage
-                    .sealed_subtype_or_branch::<OrdinaryPropertyStorage>(s, label, f)
-                    .nullable(),
-                f,
-            );
-        storage.clear(f);
         let key = PropertyKeyLocals::from_string(s, &p.name, f);
-        let entry = self.emit_ordinary_property_entry(&header, &key, f)?;
+        let entry = s.reserve_gc_local::<PropertyEntry, Nullable>(f).initialize_null(s, f);
+        storage.is_subtype::<GlobalBuiltinBacking>(s, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let backing = s.reserve_gc_local(f).initialize(
+            storage.load(s, f).cast_subtype::<GlobalBuiltinBacking>(s, f), f,
+        );
+        let (observed, row) = self.emit_global_builtin_own_entry_or_row(&backing, &key, f)?;
+        entry.replace(observed.load(s, f), f);
+        observed.clear(f);
+        entry.load(s, f).is_null(f);
+        row.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32GeS);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        let realized = self.emit_global_builtin_ensure_entry(&backing, row, &key, f)?;
+        entry.replace(realized.load(s, f).nullable(), f);
+        realized.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(row, f);
+        backing.clear(f);
+        f.instruction(&Instruction::Else);
+        storage.is_subtype::<OrdinaryPropertyStorage>(s, f);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(declined, f);
+        let observed = self.emit_ordinary_property_entry(&header, &key, f)?;
+        entry.replace(observed.load(s, f), f);
+        observed.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         entry.load(s, f).is_null(f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
@@ -506,21 +611,11 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         entry.clear(f);
-        // The global object has no such property. The witness also needs
-        // its [[Prototype]] to be one ordinary object, with a null
-        // [[Prototype]] of its own and no such property in intrinsic rows
-        // or a dictionary; the probe reads without changing the storage.
-        let table = s.reserve_gc_local::<PropertyTable, Nullable>(f).initialize(
-            s.field(OrdinaryPropertyStorageSchema::ENTRIES)
-                .read(&dictionary, s, f)
-                .reference()
-                .nullable(),
-            f,
-        );
-        let length = s.reserve_i32_local(f);
-        s.field(OrdinaryPropertyStorageSchema::LENGTH)
-            .read(&dictionary, s, f)
-            .store(length, f);
+        // No live original row or appended property for the name. Capture
+        // dictionary insertion state and require a closed ordinary prototype.
+        let dictionary = self.emit_absence_dictionary_or_branch(&storage, false, declined, f);
+        storage.clear(f);
+        let (table, length) = self.emit_absence_dictionary_extent(&dictionary, f);
         let edge = s
             .reserve_gc_local::<JavaScriptObject, Nullable>(f)
             .initialize(
@@ -558,40 +653,9 @@ impl FunctionBuilder<'_> {
                     .nullable(),
                 f,
             );
-        let parent_dictionary = s
-            .reserve_gc_local::<OrdinaryPropertyStorage, Nullable>(f)
-            .initialize_null(s, f);
-        let parent_table = s
-            .reserve_gc_local::<PropertyTable, Nullable>(f)
-            .initialize_null(s, f);
-        let parent_length = s.reserve_i32_local(f);
-        parent_length.set_constant(0, f);
-        parent_storage.is_subtype::<OrdinaryPropertyStorage>(s, f);
-        self.open_frame(ControlFrameKind::If, f);
-        parent_dictionary.replace(
-            parent_storage
-                .load(s, f)
-                .cast_subtype::<OrdinaryPropertyStorage>(s, f)
-                .nullable(),
-            f,
-        );
-        parent_table.replace(
-            s.field(OrdinaryPropertyStorageSchema::ENTRIES)
-                .read(&parent_dictionary, s, f)
-                .reference()
-                .nullable(),
-            f,
-        );
-        s.field(OrdinaryPropertyStorageSchema::LENGTH)
-            .read(&parent_dictionary, s, f)
-            .store(parent_length, f);
-        f.instruction(&Instruction::Else);
-        // Any other storage than intrinsic rows can gain a key in place.
-        parent_storage.is_subtype::<IntrinsicPropertyStorage>(s, f);
-        f.instruction(&Instruction::I32Eqz);
-        self.emit_branch_if_to_target(declined, f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
+        let parent_dictionary =
+            self.emit_absence_dictionary_or_branch(&parent_storage, true, declined, f);
+        let (parent_table, parent_length) = self.emit_absence_dictionary_extent(&parent_dictionary, f);
         let witness = s
             .reserve_gc_local::<GlobalAbsenceWitness, Nullable>(f)
             .initialize(

@@ -87,8 +87,8 @@ export function escapedAlias(array,seed,extra) {
                 assert_eq!(program.function_type(imported), runtime.function_type(definition));
                 for phase in [&body[..allocation], preflight[0].as_ref()] {
                     assert_eq!(phase.iter().filter(|op| matches!(op,
-                        Operator::Call { function_index } if *function_index == imported)).count(), 2,
-                        "both own fields use canonical intrinsic decoding before allocation and during preflight");
+                        Operator::Call { function_index } if *function_index == imported)).count(), 4,
+                        "both own fields use canonical intrinsic decoding for intrinsic and global-builtin storage before allocation and during preflight");
                 }
             }
             let (resolve, _) = runtime.named("helper::property_value_resolve");

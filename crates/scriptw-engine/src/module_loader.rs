@@ -8,6 +8,7 @@
 //! Nothing here bakes in a test262 path. The runner supplies the root, exactly
 //! as any other embedder would.
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -86,12 +87,12 @@ impl EmbeddedSourceRole {
     pub(crate) fn parse_entry<'a>(
         self,
         graph: &'a EmbeddedModuleGraph,
-        source: &str,
+        source: Cow<'_, str>,
         goal: ParseGoal,
         filename: Option<&str>,
     ) -> Result<ParsedEmbeddedEntry<'a>, EmbeddedEntryError> {
         let filename = self
-            .parse_filename(graph, source, goal, filename)
+            .parse_filename(graph, source.as_ref(), goal, filename)
             .map_err(EmbeddedEntryError::Authority)?;
         let source = scriptw_front::parse(source, scriptw_front::ParseOptions { goal, filename })
             .map_err(EmbeddedEntryError::Parse)?;
@@ -467,7 +468,7 @@ pub(crate) fn include_foreign_module_registry_requests(
     // keeping the fallback loader incapable of any ambient IO.
     let roots = (0..graph.modules.len()).collect();
     let loader = ForeignModuleLoader::new(registry.clone(), Box::new(RejectAllModuleLoader));
-    extend_module_graph_requests_from_roots(graph, requests_to_add, &loader, roots)?;
+    extend_module_graph_requests_from_roots(graph, requests_to_add, &loader, roots, None)?;
     // Canonical host keys can collide even before a request has a resolution.
     // An existing source record must not silently replace the registered
     // capability when the loading driver reuses that key.
@@ -793,7 +794,7 @@ pub fn load_module_graph(
         }
     };
 
-    load_module_graph_from_entry(entry_module, loader)
+    load_module_graph_from_entry(entry_module, loader, None)
 }
 
 /// [`load_module_graph`] with an entry already parsed by the compilation front
@@ -810,7 +811,7 @@ pub(crate) fn load_module_graph_from_parsed(
         format!("file://{}", entry_key.as_str()),
         source,
     );
-    load_module_graph_from_entry(entry_module, loader)
+    load_module_graph_from_entry(entry_module, loader, None)
 }
 
 /// Script-entry counterpart of [`load_module_graph_from_parsed`]. The entry
@@ -821,18 +822,52 @@ pub(crate) fn load_module_graph_from_parsed_script(
     source: ParsedScript,
     loader: &dyn HostModuleLoader,
 ) -> Result<ModuleGraphSources, ModuleLoadError> {
+    load_module_graph_from_discovered_script(entry_locator, source, loader, None)
+}
+
+type GraphLoadingRequests = (Vec<scriptw_ir::ModuleRequestIr>, Vec<ModuleRequestKeyIr>);
+
+/// Test the retained Script before constructing its ambient loader or
+/// canonicalizing its filename, then feed the same discovery to the driver.
+pub(super) fn discover_module_graph_from_parsed_script(
+    entry_locator: &str,
+    source: &ParsedScript,
+    loader: &mut Option<Box<dyn HostModuleLoader>>,
+    configure_loader: impl FnOnce() -> Box<dyn HostModuleLoader>,
+) -> Result<Option<ModuleGraphSources>, ModuleLoadError> {
+    let Some(requests) = ModuleSourceIr::script_graph_loading_requests(source) else {
+        return Ok(None);
+    };
+    load_module_graph_from_discovered_script(
+        entry_locator,
+        source.clone(),
+        loader.get_or_insert_with(configure_loader).as_ref(),
+        Some(requests),
+    )
+    .map(Some)
+}
+
+/// Consume the initial Script discovery when the caller already used it to
+/// decide whether the Script needs a graph or a host loader.
+fn load_module_graph_from_discovered_script(
+    entry_locator: &str,
+    source: ParsedScript,
+    loader: &dyn HostModuleLoader,
+    entry_requests: Option<GraphLoadingRequests>,
+) -> Result<ModuleGraphSources, ModuleLoadError> {
     let entry_key = loader.canonical_key(entry_locator);
     let entry_module = ModuleSourceIr::from_parsed_script(
         entry_key.clone(),
         format!("file://{}", entry_key.as_str()),
         source,
     );
-    load_module_graph_from_entry(entry_module, loader)
+    load_module_graph_from_entry(entry_module, loader, entry_requests)
 }
 
 fn load_module_graph_from_entry(
     entry_module: ModuleSourceIr,
     loader: &dyn HostModuleLoader,
+    entry_requests: Option<GraphLoadingRequests>,
 ) -> Result<ModuleGraphSources, ModuleLoadError> {
     let mut graph = ModuleGraphSources {
         modules: vec![entry_module],
@@ -840,7 +875,13 @@ fn load_module_graph_from_entry(
         resolutions: Vec::new(),
         realm_requests: BTreeMap::new(),
     };
-    extend_module_graph_realm_requests(&mut graph, &[], loader)?;
+    extend_module_graph_requests_from_roots(
+        &mut graph,
+        &[],
+        loader,
+        VecDeque::from([0]),
+        entry_requests,
+    )?;
     Ok(graph)
 }
 
@@ -853,7 +894,7 @@ pub(crate) fn extend_module_graph_realm_requests(
     loader: &dyn HostModuleLoader,
 ) -> Result<(), ModuleLoadError> {
     let roots = VecDeque::from([graph.entry as usize]);
-    extend_module_graph_requests_from_roots(graph, requests_to_add, loader, roots)
+    extend_module_graph_requests_from_roots(graph, requests_to_add, loader, roots, None)
 }
 
 fn extend_module_graph_requests_from_roots(
@@ -861,6 +902,7 @@ fn extend_module_graph_requests_from_roots(
     requests_to_add: &[ModuleRequestKeyIr],
     loader: &dyn HostModuleLoader,
     mut pending: VecDeque<usize>,
+    mut entry_requests: Option<GraphLoadingRequests>,
 ) -> Result<(), ModuleLoadError> {
     let entry = graph.entry as usize;
     if entry >= graph.modules.len() {
@@ -892,15 +934,18 @@ fn extend_module_graph_requests_from_roots(
         }
         let referrer = u32::try_from(cursor).unwrap_or(u32::MAX);
         let key = modules[cursor].key().clone();
-        let requests = modules[cursor].module_loading_requests();
-
         // A rejected module produces no requests; `scriptw-ir` reports the
         // retained parse failure itself without trying the parser again.
-        let requests = requests.unwrap_or_default();
+        let discovered = if cursor == entry {
+            entry_requests.take()
+        } else {
+            None
+        };
+        let (requests, mut realm_candidates) =
+            discovered.unwrap_or_else(|| modules[cursor].graph_loading_requests());
         let source_requests = requests
             .into_iter()
             .map(|request| (Some(referrer), request));
-        let mut realm_candidates = modules[cursor].realm_module_requests();
         if cursor == entry {
             realm_candidates.extend_from_slice(requests_to_add);
         }
@@ -1154,6 +1199,62 @@ mod tests {
         assert_eq!(graph.units.len(), 2);
         assert_eq!(graph.entry, 0);
         assert_eq!(graph.keys[&sources.modules[1].record_key()], 1);
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn ambient_script_discovery_distinguishes_requests_from_method_names() {
+        let parse_script = |source| {
+            let ParsedSource::Script(script) =
+                scriptw_front::parse(source, scriptw_front::ParseOptions::script()).unwrap()
+            else {
+                unreachable!()
+            };
+            script
+        };
+        let mut loader = None;
+        let graph_free = parse_script("({ import() {}, importValue() {} });");
+        assert!(discover_module_graph_from_parsed_script(
+            "entry.js",
+            &graph_free,
+            &mut loader,
+            || { panic!("a graph-free Script must not construct an ambient loader") }
+        )
+        .unwrap()
+        .is_none());
+        assert!(loader.is_none());
+
+        let base = temp_base("script-discovery");
+        write_tree(&base, &[("source.js", "export const value = 1;")]);
+        let computed = parse_script("function get(name) { return import(name); }");
+        let graph =
+            discover_module_graph_from_parsed_script("entry.js", &computed, &mut loader, || {
+                Box::new(loader_at(&base))
+            })
+            .unwrap()
+            .expect("computed import needs a Script graph");
+        assert_eq!(graph.modules.len(), 1);
+        assert!(graph.resolutions.is_empty());
+
+        let both =
+            parse_script(r#"import('source.js'); realm['import\u0056alue']('realm', 'value');"#);
+        let graph =
+            discover_module_graph_from_parsed_script("entry.js", &both, &mut loader, || {
+                panic!("an installed loader must be reused")
+            })
+            .unwrap()
+            .expect("literal requests need a Script graph");
+        assert_eq!(
+            graph.resolutions,
+            [(0, ModuleRequestKeyIr::plain("source.js"), 1)]
+        );
+        assert!(matches!(
+            graph
+                .realm_requests
+                .get(&ModuleRequestKeyIr::plain("realm")),
+            Some(scriptw_ir::RealmModuleResolutionIr::Rejected(_))
+        ));
+        assert_eq!(graph.realm_requests.len(), 1);
         let _ = fs::remove_dir_all(&base);
     }
 

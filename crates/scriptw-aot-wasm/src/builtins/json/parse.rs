@@ -1,7 +1,7 @@
 //! An iterative UTF-16 parser builds fresh containers directly; only a reviver
 //! also receives the completed private records.
 use super::parse_cursor::JsonCursor;
-use super::parse_frame_state::JsonParseChildKey;
+use super::parse_frame_state::{JsonParseChildKey, JsonParseObjectScratch};
 use super::*;
 
 /// Where a completed value goes: `value`, flagged by `delivered`, and with a
@@ -28,6 +28,7 @@ impl FunctionBuilder<'_> {
     ) -> Result<GcLocal<JsonParseRecord, Nullable>, EmitError> {
         let s = self.runtime_schema();
         let cursor = JsonCursor::open(text, s, f);
+        let object_scratch = JsonParseObjectScratch::open(s, f);
         let start = s.reserve_i32_local(f);
         let ordinal = s.reserve_i64_local(f);
         let state = s.reserve_i32_local(f);
@@ -95,6 +96,9 @@ impl FunctionBuilder<'_> {
                 &current,
                 f,
             );
+            if !array {
+                object_scratch.open_frame(&frame, s, f);
+            }
             current.replace(frame.load(s, f).nullable(), f);
             frame.clear(f);
             json_i32(expect_value, 0, f);
@@ -112,7 +116,10 @@ impl FunctionBuilder<'_> {
         // Source records are private reviver input, never part of the parsed value.
         capture_source.load(f);
         self.open_frame(ControlFrameKind::If, f);
-        source.replace(cursor.slice_string(start, cursor.at, self, f)?.nullable(), f);
+        source.replace(
+            cursor.slice_string(start, cursor.at, self, f)?.nullable(),
+            f,
+        );
         let primitive = self.emit_json_parse_record(value, &source, &no_children, f);
         record.replace(primitive.load(s, f).nullable(), f);
         primitive.clear(f);
@@ -160,7 +167,7 @@ impl FunctionBuilder<'_> {
                 .require_non_null(f),
             f,
         );
-        self.emit_json_object_member(&container, &key, value, f)?;
+        self.emit_json_deliver_object_member(&object_scratch, &frame, &container, &key, value, f)?;
         capture_source.load(f);
         self.open_frame(ControlFrameKind::If, f);
         let child = s
@@ -212,6 +219,8 @@ impl FunctionBuilder<'_> {
             delivered,
             capture_source,
         };
+        let close_container = s.reserve_i32_local(f);
+        close_container.set_constant(0, f);
         let dispatched = self.open_frame(ControlFrameKind::Block, f);
         for selected in JsonParseFrameState::ALL {
             state.load(f);
@@ -225,7 +234,7 @@ impl FunctionBuilder<'_> {
                     f.instruction(&Instruction::I32Const(if array { 93 } else { 125 }));
                     f.instruction(&Instruction::I32Eq);
                     self.open_frame(ControlFrameKind::If, f);
-                    self.emit_json_complete_container(&frame, &delivery, &cursor, f)?;
+                    close_container.set_constant(1, f);
                     f.instruction(&Instruction::Else);
                     self.emit_json_parse_state(
                         &frame,
@@ -301,7 +310,7 @@ impl FunctionBuilder<'_> {
                     )?;
                     self.pop_control(ControlFrameKind::If);
                     f.instruction(&Instruction::End);
-                    self.emit_json_complete_container(&frame, &delivery, &cursor, f)?;
+                    close_container.set_constant(1, f);
                     self.pop_control(ControlFrameKind::If);
                     f.instruction(&Instruction::End);
                 }
@@ -312,6 +321,12 @@ impl FunctionBuilder<'_> {
         }
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
+        close_container.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_json_complete_container(&frame, &delivery, &cursor, &object_scratch, f)?;
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(close_container, f);
         frame.clear(f);
         self.emit_branch_to_target(next, f);
         self.pop_control(ControlFrameKind::Loop);
@@ -336,6 +351,7 @@ impl FunctionBuilder<'_> {
         s.release_i32_local(state, f);
         s.release_i64_local(ordinal, f);
         s.release_i32_local(start, f);
+        object_scratch.close(s, f);
         cursor.close(s, f);
         Ok(record)
     }
@@ -344,6 +360,7 @@ impl FunctionBuilder<'_> {
         frame: &GcLocal<JsonParseFrame>,
         delivery: &JsonParseDelivery<'_>,
         cursor: &JsonCursor<'_>,
+        object_scratch: &JsonParseObjectScratch,
         f: &mut Function,
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
@@ -358,6 +375,11 @@ impl FunctionBuilder<'_> {
         s.struct_type::<StoredValue>()
             .read_into(&stored, delivery.value, s, f);
         stored.clear(f);
+        self.emit_json_reference_test::<OrdinaryObject>(delivery.value, f);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_json_complete_object_members(object_scratch, frame, delivery.value, f)?;
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         delivery.capture_source.load(f);
         self.open_frame(ControlFrameKind::If, f);
         let source = s

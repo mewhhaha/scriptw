@@ -86,6 +86,13 @@ pub(super) fn compile(
     for argument in &arguments {
         argument.emit(&mut function);
     }
+    if entry.arity() == crate::function_entry::LocalArgumentsArity::Wide {
+        // The validated count is an unsigned GC array length. Preserve the
+        // original vector for reads beyond the local lanes or late construction.
+        count.load(&mut function);
+        function.instruction(&Instruction::I32WrapI64);
+        vector.load(schema, &mut function);
+    }
     caller_realm.load(schema, &mut function);
     program.load(schema, &mut function);
     entry.emit_return_call_instruction(&mut function);

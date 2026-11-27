@@ -25,7 +25,7 @@ pub use eval_source::{
     prepare_eval_source, prepare_eval_source_utf16, DirectEvalParseContext, EvalInvocationContext,
     EvalParseContext,
 };
-pub use json::{parse_json, JsonParseError, JsonValue, ParsedJson};
+pub use json::{parse_json, parse_json_retaining_source, JsonParseError, JsonValue, ParsedJson};
 pub use utf16_source::{
     decode_js_string_utf16, encode_js_string_utf16, SourceTextEncoding,
     JS_STRING_SURROGATE_SENTINEL,
@@ -81,14 +81,15 @@ pub struct SourceUnit {
 /// longer lifetime than the other.
 #[derive(Clone)]
 pub struct ParsedScript {
-    source: SourceUnit,
     syntax: Rc<ScriptSyntax>,
 }
 
 struct ScriptSyntax {
+    source: SourceUnit,
     ast: Script,
     interner: Interner,
     source_text: boa_ast::SourceText,
+    has_dynamic_import: bool,
 }
 
 /// Identity of one successful Script parse, retaining its actual owned syntax
@@ -147,11 +148,11 @@ impl core::fmt::Debug for ParsedModuleIdentity {
 /// that it could accidentally parse a second time.
 #[derive(Clone)]
 pub struct ParsedModule {
-    source: SourceUnit,
     syntax: Rc<ModuleSyntax>,
 }
 
 struct ModuleSyntax {
+    source: SourceUnit,
     ast: Module,
     interner: Interner,
     source_text: boa_ast::SourceText,
@@ -171,10 +172,20 @@ pub enum ParsedSource {
 
 impl ParsedSource {
     #[must_use]
-    pub const fn source(&self) -> &SourceUnit {
+    pub fn source(&self) -> &SourceUnit {
         match self {
             Self::Script(source) => source.source(),
             Self::Module(source) => source.source(),
+        }
+    }
+
+    /// Recovers the source allocation once compilation releases its syntax.
+    #[doc(hidden)]
+    pub fn into_source(self) -> SourceUnit {
+        match self {
+            Self::Script(source) => source.into_source(),
+            Self::Module(source) => Rc::try_unwrap(source.syntax)
+                .map_or_else(|syntax| syntax.source.clone(), |syntax| syntax.source),
         }
     }
 
@@ -205,8 +216,21 @@ impl ParsedSource {
 
 impl ParsedScript {
     #[must_use]
-    pub const fn source(&self) -> &SourceUnit {
-        &self.source
+    pub fn source(&self) -> &SourceUnit {
+        &self.syntax.source
+    }
+
+    #[doc(hidden)]
+    pub fn into_source(self) -> SourceUnit {
+        Rc::try_unwrap(self.syntax)
+            .map_or_else(|syntax| syntax.source.clone(), |syntax| syntax.source)
+    }
+
+    /// Whether the callable-binding validation walk saw an actual `import()`.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn has_dynamic_import(&self) -> bool {
+        self.syntax.has_dynamic_import
     }
 
     /// Exact semantic source units retained with the AST/interner allocation.
@@ -246,8 +270,8 @@ impl ParsedScript {
 
 impl ParsedModule {
     #[must_use]
-    pub const fn source(&self) -> &SourceUnit {
-        &self.source
+    pub fn source(&self) -> &SourceUnit {
+        &self.syntax.source
     }
 
     /// Retains this Module's exact syntax/interner owner without copying text.
@@ -295,13 +319,13 @@ impl Deref for ParsedModule {
 
 impl core::fmt::Debug for ParsedScript {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("ParsedScript").field(&self.source).finish()
+        f.debug_tuple("ParsedScript").field(self.source()).finish()
     }
 }
 
 impl core::fmt::Debug for ParsedModule {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("ParsedModule").field(&self.source).finish()
+        f.debug_tuple("ParsedModule").field(self.source()).finish()
     }
 }
 
@@ -316,7 +340,7 @@ impl core::fmt::Debug for ParsedSource {
 
 impl PartialEq for ParsedScript {
     fn eq(&self, other: &Self) -> bool {
-        self.source == other.source
+        self.source() == other.source()
     }
 }
 
@@ -324,7 +348,7 @@ impl Eq for ParsedScript {}
 
 impl PartialEq for ParsedModule {
     fn eq(&self, other: &Self) -> bool {
-        self.source == other.source
+        self.source() == other.source()
     }
 }
 
@@ -588,40 +612,60 @@ pub fn parse(
     source_text: impl Into<String>,
     options: ParseOptions,
 ) -> Result<ParsedSource, ParseError> {
-    let source_text = source_text.into();
-    let mut interner = Interner::default();
-    let scope = Scope::new_global();
-    let source = if let Some(filename) = &options.filename {
-        Source::from_bytes(source_text.as_bytes()).with_path(std::path::Path::new(filename))
-    } else {
-        Source::from_bytes(source_text.as_bytes())
-    };
+    parse_retaining_source(source_text.into(), options).map_err(|(_, error)| error)
+}
 
-    let ast = parse_with_boundary(&source_text, || match options.goal {
-        ParseGoal::Script => Parser::new(source)
-            .parse_script_with_source(&scope, &mut interner)
-            .map(|(ast, source)| ParsedAst::Script(ast, source)),
-        ParseGoal::Module => Parser::new(source)
-            .parse_module_with_source(&scope, &mut interner)
-            .map(|(ast, source)| ParsedAst::Module(ast, source)),
-    })?;
-
-    match &ast {
-        ParsedAst::Script(ast, _) => strict_callable_bindings::validate(ast, |position| {
-            source_span_at_position(&source_text, position)
-        }),
-        ParsedAst::Module(ast, _) => strict_callable_bindings::validate(ast, |position| {
-            source_span_at_position(&source_text, position)
-        }),
-    }?;
-
+/// Parses owned UTF-8 and returns the same source metadata on rejection.
+#[doc(hidden)]
+pub fn parse_retaining_source(
+    source_text: String,
+    options: ParseOptions,
+) -> Result<ParsedSource, (SourceUnit, ParseError)> {
     let source = SourceUnit {
         goal: options.goal,
         filename: options.filename,
         source_text,
         encoding: SourceTextEncoding::Utf8,
     };
-    Ok(parsed_source(ast, source, interner))
+    let mut interner = Interner::default();
+    match parse_utf8_syntax(&source, &mut interner) {
+        Ok((ast, has_dynamic_import)) => {
+            Ok(parsed_source(ast, source, interner, has_dynamic_import))
+        }
+        Err(error) => Err((source, error)),
+    }
+}
+
+fn parse_utf8_syntax(
+    source_unit: &SourceUnit,
+    interner: &mut Interner,
+) -> Result<(ParsedAst, bool), ParseError> {
+    let source_text = &source_unit.source_text;
+    let scope = Scope::new_global();
+    let source = if let Some(filename) = &source_unit.filename {
+        Source::from_bytes(source_text.as_bytes()).with_path(std::path::Path::new(filename))
+    } else {
+        Source::from_bytes(source_text.as_bytes())
+    };
+
+    let ast = parse_with_boundary(source_text, || match source_unit.goal {
+        ParseGoal::Script => Parser::new(source)
+            .parse_script_with_source(&scope, interner)
+            .map(|(ast, source)| ParsedAst::Script(ast, source)),
+        ParseGoal::Module => Parser::new(source)
+            .parse_module_with_source(&scope, interner)
+            .map(|(ast, source)| ParsedAst::Module(ast, source)),
+    })?;
+
+    let has_dynamic_import = match &ast {
+        ParsedAst::Script(ast, _) => strict_callable_bindings::validate(ast, |position| {
+            source_span_at_position(source_text, position)
+        }),
+        ParsedAst::Module(ast, _) => strict_callable_bindings::validate(ast, |position| {
+            source_span_at_position(source_text, position)
+        }),
+    }?;
+    Ok((ast, has_dynamic_import))
 }
 
 /// Parses a prepared Script supplied as an ECMAScript string. Module host
@@ -633,37 +677,44 @@ pub fn parse_script_utf16(source_units: &[u16]) -> Result<ParsedScript, ParseErr
         Parser::new(Source::from_utf16(source_units))
             .parse_script_with_source(&scope, &mut interner)
     })?;
-    strict_callable_bindings::validate(&ast, |position| {
+    let has_dynamic_import = strict_callable_bindings::validate(&ast, |position| {
         source_span_utf16_at_position(source_units, position)
     })?;
     Ok(ParsedScript {
-        source: SourceUnit {
-            goal: ParseGoal::Script,
-            filename: None,
-            source_text: encode_js_string_utf16(source_units),
-            encoding: SourceTextEncoding::EncodedUtf16,
-        },
         syntax: Rc::new(ScriptSyntax {
+            source: SourceUnit {
+                goal: ParseGoal::Script,
+                filename: None,
+                source_text: encode_js_string_utf16(source_units),
+                encoding: SourceTextEncoding::EncodedUtf16,
+            },
             ast,
             interner,
             source_text,
+            has_dynamic_import,
         }),
     })
 }
 
-fn parsed_source(ast: ParsedAst, source: SourceUnit, interner: Interner) -> ParsedSource {
+fn parsed_source(
+    ast: ParsedAst,
+    source: SourceUnit,
+    interner: Interner,
+    has_dynamic_import: bool,
+) -> ParsedSource {
     match ast {
         ParsedAst::Script(ast, source_text) => ParsedSource::Script(ParsedScript {
-            source,
             syntax: Rc::new(ScriptSyntax {
+                source,
                 ast,
                 interner,
                 source_text,
+                has_dynamic_import,
             }),
         }),
         ParsedAst::Module(ast, source_text) => ParsedSource::Module(ParsedModule {
-            source,
             syntax: Rc::new(ModuleSyntax {
+                source,
                 ast,
                 interner,
                 source_text,

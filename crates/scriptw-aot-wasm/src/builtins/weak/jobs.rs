@@ -1,12 +1,34 @@
 use super::finalization::cells::CellSelection;
 use super::*;
+
+// The runtime and all its programs share this private memory. This byte stays
+// set once a successful constructor creates a resource in the Store.
+const WEAK_ACTIVITY_ADDRESS: u32 = crate::heap::DEADLINE_POLL_ADDRESS + 1;
+const _: () = assert!(WEAK_ACTIVITY_ADDRESS < crate::heap::STATIC_DATA_OFFSET);
+const WEAK_ACTIVITY_BYTE: wasm_encoder::MemArg = wasm_encoder::MemArg {
+    offset: WEAK_ACTIVITY_ADDRESS as u64,
+    align: 0,
+    // Runtime re-encoding remaps the emitter's private memory index.
+    memory_index: 0,
+};
+
 impl FunctionBuilder<'_> {
+    pub(crate) fn emit_record_weak_activity(&self, f: &mut Function) {
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Store8(WEAK_ACTIVITY_BYTE));
+    }
+
     /// Called once after the script/module job and after each dequeued job.
     pub(crate) fn emit_finish_weak_job(&mut self, f: &mut Function) -> Result<(), EmitError> {
         let s = self.runtime_schema();
+        let exit = self.open_frame(ControlFrameKind::Block, f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32Load8U(WEAK_ACTIVITY_BYTE));
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(exit, f);
         self.weak_import(GcHostImport::WeakJobFinish)?
             .emit_call_instruction(f);
-        let exit = self.open_frame(ControlFrameKind::Block, f);
         let again = self.open_frame(ControlFrameKind::Loop, f);
         let next = s.reserve_gc_local(f).initialize(
             self.weak_import(GcHostImport::FinalizationNextRegistry)?

@@ -55,52 +55,70 @@ pub(super) fn literal_realm_requests<'ast>(
     source: &'ast impl VisitWith,
     interner: &'ast Interner,
 ) -> Vec<ModuleRequestKeyIr> {
-    struct Requests<'a> {
-        interner: &'a Interner,
-        requests: BTreeSet<ModuleRequestKeyIr>,
-    }
-    impl<'ast> Visitor<'ast> for Requests<'_> {
-        type BreakTy = ();
-        fn visit_expression(&mut self, expression: &'ast Expression) -> ControlFlow<()> {
-            let Expression::Call(call) = expression else {
-                return expression.visit_with(self);
-            };
-            if let Expression::PropertyAccess(PropertyAccess::Simple(access)) =
-                call.function().flatten()
-            {
-                let name = match access.field() {
-                    PropertyAccessField::Const(name) => {
-                        Some(self.interner.resolve_expect(name.sym()).to_string())
-                    }
-                    PropertyAccessField::Expr(expression) => match expression.flatten() {
-                        Expression::Literal(literal) => match literal.kind() {
-                            LiteralKind::String(name) => {
-                                Some(self.interner.resolve_expect(*name).to_string())
-                            }
-                            _ => None,
-                        },
-                        _ => None,
-                    },
-                };
-                if name.as_deref() == Some("importValue") {
-                    if let Some(Expression::Literal(literal)) =
-                        call.args().first().map(Expression::flatten)
-                    {
-                        if let LiteralKind::String(specifier) = literal.kind() {
-                            self.requests.insert(ModuleRequestKeyIr::plain(
-                                self.interner.resolve_expect(*specifier).to_string(),
-                            ));
-                        }
-                    }
-                }
-            }
-            expression.visit_with(self)
-        }
-    }
-    let mut requests = Requests {
-        interner,
-        requests: BTreeSet::new(),
+    let Some(mut requests) = RealmRequestScan::new(interner) else {
+        return Vec::new();
     };
     let _ = source.visit_with(&mut requests);
-    requests.requests.into_iter().collect()
+    requests.into_requests()
+}
+
+pub(super) struct RealmRequestScan<'a> {
+    interner: &'a Interner,
+    import_value: boa_interner::Sym,
+    requests: BTreeSet<ModuleRequestKeyIr>,
+}
+
+impl<'a> RealmRequestScan<'a> {
+    pub(super) fn new(interner: &'a Interner) -> Option<Self> {
+        Some(Self {
+            interner,
+            import_value: interner.get("importValue")?,
+            requests: BTreeSet::new(),
+        })
+    }
+
+    pub(super) fn observe(&mut self, expression: &Expression) {
+        let Expression::Call(call) = expression else {
+            return;
+        };
+        let Expression::PropertyAccess(PropertyAccess::Simple(access)) = call.function().flatten()
+        else {
+            return;
+        };
+        let name = match access.field() {
+            PropertyAccessField::Const(name) => name.sym(),
+            PropertyAccessField::Expr(expression) => {
+                let Expression::Literal(literal) = expression.flatten() else {
+                    return;
+                };
+                let LiteralKind::String(name) = literal.kind() else {
+                    return;
+                };
+                *name
+            }
+        };
+        if name == self.import_value {
+            if let Some(Expression::Literal(literal)) = call.args().first().map(Expression::flatten)
+            {
+                if let LiteralKind::String(specifier) = literal.kind() {
+                    self.requests.insert(ModuleRequestKeyIr::plain(
+                        self.interner.resolve_expect(*specifier).to_string(),
+                    ));
+                }
+            }
+        }
+    }
+
+    pub(super) fn into_requests(self) -> Vec<ModuleRequestKeyIr> {
+        self.requests.into_iter().collect()
+    }
+}
+
+impl<'ast> Visitor<'ast> for RealmRequestScan<'_> {
+    type BreakTy = core::convert::Infallible;
+
+    fn visit_expression(&mut self, expression: &'ast Expression) -> ControlFlow<Self::BreakTy> {
+        self.observe(expression);
+        expression.visit_with(self)
+    }
 }

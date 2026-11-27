@@ -111,12 +111,13 @@ fn snapshot_exports_have_actual_gc_roots_witnesses_and_a_typed_resolver() {
             SNAPSHOT_SYMBOLS_EXPORT,
             SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT,
             SNAPSHOT_ENSURE_PROPERTY_STORAGE_EXPORT,
+            GcSnapshotLayout::GLOBAL_BUILTIN_ROW_EXPORT,
         ])
         .collect::<BTreeSet<_>>();
     assert_eq!(
         snapshot_export_names(&runtime_exports),
         expected,
-        "R exports three roots, declaration-derived witnesses and both property projections"
+        "R exports three roots, declaration-derived witnesses and all property projections"
     );
     for name in expected {
         assert_eq!(
@@ -130,6 +131,44 @@ fn snapshot_exports_have_actual_gc_roots_witnesses_and_a_typed_resolver() {
             .iter()
             .find(|(export, _, _)| export == name)
             .unwrap();
+        if name == GcSnapshotLayout::GLOBAL_BUILTIN_ROW_EXPORT {
+            assert_eq!(*kind, ExternalKind::Func, "{name}");
+            let signature = exported_function_type(runtime.bytes(), *index);
+            assert_eq!(signature.params().len(), 2, "backing and row index");
+            assert_eq!(signature.params()[1], ValType::I32, "row index is i32");
+            assert_eq!(signature.results().len(), 2, "key and descriptor");
+            for (actual, layout) in [
+                signature.params()[0],
+                signature.results()[0],
+                signature.results()[1],
+            ]
+            .into_iter()
+            .zip([
+                GcSnapshotLayout::GlobalBuiltinBacking,
+                GcSnapshotLayout::String,
+                GcSnapshotLayout::Descriptor,
+            ]) {
+                let (_, kind, index) = runtime_exports
+                    .iter()
+                    .find(|(name, _, _)| name == layout.witness_export())
+                    .unwrap();
+                assert_eq!(*kind, ExternalKind::Global);
+                let ValType::Ref(witness) = runtime_globals[*index as usize].content_type else {
+                    panic!("the published witness must be a GC reference");
+                };
+                let ValType::Ref(actual) = actual else {
+                    panic!("the resolver boundary must use concrete GC references");
+                };
+                assert!(!actual.is_nullable(), "resolver values are non-null");
+                assert!(matches!(actual.heap_type(), HeapType::Concrete(_)));
+                assert_eq!(
+                    actual.heap_type(),
+                    witness.heap_type(),
+                    "resolver signature must use the exact published {layout:?} type"
+                );
+            }
+            continue;
+        }
         if name == SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT
             || name == SNAPSHOT_ENSURE_PROPERTY_STORAGE_EXPORT
         {

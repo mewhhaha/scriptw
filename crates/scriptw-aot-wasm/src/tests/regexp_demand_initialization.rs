@@ -120,8 +120,8 @@ fn canonical_runtime_defers_regexp_and_builds_its_family_in_the_realm_owner() {
         let publication = body(bytes, named(&names, &publisher));
         assert_eq!(
             struct_new_count(&publication, recipe_type),
-            1,
-            "{publisher} installs one defining-Realm recipe",
+            0,
+            "{publisher} publishes the sealed global table without eagerly constructing the RegExp recipe",
         );
         assert_eq!(
             call_count(&publication, ensure_index),
@@ -129,6 +129,12 @@ fn canonical_runtime_defers_regexp_and_builds_its_family_in_the_realm_owner() {
             "global publication leaves RegExp dormant",
         );
     }
+    let values = body(bytes, named(&names, "helper::intrinsic_property_value"));
+    assert_eq!(
+        struct_new_count(&values, recipe_type),
+        1,
+        "only the on-demand RegExp row path creates the defining-Realm recipe",
+    );
 
     let realm_type = type_index::<RealmRecord>(schema);
     let regexp_state_field = regexp_state_field(&registered);

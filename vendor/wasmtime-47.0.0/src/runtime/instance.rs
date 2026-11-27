@@ -9,8 +9,8 @@ use crate::store::{
 };
 use crate::types::matching;
 use crate::{
-    AsContextMut, Engine, Export, Extern, Func, Global, Memory, Module, ModuleExport, SharedMemory,
-    StoreContext, StoreContextMut, Table, Tag, TypedFunc,
+    AsContextMut, Engine, Export, Extern, Func, Global, Memory, MemoryType, Module, ModuleExport,
+    SharedMemory, StoreContext, StoreContextMut, Table, Tag, TypedFunc,
 };
 use alloc::sync::Arc;
 use core::ptr::NonNull;
@@ -458,7 +458,8 @@ impl Instance {
         let store = store.as_context_mut().0;
 
         // Verify the `ModuleExport` matches the module used in this instance.
-        if self._module(store).id() != export.module {
+        // A dummy caller instance (from a direct Rust host call) has no module.
+        if store.module_for_instance(self.id).map(|m| m.id()) != Some(export.module) {
             return None;
         }
 
@@ -466,14 +467,17 @@ impl Instance {
     }
 
     fn _get_export(&self, store: &mut StoreOpaque, entity: EntityIndex) -> Extern {
+        Extern::from_wasmtime_export(self._get_export_raw(store, entity), store.engine())
+    }
+
+    fn _get_export_raw(&self, store: &mut StoreOpaque, entity: EntityIndex) -> vm::Export {
         let id = store.id();
         // SAFETY: the store `id` owns this instance and all exports contained
         // within.
-        let export = unsafe {
+        unsafe {
             let (instance, registry) = self.id.get_mut_and_module_registry(store);
             instance.get_export_by_index_mut(registry, id, entity)
-        };
-        Extern::from_wasmtime_export(export, store.engine())
+        }
     }
 
     /// Looks up an exported [`Func`] value by name.
@@ -710,7 +714,6 @@ impl OwnedImports {
 
     /// Note that this is unsafe as the validity of `item` is not verified and
     /// it contains a bunch of raw pointers.
-    #[cfg(feature = "component-model")]
     pub(crate) fn push_export(
         &mut self,
         store: &StoreOpaque,
@@ -760,7 +763,9 @@ impl OwnedImports {
 /// none of the imports it closed over are tied to any particular [`Store`].
 ///
 /// This structure is created through the [`Linker::instantiate_pre`] method,
-/// which also has some more information and examples.
+/// which also has some more information and examples. Linker methods that
+/// leave memory or module exports to be supplied at instantiation likewise
+/// pre-check the types of all imports.
 ///
 /// [`Store`]: crate::Store
 /// [`Linker::instantiate_pre`]: crate::Linker::instantiate_pre
@@ -775,6 +780,8 @@ pub struct InstancePre<T> {
     /// to everything internally into a `Store<T>` without having to clone each
     /// individual item.
     items: Arc<TryVec<Definition>>,
+
+    late_imports: LateImports,
 
     /// A count of `Definition::HostFunc` entries in `items` above to
     /// preallocate space in a `Store` up front for all entries to be inserted.
@@ -797,12 +804,45 @@ pub struct InstancePre<T> {
     _marker: core::marker::PhantomData<fn() -> T>,
 }
 
+/// A late binding describes where imports omitted from `InstancePre::items`
+/// come from. Fixed definitions occupy all remaining positions in order.
+#[derive(Clone, Default)]
+pub(crate) struct LateImports {
+    pub shared_memory: Option<SharedMemorySlot>,
+    pub module_exports: Option<ModuleExportBindings>,
+}
+
+impl LateImports {
+    fn is_empty(&self) -> bool {
+        self.shared_memory.is_none() && self.module_exports.is_none()
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct SharedMemorySlot {
+    pub position: usize,
+    pub ty: MemoryType,
+}
+
+#[derive(Clone)]
+pub(crate) struct ModuleExportBindings {
+    pub source: Module,
+    pub exports: Arc<TryVec<Option<ModuleExport>>>,
+}
+
+#[derive(Default)]
+struct BoundImports<'a> {
+    shared_memory: Option<(usize, &'a SharedMemory)>,
+    module_exports: Option<(Instance, &'a [Option<ModuleExport>])>,
+}
+
 /// InstancePre's clone does not require T: Clone
 impl<T> Clone for InstancePre<T> {
     fn clone(&self) -> Self {
         Self {
             module: self.module.clone(),
             items: self.items.clone(),
+            late_imports: self.late_imports.clone(),
             host_funcs: self.host_funcs,
             func_refs: self.func_refs.clone(),
             asyncness: self.asyncness,
@@ -820,8 +860,16 @@ impl<T: 'static> InstancePre<T> {
     /// This method is unsafe as the `T` of the `InstancePre<T>` is not
     /// guaranteed to be the same as the `T` within the `Store`, the caller must
     /// verify that.
-    pub(crate) unsafe fn new(module: &Module, items: TryVec<Definition>) -> Result<InstancePre<T>> {
-        typecheck(module, &items, |cx, ty, item| cx.definition(ty, &item.ty()))?;
+    pub(crate) unsafe fn new(
+        module: &Module,
+        items: TryVec<Definition>,
+        late_imports: LateImports,
+    ) -> Result<InstancePre<T>> {
+        if late_imports.is_empty() {
+            typecheck(module, &items, |cx, ty, item| cx.definition(ty, &item.ty()))?;
+        } else {
+            typecheck_late_imports(module, &items, &late_imports)?;
+        }
 
         let mut func_refs = TryVec::with_capacity(items.len())?;
         let mut host_funcs = 0;
@@ -847,6 +895,7 @@ impl<T: 'static> InstancePre<T> {
         Ok(InstancePre {
             module: module.clone(),
             items: try_new::<Arc<_>>(items)?,
+            late_imports,
             host_funcs,
             func_refs: try_new::<Arc<_>>(func_refs)?,
             asyncness,
@@ -872,17 +921,96 @@ impl<T: 'static> InstancePre<T> {
     /// # Panics
     ///
     /// Panics if any import closed over by this [`InstancePre`] isn't owned by
-    /// `store`, or if `store` has async support enabled. Additionally this
-    /// function will panic if the `store` provided comes from a different
-    /// [`Engine`] than the [`InstancePre`] originally came from.
+    /// `store`, or if `store` has async support enabled.
     ///
     /// # Errors
+    ///
+    /// The store must use the same [`Engine`] as this [`InstancePre`].
     ///
     /// This function will return an [`OutOfMemory`][crate::OutOfMemory] error when
     /// memory allocation fails. See the `OutOfMemory` type's documentation for
     /// details on Wasmtime's out-of-memory handling.
-    pub fn instantiate(&self, mut store: impl AsContextMut<Data = T>) -> Result<Instance> {
+    pub fn instantiate(&self, store: impl AsContextMut<Data = T>) -> Result<Instance> {
+        self.instantiate_bound(store, None, None)
+    }
+
+    /// Instantiates with the memory slot prepared by
+    /// [`Linker::instantiate_pre_with_shared_memory`](crate::Linker::instantiate_pre_with_shared_memory).
+    ///
+    /// The memory must come from the same engine and have the exact declared
+    /// memory type. Each instantiation can supply a different memory.
+    pub fn instantiate_with_shared_memory(
+        &self,
+        store: impl AsContextMut<Data = T>,
+        memory: &SharedMemory,
+    ) -> Result<Instance> {
+        self.instantiate_bound(store, Some(memory), None)
+    }
+
+    /// Instantiates with the exports prepared by
+    /// [`Linker::instantiate_pre_with_module_exports`](crate::Linker::instantiate_pre_with_module_exports).
+    ///
+    /// The source instance must belong to this store and have been instantiated
+    /// from the same source module used to prepare the imports. If preparation
+    /// designated a shared memory import, supply the matching memory here.
+    pub fn instantiate_with_module_exports(
+        &self,
+        store: impl AsContextMut<Data = T>,
+        source: Instance,
+        memory: Option<&SharedMemory>,
+    ) -> Result<Instance> {
+        self.instantiate_bound(store, memory, Some(source))
+    }
+
+    fn bind_shared_memory<'a>(
+        &self,
+        memory: Option<&'a SharedMemory>,
+    ) -> Result<Option<(usize, &'a SharedMemory)>> {
+        match (&self.late_imports.shared_memory, memory) {
+            (Some(slot), Some(memory)) => {
+                ensure!(
+                    Engine::same(memory.engine(), self.module.engine()),
+                    "shared memory belongs to a different engine"
+                );
+                ensure!(
+                    memory.ty() == slot.ty,
+                    "shared memory type differs from its import"
+                );
+                Ok(Some((slot.position, memory)))
+            }
+            (None, None) => Ok(None),
+            (None, Some(_)) => bail!("prepared instance has no shared memory slot"),
+            (Some(_), None) => bail!("prepared instance requires shared memory"),
+        }
+    }
+
+    fn instantiate_bound(
+        &self,
+        mut store: impl AsContextMut<Data = T>,
+        memory: Option<&SharedMemory>,
+        source: Option<Instance>,
+    ) -> Result<Instance> {
         let mut store = store.as_context_mut();
+        let shared_memory = self.bind_shared_memory(memory)?;
+        let module_exports = match (&self.late_imports.module_exports, source) {
+            (Some(bindings), Some(source)) => {
+                ensure!(
+                    source.id.store_id() == store.0.id(),
+                    "source instance belongs to a different store"
+                );
+                ensure!(
+                    store
+                        .0
+                        .module_for_instance(source.id)
+                        .is_some_and(|actual| Module::same(actual, &bindings.source)),
+                    "source instance belongs to a different module"
+                );
+                Some((source, &bindings.exports[..]))
+            }
+            (None, None) => None,
+            (None, Some(_)) => bail!("prepared instance has no source module exports"),
+            (Some(_), None) => bail!("prepared instance requires source module exports"),
+        };
         let imports = pre_instantiate_raw(
             &mut store.0,
             &self.module,
@@ -890,6 +1018,10 @@ impl<T: 'static> InstancePre<T> {
             self.host_funcs,
             &self.func_refs,
             self.asyncness,
+            BoundImports {
+                shared_memory,
+                module_exports,
+            },
         )?;
 
         // Note that this is specifically done after `pre_instantiate_raw` to
@@ -898,9 +1030,9 @@ impl<T: 'static> InstancePre<T> {
         // this instantiation to say "use `instantiate_async` instead".
         store.0.validate_sync_call()?;
 
-        // This unsafety should be handled by the type-checking performed by the
-        // constructor of `InstancePre` to assert that all the imports we're passing
-        // in match the module we're instantiating.
+        // SAFETY: construction checked the fixed imports and the late import
+        // declarations. The bound memory and source instance were checked
+        // against those declarations above.
         vm::assert_ready(unsafe {
             Instance::new_started(&mut store, &self.module, imports.as_ref(), Asyncness::No)
         })
@@ -927,6 +1059,10 @@ impl<T: 'static> InstancePre<T> {
         &self,
         mut store: impl AsContextMut<Data = T>,
     ) -> Result<Instance> {
+        ensure!(
+            self.late_imports.is_empty(),
+            "prepared instance requires late imports"
+        );
         let mut store = store.as_context_mut();
         let imports = pre_instantiate_raw(
             &mut store.0,
@@ -935,6 +1071,7 @@ impl<T: 'static> InstancePre<T> {
             self.host_funcs,
             &self.func_refs,
             self.asyncness,
+            BoundImports::default(),
         )?;
 
         // This unsafety should be handled by the type-checking performed by the
@@ -959,7 +1096,12 @@ fn pre_instantiate_raw(
     host_funcs: usize,
     func_refs: &Arc<TryVec<VMFuncRef>>,
     asyncness: Asyncness,
+    bound_imports: BoundImports<'_>,
 ) -> Result<OwnedImports> {
+    ensure!(
+        Engine::same(store.engine(), module.engine()),
+        "cross-`Engine` instantiation is not currently supported"
+    );
     // Register this module and use it to fill out any funcref wasm_call holes
     // we can. For more comments on this see `typecheck_externs`.
     let (modules, engine, breakpoints) = store.modules_and_engine_and_breakpoints_mut();
@@ -986,7 +1128,27 @@ fn pre_instantiate_raw(
 
     let mut func_refs = func_refs.iter().map(|f| NonNull::from(f));
     let mut imports = OwnedImports::new(module)?;
-    for import in items.iter() {
+    let import_count = bound_imports.module_exports.map_or_else(
+        || items.len() + usize::from(bound_imports.shared_memory.is_some()),
+        |(_, exports)| exports.len(),
+    );
+    let mut items = items.iter();
+    for position in 0..import_count {
+        if let Some((memory_position, memory)) = bound_imports.shared_memory {
+            if memory_position == position {
+                imports.memories.push(memory.vmimport(store))?;
+                continue;
+            }
+        }
+        if let Some((source, exports)) = bound_imports.module_exports {
+            if let Some(export) = &exports[position] {
+                let item = source._get_export_raw(store, export.entity);
+                imports.push_export(store, &item)?;
+                continue;
+            }
+        }
+
+        let import = items.next().unwrap();
         if !import.comes_from_same_store(store) {
             bail!("cross-`Store` instantiation is not currently supported");
         }
@@ -1014,6 +1176,78 @@ fn pre_instantiate_raw(
     Ok(imports)
 }
 
+fn typecheck_late_imports(
+    module: &Module,
+    items: &[Definition],
+    late_imports: &LateImports,
+) -> Result<()> {
+    let imports = module.env_module().imports();
+    if let Some(slot) = &late_imports.shared_memory {
+        ensure!(
+            slot.position < imports.len(),
+            "shared memory import missing"
+        );
+    }
+    if let Some(bindings) = &late_imports.module_exports {
+        ensure!(
+            Engine::same(bindings.source.engine(), module.engine()),
+            "source module belongs to a different engine"
+        );
+        ensure!(
+            imports.len() == bindings.exports.len(),
+            "wrong number of import bindings"
+        );
+    }
+    let cx = matching::MatchCx::new(module.engine());
+    let mut items = items.iter();
+    for (position, (namespace, name, expected)) in imports.enumerate() {
+        let export = late_imports
+            .module_exports
+            .as_ref()
+            .and_then(|bindings| Some((&bindings.source, bindings.exports[position]?)));
+        if let Some(slot) = &late_imports.shared_memory {
+            if slot.position == position {
+                ensure!(
+                    export.is_none()
+                        && slot.ty.is_shared()
+                        && matches!(
+                            expected,
+                            EntityType::Memory(memory) if &memory == slot.ty.wasmtime_memory()
+                        ),
+                    "incompatible shared memory import `{namespace}::{name}`"
+                );
+                continue;
+            }
+        }
+        let actual = match export {
+            Some((source, export)) => {
+                ensure!(
+                    export.module == source.id(),
+                    "export belongs to a different module"
+                );
+                // A source instance can re-export a subtype of its declared
+                // type. The declared limits are lower bounds on current
+                // sizes, since memories and tables can only grow.
+                match source.env_module().type_of(export.entity) {
+                    EntityType::Function(ty) => DefinitionType::Func(ty.unwrap_engine_type_index()),
+                    EntityType::Global(ty) => DefinitionType::Global(ty),
+                    EntityType::Table(ty) => DefinitionType::Table(ty, ty.limits.min),
+                    EntityType::Memory(ty) => DefinitionType::Memory(ty, ty.limits.min),
+                    EntityType::Tag(ty) => DefinitionType::Tag(ty),
+                }
+            }
+            None => items
+                .next()
+                .ok_or_else(|| format_err!("missing import of `{namespace}::{name}`"))?
+                .ty(),
+        };
+        cx.definition(&expected, &actual)
+            .with_context(|| format!("incompatible import type for `{namespace}::{name}`"))?;
+    }
+    ensure!(items.next().is_none(), "too many fixed imports");
+    Ok(())
+}
+
 fn typecheck<I>(
     module: &Module,
     import_args: &[I],
@@ -1032,6 +1266,174 @@ fn typecheck<I>(
             .with_context(|| format!("incompatible import type for `{name}::{field}`"))?;
     }
     Ok(())
+}
+
+#[cfg(all(test, feature = "cranelift", feature = "threads", feature = "wat"))]
+mod late_import_tests {
+    use crate::prelude::ToString;
+    use crate::{
+        Caller, Config, Engine, Instance, Linker, MemoryType, Module, Result, SharedMemory, Store,
+    };
+
+    const RUNTIME: &str = r#"
+        (module
+            (import "host" "memory" (memory 1 2 shared))
+            (import "host" "bias" (func $bias (result i32)))
+            (func (export "write") (param i32)
+                i32.const 0
+                local.get 0
+                call $bias
+                i32.add
+                i32.store)
+            (func (export "read") (result i32)
+                i32.const 0
+                i32.load))
+    "#;
+
+    const PROGRAM: &str = r#"
+        (module
+            (import "runtime" "write" (func $write (param i32)))
+            (import "host" "memory" (memory 1 2 shared))
+            (import "host" "bias" (func $bias (result i32)))
+            (func (export "write") (param i32)
+                local.get 0
+                call $bias
+                i32.add
+                call $write)
+            (func (export "read") (result i32)
+                i32.const 0
+                i32.load))
+    "#;
+
+    fn engine() -> Result<Engine> {
+        let mut config = Config::new();
+        config.wasm_threads(true).shared_memory(true);
+        Engine::new(&config)
+    }
+
+    fn linker(engine: &Engine) -> Result<Linker<i32>> {
+        let mut linker = Linker::new(engine);
+        linker.func_wrap("host", "bias", |caller: Caller<'_, i32>| *caller.data())?;
+        Ok(linker)
+    }
+
+    #[test]
+    fn late_shared_memory_requires_exact_type_and_engine() -> Result<()> {
+        let engine = engine()?;
+        let runtime = Module::new(&engine, RUNTIME)?;
+        let pre =
+            linker(&engine)?.instantiate_pre_with_shared_memory(&runtime, "host", "memory")?;
+        let mut store = Store::new(&engine, 0);
+
+        // The smaller maximum normally satisfies Wasm's memory subtyping
+        // rule. Rebinding requires the exact type checked during preparation.
+        let smaller = SharedMemory::new(&engine, MemoryType::shared(1, 1))?;
+        let error = pre
+            .instantiate_with_shared_memory(&mut store, &smaller)
+            .unwrap_err();
+        assert!(error.to_string().contains("shared memory type differs"));
+
+        let other_engine = self::engine()?;
+        let foreign = SharedMemory::new(&other_engine, MemoryType::shared(1, 2))?;
+        let error = pre
+            .instantiate_with_shared_memory(&mut store, &foreign)
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("shared memory belongs to a different engine")
+        );
+        assert!(pre.instantiate(&mut store).is_err());
+
+        let memory = SharedMemory::new(&engine, MemoryType::shared(1, 2))?;
+        pre.instantiate_with_shared_memory(&mut store, &memory)?;
+        Ok(())
+    }
+
+    #[test]
+    fn late_imports_use_live_exports_and_isolated_shared_memory() -> Result<()> {
+        let engine = engine()?;
+        let runtime = Module::new(&engine, RUNTIME)?;
+        let program = Module::new(&engine, PROGRAM)?;
+        let linker = linker(&engine)?;
+        let runtime_pre = linker.instantiate_pre_with_shared_memory(&runtime, "host", "memory")?;
+        let slot = Some(("host", "memory"));
+        assert!(
+            linker
+                .instantiate_pre_with_module_exports(
+                    &program,
+                    &runtime,
+                    &[runtime.get_export_index("read"), None, None],
+                    slot,
+                )
+                .is_err()
+        );
+        let program_pre = linker.instantiate_pre_with_module_exports(
+            &program,
+            &runtime,
+            &[runtime.get_export_index("write"), None, None],
+            slot,
+        )?;
+        drop(linker);
+
+        let first_memory = SharedMemory::new(&engine, MemoryType::shared(1, 2))?;
+        let second_memory = SharedMemory::new(&engine, MemoryType::shared(1, 2))?;
+        let mut first_store = Store::new(&engine, 1);
+        let mut second_store = Store::new(&engine, 10);
+        let first_runtime =
+            runtime_pre.instantiate_with_shared_memory(&mut first_store, &first_memory)?;
+        let second_runtime =
+            runtime_pre.instantiate_with_shared_memory(&mut second_store, &second_memory)?;
+        assert!(
+            program_pre
+                .instantiate_with_module_exports(
+                    &mut second_store,
+                    first_runtime,
+                    Some(&second_memory)
+                )
+                .is_err()
+        );
+        assert!(
+            program_pre
+                .instantiate_with_module_exports(&mut second_store, second_runtime, None)
+                .is_err()
+        );
+        let other_module = Module::new(&engine, "(module)")?;
+        let other_instance = Instance::new(&mut second_store, &other_module, &[])?;
+        assert!(
+            program_pre
+                .instantiate_with_module_exports(
+                    &mut second_store,
+                    other_instance,
+                    Some(&second_memory)
+                )
+                .is_err()
+        );
+
+        let first = program_pre.instantiate_with_module_exports(
+            &mut first_store,
+            first_runtime,
+            Some(&first_memory),
+        )?;
+        let second = program_pre.instantiate_with_module_exports(
+            &mut second_store,
+            second_runtime,
+            Some(&second_memory),
+        )?;
+        let first_read = first.get_typed_func::<(), i32>(&mut first_store, "read")?;
+        let second_read = second.get_typed_func::<(), i32>(&mut second_store, "read")?;
+        first
+            .get_typed_func::<i32, ()>(&mut first_store, "write")?
+            .call(&mut first_store, 3)?;
+        assert_eq!(first_read.call(&mut first_store, ())?, 5);
+        assert_eq!(second_read.call(&mut second_store, ())?, 0);
+        second
+            .get_typed_func::<i32, ()>(&mut second_store, "write")?
+            .call(&mut second_store, 3)?;
+        assert_eq!(second_read.call(&mut second_store, ())?, 23);
+        assert_eq!(first_read.call(&mut first_store, ())?, 5);
+        Ok(())
+    }
 }
 
 #[cfg(all(test, feature = "cranelift", feature = "wat"))]

@@ -194,6 +194,8 @@ impl FunctionBuilder<'_> {
                 f,
             );
             parent.clear(f);
+            // A closed tail requires immutable rows. Global backing can
+            // acquire an own property while retaining its storage identity.
             let storage = s.reserve_gc_local(f).initialize(
                 base.sealed_subtype_or_branch::<IntrinsicPropertyStorage>(
                     s,

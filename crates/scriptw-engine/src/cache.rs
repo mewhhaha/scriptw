@@ -284,6 +284,46 @@ impl FunctionCache {
         <Self as CacheStore>::get(self, key).map(Cow::into_owned)
     }
 
+    /// Read a single published program entry into its final backing buffer.
+    /// The file handle follows one inode across concurrent atomic replacements.
+    pub(crate) fn read_program(&self, key: &[u8]) -> Option<Vec<u8>> {
+        let read = self.open(key).and_then(|file| {
+            let len = file.metadata()?.len();
+            if len > self.limit_bytes || len > isize::MAX as u64 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "cached program exceeds the cache size limit",
+                ));
+            }
+            let mut bytes = Vec::new();
+            bytes
+                .try_reserve_exact(len as usize)
+                .map_err(io::Error::other)?;
+            file.take(len).read_to_end(&mut bytes)?;
+            if bytes.len() as u64 != len {
+                return Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "cached program was truncated",
+                ));
+            }
+            Ok(bytes)
+        });
+        self.count_read(read)
+    }
+
+    fn count_read(&self, read: io::Result<Vec<u8>>) -> Option<Vec<u8>> {
+        match read {
+            Ok(bytes) => {
+                self.hits.fetch_add(1, Ordering::Relaxed);
+                Some(bytes)
+            }
+            Err(_) => {
+                self.misses.fetch_add(1, Ordering::Relaxed);
+                None
+            }
+        }
+    }
+
     pub(crate) fn write(&self, key: &[u8], value: Vec<u8>) -> bool {
         <Self as CacheStore>::insert(self, key, value)
     }
@@ -302,23 +342,12 @@ impl FunctionCache {
 
 impl CacheStore for FunctionCache {
     fn get(&self, key: &[u8]) -> Option<Cow<'_, [u8]>> {
-        // Cranelift calls this trait method directly, so function and
-        // program hits both refresh their recency here.
         let read = self.open(key).and_then(|mut file| {
             let mut bytes = Vec::new();
             file.read_to_end(&mut bytes)?;
             Ok(bytes)
         });
-        match read {
-            Ok(bytes) => {
-                self.hits.fetch_add(1, Ordering::Relaxed);
-                Some(Cow::Owned(bytes))
-            }
-            Err(_) => {
-                self.misses.fetch_add(1, Ordering::Relaxed);
-                None
-            }
-        }
+        self.count_read(read).map(Cow::Owned)
     }
 
     fn insert(&self, key: &[u8], value: Vec<u8>) -> bool {
@@ -664,7 +693,7 @@ mod tests {
             let bytes = if direct_function_read {
                 <FunctionCache as CacheStore>::get(&cache, b"reused").map(Cow::into_owned)
             } else {
-                cache.read(b"reused")
+                cache.read_program(b"reused")
             };
             assert_eq!(bytes.as_deref(), Some(&[1; 30][..]));
             // Model noatime even when this fixture runs on a filesystem that
@@ -683,6 +712,19 @@ mod tests {
             assert_eq!(cache.counters(), (1, 0));
             let _ = fs::remove_dir_all(root);
         }
+    }
+
+    #[test]
+    fn program_reads_apply_the_current_budget_to_existing_entries() {
+        let root = temp_cache("program-read-budget");
+        let cache = FunctionCache::new(root.clone(), 32).unwrap();
+        // A different process may have published this under a larger budget.
+        fs::write(cache.entry_path(b"entry"), [1; 33]).unwrap();
+        assert!(cache.read_program(b"entry").is_none());
+        fs::write(cache.entry_path(b"entry"), [2; 32]).unwrap();
+        assert_eq!(cache.read_program(b"entry").as_deref(), Some(&[2; 32][..]));
+        assert_eq!(cache.counters(), (1, 1));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

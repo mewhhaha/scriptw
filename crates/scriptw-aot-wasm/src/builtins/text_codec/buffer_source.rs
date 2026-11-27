@@ -1,7 +1,7 @@
 use super::*;
 
 pub(super) struct TextDecoderInput {
-    pub(super) bytes: GcLocal<ByteArray>,
+    pub(super) bytes: GcLocal<ByteArray, Nullable>,
     pub(super) start: I32Local,
     pub(super) length: I32Local,
 }
@@ -172,6 +172,10 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32WrapI64);
         extent.store(f);
         access.shared.load(f);
+        extent.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32Ne);
+        f.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, f);
         let bytes = s.reserve_gc_local(f).initialize(
             s.array_type::<ByteArray>()
@@ -227,12 +231,6 @@ impl FunctionBuilder<'_> {
         // buffer or out-of-bounds view yields an empty byte sequence per Web IDL.
         extent.set_constant(0, f);
         start.set_constant(0, f);
-        result.replace(
-            s.array_type::<ByteArray>()
-                .filled(GcOperand::i32(0), extent, f)
-                .nullable(),
-            f,
-        );
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         s.release_i32_local(valid, f);
@@ -245,20 +243,10 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::Else);
         extent.set_constant(0, f);
         start.set_constant(0, f);
-        result.replace(
-            s.array_type::<ByteArray>()
-                .filled(GcOperand::i32(0), extent, f)
-                .nullable(),
-            f,
-        );
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        let bytes = s
-            .reserve_gc_local(f)
-            .initialize(result.load(s, f).require_non_null(f), f);
-        result.clear(f);
         Ok(TextDecoderInput {
-            bytes,
+            bytes: result,
             start,
             length: extent,
         })

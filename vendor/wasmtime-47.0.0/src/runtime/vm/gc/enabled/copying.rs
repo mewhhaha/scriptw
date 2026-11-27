@@ -430,6 +430,9 @@ struct CopyingHeap {
     /// For every type that we have allocated in this heap, how do we trace it?
     trace_infos: TraceInfos,
 
+    /// Vacant scratch buffers reused by successive collections.
+    ephemeron_marking: EphemeronMarking,
+
     /// Count of how many no-gc scopes we are currently within.
     no_gc_count: u64,
 
@@ -535,6 +538,7 @@ impl CopyingHeap {
         log::trace!("allocating new copying heap");
         let mut heap = Self {
             trace_infos: TraceInfos::new(),
+            ephemeron_marking: EphemeronMarking::default(),
             no_gc_count: 0,
             memory: None,
             vmmemory: None,
@@ -1070,26 +1074,6 @@ impl<'a> Evacuation<'a> {
         Ok(unsafe { &mut *self.base.add(index).cast::<T>() })
     }
 
-    /// The little-endian reference stored in the four heap bytes at `at`.
-    #[inline(always)]
-    fn read_ref(&self, at: usize) -> Result<u32> {
-        if at.checked_add(4).is_none_or(|end| end > self.len) {
-            bail_bug!("corrupt gc heap");
-        }
-        // SAFETY: in bounds; fields need not be aligned beyond four bytes.
-        Ok(u32::from_le(unsafe { self.base.add(at).cast::<u32>().read_unaligned() }))
-    }
-
-    #[inline(always)]
-    fn write_ref(&mut self, at: usize, raw: u32) -> Result<()> {
-        if at.checked_add(4).is_none_or(|end| end > self.len) {
-            bail_bug!("corrupt gc heap");
-        }
-        // SAFETY: as for `read_ref`.
-        unsafe { self.base.add(at).cast::<u32>().write_unaligned(raw.to_le()) };
-        Ok(())
-    }
-
     /// Where the object `from`, which the collection moves, now is: its
     /// forwarding reference, or a new copy.
     #[inline(always)]
@@ -1174,14 +1158,42 @@ survived collection, since the active space is the same size as the idle space",
         Ok(object.forwarding_ref()?.map(|to_ref| to_ref.as_raw_u32()))
     }
 
-    /// Forward the reference in the four heap bytes at `field`, an object's
-    /// field or a remembered slot, if the collection moves its referent.
+    /// Forward the reference in a remembered slot, which is not covered by the
+    /// object bounds checked during `scan`.
     #[inline(always)]
-    fn scan_field(&mut self, field: usize, marking: &mut EphemeronMarking) -> Result<()> {
-        let raw = self.read_ref(field)?;
+    fn scan_remembered_slot(&mut self, field: usize, marking: &mut EphemeronMarking) -> Result<()> {
+        if field.checked_add(4).is_none_or(|end| end > self.len) {
+            bail_bug!("corrupt gc heap");
+        }
+        // SAFETY: the write barriers remember slots in allocated objects,
+        // and the range is in bounds in the heap, which cannot grow or move
+        // during evacuation.
+        unsafe { self.scan_field_in_bounds(field, marking) }
+    }
+
+    /// Forward the reference in the four bytes at a validated heap offset.
+    ///
+    /// # Safety
+    ///
+    /// The four bytes starting at `field` must be within the heap allocation
+    /// and readable and writable during evacuation.
+    #[inline(always)]
+    unsafe fn scan_field_in_bounds(
+        &mut self,
+        field: usize,
+        marking: &mut EphemeronMarking,
+    ) -> Result<()> {
+        // SAFETY: the caller checked the range, and unaligned access is valid.
+        let raw = u32::from_le(unsafe { self.base.add(field).cast::<u32>().read_unaligned() });
         if self.moves(raw) {
             let to = self.forward(raw, marking)?;
-            self.write_ref(field, to)?;
+            // SAFETY: forwarding cannot resize or relocate the heap.
+            unsafe {
+                self.base
+                    .add(field)
+                    .cast::<u32>()
+                    .write_unaligned(to.to_le())
+            };
         }
         Ok(())
     }
@@ -1218,31 +1230,39 @@ survived collection, since the active space is the same size as the idle space",
 
         match inline_info {
             InlineTraceInfo::Struct { gc_ref_bitmap } => {
+                // Every set bit names a slot at or below the highest set bit.
                 if gc_ref_bitmap != 0 {
                     inside(HEADER_SIZE + (31 - gc_ref_bitmap.leading_zeros()) * 4)?;
                 }
                 let mut remaining = gc_ref_bitmap;
                 while remaining != 0 {
                     let slot = remaining.trailing_zeros();
-                    self.scan_field(start + usize::try_from(HEADER_SIZE + slot * 4)?, marking)?;
+                    let field = start + usize::try_from(HEADER_SIZE + slot * 4)?;
+                    // SAFETY: the highest slot fits in the checked object range.
+                    unsafe { self.scan_field_in_bounds(field, marking)? };
                     remaining &= remaining - 1;
                 }
             }
             InlineTraceInfo::Array { elems_are_gc_refs } => {
                 if elems_are_gc_refs {
                     let len = self.object::<VMCopyingArrayHeader>(start)?.length;
-                    if len != 0 {
-                        match (len - 1)
-                            .checked_mul(u32::try_from(mem::size_of::<u32>())?)
-                            .and_then(|i| i.checked_add(GC_REF_ARRAY_ELEMS_OFFSET))
-                        {
-                            Some(last) => inside(last)?,
-                            None => bail_bug!("array element offset overflow"),
-                        }
+                    if len == 0 {
+                        return Ok(size);
+                    }
+                    let Some(end) = len
+                        .checked_mul(4)
+                        .and_then(|bytes| GC_REF_ARRAY_ELEMS_OFFSET.checked_add(bytes))
+                    else {
+                        bail_bug!("array element offset overflow");
+                    };
+                    if end > size {
+                        bail_bug!("gc reference outside its object");
                     }
                     let elems = start + usize::try_from(GC_REF_ARRAY_ELEMS_OFFSET)?;
-                    for i in 0..usize::try_from(len)? {
-                        self.scan_field(elems + i * mem::size_of::<u32>(), marking)?;
+                    let end = start + usize::try_from(end)?;
+                    for field in (elems..end).step_by(mem::size_of::<u32>()) {
+                        // SAFETY: every element fits in the checked object range.
+                        unsafe { self.scan_field_in_bounds(field, marking)? };
                     }
                 }
             }
@@ -1254,7 +1274,9 @@ survived collection, since the active space is the same size as the idle space",
                     TraceInfo::Struct { gc_ref_offsets } => {
                         for &offset in gc_ref_offsets {
                             inside(offset)?;
-                            self.scan_field(start + usize::try_from(offset)?, marking)?;
+                            let field = start + usize::try_from(offset)?;
+                            // SAFETY: this field fits in the checked object range.
+                            unsafe { self.scan_field_in_bounds(field, marking)? };
                         }
                     }
                     TraceInfo::Array { .. } => {
@@ -1362,6 +1384,7 @@ unsafe impl GcHeap for CopyingHeap {
             last_minor,
             direct_old,
             remembered: _,
+            ephemeron_marking,
             young_extern_ref_set_head,
         } = self;
 
@@ -1372,6 +1395,7 @@ unsafe impl GcHeap for CopyingHeap {
         *collecting_minor = false;
         *last_minor = false;
         direct_old.clear();
+        *ephemeron_marking = EphemeronMarking::default();
         *young_extern_ref_set_head = None;
         *no_gc_count = 0;
         *vmmemory = None;
@@ -1687,13 +1711,14 @@ unsafe impl GcHeap for CopyingHeap {
                     unreachable!("the window was just closed")
                 }
             };
+        let marking = mem::take(&mut self.ephemeron_marking);
         Box::new(CopyingCollection {
             roots: Some(roots),
             trace_state,
             heap: self,
             phase: CopyingCollectionPhase::ProcessRoots,
             weak_cursor: 0,
-            marking: EphemeronMarking::default(),
+            marking,
         })
     }
 
@@ -1712,6 +1737,31 @@ unsafe impl GcHeap for CopyingHeap {
         // of the GC heap, because we cannot safely extend the active space in
         // that configuration without making it larger than the idle space.
         self.idle_space_start < self.active_space_start
+    }
+
+    fn min_growth_bytes(&self, bytes_needed: u64) -> u64 {
+        let alloc_size = bytes_needed
+            .div_ceil(2)
+            .checked_next_multiple_of(u64::from(ALIGN))
+            .unwrap_or(u64::MAX);
+        let floor = u64::from(self.null_guard.max(self.nursery_end));
+        let nursery_window = if self.nursery_end != 0 {
+            u64::from(self.nursery_end.saturating_sub(self.nursery_start()))
+        } else {
+            0
+        };
+        let old_used = if self.active_space_end() == 0 && self.idle_space_end == 0 {
+            0
+        } else {
+            u64::from(self.bump_ptr().saturating_sub(self.active_space_start))
+        };
+        let required_per_space = old_used
+            .saturating_add(alloc_size)
+            .saturating_add(nursery_window);
+        let required_total = floor.saturating_add(required_per_space.saturating_mul(2));
+        required_total
+            .saturating_sub(u64::from(self.capacity()))
+            .max(1)
     }
 
     unsafe fn replace_memory(&mut self, memory: crate::vm::Memory, delta_bytes_grown: u64) {
@@ -1880,7 +1930,7 @@ impl CopyingCollection<'_, '_> {
         } else {
             for i in 0..len {
                 let slot = usize::try_from(evacuation.heap.remembered[i])?;
-                evacuation.scan_field(slot, &mut self.marking)?;
+                evacuation.scan_remembered_slot(slot, &mut self.marking)?;
             }
             for i in 0..evacuation.heap.direct_old.len() {
                 let index = evacuation.heap.direct_old[i];
@@ -1911,7 +1961,7 @@ impl CopyingCollection<'_, '_> {
             // Old owners and keys are live for a minor collection.
             let nursery_end = self.heap.nursery_end;
             let weak = &*self.trace_state.weak_gc;
-            self.marking = EphemeronMarking::new(
+            self.marking.prepare(
                 weak,
                 weak.touched.iter().map(|&slot| slot as usize),
                 |raw| raw >= nursery_end,
@@ -1925,7 +1975,7 @@ impl CopyingCollection<'_, '_> {
             self.process_remembered(old_end)?;
         } else {
             let weak = &*self.trace_state.weak_gc;
-            self.marking = EphemeronMarking::new(weak, 0..weak.slots.len(), |_| false)?;
+            self.marking.prepare(weak, 0..weak.slots.len(), |_| false)?;
             self.trace_state.weak_gc.advance_epoch()?;
             self.heap.flip();
             self.heap.initialize_worklist();
@@ -2108,6 +2158,9 @@ impl Drop for CopyingCollection<'_, '_> {
             }
             CopyingCollectionPhase::ProcessRoots | CopyingCollectionPhase::Done => {}
         }
+        // Even a failed preparation may have reserved part of the scratch.
+        self.marking.reset();
+        self.heap.ephemeron_marking = mem::take(&mut self.marking);
     }
 }
 
@@ -2254,7 +2307,16 @@ mod tests {
     #[cfg(feature = "cranelift")]
     #[test]
     fn compiled_code_and_runtime_agree_on_the_nursery() {
-        for size in [0, 64 << 10, 1 << 20, 2 << 20, 16 << 20, 64 << 20, 1 << 32] {
+        for size in [
+            0,
+            64 << 10,
+            1 << 20,
+            2 << 20,
+            16 << 20,
+            32 << 20,
+            64 << 20,
+            1 << 32,
+        ] {
             assert_eq!(
                 super::nursery_end_for_initial_size(size),
                 wasmtime_cranelift::copying_heap_data::nursery_end(size),
@@ -2262,6 +2324,7 @@ mod tests {
             );
         }
         assert_eq!(super::nursery_end_for_initial_size(16 << 20), 2 << 20);
+        assert_eq!(super::nursery_end_for_initial_size(32 << 20), 4 << 20);
         assert_eq!(super::nursery_end_for_initial_size(1 << 20), 0);
     }
 

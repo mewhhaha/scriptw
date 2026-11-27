@@ -10,38 +10,23 @@ impl FunctionBuilder<'_> {
         string: &GcLocal<StringValue>,
         f: &mut Function,
     ) -> Result<(), EmitError> {
-        self.emit_json_quote_into_with_punctuation(accumulator, string, None, false, f)
+        let s = self.runtime_schema();
+        let output = StringAccumulatorCursor::open(accumulator, s, f);
+        self.emit_json_quote_into_cursor(accumulator, &output, string, None, f);
+        output.close(accumulator, s, f);
+        Ok(())
     }
 
-    /// Saves `mark` as the accumulator length before this member, appends an
-    /// optional leading `,` (when `emitted` is nonzero), `QuoteJSONString(key)`,
-    /// and a trailing `:`, all under a single `StringAccumulatorCursor` open and
-    /// upfront capacity reservation.
-    pub(super) fn emit_json_quote_object_key_into(
+    /// With a member separator, writes the optional comma and trailing colon
+    /// under the same reservation as QuoteJSONString.
+    pub(super) fn emit_json_quote_into_cursor(
         &mut self,
         accumulator: &GcLocal<StringAccumulator>,
+        output: &StringAccumulatorCursor,
         string: &GcLocal<StringValue>,
-        emitted: I32Local,
-        mark: I32Local,
+        member: Option<I32Local>,
         f: &mut Function,
-    ) -> Result<(), EmitError> {
-        self.emit_json_quote_into_with_punctuation(
-            accumulator,
-            string,
-            Some((emitted, mark)),
-            true,
-            f,
-        )
-    }
-
-    fn emit_json_quote_into_with_punctuation(
-        &mut self,
-        accumulator: &GcLocal<StringAccumulator>,
-        string: &GcLocal<StringValue>,
-        leading_comma: Option<(I32Local, I32Local)>,
-        trailing_colon: bool,
-        f: &mut Function,
-    ) -> Result<(), EmitError> {
+    ) {
         let s = self.runtime_schema();
         let units = s.reserve_gc_local(f).initialize(
             s.struct_type::<StringValue>()
@@ -60,21 +45,16 @@ impl FunctionBuilder<'_> {
         let spare = s.reserve_i32_local(f);
         s.array_type::<CodeUnitArray>().length(&units, s, f);
         length.store(f);
-        let output = StringAccumulatorCursor::open(accumulator, s, f);
-        if let Some((_, mark)) = leading_comma {
-            output.length().load(f);
-            mark.store(f);
-        }
         // Optional leading comma, both quotes, optional trailing colon, and one
         // output unit per remaining input unit.
-        let fixed_padding = 2 + i32::from(leading_comma.is_some()) + i32::from(trailing_colon);
-        let trailing_padding = 1 + i32::from(trailing_colon);
+        let fixed_padding = 2 + 2 * i32::from(member.is_some());
+        let trailing_padding = 1 + i32::from(member.is_some());
         length.load(f);
         f.instruction(&Instruction::I32Const(fixed_padding));
         f.instruction(&Instruction::I32Add);
         extra.store(f);
         output.reserve(accumulator, extra, s, f);
-        if let Some((emitted, _)) = leading_comma {
+        if let Some(emitted) = member {
             emitted.load(f);
             self.open_frame(ControlFrameKind::If, f);
             json_i32(unit, 44, f);
@@ -85,7 +65,7 @@ impl FunctionBuilder<'_> {
         json_i32(unit, 34, f);
         output.push(unit, s, f);
         json_i32(index, 0, f);
-        self.emit_json_quote_plain_prefix(accumulator, &output, &units, length, index, unit, f);
+        self.emit_json_quote_plain_prefix(accumulator, output, &units, length, index, unit, f);
         json_i32(spare, 0, f);
         let done = self.open_frame(ControlFrameKind::Block, f);
         let next = self.open_frame(ControlFrameKind::Loop, f);
@@ -190,13 +170,7 @@ impl FunctionBuilder<'_> {
         // Every remaining unit is escaped: a two-unit short escape or a
         // six-unit \uXXXX escape (control units and lone surrogates).
         json_i32(escape, 0, f);
-        for (code, escaped) in [
-            (8, 98),
-            (9, 116),
-            (10, 110),
-            (12, 102),
-            (13, 114),
-        ] {
+        for (code, escaped) in [(8, 98), (9, 116), (10, 110), (12, 102), (13, 114)] {
             unit.load(f);
             f.instruction(&Instruction::I32Const(code));
             f.instruction(&Instruction::I32Eq);
@@ -264,16 +238,14 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         json_i32(unit, 34, f);
         output.push(unit, s, f);
-        if trailing_colon {
+        if member.is_some() {
             json_i32(unit, 58, f);
             output.push(unit, s, f);
         }
-        output.close(accumulator, s, f);
         for local in [spare, extra, hex, escape, next_unit, unit, index, length] {
             s.release_i32_local(local, f);
         }
         units.clear(f);
-        Ok(())
     }
 
     /// Bulk-copy a long ordinary prefix. A prefix shorter than 16 units

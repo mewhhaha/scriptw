@@ -1059,7 +1059,7 @@ fn program_wasm_cache_reuses_emitted_artifact() {
     })
     .expect("cache miss should emit Wasm");
     assert!(first.cached_entry.is_none());
-    assert!(first.bytes.starts_with(b"\0asm"));
+    assert!(first.bytes.as_ref().starts_with(b"\0asm"));
     assert!(cache.contains(&key));
 
     let second = engine
@@ -1071,7 +1071,7 @@ fn program_wasm_cache_reuses_emitted_artifact() {
         )
         .expect("cache hit should load emitted Wasm");
     assert!(second.cached_entry.is_some());
-    assert_eq!(second.bytes, first.bytes);
+    assert_eq!(second.bytes.as_ref(), first.bytes.as_ref());
 
     let _ = std::fs::remove_dir_all(cache_root);
 }
@@ -1193,7 +1193,7 @@ fn closed_module_cache_hit_skips_lowering_and_rechecks_dependency_bytes() {
         assert_eq!(after_cold, before + 1);
         let warm = load().expect("closed graph should load from cache");
         assert!(warm.cached_entry.is_some());
-        assert_eq!(first.bytes, warm.bytes);
+        assert_eq!(first.bytes.as_ref(), warm.bytes.as_ref());
         assert_eq!(
             LOWERING_ATTEMPTS.with(|attempts| attempts.get()),
             after_cold
@@ -1202,7 +1202,7 @@ fn closed_module_cache_hit_skips_lowering_and_rechecks_dependency_bytes() {
         files.write("dep.js", "export const value = 22;");
         let changed = load().expect("changed dependency should recompile");
         assert!(changed.cached_entry.is_none());
-        assert_ne!(first.bytes, changed.bytes);
+        assert_ne!(first.bytes.as_ref(), changed.bytes.as_ref());
         assert_eq!(
             LOWERING_ATTEMPTS.with(|attempts| attempts.get()),
             after_cold + 1
@@ -1236,16 +1236,7 @@ fn initial_module_cache_candidate_does_not_name_a_prepared_source_closure() {
             role,
         )
         .unwrap();
-        let prepared = Engine::lower_parsed_compilation(
-            parsed,
-            &options,
-            ProgramEntry {
-                source,
-                goal: ParseGoal::Module,
-                role,
-            },
-        )
-        .unwrap();
+        let prepared = Engine::lower_parsed_compilation(parsed, &options, role).unwrap();
         let closed = program_cache_key_for_role(
             source,
             ParseGoal::Module,
@@ -1523,7 +1514,7 @@ fn unavailable_program_cache_skips_identity_for_cold_and_lookup_compilation() {
                     None,
                 )
                 .unwrap();
-            assert_eq!(lookup.bytes, direct.bytes);
+            assert_eq!(lookup.bytes.as_ref(), direct.bytes.as_ref());
             assert_eq!(
                 COMPILER_CACHE_IDENTITY_REQUESTS.with(std::cell::Cell::get),
                 0,
@@ -1569,7 +1560,7 @@ fn persisted_programs_still_request_executable_bound_identity_and_hit_checked_ca
             second.cached_entry.is_some(),
             "the actual persisted P was admitted"
         );
-        assert_eq!(first.bytes, second.bytes);
+        assert_eq!(first.bytes.as_ref(), second.bytes.as_ref());
         assert_eq!(
             first.runtime.unwrap().as_ref().key(),
             second.runtime.unwrap().as_ref().key()

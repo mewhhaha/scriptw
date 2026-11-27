@@ -68,6 +68,12 @@ impl ValidatedRuntimeArtifact {
         builtins: &[scriptw_ir::StandardBuiltinId],
         temporal: bool,
     ) -> Result<&Arc<crate::data::CompilerOwnedPool>, EmitError> {
+        if let Some(prefix) = self
+            .runtime
+            .precomputed_compiler_owned_pool(functions, &self.selection)?
+        {
+            return Ok(prefix);
+        }
         self.runtime
             .compiler_owned_pool
             .get_or_init(|| {

@@ -160,6 +160,11 @@ impl FunctionBuilder<'_> {
             })?;
         let done = self.open_frame(ControlFrameKind::Block, f);
         let again = self.open_frame(ControlFrameKind::Loop, f);
+        let head = s.load_atomics_async_waiter_queue(RuntimeQueueEnd::Head, f);
+        current.replace(head.load(s, f), f);
+        head.clear(f);
+        current.load(s, f).is_null(f);
+        self.emit_branch_if_to_target(done, f);
         f.instruction(&Instruction::Call(clock));
         now.store(f);
         f.instruction(&Instruction::I64Const(i64::MAX));
@@ -167,9 +172,6 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(0));
         any_active.store(f);
         previous.set_null(s, f);
-        let head = s.load_atomics_async_waiter_queue(RuntimeQueueEnd::Head, f);
-        current.replace(head.load(s, f), f);
-        head.clear(f);
         let scanned = self.open_frame(ControlFrameKind::Block, f);
         let scan = self.open_frame(ControlFrameKind::Loop, f);
         current.load(s, f).is_null(f);

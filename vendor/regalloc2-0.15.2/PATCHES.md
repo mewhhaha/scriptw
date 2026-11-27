@@ -60,3 +60,9 @@ went from 15.24 G to 13.53 G of the program's 57.11 G native compilation;
 the map's clears alone had written 1.16 G instructions of `memset`.
 
 Tests: the crate's own unit tests pass unchanged.
+
+## Backtracking split budget
+
+`src/ion/data_structures.rs` lets backtracking try four splits per spill set
+before `split_and_requeue_bundle` falls back to minimal bundles. The limit
+only guards an increment of the spill set's `u8` counter.

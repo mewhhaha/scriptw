@@ -1,6 +1,10 @@
 //! Opt-in, declaration-derived host projections. No JavaScript operation is
 //! emitted by these witnesses or by the retained Realm inventory.
 use super::*;
+use crate::runtime_helpers::{
+    HelperParameters, RuntimeHelperId, SnapshotGlobalBuiltinRowParameters,
+};
+use crate::{ControlFrameKind, EmitError, FunctionBuilder};
 use scriptw_runtime::rooted_snapshot::{SnapshotIntrinsic, SnapshotWellKnownSymbol};
 
 macro_rules! snapshot_layouts {
@@ -20,6 +24,7 @@ snapshot_layouts!(PropertyValue => PropertyValue, Stored => StoredValue, String 
     BigInt => BigIntValue, Limbs => BigIntLimbArray, Symbol => SymbolValue,
     Object => OrdinaryObject, PropertyStorage => OrdinaryPropertyStorage,
     IntrinsicStorage => IntrinsicPropertyStorage,
+    GlobalBuiltinBacking => GlobalBuiltinBacking,
     CompactStorage => CompactDataStorage, ArrayCompactStorage => ArrayCompactDataStorage,
     InlineCompactStorage => InlineCompactDataStorage, CompactShape => CompactDataShape,
     CompactKeys => CompactShapeKeys, CompactTags => CompactTagArray,
@@ -47,6 +52,11 @@ pub const SNAPSHOT_RESOLVE_PROPERTY_VALUE_EXPORT: &str = "scriptw_snapshot_resol
 pub const SNAPSHOT_ENSURE_PROPERTY_STORAGE_EXPORT: &str =
     "scriptw_snapshot_ensure_property_storage";
 
+impl GcSnapshotLayout {
+    pub const GLOBAL_BUILTIN_ROW_EXPORT: &str = "scriptw_snapshot_global_builtin_row";
+    pub const GLOBAL_BUILTIN_ROW_LIMIT: u32 = crate::objects::MAX_GLOBAL_BUILTIN_ROWS as u32;
+}
+
 pub const SNAPSHOT_ENTRY_REALM_EXPORT: &str = "scriptw_snapshot_entry_realm";
 pub const SNAPSHOT_REALMS_EXPORT: &str = "scriptw_snapshot_realms";
 pub const SNAPSHOT_SYMBOLS_EXPORT: &str = "scriptw_snapshot_well_known_symbols";
@@ -69,6 +79,10 @@ snapshot_fields!(StoredTag => Stored, StoredValueSchema::TAG,
     ObjectPrototype => Object, OrdinaryObjectSchema::PROTOTYPE, ObjectProperties => Object, OrdinaryObjectSchema::PROPERTIES,
     ObjectPrivate => Object, OrdinaryObjectSchema::PRIVATE_ELEMENTS, ObjectExtensible => Object, OrdinaryObjectSchema::EXTENSIBLE,
     IntrinsicCount => IntrinsicStorage, IntrinsicPropertyStorageSchema::COUNT,
+    GlobalBuiltinRows => GlobalBuiltinBacking, GlobalBuiltinBackingSchema::ROWS,
+    GlobalBuiltinDeletedLow => GlobalBuiltinBacking, GlobalBuiltinBackingSchema::DELETED_LOW,
+    GlobalBuiltinDeletedHigh => GlobalBuiltinBacking, GlobalBuiltinBackingSchema::DELETED_HIGH,
+    GlobalBuiltinAppend => GlobalBuiltinBacking, GlobalBuiltinBackingSchema::APPEND,
     ArrayCompactShape => ArrayCompactStorage, ArrayCompactDataStorageSchema::SHAPE,
     CompactTags => ArrayCompactStorage, ArrayCompactDataStorageSchema::TAGS,
     CompactScalars => ArrayCompactStorage, ArrayCompactDataStorageSchema::SCALARS,
@@ -242,6 +256,11 @@ impl RuntimeSchema {
             wasm_encoder::ExportKind::Func,
             crate::runtime_helpers::RuntimeHelperId::OrdinaryPropertyStorageEnsure.index(helpers),
         );
+        exports.export(
+            GcSnapshotLayout::GLOBAL_BUILTIN_ROW_EXPORT,
+            wasm_encoder::ExportKind::Func,
+            RuntimeHelperId::SnapshotGlobalBuiltinRow.index(helpers),
+        );
         for (layout, index) in &roots.witnesses {
             exports.export(
                 layout.witness_export(),
@@ -295,6 +314,53 @@ impl RuntimeSchema {
         let result = realm.load(self, function);
         realm.clear(function);
         result
+    }
+}
+
+impl FunctionBuilder<'_> {
+    /// The host validates the extent and charges its budget before observing a
+    /// live row. Keep the projected key and descriptor rooted across the ABI.
+    pub(crate) fn compile_snapshot_global_builtin_row_helper(
+        &mut self,
+    ) -> Result<Function, EmitError> {
+        let mut function = self.begin_helper_body(RuntimeHelperId::SnapshotGlobalBuiltinRow);
+        let parameters =
+            self.helper_parameters::<SnapshotGlobalBuiltinRowParameters>(&mut function);
+        let schema = self.runtime_schema();
+        let rows = schema.reserve_gc_local(&mut function).initialize(
+            schema
+                .field(GlobalBuiltinBackingSchema::ROWS)
+                .read(&parameters.backing, schema, &mut function)
+                .reference(),
+            &mut function,
+        );
+        parameters.index.load(&mut function);
+        schema
+            .field(IntrinsicPropertyStorageSchema::COUNT)
+            .read(&rows, schema, &mut function);
+        function.instruction(&Instruction::I32GeU);
+        self.emit_global_builtin_is_deleted(&parameters.backing, parameters.index, &mut function);
+        function.instruction(&Instruction::I32Or);
+        self.open_frame(ControlFrameKind::If, &mut function);
+        function.instruction(&Instruction::Unreachable);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        rows.clear(&mut function);
+
+        let key =
+            self.emit_global_builtin_row_key(&parameters.backing, parameters.index, &mut function)?;
+        let descriptor = self.emit_global_builtin_row_descriptor(
+            &parameters.backing,
+            parameters.index,
+            &mut function,
+        )?;
+        key.value().cast_reference::<StringValue>(schema, &mut function);
+        descriptor.load(schema, &mut function);
+        descriptor.clear(&mut function);
+        key.clear(&mut function);
+        parameters.release(&mut function);
+        function.instruction(&Instruction::End);
+        Ok(self.finish_function(function))
     }
 }
 

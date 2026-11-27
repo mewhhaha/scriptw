@@ -97,7 +97,7 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    /// encode(input) writes the result's ArrayBuffer backing in one pass.
+    /// encode(input) writes UTF-8 into the result's ArrayBuffer backing.
     ///
     /// The Uint8Array and its ArrayBuffer take the current function Realm's
     /// %Uint8Array.prototype% and %ArrayBuffer.prototype%, exactly what
@@ -105,17 +105,16 @@ impl FunctionBuilder<'_> {
     /// both constructors' "prototype" properties are non-writable and
     /// non-configurable, and the fresh view is unobservable until returned.
     ///
-    /// An input of at most `SCRATCH_ENCODE_UNITS` code units is encoded once
-    /// into a private scratch array that grows on demand, and the exact
-    /// backing is then one bulk copy of the bytes written. A longer input
-    /// keeps the two passes that count the exact UTF-8 length first, so its
-    /// largest allocation is the result itself. Both write through the same
-    /// loop: a leaf kernel copies each ASCII run, and every other scalar is
-    /// encoded here.
+    /// Short and very large inputs are sized before encoding so they can
+    /// write into the exact final backing. Intermediate inputs use a growing
+    /// scratch array and copy the bytes written into the final backing. The
+    /// write loop copies each ASCII run through a leaf kernel and encodes
+    /// the remaining scalars individually.
     pub(crate) fn emit_text_encoder_encode(&mut self, f: &mut Function) -> Result<(), EmitError> {
-        /// The longest input encoded through the scratch array, whose
-        /// capacity stays below four bytes a unit plus a constant.
-        const SCRATCH_ENCODE_UNITS: i32 = 1 << 20;
+        // Two passes over a short input avoid the scratch allocation and
+        // copy. Mid-sized inputs still benefit from single-pass encoding.
+        const SHORT_EXACT_ENCODE_UNITS: i32 = 256;
+        const MAX_SCRATCH_ENCODE_UNITS: i32 = 1 << 20;
         let s = self.runtime_schema();
         let base = self.runtime_helper_base()?;
         let argument = s.reserve_value_local(f);
@@ -176,14 +175,19 @@ impl FunctionBuilder<'_> {
             .reserve_gc_local::<ByteArray, Nullable>(f)
             .initialize_null(s, f);
         count.load(f);
-        f.instruction(&Instruction::I32Const(SCRATCH_ENCODE_UNITS));
+        f.instruction(&Instruction::I32Const(SHORT_EXACT_ENCODE_UNITS));
+        f.instruction(&Instruction::I32LeU);
+        count.load(f);
+        f.instruction(&Instruction::I32Const(MAX_SCRATCH_ENCODE_UNITS));
         f.instruction(&Instruction::I32GtU);
+        f.instruction(&Instruction::I32Or);
         exact.store(f);
         exact.load(f);
         self.open_frame(ControlFrameKind::If, f);
         // The exact UTF-8 length. Lone surrogates become U+FFFD, which, like
         // every other BMP scalar from U+0800, takes three bytes.
-        f.instruction(&Instruction::I64Const(0));
+        count.load(f);
+        f.instruction(&Instruction::I64ExtendI32U);
         byte_length.store(f);
         f.instruction(&Instruction::I32Const(0));
         read.store(f);
@@ -197,13 +201,12 @@ impl FunctionBuilder<'_> {
             .read(&input.units, read, s, f)
             .store(unit, f);
         encoder_increment(read, f);
-        byte_length.load(f);
-        f.instruction(&Instruction::I64Const(1));
         unit.load(f);
         f.instruction(&Instruction::I32Const(0x80));
-        f.instruction(&Instruction::I32GeU);
-        f.instruction(&Instruction::I64ExtendI32U);
-        f.instruction(&Instruction::I64Add);
+        f.instruction(&Instruction::I32LtU);
+        self.emit_branch_if_to_target(count_next, f);
+        byte_length.load(f);
+        f.instruction(&Instruction::I64Const(1));
         unit.load(f);
         f.instruction(&Instruction::I32Const(0x800));
         f.instruction(&Instruction::I32GeU);
@@ -211,8 +214,8 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I64Add);
         f.instruction(&Instruction::I64Add);
         byte_length.store(f);
-        // A high surrogate followed by a low surrogate is one four-byte
-        // scalar: one more byte than the three already counted for it.
+        // Both units in a surrogate pair already contribute one byte.
+        // The two bytes added for the high surrogate complete its scalar.
         unit.load(f);
         f.instruction(&Instruction::I32Const(0xfc00));
         f.instruction(&Instruction::I32And);
@@ -233,10 +236,6 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, f);
         encoder_increment(read, f);
-        byte_length.load(f);
-        f.instruction(&Instruction::I64Const(1));
-        f.instruction(&Instruction::I64Add);
-        byte_length.store(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);

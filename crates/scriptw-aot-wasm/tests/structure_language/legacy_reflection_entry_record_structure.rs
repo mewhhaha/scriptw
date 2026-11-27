@@ -160,6 +160,12 @@ fn only_known_paths_replace_a_header_storage() {
                 "emit_intrinsic_unscopables",
                 "write"
             ),
+            // A freshly allocated JSON.parse object receives its initial inline compact storage.
+            (
+                "builtins/json/parse_object.rs",
+                "emit_json_publish_private_object",
+                "write"
+            ),
             // Type registration tests only: the typed write and a deliberately
             // invalid raw operand.
             ("gc_types/type_registration_tests.rs", "module", "other"),
@@ -185,7 +191,7 @@ fn only_replacement_and_deletion_change_an_entry_descriptor() {
                 "write"
             ),
             // Deletion installs a fresh accessor descriptor no property owns.
-            ("objects.rs", "emit_object_delete_ordinary", "write"),
+            ("objects.rs", "emit_retire_ordinary_property_entry", "write"),
             // Read-only host snapshot projection.
             ("gc_types/snapshot.rs", "index", "other"),
         ]),
@@ -195,7 +201,7 @@ fn only_replacement_and_deletion_change_an_entry_descriptor() {
 }
 
 #[test]
-fn only_compaction_and_fresh_publication_replace_a_dictionary_table() {
+fn only_compaction_replaces_a_dictionary_table() {
     let sources = sources();
     assert_eq!(
         non_read_uses(&sources, "OrdinaryPropertyStorageSchema::ENTRIES"),
@@ -204,12 +210,6 @@ fn only_compaction_and_fresh_publication_replace_a_dictionary_table() {
             (
                 "objects/property_storage.rs",
                 "compile_ordinary_property_prepare_helper",
-                "write"
-            ),
-            // Sizes an empty dictionary once before its first rows.
-            (
-                "objects/fresh_publication.rs",
-                "compile_fresh_data_properties_publish_helper",
                 "write"
             ),
             // Read-only host snapshot projection.
@@ -296,7 +296,7 @@ fn array_writes(sources: &[Source], element: &str) -> Vec<(String, String, Strin
 }
 
 #[test]
-fn only_insertion_compaction_and_deletion_write_a_dictionary_table() {
+fn only_insertion_compaction_and_deletion_write_a_property_table() {
     let sources = sources();
     let rows = |rows: &[(&str, &str, &str)]| {
         let mut rows = rows
@@ -311,14 +311,26 @@ fn only_insertion_compaction_and_deletion_write_a_dictionary_table() {
     assert_eq!(
         array_writes(&sources, "PropertyTable"),
         rows(&[
-            // Deletion nulls the record's slot after swapping its descriptor.
+            // Deletion nulls the record's slot and retires its descriptor.
             ("objects.rs", "emit_object_delete_ordinary", "write"),
-            // A fresh dictionary's table, filled before its first rows.
+            // An original builtin row acquires an entry in its immutable rank.
             (
-                "objects/fresh_publication.rs",
-                "compile_fresh_data_properties_publish_helper",
+                "objects/global_builtin_storage.rs",
+                "emit_global_builtin_install_entry",
                 "filled"
             ),
+            (
+                "objects/global_builtin_storage.rs",
+                "emit_global_builtin_install_entry",
+                "write"
+            ),
+            // Retiring an original builtin removes it from the rank table.
+            (
+                "objects/global_builtin_storage.rs",
+                "emit_global_builtin_delete_row",
+                "write"
+            ),
+            // A fresh native constructor's dictionary table.
             (
                 "objects/native_constructor.rs",
                 "compile_native_constructor_header_allocate_helper",
@@ -342,34 +354,21 @@ fn only_insertion_compaction_and_deletion_write_a_dictionary_table() {
                 "write"
             ),
         ]),
-        "a new writer of a dictionary's PropertyTable must keep every live property's \
+        "a new writer of a PropertyTable must keep every live property's \
          one record reachable; review the active legacy function reflection contract"
     );
     assert_eq!(
         non_read_uses(&sources, "OrdinaryPropertyStorageSchema::INDEX"),
-        expected(&[
-            (
-                "objects/fresh_publication.rs",
-                "compile_fresh_data_properties_publish_helper",
-                "write"
-            ),
-            (
-                "objects/property_storage.rs",
-                "compile_ordinary_property_prepare_helper",
-                "write"
-            ),
-        ]),
+        expected(&[(
+            "objects/property_storage.rs",
+            "compile_ordinary_property_prepare_helper",
+            "write"
+        ),]),
         "a new writer of a dictionary's key index must index every live record"
     );
     assert_eq!(
         non_read_uses(&sources, "OrdinaryPropertyStorageSchema::LENGTH"),
         expected(&[
-            // Commits the final fresh row count once after all rows [0..count) are populated.
-            (
-                "objects/fresh_publication.rs",
-                "compile_fresh_data_properties_publish_helper",
-                "write"
-            ),
             (
                 "objects/property_storage.rs",
                 "emit_ordinary_insert_in_dictionary",
@@ -433,11 +432,6 @@ fn entry_records_are_inserted_only_after_a_proof_of_absence_or_into_a_fresh_tabl
             "objects/compact_data.rs",
             "compile_ordinary_property_storage_ensure_helper",
         ),
-        // Fresh data rows of a new dictionary; the helper traps unless empty.
-        (
-            "objects/fresh_publication.rs",
-            "compile_fresh_data_properties_publish_helper",
-        ),
         // Intrinsic rows move into a fresh dictionary: their keys are distinct.
         (
             "objects/intrinsic_properties.rs",
@@ -465,7 +459,33 @@ fn entry_records_are_inserted_only_after_a_proof_of_absence_or_into_a_fresh_tabl
 }
 
 #[test]
-fn entry_records_are_constructed_only_by_dictionary_insertion() {
+fn only_first_use_publishes_a_global_backing_table() {
+    let sources = sources();
+    assert_eq!(
+        non_read_uses(&sources, "GlobalBuiltinBackingSchema::ENTRIES"),
+        expected(&[(
+            "objects/global_builtin_storage.rs",
+            "emit_global_builtin_install_entry",
+            "write"
+        )]),
+        "once installed, the entries table keeps every live original entry in its rank"
+    );
+    assert_eq!(
+        non_read_uses(&sources, "GlobalBuiltinBackingSchema::APPEND"),
+        expected(&[
+            (
+                "objects/global_builtin_storage.rs",
+                "emit_ensure_global_builtin_append",
+                "write"
+            ),
+            ("gc_types/snapshot.rs", "index", "other"),
+        ]),
+        "once installed, the append dictionary stays with the backing"
+    );
+}
+
+#[test]
+fn entry_records_are_constructed_only_by_insertion_or_first_use_of_a_builtin_row() {
     let sources = sources();
     let constructions = sources
         .iter()
@@ -484,11 +504,17 @@ fn entry_records_are_constructed_only_by_dictionary_insertion() {
         .collect::<Vec<_>>();
     assert_eq!(
         constructions,
-        vec![(
-            "objects/property_storage.rs".to_string(),
-            "emit_ordinary_insert_in_dictionary".to_string()
-        )],
-        "a property keeps its one entry record; insertion follows a proof of absence"
+        vec![
+            (
+                "objects/global_builtin_storage.rs".to_string(),
+                "emit_global_builtin_install_entry".to_string()
+            ),
+            (
+                "objects/property_storage.rs".to_string(),
+                "emit_ordinary_insert_in_dictionary".to_string()
+            ),
+        ],
+        "each live property keeps its entry record once insertion or first use creates it"
     );
     // Every other struct construction or field write goes through the typed
     // layout API scanned above.

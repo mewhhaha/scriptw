@@ -14,7 +14,7 @@ use wasmtime::{
     StoreLimitsBuilder, StructRef, StructRefPre, Trap, Val,
 };
 
-const KEEP_RESIDENT: usize = 16 * 1024 * 1024;
+const KEEP_RESIDENT: usize = 32 * 1024 * 1024;
 
 fn runtime_config() -> Config {
     let mut config = Config::new();

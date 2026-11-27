@@ -154,6 +154,17 @@ tests that used `iconst 0` as a stand-in reference
 now use 4; all 64 crate tests pass (run out of tree: the crate is not a
 workspace member).
 
+## Root stores on cold call edges
+
+`src/frontend/safepoints.rs` uses the liveness pass's CFG to recognize a
+single-entry cold arm and a call-free fast path to a common join. A root
+defined after the source's last safepoint can spill in the cold arm if it
+dies in the diamond and no join safepoint needs it. The fast edge passes
+its original SSA reference when the join uses the root. The cold edge
+passes the value reloaded after the safepoint. The existing spill path
+covers extra entries, live roots at the join's safepoints and exceptional
+call edges.
+
 ## Joins of one repeated constant need no block parameter (2026-11-22)
 
 `src/ssa.rs`, `finish_predecessors_lookup`: upstream removes a would-be

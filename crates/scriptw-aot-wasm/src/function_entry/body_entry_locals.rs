@@ -58,6 +58,29 @@ enum BodyArguments {
         count: I64Local,
     },
     Locals(Vec<ValueLocals>),
+    CountedLocals(CountedLocalArguments),
+}
+
+/// The actual count and original values of a strict projected invocation.
+/// An adapter supplies the original vector; direct local calls omit it.
+pub(crate) struct CountedLocalArguments {
+    lanes: Vec<ValueLocals>,
+    count: I32Local,
+    vector: GcLocal<ValueArray, Nullable>,
+}
+
+impl CountedLocalArguments {
+    pub(crate) fn lanes(&self) -> &[ValueLocals] {
+        &self.lanes
+    }
+
+    pub(crate) fn count(&self) -> I32Local {
+        self.count
+    }
+
+    pub(crate) fn vector(&self) -> &GcLocal<ValueArray, Nullable> {
+        &self.vector
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -183,7 +206,7 @@ impl PlannedBodyEntry<'_> {
                 caller_realm: schema.parameter_gc::<RealmRecord, NonNullable>(
                     match arguments_layout {
                         ArgumentLayout::Vector => 9,
-                        ArgumentLayout::Locals(entry) => 7 + 3 * entry.slot_count() as u32,
+                        ArgumentLayout::Locals(entry) => entry.arity().caller_realm_parameter(),
                     },
                     function,
                 ),
@@ -275,7 +298,7 @@ impl PlannedBodyEntry<'_> {
         };
         let program_index = match arguments_layout {
             ArgumentLayout::Vector => self.program_parameter_index(),
-            ArgumentLayout::Locals(entry) => 8 + 3 * entry.slot_count() as u32,
+            ArgumentLayout::Locals(entry) => entry.arity().caller_realm_parameter() + 1,
         };
         // The native program context binds an initialized owner local,
         // never the caller's parameter (native_program_template): a copy.
@@ -315,11 +338,24 @@ impl PlannedBodyEntry<'_> {
                 };
                 BodyArguments::Vector { values, count }
             }
-            ArgumentLayout::Locals(entry) => BodyArguments::Locals(
-                (0..entry.slot_count())
+            ArgumentLayout::Locals(entry) => {
+                let lanes = (0..entry.slot_count())
                     .map(|index| schema.parameter_value(7 + 3 * index as u32, function))
-                    .collect(),
-            ),
+                    .collect();
+                if entry.projects_arguments() {
+                    let (count, vector) = entry
+                        .arity()
+                        .projection_parameters()
+                        .expect("projected local entry has count and argv operands");
+                    BodyArguments::CountedLocals(CountedLocalArguments {
+                        lanes,
+                        count: schema.parameter_i32(count, function),
+                        vector: schema.parameter_gc(vector, function),
+                    })
+                } else {
+                    BodyArguments::Locals(lanes)
+                }
+            }
         };
         let new_target = match &role {
             EntryRoleLocals::Ordinary { .. } | EntryRoleLocals::PreparedScript { .. } => {
@@ -406,7 +442,7 @@ impl BodyEntryLocals {
     pub(crate) fn arguments(&self) -> &GcLocal<ValueArray> {
         match &self.arguments {
             BodyArguments::Vector { values, .. } => values,
-            BodyArguments::Locals(_) => {
+            BodyArguments::Locals(_) | BodyArguments::CountedLocals(_) => {
                 unreachable!("validated local-arguments body cannot observe its vector")
             }
         }
@@ -414,9 +450,16 @@ impl BodyEntryLocals {
     pub(crate) fn argument_count(&self) -> I64Local {
         match &self.arguments {
             BodyArguments::Vector { count, .. } => *count,
-            BodyArguments::Locals(_) => {
-                unreachable!("validated local-arguments body cannot observe its count")
+            BodyArguments::Locals(_) | BodyArguments::CountedLocals(_) => {
+                unreachable!("local arguments do not have a vector ABI count")
             }
+        }
+    }
+
+    pub(crate) fn counted_local_arguments(&self) -> Option<&CountedLocalArguments> {
+        match &self.arguments {
+            BodyArguments::CountedLocals(arguments) => Some(arguments),
+            _ => None,
         }
     }
 
@@ -428,8 +471,10 @@ impl BodyEntryLocals {
         destination: &ValueLocals,
         function: &mut Function,
     ) -> bool {
-        let BodyArguments::Locals(values) = &self.arguments else {
-            return false;
+        let values = match &self.arguments {
+            BodyArguments::Vector { .. } => return false,
+            BodyArguments::Locals(lanes) => lanes,
+            BodyArguments::CountedLocals(arguments) => &arguments.lanes,
         };
         let value = values
             .get(index)
@@ -533,6 +578,12 @@ impl BodyEntryLocals {
             BodyArguments::Locals(values) => {
                 for value in values {
                     value.clear(function);
+                }
+            }
+            BodyArguments::CountedLocals(arguments) => {
+                arguments.vector.clear(function);
+                for lane in arguments.lanes {
+                    lane.clear(function);
                 }
             }
         }

@@ -107,12 +107,13 @@ fn lookups(artifact: &WasmArtifact, name: &str) -> BTreeMap<String, Lookups> {
             if Some(*function_index) != resolve {
                 continue;
             }
-            // The miss path passes the pooled ordinal as the call's immediate.
+            // Record direct pooled-ordinal immediates; indirect runtime-ordinal
+            // calls (e.g. loop-projected string formatting) do not name a
+            // global identifier key.
             let sequence = &operators[index.saturating_sub(1)..=index];
-            let [Operator::I32Const { value }, Operator::Call { .. }] = sequence else {
-                panic!("{variant}: unknown pooled ordinal at {index}: {sequence:?}")
-            };
-            *lookup.keys.entry(*value).or_default() += 1;
+            if let [Operator::I32Const { value }, Operator::Call { .. }] = sequence {
+                *lookup.keys.entry(*value).or_default() += 1;
+            }
         }
         result.insert(variant.to_owned(), lookup);
     });

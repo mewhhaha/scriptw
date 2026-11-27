@@ -1,8 +1,9 @@
 //! Inspect real dynamic callsites, canonical source bodies, and argv adapters.
 use super::*;
 use crate::gc_types::{
-    ExecutableCode, GcFunctionRole, GcNullability, GlobalLedger, LocalArgumentsCallable,
-    RuntimeModuleTypes, StoredValue, ValueArray, WideLocalArgumentsCallable,
+    ArgumentsObject, ExecutableCode, GcFunctionRole, GcNullability, GlobalLedger,
+    LocalArgumentsCallable, RuntimeModuleTypes, StoredValue, ValueArray,
+    WideLocalArgumentsCallable,
 };
 
 fn declarations(artifact: &WasmArtifact) -> Vec<u32> {
@@ -52,20 +53,15 @@ fn canonical_index_for(artifact: &WasmArtifact, name: &str, signature: u32) -> u
 }
 
 fn inspect_dynamic_call(tail: bool, wide: bool) {
-    let (actuals, formals, snapshot_count, signature) = if wide {
+    let (actuals, observations, snapshot_count, signature) = if wide {
         (
-            "row,1,2,3,4",
-            "row,a,b,c,d",
-            5,
+            "row,1,2,3,4,5",
+            "+arguments.length+arguments[5]",
+            6,
             WideLocalArgumentsCallable::SIGNATURE.type_index(),
         )
     } else {
-        (
-            "row",
-            "row",
-            1,
-            LocalArgumentsCallable::SIGNATURE.type_index(),
-        )
+        ("row", "", 1, LocalArgumentsCallable::SIGNATURE.type_index())
     };
     let ending = if tail {
         format!("return steps[index & 1]({actuals});")
@@ -73,7 +69,7 @@ fn inspect_dynamic_call(tail: bool, wide: bool) {
         format!("var value = steps[index & 1]({actuals}); return value;")
     };
     let artifact = emit_script(&format!(
-        "'use strict'; var steps; function prepare(seed) {{ var tick=seed; steps=[function({formals}){{tick++;return row.x+tick;}},function({formals}){{tick+=3;return row.y+tick;}}]; }} function frame(index,row) {{ {ending} }} prepare(7); frame(globalThis.index,globalThis.row);"
+        "'use strict'; var steps; function prepare(seed) {{ var tick=seed; steps=[function(row){{tick++;return row.x+tick{observations};}},function(row){{tick+=3;return row.y+tick{observations};}}]; }} function frame(index,row) {{ {ending} }} prepare(7); frame(globalThis.index,globalThis.row);"
     ))
     .expect("capturing dynamic calls emit");
     expect_valid_module(&artifact, 4);
@@ -113,6 +109,18 @@ fn inspect_dynamic_call(tail: bool, wide: bool) {
                     _ => false,
                 })
                 .expect("actual dynamic call reaches the typed source body");
+            if wide {
+                assert!(
+                    operators[..call].windows(2).any(|ops| matches!(
+                        ops,
+                        [Operator::I32Const { value: 6 }, Operator::RefNull { hty }]
+                            if *hty == wasmparser::HeapType::Concrete(
+                                wasmparser::UnpackedIndex::Module(vector)
+                            )
+                    )),
+                    "the six-argument call passes the actual count and no argv"
+                );
+            }
             assert!(
                 operators[..call]
                     .iter()
@@ -207,44 +215,147 @@ fn dynamic_capturing_tail_calls_reach_the_typed_entry_without_an_argument_vector
 }
 
 #[test]
-fn five_actual_dynamic_calls_allocate_five_snapshots_and_an_argv_only_on_guard_miss() {
+fn six_actual_dynamic_calls_to_arguments_readers_allocate_argv_only_on_guard_miss() {
     inspect_dynamic_call(false, true);
 }
 
 #[test]
-fn five_actual_dynamic_tail_calls_use_the_wide_typed_entry_before_any_argv() {
+fn six_actual_dynamic_tail_calls_to_arguments_readers_use_the_wide_typed_entry() {
     inspect_dynamic_call(true, true);
 }
 
 #[test]
-fn arguments_observers_and_complex_parameters_retain_the_vector_body() {
+fn only_projected_strict_arguments_reads_get_counted_local_bodies() {
     let artifact = emit_script(
-        "'use strict'; function observed(a,b,c,d,e){return arguments.length;} function defaults(a,b,c,d,e=7){return e;} function rest(...a){return a[0];} observed(1); defaults(); rest(1);"
-    ).expect("vector-only source functions emit");
-    expect_valid_module(&artifact, 3);
-    let signatures = declarations(&artifact);
-    for (index, name) in function_names(&artifact) {
-        if ["observed", "defaults", "rest"]
-            .iter()
-            .any(|source| name.contains(&format!("::{source}#")))
-        {
-            for signature in [
-                LocalArgumentsCallable::SIGNATURE.type_index(),
-                WideLocalArgumentsCallable::SIGNATURE.type_index(),
-            ] {
-                assert_ne!(
-                    signatures[index as usize], signature,
-                    "{name} needs the actual incoming argument list"
-                );
-            }
+        r#"
+        function projectedLength() { 'use strict'; return arguments.length; }
+        function projectedIndex(index) { 'use strict'; return arguments[index]; }
+        function escaped() { 'use strict'; return arguments; }
+        function mutated(value) { 'use strict'; arguments[0] = value; return arguments.length; }
+        function deleted() { 'use strict'; delete arguments[0]; return arguments.length; }
+        function presence() { 'use strict'; return 0 in arguments; }
+        function callee() { 'use strict'; return arguments.callee; }
+        function iterator() { 'use strict'; return arguments[Symbol.iterator]; }
+        function sloppy(value) { value = 7; return arguments[0]; }
+        function directEval() { 'use strict'; return eval('arguments.length'); }
+        function complexParameters() {
+            'use strict';
+            function defaults(value = 7) { return value; }
+            function rest(...values) { return values[0]; }
+            return [defaults, rest];
         }
+        "#,
+    )
+    .expect("arguments observer controls emit");
+    expect_valid_module(&artifact, 13);
+    let wide = WideLocalArgumentsCallable::SIGNATURE.type_index();
+    canonical_index_for(&artifact, "projectedLength", wide);
+    canonical_index_for(&artifact, "projectedIndex", wide);
+    let signatures = declarations(&artifact);
+    let names = function_names(&artifact);
+    for source in [
+        "escaped",
+        "mutated",
+        "deleted",
+        "presence",
+        "callee",
+        "iterator",
+        "sloppy",
+        "directEval",
+        "defaults",
+        "rest",
+    ] {
+        let (index, name) = names
+            .iter()
+            .find(|(_, name)| name.starts_with(&format!("js::{source}#")))
+            .expect("vector-only control has a compiled body");
+        assert_eq!(
+            signatures[*index as usize],
+            crate::StaticSignature::JavaScriptFunction.type_index(),
+            "{name} needs the incoming argument vector"
+        );
+    }
+}
+
+#[test]
+fn counted_reads_use_the_entry_count_and_build_arguments_after_a_missed_index() {
+    let artifact = emit_script(
+        "'use strict'; function argCount() { return arguments.length; } function read(index) { return arguments[index]; }",
+    )
+    .expect("counted read bodies emit");
+    expect_valid_module(&artifact, 2);
+    let wide = WideLocalArgumentsCallable::SIGNATURE.type_index();
+    let count_body = canonical_index_for(&artifact, "argCount", wide);
+    let read_body = canonical_index_for(&artifact, "read", wide);
+    let registered = RuntimeModuleTypes::register(crate::tests::standalone_kind())
+        .finalize_globals(GlobalLedger::new(), false, 0);
+    let wasm_encoder::HeapType::Concrete(arguments_type) = registered
+        .globals()
+        .schema()
+        .reference_type::<ArgumentsObject>(GcNullability::NonNullable)
+        .heap_type
+    else {
+        panic!("ArgumentsObject has a registered concrete type");
+    };
+    let arguments_allocation = |op: &Operator<'_>| matches!(op, Operator::StructNew { struct_type_index } if *struct_type_index == arguments_type);
+    let mut index = imported_function_count(&artifact);
+    for payload in Parser::new(0).parse_all(&artifact.bytes) {
+        let Payload::CodeSectionEntry(body) = payload.expect("P decodes") else {
+            continue;
+        };
+        if index == count_body {
+            let operators = crate::tests::emitted_operators(&body);
+            let conversion = operators
+                .windows(2)
+                .position(|ops| {
+                    matches!(
+                        ops,
+                        [
+                            Operator::LocalGet { local_index: 25 },
+                            Operator::F64ConvertI32U
+                        ]
+                    )
+                })
+                .expect("the incoming count becomes a JavaScript Number");
+            assert!(
+                operators[..conversion]
+                    .iter()
+                    .all(|op| !arguments_allocation(op)),
+                "the .length fast path reads its count before any arguments object allocation"
+            );
+        }
+        if index == read_body {
+            let operators = crate::tests::emitted_operators(&body);
+            let conversion = operators
+                .iter()
+                .position(|op| matches!(op, Operator::I32TruncSatF64U))
+                .expect("the index is tested before reading a lane");
+            let allocation = operators
+                .iter()
+                .position(arguments_allocation)
+                .expect("an absent own index can need the real object and its prototype");
+            assert!(conversion < allocation, "the entry leaves the object lazy");
+            assert!(
+                operators[conversion..allocation]
+                    .iter()
+                    .any(|op| matches!(op, Operator::BrIf { .. })),
+                "the numeric index check guards the local read and its fallback"
+            );
+            assert!(
+                operators[conversion..allocation]
+                    .iter()
+                    .any(|op| matches!(op, Operator::BrTable { .. })),
+                "an in-range computed index selects an original lane directly"
+            );
+        }
+        index += 1;
     }
 }
 
 fn inspect_vector_adapter(wide: bool) {
     let (source, signature) = if wide {
         (
-            "'use strict'; function make(a,b,c,d,e){return {a,b,c,d,e};} globalThis.saved=make;",
+            "'use strict'; function make(index){return [arguments.length, arguments[index]];} function overflow(callback){return callback(6,1,2,3,4,5,6);} globalThis.saved=make; globalThis.overflow=overflow;",
             WideLocalArgumentsCallable::SIGNATURE.type_index(),
         )
     } else {
@@ -255,24 +366,57 @@ fn inspect_vector_adapter(wide: bool) {
     };
     let artifact =
         emit_script(source).expect("escaping source callable emits both invocation entries");
-    expect_valid_module(&artifact, 1);
+    expect_valid_module(&artifact, if wide { 2 } else { 1 });
     let canonical = canonical_index_for(&artifact, "make", signature);
+    let overflow = wide.then(|| canonical_index(&artifact, "overflow"));
     let mut adapters = 0;
+    let mut index = imported_function_count(&artifact);
     for payload in Parser::new(0).parse_all(&artifact.bytes) {
         let Payload::CodeSectionEntry(body) = payload.expect("P decodes") else {
             continue;
         };
         let operators = crate::tests::emitted_operators(&body);
+        if Some(index) == overflow {
+            assert!(
+                operators
+                    .iter()
+                    .any(|op| matches!(op, Operator::ArrayNewFixed { array_size: 7, .. })),
+                "an over-width call keeps every actual in argv"
+            );
+            assert!(
+                operators.iter().all(|op| !matches!(
+                    op,
+                    Operator::CallRef { type_index } | Operator::ReturnCallRef { type_index }
+                        if *type_index == LocalArgumentsCallable::SIGNATURE.type_index()
+                            || *type_index == WideLocalArgumentsCallable::SIGNATURE.type_index()
+                )),
+                "an over-width call enters through the ordinary argv signature"
+            );
+        }
         if operators.iter().any(|op| {
             matches!(op, Operator::ReturnCall { function_index } if *function_index == canonical)
         }) {
             adapters += 1;
+            if wide {
+                assert!(
+                    operators.windows(3).any(|ops| matches!(
+                        ops,
+                        [
+                            Operator::LocalGet { local_index: 7 },
+                            Operator::I32WrapI64,
+                            Operator::LocalGet { local_index: 8 },
+                        ]
+                    )),
+                    "the adapter forwards the actual count and the original vector for overflow"
+                );
+            }
             assert!(operators.iter().all(|op| !matches!(op,
                 Operator::StructNew { .. } | Operator::StructNewDefault { .. }
                 | Operator::ArrayNew { .. } | Operator::ArrayNewDefault { .. }
                 | Operator::ArrayNewFixed { .. } | Operator::GlobalSet { .. })),
                 "the adapter neither allocates nor installs a second source activation");
         }
+        index += 1;
     }
     assert_eq!(
         adapters, 1,
@@ -286,7 +430,7 @@ fn vector_entry_is_a_thin_tail_adapter_to_the_single_canonical_body() {
 }
 
 #[test]
-fn five_formal_vector_entry_only_unpacks_and_tail_enters_one_wide_canonical_body() {
+fn counted_vector_entry_tail_enters_the_wide_body_with_its_original_arguments() {
     inspect_vector_adapter(true);
 }
 

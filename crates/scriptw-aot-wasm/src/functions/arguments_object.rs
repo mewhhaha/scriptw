@@ -27,9 +27,7 @@ impl FunctionBuilder<'_> {
                 .load(schema, function),
             function,
         );
-        let list = schema
-            .reserve_gc_local(function)
-            .initialize(entry.arguments().load(schema, function), function);
+        let list = self.emit_arguments_object_input_vector(function);
         let realm = schema
             .reserve_gc_local(function)
             .initialize(self.emit_current_function_realm(function), function);

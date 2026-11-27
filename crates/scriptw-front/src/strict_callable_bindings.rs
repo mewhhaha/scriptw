@@ -8,7 +8,8 @@
 use super::{early_error_code::TYPED_STRICT_BINDING_CODE, ParseError, SourceSpan};
 use boa_ast::{
     expression::{
-        literal::ObjectMethodDefinition, Expression, Identifier, RESERVED_IDENTIFIERS_STRICT,
+        literal::ObjectMethodDefinition, Expression, Identifier, ImportCall,
+        RESERVED_IDENTIFIERS_STRICT,
     },
     function::{
         ArrowFunction, AsyncArrowFunction, AsyncFunctionDeclaration, AsyncFunctionExpression,
@@ -21,18 +22,20 @@ use boa_ast::{
 };
 use std::ops::ControlFlow;
 
+/// Admit every callable binding and retain whether the same walk saw `import()`.
 pub(super) fn validate<N: VisitWith>(
     ast: &N,
     span: impl FnOnce(Position) -> Option<SourceSpan>,
-) -> Result<(), ParseError> {
-    if let ControlFlow::Break(identifier) = ast.visit_with(&mut CallableHeaders) {
+) -> Result<bool, ParseError> {
+    let mut headers = CallableHeaders::default();
+    if let ControlFlow::Break(identifier) = ast.visit_with(&mut headers) {
         return Err(ParseError::early_error(
             TYPED_STRICT_BINDING_CODE,
             "strict callable header contains a reserved binding identifier",
             span(identifier.span().start()),
         ));
     }
-    Ok(())
+    Ok(headers.has_dynamic_import)
 }
 
 struct ParameterBindings;
@@ -73,7 +76,10 @@ fn check_header(
     ControlFlow::Continue(())
 }
 
-struct CallableHeaders;
+#[derive(Default)]
+struct CallableHeaders {
+    has_dynamic_import: bool,
+}
 
 macro_rules! declaration_header {
     ($visit:ident, $node:ident) => {
@@ -110,6 +116,11 @@ macro_rules! unnamed_header {
 
 impl<'ast> Visitor<'ast> for CallableHeaders {
     type BreakTy = Identifier;
+
+    fn visit_import_call(&mut self, node: &'ast ImportCall) -> ControlFlow<Self::BreakTy> {
+        self.has_dynamic_import = true;
+        node.visit_with(self)
+    }
 
     declaration_header!(visit_function_declaration, FunctionDeclaration);
     declaration_header!(visit_generator_declaration, GeneratorDeclaration);

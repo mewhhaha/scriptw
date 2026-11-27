@@ -177,7 +177,7 @@ fn runtime_dependent_and_rooted_programs_retain_the_exact_runtime_pool() {
     for source in [
         "let value = 1; value;",
         "'text'.length;",
-        "print(1);",
+        "print({});",
         "'literal'; ({});",
         "('literal', print(1));",
     ] {

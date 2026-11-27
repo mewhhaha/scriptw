@@ -31,7 +31,7 @@ impl<'a> Reader<'a> {
     }
 }
 
-impl BuildMetadata {
+impl BuildMetadata<'static> {
     // This function is private to the unsafe build-candidate boundary. A valid
     // checksum protects framing mistakes; it cannot authorize caller metadata.
     // The inputs are static immutable Cargo build slices; caching by their exact
@@ -41,16 +41,14 @@ impl BuildMetadata {
         proof: super::super::inputs::ImmutableMetadata,
         profile: RuntimeSourceCompilationProfile,
     ) -> Option<Arc<Self>> {
-        type CacheKey = (usize, usize, usize, usize, u8);
+        type CacheKey = ([(usize, usize); 4], u8);
         static DECODED: std::sync::OnceLock<
-            std::sync::Mutex<Vec<(CacheKey, Option<Arc<BuildMetadata>>)>>,
+            std::sync::Mutex<Vec<(CacheKey, Option<Arc<BuildMetadata<'static>>>)>>,
         > = std::sync::OnceLock::new();
         let (package, source, intl_metadata, metadata) = proof.parts();
         let key: CacheKey = (
-            package.as_ptr() as usize,
-            source.as_ptr() as usize,
-            intl_metadata.as_ptr() as usize,
-            metadata.as_ptr() as usize,
+            [package, source.as_slice(), intl_metadata, metadata]
+                .map(|bytes| (bytes.as_ptr() as usize, bytes.len())),
             profile.wire(),
         );
         let cache = DECODED.get_or_init(Default::default);
@@ -75,9 +73,11 @@ impl BuildMetadata {
         guard.push((key, parsed.clone()));
         parsed
     }
+}
 
+impl<'receipt> BuildMetadata<'receipt> {
     fn parse(
-        metadata: &[u8],
+        metadata: &'receipt [u8],
         package: &'static [u8],
         source: &[u8; 32],
         profile: RuntimeSourceCompilationProfile,
@@ -158,6 +158,12 @@ impl BuildMetadata {
             globals.push(wasm_encoder::GlobalType::try_from(global).ok()?);
             r.0 = r.0.get(reader.original_position()..)?;
         }
+        let compiler_prefix = match (profile, r.field()?) {
+            (RuntimeSourceCompilationProfile::Portable, []) => return None,
+            (RuntimeSourceCompilationProfile::Portable, prefix) => Some(prefix),
+            (RuntimeSourceCompilationProfile::NativeHost, []) => None,
+            (RuntimeSourceCompilationProfile::NativeHost, _) => return None,
+        };
         let largest_body = r.word()?;
         if largest_body == 0 || largest_body > wasm.len() {
             return None;
@@ -210,6 +216,7 @@ impl BuildMetadata {
             intl_identity,
             profile,
             layout: RuntimeLayout::new(imported_functions, function_types, globals, pool),
+            compiler_prefix,
             largest_body,
             data,
             frames,
@@ -219,7 +226,7 @@ impl BuildMetadata {
     /// Corruption controls inspect parser rejection without exposing authority.
     #[cfg(test)]
     pub(super) fn parser_rejects(
-        metadata: &[u8],
+        metadata: &'receipt [u8],
         package: &'static [u8],
         source: &[u8; 32],
         profile: RuntimeSourceCompilationProfile,

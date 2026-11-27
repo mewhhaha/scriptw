@@ -6,19 +6,45 @@ use crate::gc_types::RuntimeSchema;
 pub(crate) struct ProjectedArgumentsLocals {
     proof: StrictArgumentsProjection,
     storage: BindingStorage,
-    first: ValueLocals,
-    count: I32Local,
+    inputs: ProjectedArgumentsInputs,
     /// The real object once a read needed it: Undefined until then. Every
     /// read after it goes to the object, which an inherited getter may have
     /// changed.
     materialized: ValueLocals,
 }
 
+enum ProjectedArgumentsInputs {
+    Vector { first: ValueLocals, count: I32Local },
+    Local { count: I32Local },
+}
+
+enum ProjectedStaticRead {
+    Length,
+    Index(u32),
+}
+
 impl ProjectedArgumentsLocals {
     pub(crate) fn clear(self, schema: &RuntimeSchema, function: &mut Function) {
-        self.first.clear(function);
         self.materialized.clear(function);
-        schema.release_i32_local(self.count, function);
+        if let ProjectedArgumentsInputs::Vector { first, count } = self.inputs {
+            first.clear(function);
+            schema.release_i32_local(count, function);
+        }
+    }
+
+    fn count(&self) -> I32Local {
+        match self.inputs {
+            ProjectedArgumentsInputs::Vector { count, .. }
+            | ProjectedArgumentsInputs::Local { count } => count,
+        }
+    }
+
+    fn emit_is_unmaterialized(&self, function: &mut Function) {
+        self.materialized.tag().load(function);
+        function.instruction(&Instruction::I32Const(
+            WasmRuntimeValueTag::Undefined as i32,
+        ));
+        function.instruction(&Instruction::I32Eq);
     }
 }
 
@@ -27,9 +53,8 @@ impl FunctionBuilder<'_> {
     /// computed reads observe: nothing is built at entry. An unmapped object's
     /// own index below the count is a writable data property holding the
     /// passed value and `length` holds the count; nothing can write them
-    /// before the object exists, and building it later from the unchanged
-    /// argument vector makes the same object, so reads answer from the
-    /// vector until one needs the object itself.
+    /// before the object exists. The original vector or rooted local lanes
+    /// answer those reads until an operation needs the real object.
     pub(super) fn initialize_projected_arguments_binding(
         &mut self,
         proof: StrictArgumentsProjection,
@@ -47,24 +72,30 @@ impl FunctionBuilder<'_> {
             PresentArgumentsObjectProtocol::Unmapped(_)
         ));
         let schema = self.runtime_schema();
-        let first = schema.reserve_value_local(function);
-        first.set_undefined(function);
-        let count = schema.reserve_i32_local(function);
-        schema.array_type::<ValueArray>().length(
-            self.body_entry_locals()
-                .expect("source invocation owns its argument vector")
-                .arguments(),
-            schema,
-            function,
-        );
-        count.store(function);
-        count.load(function);
-        self.open_frame(ControlFrameKind::If, function);
-        // Snapshot before formal assignment, callbacks or private argument-list
-        // reuse. Unmapped own index zero is an unobservable data property.
-        self.read_argument_at_index(0, &first, function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
+        let entry = self
+            .body_entry_locals()
+            .expect("projection belongs to a callable invocation");
+        let inputs = if let Some(arguments) = entry.counted_local_arguments() {
+            ProjectedArgumentsInputs::Local {
+                count: arguments.count(),
+            }
+        } else {
+            let first = schema.reserve_value_local(function);
+            first.set_undefined(function);
+            let count = schema.reserve_i32_local(function);
+            schema
+                .array_type::<ValueArray>()
+                .length(entry.arguments(), schema, function);
+            count.store(function);
+            count.load(function);
+            self.open_frame(ControlFrameKind::If, function);
+            // Snapshot before formal assignment or callbacks. Unmapped own
+            // index zero is an unobservable data property.
+            self.read_argument_at_index(0, &first, function);
+            self.pop_control(ControlFrameKind::If);
+            function.instruction(&Instruction::End);
+            ProjectedArgumentsInputs::Vector { first, count }
+        };
         let placeholder = schema.reserve_value_local(function);
         placeholder.set_undefined(function);
         self.write_binding_from_locals(storage, &placeholder, function);
@@ -74,8 +105,7 @@ impl FunctionBuilder<'_> {
         self.projected_arguments = Some(ProjectedArgumentsLocals {
             proof,
             storage,
-            first,
-            count,
+            inputs,
             materialized,
         });
         Ok(())
@@ -88,11 +118,7 @@ impl FunctionBuilder<'_> {
         projected: &ProjectedArgumentsLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        projected.materialized.tag().load(function);
-        function.instruction(&Instruction::I32Const(
-            WasmRuntimeValueTag::Undefined as i32,
-        ));
-        function.instruction(&Instruction::I32Eq);
+        projected.emit_is_unmaterialized(function);
         self.open_frame(ControlFrameKind::If, function);
         self.initialize_arguments_binding(
             projected.storage,
@@ -107,7 +133,7 @@ impl FunctionBuilder<'_> {
 
     /// Whether `expression` is a read the projection answers. A fast path that
     /// would evaluate its base on its own leaves it whole instead, so the read
-    /// keeps the answer from the argument vector.
+    /// keeps the answer from the invocation's original arguments.
     pub(crate) fn is_projected_arguments_read(&self, expression: &TypedExpr) -> bool {
         self.projected_arguments
             .as_ref()
@@ -141,8 +167,23 @@ impl FunctionBuilder<'_> {
             self.projected_arguments = Some(projected);
             return Ok(false);
         };
-        let result = match read {
-            ArgumentsProjectionRead::Index => {
+        let static_read = match read {
+            ArgumentsProjectionRead::Length => Some(ProjectedStaticRead::Length),
+            ArgumentsProjectionRead::First => Some(ProjectedStaticRead::Index(0)),
+            ArgumentsProjectionRead::Other | ArgumentsProjectionRead::Index => self
+                .body_entry_locals()
+                .and_then(|entry| entry.counted_local_arguments())
+                .and_then(|arguments| {
+                    let index = projected.proof.literal_index(expression)?;
+                    (index < arguments.lanes().len() as u32)
+                        .then_some(ProjectedStaticRead::Index(index))
+                }),
+        };
+        let result = match (static_read, read) {
+            (Some(read), _) => {
+                self.compile_projected_static_read(&projected, read, expression, output, function)
+            }
+            (None, ArgumentsProjectionRead::Index) => {
                 // The key is evaluated first, with the projection in place:
                 // it may read the binding itself.
                 let key_expression = projected
@@ -157,6 +198,7 @@ impl FunctionBuilder<'_> {
                     .take()
                     .expect("the key's reads restore the projection");
                 let result = compiled.and_then(|()| {
+                    self.emit_propagate_current_throw_if_needed(function);
                     self.compile_projected_index_read(&projected, &key, output, function)
                 });
                 key.clear(function);
@@ -164,59 +206,54 @@ impl FunctionBuilder<'_> {
                 result?;
                 return Ok(true);
             }
-            read => {
-                self.compile_projected_static_read(&projected, read, expression, output, function)
-            }
+            (None, _) => self
+                .emit_materialize_projected_arguments(&projected, function)
+                .and_then(|()| self.compile_expr_to_value(expression, output, function)),
         };
         self.projected_arguments = Some(projected);
         result?;
         Ok(true)
     }
 
-    /// `.length`, index zero and other static keys.
+    /// `.length` or a statically selected local lane.
     fn compile_projected_static_read(
         &mut self,
         projected: &ProjectedArgumentsLocals,
-        read: ArgumentsProjectionRead,
+        read: ProjectedStaticRead,
         expression: &TypedExpr,
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        // Answered from the vector while no object exists, and for index
-        // zero only when it is an own index.
-        projected.materialized.tag().load(function);
-        function.instruction(&Instruction::I32Const(
-            WasmRuntimeValueTag::Undefined as i32,
-        ));
-        function.instruction(&Instruction::I32Eq);
-        match read {
-            ArgumentsProjectionRead::First => {
-                projected.count.load(function);
-                function.instruction(&Instruction::I32Const(0));
-                function.instruction(&Instruction::I32Ne);
-                function.instruction(&Instruction::I32And);
-            }
-            ArgumentsProjectionRead::Length => {}
-            ArgumentsProjectionRead::Other | ArgumentsProjectionRead::Index => {
-                function.instruction(&Instruction::Drop);
-                function.instruction(&Instruction::I32Const(0));
-            }
+        projected.emit_is_unmaterialized(function);
+        if let ProjectedStaticRead::Index(index) = read {
+            projected.count().load(function);
+            function.instruction(&Instruction::I32Const(index as i32));
+            function.instruction(&Instruction::I32GtU);
+            function.instruction(&Instruction::I32And);
         }
         self.open_frame(ControlFrameKind::If, function);
         match read {
-            ArgumentsProjectionRead::First => output.copy_from(&projected.first, function),
-            ArgumentsProjectionRead::Length => {
+            ProjectedStaticRead::Index(index) => match &projected.inputs {
+                ProjectedArgumentsInputs::Vector { first, .. } => {
+                    assert_eq!(index, 0, "only index zero has a vector snapshot");
+                    output.copy_from(first, function);
+                }
+                ProjectedArgumentsInputs::Local { .. } => {
+                    let entry = self
+                        .body_entry_locals()
+                        .expect("local projection belongs to a callable entry");
+                    assert!(entry.copy_local_argument(index as usize, output, function));
+                }
+            },
+            ProjectedStaticRead::Length => {
                 let bits = schema.reserve_i64_local(function);
-                projected.count.load(function);
+                projected.count().load(function);
                 function.instruction(&Instruction::F64ConvertI32U);
                 function.instruction(&Instruction::I64ReinterpretF64);
                 bits.store(function);
                 output.set_number(bits, function);
                 schema.release_i64_local(bits, function);
-            }
-            ArgumentsProjectionRead::Other | ArgumentsProjectionRead::Index => {
-                output.set_undefined(function);
             }
         }
         self.completion().set_normal(output, function);
@@ -246,11 +283,8 @@ impl FunctionBuilder<'_> {
         let number = schema.reserve_f64_local(function);
         let done = self.open_frame(ControlFrameKind::Block, function);
         let object = self.open_frame(ControlFrameKind::Block, function);
-        projected.materialized.tag().load(function);
-        function.instruction(&Instruction::I32Const(
-            WasmRuntimeValueTag::Undefined as i32,
-        ));
-        function.instruction(&Instruction::I32Ne);
+        projected.emit_is_unmaterialized(function);
+        function.instruction(&Instruction::I32Eqz);
         self.emit_branch_if_to_target(object, function);
         key.tag().load(function);
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Number as i32));
@@ -269,14 +303,11 @@ impl FunctionBuilder<'_> {
         number.load(function);
         function.instruction(&Instruction::F64Ne);
         index.load(function);
-        projected.count.load(function);
+        projected.count().load(function);
         function.instruction(&Instruction::I32GeU);
         function.instruction(&Instruction::I32Or);
         self.emit_branch_if_to_target(object, function);
-        let entry = self
-            .body_entry_locals()
-            .expect("source invocation owns its argument vector");
-        self.emit_argument_vector_entry_to_value(entry.arguments(), index, output, function);
+        self.emit_projected_argument_at_index(index, output, function);
         self.completion().set_normal(output, function);
         self.emit_branch_to_target(done, function);
         self.pop_control(ControlFrameKind::Block);

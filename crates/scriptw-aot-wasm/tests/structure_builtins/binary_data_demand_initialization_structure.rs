@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 const BOOTSTRAP: &str = include_str!("../../src/builtins/bootstrap.rs");
+const GLOBAL_PUBLICATION: &str = include_str!("../../src/builtins/bootstrap/global_publication.rs");
 const BINARY: &str = include_str!("../../src/builtins/bootstrap/binary_data_initialization.rs");
 const FUNCTIONS: &str = include_str!("../../src/functions.rs");
 const LOADER: &str = include_str!("../../src/functions/realm_intrinsic.rs");
@@ -147,23 +148,25 @@ fn external_and_installer_reads_ensure_the_defining_realm_while_build_reads_requ
 #[test]
 fn ordinary_global_properties_retain_closed_defining_realm_recipes_and_never_resurrect() {
     let global = bounded(
-        BOOTSTRAP,
-        "GlobalPropertyInitializerIr::BuiltinFunction(builtin) => {",
-        "GlobalPropertyInitializerIr::HostFunction",
+        GLOBAL_PUBLICATION,
+        "fn emit_standard_global_value(",
+        "fn emit_host_global_value(",
     );
     assert!(
         global.find("BinaryDataConstructor::from_builtin").unwrap()
-            < global.find("emit_load_non_array_realm_intrinsic").unwrap()
+            < global
+                .find("emit_load_non_array_realm_intrinsic_stored")
+                .unwrap()
     );
     assert!(global.contains("Some(self.emit_deferred_binary_data_constructor_value("));
-    // The recipe is published in plan order with the binding's own attributes.
-    let row = bounded(
-        BOOTSTRAP,
-        "let property_value = match deferred {",
-        "publication.finish(",
+    // Builtin global rows encode their recipe into the immutable global table
+    // in catalog order with each binding's own attributes.
+    let encode = bounded(
+        GLOBAL_PUBLICATION,
+        "pub(crate) fn encode_global_builtin_recipe(",
+        "pub(crate) fn emit_global_builtin_layout_recipe_value(",
     );
-    assert!(row.contains("publication.push("));
-    assert!(row.contains("writable: binding.initializer.writable()"));
+    assert!(encode.contains("I::BuiltinFunction(builtin) => (R::StandardFunction, *builtin as u32),"));
     let publication = bounded(
         BINARY,
         "pub(super) fn emit_deferred_binary_data_constructor_value(",

@@ -4494,6 +4494,9 @@ pub enum GlobalLexicalBindingModeIr {
 pub struct GlobalBindingPlan {
     object_bindings: BTreeMap<String, ScriptGlobalBindingIr>,
     lexical_bindings: BTreeMap<String, GlobalLexicalBindingModeIr>,
+    annex_b_order: Vec<String>,
+    var_order: Vec<String>,
+    function_order: Vec<String>,
 }
 
 impl GlobalBindingPlan {
@@ -4504,6 +4507,7 @@ impl GlobalBindingPlan {
         let mut plan = Self {
             object_bindings: BTreeMap::new(),
             lexical_bindings: lexical_bindings.into_iter().collect(),
+            ..Self::default()
         };
         for binding in object_bindings {
             plan.insert_initial(binding);
@@ -4512,6 +4516,13 @@ impl GlobalBindingPlan {
     }
 
     pub fn insert_initial(&mut self, binding: ScriptGlobalBindingIr) {
+        match binding.initializer {
+            GlobalPropertyInitializerIr::SourceFunction(_) => self.function_order.push(binding.name.clone()),
+            GlobalPropertyInitializerIr::FreshUndefined => {
+                self.var_order.push(binding.name.clone());
+            }
+            _ => {}
+        }
         let previous = self.object_bindings.insert(binding.name.clone(), binding);
         assert!(
             previous.is_none(),
@@ -4555,7 +4566,11 @@ impl GlobalBindingPlan {
     }
 
     pub fn record_annex_b_var(&mut self, name: String) {
+        let fresh = !self.object_bindings.contains_key(&name);
         self.record_var(name);
+        if fresh {
+            self.annex_b_order.push(self.var_order.pop().expect("the new var was just recorded"));
+        }
     }
 
     pub fn record_function(
@@ -4567,6 +4582,13 @@ impl GlobalBindingPlan {
             !self.lexical_bindings.contains_key(&name),
             "a global function name cannot collide with a global lexical name"
         );
+        if self.object_bindings.get(&name).is_some_and(|binding| {
+            binding.declarations.with_function() == binding.declarations
+                || matches!(binding.initializer, GlobalPropertyInitializerIr::SourceFunction(_))
+        }) {
+            self.function_order.retain(|previous| previous != &name);
+        }
+        self.function_order.push(name.clone());
         let (initializer, declarations, disposition) = match self.object_bindings.get(&name) {
             Some(binding) if !binding.initializer.permits_global_function_declaration() => (
                 binding.initializer.clone(),
@@ -4601,6 +4623,22 @@ impl GlobalBindingPlan {
 
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &ScriptGlobalBindingIr> {
         self.object_bindings.values()
+    }
+
+    /// Annex B creates its additional vars before ordinary function and var
+    /// publication. A duplicate function occupies the final declaration's
+    /// position, as when GlobalDeclarationInstantiation scans in reverse.
+    pub fn entry_declarations(&self) -> impl Iterator<Item = &ScriptGlobalBindingIr> {
+        let vars = |name: &String| {
+            let binding = &self.object_bindings[name];
+            matches!(binding.initializer, GlobalPropertyInitializerIr::FreshUndefined)
+                .then_some(binding)
+        };
+        self.annex_b_order.iter().filter_map(vars)
+            .chain(self.function_order.iter()
+                .map(|name| &self.object_bindings[name])
+                .filter(|binding| matches!(binding.initializer, GlobalPropertyInitializerIr::SourceFunction(_))))
+            .chain(self.var_order.iter().filter_map(vars))
     }
 
     /// Script-global bindings with frame storage for declaration writes.

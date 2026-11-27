@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use sha2::{Digest, Sha256};
 use wasm_encoder::{EntityType, ExportKind, ExportSection, GlobalType, ImportSection};
 
-use crate::data::{PoolBoundary, StringPool};
+use crate::data::{CompilerOwnedPool, PoolBoundary, StringPool};
 use crate::EmitError;
 
 mod build_package;
@@ -208,7 +208,10 @@ pub const NATIVE_REGEXP_LITERAL_FACTORY_EXPORT: &str = "scriptw.native_regexp_li
 // Version 93 precomputes bucket positions for fresh global dictionaries.
 // Version 94 publishes global dictionary rows directly and makes well-known
 // symbols, Array callables, RegExp legacy state and native payloads demand-owned.
-const LAYOUT_VERSION: u32 = 94;
+// Version 95 includes the Wave 8A layout changes and replaces eager global
+// builtin publication with immutable rows, sparse original entries and an
+// append dictionary. Rooted snapshots gain a typed global-row projection.
+const LAYOUT_VERSION: u32 = 95;
 
 /// A checked current envelope, or the compiler's own current emission.
 /// Decoding a raw payload cannot silently mint its version authority.
@@ -425,6 +428,7 @@ impl ModuleKind<'_> {
 pub(crate) struct EmittedModule {
     pub(crate) artifact: crate::WasmArtifact,
     pub(crate) runtime_layout: Option<RuntimeLayout>,
+    pub(crate) runtime_pool: Option<StringPool>,
 }
 
 pub struct RuntimeArtifact {
@@ -515,6 +519,47 @@ impl RuntimeArtifact {
 
     pub(crate) fn admitted_compiler_pool_matches(&self, utf16: &[u8], data: &[u8]) -> Option<bool> {
         Some(self.build_admission.as_ref()?.matches_pool(utf16, data))
+    }
+
+    /// The immutable Cargo receipt binds the pool to this exact R, layout and
+    /// admitted Intl compilation data.
+    pub(crate) fn precomputed_compiler_owned_pool(
+        &self,
+        functions: &std::collections::BTreeMap<scriptw_ir::FunctionId, crate::WasmFunctionMeta>,
+        selection: &scriptw_intl::IntlDataSelection,
+    ) -> Result<Option<&Arc<CompilerOwnedPool>>, EmitError> {
+        let Some(build) = &self.build_admission else {
+            return Ok(None);
+        };
+        let Some(prefix) = build.compiler_prefix else {
+            return Ok(None);
+        };
+        let selected = selection
+            .compilation_data()
+            .map_err(|error| EmitError::unsupported(error.to_string()))?;
+        if !self
+            .compilation_data
+            .as_ref()
+            .is_some_and(|data| Arc::ptr_eq(data, selected))
+        {
+            return Ok(None);
+        }
+        self.compiler_owned_pool
+            .get_or_init(|| {
+                let (utf16, static_parts) = build.pool_segments();
+                CompilerOwnedPool::from_build_prefix(
+                    prefix,
+                    utf16,
+                    static_parts,
+                    self.layout.pool,
+                    functions,
+                    selection,
+                )
+                .map(Arc::new)
+            })
+            .as_ref()
+            .map(Some)
+            .map_err(Clone::clone)
     }
 
     fn require_intl_profile(
@@ -615,6 +660,14 @@ fn emit_runtime_artifact(
     selection: &scriptw_intl::IntlDataSelection,
     source_compilation_profile: RuntimeSourceCompilationProfile,
 ) -> Result<Arc<RuntimeArtifact>, EmitError> {
+    emit_runtime_artifact_with_pool(selection, source_compilation_profile)
+        .map(|(artifact, _)| artifact)
+}
+
+fn emit_runtime_artifact_with_pool(
+    selection: &scriptw_intl::IntlDataSelection,
+    source_compilation_profile: RuntimeSourceCompilationProfile,
+) -> Result<(Arc<RuntimeArtifact>, StringPool), EmitError> {
     let parsed = scriptw_front::parse(";", scriptw_front::ParseOptions::script())
         .map_err(|_| EmitError::unsupported("the empty runtime script must parse"))?;
     let script = scriptw_ir::lower(&parsed)
@@ -624,16 +677,22 @@ fn emit_runtime_artifact(
     let layout = module
         .runtime_layout
         .ok_or_else(|| EmitError::unsupported("the runtime module must describe its layout"))?;
+    let pool = module.runtime_pool.ok_or_else(|| {
+        EmitError::unsupported("the runtime module must retain its compiler pool")
+    })?;
     let compilation = selection
         .compilation_data()
         .map_err(|error| EmitError::unsupported(error.to_string()))?;
-    Ok(Arc::new(RuntimeArtifact::new(
-        Cow::Owned(module.artifact.bytes),
-        layout,
-        CurrentRuntimeLayoutVersion::emitted_current(),
-        source_compilation_profile,
-        Arc::clone(compilation),
-    )))
+    Ok((
+        Arc::new(RuntimeArtifact::new(
+            Cow::Owned(module.artifact.bytes),
+            layout,
+            CurrentRuntimeLayoutVersion::emitted_current(),
+            source_compilation_profile,
+            Arc::clone(compilation),
+        )),
+        pool,
+    ))
 }
 
 fn runtime_key(bytes: &[u8]) -> RuntimeArtifactKey {

@@ -1,7 +1,7 @@
 use super::*;
 use crate::functions::FunctionNamePrefix;
 use crate::gc_types::{
-    CompletionLocals, GcLocal, GcOperand, GcStackReference, I32Local, I64Local, Nullable,
+    CompletionLocals, GcLocal, GcOperand, GcStackReference, GlobalBuiltinBacking, I32Local, I64Local, Nullable,
     OrdinaryObject, OrdinaryObjectSchema, OrdinaryPropertyIndex, OrdinaryPropertyStorage,
     OrdinaryPropertyStorageSchema, PropertyDescriptor, PropertyDescriptorSchema, PropertyEntry,
     PropertyEntrySchema, PropertyTable, ProxyObject, ScalarValue, StoredValue, ValueLocals,
@@ -37,7 +37,8 @@ pub(crate) use compact_data::{
 };
 mod define_property;
 mod dense_array_index;
-mod fresh_publication;
+mod global_builtin_storage;
+pub(crate) use global_builtin_storage::MAX_GLOBAL_BUILTIN_ROWS;
 mod descriptor_object;
 mod has_property;
 mod header_projection;
@@ -3163,10 +3164,12 @@ impl<'a> FunctionBuilder<'a> {
         self.emit_branch_to_target(exit, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        let descriptor = self.emit_proxy_target_descriptor_fact(slots.target(), key, function)?;
-        descriptor.emit_found_i32(schema, function);
+        let found = schema.reserve_i32_local(function);
+        let configurable = schema.reserve_i32_local(function);
+        self.emit_own_property_configurability(slots.target(), key, found, configurable, function)?;
+        found.load(function);
         self.open_frame(ControlFrameKind::If, function);
-        descriptor.emit_configurable_i32(schema, function);
+        configurable.load(function);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
         self.emit_proxy_execution_realm_type_error(RuntimeErrorMessage::PROXY_DELETEPROPERTY_TRAP_RETURNED_TRUE_FOR_NON_CONFIGURABLE_TARGET_PROPERTY, result, function)?;
@@ -3205,7 +3208,8 @@ impl<'a> FunctionBuilder<'a> {
         self.emit_object_boolean_result(boolean, result, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        descriptor.clear(function);
+        schema.release_i32_local(configurable, function);
+        schema.release_i32_local(found, function);
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
         schema.release_i32_local(boolean, function);
@@ -3430,6 +3434,44 @@ impl<'a> FunctionBuilder<'a> {
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         schema.release_i32_local(packed, function);
+        let header = schema.reserve_gc_local(function).initialize(
+            self.emit_object_header_projection(object, function), function,
+        );
+        let backing = self.emit_global_builtin_backing(&header, function);
+        backing.load(schema, function).is_null(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        let global = schema.reserve_gc_local(function).initialize(
+            backing.load(schema, function).require_non_null(function), function,
+        );
+        let index = self.emit_global_builtin_find(&global, key, function)?;
+        index.load(function);
+        function.instruction(&Instruction::I32Const(0));
+        function.instruction(&Instruction::I32GeS);
+        self.open_frame(ControlFrameKind::If, function);
+        let flags = self.emit_global_builtin_row_flags(&global, index, function);
+        flags.load(function);
+        function.instruction(&Instruction::I32Const(DescriptorMask::CONFIGURABLE.as_i32()));
+        function.instruction(&Instruction::I32And);
+        function.instruction(&Instruction::I32Eqz);
+        function.instruction(&Instruction::I32Eqz);
+        boolean.store(function);
+        boolean.load(function);
+        self.open_frame(ControlFrameKind::If, function);
+        self.emit_global_builtin_delete_row(&global, index, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        self.emit_object_boolean_result(boolean, result, function);
+        self.emit_branch_to_target(exit, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        schema.release_i32_local(flags, function);
+        schema.release_i32_local(index, function);
+        global.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        backing.clear(function);
+        header.clear(function);
         let descriptor = self.emit_direct_own_descriptor_fact(object, key, function)?;
         descriptor.load(schema, function);
         function.instruction(&Instruction::RefIsNull);
@@ -3546,11 +3588,25 @@ impl<'a> FunctionBuilder<'a> {
         schema.release_i32_local(position, function);
         table.clear(function);
         storage.clear(function);
+        self.emit_retire_ordinary_property_entry(&entry, function);
+        entry.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        candidate.clear(function);
+        header.clear(function);
+        Ok(())
+    }
+
+    fn emit_retire_ordinary_property_entry(
+        &mut self,
+        entry: &GcLocal<PropertyEntry>,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
         // The entry record outlives its property in whoever holds it: a
         // global read site's record does. It gives up the descriptor for a
         // fresh accessor descriptor that no property owns, so the record
-        // alone says the property is gone. This is the only place a live
-        // entry leaves its table.
+        // alone says the property is gone.
         let absent = schema
             .reserve_gc_local(function)
             .initialize(schema.stored_undefined(function), function);
@@ -3573,20 +3629,14 @@ impl<'a> FunctionBuilder<'a> {
             function,
         );
         schema.field(PropertyEntrySchema::DESCRIPTOR).write(
-            &entry,
+            entry,
             GcOperand::reference(&dead, schema),
             schema,
             function,
         );
-        self.emit_watched_entry_edit(&entry, function);
+        self.emit_watched_entry_edit(entry, function);
         dead.clear(function);
         absent.clear(function);
-        entry.clear(function);
-        self.pop_control(ControlFrameKind::If);
-        function.instruction(&Instruction::End);
-        candidate.clear(function);
-        header.clear(function);
-        Ok(())
     }
 
     pub(crate) fn emit_proxy_set_invariant_check(

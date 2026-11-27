@@ -126,10 +126,9 @@ impl FunctionBuilder<'_> {
         self.emit_branch_to_target(exit, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        let descriptor = self.emit_proxy_target_descriptor_fact(object, key, function)?;
-        descriptor.emit_found_i32(schema, function);
-        boolean.store(function);
-        descriptor.clear(function);
+        let enumerable = schema.reserve_i32_local(function);
+        self.emit_own_property_enumerability(object, key, boolean, enumerable, function)?;
+        schema.release_i32_local(enumerable, function);
         boolean.load(function);
         self.open_frame(ControlFrameKind::If, function);
         self.emit_object_boolean_result(boolean, result, function);
@@ -238,10 +237,12 @@ impl FunctionBuilder<'_> {
         boolean.load(function);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
-        let descriptor = self.emit_proxy_target_descriptor_fact(slots.target(), key, function)?;
-        descriptor.emit_found_i32(schema, function);
+        let found = schema.reserve_i32_local(function);
+        let configurable = schema.reserve_i32_local(function);
+        self.emit_own_property_configurability(slots.target(), key, found, configurable, function)?;
+        found.load(function);
         self.open_frame(ControlFrameKind::If, function);
-        descriptor.emit_configurable_i32(schema, function);
+        configurable.load(function);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);
         self.emit_proxy_execution_realm_type_error(
@@ -283,7 +284,8 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        descriptor.clear(function);
+        schema.release_i32_local(configurable, function);
+        schema.release_i32_local(found, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         result.kind().load(function);

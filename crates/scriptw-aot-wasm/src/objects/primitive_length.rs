@@ -1,6 +1,6 @@
 //! Exact static length consumers inspect actual Strings and Arrays before Get.
 use super::*;
-use crate::gc_types::{ArrayObject, ArrayObjectSchema, StringValue};
+use crate::gc_types::{ArrayObject, ArrayObjectSchema, MAX_STRING_LENGTH, StringValue};
 
 mod local_binding;
 
@@ -42,6 +42,141 @@ impl<'a> ConcatLengthConsumer<'a> {
             right: rhs,
             fallback_binding: None,
         })
+    }
+}
+
+/// A contiguous straight-line loop prefix can establish the exact lengths
+/// of private String locals on every trip, with no value feedback at entry.
+fn literal_loop_concat_length(
+    builder: &FunctionBuilder<'_>,
+    plan: &ConcatLengthConsumer<'_>,
+) -> Option<i64> {
+    if builder.bounded_inductions.is_empty() {
+        return None;
+    }
+    let binding = |value: &TypedExpr| match &value.expr {
+        ExprIr::Identifier(name) => builder.private_local_binding(name),
+        _ => None,
+    };
+    let left = binding(plan.left)?;
+    let right = binding(plan.right)?;
+    for statement in builder.body.statements.iter().take(64) {
+        let StatementIr::For {
+            body,
+            lexical_environment: None,
+            ..
+        } = statement
+        else {
+            continue;
+        };
+        let StatementIr::Block(body) = body.as_ref() else {
+            continue;
+        };
+        if body.lexical_environment.is_some() {
+            continue;
+        }
+        let Some(position) = body.statements.iter().take(64).position(|statement| {
+            let StatementIr::Expression(value) = statement else {
+                return false;
+            };
+            let value: &TypedExpr = match &value.expr {
+                ExprIr::AssignIdentifier { value, .. } => value,
+                ExprIr::CompoundAssignIdentifier { name, value, .. }
+                    if builder.private_local_binding(name).is_some() =>
+                {
+                    value
+                }
+                _ => value,
+            };
+            let target: &TypedExpr = match &value.expr {
+                ExprIr::PropertyRead { target, key }
+                    if StaticLengthKey::for_property_key(key).is_some() =>
+                {
+                    target
+                }
+                ExprIr::SpecOperation {
+                    operation: SpecOperationIr::GetV,
+                    operands,
+                } => match operands.as_slice() {
+                    [target, key] if StaticLengthKey::for_get_v_operand(key).is_some() => target,
+                    _ => return false,
+                },
+                _ => return false,
+            };
+            std::ptr::eq(target, plan.target)
+        }) else {
+            continue;
+        };
+        let mut left_length = None;
+        let mut right_length = None;
+        for statement in body.statements[..position].iter().rev().take(8) {
+            let StatementIr::Expression(value) = statement else {
+                break;
+            };
+            let ExprIr::AssignIdentifier { name, value } = &value.expr else {
+                break;
+            };
+            let Some(id) = builder.private_local_binding(name) else {
+                break;
+            };
+            let Some(length) = assigned_literal_length(value, builder, 8) else {
+                break;
+            };
+            if id == left && left_length.is_none() {
+                left_length = Some(length);
+            }
+            if id == right && right_length.is_none() {
+                right_length = Some(length);
+            }
+            if let (Some(left), Some(right)) = (left_length, right_length) {
+                let total = i64::from(left) + i64::from(right);
+                return (total <= MAX_STRING_LENGTH).then_some(total);
+            }
+        }
+    }
+    None
+}
+
+fn assigned_literal_length(
+    value: &TypedExpr,
+    builder: &FunctionBuilder<'_>,
+    depth: u8,
+) -> Option<u32> {
+    let depth = depth.checked_sub(1)?;
+    match &value.expr {
+        ExprIr::String(text) => u32::try_from(scriptw_ir::decode_js_string_utf16(text).len()).ok(),
+        ExprIr::Conditional {
+            condition,
+            then_expr,
+            else_expr,
+        } if primitive_loop_condition(condition, builder, depth) => {
+            let yes = assigned_literal_length(then_expr, builder, depth)?;
+            let no = assigned_literal_length(else_expr, builder, depth)?;
+            (yes == no).then_some(yes)
+        }
+        _ => None,
+    }
+}
+
+/// Predicates stay at the original assignments. Prove they cannot overwrite
+/// any other private local while selecting a String alternative.
+fn primitive_loop_condition(value: &TypedExpr, builder: &FunctionBuilder<'_>, depth: u8) -> bool {
+    let Some(depth) = depth.checked_sub(1) else {
+        return false;
+    };
+    match &value.expr {
+        ExprIr::Number(_) | ExprIr::Boolean(_) => true,
+        ExprIr::Identifier(_) => builder.bounded_induction_read(value).is_some(),
+        ExprIr::BinaryNumber { lhs, rhs, .. }
+        | ExprIr::CoerciveBinaryNumber { lhs, rhs, .. }
+        | ExprIr::CompareNumber { lhs, rhs, .. }
+        | ExprIr::CompareValue { lhs, rhs, .. }
+        | ExprIr::BitwiseNumeric { lhs, rhs, .. } => {
+            primitive_loop_condition(lhs, builder, depth)
+                && primitive_loop_condition(rhs, builder, depth)
+        }
+        ExprIr::LogicalNot { expr } => primitive_loop_condition(expr, builder, depth),
+        _ => false,
     }
 }
 
@@ -188,13 +323,10 @@ impl FunctionBuilder<'_> {
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<bool, EmitError> {
-        let Some(plan) = StaticLengthKey::for_property_key(key)
-            .and_then(|key| ConcatLengthConsumer::new(target, key))
-        else {
+        let Some(key) = StaticLengthKey::for_property_key(key) else {
             return Ok(false);
         };
-        self.compile_concat_length_consumer(plan, output, function)?;
-        Ok(true)
+        self.try_compile_string_length_consumer(target, key, output, function)
     }
 
     pub(crate) fn try_compile_concat_length_get_v(
@@ -210,13 +342,24 @@ impl FunctionBuilder<'_> {
         let [target, key] = operands else {
             return Ok(false);
         };
-        let Some(plan) = StaticLengthKey::for_get_v_operand(key)
-            .and_then(|key| ConcatLengthConsumer::new(target, key))
-        else {
+        let Some(key) = StaticLengthKey::for_get_v_operand(key) else {
             return Ok(false);
         };
-        self.compile_concat_length_consumer(plan, output, function)?;
-        Ok(true)
+        self.try_compile_string_length_consumer(target, key, output, function)
+    }
+
+    fn try_compile_string_length_consumer(
+        &mut self,
+        target: &TypedExpr,
+        key: StaticLengthKey,
+        output: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<bool, EmitError> {
+        if let Some(plan) = ConcatLengthConsumer::new(target, key) {
+            self.compile_concat_length_consumer(plan, output, function)?;
+            return Ok(true);
+        }
+        self.try_compile_joined_string_length(target, output, function)
     }
 
     fn compile_concat_length_consumer(
@@ -225,6 +368,13 @@ impl FunctionBuilder<'_> {
         output: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
+        if let Some(length) = literal_loop_concat_length(self, &plan) {
+            output.set_scalar(
+                ScalarValue::NumberBits((length as f64).to_bits() as i64),
+                function,
+            );
+            return Ok(());
+        }
         let schema = self.runtime_schema();
         let left = schema.reserve_value_local(function);
         let right = schema.reserve_value_local(function);
@@ -258,7 +408,7 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I64Add);
         total.store(function);
         total.load(function);
-        function.instruction(&Instruction::I64Const(u32::MAX as i64));
+        function.instruction(&Instruction::I64Const(MAX_STRING_LENGTH));
         function.instruction(&Instruction::I64LeU);
         self.open_frame(ControlFrameKind::If, function);
         total.load(function);

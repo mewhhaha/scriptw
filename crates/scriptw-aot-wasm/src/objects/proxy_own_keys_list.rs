@@ -4,8 +4,9 @@
 use super::*;
 use crate::gc_types::{
     ArgumentsObject, ArgumentsObjectSchema, ArrayObject, CodeUnitArray, I32Local, I64Local,
-    IndexedTable, ModuleNamespaceObject, PrimitiveBox, PrimitiveBoxSchema, PropertyKeyConstruction,
-    PropertyKeyTable, StringValue, StringValueSchema, TypedArrayObject,
+    GlobalBuiltinBacking, GlobalBuiltinBackingSchema, IndexedTable, IntrinsicPropertyStorage,
+    IntrinsicPropertyStorageSchema, ModuleNamespaceObject, PrimitiveBox, PrimitiveBoxSchema,
+    PropertyKeyConstruction, PropertyKeyTable, StringValue, StringValueSchema, TypedArrayObject,
 };
 use crate::runtime_helpers::{
     HelperParameters, ObjectOwnKeysArguments, ObjectOwnKeysParameters, RuntimeHelperId,
@@ -401,40 +402,83 @@ impl FunctionBuilder<'_> {
         compact.clear(function);
         function.instruction(&Instruction::Else);
         let intrinsic = schema
-            .reserve_gc_local::<crate::gc_types::IntrinsicPropertyStorage, Nullable>(function)
+            .reserve_gc_local::<IntrinsicPropertyStorage, Nullable>(function)
+            .initialize_null(schema, function);
+        let global = schema
+            .reserve_gc_local::<GlobalBuiltinBacking, Nullable>(function)
             .initialize_null(schema, function);
         let properties = schema
             .reserve_gc_local::<PropertyTable, Nullable>(function)
             .initialize_null(schema, function);
-        let extent = schema.reserve_i32_local(function);
-        base.is_subtype::<crate::gc_types::IntrinsicPropertyStorage>(schema, function);
+        let original_length = schema.reserve_i32_local(function);
+        original_length.set_constant(0, function);
+        let named_length = schema.reserve_i32_local(function);
+        named_length.set_constant(0, function);
+        base.is_subtype::<IntrinsicPropertyStorage>(schema, function);
         self.open_frame(ControlFrameKind::If, function);
         let concrete = schema.reserve_gc_local(function).initialize(
             base.load(schema, function)
-                .cast_subtype::<crate::gc_types::IntrinsicPropertyStorage>(schema, function),
+                .cast_subtype::<IntrinsicPropertyStorage>(schema, function),
             function,
         );
         intrinsic.replace(concrete.load(schema, function).nullable(), function);
         schema
-            .field(crate::gc_types::IntrinsicPropertyStorageSchema::COUNT)
+            .field(IntrinsicPropertyStorageSchema::COUNT)
             .read(&concrete, schema, function)
-            .store(extent, function);
+            .store(named_length, function);
         concrete.clear(function);
         function.instruction(&Instruction::Else);
+        let dictionary = schema
+            .reserve_gc_local::<OrdinaryPropertyStorage, Nullable>(function)
+            .initialize_null(schema, function);
+        base.is_subtype::<GlobalBuiltinBacking>(schema, function);
+        self.open_frame(ControlFrameKind::If, function);
+        let backing = schema.reserve_gc_local(function).initialize(
+            base.load(schema, function)
+                .cast_subtype::<GlobalBuiltinBacking>(schema, function),
+            function,
+        );
+        global.replace(backing.load(schema, function).nullable(), function);
+        let rows = schema
+            .field(GlobalBuiltinBackingSchema::ROWS)
+            .read(&backing, schema, function)
+            .reference();
+        schema
+            .field(IntrinsicPropertyStorageSchema::COUNT)
+            .read_top(rows, function)
+            .store(original_length, function);
+        dictionary.replace(
+            schema
+                .field(GlobalBuiltinBackingSchema::APPEND)
+                .read(&backing, schema, function)
+                .reference(),
+            function,
+        );
+        backing.clear(function);
+        function.instruction(&Instruction::Else);
         let storage = self.emit_dictionary_property_storage(&header, function);
+        dictionary.replace(storage.load(schema, function).nullable(), function);
+        storage.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        dictionary.load(schema, function).is_null(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
         properties.replace(
             schema
                 .field(OrdinaryPropertyStorageSchema::ENTRIES)
-                .read(&storage, schema, function)
+                .read(&dictionary, schema, function)
                 .reference()
                 .nullable(),
             function,
         );
         schema
             .field(OrdinaryPropertyStorageSchema::LENGTH)
-            .read(&storage, schema, function)
-            .store(extent, function);
-        storage.clear(function);
+            .read(&dictionary, schema, function)
+            .store(named_length, function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        dictionary.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         let indexed = schema
@@ -445,7 +489,6 @@ impl FunctionBuilder<'_> {
             .initialize_null(schema, function);
         let primitive = schema.reserve_value_local(function);
         primitive.set_undefined(function);
-        let named_length = schema.reserve_i32_local(function);
         let indexed_length = schema.reserve_i32_local(function);
         let virtual_length = schema.reserve_i64_local(function);
         let capacity = schema.reserve_i64_local(function);
@@ -570,11 +613,11 @@ impl FunctionBuilder<'_> {
         typed_array.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        extent.load(function);
-        named_length.store(function);
-        schema.release_i32_local(extent, function);
         named_length.load(function);
         function.instruction(&Instruction::I64ExtendI32U);
+        original_length.load(function);
+        function.instruction(&Instruction::I64ExtendI32U);
+        function.instruction(&Instruction::I64Add);
         indexed_length.load(function);
         function.instruction(&Instruction::I64ExtendI32U);
         function.instruction(&Instruction::I64Add);
@@ -692,6 +735,35 @@ impl FunctionBuilder<'_> {
         self.emit_own_keys_candidate_push(&candidates, count, &value, function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
+        // Surviving original rows precede all keys in the append dictionary.
+        // The common ordering pass still puts array indices and Symbols in
+        // their respective groups.
+        index.set_constant(0, function);
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        let next = self.open_frame(ControlFrameKind::Loop, function);
+        index.load(function);
+        original_length.load(function);
+        function.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(done, function);
+        let backing = schema.reserve_gc_local(function).initialize(
+            global.load(schema, function).require_non_null(function),
+            function,
+        );
+        self.emit_global_builtin_is_deleted(&backing, index, function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
+        let key = self.emit_global_builtin_row_key(&backing, index, function)?;
+        self.emit_own_keys_candidate_push(&candidates, count, key.value(), function);
+        key.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        backing.clear(function);
+        self.emit_own_keys_increment(index, function);
+        self.emit_branch_to_target(next, function);
+        self.pop_control(ControlFrameKind::Loop);
+        function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
         function.instruction(&Instruction::I32Const(0));
         index.store(function);
         self.open_frame(ControlFrameKind::Block, function);
@@ -760,10 +832,12 @@ impl FunctionBuilder<'_> {
         schema.release_i64_local(virtual_length, function);
         schema.release_i32_local(indexed_length, function);
         schema.release_i32_local(named_length, function);
+        schema.release_i32_local(original_length, function);
         primitive.clear(function);
         array_keys.clear(function);
         indexed.clear(function);
         properties.clear(function);
+        global.clear(function);
         intrinsic.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
@@ -1041,6 +1115,7 @@ impl FunctionBuilder<'_> {
         let trap_length = schema.reserve_i32_local(function);
         let index = schema.reserve_i32_local(function);
         let found = schema.reserve_i32_local(function);
+        let configurable = schema.reserve_i32_local(function);
         target_keys.length(length, schema, function);
         snapshot.length(trap_length, schema, function);
         let nonconfigurable = schema.reserve_gc_local(function).initialize(
@@ -1060,9 +1135,11 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I32GeU);
         function.instruction(&Instruction::BrIf(1));
         let key = target_keys.read_key(index, self, function)?;
-        let descriptor = self.emit_proxy_target_descriptor_fact(slots.target(), &key, function)?;
-        descriptor.emit_found_i32(schema, function);
-        descriptor.emit_configurable_i32(schema, function);
+        self.emit_own_property_configurability(
+            slots.target(), &key, found, configurable, function,
+        )?;
+        found.load(function);
+        configurable.load(function);
         function.instruction(&Instruction::I32Eqz);
         function.instruction(&Instruction::I32And);
         found.store(function);
@@ -1073,7 +1150,6 @@ impl FunctionBuilder<'_> {
             schema,
             function,
         );
-        descriptor.clear(function);
         key.clear(function);
         self.emit_own_keys_increment(index, function);
         function.instruction(&Instruction::Br(0));
@@ -1081,6 +1157,7 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
+        schema.release_i32_local(configurable, function);
         function.instruction(&Instruction::I32Const(0));
         index.store(function);
         let validation_exit = self.open_frame(ControlFrameKind::Block, function);

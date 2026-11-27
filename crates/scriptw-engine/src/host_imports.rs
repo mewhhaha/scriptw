@@ -110,6 +110,43 @@ pub(super) fn build(
     Ok(linker)
 }
 
+/// The general execution path can reuse an import-free instance with any
+/// caller linker. Prepared instances with imports use the embedding path's
+/// shared linker identity check.
+pub(super) fn instantiate(
+    linker: &WasmtimeLinker<WasmHostState>,
+    store: &mut WasmtimeStore<WasmHostState>,
+    module: &WasmtimeModule,
+    import_free: Option<&OnceLock<wasmtime::InstancePre<WasmHostState>>>,
+) -> wasmtime::Result<wasmtime::Instance> {
+    let Some(slot) = import_free else {
+        return linker.instantiate(store, module);
+    };
+    if let Some(prepared) = slot.get() {
+        return prepared.instantiate(store);
+    }
+    let prepared = linker.instantiate_pre(module)?;
+    slot.get_or_init(|| prepared).instantiate(store)
+}
+
+/// Prepare the host module using only the immutable callback table. The one
+/// shared memory import, if present, is supplied by each registered Store.
+pub(super) fn prepare(
+    linker: &WasmtimeLinker<WasmHostState>,
+    module: &WasmtimeModule,
+    memories: &crate::host_memory_imports::HostMemoryImports,
+) -> wasmtime::Result<wasmtime::InstancePre<WasmHostState>> {
+    if memories.shared().is_some() {
+        linker.instantiate_pre_with_shared_memory(
+            module,
+            WASM_HOST_IMPORT_NAMESPACE,
+            WASM_HOST_IMPORT_SHARED_MEMORY,
+        )
+    } else {
+        linker.instantiate_pre(module)
+    }
+}
+
 /// Register the same checked callbacks on an embedder-owned linker. This adds
 /// no memory, runtime instance, foreign implementation or source compiler.
 pub(super) fn register(

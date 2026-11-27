@@ -5,9 +5,11 @@
 //! Safe candidates receive complete body validation. The explicitly unsafe
 //! immutable Cargo boundary can reuse the producer's full body validation.
 
+#[cfg(test)]
+use super::emit_runtime_artifact;
 use super::validation::FunctionBodyValidation;
 use super::{
-    cache, emit_runtime_artifact, CurrentRuntimeLayoutVersion, RuntimeArtifact,
+    cache, emit_runtime_artifact_with_pool, CurrentRuntimeLayoutVersion, RuntimeArtifact,
     RuntimeArtifactCache, RuntimeArtifactKey, RuntimeSourceCompilationProfile, LAYOUT_VERSION,
 };
 use crate::EmitError;
@@ -31,6 +33,7 @@ const DIGEST_BYTES: usize = 32;
 pub struct RuntimeBuildArtifact {
     runtime: Arc<RuntimeArtifact>,
     package: Vec<u8>,
+    compiler_prefix: Option<Vec<u8>>,
 }
 
 impl RuntimeBuildArtifact {
@@ -110,7 +113,7 @@ pub fn build_runtime_artifact_with_source_compilation_profile(
     source_compilation_profile: RuntimeSourceCompilationProfile,
 ) -> Result<RuntimeBuildArtifact, EmitError> {
     let identity = cache::RuntimeIdentity::admit(selection, source_compilation_profile)?;
-    let runtime = emit_runtime_artifact(selection, source_compilation_profile)?;
+    let (runtime, pool) = emit_runtime_artifact_with_pool(selection, source_compilation_profile)?;
     let package = encode(&runtime, &identity, compiler_source);
     let admitted = decode(&package, &identity, compiler_source).ok_or_else(|| {
         let detail = super::validation::explain_wasm_validation(runtime.bytes()).err()
@@ -124,7 +127,21 @@ pub fn build_runtime_artifact_with_source_compilation_profile(
             "compiler invariant: build runtime round-trip changed its key or typed layout",
         ));
     }
-    Ok(RuntimeBuildArtifact { runtime, package })
+    let data = identity.compilation();
+    let compiler_prefix = if source_compilation_profile == RuntimeSourceCompilationProfile::Portable
+        && data.identity().profile().profile() == &scriptw_intl::IntlDataProfile::Minimal
+        && data.identity().profile().services() == scriptw_intl::IntlServiceSet::ALL
+        && data.service_selection().is_none()
+    {
+        Some(crate::data::CompilerOwnedPool::encode_build_prefix(&pool)?)
+    } else {
+        None
+    };
+    Ok(RuntimeBuildArtifact {
+        runtime,
+        package,
+        compiler_prefix,
+    })
 }
 
 #[cfg(test)]

@@ -398,11 +398,20 @@ impl Parser<'_> {
 }
 
 pub fn parse_json(source: String) -> Result<ParsedJson, JsonParseError> {
-    let value = Parser {
+    parse_json_retaining_source(source).map_err(|(_, error)| error)
+}
+
+#[doc(hidden)]
+pub fn parse_json_retaining_source(source: String) -> Result<ParsedJson, (String, JsonParseError)> {
+    let value = match (Parser {
         source: &source,
         offset: 0,
-    }
-    .value()?;
+    })
+    .value()
+    {
+        Ok(value) => value,
+        Err(error) => return Err((source, error)),
+    };
     Ok(ParsedJson {
         source,
         value: Some(std::sync::Arc::new(value)),

@@ -193,8 +193,8 @@ than the value can change.
 - The GC heap base (when the heap cannot move) and the function's `vmctx`
   parameter are one value for a whole activation. As one SSA value each is
   live across every call; in a large function the register allocator spills
-  it and, after the two splits `regalloc2` allows a value
-  (`MAX_SPLITS_PER_SPILLSET`), reloads it before every single use. Each
+  it and can reload it before every use after exhausting its split budget
+  (`MAX_SPLITS_PER_SPILLSET`). Each
   therefore gets a home slot: the entry block stores the value there once,
   and every use is first a load from the home (`FrameHome::load` for the
   base, `FrameHome::of_parameter` after translation for the `vmctx`, which
@@ -616,7 +616,7 @@ settings are untouched.
   the value is not null is recorded only where the check is made.
 - **Casts: the `i31` test first, the null check in the header load**
   (`gc::translate_ref_cast`). In a trapping `ref.cast` to a non-nullable
-  concrete type whose operand is not known to be non-null, when the header's
+  concrete type with a possibly null operand, when the header's
   type-id load lies within the null guard, the load carries
   `TRAP_CAST_FAILURE` and is the null check; the `i31` test (when the operand
   can be an `i31`) comes before it. Reference 0 has the `i31` bit clear,
@@ -632,6 +632,12 @@ settings are untouched.
   A non-null reference into a corrupt heap that faults on the header now
   reports a cast failure instead of `TRAP_GC_HEAP_CORRUPT`, as field
   accesses that are their own null check already report a null reference.
+- **Statically non-null cast operands** (`gc::{translate_ref_test,
+  translate_ref_cast}`). Static reference types and proven non-null facts
+  bypass the null branch in tests and retain the heap-corruption trap code
+  on the specialized cast's header load. Tests still distinguish `i31`
+  operands before reading headers and pass their original target type to
+  branch fact tracking.
 - **The type-id array's base in a home slot** (`type_ids_array` in
   `func_environ.rs`, the `TypeIdsHome` alias region). Every type test,
   allocation, typed funcref read and `call_indirect` signature check read

@@ -64,10 +64,10 @@ impl Engine {
         // Snapshot artifacts link against a snapshot runtime that the program
         // cache cannot name, so only standalone entries are cached or reused.
         let cached = cache.as_ref().zip(key).and_then(|(cache, key)| {
-            let entry = cache.read(&key)?;
-            let bytes = wasm_runtime_link::decode_standalone_cache_entry(&entry)?;
+            let entry = cache.read_program(&key)?;
+            let bytes = wasm_runtime_link::load_standalone_cache_entry(entry)?;
             Some(ProgramWasmArtifact {
-                bytes: Arc::from(bytes),
+                bytes,
                 runtime: None,
                 compilation_policy: WasmCompilationPolicy::from_options(&options),
                 cached_entry: Some(ProgramWasmCacheEntry {
@@ -143,7 +143,7 @@ impl Engine {
             );
         }
         Ok(ProgramWasmArtifact {
-            bytes: Arc::from(artifact.bytes),
+            bytes: wasm_runtime_link::ProgramWasmBytes::emitted(artifact.bytes),
             runtime: runtime.map(wasm_runtime_link::ProgramRuntime::Raw),
             cached_entry: None,
             compilation_policy: WasmCompilationPolicy::from_unit(&unit),

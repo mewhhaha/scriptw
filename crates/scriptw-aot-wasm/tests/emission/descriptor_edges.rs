@@ -74,8 +74,10 @@ fn data_merge_boxes_only_supplied_value_and_reuses_complete_accessor_edges() {
         let arm = arms[0];
         let completions = arm.iter().enumerate().filter_map(|(i, op)| matches!(op,
             Operator::StructNew { struct_type_index } if *struct_type_index == descriptor).then_some(i)).collect::<Vec<_>>();
-        assert_eq!(completions.len(), 2, "both descriptor kinds retain fresh complete merge records");
-        let before_output = &arm[..completions[0]];
+        assert_eq!(completions.len(), 3, "one lazy global-builtin descriptor lookup plus both fresh complete merge records");
+        let merge_start = completions[0] + 1;
+        let merges = &completions[1..];
+        let before_output = &arm[merge_start..merges[0]];
         assert_eq!(before_output.iter().filter(|op| matches!(op,
             Operator::StructNew { struct_type_index } | Operator::StructNewDefault { struct_type_index }
                 if *struct_type_index == stored)).count(), 1,
@@ -83,7 +85,7 @@ fn data_merge_boxes_only_supplied_value_and_reuses_complete_accessor_edges() {
         let getter = edge_local(before_output, descriptor, GcSnapshotField::DescriptorGet.index());
         let setter = edge_local(before_output, descriptor, GcSnapshotField::DescriptorSet.index());
         assert_ne!(getter, setter, "each retained accessor edge has its own live root");
-        for output in completions {
+        for &output in merges {
             assert!(matches!(&arm[output - 6..output], [
                 Operator::LocalGet { .. }, Operator::RefAsNonNull,
                 Operator::LocalGet { local_index: get }, Operator::RefAsNonNull,

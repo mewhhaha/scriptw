@@ -222,14 +222,9 @@ impl FunctionBuilder<'_> {
         argv.clear(f);
         self.stream_abrupt(&pending, &output, exit, f);
         self.stream_end_if(f);
-        self.stream_observe(&controller, pending.value(), true, &output, f)?;
-        output.kind().load(f);
-        f.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
-        f.instruction(&Instruction::I32Ne);
-        self.open_frame(ControlFrameKind::If, f);
+        self.stream_observe(&controller, &realm, &pending, StreamFulfillment::Start, f)?;
         output.value().set_reference(&stream, s, f);
         output.set_kind(CompletionKind::Normal, f);
-        self.stream_end_if(f);
         controller_value.clear(f);
         controller.clear(f);
         cancel_stored.clear(f);

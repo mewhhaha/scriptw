@@ -181,7 +181,7 @@ def validate_identity(row, host_sha):
     shared = row.get('shared_configuration', {})
     require(shared.get('consumer_compiler_enabled') is False
             and shared.get('runtime_policy') == 'scriptw-required-wasmtime-experimental-v1'
-            and shared.get('collector') == 'copying' and shared.get('gc_initial_bytes') == 16777216
+            and shared.get('collector') == 'copying' and shared.get('gc_initial_bytes') == 33554432
             and shared.get('wasmtime_version') == '47.0.0' and shared.get('target') == 'generic',
             'unexpected required experimental runtime baseline')
 

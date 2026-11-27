@@ -263,9 +263,9 @@ fn emitted_cyclic_churn_reuses_the_product_gc_heap() {
         );
         // These are reserved-capacity snapshots, not allocation/live-byte or
         // pause counters. The original product configuration is used intact.
-        assert!(profile.heap.capacity_before_execution_bytes <= 16 * 1024 * 1024);
+        assert!(profile.heap.capacity_before_execution_bytes <= 32 * 1024 * 1024);
         assert!(
-            profile.heap.capacity_after_execution_bytes <= 16 * 1024 * 1024,
+            profile.heap.capacity_after_execution_bytes <= 32 * 1024 * 1024,
             "cyclic churn grew the product GC heap: {:?}",
             profile.heap
         );

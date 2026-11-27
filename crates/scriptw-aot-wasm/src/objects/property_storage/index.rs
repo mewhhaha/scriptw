@@ -102,6 +102,52 @@ impl FunctionBuilder<'_> {
         Ok(self.finish_function(function))
     }
 
+    pub(crate) fn compile_global_builtin_append_find_helper(
+        &mut self,
+    ) -> Result<Function, EmitError> {
+        let mut function = self.begin_helper_body(RuntimeHelperId::GlobalBuiltinAppendFind);
+        let parameters = self
+            .helper_parameters::<crate::runtime_helpers::GlobalBuiltinAppendFindParameters>(
+                &mut function,
+            );
+        let schema = self.runtime_schema();
+        let append = schema.reserve_gc_local(&mut function).initialize(
+            schema
+                .field(crate::gc_types::GlobalBuiltinBackingSchema::APPEND)
+                .read(&parameters.backing, schema, &mut function)
+                .reference(),
+            &mut function,
+        );
+        let result = schema
+            .reserve_gc_local::<PropertyEntry, Nullable>(&mut function)
+            .initialize_null(schema, &mut function);
+        append.load(schema, &mut function).is_null(&mut function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, &mut function);
+        let dictionary = schema.reserve_gc_local(&mut function).initialize(
+            append
+                .load(schema, &mut function)
+                .require_non_null(&mut function),
+            &mut function,
+        );
+        let entry = self.emit_ordinary_dictionary_find(
+            &dictionary,
+            OrdinaryPropertyQuery::Fresh(&parameters.key),
+            &mut function,
+        )?;
+        result.replace(entry.load(schema, &mut function), &mut function);
+        entry.clear(&mut function);
+        dictionary.clear(&mut function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        result.load(schema, &mut function);
+        result.clear(&mut function);
+        append.clear(&mut function);
+        parameters.release(&mut function);
+        function.instruction(&Instruction::End);
+        Ok(self.finish_function(function))
+    }
+
     pub(super) fn emit_prepared_ordinary_property_entry(
         &mut self,
         object: &GcLocal<OrdinaryObject>,
@@ -136,19 +182,53 @@ impl FunctionBuilder<'_> {
         function: &mut Function,
     ) -> Result<GcLocal<PropertyEntry, Nullable>, EmitError> {
         let schema = self.runtime_schema();
-        let key = query.key();
+        let backing = self.emit_global_builtin_backing(object, function);
+        let result = schema
+            .reserve_gc_local::<PropertyEntry, Nullable>(function)
+            .initialize_null(schema, function);
+        backing.load(schema, function).is_null(function);
+        self.open_frame(ControlFrameKind::If, function);
         let storage = self.emit_dictionary_property_storage(object, function);
+        let entry = self.emit_ordinary_dictionary_find(&storage, query, function)?;
+        result.replace(entry.load(schema, function), function);
+        entry.clear(function);
+        storage.clear(function);
+        function.instruction(&Instruction::Else);
+        let global = schema.reserve_gc_local(function).initialize(
+            backing.load(schema, function).require_non_null(function),
+            function,
+        );
+        let (entry, index) =
+            self.emit_global_builtin_own_entry_or_row(&global, query.key(), function)?;
+        result.replace(entry.load(schema, function), function);
+        entry.clear(function);
+        schema.release_i32_local(index, function);
+        global.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        backing.clear(function);
+        Ok(result)
+    }
+
+    fn emit_ordinary_dictionary_find(
+        &mut self,
+        storage: &GcLocal<OrdinaryPropertyStorage>,
+        query: OrdinaryPropertyQuery<'_>,
+        function: &mut Function,
+    ) -> Result<GcLocal<PropertyEntry, Nullable>, EmitError> {
+        let schema = self.runtime_schema();
+        let key = query.key();
         let entries = schema.reserve_gc_local(function).initialize(
             schema
                 .field(OrdinaryPropertyStorageSchema::ENTRIES)
-                .read(&storage, schema, function)
+                .read(storage, schema, function)
                 .reference(),
             function,
         );
         let buckets = schema.reserve_gc_local(function).initialize(
             schema
                 .field(OrdinaryPropertyStorageSchema::INDEX)
-                .read(&storage, schema, function)
+                .read(storage, schema, function)
                 .reference(),
             function,
         );
@@ -172,7 +252,7 @@ impl FunctionBuilder<'_> {
         // A fresh String query first tries the position its key remembers.
         let hinted = matches!(query, OrdinaryPropertyQuery::Fresh(_));
         if hinted {
-            self.emit_string_key_entry_hint_probe(&storage, &entries, key, &output, function);
+            self.emit_string_key_entry_hint_probe(storage, &entries, key, &output, function);
         }
         capacity.load(function);
         function.instruction(&Instruction::I32Const(0));
@@ -273,7 +353,6 @@ impl FunctionBuilder<'_> {
         schema.release_i32_local(capacity, function);
         buckets.clear(function);
         entries.clear(function);
-        storage.clear(function);
         Ok(output)
     }
 

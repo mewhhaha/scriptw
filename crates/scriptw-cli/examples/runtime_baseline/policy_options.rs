@@ -62,7 +62,7 @@ pub(super) fn parse(args: &[String]) -> Result<InvocationOptions, String> {
     let policy = (native.is_some() || capacity.is_some() || allocation.is_some()).then(|| {
         WasmRuntimeProfileOptions::new(
             native.unwrap_or(WasmProfileNativeMode::Fast),
-            capacity.unwrap_or(WasmProfileGcInitialCapacity::MiB16),
+            capacity.unwrap_or(WasmProfileGcInitialCapacity::MiB32),
             allocation.unwrap_or(WasmProfileRegisterAllocation::SinglePass),
         )
     });

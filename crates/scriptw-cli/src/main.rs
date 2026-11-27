@@ -464,31 +464,28 @@ fn command_main(mut args: Vec<String>, stdout: OutputBuffer) -> Result<(), Strin
                 .next()
                 .ok_or_else(|| "build needs a source file".to_string())?;
             let source = read_source(&path)?;
-            let unit = engine
-                .compile_script(
-                    &source,
+            engine
+                .compile_script_to_wasm(
+                    source,
                     CompileOptions {
-                        filename: Some(path.clone()),
+                        filename: Some(path),
                         host_surface_policy,
                         intl_profile: intl_profile.unwrap_or_default(),
                         ..CompileOptions::default()
                     },
                 )
-                .map_err(|err| err.to_string())?;
-            engine
-                .emit_wasm(&unit)
                 .map(|artifact| {
                     // `SCRIPTW_WASM_DUMP` receives the program module; a linked
                     // program's runtime module goes beside it. Runtime-free
                     // replacements remove any prior runtime sidecar.
-                    if let Some(path) = std::env::var_os("SCRIPTW_WASM_DUMP") {
-                        fs::write(&path, &artifact.bytes).unwrap_or_else(|err| {
+                    let runtime_bytes = artifact.runtime.as_ref().map(|runtime| runtime.bytes());
+                    if let Some(mut runtime_path) = std::env::var_os("SCRIPTW_WASM_DUMP") {
+                        fs::write(&runtime_path, &artifact.bytes).unwrap_or_else(|err| {
                             panic!("failed to write SCRIPTW_WASM_DUMP artifact: {err}");
                         });
-                        let mut runtime_path = path.clone();
                         runtime_path.push(".runtime.wasm");
-                        if let Some(runtime) = &artifact.runtime {
-                            fs::write(&runtime_path, runtime.bytes()).unwrap_or_else(|err| {
+                        if let Some(bytes) = runtime_bytes {
+                            fs::write(&runtime_path, bytes).unwrap_or_else(|err| {
                                 panic!("failed to write SCRIPTW_WASM_DUMP runtime artifact: {err}");
                             });
                         } else if let Err(err) = fs::remove_file(&runtime_path) {
@@ -499,11 +496,8 @@ fn command_main(mut args: Vec<String>, stdout: OutputBuffer) -> Result<(), Strin
                     }
                     if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
                         eprintln!("scriptw wasm trace: artifact bytes: {}", artifact.bytes.len());
-                        if let Some(runtime) = &artifact.runtime {
-                            eprintln!(
-                                "scriptw wasm trace: runtime bytes: {}",
-                                runtime.bytes().len()
-                            );
+                        if let Some(bytes) = runtime_bytes {
+                            eprintln!("scriptw wasm trace: runtime bytes: {}", bytes.len());
                         }
                     }
                     println!("built Wasm artifact: {}", artifact.description)

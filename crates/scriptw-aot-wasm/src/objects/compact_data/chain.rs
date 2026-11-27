@@ -716,7 +716,9 @@ impl FunctionBuilder<'_> {
         self.emit_branch_to_target(found, f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
-        // An immutable intrinsic layout; any other storage declines.
+        // Only intrinsic rows can prove the remainder here. The global
+        // backing has deletion state and an append dictionary, so it
+        // declines to the ordinary lookup.
         let intrinsic = s.reserve_gc_local(f).initialize(
             base.sealed_subtype_or_branch::<IntrinsicPropertyStorage>(
                 s,

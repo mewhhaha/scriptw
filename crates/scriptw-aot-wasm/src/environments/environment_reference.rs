@@ -2,9 +2,9 @@ use super::global_environment::GlobalBindingFailure;
 use super::named_environment::NamedEnvironmentKind;
 use super::*;
 use crate::gc_types::{
-    GcNullability, JavaScriptObject, NamedBinding, NamedBindingSchema, ObjectEnvironmentSchema,
-    OrdinaryObject, OrdinaryObjectSchema, OrdinaryPropertyStorage, RealmRecordSchema,
-    StringValueSchema,
+    GcNullability, GlobalBuiltinBacking, GlobalBuiltinBackingSchema, JavaScriptObject, NamedBinding,
+    NamedBindingSchema, ObjectEnvironmentSchema, OrdinaryObject, OrdinaryObjectSchema,
+    OrdinaryPropertyStorage, RealmRecordSchema, StringValueSchema,
 };
 use crate::objects::OwnDataProbe;
 use crate::operations::PropertyKeyLocals;
@@ -464,12 +464,42 @@ impl FunctionBuilder<'_> {
                 .reference(),
             function,
         );
+        let append = schema
+            .reserve_gc_local::<OrdinaryPropertyStorage, Nullable>(function)
+            .initialize_null(schema, function);
+        storage.is_subtype::<GlobalBuiltinBacking>(schema, function);
+        self.open_frame(ControlFrameKind::If, function);
+        let backing = schema.reserve_gc_local(function).initialize(
+            storage.load(schema, function)
+                .cast_subtype::<GlobalBuiltinBacking>(schema, function),
+            function,
+        );
+        append.replace(
+            schema.field(GlobalBuiltinBackingSchema::APPEND)
+                .read(&backing, schema, function)
+                .reference(),
+            function,
+        );
+        backing.clear(function);
+        function.instruction(&Instruction::Else);
         storage.is_subtype::<OrdinaryPropertyStorage>(schema, function);
         self.open_frame(ControlFrameKind::If, function);
+        append.replace(
+            storage.load(schema, function)
+                .cast_subtype::<OrdinaryPropertyStorage>(schema, function)
+                .nullable(),
+            function,
+        );
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        storage.clear(function);
+        append.load(schema, function).is_null(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.open_frame(ControlFrameKind::If, function);
         let dictionary = schema.reserve_gc_local(function).initialize(
-            storage
-                .load(schema, function)
-                .cast_subtype::<OrdinaryPropertyStorage>(schema, function),
+            append.load(schema, function).require_non_null(function),
             function,
         );
         let hint = schema.reserve_i32_local(function);
@@ -482,7 +512,7 @@ impl FunctionBuilder<'_> {
         dictionary.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        storage.clear(function);
+        append.clear(function);
         found.load(function);
         function.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, function);

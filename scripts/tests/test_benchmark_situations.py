@@ -27,7 +27,7 @@ def identity():
                 executable_sha256='c' * 64,
                 shared_configuration=dict(consumer_compiler_enabled=False,
                     runtime_policy='scriptw-required-wasmtime-experimental-v1', collector='copying',
-                    gc_initial_bytes=16777216, wasmtime_version='47.0.0', target='generic',
+                    gc_initial_bytes=33554432, wasmtime_version='47.0.0', target='generic',
                     target_triple='x86_64-unknown-linux-gnu', native_compilation_mode='size-optimized',
                     register_allocation='backtracking'))
 

@@ -1,11 +1,11 @@
 //! A native join observed only through length needs no temporary String.
 use super::dense_array::ReadKey;
-use super::invariant_imul::{emit_own_native_method_guard, CachedRuntimeName, PureNativeMethod};
+use super::invariant_imul::{CachedRuntimeName, PureNativeMethod, emit_own_native_method_guard};
 use super::*;
 use crate::operations::PropertyKeyLocals;
 
 /// Bound speculation even when the original arithmetic loop is zero-trip.
-const MAX_PREFLIGHT_ELEMENTS: i64 = 256;
+const MAX_SPECULATIVE_ELEMENTS: i64 = 256;
 
 #[derive(PartialEq, Eq)]
 pub(super) struct JoinedStringArrayLength {
@@ -20,7 +20,11 @@ impl JoinedStringArrayLength {
         if !matches!(outer.key, ReadKey::Length | ReadKey::StaticString("length")) {
             return None;
         }
-        let ExprIr::MaterializeBinding { name, value, body } = &outer.target.expr else {
+        Self::of_join(outer.target, builder)
+    }
+
+    fn of_join(value: &TypedExpr, builder: &FunctionBuilder<'_>) -> Option<Self> {
+        let ExprIr::MaterializeBinding { name, value, body } = &value.expr else {
             return None;
         };
         let ExprIr::Identifier(receiver) = &value.expr else {
@@ -50,14 +54,17 @@ impl JoinedStringArrayLength {
         {
             return None;
         }
-        let [separator] = args.as_slice() else {
-            return None;
+        let separator_length = match args.as_slice() {
+            [] => 1,
+            [separator] => match &separator.expr {
+                ExprIr::Undefined => 1,
+                ExprIr::String(text) => {
+                    u32::try_from(scriptw_ir::decode_js_string_utf16(text).len()).ok()?
+                }
+                _ => return None,
+            },
+            _ => return None,
         };
-        let ExprIr::String(separator) = &separator.expr else {
-            return None;
-        };
-        let separator_length =
-            u32::try_from(scriptw_ir::decode_js_string_utf16(separator).len()).ok()?;
         Some(Self {
             receiver,
             separator_length,
@@ -73,6 +80,16 @@ impl JoinedStringArrayLength {
         &self,
         builder: &mut FunctionBuilder<'_>,
         accepted: I32Local,
+        function: &mut Function,
+    ) -> Result<JoinedLengthFact, EmitError> {
+        self.emit_projection(builder, accepted, Some(MAX_SPECULATIVE_ELEMENTS), function)
+    }
+
+    fn emit_projection(
+        &self,
+        builder: &mut FunctionBuilder<'_>,
+        accepted: I32Local,
+        limit: Option<i64>,
         function: &mut Function,
     ) -> Result<JoinedLengthFact, EmitError> {
         let s = builder.runtime_schema();
@@ -233,10 +250,12 @@ impl JoinedStringArrayLength {
         s.field(ArrayObjectSchema::LENGTH)
             .read(&array, s, function)
             .store_i64(length, function);
-        length.load(function);
-        function.instruction(&Instruction::I64Const(MAX_PREFLIGHT_ELEMENTS));
-        function.instruction(&Instruction::I64GtU);
-        builder.emit_branch_if_to_target(decline, function);
+        if let Some(limit) = limit {
+            length.load(function);
+            function.instruction(&Instruction::I64Const(limit));
+            function.instruction(&Instruction::I64GtU);
+            builder.emit_branch_if_to_target(decline, function);
+        }
         s.field(ArrayObjectSchema::COUNT).read(&array, s, function);
         length.load(function);
         function.instruction(&Instruction::I64Ne);
@@ -288,6 +307,10 @@ impl JoinedStringArrayLength {
         function.instruction(&Instruction::I64Const(i64::from(self.separator_length)));
         function.instruction(&Instruction::I64Mul);
         total.store(function);
+        total.load(function);
+        function.instruction(&Instruction::I64Const(MAX_STRING_LENGTH));
+        function.instruction(&Instruction::I64GtU);
+        builder.emit_branch_if_to_target(decline, function);
         index.set_constant(0, function);
         let complete = builder.open_frame(ControlFrameKind::Block, function);
         let scan = builder.open_frame(ControlFrameKind::Loop, function);
@@ -307,20 +330,13 @@ impl JoinedStringArrayLength {
         s.field(StoredValueSchema::TAG)
             .read(&stored, s, function)
             .store(element.tag(), function);
+        element.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String.tag()));
+        function.instruction(&Instruction::I32Eq);
+        builder.open_frame(ControlFrameKind::If, function);
         s.field(StoredValueSchema::REFERENCE)
             .read(&stored, s, function)
             .store_eq(element.reference(), function);
-        element.tag().load(function);
-        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String.tag()));
-        function.instruction(&Instruction::I32Ne);
-        builder.emit_branch_if_to_target(decline, function);
-        element.reference().load(function);
-        function.instruction(&Instruction::RefTestNonNull(
-            s.reference_type::<StringValue>(crate::gc_types::GcNullability::NonNullable)
-                .heap_type,
-        ));
-        function.instruction(&Instruction::I32Eqz);
-        builder.emit_branch_if_to_target(decline, function);
         string.replace(
             element
                 .cast_reference::<StringValue>(s, function)
@@ -339,6 +355,18 @@ impl JoinedStringArrayLength {
         function.instruction(&Instruction::I64ExtendI32U);
         function.instruction(&Instruction::I64Add);
         total.store(function);
+        function.instruction(&Instruction::Else);
+        element.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Null.tag()));
+        function.instruction(&Instruction::I32Eq);
+        element.tag().load(function);
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Undefined.tag()));
+        function.instruction(&Instruction::I32Eq);
+        function.instruction(&Instruction::I32Or);
+        function.instruction(&Instruction::I32Eqz);
+        builder.emit_branch_if_to_target(decline, function);
+        builder.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
         index.load(function);
         function.instruction(&Instruction::I32Const(1));
         function.instruction(&Instruction::I32Add);
@@ -350,10 +378,10 @@ impl JoinedStringArrayLength {
         function.instruction(&Instruction::End);
         builder.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        // 256 rows and u32 code-unit/separator lengths cannot overflow i64.
-        // Preserve the original join's resource owner outside its u32 domain.
+        // The checked separator total plus at most u32::MAX Strings of at
+        // most u32::MAX units fits in u64. The native call owns length errors.
         total.load(function);
-        function.instruction(&Instruction::I64Const(u32::MAX as i64));
+        function.instruction(&Instruction::I64Const(MAX_STRING_LENGTH));
         function.instruction(&Instruction::I64GtU);
         builder.emit_branch_if_to_target(decline, function);
         total.load(function);
@@ -382,6 +410,49 @@ impl JoinedStringArrayLength {
         s.release_i64_local(total, function);
         s.release_i64_local(length, function);
         Ok(fact)
+    }
+}
+
+impl FunctionBuilder<'_> {
+    /// A standalone length read consumes the projection at the original call
+    /// site. There is no speculation across loop tests or preceding effects.
+    pub(crate) fn try_compile_joined_string_length(
+        &mut self,
+        target: &TypedExpr,
+        output: &ValueLocals,
+        function: &mut Function,
+    ) -> Result<bool, EmitError> {
+        let Some(plan) = JoinedStringArrayLength::of_join(target, self) else {
+            return Ok(false);
+        };
+        let s = self.runtime_schema();
+        let accepted = s.reserve_i32_local(function);
+        accepted.set_constant(1, function);
+        let fact = plan.emit_projection(self, accepted, None, function)?;
+        accepted.load(function);
+        self.open_frame(ControlFrameKind::If, function);
+        let bits = s.reserve_i64_local(function);
+        fact.emit(function);
+        function.instruction(&Instruction::I64ReinterpretF64);
+        bits.store(function);
+        output.set_number(bits, function);
+        s.release_i64_local(bits, function);
+        function.instruction(&Instruction::Else);
+        let receiver = s.reserve_value_local(function);
+        self.compile_expr_to_value(target, &receiver, function)?;
+        self.compile_property_read_from_locals(
+            target,
+            &PropertyKeyIr::ArrayLength,
+            &receiver,
+            output,
+            function,
+        )?;
+        receiver.clear(function);
+        self.pop_control(ControlFrameKind::If);
+        function.instruction(&Instruction::End);
+        fact.release(self, function);
+        s.release_i32_local(accepted, function);
+        Ok(true)
     }
 }
 

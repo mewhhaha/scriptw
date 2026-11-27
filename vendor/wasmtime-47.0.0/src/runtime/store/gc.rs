@@ -308,6 +308,11 @@ impl StoreOpaque {
         }
 
         let page_size = self.engine().tunables().gc_heap_memory_type().page_size();
+        let min_growth_bytes = self
+            .gc_store
+            .as_ref()
+            .map_or(bytes_needed, |gc| gc.gc_heap.min_growth_bytes(bytes_needed));
+        let min_pages_needed = min_growth_bytes.div_ceil(page_size).max(1);
 
         // Take the GC heap's underlying memory out of the GC heap, attempt to
         // grow it, then replace it.
@@ -351,17 +356,17 @@ impl StoreOpaque {
                 .await
                 .context(GcHeapGrowthFailed)?
         };
-        // When a limit refuses the doubling, grow by what the allocation
-        // needs, so that the heap can still reach the limit. (A nursery keeps
-        // part of the heap out of both semi-spaces.)
-        let delta_pages_for_alloc = if grown.is_none() && delta_pages_for_alloc > pages_needed {
+        // When a limit refuses amortized growth, fall back to the exact extra
+        // pages the heap actually lacks so that a heap near its cap can still
+        // use its remaining room.
+        let delta_pages_for_alloc = if grown.is_none() && delta_pages_for_alloc > min_pages_needed {
             grown = unsafe {
                 heap.memory
-                    .grow(pages_needed, limiter)
+                    .grow(min_pages_needed, limiter)
                     .await
                     .context(GcHeapGrowthFailed)?
             };
-            pages_needed
+            min_pages_needed
         } else {
             delta_pages_for_alloc
         };

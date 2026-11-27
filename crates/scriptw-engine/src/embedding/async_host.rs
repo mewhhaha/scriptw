@@ -112,6 +112,10 @@ impl Drop for ForeignCompleter {
 }
 
 pub(super) struct ForeignAsyncState {
+    requests: Option<ForeignAsyncRequests>,
+}
+
+struct ForeignAsyncRequests {
     sender: Sender<WorkerSettlement>,
     receiver: Receiver<WorkerSettlement>,
     next_request: Option<ForeignRequestId>,
@@ -119,14 +123,8 @@ pub(super) struct ForeignAsyncState {
 }
 
 impl ForeignAsyncState {
-    pub(super) fn new() -> Self {
-        let (sender, receiver) = mpsc::channel();
-        Self {
-            sender,
-            receiver,
-            next_request: Some(ForeignRequestId(1)),
-            pending: BTreeMap::new(),
-        }
+    pub(super) const fn new() -> Self {
+        Self { requests: None }
     }
 
     /// Callers validate and root both resolver references in this Store before
@@ -138,34 +136,48 @@ impl ForeignAsyncState {
         reject: OwnedRooted<EqRef>,
         expected: ForeignResultType,
     ) -> Result<ForeignCompleter, EngineError> {
-        let request = self
+        let requests = self.requests.get_or_insert_with(|| {
+            let (sender, receiver) = mpsc::channel();
+            ForeignAsyncRequests {
+                sender,
+                receiver,
+                next_request: Some(ForeignRequestId(1)),
+                pending: BTreeMap::new(),
+            }
+        });
+        let request = requests
             .next_request
             .ok_or_else(|| EngineError::new("asynchronous foreign request identity exhausted"))?;
-        self.next_request = request.0.checked_add(1).map(ForeignRequestId);
-        assert!(self
+        requests.next_request = request.0.checked_add(1).map(ForeignRequestId);
+        assert!(requests
             .pending
             .insert(request, PendingResolvers { resolve, reject })
             .is_none());
         Ok(ForeignCompleter {
             request,
-            sender: Some(self.sender.clone()),
+            sender: Some(requests.sender.clone()),
             expected,
         })
     }
 
     pub(super) fn pending_count(&self) -> usize {
-        self.pending.len()
+        self.requests
+            .as_ref()
+            .map_or(0, |requests| requests.pending.len())
     }
 
     /// Detach a finite nonblocking FIFO batch. Worker threads never contend on
     /// Store locks, and jobs started by settlement belong to a later batch.
     pub(super) fn take_ready(&mut self) -> Vec<ReadyForeignSettlement> {
         let mut ready = Vec::new();
-        for _ in 0..self.pending.len() {
-            let Ok(message) = self.receiver.try_recv() else {
+        let Some(requests) = &mut self.requests else {
+            return ready;
+        };
+        for _ in 0..requests.pending.len() {
+            let Ok(message) = requests.receiver.try_recv() else {
                 break;
             };
-            let pending = self
+            let pending = requests
                 .pending
                 .remove(&message.request)
                 .expect("each owned completer settles its registered request exactly once");

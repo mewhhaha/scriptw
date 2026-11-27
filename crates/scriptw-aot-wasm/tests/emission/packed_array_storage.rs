@@ -740,9 +740,8 @@ fn many_short_array_literals_keep_publication_cfg_in_one_runtime_body() {
             let mut source = String::from("function make(consume){");
             for ordinal in 0..LITERALS {
                 source.push_str(&format!(
-                    "consume([{ordinal},{},{}]);",
+                    "consume([\"k{ordinal}\",{},\"v{ordinal}\"]);",
                     ordinal + 1,
-                    ordinal + 2
                 ));
             }
             source.push_str("}make;");

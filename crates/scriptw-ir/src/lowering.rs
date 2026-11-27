@@ -2318,7 +2318,7 @@ impl<'a> ScriptLowerer<'a> {
         }
         functions.append(&mut self.generated_functions);
         let (global_bindings, restricted_global_functions) =
-            self.script_global_bindings(self.analysis.script_root_functions.as_slice());
+            self.script_global_bindings(script, self.analysis.script_root_functions.as_slice());
         let rejects_fresh_entry_declarations = matches!(
             self.analysis.script_instantiation,
             ScriptInstantiation::FreshEntry | ScriptInstantiation::ModuleAfterGlobalScript
@@ -2406,6 +2406,7 @@ impl<'a> ScriptLowerer<'a> {
 
     fn script_global_bindings(
         &self,
+        script: &Script,
         root_functions: &[PendingFunction<'a>],
     ) -> (GlobalBindingPlan, Vec<String>) {
         let activation_id = self.analysis.owner_plans[SCRIPT_OWNER_ID].activation_environment_id;
@@ -2442,22 +2443,31 @@ impl<'a> ScriptLowerer<'a> {
                 });
             }
         }
+        use boa_ast::operations::{var_scoped_declarations, VarScopedDeclaration};
+        for name in var_scoped_declarations(script)
+            .into_iter()
+            .filter(|declaration| matches!(declaration, VarScopedDeclaration::VariableDeclaration(_)))
+            .flat_map(|declaration| declaration.bound_names())
+        {
+            let name = self.interner.resolve_expect(name).to_string();
+            if self.var_bindings.get(&name).is_some_and(|binding| binding.is_script_global) {
+                bindings.record_var(name);
+            }
+        }
+        for function in annex_b_function_declarations(script) {
+            if let Some(plan) = self.analysis.annex_b_function_plans
+                .get(&function_declaration_key(function))
+                .filter(|plan| plan.owner_id == SCRIPT_OWNER_ID && plan.copy_to_variable_environment)
+            {
+                bindings.record_annex_b_var(plan.source_name.clone());
+            }
+        }
         for (name, _) in self
             .var_bindings
             .iter()
             .filter(|(_, binding)| binding.is_script_global)
         {
             bindings.record_var(name.clone());
-        }
-        for name in self
-            .analysis
-            .annex_b_function_plans
-            .values()
-            .filter(|plan| plan.owner_id == SCRIPT_OWNER_ID && plan.copy_to_variable_environment)
-            .map(|plan| plan.source_name.clone())
-            .collect::<BTreeSet<_>>()
-        {
-            bindings.record_annex_b_var(name);
         }
         // 16.1.7 considers var-scoped function declarations in reverse list
         // order. Recording in source order makes replacement select exactly

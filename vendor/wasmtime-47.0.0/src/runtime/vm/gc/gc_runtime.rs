@@ -438,6 +438,14 @@ pub unsafe trait GcHeap: 'static + Send + Sync {
         false
     }
 
+    /// Minimum additional heap bytes needed to satisfy an allocation that
+    /// reported `bytes_needed`, after accounting for already-free capacity in
+    /// the current heap. Used as a fallback only when a resource limiter
+    /// refuses normal amortized growth.
+    fn min_growth_bytes(&self, bytes_needed: u64) -> u64 {
+        bytes_needed
+    }
+
     /// Start a new garbage collection process.
     ///
     /// The given `roots` are GC roots and should not be collected (nor anything

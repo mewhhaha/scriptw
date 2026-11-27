@@ -2,7 +2,8 @@
 use super::*;
 use crate::gc_types::{
     DeferredIntrinsicValue, Environment, ExecutableCode, FunctionContext, FunctionObject,
-    GcHeapType, GcNullability, GlobalLedger, IntrinsicPropertyStorage, OrdinaryObject,
+    GcHeapType, GcNullability, GlobalBuiltinBacking, GlobalLedger, IntrinsicPropertyStorage,
+    OrdinaryObject, OrdinaryPropertyIndex, PropertyDescriptor, PropertyEntry, PropertyTable,
     PropertyValue, RealmRecord, RuntimeModuleTypes, RuntimeSchema, StoredValue, StringValue,
 };
 
@@ -30,29 +31,83 @@ fn body(bytes: &[u8], index: u32) -> Vec<Operator<'_>> {
 }
 
 #[test]
-fn fresh_global_publication_allocates_only_final_dictionary_arrays() {
+fn fresh_realms_allocate_global_backing_without_property_entries_or_dictionary_arrays() {
     let artifact = emit_script("this;").unwrap();
     expect_valid_module(&artifact, 0);
-    let bytes = artifact.runtime().unwrap().bytes();
-    let publisher = function_names_in_bytes(bytes)
-        .into_iter()
-        .find_map(|(index, name)| {
-            (name == "helper::fresh_data_properties_publish").then_some(index)
+    let runtime = artifact.runtime().unwrap().bytes();
+    let program = artifact.bytes.as_slice();
+    let names = function_names_in_bytes(runtime);
+    let main = Parser::new(0)
+        .parse_all(program)
+        .find_map(|section| match section.unwrap() {
+            Payload::ExportSection(exports) => exports
+                .into_iter()
+                .map(Result::unwrap)
+                .find_map(|export| (export.name == "main").then_some(export.index)),
+            _ => None,
         })
-        .expect("the runtime owns the fresh global publication kernel");
-    let publisher = body(bytes, publisher);
-    assert_eq!(
-        publisher
-            .iter()
-            .filter(|op| matches!(op, Operator::ArrayNew { .. } | Operator::ArrayNewDefault { .. }))
-            .count(),
-        2,
-        "the first row allocates the final ordered table and bucket index"
+        .expect("P exports the entry Realm producer");
+    let registered = RuntimeModuleTypes::register(crate::runtime_artifact::ModuleKind::Runtime(
+        crate::RuntimeSourceCompilationProfile::Portable,
+    ))
+    .finalize_globals(GlobalLedger::new(), false, 0);
+    let schema = registered.globals().schema();
+    let backing = type_index::<GlobalBuiltinBacking>(schema);
+    let entry = type_index::<PropertyEntry>(schema);
+    let descriptor = type_index::<PropertyDescriptor>(schema);
+    let entries = type_index::<PropertyTable>(schema);
+    let index = type_index::<OrdinaryPropertyIndex>(schema);
+    let create_realm = format!("host::{}", scriptw_ir::HostBuiltinId::CreateRealm.as_str());
+    let shadow_realm = format!(
+        "builtin::{}",
+        StandardBuiltinId::ShadowRealmConstructor.debug_name()
     );
-    assert!(
-        !publisher.iter().any(|op| matches!(op, Operator::Loop { .. })),
-        "each row writes its precomputed bucket directly"
-    );
+    for (bytes, producer, wrapper_descriptors) in [
+        (program, main, 0),
+        (
+            runtime,
+            super::error_demand_initialization::named(&names, &create_realm),
+            // The Test262 hook installs its facade and $262 after bootstrap.
+            7,
+        ),
+        (
+            runtime,
+            super::error_demand_initialization::named(&names, &shadow_realm),
+            0,
+        ),
+    ] {
+        let ops = body(bytes, producer);
+        assert_eq!(
+            ops.iter()
+                .filter(|op| matches!(op, Operator::StructNew { struct_type_index }
+                    if *struct_type_index == backing))
+                .count(),
+            1,
+            "each Realm creates one global backing"
+        );
+        assert!(
+            !ops.iter().any(|op| match op {
+                Operator::StructNew { struct_type_index } => *struct_type_index == entry,
+                Operator::ArrayNew { array_type_index }
+                | Operator::ArrayNewDefault { array_type_index }
+                | Operator::ArrayNewFixed {
+                    array_type_index, ..
+                } => {
+                    [entries, index].contains(array_type_index)
+                }
+                _ => false,
+            }),
+            "global bootstrap does not allocate per-row records or dictionary arrays"
+        );
+        assert_eq!(
+            ops.iter()
+                .filter(|op| matches!(op, Operator::StructNew { struct_type_index }
+                    if *struct_type_index == descriptor))
+                .count(),
+            wrapper_descriptors,
+            "the original built-in rows do not allocate descriptors"
+        );
+    }
 }
 
 #[test]

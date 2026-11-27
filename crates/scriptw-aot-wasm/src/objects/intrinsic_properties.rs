@@ -5,6 +5,7 @@ use super::*;
 use crate::gc_types::*;
 use crate::runtime_helpers::*;
 mod installation;
+pub(super) use installation::emit_intrinsic_layout_storage_record;
 
 impl FunctionBuilder<'_> {
     /// The complete intrinsic layout is the header's first property storage.
@@ -249,9 +250,17 @@ impl FunctionBuilder<'_> {
         value.replace(setter.load(s, &mut f).nullable(), &mut f);
         setter.clear(&mut f);
         f.instruction(&Instruction::Else);
+        Self::emit_is_global_builtin_layout_recipe(&row, &mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let global = self.emit_global_builtin_layout_recipe_value(&row, &realm, &mut f)?;
+        value.replace(global.load(s, &mut f).nullable(), &mut f);
+        global.clear(&mut f);
+        f.instruction(&Instruction::Else);
         let getter = self.emit_intrinsic_layout_recipe_value(&row, &realm, false, &mut f)?;
         value.replace(getter.load(s, &mut f).nullable(), &mut f);
         getter.clear(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         s.array_type::<IntrinsicPropertyValueCache>().write(

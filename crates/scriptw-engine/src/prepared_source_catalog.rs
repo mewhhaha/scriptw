@@ -72,7 +72,12 @@ pub(super) fn prepare_source_catalog(
             }
             continue;
         }
-        let PreparedModuleCompilation::Ambient { loader, graph, .. } = modules else {
+        let PreparedModuleCompilation::Ambient {
+            policy,
+            loader,
+            graph,
+        } = modules
+        else {
             unreachable!("the complete catalog was handled above")
         };
         let requests = session
@@ -93,6 +98,7 @@ pub(super) fn prepare_source_catalog(
         if requests.is_empty() && !script_changed && (graph.is_some() || script_sites.is_empty()) {
             return Ok(ir);
         }
+        let loader = loader.get_or_insert_with(|| configured_module_loader(options, *policy));
         if graph.is_none() {
             let locator = options.filename.as_deref().unwrap_or("<entry>");
             let loaded = match source {
@@ -400,7 +406,12 @@ export const value = 1;
             )
         })
         .unwrap();
-        for (source, mut options) in [("function {", options.clone()), ("true;", options)] {
+        const STRICT_CALLABLE_BINDING: &str = "function f(implements) { 'use strict'; }";
+        for (source, mut options) in [
+            ("function {", options.clone()),
+            (STRICT_CALLABLE_BINDING, options.clone()),
+            ("true;", options),
+        ] {
             if source == "true;" {
                 options.module_prelude = Some("export {};".into());
             }
@@ -413,17 +424,23 @@ export const value = 1;
             )
             .unwrap();
             assert!(cache.write(&key, wasm_runtime_link::encode_cache_entry(valid.program())));
-            assert!(
-                engine
-                    .load_or_compile_program_wasm_on_current_thread(
-                        source,
-                        ParseGoal::Script,
-                        options,
-                        Some(Arc::clone(&cache)),
-                    )
-                    .is_err(),
-                "cache must not mask current source admission: {source}"
+            let reads_before = cache.counters();
+            let result = engine.load_or_compile_program_wasm_on_current_thread(
+                source,
+                ParseGoal::Script,
+                options,
+                Some(Arc::clone(&cache)),
             );
+            let Err(error) = result else {
+                panic!("cache must not mask current source admission: {source}");
+            };
+            assert_eq!(cache.counters(), reads_before);
+            if source == STRICT_CALLABLE_BINDING {
+                assert_eq!(
+                    error.parse_diagnostic().unwrap().code.wire_name(),
+                    scriptw_front::EarlyErrorCode::StrictModeReservedBindingIdentifier.wire_name(),
+                );
+            }
         }
     }
 
@@ -451,24 +468,24 @@ export const value = 1;
         assert!(first.cached_entry.is_none());
         let warm = load().unwrap();
         assert!(warm.cached_entry.is_some());
-        assert_eq!(first.bytes, warm.bytes);
+        assert_eq!(first.bytes.as_ref(), warm.bytes.as_ref());
         files.write("value.js", "export const value = 2;");
         let edited = load().unwrap();
         assert!(
             edited.cached_entry.is_none(),
             "finite-source dependency edit must miss"
         );
-        assert_ne!(first.bytes, edited.bytes);
+        assert_ne!(first.bytes.as_ref(), edited.bytes.as_ref());
         let warm_edit = load().unwrap();
         assert!(warm_edit.cached_entry.is_some());
-        assert_eq!(edited.bytes, warm_edit.bytes);
+        assert_eq!(edited.bytes.as_ref(), warm_edit.bytes.as_ref());
         std::fs::remove_file(files.0.join("value.js")).unwrap();
         let removed = load().unwrap();
         assert!(
             removed.cached_entry.is_none(),
             "a missing dependency cannot use loaded code"
         );
-        assert_ne!(edited.bytes, removed.bytes);
+        assert_ne!(edited.bytes.as_ref(), removed.bytes.as_ref());
     }
     #[test]
     fn prepared_script_import_edges_keep_the_actual_base_identity_and_load_policy() {

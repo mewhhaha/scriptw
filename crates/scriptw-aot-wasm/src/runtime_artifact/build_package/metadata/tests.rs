@@ -27,7 +27,7 @@ fn fixture() -> &'static Fixture {
         }
     })
 }
-fn decode(bytes: &[u8]) -> Option<Arc<BuildMetadata>> {
+fn decode(bytes: &[u8]) -> Option<Arc<BuildMetadata<'static>>> {
     let f = fixture();
     assert!(std::ptr::eq(bytes, &f.metadata[..]));
     // SAFETY: the complete fixture producer owns these unchanged outputs.
@@ -255,4 +255,65 @@ fn receipt_metadata_is_reused_only_through_the_unsafe_exact_producer_candidate()
         .identity(&custom)
         .unwrap()
         .is_none());
+}
+
+#[test]
+fn portable_program_bytes_match_with_and_without_the_cargo_prefix() {
+    let fixture = fixture();
+    // SAFETY: these immutable slices are exact outputs of the checked test
+    // producer, just like the Cargo-linked package and receipts.
+    let inputs = unsafe {
+        RuntimeArtifactInputs::new(None).with_immutable_minimal_build(
+            producer().package_bytes(),
+            &SOURCE,
+            fixture.intl,
+            &fixture.metadata,
+        )
+    };
+    let cargo_selection = inputs
+        .intl_selection(&IntlCompilationProfile::Minimal)
+        .unwrap();
+    let fast = inputs.admit_supplied_package(&cargo_selection).unwrap();
+    let fresh_selection = IntlDataSelection::new(IntlCompilationProfile::Minimal);
+    let fresh = &producer().runtime;
+    assert!(fast.bytes() == fresh.bytes());
+    assert!(fresh.build_admission.is_none());
+
+    let parsed = scriptw_front::parse(
+        r#"
+            let sample = { text: "Café", length: 4 };
+            let backref = /(\p{Letter})\1/iu;
+            let computed = new RegExp(sample.text, "i");
+            print(sample.text.normalize("NFD"));
+            print(backref.test("aa"), computed.test(sample.text));
+            print(Intl.supportedValuesOf("calendar").length);
+            print(Temporal.PlainDate.from("2026-11-26").year);
+        "#,
+        scriptw_front::ParseOptions::script(),
+    )
+    .unwrap();
+    let mut script = scriptw_ir::lower(&parsed).script.unwrap();
+    crate::builtins::append_empty_dynamic_function_bodies(&mut script);
+    let emit = |runtime: &Arc<RuntimeArtifact>, selection: &IntlDataSelection| {
+        crate::emit::emit_script_module(
+            &script,
+            crate::runtime_artifact::ModuleKind::Program(runtime),
+            crate::PromiseRejectionPolicy::default(),
+            selection,
+            crate::profile::ProfileUse::None,
+        )
+        .unwrap()
+        .artifact
+        .bytes
+    };
+    let expected = emit(fresh, &fresh_selection);
+    let actual = emit(&fast, &cargo_selection);
+    assert!(fast.compiler_owned_pool.get().unwrap().is_ok());
+    assert!(
+        expected == actual,
+        "the Cargo pool changed Portable P bytes"
+    );
+    wasmparser::Validator::new_with_features(crate::runtime_artifact::program_validation_features())
+        .validate_all(&actual)
+        .unwrap();
 }

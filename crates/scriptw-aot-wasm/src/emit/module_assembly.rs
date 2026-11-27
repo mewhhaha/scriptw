@@ -1,4 +1,5 @@
 use super::*;
+use crate::data::CompilerOwnedPool;
 use crate::function_layout::ModuleEntryRole;
 use crate::runtime_artifact::{EmittedModule, ModuleKind, RuntimeLayout};
 use crate::runtime_helpers::ProgramHook;
@@ -21,7 +22,7 @@ pub(crate) use native_program::{
     emit_runtime_direct_eval_module, emit_runtime_global_script_module,
 };
 pub(crate) use program_entries::emit_runtime_function_module;
-pub(super) use program_entries::emit_script_module;
+pub(crate) use program_entries::emit_script_module;
 use program_entries::ProgramExports;
 
 #[allow(clippy::too_many_arguments)]
@@ -383,39 +384,56 @@ fn emit_script_module_with_factory(
         crate::profile::collect::ProfileMemory::after(program_memories),
     );
     let entry_exports = ProgramExports::new(kind, &layout, factory, &function_metas)?;
-    let owned_pool;
-    let string_pool = match (kind, validated_runtime) {
-        // Standalone admission excludes runtime operations and source functions.
-        // Literal Strings copy their source-only passive UTF-16 image into GC.
-        (ModuleKind::Standalone(admission), None) => admission.pool(),
+    let pool_started = std::env::var_os("SCRIPTW_WASM_TRACE").map(|_| std::time::Instant::now());
+    let shared_prefix = match (kind, validated_runtime) {
+        (ModuleKind::Program(runtime), None) => {
+            runtime.precomputed_compiler_owned_pool(function_metas.metas(), intl_selection)?
+        }
         (ModuleKind::Program(runtime), Some(validated))
             if std::sync::Arc::ptr_eq(runtime, validated.runtime()) =>
         {
-            owned_pool = StringPool::collect_with_validated_runtime(
-                script,
+            Some(validated.compiler_owned_pool(
                 function_metas.metas(),
                 &compiled_standard_builtins,
                 uses_temporal_calendar,
-                validated,
-            )?;
-            &owned_pool
+            )?)
         }
-        (_, None) => {
-            owned_pool = StringPool::collect(
-                script,
-                function_metas.metas(),
-                &compiled_standard_builtins,
-                uses_temporal_calendar,
-                intl_selection,
-            )?;
-            &owned_pool
-        }
+        (_, None) => None,
         _ => {
             return Err(EmitError::unsupported(
                 "native pool proof must retain its exact linked runtime",
             ));
         }
     };
+    let mut owned_pool = None;
+    let string_pool: &StringPool = match (kind, shared_prefix) {
+        // Standalone admission excludes runtime operations and source functions.
+        // Literal Strings copy their source-only passive UTF-16 image into GC.
+        (ModuleKind::Standalone(admission), None) => admission.pool(),
+        (_, Some(prefix)) => owned_pool.insert(CompilerOwnedPool::collect_program(
+            prefix,
+            script,
+            function_metas.metas(),
+        )?),
+        (_, None) => owned_pool.insert(StringPool::collect(
+            script,
+            function_metas.metas(),
+            &compiled_standard_builtins,
+            uses_temporal_calendar,
+            intl_selection,
+        )?),
+    };
+    if let Some(started) = pool_started {
+        let source = if shared_prefix.is_some() {
+            "reused compiler prefix"
+        } else {
+            "fresh pool"
+        };
+        eprintln!(
+            "scriptw wasm trace: string pool ({source}): {:?}",
+            started.elapsed()
+        );
+    }
     match kind {
         ModuleKind::Standalone(_) => {}
         ModuleKind::Runtime(_) => string_pool.require_runtime_only()?,
@@ -1462,7 +1480,8 @@ fn emit_script_module_with_factory(
             DeferredIntrinsicInstallRun, compile_deferred_intrinsic_install_run_helper;
             IntrinsicDataPublish, compile_intrinsic_data_publish_helper;
             IntrinsicAccessorPublish, compile_intrinsic_accessor_publish_helper;
-            FreshDataPropertiesPublish, compile_fresh_data_properties_publish_helper;
+            GlobalBuiltinAppendFind, compile_global_builtin_append_find_helper;
+            SnapshotGlobalBuiltinRow, compile_snapshot_global_builtin_row_helper;
             PropertyValueResolve, compile_property_value_resolve_helper;
             ArgumentListAppend, compile_argument_list_append_helper;
             CachedPropertyRead, compile_cached_property_read_helper;
@@ -2223,5 +2242,6 @@ fn emit_script_module_with_factory(
     Ok(EmittedModule {
         artifact,
         runtime_layout,
+        runtime_pool: if compile_runtime { owned_pool } else { None },
     })
 }

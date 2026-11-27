@@ -636,6 +636,15 @@ impl FunctionBuilder<'_> {
         intrinsic.clear(f);
         f.instruction(&Instruction::Else);
         // A dictionary holder: remember the entry position, checked by key.
+        // Global rows and appended entries do not share one position domain.
+        let dictionary = schema.reserve_gc_local(f).initialize(
+            holder_base.sealed_subtype_or_branch::<OrdinaryPropertyStorage>(
+                schema,
+                self.local_branch_label(done),
+                f,
+            ),
+            f,
+        );
         let entry = self.emit_ordinary_property_entry(&holder, key, f)?;
         entry.load(schema, f).is_null(f);
         f.instruction(&Instruction::I32Eqz);
@@ -648,17 +657,11 @@ impl FunctionBuilder<'_> {
             .read(&present, schema, f)
             .store(holder_slot, f);
         present.clear(f);
-        let dictionary = schema.reserve_gc_local(f).initialize(
-            holder_base
-                .load(schema, f)
-                .cast_subtype::<OrdinaryPropertyStorage>(schema, f),
-            f,
-        );
         self.emit_dictionary_position_read(&dictionary, holder_slot, key, &value, found, f);
-        dictionary.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         entry.clear(f);
+        dictionary.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);

@@ -1314,7 +1314,8 @@ impl TypeRegistryInner {
         // On a fresh registry, reserve for the whole module before the first
         // insertion. Other modules may share every type, so grow those arenas
         // on misses only.
-        if self.hash_consing_map.is_empty() {
+        let empty_registry = self.hash_consing_map.is_empty();
+        if empty_registry {
             self.hash_consing_map.reserve(types.rec_groups().len())?;
             self.reserve_type_capacity(num_types)?;
         }
@@ -1326,6 +1327,7 @@ impl TypeRegistryInner {
                 module_group.clone(),
                 types,
                 &mut prefix,
+                empty_registry,
             )?;
 
             // Update the module-to-engine map with this rec group's
@@ -1363,6 +1365,7 @@ impl TypeRegistryInner {
         range: Range<ModuleInternedTypeIndex>,
         module_types: &ModuleTypes,
         prefix: &mut &[RecGroupEntry],
+        empty_registry: bool,
     ) -> Result<RecGroupEntry, OutOfMemory> {
         // Any references in this rec group to types outside of this rec group
         // may only be to fully-registered types.
@@ -1398,16 +1401,20 @@ impl TypeRegistryInner {
             *prefix = &[];
         }
 
-        let probe = RecGroupProbe::new(view);
-        if let Some(entry) = self.get_rec_group(&probe) {
-            log::trace!("hash-consing map hit: reusing {entry:?}");
-            assert_eq!(entry.0.unregistered.load(Acquire), false);
-            self.debug_assert_all_registered(entry);
-            entry.incref("hash-consing map hit");
-            return Ok(entry.clone());
-        }
+        // On a populated registry, look for a shared entry before allocating a
+        // key. On the first module, most groups are new. Canonicalize their
+        // owned keys once and let insertion check for duplicates. Even the
+        // first module can have duplicates, e.g. due to synthesized trampolines.
+        let probe = if empty_registry {
+            None
+        } else {
+            let probe = RecGroupProbe::new(view);
+            if let Some(entry) = self.get_rec_group(&probe) {
+                return Ok(self.reuse_rec_group(entry));
+            }
+            Some(probe)
+        };
 
-        log::trace!("hash-consing map miss: making new registration");
         let mut key_types = iter_entity_range(range.clone()).map(|module_index| {
             let mut ty = module_types[module_index].try_clone()?;
             ty.canonicalize_for_hash_consing(range.clone(), &mut |idx| {
@@ -1422,42 +1429,61 @@ impl TypeRegistryInner {
             RecGroupKeyTypes::Many(key_types.try_collect::<Box<[_]>, OutOfMemory>()?)
         };
 
-        debug_assert_eq!(
-            probe.hash,
-            RecGroupProbe::new(RecGroupKeyView::Canonical(&key)).hash
-        );
-        debug_assert!(probe.view == RecGroupKeyView::Canonical(&key));
-        self.register_new_rec_group(gc_runtime, key, probe.hash)
+        let canonical = RecGroupKeyView::Canonical(&key);
+        let hash = match probe {
+            Some(probe) => {
+                debug_assert_eq!(probe.hash, RecGroupProbe::new(canonical.clone()).hash);
+                debug_assert!(probe.view == canonical);
+                probe.hash
+            }
+            None => RecGroupProbe::new(canonical).hash,
+        };
+        self.register_rec_group(gc_runtime, key, hash)
     }
 
-    /// Register a new rec group that is not already in this registry.
-    fn register_new_rec_group(
+    fn reuse_rec_group(&self, entry: &RecGroupEntry) -> RecGroupEntry {
+        log::trace!("hash-consing map hit: reusing {entry:?}");
+        assert!(!entry.0.unregistered.load(Acquire));
+        self.debug_assert_all_registered(entry);
+        entry.incref("hash-consing map hit");
+        entry.clone()
+    }
+
+    /// Insert a canonicalized rec group and initialize its arenas, or reuse an
+    /// equivalent entry already in the registry.
+    fn register_rec_group(
         &mut self,
         gc_runtime: Option<&(dyn GcRuntime + 'static)>,
         key: RecGroupKeyTypes,
         hash: u64,
     ) -> Result<RecGroupEntry, OutOfMemory> {
-        debug_assert!(
-            self.get_rec_group(&RecGroupProbe {
-                view: RecGroupKeyView::Canonical(&key),
-                hash,
-            })
-            .is_none()
-        );
-
         self.reserve_type_capacity(key.len())?;
         let entry_inner = RecGroupEntry::new_inner()?;
         let shared_type_indices = self.assign_shared_type_indices(key.len())?;
         let entry = RecGroupEntry::init(entry_inner, key, hash, shared_type_indices);
 
-        // XXX: From the creation of the `Undo` and afterwards, we can write to
-        // `self` and its arenas. We must, however, always ensure that the
-        // `Undo` fully rolls back the changes made below, so keep this in mind
-        // if adding/removing/changing the arenas in `self`.
+        // The write lock covers the entire registration. Insert before filling
+        // any arena so the first-module path needs only one hash-table probe
+        // for each new entry. Trampoline registration below can recurse, but
+        // only for a distinct singleton type that is its own trampoline, so
+        // it cannot find this entry before it is initialized.
+        match self.hash_consing_map.insert(entry.clone()) {
+            Ok(true) => {}
+            Ok(false) => {
+                self.remove_entry_types(&entry);
+                return Ok(self.reuse_rec_group(self.hash_consing_map.get(&entry).unwrap()));
+            }
+            Err(e) => {
+                self.remove_entry_types(&entry);
+                return Err(e);
+            }
+        }
+
+        // From here on, rollback must remove both this key and every arena
+        // entry or outgoing reference we install.
         let did_incref = Cell::new(false);
-        let entry2 = entry.clone();
         let mut registry = Undo::new(self, |registry| {
-            registry.remove_entry_impl(&entry2, did_incref.get());
+            registry.remove_entry_impl(&entry, did_incref.get());
             registry.drain_drop_stack();
         });
 
@@ -1473,9 +1499,6 @@ impl TypeRegistryInner {
         registry.insert_entry_trampolines(gc_runtime, &entry)?;
         registry.insert_entry_gc_layouts(gc_runtime, &entry)?;
 
-        let is_new_entry = registry.hash_consing_map.insert(entry.clone())?;
-        debug_assert!(is_new_entry);
-
         // We successfully registered the rec group! Commit our changes,
         // increment the rec group's registration count to one, and return it.
         registry.debug_assert_all_registered(&entry);
@@ -1487,10 +1510,7 @@ impl TypeRegistryInner {
     /// Implementation of removing a rec group entry.
     ///
     /// Shared by both unregistering a rec group and rolling back changes when
-    /// we OOM in `register_new_rec_group`.
-    ///
-    /// The order of removals should be the reverse of the insertions in
-    /// `register_new_rec_group`.
+    /// we OOM in `register_rec_group`.
     fn remove_entry_impl(&mut self, entry: &RecGroupEntry, should_decref: bool) {
         // All entries we are removing should *really* be ready for
         // unregistration.
@@ -1502,8 +1522,8 @@ impl TypeRegistryInner {
         // comment in `unregister_entry`.
         entry.0.unregistered.store(true, Release);
 
-        // Perform the removals in the opposite order as the insertions in
-        // `register_new_rec_group`.
+        // Remove the key before clearing the arenas. Release outgoing edges
+        // after removing this group's type information.
         self.hash_consing_map.remove(entry);
         self.remove_entry_gc_layouts(&entry);
         self.remove_entry_trampolines(&entry);
@@ -1905,28 +1925,26 @@ impl TypeRegistryInner {
         // existing signatures on nearly every call.
         let probe = RecGroupProbe::new(RecGroupKeyView::Canonical(core::slice::from_ref(&ty)));
         if let Some(entry) = self.get_rec_group(&probe) {
-            log::trace!("hash-consing map hit: reusing {entry:?}");
-            assert_eq!(entry.0.unregistered.load(Acquire), false);
-            self.debug_assert_all_registered(entry);
-            entry.incref("hash-consing map hit");
-            return Ok(entry.clone());
+            return Ok(self.reuse_rec_group(entry));
         }
 
-        log::trace!("hash-consing map miss: making new registration");
         let hash = probe.hash;
         let key = RecGroupKeyTypes::One(try_new(ty)?);
-        self.register_new_rec_group(gc_runtime, key, hash)
+        self.register_rec_group(gc_runtime, key, hash)
     }
 
+    #[inline]
     fn trampoline_type(&self, index: VMSharedTypeIndex) -> VMSharedTypeIndex {
-        let slab_id = shared_type_index_to_slab_id(index);
-        self.debug_assert_registered(index);
-
-        let ty = self.types[slab_id].as_ref().unwrap();
-        debug_assert!(
-            ty.is_func(),
-            "cannot get the trampoline type of a non-function type: {index:?} = {ty:?}"
-        );
+        if cfg!(debug_assertions) {
+            self.debug_assert_registered(index);
+            let ty = self.types[shared_type_index_to_slab_id(index)]
+                .as_ref()
+                .unwrap();
+            assert!(
+                ty.is_func(),
+                "cannot get the trampoline type of a non-function type: {index:?} = {ty:?}"
+            );
+        }
 
         match self.type_to_trampoline.get(index).and_then(|x| x.expand()) {
             Some(ty) => ty,
@@ -2270,6 +2288,51 @@ impl TypeRegistry {
 mod tests {
     use crate::{Config, Engine, Module};
     use wasmtime_environ::TypeIndex;
+
+    #[test]
+    fn first_module_reuses_generated_trampoline_types() {
+        let mut config = Config::new();
+        config.wasm_gc(true);
+        let engine = Engine::new(&config).unwrap();
+        let bytes = engine
+            .precompile_module(
+                br#"(module
+                    (type $object (struct))
+                    (type $typed (func (param (ref null $object))))
+                    (type $erased (func (param anyref))))"#,
+            )
+            .unwrap();
+        // SAFETY: These bytes were just precompiled by this engine.
+        let load = || unsafe { Module::deserialize(&engine, &bytes).unwrap() };
+        let shared = |module: &Module, idx| {
+            module.env_module().types[TypeIndex::from_u32(idx)].unwrap_engine_type_index()
+        };
+        let registry = engine.signatures();
+
+        for _ in 0..2 {
+            assert!(registry.0.read().hash_consing_map.is_empty());
+            let first = load();
+            let object = shared(&first, 0);
+            let typed = shared(&first, 1);
+            let erased = shared(&first, 2);
+            assert_ne!(typed, erased);
+            assert_eq!(registry.0.read().hash_consing_map.len(), 3);
+            assert_eq!(registry.trampoline_type(typed), erased);
+
+            let second = load();
+            assert_eq!(shared(&second, 0), object);
+            assert_eq!(shared(&second, 1), typed);
+            assert_eq!(shared(&second, 2), erased);
+            drop(first);
+            assert!(registry.borrow(object).is_some());
+            assert!(registry.borrow(typed).is_some());
+            assert!(registry.borrow(erased).is_some());
+            drop(second);
+            assert!(registry.borrow(object).is_none());
+            assert!(registry.borrow(typed).is_none());
+            assert!(registry.borrow(erased).is_none());
+        }
+    }
 
     #[test]
     fn deserialized_modules_share_recursive_prefix_until_the_last_drop() {

@@ -120,6 +120,17 @@ impl FunctionBuilder<'_> {
         converted.clear(&mut f);
         intrinsic.clear(&mut f);
         f.instruction(&Instruction::Else);
+        base.is_subtype::<crate::gc_types::GlobalBuiltinBacking>(schema, &mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let backing = schema.reserve_gc_local(&mut f).initialize(
+            base.load(schema, &mut f).cast_subtype::<crate::gc_types::GlobalBuiltinBacking>(schema, &mut f),
+            &mut f,
+        );
+        let append = self.emit_ensure_global_builtin_append(&backing, &mut f);
+        result.replace(append.load(schema, &mut f).nullable(), &mut f);
+        append.clear(&mut f);
+        backing.clear(&mut f);
+        f.instruction(&Instruction::Else);
         let compact = schema.reserve_gc_local(&mut f).initialize(
             base.load(schema, &mut f)
                 .cast_subtype::<CompactDataStorage>(schema, &mut f),
@@ -212,6 +223,8 @@ impl FunctionBuilder<'_> {
         compact.clear(&mut f);
         schema.release_i32_local(index, &mut f);
         schema.release_i32_local(count, &mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
@@ -1436,6 +1449,16 @@ impl FunctionBuilder<'_> {
         self.emit_intrinsic_own_data_value(&intrinsic, key, output, found, f)?;
         intrinsic.clear(f);
         f.instruction(&Instruction::Else);
+        base.is_subtype::<GlobalBuiltinBacking>(schema, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let backing = schema.reserve_gc_local(f).initialize(
+            base.load(schema, f)
+                .cast_subtype::<GlobalBuiltinBacking>(schema, f),
+            f,
+        );
+        self.emit_global_builtin_own_data_value(&backing, key, output, found, f)?;
+        backing.clear(f);
+        f.instruction(&Instruction::Else);
         let entry = self.emit_ordinary_property_entry(object, key, f)?;
         let descriptor = self.emit_ordinary_entry_descriptor_reference(&entry, f);
         descriptor.load(schema, f).is_null(f);
@@ -1465,6 +1488,8 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         base.clear(f);
         Ok(())
     }
@@ -1480,9 +1505,23 @@ impl FunctionBuilder<'_> {
         enumerable: I32Local,
         f: &mut Function,
     ) -> Result<(), EmitError> {
+        self.emit_ordinary_own_property_attribute(
+            object, key, DescriptorMask::ENUMERABLE, found, enumerable, f,
+        )
+    }
+
+    pub(super) fn emit_ordinary_own_property_attribute(
+        &mut self,
+        object: &GcLocal<OrdinaryObject>,
+        key: &PropertyKeyLocals,
+        mask: DescriptorMask,
+        found: I32Local,
+        attribute: I32Local,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         found.set_constant(0, f);
-        enumerable.set_constant(0, f);
+        attribute.set_constant(0, f);
         let base = schema.reserve_gc_local(f).initialize(
             schema
                 .field(OrdinaryObjectSchema::PROPERTIES)
@@ -1503,11 +1542,11 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, f);
         let attributes = self.emit_compact_data_attributes(&compact, f);
         attributes.load(f);
-        f.instruction(&Instruction::I32Const(DescriptorMask::ENUMERABLE.as_i32()));
+        f.instruction(&Instruction::I32Const(mask.as_i32()));
         f.instruction(&Instruction::I32And);
         f.instruction(&Instruction::I32Eqz);
         f.instruction(&Instruction::I32Eqz);
-        enumerable.store(f);
+        attribute.store(f);
         attributes.clear(schema, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -1537,16 +1576,39 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, f);
         let row = self.emit_intrinsic_property_row(&intrinsic, index, f);
         row.flags().load(f);
-        f.instruction(&Instruction::I32Const(DescriptorMask::ENUMERABLE.as_i32()));
+        f.instruction(&Instruction::I32Const(mask.as_i32()));
         f.instruction(&Instruction::I32And);
         f.instruction(&Instruction::I32Eqz);
         f.instruction(&Instruction::I32Eqz);
-        enumerable.store(f);
+        attribute.store(f);
         row.clear(schema, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         schema.release_i32_local(index, f);
         intrinsic.clear(f);
+        f.instruction(&Instruction::Else);
+        base.is_subtype::<GlobalBuiltinBacking>(schema, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let backing = schema.reserve_gc_local(f).initialize(
+            base.load(schema, f)
+                .cast_subtype::<GlobalBuiltinBacking>(schema, f),
+            f,
+        );
+        let flags = self.emit_global_builtin_own_flags(&backing, key, f)?;
+        flags.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32GeS);
+        found.store(f);
+        flags.load(f);
+        f.instruction(&Instruction::I32Const(mask.as_i32()));
+        f.instruction(&Instruction::I32And);
+        f.instruction(&Instruction::I32Eqz);
+        f.instruction(&Instruction::I32Eqz);
+        found.load(f);
+        f.instruction(&Instruction::I32And);
+        attribute.store(f);
+        schema.release_i32_local(flags, f);
+        backing.clear(f);
         f.instruction(&Instruction::Else);
         let entry = self.emit_ordinary_property_entry(object, key, f)?;
         let descriptor = self.emit_ordinary_entry_descriptor_reference(&entry, f);
@@ -1561,16 +1623,18 @@ impl FunctionBuilder<'_> {
             .read(&descriptor, schema, f)
             .store(flags, f);
         flags.load(f);
-        f.instruction(&Instruction::I32Const(DescriptorMask::ENUMERABLE.as_i32()));
+        f.instruction(&Instruction::I32Const(mask.as_i32()));
         f.instruction(&Instruction::I32And);
         f.instruction(&Instruction::I32Eqz);
         f.instruction(&Instruction::I32Eqz);
-        enumerable.store(f);
+        attribute.store(f);
         schema.release_i32_local(flags, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         descriptor.clear(f);
         entry.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
@@ -1815,11 +1879,25 @@ impl FunctionBuilder<'_> {
         descriptor.clear(&mut f);
         intrinsic.clear(&mut f);
         f.instruction(&Instruction::Else);
+        base.is_subtype::<GlobalBuiltinBacking>(schema, &mut f);
+        self.open_frame(ControlFrameKind::If, &mut f);
+        let backing = schema.reserve_gc_local(&mut f).initialize(
+            base.load(schema, &mut f)
+                .cast_subtype::<GlobalBuiltinBacking>(schema, &mut f),
+            &mut f,
+        );
+        let descriptor = self.emit_global_builtin_own_descriptor(&backing, &p.key, &mut f)?;
+        output.replace(descriptor.load(schema, &mut f), &mut f);
+        descriptor.clear(&mut f);
+        backing.clear(&mut f);
+        f.instruction(&Instruction::Else);
         let entry = self.emit_ordinary_property_entry(&p.object, &p.key, &mut f)?;
         let descriptor = self.emit_ordinary_entry_descriptor_reference(&entry, &mut f);
         output.replace(descriptor.load(schema, &mut f), &mut f);
         descriptor.clear(&mut f);
         entry.clear(&mut f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::If);

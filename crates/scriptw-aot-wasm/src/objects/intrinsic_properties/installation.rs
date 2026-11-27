@@ -14,7 +14,7 @@ use wasm_encoder::{Encode, Instruction, ValType};
 use wasmparser::{FunctionBody as ParsedFunctionBody, Operator};
 
 /// Construct the sealed storage before its owning header is allocated.
-pub(super) fn emit_intrinsic_layout_storage_record(
+pub(crate) fn emit_intrinsic_layout_storage_record(
     span: RPropertyLayoutSpan,
     realm: &GcLocal<RealmRecord>,
     schema: &RuntimeSchema,

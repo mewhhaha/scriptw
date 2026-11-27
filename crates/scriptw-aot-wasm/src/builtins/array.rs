@@ -584,22 +584,7 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I64ReinterpretF64);
         number.scalar().store(f);
         number.set_number(number.scalar(), f);
-        let handled = self.emit_local_argument_call_from_values(
-            mapper,
-            this_arg,
-            &[value, &number],
-            pending,
-            f,
-        )?;
-        handled.load(f);
-        s.release_i32_local(handled, f);
-        f.instruction(&Instruction::I32Eqz);
-        self.open_frame(ControlFrameKind::If, f);
-        let argv = self.emit_pre_evaluated_arg_vector(&[value, &number], f);
-        self.emit_function_or_proxy_call_with_argv(mapper, this_arg, &argv, pending, f)?;
-        argv.clear(f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
+        self.emit_array_callback_call_from_values(mapper, this_arg, &[value, &number], pending, f)?;
         number.clear(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -1181,9 +1166,9 @@ impl FunctionBuilder<'_> {
         Ok(())
     }
 
-    /// Calls an Array iteration callback using the zero-allocation local
-    /// arguments ABI when the callee publishes one (e.g. arrow/strict
-    /// callbacks), falling back to an allocated `ValueArray` otherwise.
+    /// Dispatches from the values already read by the Array algorithm. An
+    /// eligible callback can consume local arguments without building a List;
+    /// the vector fallback receives the original argument count and values.
     pub(super) fn emit_array_callback_call_from_values(
         &mut self,
         callback: &ValueLocals,
@@ -1192,9 +1177,8 @@ impl FunctionBuilder<'_> {
         pending: &CompletionLocals,
         f: &mut Function,
     ) -> Result<(), EmitError> {
-        let handled = self.emit_local_argument_call_from_values(
-            callback, this_arg, arguments, pending, f,
-        )?;
+        let handled =
+            self.emit_local_argument_call_from_values(callback, this_arg, arguments, pending, f)?;
         handled.load(f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);

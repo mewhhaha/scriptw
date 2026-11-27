@@ -23,6 +23,7 @@ use wasmtime_environ::{
 const I32: u8 = 0x7f;
 const ANYREF: u8 = 0x6e;
 const REF_NULL: u8 = 0x63;
+const REF: u8 = 0x64;
 
 // The module's types: a final struct with one mutable `i32` field, and the
 // signatures of the test functions and of the imported callee.
@@ -31,6 +32,8 @@ const SIG_ONE_REF: u8 = 1;
 const SIG_TWO_REFS: u8 = 2;
 const SIG_ANYREF: u8 = 3;
 const SIG_CALLEE: u8 = 4;
+const SIG_NON_NULL_ANYREF: u8 = 5;
+const SIG_NON_NULL_STRUCT: u8 = 6;
 
 /// The imported function, which a function calls to have a call.
 const CALLEE: u8 = 0;
@@ -56,6 +59,7 @@ const REF_AS_NON_NULL: u8 = 0xd4;
 const GC: u8 = 0xfb;
 const STRUCT_GET: u8 = 0x02;
 const REF_TEST: u8 = 0x14;
+const REF_TEST_NULLABLE: u8 = 0x15;
 const REF_CAST: u8 = 0x16;
 const EMPTY: u8 = 0x40;
 
@@ -104,6 +108,8 @@ fn module(functions: &[(u8, &[u8])]) -> Vec<u8> {
         .concat(),
         vec![0x60, 1, ANYREF, 1, I32],
         vec![0x60, 0, 0],
+        vec![0x60, 1, REF, ANYREF, 1, I32],
+        vec![0x60, 1, REF, STRUCT, 1, I32],
     ]);
     let import = vec(&[vec![1, b'm', 1, b'f', 0x00, SIG_CALLEE]]);
     let declarations = vec(&functions
@@ -381,6 +387,42 @@ fn a_trapping_cast_leaves_its_null_check_to_the_header_load() {
     let explicit = &translate(false, functions)[0].clif;
     assert_eq!(traps(explicit, TRAP_CAST_FAILURE), 3);
     assert_eq!(trapping_loads(explicit, TRAP_CAST_FAILURE), 0);
+}
+
+#[test]
+fn statically_non_null_cast_operands_skip_null_checks() {
+    #[rustfmt::skip]
+    let functions: &[(&str, u8, &[u8])] = &[
+        ("cast_non_null_anyref", SIG_NON_NULL_ANYREF, &[
+            LOCAL_GET, 0, GC, REF_CAST, STRUCT, GC, STRUCT_GET, STRUCT, 0,
+        ]),
+        ("test_nullable_target", SIG_ANYREF, &[
+            LOCAL_GET, 0, GC, REF_TEST_NULLABLE, STRUCT,
+        ]),
+        ("test_nullable_target_non_null_anyref", SIG_NON_NULL_ANYREF, &[
+            LOCAL_GET, 0, GC, REF_TEST_NULLABLE, STRUCT,
+        ]),
+        ("test_nullable_target_non_null_struct", SIG_NON_NULL_STRUCT, &[
+            LOCAL_GET, 0, GC, REF_TEST_NULLABLE, STRUCT,
+        ]),
+    ];
+    for null_guard in [true, false] {
+        let translated = translate(null_guard, functions);
+        let cast = &translated[0].clif;
+        assert_eq!(traps(cast, TRAP_CAST_FAILURE), 2);
+        assert_eq!(trapping_loads(cast, TRAP_CAST_FAILURE), 0);
+
+        // A nullable operand tests null and i31; a non-null anyref only
+        // tests i31, and a non-null struct goes straight to its header.
+        for (test, branches) in translated[1..].iter().zip([2, 1, 0]) {
+            assert_eq!(
+                insts(&test.clif)
+                    .filter(|inst| inst.opcode() == ir::Opcode::Brif)
+                    .count(),
+                branches,
+            );
+        }
+    }
 }
 
 #[test]

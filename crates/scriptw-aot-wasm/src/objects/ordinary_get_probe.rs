@@ -202,13 +202,14 @@ impl FunctionBuilder<'_> {
         f: &mut Function,
     ) -> Result<I32Local, EmitError> {
         let schema = self.runtime_schema();
-        let absent = schema.reserve_i32_local(f);
-        let probe = OrdinaryGetProbe::new(schema, f);
-        self.emit_ordinary_get_from_header(object, key, &probe, f)?;
-        probe.emit_state_i32(OrdinaryGetState::Absent, f);
-        absent.store(f);
-        probe.clear(schema, f);
-        Ok(absent)
+        let found = schema.reserve_i32_local(f);
+        let enumerable = schema.reserve_i32_local(f);
+        self.emit_ordinary_own_property_enumerability(object, key, found, enumerable, f)?;
+        found.load(f);
+        f.instruction(&Instruction::I32Eqz);
+        found.store(f);
+        schema.release_i32_local(enumerable, f);
+        Ok(found)
     }
 
     /// True when an ordinary or function object has no own property `key`.
@@ -588,15 +589,45 @@ impl FunctionBuilder<'_> {
         schema.release_i32_local(lacks, f);
         intrinsic.clear(f);
         f.instruction(&Instruction::Else);
+        base.is_subtype::<GlobalBuiltinBacking>(schema, f);
+        self.open_frame(ControlFrameKind::If, f);
+        let backing = schema.reserve_gc_local(f).initialize(
+            base.load(schema, f)
+                .cast_subtype::<GlobalBuiltinBacking>(schema, f),
+            f,
+        );
+        self.emit_global_builtin_get(&backing, key, probe, f)?;
+        backing.clear(f);
+        f.instruction(&Instruction::Else);
         let entry = self.emit_ordinary_property_entry(object, key, f)?;
         let descriptor = self.emit_ordinary_entry_descriptor_reference(&entry, f);
+        self.emit_ordinary_get_from_descriptor(&descriptor, probe, f);
+        descriptor.clear(f);
+        entry.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        base.clear(f);
+        Ok(())
+    }
+
+    fn emit_ordinary_get_from_descriptor(
+        &mut self,
+        descriptor: &GcLocal<PropertyDescriptor, Nullable>,
+        probe: &OrdinaryGetProbe,
+        f: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
         descriptor.load(schema, f).is_null(f);
         f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
         let flags = schema.reserve_i32_local(f);
         schema
             .field(PropertyDescriptorSchema::FLAGS)
-            .read(&descriptor, schema, f)
+            .read(descriptor, schema, f)
             .store(flags, f);
         flags.load(f);
         f.instruction(&Instruction::I32Const(DescriptorMask::ACCESSOR.as_i32()));
@@ -605,7 +636,7 @@ impl FunctionBuilder<'_> {
         let getter = schema.reserve_gc_local(f).initialize(
             schema
                 .field(PropertyDescriptorSchema::GETTER)
-                .read(&descriptor, schema, f)
+                .read(descriptor, schema, f)
                 .reference(),
             f,
         );
@@ -615,20 +646,161 @@ impl FunctionBuilder<'_> {
         getter.clear(f);
         probe.set_state(OrdinaryGetState::Getter, f);
         f.instruction(&Instruction::Else);
-        self.emit_descriptor_data_value_into(&descriptor, &probe.value, f);
+        self.emit_descriptor_data_value_into(descriptor, &probe.value, f);
         probe.set_state(OrdinaryGetState::Data, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         schema.release_i32_local(flags, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+    }
+
+    /// One callback-free global property lookup. An appended key has no
+    /// original rank. Live original keys may still have only their static row.
+    pub(crate) fn emit_global_builtin_own_entry_or_row(
+        &mut self,
+        backing: &GcLocal<GlobalBuiltinBacking>,
+        key: &PropertyKeyLocals,
+        f: &mut Function,
+    ) -> Result<(GcLocal<PropertyEntry, Nullable>, I32Local), EmitError> {
+        let schema = self.runtime_schema();
+        let entry = self.emit_global_builtin_append_entry(backing, key, f)?;
+        let row = schema.reserve_i32_local(f);
+        row.set_constant(-1, f);
+        entry.load(schema, f).is_null(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let original = self.emit_global_builtin_find(backing, key, f)?;
+        original.load(f);
+        row.store(f);
+        schema.release_i32_local(original, f);
+        row.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32GeS);
+        self.open_frame(ControlFrameKind::If, f);
+        let realized = self.emit_global_builtin_row_entry(backing, row, f);
+        entry.replace(realized.load(schema, f), f);
+        realized.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        Ok((entry, row))
+    }
+
+    fn emit_global_builtin_get(
+        &mut self,
+        backing: &GcLocal<GlobalBuiltinBacking>,
+        key: &PropertyKeyLocals,
+        probe: &OrdinaryGetProbe,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let (entry, row) = self.emit_global_builtin_own_entry_or_row(backing, key, f)?;
+        entry.load(schema, f).is_null(f);
+        self.open_frame(ControlFrameKind::If, f);
+        row.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32GeS);
+        self.open_frame(ControlFrameKind::If, f);
+        let value = self.emit_global_builtin_row_value(backing, row, f)?;
+        self.emit_property_value_into(&value, &probe.value, f);
+        value.clear(f);
+        probe.set_state(OrdinaryGetState::Data, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::Else);
+        let descriptor = self.emit_ordinary_entry_descriptor_reference(&entry, f);
+        self.emit_ordinary_get_from_descriptor(&descriptor, probe, f);
         descriptor.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        schema.release_i32_local(row, f);
         entry.clear(f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
-        base.clear(f);
         Ok(())
+    }
+
+    pub(super) fn emit_global_builtin_own_data_value(
+        &mut self,
+        backing: &GcLocal<GlobalBuiltinBacking>,
+        key: &PropertyKeyLocals,
+        output: &ValueLocals,
+        found: I32Local,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let probe = OrdinaryGetProbe::new(schema, f);
+        self.emit_global_builtin_get(backing, key, &probe, f)?;
+        probe.emit_state_i32(OrdinaryGetState::Data, f);
+        found.store(f);
+        found.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        output.copy_from(probe.value(), f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        probe.clear(schema, f);
+        Ok(())
+    }
+
+    /// Presence and attributes of the selected global key. Complete descriptor
+    /// flags are nonnegative; -1 represents absence.
+    pub(super) fn emit_global_builtin_own_flags(
+        &mut self,
+        backing: &GcLocal<GlobalBuiltinBacking>,
+        key: &PropertyKeyLocals,
+        f: &mut Function,
+    ) -> Result<I32Local, EmitError> {
+        let schema = self.runtime_schema();
+        let (entry, row) = self.emit_global_builtin_own_entry_or_row(backing, key, f)?;
+        let flags = schema.reserve_i32_local(f);
+        flags.set_constant(-1, f);
+        entry.load(schema, f).is_null(f);
+        self.open_frame(ControlFrameKind::If, f);
+        row.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32GeS);
+        self.open_frame(ControlFrameKind::If, f);
+        let original = self.emit_global_builtin_row_flags(backing, row, f);
+        original.load(f);
+        flags.store(f);
+        schema.release_i32_local(original, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::Else);
+        let descriptor = self.emit_ordinary_entry_descriptor_reference(&entry, f);
+        schema
+            .field(PropertyDescriptorSchema::FLAGS)
+            .read(&descriptor, schema, f)
+            .store(flags, f);
+        descriptor.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        schema.release_i32_local(row, f);
+        entry.clear(f);
+        Ok(flags)
+    }
+
+    pub(super) fn emit_global_builtin_own_descriptor(
+        &mut self,
+        backing: &GcLocal<GlobalBuiltinBacking>,
+        key: &PropertyKeyLocals,
+        f: &mut Function,
+    ) -> Result<GcLocal<PropertyDescriptor, Nullable>, EmitError> {
+        let schema = self.runtime_schema();
+        let (entry, row) = self.emit_global_builtin_own_entry_or_row(backing, key, f)?;
+        let descriptor = self.emit_ordinary_entry_descriptor_reference(&entry, f);
+        descriptor.load(schema, f).is_null(f);
+        row.load(f);
+        f.instruction(&Instruction::I32Const(0));
+        f.instruction(&Instruction::I32GeS);
+        f.instruction(&Instruction::I32And);
+        self.open_frame(ControlFrameKind::If, f);
+        let original = self.emit_global_builtin_row_descriptor(backing, row, f)?;
+        descriptor.replace(original.load(schema, f).nullable(), f);
+        original.clear(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        schema.release_i32_local(row, f);
+        entry.clear(f);
+        Ok(descriptor)
     }
 }

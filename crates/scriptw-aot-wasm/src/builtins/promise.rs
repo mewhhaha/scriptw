@@ -2,12 +2,14 @@ use self::promise_internal_function_materialization::{
     PromiseInternalFunction, PromiseInternalFunctionMaterializationContext,
 };
 use super::super::*;
+use super::streams::StreamFulfillment;
 use crate::functions::{FunctionRealmRevokedRoute, OrdinaryDefaultPrototype};
 use crate::gc_types::*;
 use crate::operations::PropertyKeyLocals;
 
 mod async_from_sync_iterator;
 mod current_function_realm_intrinsic_promise_capability;
+mod internal_promise_capability;
 mod promise_combinator_algorithm_error_realm;
 mod promise_combinator_element_materialization;
 mod promise_combinator_reaction_pair;
@@ -60,7 +62,8 @@ pub(crate) enum ModuleReactionContinuation<'a> {
 
 enum PromiseReactionInitialization<'a> {
     Default {
-        handler: &'a ValueLocals,
+        fulfilled: &'a ValueLocals,
+        rejected: &'a ValueLocals,
         capability: &'a GcLocal<PromiseCapability, Nullable>,
     },
     AsyncFunction {
@@ -299,14 +302,9 @@ impl<'a> FunctionBuilder<'a> {
             self.emit_alloc_plain_object_with_prototype(Some(&context.prototype), function)?,
             function,
         );
-        let undefined = schema.reserve_value_local(function);
-        undefined.set_undefined(function);
-        let result = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<StoredValue>()
-                .from_value(&undefined, function),
-            function,
-        );
+        let result = schema
+            .reserve_gc_local(function)
+            .initialize(schema.stored_undefined(function), function);
         let promise = schema.reserve_gc_local(function).initialize(
             schema.struct_type::<PromiseObject>().construct(
                 (
@@ -325,7 +323,6 @@ impl<'a> FunctionBuilder<'a> {
             function,
         );
         result.clear(function);
-        undefined.clear(function);
         object.clear(function);
         context.realm.clear(function);
         context.prototype.clear(function);
@@ -391,8 +388,9 @@ impl<'a> FunctionBuilder<'a> {
 
     fn emit_enqueue_promise_reaction_list(
         &mut self,
-        head: &GcLocal<PromiseReaction, Nullable>,
-        argument: &ValueLocals,
+        head: &GcLocal<PendingJob, Nullable>,
+        settlement: PromiseSettlement,
+        argument: &GcLocal<StoredValue>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
@@ -410,13 +408,19 @@ impl<'a> FunctionBuilder<'a> {
         );
         let next = schema.reserve_gc_local(function).initialize(
             schema
-                .struct_type::<PromiseReaction>()
-                .field(PromiseReactionSchema::NEXT)
+                .struct_type::<PendingJob>()
+                .field(PendingJobSchema::NEXT)
                 .read(&reaction, schema, function)
                 .reference(),
             function,
         );
-        self.emit_enqueue_promise_reaction_job(&reaction, argument, function)?;
+        schema.field(PendingJobSchema::NEXT).write(
+            &reaction,
+            GcOperand::null(schema),
+            schema,
+            function,
+        );
+        self.emit_queue_selected_promise_reaction(&reaction, settlement, argument, function)?;
         current.replace(next.load(schema, function), function);
         next.clear(function);
         reaction.clear(function);
@@ -476,7 +480,8 @@ impl<'a> FunctionBuilder<'a> {
                             .struct_type::<PromiseReaction>()
                             .field(PromiseReactionSchema::HANDLER)
                             .read(reaction, schema, function)
-                            .reference(),
+                            .reference()
+                            .require_non_null(function),
                         function,
                     );
                     let handler = schema.reserve_value_local(function);
@@ -637,18 +642,9 @@ impl<'a> FunctionBuilder<'a> {
         )));
         function.instruction(&Instruction::I32Eq);
         function.instruction(&Instruction::If(BlockType::Empty));
-        let fulfill = schema.reserve_gc_local(function).initialize(
+        let reactions = schema.reserve_gc_local(function).initialize(
             schema
-                .struct_type::<PromiseObject>()
-                .field(PromiseObjectSchema::FULFILL_REACTIONS)
-                .read(promise, schema, function)
-                .reference(),
-            function,
-        );
-        let reject = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<PromiseObject>()
-                .field(PromiseObjectSchema::REJECT_REACTIONS)
+                .field(PromiseObjectSchema::REACTIONS_HEAD)
                 .read(promise, schema, function)
                 .reference(),
             function,
@@ -670,11 +666,11 @@ impl<'a> FunctionBuilder<'a> {
             );
         schema
             .struct_type::<PromiseObject>()
-            .field(PromiseObjectSchema::FULFILL_REACTIONS)
+            .field(PromiseObjectSchema::REACTIONS_HEAD)
             .write(promise, GcOperand::null(schema), schema, function);
         schema
             .struct_type::<PromiseObject>()
-            .field(PromiseObjectSchema::REJECT_REACTIONS)
+            .field(PromiseObjectSchema::REACTIONS_TAIL)
             .write(promise, GcOperand::null(schema), schema, function);
         schema
             .struct_type::<PromiseObject>()
@@ -685,18 +681,12 @@ impl<'a> FunctionBuilder<'a> {
                 schema,
                 function,
             );
-        match settlement {
-            PromiseSettlement::Fulfill => {
-                self.emit_enqueue_promise_reaction_list(&fulfill, value, function)?
-            }
-            PromiseSettlement::Reject => {
-                self.emit_track_unhandled_rejection(promise, function);
-                self.emit_enqueue_promise_reaction_list(&reject, value, function)?;
-            }
+        if matches!(settlement, PromiseSettlement::Reject) {
+            self.emit_track_unhandled_rejection(promise, function);
         }
+        self.emit_enqueue_promise_reaction_list(&reactions, settlement, &stored, function)?;
         stored.clear(function);
-        reject.clear(function);
-        fulfill.clear(function);
+        reactions.clear(function);
         function.instruction(&Instruction::End);
         schema.release_i32_local(state, function);
         Ok(())
@@ -1278,6 +1268,8 @@ impl<'a> FunctionBuilder<'a> {
                     GcOperand::reference(&promise, schema),
                     GcOperand::reference(&resolve, schema),
                     GcOperand::reference(&reject, schema),
+                    GcOperand::null(schema),
+                    GcOperand::boolean(false),
                 ),
                 function,
             ),
@@ -1300,29 +1292,64 @@ impl<'a> FunctionBuilder<'a> {
 
     fn emit_initialize_promise_reaction(
         &mut self,
-        reaction_type: PromiseReactionType,
         initialization: &PromiseReactionInitialization<'_>,
+        settlement: Option<PromiseSettlement>,
         function: &mut Function,
-    ) -> GcLocal<PromiseReaction> {
+    ) -> GcLocal<PendingJob> {
         let schema = self.runtime_schema();
-        let empty = schema.reserve_value_local(function);
-        empty.set_undefined(function);
-        let handler = match initialization {
-            PromiseReactionInitialization::Default { handler, .. } => *handler,
-            PromiseReactionInitialization::AsyncFunction { .. }
-            | PromiseReactionInitialization::AsyncGenerator { .. }
-            | PromiseReactionInitialization::AsyncFromSync { .. }
-            | PromiseReactionInitialization::Module { .. } => &empty,
-        };
-        let handler = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<StoredValue>()
-                .from_value(handler, function),
-            function,
-        );
-        let (kind, capability, realm, activation, generator, module, join, sync) =
-            match initialization {
-                PromiseReactionInitialization::Default { capability, .. } => (
+        if let PromiseReactionInitialization::AsyncFunction { activation, realm } = initialization {
+            return schema.reserve_gc_local(function).initialize(
+                schema
+                    .struct_type::<PromiseAwaitContinuation>()
+                    .construct(
+                        (
+                            GcOperand::null(schema),
+                            GcOperand::nullable_reference(*realm, schema),
+                            GcOperand::reference(*activation, schema),
+                            GcOperand::null(schema),
+                            GcOperand::boolean(false),
+                        ),
+                        function,
+                    )
+                    .upcast(),
+                function,
+            );
+        }
+
+        // Before settlement only ordinary reactions need two handler values.
+        let handler = schema
+            .reserve_gc_local::<StoredValue, Nullable>(function)
+            .initialize_null(schema, function);
+        let reject_handler = schema
+            .reserve_gc_local::<StoredValue, Nullable>(function)
+            .initialize_null(schema, function);
+        let (kind, capability, realm, generator, module, join, sync) = match initialization {
+            PromiseReactionInitialization::Default {
+                fulfilled,
+                rejected,
+                capability,
+            } => {
+                let selected = match settlement {
+                    Some(PromiseSettlement::Reject) => rejected,
+                    Some(PromiseSettlement::Fulfill) | None => fulfilled,
+                };
+                handler.replace(
+                    schema
+                        .struct_type::<StoredValue>()
+                        .from_value(selected, function)
+                        .nullable(),
+                    function,
+                );
+                if settlement.is_none() {
+                    reject_handler.replace(
+                        schema
+                            .struct_type::<StoredValue>()
+                            .from_value(rejected, function)
+                            .nullable(),
+                        function,
+                    );
+                }
+                (
                     PromiseReactionCallbackKind::Default,
                     GcOperand::reference(*capability, schema),
                     GcOperand::null(schema),
@@ -1330,112 +1357,83 @@ impl<'a> FunctionBuilder<'a> {
                     GcOperand::null(schema),
                     GcOperand::null(schema),
                     GcOperand::null(schema),
-                    GcOperand::null(schema),
-                ),
-                PromiseReactionInitialization::AsyncFunction { activation, realm } => (
-                    PromiseReactionCallbackKind::AsyncFunction,
-                    GcOperand::null(schema),
-                    GcOperand::nullable_reference(*realm, schema),
-                    GcOperand::nullable_reference(*activation, schema),
-                    GcOperand::null(schema),
-                    GcOperand::null(schema),
-                    GcOperand::null(schema),
-                    GcOperand::null(schema),
-                ),
-                PromiseReactionInitialization::AsyncGenerator {
-                    activation,
-                    realm,
-                    continuation,
-                } => (
-                    continuation.callback_kind(),
-                    GcOperand::null(schema),
-                    GcOperand::nullable_reference(*realm, schema),
-                    GcOperand::null(schema),
-                    GcOperand::nullable_reference(*activation, schema),
-                    GcOperand::null(schema),
-                    GcOperand::null(schema),
-                    GcOperand::null(schema),
-                ),
-                PromiseReactionInitialization::AsyncFromSync { context, realm } => (
-                    PromiseReactionCallbackKind::AsyncFromSyncIterator,
-                    GcOperand::null(schema),
-                    GcOperand::nullable_reference(*realm, schema),
-                    GcOperand::null(schema),
-                    GcOperand::null(schema),
-                    GcOperand::null(schema),
-                    GcOperand::null(schema),
-                    GcOperand::nullable_reference(*context, schema),
-                ),
-                PromiseReactionInitialization::Module {
-                    realm,
-                    continuation,
-                } => match continuation {
-                    ModuleReactionContinuation::Body(record) => (
-                        PromiseReactionCallbackKind::ModuleBody,
-                        GcOperand::null(schema),
-                        GcOperand::nullable_reference(*realm, schema),
-                        GcOperand::null(schema),
-                        GcOperand::null(schema),
-                        GcOperand::nullable_reference(*record, schema),
-                        GcOperand::null(schema),
-                        GcOperand::null(schema),
-                    ),
-                    ModuleReactionContinuation::Join(record) => (
-                        PromiseReactionCallbackKind::ModuleJoin,
-                        GcOperand::null(schema),
-                        GcOperand::nullable_reference(*realm, schema),
-                        GcOperand::null(schema),
-                        GcOperand::null(schema),
-                        GcOperand::null(schema),
-                        GcOperand::nullable_reference(*record, schema),
-                        GcOperand::null(schema),
-                    ),
-                },
-            };
-        let reaction = schema.reserve_gc_local(function).initialize(
-            schema.struct_type::<PromiseReaction>().construct(
-                (
-                    GcOperand::constant(reaction_type),
-                    GcOperand::constant(kind),
-                    GcOperand::reference(&handler, schema),
-                    capability,
-                    realm,
-                    activation,
-                    generator,
-                    module,
-                    join,
-                    sync,
-                    GcOperand::null(schema),
-                ),
-                function,
+                )
+            }
+            PromiseReactionInitialization::AsyncFunction { .. } => unreachable!(),
+            PromiseReactionInitialization::AsyncGenerator {
+                activation,
+                realm,
+                continuation,
+            } => (
+                continuation.callback_kind(),
+                GcOperand::null(schema),
+                GcOperand::nullable_reference(*realm, schema),
+                GcOperand::nullable_reference(*activation, schema),
+                GcOperand::null(schema),
+                GcOperand::null(schema),
+                GcOperand::null(schema),
             ),
+            PromiseReactionInitialization::AsyncFromSync { context, realm } => (
+                PromiseReactionCallbackKind::AsyncFromSyncIterator,
+                GcOperand::null(schema),
+                GcOperand::nullable_reference(*realm, schema),
+                GcOperand::null(schema),
+                GcOperand::null(schema),
+                GcOperand::null(schema),
+                GcOperand::nullable_reference(*context, schema),
+            ),
+            PromiseReactionInitialization::Module {
+                realm,
+                continuation,
+            } => match continuation {
+                ModuleReactionContinuation::Body(record) => (
+                    PromiseReactionCallbackKind::ModuleBody,
+                    GcOperand::null(schema),
+                    GcOperand::nullable_reference(*realm, schema),
+                    GcOperand::null(schema),
+                    GcOperand::nullable_reference(*record, schema),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                ),
+                ModuleReactionContinuation::Join(record) => (
+                    PromiseReactionCallbackKind::ModuleJoin,
+                    GcOperand::null(schema),
+                    GcOperand::nullable_reference(*realm, schema),
+                    GcOperand::null(schema),
+                    GcOperand::null(schema),
+                    GcOperand::nullable_reference(*record, schema),
+                    GcOperand::null(schema),
+                ),
+            },
+        };
+        let reaction = schema.reserve_gc_local(function).initialize(
+            schema
+                .struct_type::<PromiseReaction>()
+                .construct(
+                    (
+                        GcOperand::null(schema),
+                        realm,
+                        GcOperand::null(schema),
+                        GcOperand::boolean(false),
+                        GcOperand::constant(kind),
+                        GcOperand::reference(&handler, schema),
+                        GcOperand::reference(&reject_handler, schema),
+                        capability,
+                        generator,
+                        module,
+                        join,
+                        sync,
+                    ),
+                    function,
+                )
+                .upcast(),
             function,
         );
+        reject_handler.clear(function);
         handler.clear(function);
-        empty.clear(function);
         reaction
     }
 
-    fn emit_initialize_default_promise_reaction(
-        &mut self,
-        capability: &GcLocal<PromiseCapability, Nullable>,
-        handler: &ValueLocals,
-        reaction_type: PromiseReactionType,
-        function: &mut Function,
-    ) -> GcLocal<PromiseReaction> {
-        self.emit_initialize_promise_reaction(
-            reaction_type,
-            &PromiseReactionInitialization::Default {
-                handler,
-                capability,
-            },
-            function,
-        )
-    }
-
-    /// PerformPromiseThen for an already-owned Promise. Internal algorithms
-    /// attach reactions without observing mutable `then`, `constructor`, or
-    /// species properties. The public method selects its species beforehand.
     pub(crate) fn emit_perform_promise_then(
         &mut self,
         promise: &GcLocal<PromiseObject>,
@@ -1445,165 +1443,64 @@ impl<'a> FunctionBuilder<'a> {
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
-        let nullable_capability = schema
+        let capability = schema
             .reserve_gc_local::<PromiseCapability, Nullable>(function)
             .initialize(capability.load(schema, function).nullable(), function);
-        let fulfill = self.emit_initialize_default_promise_reaction(
-            &nullable_capability,
-            on_fulfilled,
-            PromiseReactionType::Fulfill,
+        let emitted = self.emit_owned_promise_record_reactions(
+            promise,
+            PromiseReactionInitialization::Default {
+                fulfilled: on_fulfilled,
+                rejected: on_rejected,
+                capability: &capability,
+            },
             function,
         );
-        let reject = self.emit_initialize_default_promise_reaction(
-            &nullable_capability,
-            on_rejected,
-            PromiseReactionType::Reject,
-            function,
-        );
-        self.emit_route_promise_reaction_pair(promise, &fulfill, &reject, function)?;
-        reject.clear(function);
-        fulfill.clear(function);
-        nullable_capability.clear(function);
-        Ok(())
+        capability.clear(function);
+        emitted
     }
 
-    fn emit_append_promise_reaction(
+    fn emit_append_pending_promise_reaction(
         &mut self,
         promise: &GcLocal<PromiseObject>,
-        reaction_type: PromiseReactionType,
-        reaction: &GcLocal<PromiseReaction>,
+        reaction: &GcLocal<PendingJob>,
         function: &mut Function,
     ) {
         let schema = self.runtime_schema();
-        let field = match reaction_type {
-            PromiseReactionType::Fulfill => PromiseObjectSchema::FULFILL_REACTIONS,
-            PromiseReactionType::Reject => PromiseObjectSchema::REJECT_REACTIONS,
-        };
-        let head = schema.reserve_gc_local(function).initialize(
+        let tail = schema.reserve_gc_local(function).initialize(
             schema
-                .struct_type::<PromiseObject>()
-                .field(field)
+                .field(PromiseObjectSchema::REACTIONS_TAIL)
                 .read(promise, schema, function)
                 .reference(),
             function,
         );
-        head.load(schema, function);
-        function.instruction(&Instruction::RefIsNull);
+        tail.load(schema, function).is_null(function);
         function.instruction(&Instruction::If(BlockType::Empty));
-        schema.struct_type::<PromiseObject>().field(field).write(
+        schema.field(PromiseObjectSchema::REACTIONS_HEAD).write(
             promise,
             GcOperand::nullable_reference(reaction, schema),
             schema,
             function,
         );
         function.instruction(&Instruction::Else);
-        let current = schema.reserve_gc_local(function).initialize(
-            head.load(schema, function).require_non_null(function),
+        let previous = schema.reserve_gc_local(function).initialize(
+            tail.load(schema, function).require_non_null(function),
             function,
         );
-        function.instruction(&Instruction::Block(BlockType::Empty));
-        function.instruction(&Instruction::Loop(BlockType::Empty));
-        let next = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<PromiseReaction>()
-                .field(PromiseReactionSchema::NEXT)
-                .read(&current, schema, function)
-                .reference(),
+        schema.field(PendingJobSchema::NEXT).write(
+            &previous,
+            GcOperand::nullable_reference(reaction, schema),
+            schema,
             function,
         );
-        next.load(schema, function);
-        function.instruction(&Instruction::RefIsNull);
-        function.instruction(&Instruction::If(BlockType::Empty));
-        schema
-            .struct_type::<PromiseReaction>()
-            .field(PromiseReactionSchema::NEXT)
-            .write(
-                &current,
-                GcOperand::nullable_reference(reaction, schema),
-                schema,
-                function,
-            );
-        function.instruction(&Instruction::Br(2));
+        previous.clear(function);
         function.instruction(&Instruction::End);
-        current.replace(
-            next.load(schema, function).require_non_null(function),
+        schema.field(PromiseObjectSchema::REACTIONS_TAIL).write(
+            promise,
+            GcOperand::nullable_reference(reaction, schema),
+            schema,
             function,
         );
-        next.clear(function);
-        function.instruction(&Instruction::Br(0));
-        function.instruction(&Instruction::End);
-        function.instruction(&Instruction::End);
-        current.clear(function);
-        function.instruction(&Instruction::End);
-        head.clear(function);
-    }
-
-    /// Closed PerformPromiseThen dispatch; no invalid state becomes rejection.
-    fn emit_route_promise_reaction_pair(
-        &mut self,
-        promise: &GcLocal<PromiseObject>,
-        fulfill: &GcLocal<PromiseReaction>,
-        reject: &GcLocal<PromiseReaction>,
-        function: &mut Function,
-    ) -> Result<(), EmitError> {
-        let schema = self.runtime_schema();
-        let state = schema.reserve_i32_local(function);
-        self.emit_load_promise_state_strict(promise, state, function);
-        let stored = schema.reserve_gc_local(function).initialize(
-            schema
-                .struct_type::<PromiseObject>()
-                .field(PromiseObjectSchema::RESULT)
-                .read(promise, schema, function)
-                .reference(),
-            function,
-        );
-        let value = schema.reserve_value_local(function);
-        schema
-            .struct_type::<StoredValue>()
-            .read_into(&stored, &value, schema, function);
-        let mut arms = 0;
-        for selected in PromiseState::ALL {
-            state.load(function);
-            function.instruction(&Instruction::I32Const(GcI32Constant::encode(selected)));
-            function.instruction(&Instruction::I32Eq);
-            function.instruction(&Instruction::If(BlockType::Empty));
-            match selected {
-                PromiseState::Pending => {
-                    self.emit_append_promise_reaction(
-                        promise,
-                        PromiseReactionType::Fulfill,
-                        fulfill,
-                        function,
-                    );
-                    self.emit_append_promise_reaction(
-                        promise,
-                        PromiseReactionType::Reject,
-                        reject,
-                        function,
-                    );
-                }
-                PromiseState::Fulfilled => {
-                    self.emit_enqueue_promise_reaction_job(fulfill, &value, function)?
-                }
-                PromiseState::Rejected => {
-                    self.emit_enqueue_promise_reaction_job(reject, &value, function)?
-                }
-            }
-            function.instruction(&Instruction::Else);
-            arms += 1;
-        }
-        function.instruction(&Instruction::Unreachable);
-        for _ in 0..arms {
-            function.instruction(&Instruction::End);
-        }
-        schema
-            .struct_type::<PromiseObject>()
-            .field(PromiseObjectSchema::HANDLED)
-            .write(promise, GcOperand::boolean(true), schema, function);
-        value.clear(function);
-        stored.clear(function);
-        schema.release_i32_local(state, function);
-        Ok(())
+        tail.clear(function);
     }
 
     pub(crate) fn emit_read_promise_capability_promise(
@@ -1671,19 +1568,50 @@ impl<'a> FunctionBuilder<'a> {
         initialization: PromiseReactionInitialization<'_>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
-        let fulfill = self.emit_initialize_promise_reaction(
-            PromiseReactionType::Fulfill,
-            &initialization,
+        let schema = self.runtime_schema();
+        let state = schema.reserve_i32_local(function);
+        self.emit_load_promise_state_strict(promise, state, function);
+        for selected in PromiseState::ALL {
+            state.load(function);
+            function.instruction(&Instruction::I32Const(GcI32Constant::encode(selected)));
+            function.instruction(&Instruction::I32Eq);
+            function.instruction(&Instruction::If(BlockType::Empty));
+            let settlement = match selected {
+                PromiseState::Pending => None,
+                PromiseState::Fulfilled => Some(PromiseSettlement::Fulfill),
+                PromiseState::Rejected => Some(PromiseSettlement::Reject),
+            };
+            let reaction =
+                self.emit_initialize_promise_reaction(&initialization, settlement, function);
+            if let Some(settlement) = settlement {
+                let argument = schema.reserve_gc_local(function).initialize(
+                    schema
+                        .field(PromiseObjectSchema::RESULT)
+                        .read(promise, schema, function)
+                        .reference(),
+                    function,
+                );
+                self.emit_queue_selected_promise_reaction(
+                    &reaction, settlement, &argument, function,
+                )?;
+                argument.clear(function);
+            } else {
+                self.emit_append_pending_promise_reaction(promise, &reaction, function);
+            }
+            reaction.clear(function);
+            function.instruction(&Instruction::Else);
+        }
+        function.instruction(&Instruction::Unreachable);
+        for _ in PromiseState::ALL {
+            function.instruction(&Instruction::End);
+        }
+        schema.field(PromiseObjectSchema::HANDLED).write(
+            promise,
+            GcOperand::boolean(true),
+            schema,
             function,
         );
-        let reject = self.emit_initialize_promise_reaction(
-            PromiseReactionType::Reject,
-            &initialization,
-            function,
-        );
-        self.emit_route_promise_reaction_pair(promise, &fulfill, &reject, function)?;
-        reject.clear(function);
-        fulfill.clear(function);
+        schema.release_i32_local(state, function);
         Ok(())
     }
 
@@ -1791,8 +1719,7 @@ impl<'a> FunctionBuilder<'a> {
         };
         self.emit_intrinsic_await_reactions(
             value,
-            &initialization,
-            &initialization,
+            initialization,
             PromiseResolveRealmAuthority::AsyncExecution(&realm),
             function,
         )?;
@@ -1816,8 +1743,7 @@ impl<'a> FunctionBuilder<'a> {
         };
         let emitted = self.emit_intrinsic_await_reactions(
             value,
-            &initialization,
-            &initialization,
+            initialization,
             PromiseResolveRealmAuthority::AsyncExecution(&realm),
             function,
         );
@@ -1836,18 +1762,13 @@ impl<'a> FunctionBuilder<'a> {
         let capability = schema
             .reserve_gc_local::<PromiseCapability, Nullable>(function)
             .initialize(capability.load(schema, function).nullable(), function);
-        let fulfill = PromiseReactionInitialization::Default {
-            handler: fulfilled,
-            capability: &capability,
-        };
-        let reject = PromiseReactionInitialization::Default {
-            handler: rejected,
-            capability: &capability,
-        };
         let emitted = self.emit_intrinsic_await_reactions(
             value,
-            &fulfill,
-            &reject,
+            PromiseReactionInitialization::Default {
+                fulfilled,
+                rejected,
+                capability: &capability,
+            },
             PromiseResolveRealmAuthority::CurrentFunction,
             function,
         );
@@ -1869,25 +1790,15 @@ impl<'a> FunctionBuilder<'a> {
         let capability = schema
             .reserve_gc_local::<PromiseCapability, Nullable>(function)
             .initialize_null(schema, function);
-        let fulfill = self.emit_initialize_promise_reaction(
-            PromiseReactionType::Fulfill,
-            &PromiseReactionInitialization::Default {
-                handler: fulfilled,
+        self.emit_owned_promise_record_reactions(
+            promise,
+            PromiseReactionInitialization::Default {
+                fulfilled,
+                rejected,
                 capability: &capability,
             },
             function,
-        );
-        let reject = self.emit_initialize_promise_reaction(
-            PromiseReactionType::Reject,
-            &PromiseReactionInitialization::Default {
-                handler: rejected,
-                capability: &capability,
-            },
-            function,
-        );
-        self.emit_route_promise_reaction_pair(promise, &fulfill, &reject, function)?;
-        reject.clear(function);
-        fulfill.clear(function);
+        )?;
         capability.clear(function);
         Ok(())
     }
@@ -1895,8 +1806,7 @@ impl<'a> FunctionBuilder<'a> {
     fn emit_intrinsic_await_reactions(
         &mut self,
         value: &ValueLocals,
-        fulfill: &PromiseReactionInitialization<'_>,
-        reject: &PromiseReactionInitialization<'_>,
+        initialization: PromiseReactionInitialization<'_>,
         authority: PromiseResolveRealmAuthority<'_>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
@@ -1917,18 +1827,7 @@ impl<'a> FunctionBuilder<'a> {
                 .cast_reference::<PromiseObject>(schema, function),
             function,
         );
-        let fulfill_reaction =
-            self.emit_initialize_promise_reaction(PromiseReactionType::Fulfill, fulfill, function);
-        let reject_reaction =
-            self.emit_initialize_promise_reaction(PromiseReactionType::Reject, reject, function);
-        self.emit_route_promise_reaction_pair(
-            &selected,
-            &fulfill_reaction,
-            &reject_reaction,
-            function,
-        )?;
-        reject_reaction.clear(function);
-        fulfill_reaction.clear(function);
+        self.emit_owned_promise_record_reactions(&selected, initialization, function)?;
         selected.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
@@ -2016,7 +1915,8 @@ impl<'a> FunctionBuilder<'a> {
         self.emit_propagate_current_throw_if_needed(function);
         let executor =
             self.emit_current_function_promise_internal_function_materialization_context(function);
-        let capability = self.emit_new_promise_capability(&executor, pending.value(), function)?;
+        let capability =
+            self.emit_new_internal_promise_capability(&executor, pending.value(), function)?;
         self.release_promise_internal_function_materialization_context(executor, function);
         self.emit_perform_promise_then(
             &promise,
@@ -2220,19 +2120,15 @@ impl<'a> FunctionBuilder<'a> {
 
     fn emit_run_async_continuation_job(
         &mut self,
-        reaction: &GcLocal<PromiseReaction>,
-        rejected: I32Local,
-        argument: &ValueLocals,
+        job: &GcLocal<PromiseAwaitContinuation>,
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let activation = schema.reserve_gc_local(function).initialize(
             schema
-                .struct_type::<PromiseReaction>()
-                .field(PromiseReactionSchema::ASYNC_ACTIVATION)
-                .read(reaction, schema, function)
-                .reference()
-                .require_non_null(function),
+                .field(PromiseAwaitContinuationSchema::ACTIVATION)
+                .read(job, schema, function)
+                .reference(),
             function,
         );
         schema
@@ -2243,8 +2139,10 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::If(BlockType::Empty));
         let stored = schema.reserve_gc_local(function).initialize(
             schema
-                .struct_type::<StoredValue>()
-                .from_value(argument, function),
+                .field(PromiseAwaitContinuationSchema::ARGUMENT)
+                .read(job, schema, function)
+                .reference()
+                .require_non_null(function),
             function,
         );
         schema
@@ -2256,7 +2154,9 @@ impl<'a> FunctionBuilder<'a> {
                 schema,
                 function,
             );
-        rejected.load(function);
+        let _ = schema
+            .field(PromiseAwaitContinuationSchema::REJECTED)
+            .read(job, schema, function);
         function.instruction(&Instruction::If(BlockType::Empty));
         schema
             .struct_type::<AsyncActivation>()
@@ -3028,7 +2928,8 @@ impl<'a> FunctionBuilder<'a> {
                 self.emit_run_default_promise_reaction_job(reaction, rejected, argument, function)
             }
             PromiseReactionCallbackKind::AsyncFunction => {
-                self.emit_run_async_continuation_job(reaction, rejected, argument, function)
+                function.instruction(&Instruction::Unreachable);
+                Ok(())
             }
             PromiseReactionCallbackKind::AsyncGeneratorAwait => {
                 self.emit_run_async_generator_await_job(reaction, rejected, argument, function)
@@ -3079,33 +2980,27 @@ impl<'a> FunctionBuilder<'a> {
     fn emit_run_promise_reaction_job(
         &mut self,
         reaction: &GcLocal<PromiseReaction>,
-        argument: &ValueLocals,
         function: &mut Function,
     ) -> Result<(), EmitError> {
         let schema = self.runtime_schema();
         let kind = schema.reserve_i32_local(function);
-        let reaction_type = schema.reserve_i32_local(function);
         let rejected = schema.reserve_i32_local(function);
         schema
-            .struct_type::<PromiseReaction>()
-            .field(PromiseReactionSchema::TYPE)
+            .field(PromiseReactionSchema::REJECTED)
             .read(reaction, schema, function)
-            .store(reaction_type, function);
-        let mut arms = 0;
-        for selected in PromiseReactionType::ALL {
-            reaction_type.load(function);
-            function.instruction(&Instruction::I32Const(GcI32Constant::encode(selected)));
-            function.instruction(&Instruction::I32Eq);
-            function.instruction(&Instruction::If(BlockType::Empty));
-            function.instruction(&Instruction::I32Const(i32::from(selected.is_rejected())));
-            rejected.store(function);
-            function.instruction(&Instruction::Else);
-            arms += 1;
-        }
-        function.instruction(&Instruction::Unreachable);
-        for _ in 0..arms {
-            function.instruction(&Instruction::End);
-        }
+            .store(rejected, function);
+        let stored = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(PromiseReactionSchema::ARGUMENT)
+                .read(reaction, schema, function)
+                .reference()
+                .require_non_null(function),
+            function,
+        );
+        let argument = schema.reserve_value_local(function);
+        schema
+            .struct_type::<StoredValue>()
+            .read_into(&stored, &argument, schema, function);
         schema
             .struct_type::<PromiseReaction>()
             .field(PromiseReactionSchema::CALLBACK_KIND)
@@ -3118,7 +3013,7 @@ impl<'a> FunctionBuilder<'a> {
             function.instruction(&Instruction::I32Eq);
             function.instruction(&Instruction::If(BlockType::Empty));
             self.emit_run_promise_reaction_callback(
-                selected, reaction, rejected, argument, function,
+                selected, reaction, rejected, &argument, function,
             )?;
             function.instruction(&Instruction::Else);
             arms += 1;
@@ -3128,7 +3023,8 @@ impl<'a> FunctionBuilder<'a> {
             function.instruction(&Instruction::End);
         }
         schema.release_i32_local(rejected, function);
-        schema.release_i32_local(reaction_type, function);
+        argument.clear(function);
+        stored.clear(function);
         schema.release_i32_local(kind, function);
         Ok(())
     }
@@ -3146,7 +3042,8 @@ impl<'a> FunctionBuilder<'a> {
                 .struct_type::<PromiseReaction>()
                 .field(PromiseReactionSchema::HANDLER)
                 .read(reaction, schema, function)
-                .reference(),
+                .reference()
+                .require_non_null(function),
             function,
         );
         let handler = schema.reserve_value_local(function);
@@ -3192,7 +3089,7 @@ impl<'a> FunctionBuilder<'a> {
         function.instruction(&Instruction::I32Const(CompletionKind::Throw.code() as i32));
         function.instruction(&Instruction::I32Eq);
         function.instruction(&Instruction::If(BlockType::Empty));
-        self.emit_call_promise_capability(
+        self.emit_call_internal_promise_capability(
             &selected,
             PromiseSettlement::Reject,
             handled.value(),
@@ -3200,7 +3097,7 @@ impl<'a> FunctionBuilder<'a> {
             function,
         )?;
         function.instruction(&Instruction::Else);
-        self.emit_call_promise_capability(
+        self.emit_call_internal_promise_capability(
             &selected,
             PromiseSettlement::Fulfill,
             handled.value(),
@@ -3370,91 +3267,7 @@ impl<'a> FunctionBuilder<'a> {
         self.replace_current_realm(&selected, function);
         selected.clear(function);
         function.instruction(&Instruction::End);
-        let kind = schema.reserve_i32_local(function);
-        schema
-            .struct_type::<PendingJob>()
-            .field(PendingJobSchema::KIND)
-            .read(&job, schema, function)
-            .store(kind, function);
-        let mut arms = 0;
-        for selected in PromiseJobKind::ALL {
-            kind.load(function);
-            function.instruction(&Instruction::I32Const(GcI32Constant::encode(selected)));
-            function.instruction(&Instruction::I32Eq);
-            function.instruction(&Instruction::If(BlockType::Empty));
-            match selected {
-                PromiseJobKind::Callback => {
-                    let stored = schema.reserve_gc_local(function).initialize(
-                        schema
-                            .field(PendingJobSchema::ARGUMENT)
-                            .read(&job, schema, function)
-                            .reference(),
-                        function,
-                    );
-                    self.emit_run_microtask_callback(&stored, function)?;
-                    stored.clear(function);
-                }
-                PromiseJobKind::FinalizationCleanup => {
-                    let registry = schema.reserve_gc_local(function).initialize(
-                        schema
-                            .field(PendingJobSchema::REGISTRY)
-                            .read(&job, schema, function)
-                            .reference()
-                            .require_non_null(function),
-                        function,
-                    );
-                    self.emit_run_finalization_job(&registry, function)?;
-                    registry.clear(function);
-                }
-                PromiseJobKind::Reaction => {
-                    let reaction = schema.reserve_gc_local(function).initialize(
-                        schema
-                            .struct_type::<PendingJob>()
-                            .field(PendingJobSchema::REACTION)
-                            .read(&job, schema, function)
-                            .reference()
-                            .require_non_null(function),
-                        function,
-                    );
-                    let stored = schema.reserve_gc_local(function).initialize(
-                        schema
-                            .struct_type::<PendingJob>()
-                            .field(PendingJobSchema::ARGUMENT)
-                            .read(&job, schema, function)
-                            .reference(),
-                        function,
-                    );
-                    let argument = schema.reserve_value_local(function);
-                    schema
-                        .struct_type::<StoredValue>()
-                        .read_into(&stored, &argument, schema, function);
-                    self.emit_run_promise_reaction_job(&reaction, &argument, function)?;
-                    argument.clear(function);
-                    stored.clear(function);
-                    reaction.clear(function);
-                }
-                PromiseJobKind::ResolveThenable => {
-                    let thenable = schema.reserve_gc_local(function).initialize(
-                        schema
-                            .struct_type::<PendingJob>()
-                            .field(PendingJobSchema::THENABLE)
-                            .read(&job, schema, function)
-                            .reference()
-                            .require_non_null(function),
-                        function,
-                    );
-                    self.emit_run_promise_thenable_job(&thenable, function)?;
-                    thenable.clear(function);
-                }
-            }
-            function.instruction(&Instruction::Else);
-            arms += 1;
-        }
-        function.instruction(&Instruction::Unreachable);
-        for _ in 0..arms {
-            function.instruction(&Instruction::End);
-        }
-        schema.release_i32_local(kind, function);
+        self.emit_run_pending_job(&job, function)?;
         realm.clear(function);
         next.clear(function);
         job.clear(function);
@@ -3662,8 +3475,15 @@ impl<'a> FunctionBuilder<'a> {
         }
         let context =
             self.emit_current_function_promise_internal_function_materialization_context(function);
-        let capability = self.emit_new_promise_capability(&context, constructor, function)?;
-        self.emit_call_promise_capability(&capability, settlement, value, &pending, function)?;
+        let capability =
+            self.emit_new_internal_promise_capability(&context, constructor, function)?;
+        self.emit_call_internal_promise_capability(
+            &capability,
+            settlement,
+            value,
+            &pending,
+            function,
+        )?;
         self.emit_promise_abrupt_exit(&pending, exit, function);
         let promise = schema.reserve_value_local(function);
         self.emit_read_promise_capability_promise(&capability, &promise, function);

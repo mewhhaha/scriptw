@@ -1298,16 +1298,17 @@ pub fn translate_ref_test(
     val_ty: WasmRefType,
 ) -> WasmResult<ir::Value> {
     log::trace!("translate_ref_test({test_ty:?}, {val:?})");
+    let check_null = val_ty.nullable && !func_env.is_proven(val, Proven::NonNull);
 
     // First special case: testing for references to bottom types.
     if test_ty.heap_type.is_bottom() {
-        let result = if test_ty.nullable {
+        let result = if test_ty.nullable && check_null {
             // All null references (within the same type hierarchy) match null
             // references to the bottom type.
             func_env.translate_ref_is_null(builder.cursor(), val, val_ty)?
         } else {
-            // `ref.test` is always false for non-nullable bottom types, as the
-            // bottom types are uninhabited.
+            // A nullable bottom type contains only null. A non-nullable
+            // bottom type is uninhabited.
             builder.ins().iconst(ir::types::I32, 0)
         };
         log::trace!("translate_ref_test(..) -> {result:?}");
@@ -1319,7 +1320,7 @@ pub fn translate_ref_test(
     // type, we only need to worry about whether we are testing for nullability
     // or not.
     if test_ty.heap_type.is_top() {
-        let result = if test_ty.nullable {
+        let result = if test_ty.nullable || !check_null {
             builder.ins().iconst(ir::types::I32, 1)
         } else {
             let is_null = func_env.translate_ref_is_null(builder.cursor(), val, val_ty)?;
@@ -1339,7 +1340,7 @@ pub fn translate_ref_test(
             i64::from(wasmtime_environ::I31_DISCRIMINANT),
         );
         let is_i31 = builder.ins().band(val, i31_mask);
-        let result = if test_ty.nullable {
+        let result = if test_ty.nullable && check_null {
             let is_null = func_env.translate_ref_is_null(builder.cursor(), val, val_ty)?;
             builder.ins().bor(is_null, is_i31)
         } else {
@@ -1360,44 +1361,38 @@ pub fn translate_ref_test(
         }
     }
 
-    // Otherwise, in the general case, we need to inspect our given object's
-    // actual type, which also requires null-checking and i31-checking it.
+    // Inspect the object's actual type after dispatching any null or i31
+    // operands. Only anyref, eqref, and i31ref can hold an i31.
+    let check_i31 = test_ty.heap_type.top() == WasmHeapTopType::Any
+        && matches!(
+            val_ty.heap_type,
+            WasmHeapType::Any | WasmHeapType::Eq | WasmHeapType::I31
+        );
+    let join = (check_null || check_i31).then(|| {
+        let block = builder.create_block();
+        let result = builder.append_block_param(block, ir::types::I32);
+        (block, result)
+    });
 
-    let is_any_hierarchy = test_ty.heap_type.top() == WasmHeapTopType::Any;
-
-    let non_null_block = builder.create_block();
-    let non_null_non_i31_block = builder.create_block();
-    let continue_block = builder.create_block();
-
-    // Current block: check if the reference is null and branch appropriately,
-    // unless it is known not to be.
-    if func_env.is_proven(val, Proven::NonNull) {
-        builder.ins().jump(non_null_block, &[]);
-    } else {
+    if check_null {
+        let non_null_block = builder.create_block();
         let is_null = func_env.translate_ref_is_null(builder.cursor(), val, val_ty)?;
         let result_when_is_null = builder
             .ins()
             .iconst(ir::types::I32, test_ty.nullable as i64);
         builder.ins().brif(
             is_null,
-            continue_block,
+            join.unwrap().0,
             &[result_when_is_null.into()],
             non_null_block,
             &[],
         );
+        builder.switch_to_block(non_null_block);
+        builder.seal_block(non_null_block);
     }
 
-    // Non-null block: We know the GC ref is non-null, but we need to also check
-    // for `i31` references that don't point to GC objects.
-    builder.switch_to_block(non_null_block);
-    log::trace!("translate_ref_test: non-null ref block");
-    // Only `anyref`, `eqref` and `i31ref` operands can hold an `i31`: a
-    // value statically typed as a struct or array reference never does.
-    let val_might_be_i31 = matches!(
-        val_ty.heap_type,
-        WasmHeapType::Any | WasmHeapType::Eq | WasmHeapType::I31
-    );
-    if is_any_hierarchy && val_might_be_i31 {
+    if check_i31 {
+        let heap_ref_block = builder.create_block();
         let i31_mask = builder.ins().iconst(
             ir::types::I32,
             i64::from(wasmtime_environ::I31_DISCRIMINANT),
@@ -1414,23 +1409,17 @@ pub fn translate_ref_test(
         );
         builder.ins().brif(
             is_i31,
-            continue_block,
+            join.unwrap().0,
             &[result_when_is_i31.into()],
-            non_null_non_i31_block,
+            heap_ref_block,
             &[],
         );
-    } else {
-        // If we aren't testing the `any` hierarchy, the reference cannot be an
-        // `i31ref`. Jump directly to the non-null and non-i31 block; rely on
-        // branch folding during lowering to clean this up.
-        builder.ins().jump(non_null_non_i31_block, &[]);
+        builder.switch_to_block(heap_ref_block);
+        builder.seal_block(heap_ref_block);
     }
 
-    // Non-null and non-i31 block: Read the actual `VMGcKind` or
-    // `VMSharedTypeIndex` out of the object's header and check whether it
-    // matches the expected type.
-    builder.switch_to_block(non_null_non_i31_block);
-    log::trace!("translate_ref_test: non-null and non-i31 ref block");
+    // Read the actual `VMGcKind` or `VMSharedTypeIndex` out of the object's
+    // header and check whether it matches the expected type.
     let check_header_kind = |func_env: &mut FuncEnvironment<'_>,
                              builder: &mut FunctionBuilder,
                              val: ir::Value,
@@ -1541,16 +1530,15 @@ pub fn translate_ref_test(
             return stack_switching_unsupported();
         }
     };
-    builder.ins().jump(continue_block, &[result.into()]);
-
-    // Control flow join point with the result.
-    builder.switch_to_block(continue_block);
-    let result = builder.append_block_param(continue_block, ir::types::I32);
+    let result = if let Some((block, joined_result)) = join {
+        builder.ins().jump(block, &[result.into()]);
+        builder.switch_to_block(block);
+        builder.seal_block(block);
+        joined_result
+    } else {
+        result
+    };
     log::trace!("translate_ref_test(..) -> {result:?}");
-
-    builder.seal_block(non_null_block);
-    builder.seal_block(non_null_non_i31_block);
-    builder.seal_block(continue_block);
 
     // Code that runs only when `result` is not zero knows `val` to be a
     // `test_ty`.
@@ -1611,7 +1599,7 @@ pub fn translate_ref_cast(
     // never reaches the load, and nothing between the two can trap.
     let header_end = wasmtime_environ::VM_GC_HEADER_TYPE_INDEX_OFFSET
         + u32::from(func_env.offsets.size_of_vmshared_type_index());
-    let null_trap = if func_env.is_proven(val, Proven::NonNull) {
+    let null_trap = if !val_ty.nullable || func_env.is_proven(val, Proven::NonNull) {
         None
     } else if implicit_null_check(func_env, header_end) {
         Some(crate::TRAP_CAST_FAILURE)

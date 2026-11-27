@@ -175,7 +175,7 @@ impl WasmProfileGcInitialCapacity {
 }
 
 const _: () = assert!(
-    WasmProfileGcInitialCapacity::MiB16.bytes() == wasmtime_config::WASM_GC_HEAP_INITIAL_BYTES
+    WasmProfileGcInitialCapacity::MiB32.bytes() == wasmtime_config::WASM_GC_HEAP_INITIAL_BYTES
 );
 const _: () = assert!(WasmProfileGcInitialCapacity::MiB128.bytes() < WASM_STORE_MEMORY_CAP_BYTES);
 
@@ -255,7 +255,7 @@ impl WasmRuntimeProfileOptions {
     pub(crate) fn ordinary(native_mode: WasmNativeCompilationMode) -> Self {
         Self::new(
             WasmProfileNativeMode::from_internal(native_mode),
-            WasmProfileGcInitialCapacity::MiB16,
+            WasmProfileGcInitialCapacity::MiB32,
             WasmProfileRegisterAllocation::SinglePass,
         )
     }

@@ -106,9 +106,13 @@ impl FunctionBuilder<'_> {
         argv.clear(f);
         value.clear(f);
         self.stream_end_if(f);
-        let promise = self.stream_callback_promise(&callback_realm, &pending, f)?;
-        self.stream_observe_promise(&controller, &promise, false, f)?;
-        promise.clear(f);
+        self.stream_observe(
+            &controller,
+            &callback_realm,
+            &pending,
+            StreamFulfillment::Pull,
+            f,
+        )?;
         callback_realm.clear(f);
         pull_stored.clear(f);
         source_stored.clear(f);
@@ -134,46 +138,62 @@ impl FunctionBuilder<'_> {
     ) -> Result<(), EmitError> {
         let s = self.runtime_schema();
         let controller = self.stream_capture(f);
-        let stream = s.reserve_gc_local(f).initialize(
-            s.field(ReadableByteStreamControllerObjectSchema::STREAM)
-                .read(&controller, s, f)
-                .reference(),
-            f,
-        );
         match builtin {
             StandardBuiltinId::ReadableStreamStartRejected
             | StandardBuiltinId::ReadableStreamPullRejected => {
+                let stream = s.reserve_gc_local(f).initialize(
+                    s.field(ReadableByteStreamControllerObjectSchema::STREAM)
+                        .read(&controller, s, f)
+                        .reference(),
+                    f,
+                );
                 let error = s.reserve_value_local(f);
                 self.emit_builtin_arg_to_value(0, &error, f);
                 self.stream_finish(&stream, Some(&error), f)?;
                 error.clear(f);
+                stream.clear(f);
             }
             StandardBuiltinId::ReadableStreamStartFulfilled => {
-                s.field(ReadableByteStreamControllerObjectSchema::STARTED)
-                    .write(&controller, GcOperand::boolean(true), s, f);
-                self.stream_call_pull(&controller, f)?;
+                self.emit_run_stream_fulfilled_job(&controller, StreamFulfillment::Start, f)?;
             }
             StandardBuiltinId::ReadableStreamPullFulfilled => {
+                self.emit_run_stream_fulfilled_job(&controller, StreamFulfillment::Pull, f)?;
+            }
+            _ => return Err(EmitError::unsupported("invalid stream reaction")),
+        }
+        self.completion().initialize(f);
+        controller.clear(f);
+        Ok(())
+    }
+    pub(in crate::builtins) fn emit_run_stream_fulfilled_job(
+        &mut self,
+        controller: &GcLocal<ReadableByteStreamControllerObject>,
+        fulfillment: StreamFulfillment,
+        f: &mut Function,
+    ) -> Result<(), EmitError> {
+        let s = self.runtime_schema();
+        match fulfillment {
+            StreamFulfillment::Start => {
+                s.field(ReadableByteStreamControllerObjectSchema::STARTED)
+                    .write(controller, GcOperand::boolean(true), s, f);
+                self.stream_call_pull(controller, f)?;
+            }
+            StreamFulfillment::Pull => {
                 s.field(ReadableByteStreamControllerObjectSchema::PULLING)
-                    .write(&controller, GcOperand::boolean(false), s, f);
+                    .write(controller, GcOperand::boolean(false), s, f);
                 let again = s.reserve_i32_local(f);
                 s.field(ReadableByteStreamControllerObjectSchema::PULL_AGAIN)
-                    .read(&controller, s, f)
+                    .read(controller, s, f)
                     .store(again, f);
                 again.load(f);
                 self.open_frame(ControlFrameKind::If, f);
                 s.field(ReadableByteStreamControllerObjectSchema::PULL_AGAIN)
-                    .write(&controller, GcOperand::boolean(false), s, f);
-                self.stream_call_pull(&controller, f)?;
+                    .write(controller, GcOperand::boolean(false), s, f);
+                self.stream_call_pull(controller, f)?;
                 self.stream_end_if(f);
                 s.release_i32_local(again, f);
             }
-            _ => return Err(EmitError::unsupported("invalid stream reaction")),
         }
-        self.completion().value().set_undefined(f);
-        self.completion().set_kind(CompletionKind::Normal, f);
-        stream.clear(f);
-        controller.clear(f);
         Ok(())
     }
     pub(super) fn emit_stream_controller_close(

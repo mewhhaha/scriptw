@@ -481,6 +481,7 @@ pub(crate) struct StringPool {
     token: StringPoolToken,
     compiler_owned: PoolBoundary,
     shared_prefix: Option<std::sync::Arc<CompilerOwnedPool>>,
+    runtime_table_start: Option<usize>,
     runtime_string_descriptors: Option<RuntimeStringDescriptors>,
     runtime_intrinsic_installations: Option<intrinsic_installations::RuntimeIntrinsicInstallations>,
     runtime_intrinsic_property_layouts:
@@ -2326,11 +2327,7 @@ impl CompilerOwnedPool {
         // Names are complete and R-owned before installation keys are proved.
         // Seal the final static boundary only after appending checked metadata.
         pool.collect_intrinsic_property_layout_strings()?;
-        pool.compiler_owned = pool.boundary();
-        pool.append_runtime_intrinsic_installations(function_metas)?;
-        pool.append_runtime_intrinsic_property_layouts(function_metas)?;
-        pool.append_runtime_string_descriptors()?;
-        pool.compiler_owned = pool.boundary();
+        pool.seal_runtime_tables(function_metas)?;
         Ok(Self(pool))
     }
 

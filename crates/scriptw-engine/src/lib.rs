@@ -8,8 +8,8 @@ use scriptw_intl::{
     INTL_ARTIFACT_IDENTITY_CUSTOM_SECTION,
 };
 use scriptw_ir::{
-    script_has_dynamic_import, CompletionKindIr, DynamicSourceRuntimeOperation, IrDiagnostic,
-    ProgramIr, RuntimeSemanticGap, RuntimeSemanticRejection, ValueKind,
+    CompletionKindIr, DynamicSourceRuntimeOperation, IrDiagnostic, ProgramIr, RuntimeSemanticGap,
+    RuntimeSemanticRejection, ValueKind,
 };
 pub use scriptw_runtime::rooted_snapshot::{SnapshotCompletion, SnapshotLimits, SnapshotOutcome};
 use scriptw_runtime::AgentHostOperation;
@@ -23,6 +23,7 @@ use wasmtime::{
     StoreLimitsBuilder as WasmtimeStoreLimitsBuilder, Trap as WasmtimeTrap, Val as WasmtimeVal,
 };
 
+use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -566,7 +567,7 @@ struct ProgramWasmCacheEntry {
 #[derive(Clone)]
 struct ProgramWasmArtifact {
     /// The program module; standalone when `runtime` is `None`.
-    bytes: Arc<[u8]>,
+    bytes: wasm_runtime_link::ProgramWasmBytes,
     runtime: Option<wasm_runtime_link::ProgramRuntime>,
     cached_entry: Option<ProgramWasmCacheEntry>,
     compilation_policy: WasmCompilationPolicy,
@@ -574,7 +575,7 @@ struct ProgramWasmArtifact {
 
 impl ProgramWasmArtifact {
     fn program(&self) -> WasmProgramRef<'_> {
-        WasmProgramRef::admitted(&self.bytes, self.runtime.as_ref())
+        WasmProgramRef::admitted(self.bytes.as_ref(), self.runtime.as_ref())
             .with_compilation_policy(&self.compilation_policy)
     }
 
@@ -931,60 +932,8 @@ fn configured_module_loader(
     }
 }
 
-/// Loads the module graph rooted at `source`, using the loader policy selected
-/// by `options`.
-///
-/// `source` is the entry text as the caller supplied it, which may differ from
-/// what is on disk (test262 prepends harness text). Resolution still keys off
-/// `options.filename`, so relative specifiers inside the entry resolve against
-/// the real directory.
-fn module_entry_graph(
-    source: &scriptw_front::ParsedModule,
-    options: &CompileOptions,
-    loader: &dyn HostModuleLoader,
-) -> Option<scriptw_ir::ModuleGraphSources> {
-    let entry_locator = options.filename.as_deref().unwrap_or("<entry>");
-    module_loader::load_module_graph_from_parsed(entry_locator, source.clone(), loader).ok()
-}
-
-/// The module graph a Script's `import()` calls reach, or `None` when the Script
-/// writes none.
-///
-/// A Script is not module code, but `import()` is legal in it (13.3.10 takes
-/// `GetActiveScriptOrModule`, which a Script satisfies) and names a module, so
-/// statically discoverable targets are compiled into the artifact exactly as
-/// a module's `import()` targets are. A computed-only call still needs the
-/// one-node graph's dispatcher: operand evaluation can throw, coercion can
-/// reject, and a name outside the compiled registry rejects its Promise.
-/// Discovery walks the retained Script AST without changing the parse goal,
-/// so sloppy Script forms remain valid.
-///
-/// The retained AST decides whether a Script needs a graph, including computed
-/// imports. Property and method names never become import requests, and this
-/// decision does not repeat the parser's lexical analysis.
-fn script_entry_graph(
-    source: &scriptw_front::ParsedScript,
-    options: &CompileOptions,
-    loader: &dyn HostModuleLoader,
-) -> Option<scriptw_ir::ModuleGraphSources> {
-    if !script_has_dynamic_import(source)
-        && scriptw_ir::scan_script_realm_module_requests(source).is_empty()
-    {
-        return None;
-    }
-    let entry_locator = options.filename.as_deref().unwrap_or("<entry>");
-    let graph =
-        module_loader::load_module_graph_from_parsed_script(entry_locator, source.clone(), loader)
-            .ok()?;
-    let entry = graph.modules.get(graph.entry as usize)?;
-    if !entry.script_has_dynamic_import_sites()? {
-        return None;
-    }
-    Some(graph)
-}
-
 fn parse_ambient_entry(
-    source_text: &str,
+    source_text: impl Into<String>,
     goal: ParseGoal,
     options: &CompileOptions,
     policy: AmbientModuleLoaderPolicy,
@@ -1001,10 +950,26 @@ fn parse_ambient_entry(
     if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
         eprintln!("scriptw wasm trace: parse: {:?}", parse_started.elapsed());
     }
-    let loader = configured_module_loader(options, policy);
+    // The entry's caller-supplied bytes may include a harness. Its filename
+    // still identifies the directory for relative module requests.
+    let entry_locator = options.filename.as_deref().unwrap_or("<entry>");
+    let configure = || configured_module_loader(options, policy);
+    let mut loader = None;
     let graph = match &source {
-        ParsedSource::Script(source) => script_entry_graph(source, options, loader.as_ref()),
-        ParsedSource::Module(source) => module_entry_graph(source, options, loader.as_ref()),
+        ParsedSource::Script(source) => module_loader::discover_module_graph_from_parsed_script(
+            entry_locator,
+            source,
+            &mut loader,
+            configure,
+        )
+        .ok()
+        .flatten(),
+        ParsedSource::Module(source) => module_loader::load_module_graph_from_parsed(
+            entry_locator,
+            source.clone(),
+            loader.get_or_insert_with(configure).as_ref(),
+        )
+        .ok(),
     };
     Ok((
         source,
@@ -1014,6 +979,21 @@ fn parse_ambient_entry(
             graph,
         },
     ))
+}
+
+fn parse_module_prelude(
+    prelude: Option<&str>,
+) -> Result<Option<scriptw_front::ParsedScript>, EngineError> {
+    prelude
+        .map(|prelude| {
+            parse(prelude, ParseOptions::script())
+                .map_err(|error| EngineError::from_parse_error(error).in_global_prelude())
+                .map(|parsed| match parsed {
+                    ParsedSource::Script(script) => script,
+                    ParsedSource::Module(_) => unreachable!("Script goal produces a Script"),
+                })
+        })
+        .transpose()
 }
 
 /// Cache key for a program, covering the whole module graph when there is one.
@@ -1103,10 +1083,8 @@ fn program_key_for_role(
 enum PreparedModuleCompilation {
     Ambient {
         policy: AmbientModuleLoaderPolicy,
-        // A successful graph-free artifact has completed finite-source
-        // discovery with an actual loader. No absent-loader success can
-        // silently cache an unresolved filesystem dependency.
-        loader: Box<dyn HostModuleLoader>,
+        // Finite-source lowering installs this if it discovers a graph later.
+        loader: Option<Box<dyn HostModuleLoader>>,
         graph: Option<scriptw_ir::ModuleGraphSources>,
     },
     Embedded {
@@ -1148,25 +1126,29 @@ struct PreparedCompilation {
     execution_profile: ResolvedExecutionProfile,
 }
 
-/// The entry a compilation lowers, which with its options and final module
-/// graph names the program a profile belongs to.
-#[derive(Clone, Copy)]
-struct ProgramEntry<'a> {
-    source: &'a str,
-    goal: ParseGoal,
-    role: module_loader::EmbeddedSourceRole,
-}
-
 fn wasm_aot_program_is_cached(source: &str, goal: ParseGoal, options: &CompileOptions) -> bool {
-    // This is only a scheduling hint. The execution path still reads and
-    // validates the artifact, then rebuilds it if it disappeared or is corrupt.
-    let Some(cache) = program_wasm_cache() else {
+    if cache::program_cache_limit_bytes() == 0 {
         return false;
-    };
+    }
     let Some(key) = program_wasm_cache_key(source, goal, options) else {
         return false;
     };
-    cache.contains(&key)
+    // Even this metadata-only scheduling hint goes through frontend admission
+    // before probing the cache. Execution validates the artifact separately.
+    if !run_on_execution_stack(|| {
+        parse(
+            source,
+            ParseOptions {
+                goal,
+                filename: options.filename.clone(),
+            },
+        )
+        .is_ok()
+            && parse_module_prelude(options.module_prelude.as_deref()).is_ok()
+    }) {
+        return false;
+    }
+    program_wasm_cache().is_some_and(|cache| cache.contains(&key))
 }
 
 #[doc(hidden)]
@@ -2960,6 +2942,18 @@ impl Engine {
         self.compile_on_sized_stack(source, ParseGoal::Script, options)
     }
 
+    /// Compile and emit portable Wasm for a Script on one sized compiler stack.
+    pub fn compile_script_to_wasm(
+        &self,
+        source: String,
+        options: CompileOptions,
+    ) -> Result<Artifact, EngineError> {
+        run_on_sized_stack(move || {
+            let unit = self.compile_on_current_thread(source, ParseGoal::Script, options)?;
+            self.emit_wasm_on_current_thread(&unit)
+        })
+    }
+
     pub fn compile_module(
         &self,
         source: &str,
@@ -3344,8 +3338,7 @@ impl Engine {
             }
         }
 
-        let prepared =
-            Self::lower_parsed_compilation(parsed, &options, ProgramEntry { source, goal, role })?;
+        let prepared = Self::lower_parsed_compilation(parsed, &options, role)?;
         let key = cache.as_ref().and_then(|_| {
             program_cache_key_for_role(source, goal, &options, prepared.modules.graph(), role)
         });
@@ -3367,8 +3360,8 @@ impl Engine {
         options: &CompileOptions,
     ) -> Option<ProgramWasmArtifact> {
         let started = std::time::Instant::now();
-        let admitted = cache.read(&key).and_then(|entry| {
-            wasm_runtime_link::decode_cache_entry_with_foreign(&entry, &options.intl_profile, cache)
+        let admitted = cache.read_program(&key).and_then(|entry| {
+            wasm_runtime_link::decode_cache_entry_with_foreign(entry, &options.intl_profile, cache)
         });
         if let Some((bytes, runtime, required)) = admitted {
             if required
@@ -3383,7 +3376,7 @@ impl Engine {
             if std::env::var_os("SCRIPTW_WASM_TRACE").is_some() {
                 eprintln!(
                     "scriptw wasm trace: program-cache hit: {} bytes in {:?}",
-                    bytes.len(),
+                    bytes.as_ref().len(),
                     started.elapsed()
                 );
             }
@@ -3461,7 +3454,7 @@ impl Engine {
             }
         }
         Ok(ProgramWasmArtifact {
-            bytes: Arc::from(artifact.bytes),
+            bytes: wasm_runtime_link::ProgramWasmBytes::emitted(artifact.bytes),
             runtime: artifact
                 .runtime
                 .map(|runtime| wasm_runtime_link::ProgramRuntime::Raw(runtime.0)),
@@ -3567,9 +3560,9 @@ impl Engine {
         run_on_sized_stack(move || self.compile_on_current_thread(source, goal, options))
     }
 
-    fn compile_on_current_thread(
+    fn compile_on_current_thread<'a>(
         &self,
-        source: &str,
+        source: impl Into<Cow<'a, str>>,
         goal: ParseGoal,
         options: CompileOptions,
     ) -> Result<CompilationUnit, EngineError> {
@@ -3577,9 +3570,9 @@ impl Engine {
         self.compile_prepared_on_current_thread(prepared)
     }
 
-    fn prepare_compilation(
+    fn prepare_compilation<'a>(
         &self,
-        source_text: &str,
+        source_text: impl Into<Cow<'a, str>>,
         goal: ParseGoal,
         options: &CompileOptions,
     ) -> Result<PreparedCompilation, EngineError> {
@@ -3591,32 +3584,25 @@ impl Engine {
         )
     }
 
-    fn prepare_compilation_for_role(
+    fn prepare_compilation_for_role<'a>(
         &self,
-        source_text: &str,
+        source_text: impl Into<Cow<'a, str>>,
         goal: ParseGoal,
         options: &CompileOptions,
         role: module_loader::EmbeddedSourceRole,
     ) -> Result<PreparedCompilation, EngineError> {
         let parsed = self.parse_compilation_for_role(source_text, goal, options, role)?;
-        Self::lower_parsed_compilation(
-            parsed,
-            options,
-            ProgramEntry {
-                source: source_text,
-                goal,
-                role,
-            },
-        )
+        Self::lower_parsed_compilation(parsed, options, role)
     }
 
-    fn parse_compilation_for_role(
+    fn parse_compilation_for_role<'a>(
         &self,
-        source_text: &str,
+        source_text: impl Into<Cow<'a, str>>,
         goal: ParseGoal,
         options: &CompileOptions,
         role: module_loader::EmbeddedSourceRole,
     ) -> Result<ParsedCompilation, EngineError> {
+        let source_text = source_text.into();
         let trace = std::env::var_os("SCRIPTW_WASM_TRACE").is_some();
         let parse_started = std::time::Instant::now();
         let (source, modules) = match &options.module_loading_policy {
@@ -3663,18 +3649,7 @@ impl Engine {
                 AmbientModuleLoaderPolicy::RejectAll,
             )?,
         };
-        let module_prelude = options
-            .module_prelude
-            .as_ref()
-            .map(|prelude| {
-                parse(prelude.as_str(), ParseOptions::script())
-                    .map_err(|error| EngineError::from_parse_error(error).in_global_prelude())
-                    .map(|parsed| match parsed {
-                        ParsedSource::Script(script) => script,
-                        ParsedSource::Module(_) => unreachable!("Script goal produces a Script"),
-                    })
-            })
-            .transpose()?;
+        let module_prelude = parse_module_prelude(options.module_prelude.as_deref())?;
         Ok(ParsedCompilation {
             source,
             module_prelude,
@@ -3685,7 +3660,7 @@ impl Engine {
     fn lower_parsed_compilation(
         parsed: ParsedCompilation,
         options: &CompileOptions,
-        entry: ProgramEntry<'_>,
+        role: module_loader::EmbeddedSourceRole,
     ) -> Result<PreparedCompilation, EngineError> {
         #[cfg(test)]
         LOWERING_ATTEMPTS.with(|attempts| attempts.set(attempts.get() + 1));
@@ -3709,11 +3684,11 @@ impl Engine {
         let execution_profile =
             ResolvedExecutionProfile::resolve(&options.execution_profile, || {
                 program_key_for_role(
-                    entry.source,
-                    entry.goal,
+                    &source.source().source_text,
+                    source.goal(),
                     options,
                     modules.graph(),
-                    entry.role,
+                    role,
                     &ExecutionProfileUse::None,
                 )
             })?;
@@ -3744,13 +3719,17 @@ impl Engine {
             execution_profile,
         } = prepared;
         let module_loading_policy = match modules {
-            PreparedModuleCompilation::Embedded { owner, .. } => {
+            PreparedModuleCompilation::Embedded { owner, graph } => {
+                drop(graph);
                 ModuleLoadingPolicy::Embedded(owner)
             }
-            PreparedModuleCompilation::Ambient { policy, .. } => match policy {
-                AmbientModuleLoaderPolicy::Filesystem => ModuleLoadingPolicy::Filesystem,
-                AmbientModuleLoaderPolicy::RejectAll => ModuleLoadingPolicy::RejectAll,
-            },
+            PreparedModuleCompilation::Ambient { policy, graph, .. } => {
+                drop(graph);
+                match policy {
+                    AmbientModuleLoaderPolicy::Filesystem => ModuleLoadingPolicy::Filesystem,
+                    AmbientModuleLoaderPolicy::RejectAll => ModuleLoadingPolicy::RejectAll,
+                }
+            }
         };
         // Every *coded* diagnostic is a pre-evaluation rejection: `code()` is
         // `Some` exactly for `IrDiagnostic::rejected`, whose kind is derived by
@@ -3769,9 +3748,9 @@ impl Engine {
             return Err(EngineError::from_ir_diagnostic(diagnostic.clone()));
         }
         Ok(CompilationUnit {
-            source: source.source().clone(),
+            source: source.into_source(),
             ir,
-            module_prelude: module_prelude.map(|prelude| prelude.source_text.to_string()),
+            module_prelude: module_prelude.map(|prelude| prelude.into_source().source_text),
             module_loading_policy,
             promise_rejection_policy,
             intl_profile,

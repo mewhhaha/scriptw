@@ -58,6 +58,8 @@ impl RPropertyLayoutRows {
 #[derive(Debug)]
 pub(super) struct RuntimeIntrinsicPropertyLayouts {
     rows: RPropertyLayoutRows,
+    entry_globals: RPropertyLayoutSpan,
+    created_globals: RPropertyLayoutSpan,
     named_data_groups:
         BTreeMap<IntrinsicPropertyLayoutId, BTreeMap<&'static str, IntrinsicIdentityGroup>>,
 }
@@ -206,19 +208,21 @@ fn encode_row(
 
 /// String lookup does not construct GC keys for preceding rows. The immutable
 /// index owns no insertion order: its words are ordered row positions plus one.
-fn string_index(properties: &[IntrinsicPropertySpec]) -> Result<Vec<u32>, EmitError> {
+fn string_index<'a>(
+    keys: impl ExactSizeIterator<Item = IntrinsicKey<'a>>,
+) -> Result<Vec<u32>, EmitError> {
     let error = || EmitError::unsupported("intrinsic property index exceeds static bounds");
-    let count = u32::try_from(properties.len()).map_err(|_| error())?;
+    let count = u32::try_from(keys.len()).map_err(|_| error())?;
     let capacity = count
         .checked_next_power_of_two()
         .and_then(|count| count.checked_mul(2))
         .ok_or_else(error)?;
     let mut buckets = vec![0; capacity as usize];
-    for (index, property) in properties.iter().enumerate() {
-        if !matches!(property.key, IntrinsicKey::Name(_)) {
+    for (index, key) in keys.enumerate() {
+        if !matches!(key, IntrinsicKey::Name(_)) {
             continue;
         }
-        let mut bucket = raw_key_hash(property.key) as u32 & (capacity - 1);
+        let mut bucket = raw_key_hash(key) as u32 & (capacity - 1);
         while buckets[bucket as usize] != 0 {
             bucket = (bucket + 1) & (capacity - 1);
         }
@@ -240,6 +244,12 @@ fn symbol_row_count(properties: &[IntrinsicPropertySpec]) -> Result<u32, EmitErr
 
 impl StringPool {
     pub(super) fn collect_intrinsic_property_layout_strings(&mut self) -> Result<(), EmitError> {
+        for builtin in scriptw_ir::HostBuiltinId::global_builtins() {
+            self.intern_string(builtin.global_name().expect("host global"));
+        }
+        for binding in Self::global_builtin_catalog(false) {
+            self.intern_string(&binding.name);
+        }
         for id in IntrinsicPropertyLayoutId::ALL {
             for property in id.layout()?.properties() {
                 if let IntrinsicKey::Name(name) = property.key {
@@ -304,7 +314,7 @@ impl StringPool {
                 .checked_mul(RPropertyLayoutRows::ROW_BYTES)
                 .ok_or_else(error)?;
             let index_address = span_address.checked_add(length).ok_or_else(error)?;
-            let buckets = string_index(plan.properties())?;
+            let buckets = string_index(plan.properties().iter().map(|property| property.key))?;
             let index_capacity = u32::try_from(buckets.len()).map_err(|_| error())?;
             index_capacity
                 .checked_mul(4)
@@ -342,12 +352,118 @@ impl StringPool {
                 .collect();
             named_data_groups.insert(id, groups);
         }
+        let entry_globals = self.encode_global_builtin_rows(address, &mut bytes, true)?;
+        let created_globals = self.encode_global_builtin_rows(address, &mut bytes, false)?;
         self.bytes.extend_from_slice(&bytes);
         self.runtime_intrinsic_property_layouts = Some(RuntimeIntrinsicPropertyLayouts {
             rows: RPropertyLayoutRows { spans },
+            entry_globals,
+            created_globals,
             named_data_groups,
         });
         Ok(())
+    }
+
+    pub(crate) fn global_builtin_catalog(entry: bool) -> Vec<scriptw_ir::ScriptGlobalBindingIr> {
+        let mut bindings = crate::builtins::created_realm_global_bindings();
+        if entry {
+            for builtin in scriptw_ir::HostBuiltinId::global_builtins() {
+                let name = builtin.global_name().expect("host global");
+                if bindings.iter().all(|binding| binding.name != name) {
+                    bindings.push(scriptw_ir::ScriptGlobalBindingIr {
+                        name: name.to_owned(),
+                        initializer: scriptw_ir::GlobalPropertyInitializerIr::HostFunction(builtin),
+                        declarations: scriptw_ir::GlobalDeclarationSetIr::None,
+                    });
+                }
+            }
+            bindings.sort_unstable_by(|left, right| left.name.cmp(&right.name));
+        }
+        bindings
+    }
+
+    fn encode_global_builtin_rows(
+        &self,
+        base: u32,
+        bytes: &mut Vec<u8>,
+        entry: bool,
+    ) -> Result<RPropertyLayoutSpan, EmitError> {
+        use crate::heap::StoredPropertyAttributes;
+        let error = || EmitError::unsupported("global builtin layout exceeds R static bounds");
+        let bindings = Self::global_builtin_catalog(entry);
+        if bindings.len() > crate::objects::MAX_GLOBAL_BUILTIN_ROWS {
+            return Err(EmitError::unsupported(
+                "global builtin layout exceeds deletion mask",
+            ));
+        }
+        let mut names = std::collections::BTreeSet::new();
+        let address = base
+            .checked_add(u32::try_from(bytes.len()).map_err(|_| error())?)
+            .ok_or_else(error)?;
+        for (rank, binding) in bindings.iter().enumerate() {
+            let name = binding.name.as_str();
+            if !names.insert(name) {
+                return Err(EmitError::unsupported("duplicate global builtin row"));
+            }
+            let initializer = &binding.initializer;
+            let flags = StoredPropertyAttributes::Data {
+                writable: initializer.writable(),
+                enumerable: initializer.enumerable(),
+                configurable: initializer.configurable(),
+            }
+            .descriptor_word();
+            let [kind, payload0, payload1] =
+                crate::FunctionBuilder::encode_global_builtin_recipe(initializer)?;
+            let hash = raw_key_hash(IntrinsicKey::Name(name));
+            for word in [
+                0,
+                runtime_string_ordinal(self, name)?,
+                flags.bits(),
+                rank as u32,
+                kind,
+                payload0,
+                payload1,
+                0,
+                hash as u32,
+                (hash >> 32) as u32,
+            ] {
+                bytes.extend_from_slice(&word.to_le_bytes());
+            }
+        }
+        let index_address = base
+            .checked_add(u32::try_from(bytes.len()).map_err(|_| error())?)
+            .ok_or_else(error)?;
+        let buckets = string_index(
+            bindings
+                .iter()
+                .map(|binding| IntrinsicKey::Name(&binding.name)),
+        )?;
+        let index_capacity = buckets.len() as u32;
+        for bucket in buckets {
+            bytes.extend_from_slice(&bucket.to_le_bytes());
+        }
+        bytes.extend_from_slice(&0u32.to_le_bytes());
+        base.checked_add(u32::try_from(bytes.len()).map_err(|_| error())?)
+            .ok_or_else(error)?;
+        Ok(RPropertyLayoutSpan {
+            address,
+            count: bindings.len() as u32,
+            group_count: bindings.len() as u32,
+            index_address,
+            index_capacity,
+        })
+    }
+
+    pub(crate) fn global_builtin_layout_span(
+        &self,
+        entry: bool,
+    ) -> Result<RPropertyLayoutSpan, EmitError> {
+        let layouts = self.runtime_intrinsic_property_layouts()?;
+        Ok(if entry {
+            layouts.entry_globals
+        } else {
+            layouts.created_globals
+        })
     }
 
     fn runtime_intrinsic_property_layouts(
@@ -572,7 +688,8 @@ mod tests {
     fn immutable_index_handles_collisions_without_changing_property_order() {
         for id in IntrinsicPropertyLayoutId::ALL {
             let plan = id.layout().unwrap();
-            let index = string_index(plan.properties()).unwrap();
+            let index =
+                string_index(plan.properties().iter().map(|property| property.key)).unwrap();
             let mask = index.len() as u32 - 1;
             for (ordinal, property) in plan.properties().iter().enumerate() {
                 let IntrinsicKey::Name(name) = property.key else {

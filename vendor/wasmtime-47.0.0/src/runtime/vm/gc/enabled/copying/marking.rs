@@ -1,6 +1,10 @@
 //! Collection-local incidence of independently live owners and keys.
 use crate::prelude::*;
 use crate::vm::{VMGcRef, WeakGcEdge, WeakGcRegistry};
+use core::mem::size_of;
+
+/// Limit the retained scratch to at most 1 MiB across the four buffers.
+const MAX_RETAINED_BUFFER_BYTES: usize = 256 * 1024;
 
 /// One gate of one conditional edge: the owner or key it waits for, the
 /// edge's index in `entries`, and the next dependency on the same object.
@@ -37,30 +41,48 @@ fn bucket(original: u32, mask: usize) -> usize {
 }
 
 impl EphemeronMarking {
+    /// Forget all collection-local indices and discard allocations above the
+    /// retention budget. This must also work after an interrupted preparation.
+    pub(super) fn reset(&mut self) {
+        fn reset_buffer<T>(buffer: &mut Vec<T>) {
+            if buffer.capacity() > MAX_RETAINED_BUFFER_BYTES / size_of::<T>() {
+                *buffer = Vec::new();
+            } else {
+                buffer.clear();
+            }
+        }
+
+        reset_buffer(&mut self.dependencies);
+        reset_buffer(&mut self.buckets);
+        reset_buffer(&mut self.entries);
+        reset_buffer(&mut self.ready);
+    }
+
     /// `live(raw)` says which original indices are live before anything is
     /// copied: none for a full collection, the old objects for a minor one.
     /// A gate whose object is already live opens at once.
     /// Only the registry slots `candidates` yields are considered.
-    pub(super) fn new(
+    pub(super) fn prepare(
+        &mut self,
         registry: &WeakGcRegistry,
         candidates: impl ExactSizeIterator<Item = usize>,
         live: impl Fn(u32) -> bool,
-    ) -> Result<Self> {
+    ) -> Result<()> {
+        self.reset();
         // Storage for every candidate, whether or not it is a conditional
         // edge, so that no notification allocates.
         let count = candidates.len();
         if count == 0 {
-            return Ok(Self::default());
+            return Ok(());
         }
         let overflow = || format_err!("ephemeron dependency count overflow");
-        let mut marking = Self::default();
         let dependencies = count.checked_mul(2).ok_or_else(overflow)?;
         if u32::try_from(dependencies).is_err() {
             return Err(overflow());
         }
-        marking.dependencies.try_reserve_exact(dependencies)?;
-        marking.entries.try_reserve_exact(count)?;
-        marking.ready.try_reserve_exact(count)?;
+        self.dependencies.try_reserve_exact(dependencies)?;
+        self.entries.try_reserve_exact(count)?;
+        self.ready.try_reserve_exact(count)?;
         for slot in candidates {
             if let Some(WeakGcEdge::Ephemeron {
                 owner,
@@ -70,13 +92,13 @@ impl EphemeronMarking {
             {
                 // `entries` is no longer than `dependencies`, which fits a
                 // `u32`.
-                let entry = marking.entries.len() as u32;
+                let entry = self.entries.len() as u32;
                 let mut gates = 0;
                 for (original, gate) in [(owner.as_raw_u32(), 1), (key.as_raw_u32(), 2)] {
                     if live(original) {
                         gates |= gate;
                     } else {
-                        marking.dependencies.push(Dependency {
+                        self.dependencies.push(Dependency {
                             original,
                             entry,
                             gate,
@@ -84,39 +106,44 @@ impl EphemeronMarking {
                         });
                     }
                 }
-                marking.entries.push((slot, gates));
+                self.entries.push((slot, gates));
                 if gates == 3 {
-                    marking.ready.push(slot);
+                    self.ready.push(slot);
                 }
             }
         }
-        if marking.dependencies.is_empty() {
+        if self.dependencies.is_empty() {
             // Every gate is already open.
-            return Ok(marking);
+            return Ok(());
         }
-        let buckets = (marking.dependencies.len() * 2).next_power_of_two();
-        marking.buckets.try_reserve_exact(buckets)?;
-        marking.buckets.resize(buckets, 0);
+        let buckets = self
+            .dependencies
+            .len()
+            .checked_mul(2)
+            .and_then(usize::checked_next_power_of_two)
+            .ok_or_else(overflow)?;
+        self.buckets.try_reserve_exact(buckets)?;
+        self.buckets.resize(buckets, 0);
         let mask = buckets - 1;
-        for index in 0..marking.dependencies.len() {
-            let original = marking.dependencies[index].original;
+        for index in 0..self.dependencies.len() {
+            let original = self.dependencies[index].original;
             let mut at = bucket(original, mask);
             // Fewer dependencies than buckets: an empty bucket always exists.
             loop {
-                let head = marking.buckets[at];
+                let head = self.buckets[at];
                 if head == 0 {
-                    marking.buckets[at] = index as u32 + 1;
+                    self.buckets[at] = index as u32 + 1;
                     break;
                 }
-                if marking.dependencies[head as usize - 1].original == original {
-                    marking.dependencies[index].next = head;
-                    marking.buckets[at] = index as u32 + 1;
+                if self.dependencies[head as usize - 1].original == original {
+                    self.dependencies[index].next = head;
+                    self.buckets[at] = index as u32 + 1;
                     break;
                 }
                 at = (at + 1) & mask;
             }
         }
-        Ok(marking)
+        Ok(())
     }
 
     /// Called exactly when an original-space object is first copied. Equal

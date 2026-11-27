@@ -9,14 +9,11 @@ use wasmtime::{
     StructRef, StructRefPre, TypedFunc, Val,
 };
 
-/// What the bridges retained requests enter on every call need from the
-/// instance: handles, types and allocators that are fixed once P and R are
-/// instantiated in their Store. Looking them up by name, rebuilding the
-/// call bridge's `FuncType` and re-registering its allocators per call was
-/// most of the embedding's own cost. An absent or malformed bridge is left
-/// `None` and the per-call path reports it as before.
+/// Store-local bridge handles. The typed call bridge and its GC allocators
+/// are resolved on the first retained call, including a call by `pump` to
+/// settle a foreign operation.
 pub(super) struct Bridges {
-    call: Option<CallBridge>,
+    call: OnceLock<CallBridge>,
     promise: Option<(Func, usize)>,
     realm: Option<Global>,
     pub(super) module_status: Option<WasmtimeExtern>,
@@ -45,12 +42,10 @@ struct CallBridge {
     function: TypedFunc<CallParameters, GcMainCompletion>,
     arguments: ArrayRefPre,
     stored: StructRefPre,
-    /// One empty argument array shared by every zero-argument call, allocated
-    /// lazily on the first zero-argument `call` so one-shot `evaluate` never
-    /// touches the GC heap during instantiation. A zero-length Wasm GC array
-    /// has no element a callee could write, and nothing compares argument
-    /// arrays by identity: R itself shares one empty `ValueArray` for every
-    /// argument-free entry.
+    /// One empty argument array allocated on the first zero-argument call.
+    /// A zero-length Wasm GC array has no element a callee could write, and
+    /// nothing compares argument arrays by identity. R itself shares one
+    /// empty `ValueArray` for every argument-free entry.
     no_arguments: OnceLock<OwnedRooted<ArrayRef>>,
 }
 
@@ -61,14 +56,6 @@ impl Bridges {
         roots: &Instance,
         modules: &wasm_runtime_link::WasmModules,
     ) -> Self {
-        let call = modules
-            .roots_embed_call_export()
-            .and_then(|export| roots.get_module_export(&mut *store, export))
-            .and_then(WasmtimeExtern::into_func)
-            .and_then(|function| {
-                let (arguments, stored) = modules.roots_embed_call_types()?;
-                CallBridge::new_with_types(store, function, arguments.clone(), stored.clone()).ok()
-            });
         let promise = modules
             .roots_embed_promise_export()
             .and_then(|(export, results)| {
@@ -89,7 +76,7 @@ impl Bridges {
             .and_then(|export| program.get_module_export(&mut *store, export))
             .and_then(WasmtimeExtern::into_global);
         Bridges {
-            call,
+            call: OnceLock::new(),
             promise,
             realm,
             module_status,
@@ -97,33 +84,14 @@ impl Bridges {
         }
     }
 
-    /// Whether the call bridge was typed and retained at instantiation.
+    /// Whether the call bridge has been typed and retained.
     #[cfg(test)]
     pub(super) fn has_typed_call(&self) -> bool {
-        self.call.is_some()
+        self.call.get().is_some()
     }
 }
 
 impl CallBridge {
-    fn new_with_types(
-        store: &mut impl AsContextMut<Data = WasmStoreState>,
-        function: Func,
-        arguments: ArrayType,
-        stored: wasmtime::StructType,
-    ) -> Result<Self, EngineError> {
-        let function = function
-            .typed::<CallParameters, GcMainCompletion>(&*store)
-            .map_err(|error| EngineError::new(format!("embedding call signature: {error:#}")))?;
-        let arguments = ArrayRefPre::new(&mut *store, arguments);
-        let stored = StructRefPre::new(&mut *store, stored);
-        Ok(CallBridge {
-            function,
-            stored,
-            arguments,
-            no_arguments: OnceLock::new(),
-        })
-    }
-
     fn new(
         store: &mut impl AsContextMut<Data = WasmStoreState>,
         function: Func,
@@ -148,7 +116,15 @@ impl CallBridge {
             .as_concrete_struct()
             .cloned()
             .ok_or_else(|| EngineError::new("embedding argument is not a StoredValue"))?;
-        Self::new_with_types(store, function, arguments, stored)
+        let function = function
+            .typed::<CallParameters, GcMainCompletion>(&*store)
+            .map_err(|error| EngineError::new(format!("embedding call signature: {error:#}")))?;
+        Ok(CallBridge {
+            function,
+            arguments: ArrayRefPre::new(&mut *store, arguments),
+            stored: StructRefPre::new(&mut *store, stored),
+            no_arguments: OnceLock::new(),
+        })
     }
 
     fn empty_arguments(
@@ -541,13 +517,12 @@ impl EmbeddedInstance {
         receiver: Option<&JsValue>,
         arguments: &[JsValue],
     ) -> Result<JsCompletion, EngineError> {
-        let built;
-        let bridge = match &self.bridges.call {
+        let bridge = match self.bridges.call.get() {
             Some(bridge) => bridge,
             None => {
                 let function = self.function(store, "scriptw.embed.call", false)?;
-                built = CallBridge::new(store, function)?;
-                &built
+                let bridge = CallBridge::new(store, function)?;
+                self.bridges.call.get_or_init(|| bridge)
             }
         };
         let args = if arguments.is_empty() {

@@ -1,7 +1,7 @@
-//! One canonical body receives arguments proven unobservable in Wasm locals.
+//! One canonical body receives fixed argument lanes and optional projection inputs.
 
 use super::*;
-use crate::arguments_protocol::UnobservedStrictArguments;
+use crate::arguments_protocol::{StrictArgumentsProjection, UnobservedStrictArguments};
 use crate::function_layout::LocalArgumentsFunctionIndex;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -11,10 +11,40 @@ pub(crate) enum LocalArgumentsArity {
 }
 
 impl LocalArgumentsArity {
-    pub(crate) fn slot_count(self) -> usize {
+    pub(crate) const fn slot_count(self) -> usize {
         match self {
             Self::Narrow => 2,
-            Self::Wide => 5,
+            Self::Wide => 6,
+        }
+    }
+
+    pub(crate) fn for_actuals(count: usize) -> Option<Self> {
+        [Self::Narrow, Self::Wide]
+            .into_iter()
+            .find(|arity| count <= arity.slot_count())
+    }
+
+    /// The wide ABI includes the actual count and a nullable original argv.
+    /// A local call passes null and has at most six actuals. The adapter
+    /// passes its original vector so it can forward any actual count.
+    pub(super) const fn projection_parameters(self) -> Option<(u32, u32)> {
+        match self {
+            Self::Narrow => None,
+            Self::Wide => {
+                let argc = self.argument_parameters_end();
+                Some((argc, argc + 1))
+            }
+        }
+    }
+
+    const fn argument_parameters_end(self) -> u32 {
+        7 + 3 * self.slot_count() as u32
+    }
+
+    pub(super) const fn caller_realm_parameter(self) -> u32 {
+        match self.projection_parameters() {
+            Some((_, argv)) => argv + 1,
+            None => self.argument_parameters_end(),
         }
     }
 
@@ -26,20 +56,31 @@ impl LocalArgumentsArity {
     }
 }
 
-/// The existing arguments-observer proof also justifies dropping the actual
-/// argument count and all values beyond the bounded formal list.
-///
-/// The proof decides which lists qualify, and this plan adds only the bound
-/// of five formals. A formal is an identifier or an object binding pattern:
-/// one slot carries the argument value of either, and a pattern's
-/// BindingInitialization reads its slot in the body like any other use of
-/// the formal. Rest parameters, initializers of the list and array patterns
-/// are refused by the proof.
+/// The unobserved proof permits the small ABI to omit the actual count and
+/// extra values. A projected body always uses the wide ABI so even a call
+/// supplying more actuals than formals can carry six arguments without argv.
 #[derive(Debug, Clone)]
 pub(crate) struct LocalArgumentsPlan {
     source: FunctionId,
     parameter_count: usize,
     arity: LocalArgumentsArity,
+    observation: LocalArgumentsObservation,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LocalArgumentsObservation {
+    Unobserved,
+    Projected,
+}
+
+impl LocalArgumentsObservation {
+    fn admit(source: &FunctionIr) -> Option<Self> {
+        if UnobservedStrictArguments::admit(source).is_some() {
+            Some(Self::Unobserved)
+        } else {
+            StrictArgumentsProjection::admit_local(source).map(|_| Self::Projected)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -60,6 +101,14 @@ mod tests {
             ("export function make(a,b,c,d,e,f) { return a+f; }", false),
             (
                 "export function make(a,b,c,d,e) { return arguments[4]; }",
+                true,
+            ),
+            (
+                "export function make(a,b,c,d,e,f) { return arguments[5]; }",
+                true,
+            ),
+            (
+                "export function make(a,b,c,d,e,f,g) { return arguments[6]; }",
                 false,
             ),
             (
@@ -67,10 +116,7 @@ mod tests {
                 false,
             ),
             ("export function make(a,b,c,d,e=1) { return e; }", false),
-            (
-                "export function make(a) { return arguments.length; }",
-                false,
-            ),
+            ("export function make(a) { return arguments.length; }", true),
             (
                 "export function make(a) { return () => arguments[0]; }",
                 false,
@@ -209,22 +255,35 @@ mod tests {
 
 impl LocalArgumentsPlan {
     pub(crate) fn for_function(source: &FunctionIr) -> Option<Self> {
-        let arity = match source.params.len() {
-            0..=2 => LocalArgumentsArity::Narrow,
-            3..=5 => LocalArgumentsArity::Wide,
-            _ => return None,
-        };
-        UnobservedStrictArguments::admit(source)?;
+        let parameter_count = source.params.len();
+        let formal_arity = LocalArgumentsArity::for_actuals(parameter_count)?;
+        let observation = LocalArgumentsObservation::admit(source)?;
         // A builtin entry guard tail-calls its fallback with the parameters
         // it received: both bodies of the pair take one argument layout.
-        if let Some(pair) = &source.builtin_entry {
-            UnobservedStrictArguments::admit(pair.partner())?;
-        }
+        let partner_observation = match &source.builtin_entry {
+            Some(pair) => LocalArgumentsObservation::admit(pair.partner())?,
+            None => observation,
+        };
+        let arity =
+            if [observation, partner_observation].contains(&LocalArgumentsObservation::Projected) {
+                LocalArgumentsArity::Wide
+            } else {
+                // Keep the existing formal admission for unobserved bodies.
+                if parameter_count > 5 {
+                    return None;
+                }
+                formal_arity
+            };
         Some(Self {
             source: source.id.clone(),
-            parameter_count: source.params.len(),
+            parameter_count,
             arity,
+            observation,
         })
+    }
+
+    pub(crate) fn projects_arguments(&self) -> bool {
+        self.observation == LocalArgumentsObservation::Projected
     }
 }
 
@@ -244,7 +303,7 @@ enum LocalArgumentsOwner {
 }
 
 /// Native algorithms that read at most their typed local argument slots
-/// (2 for Narrow, 5 for Wide) and never observe the argument count or any
+/// (2 for Narrow, 6 for Wide) and never observe the argument count or any
 /// later argument. An absent argument is undefined in both ABIs, so the vector
 /// adapter and a direct local call reach the same algorithm. A body that reads
 /// the count or the vector cannot be compiled for this ABI (`BodyEntryLocals`
@@ -520,6 +579,13 @@ impl PlannedLocalArgumentsEntry {
 
     pub(crate) fn slot_count(&self) -> usize {
         self.arity().slot_count()
+    }
+
+    pub(super) fn projects_arguments(&self) -> bool {
+        match &self.owner {
+            LocalArgumentsOwner::Source { proof, .. } => proof.projects_arguments(),
+            LocalArgumentsOwner::Native(_) => false,
+        }
     }
 
     pub(crate) fn signature(&self) -> StaticSignature {

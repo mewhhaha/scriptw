@@ -17,7 +17,6 @@ pub(crate) use binary_data_initialization::BinaryDataIntrinsicBuild;
 mod demand_constructors;
 mod global_publication;
 mod intl_initialization;
-use global_publication::GlobalBindingPublication;
 mod realm_initialization;
 pub(crate) use intl_initialization::IntlIntrinsicBuild;
 mod temporal_initialization;
@@ -797,17 +796,8 @@ impl<'a> FunctionBuilder<'a> {
         let bootstrap = self.bootstrap_realm.take().ok_or_else(|| {
             EmitError::unsupported("global publication requires completed Realm bootstrap")
         })?;
-        let bindings = self
-            .script_global_bindings
-            .expect("main owns its global plan")
-            .iter()
-            .filter(|binding| {
-                self.runtime_bootstrap_plan
-                    .should_install_script_global_binding(&binding.initializer)
-            })
-            .cloned()
-            .collect();
-        let object = self.emit_bootstrap_global_object(bootstrap, bindings, function)?;
+        let object = self.emit_bootstrap_global_object(bootstrap, true, function)?;
+        self.emit_entry_global_declarations(&object, function)?;
         if let Some(slot) = self.owned_env_slot(LEXICAL_THIS_NAME) {
             let value = self.runtime_schema().reserve_value_local(function);
             value.set_reference(&object, self.runtime_schema(), function);
@@ -828,22 +818,33 @@ impl<'a> FunctionBuilder<'a> {
         let environment = self.emit_alloc_realm_global_environment(realm, function)?;
         environment.clear(function);
         let bootstrap = self.emit_initialize_realm_intrinsics(realm, function)?;
-        let bindings = created_realm_global_bindings();
-        self.emit_bootstrap_global_object(bootstrap, bindings, function)
+        self.emit_bootstrap_global_object(bootstrap, false, function)
     }
 
     fn emit_bootstrap_global_object(
         &mut self,
         bootstrap: BootstrapRealm,
-        bindings: Vec<scriptw_ir::ScriptGlobalBindingIr>,
+        entry: bool,
         function: &mut Function,
     ) -> Result<GcLocal<OrdinaryObject>, EmitError> {
         let schema = self.runtime_schema();
+        let mut deleted = [0_u64; 2];
+        if entry {
+            let plan = self.script_global_bindings.expect("main owns its global plan");
+            for (index, row) in StringPool::global_builtin_catalog(true).iter().enumerate() {
+                let live = plan.get(&row.name).is_some_and(|binding| {
+                    self.runtime_bootstrap_plan.should_install_script_global_binding(&binding.initializer)
+                });
+                if !live {
+                    deleted[index / 64] |= 1 << (index % 64);
+                }
+            }
+        }
+        let span = self.strings.global_builtin_layout_span(entry)?;
         let object = schema.reserve_gc_local(function).initialize(
-            self.emit_alloc_plain_object_with_prototype(
-                Some(&bootstrap.object_prototype),
-                function,
-            )?,
+            self.emit_alloc_global_builtin_object(
+                &bootstrap.object_prototype, bootstrap.realm.realm(), span, deleted, function,
+            ),
             function,
         );
         let value = schema.reserve_value_local(function);
@@ -891,249 +892,11 @@ impl<'a> FunctionBuilder<'a> {
             );
         self.emit_initialize_realm_eval_intrinsic(bootstrap.realm.realm(), &eval, function);
         eval.clear(function);
-        // The initializers run no JavaScript and read no global properties.
-        let mut publication = GlobalBindingPublication::new(
-            &object,
-            self,
-            bindings.iter().map(|binding| binding.name.as_str()),
-            function,
-        )?;
-        for binding in &bindings {
-            // Deferred recipes keep the binding's original position and data
-            // attributes; a read resolves them in their defining Realm.
-            let deferred = match &binding.initializer {
-                GlobalPropertyInitializerIr::Intrinsic => Some(
-                    schema
-                        .reserve_gc_local(function)
-                        .initialize(stored.load(schema, function).upcast(), function),
-                ),
-                GlobalPropertyInitializerIr::Infinity => {
-                    value.set_scalar(
-                        ScalarValue::NumberBits(f64::INFINITY.to_bits() as i64),
-                        function,
-                    );
-                    None
-                }
-                GlobalPropertyInitializerIr::NaN => {
-                    value.set_scalar(ScalarValue::NumberBits(f64::NAN.to_bits() as i64), function);
-                    None
-                }
-                GlobalPropertyInitializerIr::Undefined
-                | GlobalPropertyInitializerIr::FreshUndefined => Some(
-                    schema
-                        .reserve_gc_local(function)
-                        .initialize(schema.stored_undefined(function).upcast(), function),
-                ),
-                GlobalPropertyInitializerIr::SourceFunction(id) => {
-                    let meta = self.functions.get(id).cloned().ok_or_else(|| {
-                        EmitError::unsupported(format!("missing global source function {id}"))
-                    })?;
-                    let callable = schema
-                        .reserve_gc_local::<FunctionObject, NonNullable>(function)
-                        .initialize(self.emit_function_value_payload(&meta, function)?, function);
-                    value.set_reference(&callable, schema, function);
-                    callable.clear(function);
-                    None
-                }
-                GlobalPropertyInitializerIr::ReflectObject => Some(
-                    self.emit_deferred_demand_recipe_value(
-                        crate::heap::DemandGlobalRecipe::Namespace(
-                            crate::heap::DemandNamespace::Reflect,
-                        ),
-                        &bootstrap.realm,
-                        function,
-                    )?,
-                ),
-                GlobalPropertyInitializerIr::MathObject => Some(
-                    self.emit_deferred_demand_recipe_value(
-                        crate::heap::DemandGlobalRecipe::Namespace(
-                            crate::heap::DemandNamespace::Math,
-                        ),
-                        &bootstrap.realm,
-                        function,
-                    )?,
-                ),
-                GlobalPropertyInitializerIr::JsonObject => Some(
-                    self.emit_deferred_demand_recipe_value(
-                        crate::heap::DemandGlobalRecipe::Namespace(
-                            crate::heap::DemandNamespace::Json,
-                        ),
-                        &bootstrap.realm,
-                        function,
-                    )?,
-                ),
-                GlobalPropertyInitializerIr::AtomicsObject => Some(
-                    self.emit_deferred_demand_recipe_value(
-                        crate::heap::DemandGlobalRecipe::Namespace(
-                            crate::heap::DemandNamespace::Atomics,
-                        ),
-                        &bootstrap.realm,
-                        function,
-                    )?,
-                ),
-                GlobalPropertyInitializerIr::TemporalObject => {
-                    // Deleting or replacing the property cannot recreate it.
-                    let recipe = schema.reserve_gc_local(function).initialize(
-                        schema.struct_type::<DeferredTemporalNamespace>().construct(
-                            (GcOperand::reference(bootstrap.realm.realm(), schema),),
-                            function,
-                        ),
-                        function,
-                    );
-                    let deferred = schema
-                        .reserve_gc_local(function)
-                        .initialize(recipe.load(schema, function).upcast(), function);
-                    recipe.clear(function);
-                    Some(deferred)
-                }
-                GlobalPropertyInitializerIr::IntlObject => {
-                    // Private first use cannot recreate a deleted or replaced
-                    // public property.
-                    let recipe = schema.reserve_gc_local(function).initialize(
-                        schema.struct_type::<DeferredIntlNamespace>().construct(
-                            (GcOperand::reference(bootstrap.realm.realm(), schema),),
-                            function,
-                        ),
-                        function,
-                    );
-                    let deferred = schema
-                        .reserve_gc_local(function)
-                        .initialize(recipe.load(schema, function).upcast(), function);
-                    recipe.clear(function);
-                    Some(deferred)
-                }
-                GlobalPropertyInitializerIr::BuiltinFunction(builtin) => {
-                    if *builtin == StandardBuiltinId::RegExpConstructor {
-                        Some(
-                            self.emit_deferred_regexp_constructor_value(
-                                &bootstrap.realm,
-                                function,
-                            )?,
-                        )
-                    } else if *builtin == StandardBuiltinId::DateConstructor {
-                        Some(self.emit_deferred_date_constructor_value(&bootstrap.realm, function)?)
-                    } else if let Some(constructor) =
-                        crate::heap::ErrorIntrinsicConstructor::from_builtin(*builtin)
-                    {
-                        Some(self.emit_deferred_error_constructor_value(
-                            constructor,
-                            &bootstrap.realm,
-                            function,
-                        )?)
-                    } else if let Some(demand) =
-                        crate::heap::DemandConstructor::from_builtin(*builtin)
-                    {
-                        Some(self.emit_deferred_demand_recipe_value(
-                            crate::heap::DemandGlobalRecipe::Constructor(demand),
-                            &bootstrap.realm,
-                            function,
-                        )?)
-                    } else if let Some(constructor) =
-                        crate::heap::BinaryDataConstructor::from_builtin(*builtin)
-                    {
-                        Some(self.emit_deferred_binary_data_constructor_value(
-                            constructor,
-                            &bootstrap.realm,
-                            function,
-                        )?)
-                    } else if let Some(method) = match self.functions.get(&builtin.function_id()) {
-                        Some(meta) => crate::intrinsics::DeferredIntrinsicMethod::validated_global(
-                            *builtin, meta,
-                        )?,
-                        None => None,
-                    } {
-                        Some(self.emit_deferred_global_function_value(
-                            method,
-                            &bootstrap.realm,
-                            function,
-                        ))
-                    } else if let Some(slot) = if *builtin == StandardBuiltinId::EvalFunction {
-                        Some(NonArrayRealmIntrinsicSlot::EvalFunction)
-                    } else {
-                        standard_builtin_constructor_realm_slot(*builtin)
-                    } {
-                        let canonical = self.emit_load_non_array_realm_intrinsic_stored(
-                            bootstrap.realm.realm(),
-                            slot,
-                            function,
-                        );
-                        let property = schema
-                            .reserve_gc_local(function)
-                            .initialize(canonical.load(schema, function).upcast(), function);
-                        canonical.clear(function);
-                        Some(property)
-                    } else {
-                        let callable =
-                            self.emit_intrinsic_callable(*builtin, &bootstrap.realm, function)?;
-                        value.set_reference(&callable, schema, function);
-                        callable.clear(function);
-                        None
-                    }
-                }
-                GlobalPropertyInitializerIr::HostFunction(builtin) => {
-                    if let Some(demand) = crate::heap::DemandHostFunction::from_builtin(*builtin) {
-                        Some(self.emit_deferred_demand_recipe_value(
-                            crate::heap::DemandGlobalRecipe::HostFunction(demand),
-                            &bootstrap.realm,
-                            function,
-                        )?)
-                    } else if canonical_host_function_realm_slot(*builtin).is_some() {
-                        let callable = self.emit_intrinsic_canonical_host_callable(
-                            *builtin,
-                            &bootstrap.realm,
-                            function,
-                        )?;
-                        value.set_reference(&callable, schema, function);
-                        callable.clear(function);
-                        None
-                    } else {
-                        let meta = self
-                            .functions
-                            .get(&builtin.function_id())
-                            .cloned()
-                            .ok_or_else(|| {
-                                EmitError::unsupported("missing global host function entry")
-                            })?;
-                        let callable = schema
-                            .reserve_gc_local::<FunctionObject, NonNullable>(function)
-                            .initialize(
-                                self.emit_function_value_payload_in_realm(
-                                    &meta,
-                                    &bootstrap.realm,
-                                    function,
-                                )?,
-                                function,
-                            );
-                        value.set_reference(&callable, schema, function);
-                        callable.clear(function);
-                        None
-                    }
-                }
-            };
-            let property_value = match deferred {
-                Some(deferred) => deferred,
-                None => schema.reserve_gc_local(function).initialize(
-                    schema
-                        .struct_type::<StoredValue>()
-                        .from_value(&value, function)
-                        .upcast(),
-                    function,
-                ),
-            };
-            publication.push(
-                self,
-                &binding.name,
-                &property_value,
-                crate::heap::StoredPropertyAttributes::Data {
-                    writable: binding.initializer.writable(),
-                    enumerable: binding.initializer.enumerable(),
-                    configurable: binding.initializer.configurable(),
-                },
-                function,
+        if entry {
+            self.emit_entry_global_initializer_overrides(
+                &object, &stored, &bootstrap.realm, function,
             )?;
-            property_value.clear(function);
         }
-        publication.finish(function)?;
         stored.clear(function);
         value.clear(function);
         bootstrap.clear(self, function);

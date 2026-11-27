@@ -1,12 +1,13 @@
 //! The actual callable's published typed entry is the guard, including across P.
 //! A planned source target's code identity proves its entry without reading it.
 use super::*;
-use crate::function_entry::{LocalArgumentCallInputs, LocalArgumentsCallableRole};
+use crate::function_entry::{
+    LocalArgumentCallInputs, LocalArgumentsArity, LocalArgumentsCallableRole,
+};
 use crate::gc_types::{
     CompletionLocals, ExecutableCode, ExecutableCodeKind, ExecutableCodeSchema, FunctionContext,
     FunctionContextSchema, FunctionLocal, FunctionObject, FunctionObjectSchema, GcI32Constant,
-    GcLocal, GcNullability, I32Local, LocalArgumentsCallable, ValueLocals,
-    WideLocalArgumentsCallable,
+    GcLocal, I32Local, LocalArgumentsCallable, ValueLocals, WideLocalArgumentsCallable,
 };
 
 impl FunctionBuilder<'_> {
@@ -22,7 +23,8 @@ impl FunctionBuilder<'_> {
     ) -> Result<bool, EmitError> {
         // An ineligible source hint does not justify another inline guard.
         // Full dispatch still handles an eligible replacement correctly.
-        if known_target.is_some_and(|meta| meta.entry.local_arguments().is_none()) {
+        let known_entry = known_target.and_then(|meta| meta.entry.local_arguments());
+        if known_target.is_some() && known_entry.is_none() {
             return Ok(false);
         }
         if arguments.iter().any(|argument| {
@@ -33,26 +35,35 @@ impl FunctionBuilder<'_> {
         }) {
             return Ok(false);
         }
-        match arguments.len() {
-            0..=2 => self.emit_local_argument_call::<LocalArgumentsCallable>(
-                callee,
-                receiver,
-                arguments,
-                known_target,
-                continuation,
-                output,
-                function,
-            ),
-            3..=5 => self.emit_local_argument_call::<WideLocalArgumentsCallable>(
-                callee,
-                receiver,
-                arguments,
-                known_target,
-                continuation,
-                output,
-                function,
-            ),
-            _ => Ok(false),
+        let arity = LocalArgumentsArity::for_actuals(arguments.len()).map(|arity| {
+            if known_entry.is_some_and(|entry| entry.arity() == LocalArgumentsArity::Wide) {
+                LocalArgumentsArity::Wide
+            } else {
+                arity
+            }
+        });
+        match arity {
+            Some(LocalArgumentsArity::Narrow) => self
+                .emit_local_argument_call::<LocalArgumentsCallable>(
+                    callee,
+                    receiver,
+                    arguments,
+                    known_target,
+                    continuation,
+                    output,
+                    function,
+                ),
+            Some(LocalArgumentsArity::Wide) => self
+                .emit_local_argument_call::<WideLocalArgumentsCallable>(
+                    callee,
+                    receiver,
+                    arguments,
+                    known_target,
+                    continuation,
+                    output,
+                    function,
+                ),
+            None => Ok(false),
         }
     }
 
@@ -145,7 +156,7 @@ impl FunctionBuilder<'_> {
         )
     }
 
-    /// The argument count selects the typed role; more than five never enters.
+    /// The argument count selects the typed role; over-width calls use argv.
     pub(super) fn emit_local_argument_call_values_for_count(
         &mut self,
         callee: &ValueLocals,
@@ -155,26 +166,28 @@ impl FunctionBuilder<'_> {
         result: &CompletionLocals,
         function: &mut Function,
     ) -> Result<I32Local, EmitError> {
-        match arguments.len() {
-            0..=2 => self.emit_local_argument_call_values::<LocalArgumentsCallable>(
-                callee,
-                receiver,
-                arguments,
-                None,
-                continuation,
-                result,
-                function,
-            ),
-            3..=5 => self.emit_local_argument_call_values::<WideLocalArgumentsCallable>(
-                callee,
-                receiver,
-                arguments,
-                None,
-                continuation,
-                result,
-                function,
-            ),
-            _ => {
+        match LocalArgumentsArity::for_actuals(arguments.len()) {
+            Some(LocalArgumentsArity::Narrow) => self
+                .emit_local_argument_call_values::<LocalArgumentsCallable>(
+                    callee,
+                    receiver,
+                    arguments,
+                    None,
+                    continuation,
+                    result,
+                    function,
+                ),
+            Some(LocalArgumentsArity::Wide) => self
+                .emit_local_argument_call_values::<WideLocalArgumentsCallable>(
+                    callee,
+                    receiver,
+                    arguments,
+                    None,
+                    continuation,
+                    result,
+                    function,
+                ),
+            None => {
                 let handled = self.runtime_schema().reserve_i32_local(function);
                 handled.set_constant(0, function);
                 Ok(handled)
@@ -195,19 +208,17 @@ impl FunctionBuilder<'_> {
         let schema = self.runtime_schema();
         let handled = schema.reserve_i32_local(function);
         handled.set_constant(0, function);
+        let fallback = self.open_frame(ControlFrameKind::Block, function);
         callee.tag().load(function);
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Function.tag()));
-        function.instruction(&Instruction::I32Eq);
-        callee.reference().load(function);
-        function.instruction(&Instruction::RefTestNonNull(
-            schema
-                .reference_type::<FunctionObject>(GcNullability::NonNullable)
-                .heap_type,
-        ));
-        function.instruction(&Instruction::I32And);
-        self.open_frame(ControlFrameKind::If, function);
-        let callable = schema.reserve_gc_local(function).initialize(
-            callee.cast_reference::<FunctionObject>(schema, function),
+        function.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(fallback, function);
+        let callable = schema.reserve_non_null_gc_local(function).initialize(
+            callee.sealed_reference_or_branch::<FunctionObject>(
+                schema,
+                self.local_branch_label(fallback),
+                function,
+            ),
             function,
         );
         let code = schema.reserve_gc_local(function).initialize(
@@ -297,7 +308,7 @@ impl FunctionBuilder<'_> {
         context.clear(function);
         code.clear(function);
         callable.clear(function);
-        self.pop_control(ControlFrameKind::If);
+        self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
 
         Ok(handled)
@@ -328,9 +339,9 @@ impl FunctionBuilder<'_> {
             function,
         );
         entry.clear(function);
-        if R::ARITY == crate::function_entry::LocalArgumentsArity::Wide {
+        if R::ARITY == LocalArgumentsArity::Wide {
             // A narrow local-arguments entry proves args >= 2 are unobservable,
-            // so a 3..=5 argument call site (e.g. Array.prototype.map/filter/
+            // so a 3..=6 argument call site (e.g. Array.prototype.map/filter/
             // find/reduce) can invoke it directly with the first two arguments.
             function.instruction(&Instruction::Else);
             let narrow_optional =
@@ -363,8 +374,8 @@ impl FunctionBuilder<'_> {
             function.instruction(&Instruction::End);
             narrow_optional.clear(function);
         } else {
-            // A wide local-arguments entry (3..=5 formals, e.g. JSON.stringify)
-            // pads omitted arguments with undefined, so a 0..=2 argument call
+            // A wide local-arguments entry pads omitted arguments with
+            // undefined and carries the actual count, so a 0..=2 argument call
             // site can invoke it directly without allocating a ValueArray.
             function.instruction(&Instruction::Else);
             let wide_optional =

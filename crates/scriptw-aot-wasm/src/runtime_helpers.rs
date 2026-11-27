@@ -628,6 +628,11 @@ impl OwnPropertyKeysCallResult {
         table
     }
 }
+/// The rooted snapshot host reads both typed projections together.
+pub(crate) struct SnapshotGlobalBuiltinRowCallResult {
+    private: (),
+}
+
 /// GetOwnProperty returns its whole completion and a rooted descriptor snapshot.
 /// Null represents absence on success and is also returned on abrupt completion.
 #[must_use = "root the descriptor snapshot and completion before checking for Throw"]
@@ -913,6 +918,7 @@ macro_rules! helper_field {
     (@result_type StatusCompletion) => { StatusCompletionCallResult };
     (@result_type RealmImport) => { RealmImportCallResult };
     (@result_type OwnPropertyKeys) => { OwnPropertyKeysCallResult };
+    (@result_type SnapshotGlobalBuiltinRow) => { SnapshotGlobalBuiltinRowCallResult };
     (@result_type OwnPropertyDescriptor) => { OwnPropertyDescriptorCallResult };
     (@result_type EnvironmentIdentifierResolution) => { EnvironmentIdentifierResolutionCallResult };
     (@result_type ModuleGather) => { ModuleGatherCallResult };
@@ -937,6 +943,7 @@ macro_rules! helper_field {
         types.push(AbiType::Gc(GcLayout::PropertyKeyTable, GcNullability::Nullable));
         types
     } };
+    (@result_abi SnapshotGlobalBuiltinRow) => { vec![AbiType::Gc(GcLayout::StringValue, GcNullability::NonNullable), AbiType::Gc(GcLayout::PropertyDescriptor, GcNullability::NonNullable)] };
     (@result_abi OwnPropertyDescriptor) => { {
         let mut types = crate::module::COMPLETION_TYPES.to_vec();
         types.push(AbiType::Gc(GcLayout::PropertyDescriptor, GcNullability::Nullable));
@@ -971,6 +978,7 @@ macro_rules! helper_field {
     (@result StatusCompletion) => { StatusCompletionCallResult { private: () } };
     (@result RealmImport) => { RealmImportCallResult { private: () } };
     (@result OwnPropertyKeys) => { OwnPropertyKeysCallResult { private: () } };
+    (@result SnapshotGlobalBuiltinRow) => { SnapshotGlobalBuiltinRowCallResult { private: () } };
     (@result OwnPropertyDescriptor) => { OwnPropertyDescriptorCallResult { private: () } };
     (@result EnvironmentIdentifierResolution) => { EnvironmentIdentifierResolutionCallResult { private: () } };
     (@result ModuleGather) => { ModuleGatherCallResult { private: () } };
@@ -1206,7 +1214,8 @@ runtime_helper_domain! {
     CompactObjectAllocate / CompactObjectAllocateArguments / CompactObjectAllocateParameters / "compact_object_allocate" { prototype:Value } => (Ref OrdinaryObject NonNullable);
     CompactShapeIndex / CompactShapeIndexArguments / CompactShapeIndexParameters / "compact_shape_index" { shape:(Ref CompactDataShape NonNullable) } => (Ref OrdinaryPropertyIndex NonNullable);
     IntrinsicDataPublish / IntrinsicDataPublishArguments / IntrinsicDataPublishParameters / "intrinsic_data_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,value:(Ref PropertyValue NonNullable),writable:I32,enumerable:I32,configurable:I32 } => Void;
-    FreshDataPropertiesPublish / FreshDataPropertiesPublishArguments / FreshDataPropertiesPublishParameters / "fresh_data_properties_publish" { storage:(Ref OrdinaryPropertyStorage NonNullable),key:(Ref StringValue NonNullable),descriptor:(Ref PropertyDescriptor NonNullable),position:I32,capacity:I32,final_length:I32,hash:I64,bucket:I32 } => Void;
+    GlobalBuiltinAppendFind / GlobalBuiltinAppendFindArguments / GlobalBuiltinAppendFindParameters / "global_builtin_append_find" { backing:(Ref GlobalBuiltinBacking NonNullable),key:Key } => (Ref PropertyEntry Nullable);
+    SnapshotGlobalBuiltinRow / SnapshotGlobalBuiltinRowArguments / SnapshotGlobalBuiltinRowParameters / "snapshot_global_builtin_row" { backing:(Ref GlobalBuiltinBacking NonNullable),index:I32 } => SnapshotGlobalBuiltinRow;
     IntrinsicAccessorPublish / IntrinsicAccessorPublishArguments / IntrinsicAccessorPublishParameters / "intrinsic_accessor_publish" { object:(Ref OrdinaryObject NonNullable),key:Key,getter:(Ref StoredValue NonNullable),setter:(Ref StoredValue NonNullable),enumerable:I32,configurable:I32 } => Void;
     PropertyValueResolve / PropertyValueResolveArguments / PropertyValueResolveParameters / "property_value_resolve" { value:(Ref PropertyValue NonNullable) } => (Ref StoredValue NonNullable);
     IntrinsicAccessorAllocate / IntrinsicAccessorAllocateArguments / IntrinsicAccessorAllocateParameters / "intrinsic_accessor_allocate" { header:(Ref OrdinaryObject NonNullable),code:(Ref ExecutableCode NonNullable),realm:(Ref RealmRecord NonNullable),source_ordinal:I32 } => (Ref FunctionObject NonNullable);
@@ -1418,7 +1427,7 @@ impl RuntimeHelperId {
             Self::CompactShapeIndex => HelperOwner::Runtime,
             Self::IntrinsicDataPublish => HelperOwner::Runtime,
             Self::IntrinsicAccessorPublish => HelperOwner::Runtime,
-            Self::FreshDataPropertiesPublish => HelperOwner::Runtime,
+            Self::GlobalBuiltinAppendFind | Self::SnapshotGlobalBuiltinRow => HelperOwner::Runtime,
             Self::PropertyValueResolve => HelperOwner::Runtime,
             Self::NativeFunctionAllocate => HelperOwner::Runtime,
             Self::NativeConstructorHeaderAllocate => HelperOwner::Runtime,
@@ -1612,7 +1621,7 @@ impl RuntimeHelperId {
             Self::CompactShapeIndex => true,
             Self::IntrinsicDataPublish => true,
             Self::IntrinsicAccessorPublish => true,
-            Self::FreshDataPropertiesPublish => true,
+            Self::GlobalBuiltinAppendFind | Self::SnapshotGlobalBuiltinRow => true,
             Self::PropertyValueResolve => true,
             Self::NativeFunctionAllocate => true,
             Self::NativeConstructorHeaderAllocate => true,

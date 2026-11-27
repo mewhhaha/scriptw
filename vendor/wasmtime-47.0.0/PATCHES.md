@@ -383,7 +383,7 @@ The copying collector is generational when the GC heap starts at 2 MiB or more
 ([measurements](../../docs/rust-rewrite/benchmarks.md#young-generation-2026-11-14)).
 
 - `src/runtime/vm/gc/enabled/copying.rs`: the heap's first eighth of its
-  initial size (in 64 KiB units; 2 MiB of the product's 16 MiB) is a nursery
+  initial size (in 64 KiB units; 4 MiB of the product's 32 MiB) is a nursery
   after the null guard, and the two old semi-spaces split the rest. The
   mutator, inline and through `gc_alloc_raw`, bump-allocates in the nursery;
   an object larger than a quarter of it goes to the old space and is
@@ -403,13 +403,18 @@ The copying collector is generational when the GC heap starts at 2 MiB or more
   full. The policy's post-collection live size comes from full collections
   only (`GcHeap::last_collection_was_minor`). Each collection advances the
   weak epoch, since young keys move.
+- Scans of inline struct fields and reference arrays check the field range
+  against the validated object extent before visiting individual slots.
+  Remembered slots still check their own heap range. Each heap reuses four
+  ephemeron scratch buffers, retaining up to 256 KiB per buffer between
+  collections. Ephemerons reach their fixed point before weak slots clear.
 - A heap's first full nursery does not collect
   ([measurements](../../docs/rust-rewrite/benchmarks.md#pretenure-window-2026-11-24)).
   While no collection has run since the heap got its memory, the old space
   holds only large objects allocated there directly, and the mutator's bump
   pointer and limit move to a *pretenure window* at the old space's bump: the
-  smaller of 4 MiB and the old space's free bytes less two nurseries (about
-  3 MiB of the product's 7 MiB). A Store that is dropped
+  smaller of 4 MiB and the old space's free bytes less two nurseries (4 MiB
+  with an empty old space at the product's default size). A Store that is dropped
   before the window fills never collects. `YoungAllocation` holds the state:
   `FirstNursery`, `Pretenuring { nursery_bump }`, `NurseryAfterWindow`,
   `Nursery`.
@@ -550,6 +555,11 @@ inserts them. Every rec group of every loaded module is hashed by its complete
 structural definition when the module is registered, deserialized modules
 included, so this hashing is paid by every process start. Type identity is
 unchanged: the map still compares complete keys.
+
+With an empty registry, the first module uses the reserved arenas and hashes
+each owned canonical key once before insertion. Duplicate groups reuse the
+registered type IDs and increment the existing registration count. A
+populated registry can still find shared groups through a borrowed key.
 
 The hasher is not keyed. A module whose type section is built to collide can
 make registering its own rec groups quadratic; upstream's SipHash prevents

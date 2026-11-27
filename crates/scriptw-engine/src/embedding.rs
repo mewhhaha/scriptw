@@ -171,7 +171,8 @@ pub struct EmbeddedRuntime {
     foreign: ForeignModuleRegistry,
     intl: intl_data_images::WasmIntlKernel,
     authority: Arc<()>,
-    host_linker: OnceLock<WasmtimeLinker<WasmStoreState>>,
+    host_linker: OnceLock<Arc<WasmtimeLinker<WasmStoreState>>>,
+    prepared_linkage: OnceLock<wasm_runtime_link::PreparedLinkage>,
     /// Where a Collect-mode P keeps its execution profile; `None` for any
     /// other P.
     profile_sites: Option<execution_profile::ProfileSites>,
@@ -263,21 +264,22 @@ impl EmbeddedRuntime {
     ) -> Self {
         Self {
             engine: engine.clone(),
-            modules,
+            modules: modules.retain_linkage(),
             foreign,
             intl,
             authority: Arc::new(()),
             host_linker: OnceLock::new(),
+            prepared_linkage: OnceLock::new(),
             profile_sites: None,
         }
     }
 
-    fn cached_host_linker(&self) -> Result<&WasmtimeLinker<WasmStoreState>, EngineError> {
+    fn cached_host_linker(&self) -> Result<&Arc<WasmtimeLinker<WasmStoreState>>, EngineError> {
         if let Some(linker) = self.host_linker.get() {
             return Ok(linker);
         }
         let built = host_imports::build(&self.engine, self.modules.host())?;
-        Ok(self.host_linker.get_or_init(|| built))
+        Ok(self.host_linker.get_or_init(|| Arc::new(built)))
     }
 
     /// Construct one fresh host state. The caller creates and retains the Store
@@ -374,9 +376,7 @@ impl EmbeddedRuntime {
     ) -> Result<(), EngineError> {
         self.check(store, linker, StorePhase::Fresh)?;
         store.data_mut().embedding.as_mut().unwrap().phase = StorePhase::Failed;
-        if linker.is_pristine() {
-            *linker = self.cached_host_linker()?.clone();
-        } else {
+        if !linker.try_extend_from_shared(self.cached_host_linker()?) {
             host_imports::register(linker, self.modules.host())?;
         }
         // R defines its own private memory; instantiation links it into P.
@@ -441,58 +441,57 @@ impl EmbeddedRuntime {
     ) -> Result<EmbeddedInstance, EngineError> {
         self.check(store, linker, StorePhase::Registered)?;
         store.data_mut().embedding.as_mut().unwrap().phase = StorePhase::Failed;
-        if self.modules.has_foreign_imports() {
-            for import in self.modules.program.imports() {
-                if matches!(
-                    import.module(),
-                    WASM_HOST_IMPORT_NAMESPACE | scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE
-                ) {
-                    continue;
+        for import in self.modules.foreign_imports() {
+            let actual = linker
+                .get(&mut *store, &import.module, &import.name)
+                .map_err(|error| {
+                    EngineError::new(format!(
+                        "missing declared foreign import {}.{}: {error:#}",
+                        import.module, import.name
+                    ))
+                })?;
+            let matches = match (&import.ty, actual.ty(&*store)) {
+                (WasmtimeExternType::Func(expected), WasmtimeExternType::Func(actual)) => {
+                    FuncType::eq(expected, &actual)
                 }
-                let actual = linker
-                    .get(&mut *store, import.module(), import.name())
-                    .map_err(|error| {
-                        EngineError::new(format!(
-                            "missing declared foreign import {}.{}: {error:#}",
-                            import.module(),
-                            import.name()
-                        ))
+                (WasmtimeExternType::Tag(expected), WasmtimeExternType::Tag(actual)) => {
+                    FuncType::eq(expected.ty(), actual.ty())
+                }
+                _ => false,
+            };
+            if !matches {
+                return Err(EngineError::new(format!(
+                    "foreign import type mismatch: {}.{}",
+                    import.module, import.name
+                )));
+            }
+            if let WasmtimeExtern::Tag(actual_tag) = actual {
+                let expected_tag = store
+                    .data()
+                    .embedding
+                    .as_ref()
+                    .unwrap()
+                    .error_tag
+                    .ok_or_else(|| {
+                        EngineError::new("foreign error tag has no registered Store authority")
                     })?;
-                let matches = match (import.ty(), actual.ty(&*store)) {
-                    (WasmtimeExternType::Func(expected), WasmtimeExternType::Func(actual)) => {
-                        FuncType::eq(&expected, &actual)
-                    }
-                    (WasmtimeExternType::Tag(expected), WasmtimeExternType::Tag(actual)) => {
-                        FuncType::eq(expected.ty(), actual.ty())
-                    }
-                    _ => false,
-                };
-                if !matches {
-                    return Err(EngineError::new(format!(
-                        "foreign import type mismatch: {}.{}",
-                        import.module(),
-                        import.name()
-                    )));
-                }
-                if let WasmtimeExtern::Tag(actual_tag) = actual {
-                    let expected_tag = store
-                        .data()
-                        .embedding
-                        .as_ref()
-                        .unwrap()
-                        .error_tag
-                        .ok_or_else(|| {
-                            EngineError::new("foreign error tag has no registered Store authority")
-                        })?;
-                    if !wasmtime::Tag::eq(&actual_tag, &expected_tag, &*store) {
-                        return Err(EngineError::new(
-                            "foreign error tag differs from the registered Store tag",
-                        ));
-                    }
+                if !wasmtime::Tag::eq(&actual_tag, &expected_tag, &*store) {
+                    return Err(EngineError::new(
+                        "foreign error tag differs from the registered Store tag",
+                    ));
                 }
             }
         }
-        let (program, roots) = wasm_runtime_link::instantiate(linker, store, &self.modules)?;
+        let prepared = self
+            .host_linker
+            .get()
+            .filter(|base| linker.has_unshadowed_shared_definitions(base))
+            .map(|base| {
+                self.prepared_linkage
+                    .get_or_init(|| wasm_runtime_link::PreparedLinkage::new(base, &self.modules))
+            });
+        let (program, roots) =
+            wasm_runtime_link::instantiate_with_linkage(linker, store, &self.modules, prepared)?;
         let main = match self
             .modules
             .program_main_export()
@@ -528,7 +527,7 @@ pub struct EmbeddedInstance {
     program: Instance,
     roots: Instance,
     store: Arc<()>,
-    /// Bridge handles fixed for the instance's lifetime, looked up once.
+    /// Store-local bridge handles, with typed call setup deferred until use.
     bridges: operations::Bridges,
     /// The entry Realm, global Environment and program, retained once
     /// `main` has created them; see `operations::EntryContext`.

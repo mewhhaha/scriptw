@@ -234,7 +234,7 @@ mod tests {
         assert!(PooledStores::new(one, 4096).is_err());
         assert_eq!(
             PooledStores::sequential(),
-            PooledStores::new(one, 16 * 1024 * 1024).unwrap()
+            PooledStores::new(one, 32 * 1024 * 1024).unwrap()
         );
     }
 

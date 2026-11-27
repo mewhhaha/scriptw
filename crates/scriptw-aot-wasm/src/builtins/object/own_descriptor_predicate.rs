@@ -1,4 +1,7 @@
 use super::*;
+use crate::gc_types::{
+    CompactDataStorage, CompactShapeKeys, I32Local, OrdinaryObjectSchema, StringValueSchema,
+};
 
 enum OwnDescriptorPredicateBuiltin {
     ObjectHasOwn,
@@ -7,6 +10,66 @@ enum OwnDescriptorPredicateBuiltin {
 }
 
 impl FunctionBuilder<'_> {
+    fn emit_hinted_compact_own_property_or_branch(
+        &mut self,
+        ordinary: &GcLocal<OrdinaryObject>,
+        key: &GcLocal<StringValue>,
+        found: I32Local,
+        miss: ControlTarget,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        let slot = schema.reserve_i32_local(function);
+        schema
+            .field(StringValueSchema::ENTRY_HINT)
+            .read(key, schema, function)
+            .store(slot, function);
+        slot.load(function);
+        function.instruction(&Instruction::I32Const(0));
+        function.instruction(&Instruction::I32LtS);
+        self.emit_branch_if_to_target(miss, function);
+        let properties = schema.reserve_gc_local(function).initialize(
+            schema
+                .field(OrdinaryObjectSchema::PROPERTIES)
+                .read(ordinary, schema, function)
+                .reference(),
+            function,
+        );
+        properties.is_subtype::<CompactDataStorage>(schema, function);
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, function);
+        let storage = schema.reserve_gc_local(function).initialize(
+            properties
+                .load(schema, function)
+                .cast_subtype::<CompactDataStorage>(schema, function),
+            function,
+        );
+        let keys = self.emit_compact_shape_keys(&storage, function);
+        slot.load(function);
+        schema
+            .array_type::<CompactShapeKeys>()
+            .length(&keys, schema, function);
+        function.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(miss, function);
+        // The hint is only an ordinal. A hit must identify the actual own
+        // key in this receiver's current shape, even after reassignment or
+        // a storage change. Structural equality takes the normal lookup.
+        schema
+            .array_type::<CompactShapeKeys>()
+            .read(&keys, slot, schema, function)
+            .reference();
+        key.load(schema, function);
+        function.instruction(&Instruction::RefEq);
+        found.store(function);
+        found.load(function);
+        function.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(miss, function);
+        keys.clear(function);
+        storage.clear(function);
+        properties.clear(function);
+        schema.release_i32_local(slot, function);
+    }
+
     fn compile_object_own_descriptor_predicate_builtin(
         &mut self,
         builtin: OwnDescriptorPredicateBuiltin,
@@ -34,14 +97,10 @@ impl FunctionBuilder<'_> {
         // neither ToObject nor ToPropertyKey can observe or throw, regardless of
         // the spec's coercion order between the static and prototype forms.
         receiver.tag().load(function);
-        function.instruction(&Instruction::I32Const(
-            WasmRuntimeValueTag::Object.tag(),
-        ));
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Object.tag()));
         function.instruction(&Instruction::I32Eq);
         key_value.tag().load(function);
-        function.instruction(&Instruction::I32Const(
-            WasmRuntimeValueTag::String.tag(),
-        ));
+        function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String.tag()));
         function.instruction(&Instruction::I32Eq);
         function.instruction(&Instruction::I32And);
         receiver.reference().load(function);
@@ -60,11 +119,33 @@ impl FunctionBuilder<'_> {
             key_value.cast_reference::<StringValue>(schema, function),
             function,
         );
+        let own_known = (!matches!(
+            builtin,
+            OwnDescriptorPredicateBuiltin::PrototypePropertyIsEnumerable
+        ))
+        .then(|| self.open_frame(ControlFrameKind::Block, function));
+        if let Some(own_known) = own_known {
+            let miss = self.open_frame(ControlFrameKind::Block, function);
+            self.emit_hinted_compact_own_property_or_branch(
+                &ordinary,
+                &key_string,
+                boolean,
+                miss,
+                function,
+            );
+            self.emit_branch_to_target(own_known, function);
+            self.pop_control(ControlFrameKind::Block);
+            function.instruction(&Instruction::End);
+        }
         let key = PropertyKeyLocals::from_string(schema, &key_string, function);
         self.emit_ordinary_own_property_enumerability(
             &ordinary, &key, boolean, enumerable, function,
         )?;
         key.clear(function);
+        if own_known.is_some() {
+            self.pop_control(ControlFrameKind::Block);
+            function.instruction(&Instruction::End);
+        }
         key_string.clear(function);
         ordinary.clear(function);
         function.instruction(&Instruction::Else);

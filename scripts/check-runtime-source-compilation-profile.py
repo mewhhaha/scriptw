@@ -294,7 +294,10 @@ def check(root, overrides=None):
             'unsafe{' not in origin,
             "kernel-main ELF alternative requires bounded kernel headers, loaded-table equality, exact entry/bias and unique readonly file-backed symbol/map agreement")
     link = c[E + "wasm_runtime_link.rs"]
-    require(link.count("RuntimeSourceCompilationProfile::from_module(program).ok()?==scriptw_aot_wasm::RuntimeSourceCompilationProfile::Portable") == 2 and
+    require("RuntimeSourceCompilationProfile::from_module(program).ok()?==scriptw_aot_wasm::RuntimeSourceCompilationProfile::Portable" in link and
+            "inspect_linked_program_metadata(program).ok()?" in link and
+            "profile==scriptw_aot_wasm::RuntimeSourceCompilationProfile::Portable" in link and
+            "profile!=scriptw_aot_wasm::RuntimeSourceCompilationProfile::NativeHost" in link and
             "RuntimeSourceCompilationProfile::from_module(program.bytes)" in link and
             "profile!=runtime.source_compilation_profile()" in link,
             "both compiler-owned standalone decoders and actual linked P/R check physical authority")

@@ -257,7 +257,7 @@ fn precompiled_rejects_implicit_start_native_host_and_nonminimal_policy() {
     );
     let compiler = Engine::new(RealmBuilder::new().build());
     let unit = compiler
-        .compile_script("print(1);", CompileOptions::default())
+        .compile_script("print({});", CompileOptions::default())
         .unwrap();
     let native = run_on_sized_stack(|| {
         compiler.emit_wasm_with_cache_on_current_thread(

@@ -10,7 +10,8 @@
 //!   and reloads once per safepoint-separated segment inside each block. The
 //!   collector moves objects, so a reference has to be read again after a
 //!   call. It does not have to be read again across blocks or loops without a
-//!   call.
+//!   call. For a single-entry cold-call diamond, the frontend can keep the
+//!   original SSA value on the fast edge and pass a reload on the cold edge.
 //! * **Home slots** (`base_home`): the GC heap base and the `vmctx`, each
 //!   stored once by the entry block and loaded at every use.
 //!
@@ -1049,6 +1050,55 @@ mod tests {
         body.finish(sum);
         assert_eq!(harness.forward(), 0);
         assert_eq!(harness.reloads(), 0);
+    }
+
+    #[test]
+    fn a_cold_call_reloads_its_sunk_root_on_the_slow_edge_only() {
+        let mut harness = Harness::new();
+        let mut body = harness.body();
+        let first = body.first;
+        let entry = body.builder.current_block().unwrap();
+        let slow = body.block();
+        let join = body.block();
+        body.builder.set_cold_block(slow);
+        body.builder
+            .ins()
+            .brif(body.condition, slow, &[], join, &[]);
+        body.switch_to(slow);
+        body.call();
+        let safepoint = body.builder.func.layout.last_inst(slow).unwrap();
+        body.builder.ins().jump(join, &[]);
+
+        body.switch_to(join);
+        let result = body.sum(first, first);
+        // The joined root is dead before this next safepoint.
+        body.call();
+        body.finish(result);
+
+        assert_eq!(harness.forward(), 0);
+        let [root] = harness.func.dfg.block_params(join) else {
+            panic!("expected a joined root");
+        };
+        assert_eq!(harness.arguments(entry, join), [first]);
+        let [relocated] = harness.arguments(slow, join)[..] else {
+            panic!("expected a reloaded root");
+        };
+        let [stack_map] = harness.func.dfg.user_stack_map_entries(safepoint).unwrap() else {
+            panic!("expected one live root");
+        };
+        assert_eq!(harness.reload(relocated), Some(stack_map.slot));
+        assert_eq!(harness.reloads(), 1);
+        assert_eq!(harness.operands(result), [*root, *root]);
+        assert_eq!(stores_to(&harness.func, stack_map.slot), 1);
+        for block in [entry, join] {
+            assert!(
+                harness
+                    .func
+                    .layout
+                    .block_insts(block)
+                    .all(|inst| { harness.func.dfg.insts[inst].opcode() != ir::Opcode::Store })
+            );
+        }
     }
 
     #[test]

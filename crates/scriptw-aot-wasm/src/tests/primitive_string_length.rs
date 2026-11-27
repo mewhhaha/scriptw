@@ -408,17 +408,18 @@ fn concat_length_has_two_actual_tag_guards_no_allocation_and_one_saved_operand_f
             _ => None,
         })
         .expect("widened total is bounded before conversion");
+    let max_len = crate::gc_types::MAX_STRING_LENGTH;
     assert_eq!(
         bound,
-        u32::MAX as u64,
-        "retain the original concat representable-unit boundary"
+        max_len as u64,
+        "retain the exact MAX_STRING_LENGTH concat representable-unit boundary"
     );
     for (left, right, admitted) in [
         (0, 0, true),
-        (u32::MAX, 0, true),
-        (u32::MAX - 1, 1, true),
-        (u32::MAX, 1, false),
-        (u32::MAX, u32::MAX, false),
+        (max_len, 0, true),
+        (max_len - 1, 1, true),
+        (max_len, 1, false),
+        (max_len, max_len, false),
     ] {
         assert_eq!(left as u64 + right as u64 <= bound, admitted);
     }
@@ -444,9 +445,18 @@ fn original_string_and_join_shapes_reach_real_primitive_consumers() {
     );
     let artifact = emit_script(dynamic).unwrap();
     validate_program(&artifact);
+    let dynamic_body = source_body(&artifact, "workload");
+    let string_concat = imported_helper(&artifact, "helper::string_concat");
+    let folded_eight = 8.0_f64.to_bits();
     assert!(
-        concat_length_branch(&source_body(&artifact, "workload")).is_some(),
-        "the unchanged dynamic-string workload reaches the fused outer consumer"
+        concat_length_branch(&dynamic_body).is_some()
+            || (dynamic_body.iter().any(|op| {
+                matches!(op, Operator::I64Const { value } if *value as u64 == folded_eight)
+                    || matches!(op, Operator::F64Const { value } if value.bits() == folded_eight)
+            }) && !dynamic_body.iter().any(|op| {
+                matches!(op, Operator::Call { function_index } if Some(*function_index) == string_concat)
+            })),
+        "the unchanged dynamic-string workload either reaches the fused outer consumer or folds its constant equal-length concat statically without string allocation"
     );
     for source in [
         include_str!(

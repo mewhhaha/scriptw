@@ -113,7 +113,7 @@ fn a_program_without_provider_callers_omits_the_intl_import() {
     // import: it is part of R's fixed host set, not a per-program gate. P
     // drops it, as every host function no P body calls.
     assert_eq!(
-        provider_import_counts("print(1);", HostSurfacePolicy::default()),
+        provider_import_counts("print({});", HostSurfacePolicy::default()),
         [1, 0]
     );
 }

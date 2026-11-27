@@ -1,6 +1,150 @@
 use super::buffer_source::TextDecoderInput;
 use super::*;
 
+// The existing PENDING backing holds a byte count and three carry bytes.
+// Fatal streaming errors can leave a longer queue, whose count is its
+// backing length minus the header byte.
+const CARRY_BYTES: i32 = 3;
+
+struct TextDecoderBytes<'a> {
+    current: &'a TextDecoderInput,
+    prior: GcLocal<ByteArray>,
+    prior_capacity: I32Local,
+    prior_length: I32Local,
+    current_offset: I32Local,
+    total: I32Local,
+}
+
+impl TextDecoderBytes<'_> {
+    fn read(
+        &self,
+        index: I32Local,
+        byte: I32Local,
+        builder: &mut FunctionBuilder<'_>,
+        f: &mut Function,
+    ) {
+        let s = builder.runtime_schema();
+        let at = s.reserve_i32_local(f);
+        let array = s.array_type::<ByteArray>();
+        index.load(f);
+        self.prior_length.load(f);
+        f.instruction(&Instruction::I32LtU);
+        builder.open_frame(ControlFrameKind::If, f);
+        index.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        at.store(f);
+        array.read(&self.prior, at, s, f).store(byte, f);
+        f.instruction(&Instruction::Else);
+        index.load(f);
+        self.current_offset.load(f);
+        f.instruction(&Instruction::I32Add);
+        at.store(f);
+        array.read(&self.current.bytes, at, s, f).store(byte, f);
+        builder.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        s.release_i32_local(at, f);
+    }
+
+    fn retain_tail(
+        &self,
+        decoder: &GcLocal<TextDecoderObject>,
+        from: I32Local,
+        builder: &mut FunctionBuilder<'_>,
+        f: &mut Function,
+    ) {
+        let s = builder.runtime_schema();
+        let array = s.array_type::<ByteArray>();
+        let count = s.reserve_i32_local(f);
+        let queued = s.reserve_i32_local(f);
+        let source = s.reserve_i32_local(f);
+        let destination = s.reserve_i32_local(f);
+        self.total.load(f);
+        from.load(f);
+        f.instruction(&Instruction::I32Sub);
+        count.store(f);
+
+        let tail = s.reserve_gc_local(f).initialize(self.prior.load(s, f), f);
+        self.prior_capacity.load(f);
+        f.instruction(&Instruction::I32Const(CARRY_BYTES + 1));
+        f.instruction(&Instruction::I32Ne);
+        count.load(f);
+        f.instruction(&Instruction::I32Const(CARRY_BYTES));
+        f.instruction(&Instruction::I32GtU);
+        f.instruction(&Instruction::I32Or);
+        builder.open_frame(ControlFrameKind::If, f);
+        let capacity = s.reserve_i32_local(f);
+        count.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        f.instruction(&Instruction::I32Const(CARRY_BYTES + 1));
+        count.load(f);
+        f.instruction(&Instruction::I32Const(CARRY_BYTES));
+        f.instruction(&Instruction::I32GtU);
+        f.instruction(&Instruction::Select);
+        capacity.store(f);
+        tail.replace(array.filled(GcOperand::i32(0), capacity, f), f);
+        s.release_i32_local(capacity, f);
+        s.field(TextDecoderObjectSchema::PENDING).write(
+            decoder,
+            GcOperand::reference(&tail, s),
+            s,
+            f,
+        );
+        builder.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        array.write(
+            &tail,
+            GcIndex::Constant(0),
+            GcOperand::i32_local(count),
+            s,
+            f,
+        );
+
+        queued.set_constant(0, f);
+        from.load(f);
+        self.prior_length.load(f);
+        f.instruction(&Instruction::I32LtU);
+        builder.open_frame(ControlFrameKind::If, f);
+        self.prior_length.load(f);
+        from.load(f);
+        f.instruction(&Instruction::I32Sub);
+        queued.store(f);
+        from.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        source.store(f);
+        destination.set_constant(1, f);
+        array.copy_range_from(&tail, destination, &self.prior, source, queued, s, f);
+        builder.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+
+        count.load(f);
+        queued.load(f);
+        f.instruction(&Instruction::I32Sub);
+        count.store(f);
+        count.load(f);
+        builder.open_frame(ControlFrameKind::If, f);
+        queued.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        destination.store(f);
+        self.total.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32Sub);
+        self.current_offset.load(f);
+        f.instruction(&Instruction::I32Add);
+        source.store(f);
+        array.copy_range_from(&tail, destination, &self.current.bytes, source, count, s, f);
+        builder.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        tail.clear(f);
+        for local in [destination, source, queued, count] {
+            s.release_i32_local(local, f);
+        }
+    }
+}
+
 impl FunctionBuilder<'_> {
     fn emit_text_decoder_brand(
         &mut self,
@@ -239,12 +383,11 @@ impl FunctionBuilder<'_> {
             self.emit_alloc_plain_object_with_prototype(Some(output.value()), f)?,
             f,
         );
-        let zero = s.reserve_i32_local(f);
-        f.instruction(&Instruction::I32Const(0));
-        zero.store(f);
+        let capacity = s.reserve_i32_local(f);
+        capacity.set_constant(CARRY_BYTES + 1, f);
         let bytes = s.reserve_gc_local(f).initialize(
             s.array_type::<ByteArray>()
-                .filled(GcOperand::i32(0), zero, f),
+                .filled(GcOperand::i32(0), capacity, f),
             f,
         );
         let decoder = s.reserve_gc_local(f).initialize(
@@ -266,7 +409,7 @@ impl FunctionBuilder<'_> {
         decoder.clear(f);
         bytes.clear(f);
         header.clear(f);
-        s.release_i32_local(zero, f);
+        s.release_i32_local(capacity, f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         self.completion().copy_from(&output, f);
@@ -382,11 +525,16 @@ impl FunctionBuilder<'_> {
         let old_stream = s.reserve_i32_local(f);
         let fatal = s.reserve_i32_local(f);
         let ignore_bom = s.reserve_i32_local(f);
+        let initial_bom = s.reserve_i32_local(f);
         let bom_seen = s.reserve_i32_local(f);
-        let prior_count = s.reserve_i32_local(f);
+        let prior_capacity = s.reserve_i32_local(f);
+        let prior_length = s.reserve_i32_local(f);
+        let current_offset = s.reserve_i32_local(f);
         let total = s.reserve_i32_local(f);
         let index = s.reserve_i32_local(f);
-        let at = s.reserve_i32_local(f);
+        let retain_from = s.reserve_i32_local(f);
+        let rendering = s.reserve_i32_local(f);
+        let failed = s.reserve_i32_local(f);
         let scalar = s.reserve_i32_local(f);
         let byte = s.reserve_i32_local(f);
         let start = s.reserve_i32_local(f);
@@ -408,7 +556,7 @@ impl FunctionBuilder<'_> {
             .store(ignore_bom, f);
         s.field(TextDecoderObjectSchema::BOM_SEEN)
             .read(decoder, s, f)
-            .store(bom_seen, f);
+            .store(initial_bom, f);
         let prior = s.reserve_gc_local(f).initialize(
             s.field(TextDecoderObjectSchema::PENDING)
                 .read(decoder, s, f)
@@ -416,14 +564,26 @@ impl FunctionBuilder<'_> {
             f,
         );
         s.array_type::<ByteArray>().length(&prior, s, f);
-        prior_count.store(f);
+        prior_capacity.store(f);
         old_stream.load(f);
-        f.instruction(&Instruction::I32Eqz);
         self.open_frame(ControlFrameKind::If, f);
-        f.instruction(&Instruction::I32Const(0));
-        prior_count.store(f);
-        f.instruction(&Instruction::I32Const(0));
-        bom_seen.store(f);
+        prior_capacity.load(f);
+        f.instruction(&Instruction::I32Const(CARRY_BYTES + 1));
+        f.instruction(&Instruction::I32Eq);
+        self.open_frame(ControlFrameKind::If, f);
+        s.array_type::<ByteArray>()
+            .read(&prior, GcIndex::Constant(0), s, f)
+            .store(prior_length, f);
+        f.instruction(&Instruction::Else);
+        prior_capacity.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Sub);
+        prior_length.store(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::Else);
+        prior_length.set_constant(0, f);
+        initial_bom.set_constant(0, f);
         s.field(TextDecoderObjectSchema::BOM_SEEN)
             .write(decoder, GcOperand::boolean(false), s, f);
         self.pop_control(ControlFrameKind::If);
@@ -434,92 +594,104 @@ impl FunctionBuilder<'_> {
             s,
             f,
         );
-        // Normal chunk boundaries retain at most three bytes. Fatal streaming
-        // errors can retain the rest of the input in the decoder I/O queue.
-        prior_count.load(f);
-        f.instruction(&Instruction::I64ExtendI32U);
+
+        // The decoder cursor spans the retained queue and the new input.
+        // Both are stable across the sizing and rendering passes.
+        prior_length.load(f);
         input.length.load(f);
-        f.instruction(&Instruction::I64ExtendI32U);
-        f.instruction(&Instruction::I64Add);
-        f.instruction(&Instruction::I64Const(i32::MAX as i64));
-        f.instruction(&Instruction::I64GtU);
+        f.instruction(&Instruction::I32Add);
+        total.store(f);
+        total.load(f);
+        f.instruction(&Instruction::I32Const(i32::MAX));
+        f.instruction(&Instruction::I32GtU);
         self.open_frame(ControlFrameKind::If, f);
         f.instruction(&Instruction::Unreachable);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        prior_count.load(f);
-        input.length.load(f);
-        f.instruction(&Instruction::I32Add);
-        total.store(f);
-        // No JavaScript runs while these bytes are borrowed. A retained prefix
-        // needs a joined copy; otherwise the cursor starts at the live offset.
-        let bytes = s.reserve_gc_local(f).initialize(input.bytes.load(s, f), f);
         input.start.load(f);
-        index.store(f);
-        prior_count.load(f);
+        prior_length.load(f);
+        f.instruction(&Instruction::I32Sub);
+        current_offset.store(f);
+        let bytes = TextDecoderBytes {
+            current: input,
+            prior,
+            prior_capacity,
+            prior_length,
+            current_offset,
+            total,
+        };
+
+        let slot = s.reserve_gc_local(f);
+        slot.hold_null_until_initialized(s, f);
+        written.set_constant(0, f);
+        rendering.set_constant(0, f);
+        failed.set_constant(0, f);
+        let completed = self.open_frame(ControlFrameKind::Block, f);
+        let pass = self.open_frame(ControlFrameKind::Loop, f);
+        rendering.load(f);
         self.open_frame(ControlFrameKind::If, f);
-        let joined = s.reserve_gc_local(f).initialize(
-            s.array_type::<ByteArray>()
-                .filled(GcOperand::i32(0), total, f),
-            f,
-        );
-        f.instruction(&Instruction::I32Const(0));
-        at.store(f);
-        s.array_type::<ByteArray>()
-            .copy_range_from(&joined, at, &prior, at, prior_count, s, f);
-        s.array_type::<ByteArray>().copy_range_from(
-            &joined,
-            prior_count,
-            &input.bytes,
-            input.start,
-            input.length,
-            s,
-            f,
-        );
-        bytes.replace(joined.load(s, f), f);
-        at.load(f);
-        index.store(f);
-        joined.clear(f);
+        let construction = StringConstruction::allocate(s, slot, written, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        let construction = StringConstruction::allocate(s, s.reserve_gc_local(f), total, f);
+        initial_bom.load(f);
+        bom_seen.store(f);
         total.load(f);
-        index.load(f);
-        f.instruction(&Instruction::I32Add);
-        total.store(f);
-        f.instruction(&Instruction::I32Const(0));
-        written.store(f);
-        f.instruction(&Instruction::I32Const(0));
-        prior_count.store(f);
-        // The I/O queue is consumed; an already empty pending array is kept.
-        s.array_type::<ByteArray>().length(&prior, s, f);
-        self.open_frame(ControlFrameKind::If, f);
-        let empty = s.reserve_gc_local(f).initialize(
-            s.array_type::<ByteArray>()
-                .filled(GcOperand::i32(0), prior_count, f),
-            f,
-        );
-        s.field(TextDecoderObjectSchema::PENDING).write(
-            decoder,
-            GcOperand::reference(&empty, s),
-            s,
-            f,
-        );
-        empty.clear(f);
-        self.pop_control(ControlFrameKind::If);
-        f.instruction(&Instruction::End);
+        retain_from.store(f);
+        index.set_constant(0, f);
+        written.set_constant(0, f);
+
         let decoded = self.open_frame(ControlFrameKind::Block, f);
         let next = self.open_frame(ControlFrameKind::Loop, f);
         index.load(f);
         total.load(f);
         f.instruction(&Instruction::I32GeU);
         self.emit_branch_if_to_target(decoded, f);
-        // An ASCII byte after the BOM decision is its own scalar and code
-        // unit, so a leaf kernel copies each such run. The backing holds a
-        // unit for every byte, and no sequence yields more units than bytes.
+        // Once the BOM decision is made, count or widen a whole ASCII run
+        // from the current segment. The unusual retained fatal queue can
+        // use the scalar path.
         bom_seen.load(f);
+        index.load(f);
+        prior_length.load(f);
+        f.instruction(&Instruction::I32GeU);
+        f.instruction(&Instruction::I32And);
         self.open_frame(ControlFrameKind::If, f);
-        construction.widen_ascii_from(written, &bytes, index, total, base, s, f);
+        let position = s.reserve_i32_local(f);
+        let end = s.reserve_i32_local(f);
+        index.load(f);
+        current_offset.load(f);
+        f.instruction(&Instruction::I32Add);
+        position.store(f);
+        total.load(f);
+        current_offset.load(f);
+        f.instruction(&Instruction::I32Add);
+        end.store(f);
+        rendering.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let current = s
+            .reserve_gc_local(f)
+            .initialize(input.bytes.load(s, f).require_non_null(f), f);
+        construction.widen_ascii_from(written, &current, position, end, base, s, f);
+        current.clear(f);
+        f.instruction(&Instruction::Else);
+        let run_start = s.reserve_i32_local(f);
+        position.load(f);
+        run_start.store(f);
+        self.emit_text_decoder_count_ascii(input, position, end, f);
+        written.load(f);
+        position.load(f);
+        run_start.load(f);
+        f.instruction(&Instruction::I32Sub);
+        f.instruction(&Instruction::I32Add);
+        written.store(f);
+        s.release_i32_local(run_start, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        position.load(f);
+        current_offset.load(f);
+        f.instruction(&Instruction::I32Sub);
+        index.store(f);
+        s.release_i32_local(end, f);
+        s.release_i32_local(position, f);
         index.load(f);
         total.load(f);
         f.instruction(&Instruction::I32GeU);
@@ -528,13 +700,8 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::End);
         index.load(f);
         start.store(f);
-        s.array_type::<ByteArray>()
-            .read(&bytes, index, s, f)
-            .store(byte, f);
-        index.load(f);
-        f.instruction(&Instruction::I32Const(1));
-        f.instruction(&Instruction::I32Add);
-        index.store(f);
+        bytes.read(index, byte, self, f);
+        increment_decoder_index(index, f);
         byte.load(f);
         scalar.store(f);
         f.instruction(&Instruction::I32Const(1));
@@ -608,27 +775,9 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, f);
         stream.load(f);
         self.open_frame(ControlFrameKind::If, f);
-        // Retain exactly the unfinished sequence. A final flush emits one
-        // replacement or a fatal error for the entire unfinished prefix.
-        total.load(f);
+        // The unfinished sequence is retained after the rendering pass.
         start.load(f);
-        f.instruction(&Instruction::I32Sub);
-        prior_count.store(f);
-        let tail = s.reserve_gc_local(f).initialize(
-            s.array_type::<ByteArray>()
-                .filled(GcOperand::i32(0), prior_count, f),
-            f,
-        );
-        at.set_constant(0, f);
-        s.array_type::<ByteArray>()
-            .copy_range_from(&tail, at, &bytes, start, prior_count, s, f);
-        s.field(TextDecoderObjectSchema::PENDING).write(
-            decoder,
-            GcOperand::reference(&tail, s),
-            s,
-            f,
-        );
-        tail.clear(f);
+        retain_from.store(f);
         self.emit_branch_to_target(decoded, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
@@ -637,9 +786,7 @@ impl FunctionBuilder<'_> {
         self.emit_branch_to_target(sequence_done, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        s.array_type::<ByteArray>()
-            .read(&bytes, index, s, f)
-            .store(byte, f);
+        bytes.read(index, byte, self, f);
         byte.load(f);
         lower.load(f);
         f.instruction(&Instruction::I32LtU);
@@ -680,39 +827,16 @@ impl FunctionBuilder<'_> {
         self.open_frame(ControlFrameKind::If, f);
         fatal.load(f);
         self.open_frame(ControlFrameKind::If, f);
-        // Fatal errors do not serialize this call's output. Preserve its
-        // unread I/O queue for a streaming retry, while leaving BOM state at
-        // the last successfully serialized chunk.
+        // The error leaves the BOM flag at its last serialized value.
+        // Keep any unread bytes before reporting a fatal streaming error.
         stream.load(f);
         self.open_frame(ControlFrameKind::If, f);
-        total.load(f);
         index.load(f);
-        f.instruction(&Instruction::I32Sub);
-        prior_count.store(f);
-        let tail = s.reserve_gc_local(f).initialize(
-            s.array_type::<ByteArray>()
-                .filled(GcOperand::i32(0), prior_count, f),
-            f,
-        );
-        f.instruction(&Instruction::I32Const(0));
-        at.store(f);
-        s.array_type::<ByteArray>()
-            .copy_range_from(&tail, at, &bytes, index, prior_count, s, f);
-        s.field(TextDecoderObjectSchema::PENDING).write(
-            decoder,
-            GcOperand::reference(&tail, s),
-            s,
-            f,
-        );
-        tail.clear(f);
+        retain_from.store(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
-        self.emit_throw_current_function_realm_type_error(
-            RuntimeErrorMessage::TEXT_DECODER_INVALID_DATA,
-            output,
-            f,
-        )?;
-        self.emit_branch_to_target(exit, f);
+        failed.set_constant(1, f);
+        self.emit_branch_to_target(completed, f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         f.instruction(&Instruction::I32Const(0xfffd));
@@ -738,6 +862,8 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Const(0xffff));
         f.instruction(&Instruction::I32GtU);
         self.open_frame(ControlFrameKind::If, f);
+        rendering.load(f);
+        self.open_frame(ControlFrameKind::If, f);
         scalar.load(f);
         f.instruction(&Instruction::I32Const(0x10000));
         f.instruction(&Instruction::I32Sub);
@@ -747,10 +873,6 @@ impl FunctionBuilder<'_> {
         f.instruction(&Instruction::I32Add);
         unit.store(f);
         construction.write(written, unit, s, f);
-        written.load(f);
-        f.instruction(&Instruction::I32Const(1));
-        f.instruction(&Instruction::I32Add);
-        written.store(f);
         scalar.load(f);
         f.instruction(&Instruction::I32Const(0x3ff));
         f.instruction(&Instruction::I32And);
@@ -759,17 +881,41 @@ impl FunctionBuilder<'_> {
         scalar.store(f);
         self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
+        increment_decoder_index(written, f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        rendering.load(f);
+        self.open_frame(ControlFrameKind::If, f);
         construction.write(written, scalar, s, f);
-        written.load(f);
-        f.instruction(&Instruction::I32Const(1));
-        f.instruction(&Instruction::I32Add);
-        written.store(f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        increment_decoder_index(written, f);
         self.pop_control(ControlFrameKind::Block);
         f.instruction(&Instruction::End);
         self.emit_branch_to_target(next, f);
         self.pop_control(ControlFrameKind::Loop);
         f.instruction(&Instruction::End);
         self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        rendering.load(f);
+        self.emit_branch_if_to_target(completed, f);
+        rendering.set_constant(1, f);
+        self.emit_branch_to_target(pass, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+
+        bytes.retain_tail(decoder, retain_from, self, f);
+        failed.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        self.emit_throw_current_function_realm_type_error(
+            RuntimeErrorMessage::TEXT_DECODER_INVALID_DATA,
+            output,
+            f,
+        )?;
+        self.emit_branch_to_target(exit, f);
+        self.pop_control(ControlFrameKind::If);
         f.instruction(&Instruction::End);
         s.field(TextDecoderObjectSchema::BOM_SEEN).write(
             decoder,
@@ -779,12 +925,11 @@ impl FunctionBuilder<'_> {
         );
         let text = s
             .reserve_gc_local(f)
-            .initialize(construction.publish_prefix(written, s, f), f);
+            .initialize(construction.publish(s, f), f);
         output.value().set_reference(&text, s, f);
         output.set_kind(CompletionKind::Normal, f);
         text.clear(f);
-        bytes.clear(f);
-        prior.clear(f);
+        bytes.prior.clear(f);
         for local in [
             unit,
             written,
@@ -796,11 +941,16 @@ impl FunctionBuilder<'_> {
             start,
             byte,
             scalar,
-            at,
+            failed,
+            rendering,
+            retain_from,
             index,
             total,
-            prior_count,
+            current_offset,
+            prior_length,
+            prior_capacity,
             bom_seen,
+            initial_bom,
             ignore_bom,
             fatal,
             old_stream,
@@ -809,4 +959,35 @@ impl FunctionBuilder<'_> {
         }
         Ok(())
     }
+
+    fn emit_text_decoder_count_ascii(
+        &self,
+        input: &TextDecoderInput,
+        position: I32Local,
+        end: I32Local,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        f.instruction(&Instruction::Block(BlockType::Empty));
+        f.instruction(&Instruction::Loop(BlockType::Empty));
+        s.array_type::<ByteArray>()
+            .read(&input.bytes, position, s, f);
+        f.instruction(&Instruction::I32Const(0x80));
+        f.instruction(&Instruction::I32GeU);
+        f.instruction(&Instruction::BrIf(1));
+        increment_decoder_index(position, f);
+        position.load(f);
+        end.load(f);
+        f.instruction(&Instruction::I32LtU);
+        f.instruction(&Instruction::BrIf(0));
+        f.instruction(&Instruction::End);
+        f.instruction(&Instruction::End);
+    }
+}
+
+fn increment_decoder_index(local: I32Local, f: &mut Function) {
+    local.load(f);
+    f.instruction(&Instruction::I32Const(1));
+    f.instruction(&Instruction::I32Add);
+    local.store(f);
 }

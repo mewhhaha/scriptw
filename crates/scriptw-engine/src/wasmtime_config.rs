@@ -4,7 +4,7 @@
 use crate::wasmtime_policy::PRODUCT_WASMTIME_POLICY;
 use wasmtime::{Config, ModuleVersionStrategy, OptLevel, RegallocAlgorithm, WasmBacktraceDetails};
 
-pub(crate) const CONFIGURATION_SCHEMA: u32 = 7;
+pub(crate) const CONFIGURATION_SCHEMA: u32 = 8;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum WasmNativeCompilationMode {
@@ -37,10 +37,9 @@ pub(crate) const WASM_STORE_MEMORY_CAP_BYTES: usize = 1024 * 1024 * 1024;
 pub(crate) const WASM_HEAP_RESERVATION_BYTES: u64 = 1 << 32;
 const _: () = assert!(WASM_HEAP_RESERVATION_BYTES >= WASM_STORE_MEMORY_CAP_BYTES as u64);
 pub(crate) const WASM_LINEAR_MEMORY_GUARD_BYTES: u64 = 32 * 1024 * 1024;
-// Semi-spaces with room for bootstrap and short-lived records, rather than
-// copying their live graph while growing from zero. Pages commit on demand;
-// the Store limit and the collector's growth and collection paths still apply.
-pub(crate) const WASM_GC_HEAP_INITIAL_BYTES: usize = 16 * 1024 * 1024;
+// The copying collector starts with a 4 MiB nursery and two nominal 14 MiB
+// old semi-spaces. Pages commit on demand. The Store limit still caps growth.
+pub(crate) const WASM_GC_HEAP_INITIAL_BYTES: usize = 32 * 1024 * 1024;
 const _: () = assert!(WASM_GC_HEAP_INITIAL_BYTES < WASM_STORE_MEMORY_CAP_BYTES);
 
 pub(crate) fn base_config(

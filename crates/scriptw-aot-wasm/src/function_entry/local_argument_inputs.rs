@@ -3,8 +3,9 @@ use super::runtime_dispatch::{emit_opaque_native_caller, NativeCallerBoundary};
 use super::*;
 use crate::gc_types::{
     ExecutableCode, ExecutableCodeSchema, FunctionLocal, FunctionObject, GcCallResult,
-    GcEntryFunctionRole, GcLocal, LocalArgumentsCallable, Nullable, ProgramInstanceLocals,
-    RealmRecord, RuntimeSchema, ValueLocals, WideLocalArgumentsCallable,
+    GcEntryFunctionRole, GcLocal, GcNullability, LocalArgumentsCallable, Nullable,
+    ProgramInstanceLocals, RealmRecord, RuntimeSchema, ValueArray, ValueLocals,
+    WideLocalArgumentsCallable,
 };
 
 /// Each typed role owns the matching physical entry field and argument extent.
@@ -42,8 +43,8 @@ macro_rules! local_arguments_role {
 local_arguments_role!(LocalArgumentsCallable, Narrow, LOCAL_ARGUMENTS_ENTRY);
 local_arguments_role!(WideLocalArgumentsCallable, Wide, WIDE_LOCAL_ARGUMENTS_ENTRY);
 
-/// The published typed entry owns its bounded argument semantics. Missing
-/// actuals are padded; eligible entries cannot observe an omitted argc.
+/// Local callers pass the actual values only. Missing lanes are padded while
+/// the wide ABI carries the original count and marks the vector as absent.
 pub(crate) struct LocalArgumentCallInputs<'a, R: LocalArgumentsCallableRole> {
     receiver: &'a ValueLocals,
     arguments: &'a [&'a ValueLocals],
@@ -164,6 +165,14 @@ impl<'a, R: LocalArgumentsCallableRole> LocalArgumentCallInputs<'a, R> {
                 .copied()
                 .unwrap_or(self.padding)
                 .emit(function);
+        }
+        if R::ARITY.projection_parameters().is_some() {
+            function.instruction(&Instruction::I32Const(self.arguments.len() as i32));
+            function.instruction(&Instruction::RefNull(
+                schema
+                    .reference_type::<ValueArray>(GcNullability::Nullable)
+                    .heap_type,
+            ));
         }
         self.caller_realm.load(schema, function);
         self.calling_program.reference(schema, function);

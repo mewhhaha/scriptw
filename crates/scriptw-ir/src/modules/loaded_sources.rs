@@ -1,8 +1,9 @@
 use scriptw_front::{ParseGoal, ParsedModule, ParsedScript, ParsedSource, SourceUnit};
 
 use super::module_key::{ModuleKey, ANONYMOUS_MODULE_KEY};
+use super::realm_request::RealmRequestScan;
 use super::record::{
-    loading_requests_with_dynamic_imports, module_dynamic_import_sites,
+    loading_requests_with_dynamic_imports, module_dynamic_import_sites, scan_graph_requests,
     scan_module_loading_requests, scan_module_requests, scan_script_module_requests,
     script_dynamic_import_sites, ModuleRequestIr, ModuleRequestKeyIr, ModuleUnitId,
 };
@@ -178,9 +179,9 @@ impl ModuleSourceIr {
 
     /// Parses JSON exactly once under its own grammar, retaining the actual result.
     pub fn json(key: ModuleKey, source_text: String, meta_url: String) -> Self {
-        let parse = match scriptw_front::parse_json(source_text.clone()) {
+        let parse = match scriptw_front::parse_json_retaining_source(source_text) {
             Ok(parsed) => ModuleParse::Json(parsed),
-            Err(error) => ModuleParse::JsonRejected { source_text, error },
+            Err((source_text, error)) => ModuleParse::JsonRejected { source_text, error },
         };
         Self {
             foreign: None,
@@ -265,20 +266,12 @@ impl ModuleSourceIr {
             goal: ParseGoal::Module,
             filename: Some(key.as_str().to_string()),
         };
-        let parse = match scriptw_front::parse(source_text.clone(), options) {
+        let parse = match scriptw_front::parse_retaining_source(source_text, options) {
             Ok(ParsedSource::Module(source)) => ModuleParse::Module(source),
             Ok(ParsedSource::Script(_)) => {
                 unreachable!("Module parse options cannot produce Script syntax")
             }
-            Err(error) => ModuleParse::Rejected {
-                source: SourceUnit {
-                    encoding: scriptw_front::SourceTextEncoding::Utf8,
-                    goal: ParseGoal::Module,
-                    filename: Some(key.as_str().to_string()),
-                    source_text,
-                },
-                error,
-            },
+            Err((source, error)) => ModuleParse::Rejected { source, error },
         };
         Self {
             foreign: None,
@@ -380,15 +373,71 @@ impl ModuleSourceIr {
             | ModuleParse::Bytes(_)
             | ModuleParse::Text(_)
             | ModuleParse::ModuleSource { .. } => Some(Vec::new()),
-            ModuleParse::ScriptEntry(source) => Some(loading_requests_with_dynamic_imports(
-                Vec::new(),
-                &script_dynamic_import_sites(source)
-                    .into_iter()
-                    .chain(self.prepared_script_import_sites.iter().cloned())
-                    .collect::<Vec<_>>(),
-            )),
+            ModuleParse::ScriptEntry(source) => {
+                let requests = if source.has_dynamic_import() {
+                    source.with_compiler_session(|ast, interner| {
+                        scan_graph_requests(ast, interner, None).0
+                    })
+                } else {
+                    Vec::new()
+                };
+                Some(loading_requests_with_dynamic_imports(
+                    requests,
+                    &self.prepared_script_import_sites,
+                ))
+            }
             ModuleParse::Rejected { .. } | ModuleParse::JsonRejected { .. } => None,
         }
+    }
+
+    /// Discover the two host request origins together while retaining source
+    /// phase and first-key order. Rejected records contribute no requests.
+    #[doc(hidden)]
+    pub fn graph_loading_requests(&self) -> (Vec<ModuleRequestIr>, Vec<ModuleRequestKeyIr>) {
+        match &self.parse {
+            ModuleParse::Module(source) => source.with_compiler_session(|ast, interner| {
+                scan_graph_requests(ast, interner, RealmRequestScan::new(interner))
+            }),
+            ModuleParse::ScriptEntry(source) => {
+                let (requests, realm) =
+                    Self::script_graph_loading_requests(source).unwrap_or_default();
+                if self.prepared_script_import_sites.is_empty() {
+                    (requests, realm)
+                } else {
+                    (
+                        loading_requests_with_dynamic_imports(
+                            requests,
+                            &self.prepared_script_import_sites,
+                        ),
+                        realm,
+                    )
+                }
+            }
+            ModuleParse::Json(_)
+            | ModuleParse::Bytes(_)
+            | ModuleParse::Text(_)
+            | ModuleParse::ModuleSource { .. }
+            | ModuleParse::Rejected { .. }
+            | ModuleParse::JsonRejected { .. } => (Vec::new(), Vec::new()),
+        }
+    }
+
+    /// A computed `import()` still needs a graph even when discovery returns
+    /// no static target. Graph-free scripts can skip the walk entirely when
+    /// callable validation saw no imports and no matching method was interned.
+    #[doc(hidden)]
+    pub fn script_graph_loading_requests(
+        source: &ParsedScript,
+    ) -> Option<(Vec<ModuleRequestIr>, Vec<ModuleRequestKeyIr>)> {
+        source.with_compiler_session(|ast, interner| {
+            let realm = RealmRequestScan::new(interner);
+            let has_dynamic_import = source.has_dynamic_import();
+            if !has_dynamic_import && realm.is_none() {
+                return None;
+            }
+            let requests = scan_graph_requests(ast, interner, realm);
+            (has_dynamic_import || !requests.1.is_empty()).then_some(requests)
+        })
     }
 
     /// Retained AST metadata for actual import call sites, including literal
@@ -423,7 +472,7 @@ impl ModuleSourceIr {
     pub fn script_has_dynamic_import_sites(&self) -> Option<bool> {
         match &self.parse {
             ModuleParse::ScriptEntry(source) => Some(
-                !script_dynamic_import_sites(source).is_empty()
+                source.has_dynamic_import()
                     || !self.prepared_script_import_sites.is_empty()
                     || !self.realm_module_requests().is_empty(),
             ),

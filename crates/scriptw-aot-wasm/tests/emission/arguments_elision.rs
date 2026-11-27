@@ -115,6 +115,7 @@ fn complete_ordinary_walks_omit_arguments_without_widening_five_formal_entries()
                     return a(e);
                 }
                 export function observed(a, b, c, d, e) { return arguments[0]; }
+                export function escaped(a, b, c, d, e) { return arguments; }
                 export function captured(a, b, c, d, e) { return () => arguments[4]; }
                 export function small(row, key) { row.value = key; return row.value == key; }
                 export function smallObserved(row, key) { row.value = key; return arguments[0]; }
@@ -135,6 +136,7 @@ fn complete_ordinary_walks_omit_arguments_without_widening_five_formal_entries()
                         "scan",
                         "classify",
                         "observed",
+                        "escaped",
                         "captured",
                         "small",
                         "smallObserved",
@@ -160,25 +162,26 @@ fn complete_ordinary_walks_omit_arguments_without_widening_five_formal_entries()
             .expect("actual R/P validate");
     }
     let program = Module::read(&artifact.bytes, true);
-    let observed = functions
+    let escaped = functions
         .iter()
-        .find(|(name, _)| name == "observed")
+        .find(|(name, _)| name == "escaped")
         .unwrap();
-    let (observed_index, observed_body) = program.named(&format!("js::observed#{}", observed.1));
-    let vector_signature = program.function_type(observed_index);
+    let (escaped_index, escaped_body) = program.named(&format!("js::escaped#{}", escaped.1));
+    let vector_signature = program.function_type(escaped_index);
     assert_eq!(vector_signature.params().len(), 11, "ordinary vector ABI");
-    let locals = local_types(&artifact.bytes, observed_index, vector_signature.params());
-    let arguments = arguments_type(observed_body, &locals);
+    let locals = local_types(&artifact.bytes, escaped_index, vector_signature.params());
+    let arguments = arguments_type(escaped_body, &locals);
     assert_eq!(
-        allocations(observed_body, arguments),
+        allocations(escaped_body, arguments),
         1,
-        "the observed control allocates its actual Arguments type"
+        "the escaped control allocates its actual Arguments type"
     );
     let bodies = module_bodies(&artifact.bytes);
     for name in [
         "scan",
         "classify",
         "observed",
+        "escaped",
         "captured",
         "small",
         "smallObserved",
@@ -190,15 +193,21 @@ fn complete_ordinary_walks_omit_arguments_without_widening_five_formal_entries()
         assert!(!selected.is_empty(), "the source {name} was lowered");
         for (_, id) in selected {
             let (index, body) = program.named(&format!("js::{name}#{id}"));
-            let expected = usize::from(matches!(name, "observed" | "captured" | "smallObserved"));
+            let expected = usize::from(matches!(
+                name,
+                "observed" | "escaped" | "captured" | "smallObserved"
+            ));
             assert_eq!(
                 allocations(body, arguments),
                 expected,
                 "{name} arguments materialization"
             );
             let signature = program.function_type(index);
-            if matches!(name, "small" | "scan" | "classify") {
-                let expected_parameters = if name == "small" { 15 } else { 24 };
+            if matches!(
+                name,
+                "small" | "scan" | "classify" | "observed" | "smallObserved"
+            ) {
+                let expected_parameters = if name == "small" { 15 } else { 29 };
                 assert_eq!(
                     signature.params().len(),
                     expected_parameters,
@@ -218,7 +227,7 @@ fn complete_ordinary_walks_omit_arguments_without_widening_five_formal_entries()
                     !bodies
                         .iter()
                         .any(|body| body.name == format!("js-arguments-adapter::{name}#{id}")),
-                    "five-formal and observing functions do not gain a local-entry adapter"
+                    "escaping and capturing functions do not gain a local-entry adapter"
                 );
             }
         }

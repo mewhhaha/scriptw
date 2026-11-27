@@ -152,7 +152,8 @@ static_signature_domain! {
         Gc(GcLayout::ProgramInstance, NonNullable)], COMPLETION_TYPES),
     WideLocalArgumentsFunction => ([Gc(GcLayout::FunctionObject, NonNullable), I32, I64, EqRef,
         I32, I64, EqRef, I32, I64, EqRef, I32, I64, EqRef,
-        I32, I64, EqRef, I32, I64, EqRef, I32, I64, EqRef,
+        I32, I64, EqRef, I32, I64, EqRef, I32, I64, EqRef, I32, I64, EqRef,
+        I32, Gc(GcLayout::ValueArray, Nullable),
         Gc(GcLayout::RealmRecord, NonNullable),
         Gc(GcLayout::ProgramInstance, NonNullable)], COMPLETION_TYPES),
     GeneratorFunction => ([Gc(GcLayout::FunctionObject, NonNullable), I32, I64, EqRef,
@@ -199,6 +200,26 @@ static_signature_domain! {
 // Deriving membership from actual operands prevents a new signature from
 // silently acquiring a different canonical type or shifting its declared index.
 const _: () = assert!(StaticSignature::singleton_signatures_are_first());
+
+impl StaticSignature {
+    /// The print-only module needs Main and HostPrint, both independent of
+    /// the runtime type group. Keep their usual indices and signature rows.
+    pub(crate) fn append_through_host_print(types: &mut wasm_encoder::TypeSection) {
+        let resolve = |ty: &AbiType| match ty {
+            I32 => ValType::I32,
+            I64 => ValType::I64,
+            EqRef => ValType::Ref(wasm_encoder::RefType::EQREF),
+            _ => unreachable!("print-only signature prefix uses scalar and eqref types"),
+        };
+        for &signature in &Self::ALL[..=Self::HostPrint.type_index() as usize] {
+            assert_eq!(types.len(), signature.type_index());
+            types.ty().function(
+                signature.parameter_types().iter().map(resolve),
+                signature.result_types().iter().map(resolve),
+            );
+        }
+    }
+}
 
 #[cfg(test)]
 mod program_ownership_tests;

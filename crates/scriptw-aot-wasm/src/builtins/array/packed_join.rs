@@ -2,8 +2,8 @@
 //! null and undefined. Unsupported values return to the ordered generic loop.
 use super::*;
 use crate::gc_types::{
-    CodeUnitArray, Nullable, PackedValueTable, StoredValueSchema, StringConstruction, StringValue,
-    StringValueSchema,
+    CodeUnitArray, Nullable, PackedValueTable, StoredValue, StoredValueSchema, StringConstruction,
+    StringValue, StringValueSchema,
 };
 use crate::runtime_helpers::{
     ArrayPackedJoinArguments, ArrayPackedJoinParameters, HelperParameters,
@@ -104,7 +104,6 @@ impl FunctionBuilder<'_> {
         let element = s.reserve_value_local(f);
         let index = s.reserve_i64_local(f);
         let total = s.reserve_i64_local(f);
-        let found = s.reserve_i32_local(f);
         let part_length = s.reserve_i32_local(f);
         let separator_length = s.reserve_i32_local(f);
         let offset = s.reserve_i32_local(f);
@@ -117,6 +116,9 @@ impl FunctionBuilder<'_> {
         s.array_type::<CodeUnitArray>()
             .length(&separator_units, s, f);
         separator_length.store(f);
+        let first_units = s
+            .reserve_gc_local::<CodeUnitArray, Nullable>(f)
+            .initialize_null(s, f);
         self.emit_with_packed_array_snapshot(
             receiver,
             length,
@@ -151,29 +153,38 @@ impl FunctionBuilder<'_> {
                 f.instruction(&Instruction::I64ExtendI32U);
                 f.instruction(&Instruction::I64Mul);
                 total.store(f);
+                // An oversized separator sum can decline before reading
+                // any values. The ordered fallback still owns any throws.
                 total.load(f);
-                f.instruction(&Instruction::I64Const(u32::MAX as i64));
+                f.instruction(&Instruction::I64Const(crate::gc_types::MAX_STRING_LENGTH));
                 f.instruction(&Instruction::I64GtU);
-                builder.open_frame(ControlFrameKind::If, f);
-                total.set_constant(u32::MAX as i64 + 1, f);
-                builder.pop_control(ControlFrameKind::If);
-                f.instruction(&Instruction::End);
+                builder.emit_branch_if_to_target(decline, f);
                 let all_strings = s.reserve_i32_local(f);
                 all_strings.set_constant(1, f);
-                // length <= values.len() <= i32::MAX was proven above.
                 let count32 = s.reserve_i32_local(f);
                 length.load(f);
                 f.instruction(&Instruction::I32WrapI64);
                 count32.store(f);
-                // PackedValueTable length is <= PACKED_INDEX_LIMIT (1 << 20),
-                // and every valid String is < 2^28 units, so sum < 2^48 << i64::MAX.
-                // Guard explicitly so even a hypothetical > 1M backing stays exact.
-                let need_saturate = s.reserve_i32_local(f);
-                count32.load(f);
-                f.instruction(&Instruction::I32Const(1 << 20));
-                f.instruction(&Instruction::I32GtU);
-                need_saturate.store(f);
-                slot.set_constant(0, f);
+                let uniform = builder.emit_packed_join_uniform_prefix(
+                    &values,
+                    count32,
+                    slot,
+                    &first_units,
+                    &element,
+                    part_length,
+                    f,
+                );
+                // The validated prefix contributes one length times its count.
+                // With at most u32::MAX elements of at most u32::MAX units,
+                // that product plus the checked separator sum fits in u64.
+                total.load(f);
+                slot.load(f);
+                f.instruction(&Instruction::I64ExtendI32U);
+                part_length.load(f);
+                f.instruction(&Instruction::I64ExtendI32U);
+                f.instruction(&Instruction::I64Mul);
+                f.instruction(&Instruction::I64Add);
+                total.store(f);
                 let validated = builder.open_frame(ControlFrameKind::Block, f);
                 let validate = builder.open_frame(ControlFrameKind::Loop, f);
                 slot.load(f);
@@ -213,17 +224,6 @@ impl FunctionBuilder<'_> {
                 total.store(f);
                 units.clear(f);
                 text.clear(f);
-                need_saturate.load(f);
-                builder.open_frame(ControlFrameKind::If, f);
-                total.load(f);
-                f.instruction(&Instruction::I64Const(u32::MAX as i64));
-                f.instruction(&Instruction::I64GtU);
-                builder.open_frame(ControlFrameKind::If, f);
-                total.set_constant(u32::MAX as i64 + 1, f);
-                builder.pop_control(ControlFrameKind::If);
-                f.instruction(&Instruction::End);
-                builder.pop_control(ControlFrameKind::If);
-                f.instruction(&Instruction::End);
                 f.instruction(&Instruction::Else);
                 all_strings.set_constant(0, f);
                 tag.load(f);
@@ -247,7 +247,6 @@ impl FunctionBuilder<'_> {
                 f.instruction(&Instruction::End);
                 builder.pop_control(ControlFrameKind::Block);
                 f.instruction(&Instruction::End);
-                s.release_i32_local(need_saturate, f);
                 s.release_i32_local(count32, f);
                 // Too long a result is the general join's RangeError, at the
                 // separator or element that crosses the limit; every value
@@ -287,6 +286,27 @@ impl FunctionBuilder<'_> {
                 result.set_reference(&text, s, f);
                 text.clear(f);
                 single.clear(f);
+                f.instruction(&Instruction::Else);
+                uniform.load(f);
+                builder.open_frame(ControlFrameKind::If, f);
+                let units = s
+                    .reserve_gc_local(f)
+                    .initialize(first_units.load(s, f).require_non_null(f), f);
+                let output_length = s.reserve_i32_local(f);
+                total.load(f);
+                f.instruction(&Instruction::I32WrapI64);
+                output_length.store(f);
+                builder.emit_uniform_packed_join(
+                    &units,
+                    part_length,
+                    &separator_units,
+                    separator_length,
+                    output_length,
+                    result,
+                    f,
+                );
+                s.release_i32_local(output_length, f);
+                units.clear(f);
                 f.instruction(&Instruction::Else);
                 total.load(f);
                 f.instruction(&Instruction::I32WrapI64);
@@ -598,6 +618,9 @@ impl FunctionBuilder<'_> {
                 f.instruction(&Instruction::End);
                 builder.pop_control(ControlFrameKind::If);
                 f.instruction(&Instruction::End);
+                builder.pop_control(ControlFrameKind::If);
+                f.instruction(&Instruction::End);
+                s.release_i32_local(uniform, f);
                 s.release_i32_local(all_strings, f);
                 s.release_i32_local(tag, f);
                 s.release_i32_local(slot, f);
@@ -606,14 +629,148 @@ impl FunctionBuilder<'_> {
                 Ok(())
             },
         )?;
+        first_units.clear(f);
         separator_units.clear(f);
         element.clear(f);
         s.release_i32_local(offset, f);
         s.release_i32_local(separator_length, f);
         s.release_i32_local(part_length, f);
-        s.release_i32_local(found, f);
         s.release_i64_local(total, f);
         s.release_i64_local(index, f);
         Ok(handled)
+    }
+
+    /// Leave the first unmatched slot for the normal validation loop.
+    fn emit_packed_join_uniform_prefix(
+        &mut self,
+        values: &GcLocal<PackedValueTable>,
+        count: I32Local,
+        slot: I32Local,
+        first_units: &GcLocal<CodeUnitArray, Nullable>,
+        element: &ValueLocals,
+        part_length: I32Local,
+        f: &mut Function,
+    ) -> I32Local {
+        let s = self.runtime_schema();
+        let first = s
+            .reserve_gc_local::<StringValue, Nullable>(f)
+            .initialize_null(s, f);
+        let row = s
+            .reserve_gc_local::<StoredValue, Nullable>(f)
+            .initialize_null(s, f);
+        slot.set_constant(0, f);
+        part_length.set_constant(0, f);
+        let complete = self.open_frame(ControlFrameKind::Block, f);
+        row.replace(
+            s.array_type::<PackedValueTable>()
+                .read(values, slot, s, f)
+                .reference(),
+            f,
+        );
+        row.load(s, f).is_null(f);
+        self.emit_branch_if_to_target(complete, f);
+        s.field(StoredValueSchema::TAG).read(&row, s, f);
+        f.instruction(&Instruction::I32Const(ValueKind::String.tag() as i32));
+        f.instruction(&Instruction::I32Ne);
+        self.emit_branch_if_to_target(complete, f);
+        s.field(StoredValueSchema::REFERENCE)
+            .read(&row, s, f)
+            .store_eq(element.reference(), f);
+        first.replace(element.cast_reference::<StringValue>(s, f).nullable(), f);
+        first_units.replace(
+            s.field(StringValueSchema::CODE_UNITS)
+                .read(&first, s, f)
+                .reference()
+                .nullable(),
+            f,
+        );
+        s.array_type::<CodeUnitArray>().length(first_units, s, f);
+        part_length.store(f);
+        slot.set_constant(1, f);
+        let next = self.open_frame(ControlFrameKind::Loop, f);
+        slot.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(complete, f);
+        let stored = s
+            .array_type::<PackedValueTable>()
+            .read(values, slot, s, f)
+            .reference()
+            .non_null_or_branch(self.local_branch_label(complete), f);
+        s.field(StoredValueSchema::REFERENCE).read_top(stored, f);
+        first.load(s, f);
+        // Only the String kind can carry this immutable String reference.
+        f.instruction(&Instruction::RefEq);
+        f.instruction(&Instruction::I32Eqz);
+        self.emit_branch_if_to_target(complete, f);
+        slot.load(f);
+        f.instruction(&Instruction::I32Const(1));
+        f.instruction(&Instruction::I32Add);
+        slot.store(f);
+        self.emit_branch_to_target(next, f);
+        self.pop_control(ControlFrameKind::Loop);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        f.instruction(&Instruction::End);
+        row.clear(f);
+        first.clear(f);
+        let uniform = s.reserve_i32_local(f);
+        slot.load(f);
+        count.load(f);
+        f.instruction(&Instruction::I32Eq);
+        uniform.store(f);
+        uniform
+    }
+
+    /// Seed the private result with the first element, then fill its
+    /// remaining UTF-16 span by doubling copies of `separator + element`.
+    fn emit_uniform_packed_join(
+        &mut self,
+        units: &GcLocal<CodeUnitArray>,
+        part_length: I32Local,
+        separator: &GcLocal<CodeUnitArray>,
+        separator_length: I32Local,
+        length: I32Local,
+        result: &ValueLocals,
+        f: &mut Function,
+    ) {
+        let s = self.runtime_schema();
+        let zero = s.reserve_i32_local(f);
+        zero.set_constant(0, f);
+        let extent = s.reserve_i32_local(f);
+        length.load(f);
+        part_length.load(f);
+        f.instruction(&Instruction::I32Sub);
+        extent.store(f);
+        let output = StringConstruction::allocate(s, s.reserve_gc_local(f), length, f);
+        output.copy_units_from(zero, units, part_length, s, f);
+        let pattern = s.reserve_gc_local(f).initialize(units.load(s, f), f);
+        separator_length.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        part_length.load(f);
+        self.open_frame(ControlFrameKind::If, f);
+        let period = s.reserve_i32_local(f);
+        separator_length.load(f);
+        part_length.load(f);
+        f.instruction(&Instruction::I32Add);
+        period.store(f);
+        let seed = StringConstruction::allocate(s, s.reserve_gc_local(f), period, f);
+        seed.copy_units_from(zero, separator, separator_length, s, f);
+        seed.copy_units_from(separator_length, units, part_length, s, f);
+        pattern.replace(seed.publish_units(s, f), f);
+        s.release_i32_local(period, f);
+        f.instruction(&Instruction::Else);
+        pattern.replace(separator.load(s, f), f);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::If);
+        f.instruction(&Instruction::End);
+        output.copy_repeated_units_from(part_length, &pattern, extent, s, f);
+        pattern.clear(f);
+        s.release_i32_local(extent, f);
+        s.release_i32_local(zero, f);
+        let text = s.reserve_gc_local(f).initialize(output.publish(s, f), f);
+        result.set_reference(&text, s, f);
+        text.clear(f);
     }
 }

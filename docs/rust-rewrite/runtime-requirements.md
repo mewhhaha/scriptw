@@ -40,13 +40,14 @@ affinity. Reentrant entry receives an independent 64-MiB scoped-thread stack;
 the Wasm stack limit remains 32 MiB.
 
 The GC heap reserves a fixed 4-GiB virtual address range with a 32-MiB guard.
-Its initial accessible backing is 16 MiB; the Store limiter still caps each
-backing memory at 1 GiB. Reserving addresses does not commit 4 GiB of RAM.
-On the supported 64-bit Wasmtime baseline this permits protected-page checks
-and a stable heap base; Wasm array bounds and null-reference traps remain.
-Native images bind these settings through configuration schema 6. Custom
-pooling allocators require matching GC and linear-memory tunables; ordinary
-Scriptw uses on-demand allocation.
+Its initial accessible backing is 32 MiB (a 4-MiB nursery and two nominal
+14-MiB old semi-spaces); the Store limiter still caps each backing memory at
+1 GiB. Reserving addresses does not commit 4 GiB of RAM. On the supported
+64-bit Wasmtime baseline this permits protected-page checks and a stable heap
+base; Wasm array bounds and null-reference traps remain. Native images bind
+these settings through configuration schema 8. Custom pooling allocators
+require matching GC and linear-memory tunables; ordinary Scriptw uses on-demand
+allocation.
 
 Execution timeouts need Unix signal handling. Compiled code carries no
 deadline checks: a deadline removes access to the Store's GC heap and private
@@ -82,7 +83,7 @@ states what admits that image.
 
 ## Runtime ABI
 
-The runtime ABI is **93**. Portable bundles and native images built under an
+The runtime ABI is **95**. Portable bundles and native images built under an
 earlier ABI must be rebuilt. ABIs 58 to 77 added per-site read, write,
 `instanceof` and global read records, a dictionary position hint on Strings,
 further native call entries, one JSON output accumulator, compact shape
@@ -145,7 +146,23 @@ compact `for…in`, zero-copy non-shared `TextDecoder.decode`, an execution-only
 runtime receipt for warm cache hits, and bounded caller-thread `FiberStack`
 caching (at most 2 idle stacks process-wide), alongside Cranelift local GC
 safepoint retention and Wasmtime copying-GC barrier/initialization and
-ephemeron improvements. `LAYOUT_VERSION` in
+ephemeron improvements. ABI 94 publishes global dictionary rows directly and
+makes well-known symbols, Array callables, RegExp legacy state and native
+payloads demand-owned. ABI 95 replaces eager global builtin publication with
+`GlobalBuiltinBacking` (immutable builtin rows, a 128-bit deleted mask, sparse
+lazy original entries and a nullable append dictionary, plus
+`scriptw_snapshot_global_builtin_row` for rooted snapshots), adds a 6-lane
+zero-argv strict `arguments` local entry (`WideLocalArgumentsFunction`), narrows
+immutable host `print(...)` calls to a standalone proof that drops the 42 MiB
+runtime link on simple scripts, restores the Portable `StringPool` prefix from
+the built-in runtime receipt during `scriptw build wasm`, optimizes
+Promise/await, byte streams, UTF-8 codecs, sealed array callbacks, compact
+JSON/for-in/`Object.keys`/`Object.assign`, packed joins, literal concat-length
+folding and single-word bitmap push, raises the initial copying-GC heap to
+32 MiB (`4 MiB` nursery) with near-limit growth fallback, and adds prepared
+`InstancePre` late-bound `SharedMemory` and positional R-to-P module linkage,
+single-entry cold-call GC root sinking, and `MAX_SPLITS_PER_SPILLSET = 4` in
+vendored Wasmtime 47 / Cranelift / Regalloc2. `LAYOUT_VERSION` in
 `crates/scriptw-aot-wasm/src/runtime_artifact.rs` records each step.
 
 ### Locals and GC roots

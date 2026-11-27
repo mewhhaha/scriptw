@@ -498,6 +498,12 @@ impl<'a> FunctionBuilder<'a> {
         self.completion.value().set_undefined(&mut function);
         if let Some(builtin) = StandardBuiltinId::from_function_id(&function_id) {
             self.compile_standard_builtin(builtin, &mut function)?;
+            if matches!(
+                builtin,
+                StandardBuiltinId::WeakRefConstructor | StandardBuiltinId::FinalizationRegistryConstructor
+            ) {
+                self.emit_record_weak_activity(&mut function);
+            }
         } else {
             match HostBuiltinId::from_function_id(&function_id) {
                 Some(HostBuiltinId::Print) => self.compile_host_print_builtin(&mut function)?,

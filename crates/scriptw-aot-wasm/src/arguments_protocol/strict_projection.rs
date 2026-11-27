@@ -1,11 +1,10 @@
-//! A strict invocation whose own arguments object has only two read observers.
-//! This does not authorize a different entry ABI or omit any activation cell.
+//! Proof of read-only access to a strict invocation's own arguments object.
 use super::*;
 use scriptw_ir::{
     BindingMode, BlockIr, ClassElementExecutionKind, EnvironmentBindingMutabilityIr,
     EnvironmentIdentifierOperationIr, EnvironmentIdentifierResolutionStart,
     EvalBindingDeclarationIr, EvalDeclarativeEnvironmentKindIr, EvalEnvironmentRoleIr, ExprIr,
-    ForInitIr, ObjectPropertyIr, PropertyKeyIr, SpecOperationIr, Strictness, TypedExpr,
+    ForInitIr, ObjectPropertyIr, PropertyKeyIr, SpecOperationIr, Strictness, TypedExpr, ValueKind,
     LEXICAL_ARGUMENTS_NAME,
 };
 
@@ -22,12 +21,29 @@ pub(crate) enum ArgumentsProjectionRead {
     /// `arguments[key]` for any other key expression: the passed value at an
     /// integer index below the count, otherwise the real object's [[Get]].
     Index,
-    /// Any other static key, "callee" included: the real object's [[Get]].
+    /// Other static keys. A canonical decimal name may have a literal index.
     Other,
+}
+
+#[derive(Clone, Copy)]
+enum ReadDomain {
+    AllProperties,
+    LengthAndIndices,
 }
 
 impl StrictArgumentsProjection {
     pub(crate) fn admit(function: &FunctionIr) -> Option<Self> {
+        Self::admit_read_domain(function, ReadDomain::AllProperties)
+    }
+
+    /// A counted local entry can project length and indexed reads. A computed
+    /// key still needs the full property lookup when its value is not an
+    /// in-range index.
+    pub(crate) fn admit_local(function: &FunctionIr) -> Option<Self> {
+        Self::admit_read_domain(function, ReadDomain::LengthAndIndices)
+    }
+
+    fn admit_read_domain(function: &FunctionIr, domain: ReadDomain) -> Option<Self> {
         if !function.strict
             || function.protocol != FunctionProtocolIr::OrdinaryCallAndConstruct
             || function.class_element_execution_kind != ClassElementExecutionKind::None
@@ -91,6 +107,7 @@ impl StrictArgumentsProjection {
         };
         let mut walk = ReadOnlyUses {
             proof: &proof,
+            domain,
             reads: 0,
         };
         if !walk.block(&function.body) || walk.reads == 0 {
@@ -157,15 +174,48 @@ impl StrictArgumentsProjection {
     pub(crate) fn literal_index(&self, value: &TypedExpr) -> Option<u32> {
         match self.read(value)? {
             ArgumentsProjectionRead::First => Some(0),
-            ArgumentsProjectionRead::Length | ArgumentsProjectionRead::Other => None,
-            ArgumentsProjectionRead::Index => {
-                let ExprIr::Number(bits) = &self.read_key(value)?.expr else {
+            ArgumentsProjectionRead::Length => None,
+            ArgumentsProjectionRead::Other => {
+                let ExprIr::PropertyRead {
+                    key: PropertyKeyIr::StaticString(key),
+                    ..
+                } = &value.expr
+                else {
                     return None;
                 };
-                let index = f64::from_bits(*bits);
-                // ToPropertyKey(-0) is "0", like the First read.
-                (index.fract() == 0.0 && (0.0..f64::from(u32::MAX)).contains(&index))
-                    .then_some(index as u32)
+                Self::literal_index_string(key)
+            }
+            ArgumentsProjectionRead::Index => match &self.read_key(value)?.expr {
+                ExprIr::Number(bits) => {
+                    let index = f64::from_bits(*bits);
+                    // ToPropertyKey(-0) is "0", like the First read.
+                    (index.fract() == 0.0 && (0.0..f64::from(u32::MAX)).contains(&index))
+                        .then_some(index as u32)
+                }
+                ExprIr::String(key) => Self::literal_index_string(key),
+                _ => None,
+            },
+        }
+    }
+
+    fn literal_index_string(key: &str) -> Option<u32> {
+        if (key.len() > 1 && key.starts_with('0')) || !key.bytes().all(|byte| byte.is_ascii_digit())
+        {
+            return None;
+        }
+        key.parse::<u32>().ok().filter(|&index| index < u32::MAX)
+    }
+
+    fn is_local_read(&self, value: &TypedExpr, read: ArgumentsProjectionRead) -> bool {
+        match read {
+            ArgumentsProjectionRead::First | ArgumentsProjectionRead::Length => true,
+            ArgumentsProjectionRead::Other => self.literal_index(value).is_some(),
+            ArgumentsProjectionRead::Index => {
+                self.read_key(value).is_some_and(|key| match &key.expr {
+                    ExprIr::String(key) => Self::literal_index_string(key).is_some(),
+                    ExprIr::Undefined | ExprIr::Null | ExprIr::Boolean(_) => false,
+                    _ => key.kind != ValueKind::Symbol && !reads_symbol_iterator(key),
+                })
             }
         }
     }
@@ -213,6 +263,41 @@ impl StrictArgumentsProjection {
     }
 }
 
+fn reads_symbol_iterator(value: &TypedExpr) -> bool {
+    // A late-bound Symbol reference can leave both spellings of this member
+    // as ordinary Get IR. Refuse the counted entry even when its result kind
+    // is unknown. A computed key supplied by the caller still uses full Get.
+    let base = match &value.expr {
+        ExprIr::PropertyRead {
+            target,
+            key: PropertyKeyIr::StaticString(key),
+        } if key == "iterator" => target.as_ref(),
+        ExprIr::SpecOperation {
+            operation: SpecOperationIr::GetV,
+            operands,
+        } => {
+            let [base, key] = operands.as_slice() else {
+                return false;
+            };
+            if !matches!(&key.expr, ExprIr::String(key) if key == "iterator") {
+                return false;
+            }
+            base
+        }
+        _ => return false,
+    };
+    match &base.expr {
+        ExprIr::Identifier(name)
+        | ExprIr::GlobalPropertyRead { name }
+        | ExprIr::GlobalIdentifierRead { name } => name == "Symbol",
+        ExprIr::EnvironmentIdentifier(reference) => {
+            reference.name == "Symbol"
+                && matches!(reference.operation, EnvironmentIdentifierOperationIr::Read)
+        }
+        _ => false,
+    }
+}
+
 fn other_name(name: &str) -> bool {
     name != "arguments" && name != LEXICAL_ARGUMENTS_NAME
 }
@@ -221,6 +306,7 @@ fn other_name(name: &str) -> bool {
 /// Reference producers refuse the whole invocation, never just one read.
 struct ReadOnlyUses<'a> {
     proof: &'a StrictArgumentsProjection,
+    domain: ReadDomain,
     reads: usize,
 }
 
@@ -311,11 +397,13 @@ impl ReadOnlyUses<'_> {
     }
 
     fn expression(&mut self, value: &TypedExpr, reads: bool) -> bool {
-        if self.proof.read(value).is_some() {
+        if let Some(read) = self.proof.read(value) {
             self.reads += 1;
             // A computed key is evaluated first and may itself read the
             // binding.
             return reads
+                && (matches!(self.domain, ReadDomain::AllProperties)
+                    || self.proof.is_local_read(value, read))
                 && self
                     .proof
                     .read_key(value)
@@ -490,7 +578,7 @@ mod tests {
     }
 
     #[test]
-    fn snapshots_admit_owned_reads_and_existing_captures_but_never_local_entry() {
+    fn owned_reads_and_existing_captures_keep_the_binding_and_admit_local_transport() {
         for options in [ParseOptions::module(), ParseOptions::script()] {
             let function = function(
                 "var tick=1; function make(value,index) { 'use strict'; var original=value; value=index+tick; tick=(tick+1)&255; var row=arguments[0]; return ((row.x^value)+row.y+arguments.length+tick)&1023; } make;",
@@ -498,7 +586,7 @@ mod tests {
             );
             assert!(StrictArgumentsProjection::admit(&function).is_some());
             assert!(super::super::UnobservedStrictArguments::admit(&function).is_none());
-            assert!(crate::function_entry::LocalArgumentsPlan::for_function(&function).is_none());
+            assert!(crate::function_entry::LocalArgumentsPlan::for_function(&function).is_some());
             let (_, mut arguments, storage) = UserFunctionActivationPlan::for_function(&function)
                 .unwrap()
                 .into_parts();
@@ -511,7 +599,7 @@ mod tests {
     }
 
     #[test]
-    fn unchanged_scored_observer_has_one_admitted_vector_body() {
+    fn scored_observer_has_one_admitted_projected_body() {
         let source = include_str!("../../tests/fixtures/strict_arguments_observed.js");
         let program = scriptw_ir::lower(&parse(source, ParseOptions::module()).unwrap());
         assert!(program.is_wasm_supported(), "{:?}", program.diagnostics);
@@ -529,7 +617,7 @@ mod tests {
             .captured_bindings
             .iter()
             .any(|binding| binding.source_name == "tick"));
-        assert!(crate::function_entry::LocalArgumentsPlan::for_function(admitted[0]).is_none());
+        assert!(crate::function_entry::LocalArgumentsPlan::for_function(admitted[0]).is_some());
     }
 
     #[test]
@@ -539,6 +627,7 @@ mod tests {
             "function make(a) { 'use strict'; arguments[0]=a; return arguments.length; }",
             "function make(a) { 'use strict'; arguments.length=0; return arguments[0]; }",
             "function make(a) { 'use strict'; delete arguments[0]; return arguments.length; }",
+            "function make(a) { 'use strict'; return 0 in arguments ? arguments.length : 0; }",
             "function make(a) { 'use strict'; return arguments[0](); }",
             "function make(a) { 'use strict'; return arguments[0]?.(); }",
             "function make(a) { 'use strict'; return arguments[0]`value`; }",
@@ -559,15 +648,16 @@ mod tests {
                 StrictArgumentsProjection::admit(&function).is_none(),
                 "{source}"
             );
+            assert!(StrictArgumentsProjection::admit_local(&function).is_none(), "{source}");
         }
-        // Any computed key and any other static key read the real object
-        // when the vector cannot answer them; they expose nothing.
         for source in [
             "function make(a) { 'use strict'; return arguments[1]; }",
+            "function make(a) { 'use strict'; return arguments['2']; }",
             "function make(a) { 'use strict'; return arguments[a]; }",
             "function make(a) { 'use strict'; return arguments[(a(),0)]; }",
+            "function make(a) { 'use strict'; return arguments[-1]; }",
+            "function make(a) { 'use strict'; return arguments[1.25]; }",
             "function make(a) { 'use strict'; return arguments[arguments.length - 1]; }",
-            "function make(a) { 'use strict'; return arguments.callee; }",
             // A one-unit String comparison, which has its own fast path.
             "function make(a) { 'use strict'; return arguments[0] === 'a' && arguments[1] !== 'b'; }",
             "function make(a) { 'use strict'; for (var i = 0; i < arguments.length; i++) a(arguments[i]); }",
@@ -580,7 +670,7 @@ mod tests {
         ] {
             let function = function(source, ParseOptions::module());
             assert!(
-                StrictArgumentsProjection::admit(&function).is_some(),
+                StrictArgumentsProjection::admit_local(&function).is_some(),
                 "{source}"
             );
         }
@@ -589,7 +679,32 @@ mod tests {
             ParseOptions::script(),
         );
         assert!(!sloppy.strict);
-        assert!(StrictArgumentsProjection::admit(&sloppy).is_none());
+        assert!(StrictArgumentsProjection::admit_local(&sloppy).is_none());
+    }
+
+    #[test]
+    fn explicitly_named_non_index_reads_keep_vector_projection() {
+        for read in [
+            "arguments.callee",
+            "arguments['callee']",
+            "arguments[Symbol.iterator]",
+            "arguments[Symbol['iterator']]",
+            "arguments['02']",
+            "arguments[false]",
+        ] {
+            for options in [ParseOptions::module(), ParseOptions::script()] {
+                let source = format!("function make(a) {{ 'use strict'; return {read}; }}");
+                let function = function(&source, options);
+                assert!(
+                    StrictArgumentsProjection::admit(&function).is_some(),
+                    "{source}"
+                );
+                assert!(
+                    StrictArgumentsProjection::admit_local(&function).is_none(),
+                    "{source}"
+                );
+            }
+        }
     }
 
     #[test]

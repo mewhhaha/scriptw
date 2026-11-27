@@ -1,6 +1,9 @@
 //! EnumerableOwnProperties builds only unpublished defining-Realm Arrays.
 use super::*;
-use crate::gc_types::{ArrayObject, ArrayObjectSchema, GcLocal, GcOperand, I32Local, ValueLocals};
+use crate::gc_types::{
+    ArrayObject, ArrayObjectSchema, CompactShapeKeys, GcLocal, GcOperand, I32Local,
+    PackedValueListConstruction, ValueLocals,
+};
 
 #[derive(Clone, Copy)]
 enum EnumerableOwnProperties {
@@ -71,6 +74,79 @@ impl NativeObjectResultArray {
 }
 
 impl FunctionBuilder<'_> {
+    fn emit_compact_object_keys(
+        &mut self,
+        object: &ValueLocals,
+        output: &CompletionLocals,
+        exit: ControlTarget,
+        function: &mut Function,
+    ) -> Result<(), EmitError> {
+        let schema = self.runtime_schema();
+        let fallback = self.open_frame(ControlFrameKind::Block, function);
+        let compact = self.emit_plain_data_object_storage(object, function);
+        compact.load(schema, function).is_null(function);
+        self.emit_branch_if_to_target(fallback, function);
+        let storage = schema.reserve_gc_local(function).initialize(
+            compact.load(schema, function).require_non_null(function),
+            function,
+        );
+        let keys = self.emit_compact_shape_keys(&storage, function);
+        let count = schema.reserve_i32_local(function);
+        schema
+            .array_type::<CompactShapeKeys>()
+            .length(&keys, schema, function);
+        count.store(function);
+        let index = schema.reserve_i32_local(function);
+        index.set_constant(0, function);
+        let list = PackedValueListConstruction::allocate(schema, function);
+        let value = schema.reserve_value_local(function);
+        let done = self.open_frame(ControlFrameKind::Block, function);
+        let next = self.open_frame(ControlFrameKind::Loop, function);
+        index.load(function);
+        count.load(function);
+        function.instruction(&Instruction::I32GeU);
+        self.emit_branch_if_to_target(done, function);
+        let name = schema.reserve_gc_local(function).initialize(
+            schema
+                .array_type::<CompactShapeKeys>()
+                .read(&keys, index, schema, function)
+                .reference(),
+            function,
+        );
+        value.set_reference(&name, schema, function);
+        name.clear(function);
+        list.append(&value, schema, function);
+        index.load(function);
+        function.instruction(&Instruction::I32Const(1));
+        function.instruction(&Instruction::I32Add);
+        index.store(function);
+        self.emit_branch_to_target(next, function);
+        self.pop_control(ControlFrameKind::Loop);
+        function.instruction(&Instruction::End);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        value.clear(function);
+        let prototype = self.emit_load_current_function_realm_array_prototype(function);
+        let array = schema.reserve_gc_local(function).initialize(
+            self.emit_publish_packed_value_list_with_current_function_realm_prototype(
+                list, prototype, function,
+            )?,
+            function,
+        );
+        output.value().set_reference(&array, schema, function);
+        output.set_kind(CompletionKind::Normal, function);
+        array.clear(function);
+        schema.release_i32_local(index, function);
+        schema.release_i32_local(count, function);
+        keys.clear(function);
+        storage.clear(function);
+        compact.clear(function);
+        self.emit_branch_to_target(exit, function);
+        self.pop_control(ControlFrameKind::Block);
+        function.instruction(&Instruction::End);
+        Ok(())
+    }
+
     pub(super) fn emit_native_object_result_array(
         &mut self,
         capacity: I32Local,
@@ -117,6 +193,8 @@ impl FunctionBuilder<'_> {
         let count = schema.reserve_i32_local(function);
         let index = schema.reserve_i32_local(function);
         let entry_count = schema.reserve_i32_local(function);
+        let found = schema.reserve_i32_local(function);
+        let enumerable = schema.reserve_i32_local(function);
         output.initialize(function);
         pending.initialize(function);
         let exit = self.open_frame(ControlFrameKind::Block, function);
@@ -141,6 +219,9 @@ impl FunctionBuilder<'_> {
         self.emit_value_to_current_function_realm_object_locals(&argument, &pending, function)?;
         self.emit_native_object_abrupt_exit(&pending, &output, exit, function);
         object.copy_from(pending.value(), function);
+        if matches!(mode, EnumerableOwnProperties::Keys) {
+            self.emit_compact_object_keys(&object, &output, exit, function)?;
+        }
         let keys = self.emit_object_own_property_keys(&object, function)?;
         keys.length(count, schema, function);
         let mut array = self.emit_native_object_result_array(count, function)?;
@@ -157,8 +238,8 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::I32Const(WasmRuntimeValueTag::String as i32));
         function.instruction(&Instruction::I32Eq);
         self.open_frame(ControlFrameKind::If, function);
-        let descriptor = self.emit_proxy_target_own_descriptor(&object, &key, function)?;
-        descriptor.emit_enumerable_i32(schema, function);
+        self.emit_own_property_enumerability(&object, &key, found, enumerable, function)?;
+        enumerable.load(function);
         self.open_frame(ControlFrameKind::If, function);
         match mode {
             // Keys never calls Get, and all modes skip Symbols before GPD.
@@ -187,7 +268,6 @@ impl FunctionBuilder<'_> {
         }
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
-        descriptor.clear(function);
         self.pop_control(ControlFrameKind::If);
         function.instruction(&Instruction::End);
         key.clear(function);
@@ -208,6 +288,8 @@ impl FunctionBuilder<'_> {
         self.pop_control(ControlFrameKind::Block);
         function.instruction(&Instruction::End);
         self.completion().copy_from(&output, function);
+        schema.release_i32_local(enumerable, function);
+        schema.release_i32_local(found, function);
         schema.release_i32_local(entry_count, function);
         schema.release_i32_local(index, function);
         schema.release_i32_local(count, function);

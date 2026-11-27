@@ -8,7 +8,7 @@ fn callable_entry_program_operands_are_nonnull_and_follow_existing_semantic_slot
     );
     assert_eq!(
         StaticSignature::WideLocalArgumentsFunction.parameter_count(),
-        24
+        29
     );
     for (signature, program_position, context_position, context_layout) in [
         (
@@ -25,8 +25,8 @@ fn callable_entry_program_operands_are_nonnull_and_follow_existing_semantic_slot
         ),
         (
             StaticSignature::WideLocalArgumentsFunction,
-            23,
-            22,
+            28,
+            27,
             GcLayout::RealmRecord,
         ),
         (

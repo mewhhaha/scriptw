@@ -1,7 +1,7 @@
 use super::*;
 use crate::gc_types::{
-    ArrayObject, ArrayObjectSchema, GcLocal, GcNullability, GcOperand, I32Local, StoredValue,
-    ValueArray, ValueLocals,
+    ArrayObject, ArrayObjectSchema, GcIndex, GcLocal, GcNullability, GcOperand, I32Local,
+    StoredValue, ValueArray, ValueLocals,
 };
 
 /// A private GC buffer snapshots each evaluated value once. Capacity is never
@@ -702,6 +702,128 @@ impl FunctionBuilder<'_> {
         function.instruction(&Instruction::Else);
         destination.set_undefined(function);
         function.instruction(&Instruction::End);
+    }
+
+    /// Read a proved own index from the invocation's original inputs. A
+    /// direct call keeps all actuals in local lanes. Only an argv adapter
+    /// can supply an index beyond those lanes.
+    pub(crate) fn emit_projected_argument_at_index(
+        &self,
+        index: I32Local,
+        destination: &ValueLocals,
+        function: &mut Function,
+    ) {
+        let schema = self.runtime_schema();
+        let entry = self
+            .body_entry_locals()
+            .expect("projected arguments belong to a callable");
+        let Some(arguments) = entry.counted_local_arguments() else {
+            self.emit_argument_vector_entry_to_value(
+                entry.arguments(),
+                index,
+                destination,
+                function,
+            );
+            return;
+        };
+
+        function.instruction(&Instruction::Block(BlockType::Empty));
+        let done = function.label_depth();
+        function.instruction(&Instruction::Block(BlockType::Empty));
+        let overflow = function.label_depth();
+        let cases: Vec<_> = arguments
+            .lanes()
+            .iter()
+            .map(|_| {
+                function.instruction(&Instruction::Block(BlockType::Empty));
+                function.label_depth()
+            })
+            .collect();
+        index.load(function);
+        function.branch_table_to_labels(cases.into_iter().rev(), overflow);
+        for lane in arguments.lanes() {
+            function.instruction(&Instruction::End);
+            destination.copy_from(lane, function);
+            function.branch_to_label(done);
+        }
+        function.instruction(&Instruction::End);
+        let vector = schema.reserve_gc_local(function).initialize(
+            arguments
+                .vector()
+                .load(schema, function)
+                .require_non_null(function),
+            function,
+        );
+        self.emit_argument_vector_entry_to_value(&vector, index, destination, function);
+        vector.clear(function);
+        function.instruction(&Instruction::End);
+    }
+
+    /// Supply the canonical ArgumentsObject constructor with the original
+    /// argv if present. Reconstruct it from the lanes only on a local miss
+    /// that actually needs the object.
+    pub(crate) fn emit_arguments_object_input_vector(
+        &self,
+        function: &mut Function,
+    ) -> GcLocal<ValueArray> {
+        let schema = self.runtime_schema();
+        let entry = self
+            .body_entry_locals()
+            .expect("ArgumentsObject construction belongs to a callable");
+        let vector = match entry.counted_local_arguments() {
+            None => entry.arguments().load(schema, function),
+            Some(arguments) => arguments
+                .vector()
+                .non_null_or_else(schema, function, |function| {
+                    let count = arguments.count();
+                    function.instruction(&Instruction::Block(BlockType::Result(ValType::Ref(
+                        schema.reference_type::<ValueArray>(GcNullability::NonNullable),
+                    ))));
+                    let done = function.label_depth();
+                    schema.empty_value_array(function);
+                    count.load(function);
+                    function.instruction(&Instruction::I32Eqz);
+                    function.branch_if_to_label(done);
+                    function.instruction(&Instruction::Drop);
+
+                    let stored_type = schema.struct_type::<StoredValue>();
+                    let array = schema.array_type::<ValueArray>();
+                    let first = schema.reserve_gc_local(function).initialize(
+                        stored_type.from_value(&arguments.lanes()[0], function),
+                        function,
+                    );
+                    let list = schema.reserve_gc_local(function).initialize(
+                        array.filled(GcOperand::reference(&first, schema), count, function),
+                        function,
+                    );
+                    first.clear(function);
+                    for (index, lane) in arguments.lanes().iter().enumerate().skip(1) {
+                        count.load(function);
+                        function.instruction(&Instruction::I32Const(index as i32));
+                        function.instruction(&Instruction::I32GtU);
+                        function.instruction(&Instruction::If(BlockType::Empty));
+                        let value = schema
+                            .reserve_gc_local(function)
+                            .initialize(stored_type.from_value(lane, function), function);
+                        array.write(
+                            &list,
+                            GcIndex::Constant(index as u32),
+                            GcOperand::reference(&value, schema),
+                            schema,
+                            function,
+                        );
+                        value.clear(function);
+                        function.instruction(&Instruction::End);
+                    }
+                    let result = list.load(schema, function);
+                    list.clear(function);
+                    function.instruction(&Instruction::End);
+                    result
+                }),
+        };
+        schema
+            .reserve_gc_local(function)
+            .initialize(vector, function)
     }
 
     /// Internal argument-list slicing allocates a ValueArray, independently of

@@ -27,6 +27,8 @@ mod module_assembly;
 pub(crate) mod runtime_requirement;
 pub(crate) use body_compilation::{CompletedProgramInitializeBody, ProgramInitializeCompilation};
 pub(crate) use completion_exit::CompletionExit;
+#[cfg(test)]
+pub(crate) use module_assembly::emit_script_module;
 pub(crate) use module_assembly::{
     emit_runtime_direct_eval_module, emit_runtime_function_module,
     emit_runtime_global_script_module,
@@ -665,6 +667,11 @@ fn emit_script(
             )?
             .artifact);
         }
+        if matches!(&profile, crate::profile::ProfileUse::None) {
+            if let Some(print) = runtime_requirement::StandalonePrint::admit(script) {
+                return emit_standalone_print(&print);
+            }
+        }
     }
     let mut prepared_script = script.clone();
     super::builtins::append_empty_dynamic_function_bodies(&mut prepared_script);
@@ -694,6 +701,95 @@ fn emit_script(
         profile,
     )?
     .artifact)
+}
+
+fn emit_standalone_print(
+    print: &runtime_requirement::StandalonePrint,
+) -> Result<WasmArtifact, EmitError> {
+    use wasm_encoder::{
+        AbstractHeapType, ConstExpr, DataSection, EntityType, ExportKind, ExportSection, HeapType,
+        ImportSection, MemorySection, MemoryType, Module, TypeSection,
+    };
+
+    const PRINT: u32 = 0;
+    const MAIN: u32 = 1;
+    let mut types = TypeSection::new();
+    StaticSignature::append_through_host_print(&mut types);
+    let mut imports = ImportSection::new();
+    imports.import(
+        HOST_IMPORT_MODULE,
+        HOST_IMPORT_PRINT_LINE_UTF8,
+        EntityType::Function(StaticSignature::HostPrint.type_index()),
+    );
+
+    let mut main = Function::new(LocalDeclarations::from_types([]));
+    for &(start, len) in &print.lines {
+        main.instruction(&Instruction::I32Const(start));
+        main.instruction(&Instruction::I32Const(len));
+        main.instruction(&Instruction::Call(PRINT));
+    }
+    main.instruction(&Instruction::I32Const(WasmRuntimeValueTag::Undefined.tag()));
+    main.instruction(&Instruction::I64Const(0));
+    main.instruction(&Instruction::RefNull(HeapType::Abstract {
+        shared: false,
+        ty: AbstractHeapType::Eq,
+    }));
+    main.instruction(&Instruction::I32Const(CompletionKind::Normal.code() as i32));
+    main.instruction(&Instruction::I32Const(0));
+    main.instruction(&Instruction::End);
+    let mut code = ModuleCode::new(MAIN);
+    code.push(EmittedFunction::main(main));
+    let (functions, code, table) = code.finish();
+    if let Some(budget) = FunctionBodyBudget::from_env() {
+        table.check_budget(budget)?;
+    }
+
+    let mut memory = MemorySection::new();
+    memory.memory(MemoryType {
+        minimum: (print.bytes.len() as u64).div_ceil(1 << 16).max(1),
+        maximum: None,
+        memory64: false,
+        shared: false,
+        page_size_log2: None,
+    });
+    let mut exports = ExportSection::new();
+    exports.export("main", ExportKind::Func, MAIN);
+    exports.export("memory", ExportKind::Memory, 0);
+
+    let mut module = Module::new();
+    module
+        .section(&types)
+        .section(&imports)
+        .section(&functions)
+        .section(&memory)
+        .section(&exports)
+        .section(&code);
+    if !print.bytes.is_empty() {
+        let mut data = DataSection::new();
+        data.active(0, &ConstExpr::i32_const(0), print.bytes.iter().copied());
+        module.section(&data);
+    }
+    module.section(&table.name_section());
+    let profile = crate::RuntimeSourceCompilationProfile::Portable;
+    module.section(&wasm_encoder::CustomSection {
+        name: crate::RUNTIME_SOURCE_COMPILATION_PROFILE_CUSTOM_SECTION.into(),
+        data: (&[profile.wire()][..]).into(),
+    });
+    let function_sizes = table.summaries();
+    write_size_report_file_if_requested(&function_sizes);
+    Ok(WasmArtifact {
+        bytes: module.finish(),
+        invariant_note: "direct-js-to-wasm module",
+        debug_dump: format!(
+            "module: js-aot\nexport func: main -> tag/scalar/reference/kind/target\nmain completion ABI: tag/scalar/reference/kind/target\nstatic result kind: undefined\nlocals: 0\nimport func: {HOST_IMPORT_MODULE}.{HOST_IMPORT_PRINT_LINE_UTF8}\nmemory: exported linear memory\ndata segments: {}\nruntime helper functions: 0\nemitted code bytes: {}",
+            u8::from(!print.bytes.is_empty()),
+            table.total_body_bytes(),
+        ),
+        function_sizes,
+        gc_host_imports: Vec::new(),
+        runtime: None,
+        site_map: crate::profile::SiteMap::default(),
+    })
 }
 
 /// The runtime module, emitted from the empty script every program is a

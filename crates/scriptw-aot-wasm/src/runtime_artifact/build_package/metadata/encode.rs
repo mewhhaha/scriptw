@@ -38,9 +38,22 @@ impl RuntimeBuildArtifact {
         let selected = selection
             .compilation_data()
             .map_err(|error| EmitError::unsupported(error.to_string()))?;
-        if selected.identity().profile().profile() != &scriptw_intl::IntlDataProfile::Minimal {
+        if selected.identity().profile().profile() != &scriptw_intl::IntlDataProfile::Minimal
+            || selected.identity().profile().services() != scriptw_intl::IntlServiceSet::ALL
+            || selected.service_selection().is_some()
+        {
             return Err(EmitError::unsupported(
                 "immutable build metadata requires the complete Minimal profile",
+            ));
+        }
+        if self.package.get(12..44) != Some(source.as_slice())
+            || self
+                .runtime
+                .intl_compilation_data()
+                .is_none_or(|data| data.identity() != selected.identity())
+        {
+            return Err(EmitError::unsupported(
+                "immutable build metadata source/Intl differs from admitted runtime",
             ));
         }
         let mut out = METADATA_MAGIC.to_vec();
@@ -71,6 +84,10 @@ impl RuntimeBuildArtifact {
         for global in &layout.globals {
             global.encode(&mut out);
         }
+        field(
+            &mut out,
+            self.compiler_prefix.as_deref().unwrap_or_default(),
+        );
         let wasm = &self.package[offset..self.package.len() - 32];
         let mut largest_body = 0;
         let mut data = Vec::new();

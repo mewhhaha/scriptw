@@ -23,7 +23,7 @@ fn engine() -> wasmtime::Engine {
 fn public_runtime_reserves_the_gc_heap_and_linear_memory_alike() {
     let engine = engine();
     assert_eq!(engine.get_gc_heap_reservation(), 1_u64 << 32);
-    assert_eq!(engine.get_gc_heap_initial_size(), 16 * 1024 * 1024);
+    assert_eq!(engine.get_gc_heap_initial_size(), 32 * 1024 * 1024);
     assert_eq!(engine.get_gc_heap_guard_size(), 32 * 1024 * 1024);
     assert_eq!(engine.get_gc_heap_reservation_for_growth(), 0);
     assert!(!engine.get_gc_heap_may_move());

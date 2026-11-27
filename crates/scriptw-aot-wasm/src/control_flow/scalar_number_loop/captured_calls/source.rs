@@ -20,7 +20,9 @@ impl CapturedCallSource {
         if function.builtin_entry.is_some() {
             return None;
         }
-        let arguments = match crate::function_entry::LocalArgumentsPlan::for_function(function) {
+        let arguments = match crate::function_entry::LocalArgumentsPlan::for_function(function)
+            .filter(|plan| !plan.projects_arguments())
+        {
             Some(_) => None,
             None => Some(StrictArgumentsProjection::admit(function)?),
         };

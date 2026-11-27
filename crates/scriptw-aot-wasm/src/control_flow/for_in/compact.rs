@@ -201,6 +201,10 @@ impl FunctionBuilder<'_> {
                 .reference(),
             f,
         );
+        // Both dictionary and compact consumers validate the hinted position
+        // against their live storage and the exact String reference.
+        s.field(StringValueSchema::ENTRY_HINT)
+            .write(&name, GcOperand::i32_local(index), s, f);
         output.value().set_reference(&name, s, f);
         output.set_kind(CompletionKind::Normal, f);
         index.load(f);

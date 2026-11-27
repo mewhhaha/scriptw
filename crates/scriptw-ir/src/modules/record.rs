@@ -1251,6 +1251,17 @@ fn record_request(
     }
 }
 
+fn static_module_request(item: &ModuleItem) -> Option<&boa_ast::declaration::ModuleRequest> {
+    match item {
+        ModuleItem::ImportDeclaration(import) => Some(import.request()),
+        ModuleItem::ExportDeclaration(export) => match export.as_ref() {
+            ExportDeclaration::ReExport { request, .. } => Some(request.module_request()),
+            _ => None,
+        },
+        ModuleItem::StatementListItem(_) => None,
+    }
+}
+
 /// `ParseModule` (16.2.1.6.1): builds a module record from the front end's
 /// retained parse product.
 ///
@@ -1388,13 +1399,8 @@ fn build_module_record(
     // and `[[RequestedModules]]` order is what fixes dependency evaluation
     // order for otherwise independent dependencies.
     for item in items {
-        let source_request = match item {
-            ModuleItem::ImportDeclaration(import) => import.request(),
-            ModuleItem::ExportDeclaration(export) => match export.as_ref() {
-                ExportDeclaration::ReExport { request, .. } => request.module_request(),
-                _ => continue,
-            },
-            ModuleItem::StatementListItem(_) => continue,
+        let Some(source_request) = static_module_request(item) else {
+            continue;
         };
         let request = record_request(interner, source_request, admission);
         if static_catalog_eligibility(interner, source_request)
@@ -2041,13 +2047,9 @@ impl<'ast> Visitor<'ast> for ModuleBodyScan<'_> {
     }
 
     fn visit_import_call(&mut self, node: &'ast ImportCall) -> ControlFlow<Self::BreakTy> {
-        let static_specifier = match node.argument() {
-            Expression::Literal(literal) => match (literal.kind(), self.interner) {
-                (LiteralKind::String(sym), Some(interner)) => Some(resolved_name(interner, *sym)),
-                _ => None,
-            },
-            _ => None,
-        };
+        let static_specifier = literal_import_specifier(node)
+            .zip(self.interner)
+            .map(|(symbol, interner)| resolved_name(interner, symbol));
         let catalog_eligibility = dynamic_catalog_eligibility(node, self.interner);
         let attributes = match (self.admission, catalog_eligibility) {
             (
@@ -2123,6 +2125,15 @@ impl<'ast> Visitor<'ast> for ModuleBodyScan<'_> {
     }
 }
 
+fn literal_import_specifier(node: &ImportCall) -> Option<Sym> {
+    if let Expression::Literal(literal) = node.argument() {
+        if let LiteralKind::String(symbol) = literal.kind() {
+            return Some(*symbol);
+        }
+    }
+    None
+}
+
 /// Projects `[[RequestedModules]]` to phase-free host-resolution keys and adds
 /// string-literal `import(...)` keys, without lowering anything.
 ///
@@ -2149,29 +2160,27 @@ pub fn scan_module_requests(source: &ParsedModule) -> Vec<ModuleRequestKeyIr> {
 /// whether to open a loaded target's dependencies. Resolution remains keyed by
 /// the phase-free key; a later non-source occurrence promotes the same row.
 pub(super) fn scan_module_loading_requests(source: &ParsedModule) -> Vec<ModuleRequestIr> {
-    let record = source.with_compiler_session(|module, interner| {
-        build_module_record(
-            module,
-            interner,
-            source.source(),
-            0,
-            ModuleKey::from_host(ANONYMOUS_MODULE_KEY),
-            super::admission::GraphAdmission::LoadedClosure,
-        )
-    });
-    loading_requests_with_dynamic_imports(record.requested_modules, &record.dynamic_import_sites)
+    source.with_compiler_session(|module, interner| scan_graph_requests(module, interner, None).0)
 }
 
 pub(super) fn loading_requests_with_dynamic_imports(
     requests: Vec<ModuleRequestIr>,
     sites: &[DynamicImportSiteIr],
 ) -> Vec<ModuleRequestIr> {
+    coalesce_loading_requests(
+        requests.into_iter().chain(
+            sites
+                .iter()
+                .filter_map(DynamicImportSiteIr::discovery_request),
+        ),
+    )
+}
+
+fn coalesce_loading_requests(
+    requests: impl IntoIterator<Item = ModuleRequestIr>,
+) -> Vec<ModuleRequestIr> {
     let mut loading: Vec<ModuleRequestIr> = Vec::new();
-    for request in requests.into_iter().chain(
-        sites
-            .iter()
-            .filter_map(DynamicImportSiteIr::discovery_request),
-    ) {
+    for request in requests {
         if let Some(previous) = loading
             .iter_mut()
             .find(|previous| previous.key() == request.key())
@@ -2184,6 +2193,73 @@ pub(super) fn loading_requests_with_dynamic_imports(
         }
     }
     loading
+}
+
+/// Host discovery needs the request keys and phases, without constructing the
+/// lowering record or decoding source ranges. Static rows precede dynamic
+/// rows, and the Realm rows retain their separate origin and sorted order.
+pub(super) fn scan_graph_requests<'ast>(
+    ast: &'ast impl VisitWith,
+    interner: &'ast Interner,
+    realm: Option<super::realm_request::RealmRequestScan<'ast>>,
+) -> (Vec<ModuleRequestIr>, Vec<ModuleRequestKeyIr>) {
+    struct Scan<'a> {
+        interner: &'a Interner,
+        static_requests: Vec<ModuleRequestIr>,
+        dynamic_requests: Vec<ModuleRequestIr>,
+        realm: Option<super::realm_request::RealmRequestScan<'a>>,
+    }
+    impl<'ast> Visitor<'ast> for Scan<'_> {
+        type BreakTy = core::convert::Infallible;
+
+        fn visit_module_item(&mut self, item: &'ast ModuleItem) -> ControlFlow<Self::BreakTy> {
+            if let Some(request) = static_module_request(item) {
+                self.static_requests
+                    .push(module_request(self.interner, request));
+            }
+            item.visit_with(self)
+        }
+
+        fn visit_import_call(&mut self, node: &'ast ImportCall) -> ControlFlow<Self::BreakTy> {
+            if let Some(specifier) = literal_import_specifier(node) {
+                let attributes = match dynamic_import_attributes(node, Some(self.interner)) {
+                    DynamicImportAttributesIr::Known(attributes) => attributes,
+                    DynamicImportAttributesIr::Runtime => ModuleRequestAttributesIr::empty(),
+                };
+                self.dynamic_requests.push(ModuleRequestIr::new(
+                    resolved_name(self.interner, specifier),
+                    ImportPhaseIr::from_ast(node.phase()),
+                    attributes,
+                ));
+            }
+            node.visit_with(self)
+        }
+
+        fn visit_expression(&mut self, expression: &'ast Expression) -> ControlFlow<Self::BreakTy> {
+            if let Some(realm) = &mut self.realm {
+                realm.observe(expression);
+            }
+            expression.visit_with(self)
+        }
+    }
+    let mut scan = Scan {
+        interner,
+        static_requests: Vec::new(),
+        dynamic_requests: Vec::new(),
+        realm,
+    };
+    let _ = ast.visit_with(&mut scan);
+    (
+        coalesce_loading_requests(
+            scan.static_requests
+                .into_iter()
+                .chain(scan.dynamic_requests),
+        ),
+        scan.realm.map_or_else(
+            Vec::new,
+            super::realm_request::RealmRequestScan::into_requests,
+        ),
+    )
 }
 
 /// Reads the statically resolvable `import(...)` requests in a Script without
@@ -2278,14 +2354,7 @@ pub(crate) fn script_dynamic_import_sites(source: &ParsedScript) -> Vec<DynamicI
 
 /// Whether a retained Script AST contains a dynamic import, including a computed one.
 pub fn script_has_dynamic_import(source: &ParsedScript) -> bool {
-    struct FindImport;
-    impl<'ast> Visitor<'ast> for FindImport {
-        type BreakTy = ();
-        fn visit_import_call(&mut self, _: &'ast ImportCall) -> ControlFlow<Self::BreakTy> {
-            ControlFlow::Break(())
-        }
-    }
-    source.with_compiler_session(|script, _| script.visit_with(&mut FindImport).is_break())
+    source.has_dynamic_import()
 }
 
 fn script_sites_with_admission(

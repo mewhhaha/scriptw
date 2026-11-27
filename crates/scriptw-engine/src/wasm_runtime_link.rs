@@ -193,6 +193,35 @@ const ENTRY_STANDALONE: u8 = 1;
 const ENTRY_LINKED: u8 = 2;
 const KEY_BYTES: usize = 32;
 
+/// Wrap the original buffer without moving the Wasm payload past its cache header.
+#[derive(Clone)]
+pub(super) struct ProgramWasmBytes {
+    buffer: Arc<Vec<u8>>,
+    offset: usize,
+}
+
+impl ProgramWasmBytes {
+    pub(super) fn emitted(bytes: Vec<u8>) -> Self {
+        Self {
+            buffer: Arc::new(bytes),
+            offset: 0,
+        }
+    }
+
+    fn cached(entry: Vec<u8>, program_len: usize) -> Self {
+        Self {
+            offset: entry.len() - program_len,
+            buffer: Arc::new(entry),
+        }
+    }
+}
+
+impl AsRef<[u8]> for ProgramWasmBytes {
+    fn as_ref(&self) -> &[u8] {
+        &self.buffer[self.offset..]
+    }
+}
+
 pub(super) fn encode_cache_entry(program: WasmProgramRef<'_>) -> Vec<u8> {
     let mut entry = Vec::with_capacity(1 + KEY_BYTES + program.bytes.len());
     match program.runtime {
@@ -208,7 +237,7 @@ pub(super) fn encode_cache_entry(program: WasmProgramRef<'_>) -> Vec<u8> {
 
 /// Decodes a standalone entry. A linked entry is a miss here: the caller has no
 /// way to name the runtime it was emitted against.
-pub(super) fn decode_standalone_cache_entry(entry: &[u8]) -> Option<&[u8]> {
+pub(crate) fn decode_standalone_cache_entry(entry: &[u8]) -> Option<&[u8]> {
     match entry.split_first()? {
         (&ENTRY_STANDALONE, program) => {
             (scriptw_aot_wasm::RuntimeSourceCompilationProfile::from_module(program).ok()?
@@ -219,6 +248,11 @@ pub(super) fn decode_standalone_cache_entry(entry: &[u8]) -> Option<&[u8]> {
     }
 }
 
+pub(super) fn load_standalone_cache_entry(entry: Vec<u8>) -> Option<ProgramWasmBytes> {
+    let len = decode_standalone_cache_entry(&entry)?.len();
+    Some(ProgramWasmBytes::cached(entry, len))
+}
+
 /// Decodes an entry and reattaches the runtime for a linked program. An entry
 /// recorded against a different runtime key than the current one is a miss.
 #[cfg(test)]
@@ -226,19 +260,19 @@ pub(super) fn decode_cache_entry(
     entry: &[u8],
     intl_profile: &IntlCompilationProfile,
     cache: &cache::FunctionCache,
-) -> Option<(Arc<[u8]>, Option<ProgramRuntime>)> {
-    decode_cache_entry_with_foreign(entry, intl_profile, cache)
+) -> Option<(ProgramWasmBytes, Option<ProgramRuntime>)> {
+    decode_cache_entry_with_foreign(entry.to_vec(), intl_profile, cache)
         .map(|(bytes, runtime, _)| (bytes, runtime))
 }
 
 /// Decodes an entry, reattaches the runtime for a linked program, and returns
 /// its validated foreign-module requirements from the same single Wasm parse.
 pub(super) fn decode_cache_entry_with_foreign(
-    entry: &[u8],
+    entry: Vec<u8>,
     intl_profile: &IntlCompilationProfile,
     cache: &cache::FunctionCache,
 ) -> Option<(
-    Arc<[u8]>,
+    ProgramWasmBytes,
     Option<ProgramRuntime>,
     scriptw_ir::foreign::ForeignModuleRegistry,
 )> {
@@ -246,8 +280,9 @@ pub(super) fn decode_cache_entry_with_foreign(
         (&ENTRY_STANDALONE, program) => {
             let (profile, foreign) =
                 scriptw_aot_wasm::inspect_linked_program_metadata(program).ok()?;
+            let len = program.len();
             (profile == scriptw_aot_wasm::RuntimeSourceCompilationProfile::Portable)
-                .then(|| (Arc::from(program), None, foreign))
+                .then(|| (ProgramWasmBytes::cached(entry, len), None, foreign))
         }
         (&ENTRY_LINKED, rest) => {
             let (recorded, program) = rest.split_at_checked(KEY_BYTES)?;
@@ -272,8 +307,9 @@ pub(super) fn decode_cache_entry_with_foreign(
                     )
                 }
             };
+            let len = program.len();
             (runtime.as_ref().key().as_bytes().as_slice() == recorded)
-                .then(|| (Arc::from(program), Some(runtime), foreign))
+                .then(|| (ProgramWasmBytes::cached(entry, len), Some(runtime), foreign))
         }
         _ => None,
     }
@@ -399,35 +435,24 @@ enum ProgramImportSource {
 
 struct ProgramImportPlan {
     entries: Box<[ProgramImportSource]>,
-    has_foreign_imports: bool,
+    foreign: Box<[ForeignImport]>,
+    /// A scratch allocation for sequential fresh Stores. It is empty whenever
+    /// it is in the slot, so this plan cannot retain Store-owned imports.
+    reusable_entries: Option<Mutex<Vec<WasmtimeExtern>>>,
     has_runtime_imports: bool,
     imports_runtime_private_memory: bool,
     runtime_private_memory_export: Option<wasmtime::ModuleExport>,
     program_main_export: Option<wasmtime::ModuleExport>,
     program_module_status_export: Option<wasmtime::ModuleExport>,
     program_prelude_phase_export: Option<wasmtime::ModuleExport>,
-    roots_embed_call_export: Option<wasmtime::ModuleExport>,
-    roots_embed_call_types: Option<(wasmtime::ArrayType, wasmtime::StructType)>,
     roots_embed_promise_export: Option<(wasmtime::ModuleExport, usize)>,
     roots_snapshot_entry_realm_export: Option<wasmtime::ModuleExport>,
 }
 
-fn extract_embed_call_types(
-    roots: &WasmtimeModule,
-) -> Option<(wasmtime::ArrayType, wasmtime::StructType)> {
-    let WasmtimeExternType::Func(ty) = roots.get_export("scriptw.embed.call")? else {
-        return None;
-    };
-    let arguments = ty
-        .params()
-        .nth(6)
-        .and_then(|p| p.as_ref().and_then(|r| r.heap_type().as_concrete_array()).cloned())?;
-    let wasmtime::StorageType::ValType(wasmtime::ValType::Ref(element)) = arguments.element_type()
-    else {
-        return None;
-    };
-    let stored = element.heap_type().as_concrete_struct().cloned()?;
-    Some((arguments, stored))
+pub(super) struct ForeignImport {
+    pub(super) module: Box<str>,
+    pub(super) name: Box<str>,
+    pub(super) ty: WasmtimeExternType,
 }
 
 impl ProgramImportPlan {
@@ -442,7 +467,7 @@ impl ProgramImportPlan {
         );
         let runtime_namespace = scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE;
         let mut entries = Vec::new();
-        let mut has_foreign_imports = false;
+        let mut foreign = Vec::new();
         let mut has_runtime_imports = false;
         let mut imports_runtime_private_memory = false;
         for import in program.imports() {
@@ -451,7 +476,11 @@ impl ProgramImportPlan {
             if !matches!(module_name, crate::WASM_HOST_IMPORT_NAMESPACE)
                 && module_name != runtime_namespace
             {
-                has_foreign_imports = true;
+                foreign.push(ForeignImport {
+                    module: module_name.into(),
+                    name: item_name.into(),
+                    ty: import.ty(),
+                });
             }
             if let Some(runtime_module) = runtime {
                 if module_name == runtime_namespace {
@@ -479,10 +508,6 @@ impl ProgramImportPlan {
                 .get_export_index(crate::host_memory_imports::HOST_MODULE_MEMORY_EXPORT)
         });
         let roots_module = runtime.unwrap_or(program);
-        let roots_embed_call_export = roots_module.get_export_index("scriptw.embed.call");
-        let roots_embed_call_types = roots_embed_call_export
-            .as_ref()
-            .and_then(|_| extract_embed_call_types(roots_module));
         let roots_embed_promise_export = roots_module
             .get_export_index("scriptw.embed.promise")
             .and_then(|export| {
@@ -495,7 +520,8 @@ impl ProgramImportPlan {
             });
         Self {
             entries: entries.into_boxed_slice(),
-            has_foreign_imports,
+            foreign: foreign.into_boxed_slice(),
+            reusable_entries: None,
             has_runtime_imports,
             imports_runtime_private_memory,
             runtime_private_memory_export,
@@ -504,11 +530,81 @@ impl ProgramImportPlan {
                 .get_export_index(scriptw_aot_wasm::MODULE_EVALUATION_STATUS_EXPORT),
             program_prelude_phase_export: program
                 .get_export_index(scriptw_aot_wasm::GLOBAL_SCRIPT_PRELUDE_PHASE_EXPORT),
-            roots_embed_call_export,
-            roots_embed_call_types,
             roots_embed_promise_export,
             roots_snapshot_entry_realm_export: roots_module
                 .get_export_index(scriptw_aot_wasm::SNAPSHOT_ENTRY_REALM_EXPORT),
+        }
+    }
+
+    fn prepare(
+        &self,
+        linker: &WasmtimeLinker<WasmHostState>,
+        program: &WasmtimeModule,
+        runtime: &WasmtimeModule,
+        shared_memory: Option<&wasmtime::MemoryType>,
+    ) -> Option<PreparedProgram> {
+        let mut shared_import = None;
+        let mut exports = Vec::with_capacity(self.entries.len());
+        for (entry, import) in self.entries.iter().zip(program.imports()) {
+            let export = match entry {
+                ProgramImportSource::RuntimeExport { export, .. } => Some((*export)?),
+                ProgramImportSource::RuntimePrivateMemory => {
+                    Some(self.runtime_private_memory_export?)
+                }
+                ProgramImportSource::Linker { module, name }
+                    if module.as_ref() == WASM_HOST_IMPORT_NAMESPACE =>
+                {
+                    if name.as_ref() == WASM_HOST_IMPORT_SHARED_MEMORY {
+                        let WasmtimeExternType::Memory(ty) = import.ty() else {
+                            return None;
+                        };
+                        if shared_memory != Some(&ty) {
+                            return None;
+                        }
+                        shared_import =
+                            Some((WASM_HOST_IMPORT_NAMESPACE, WASM_HOST_IMPORT_SHARED_MEMORY));
+                    } else if !linker.has_definition(module, name) {
+                        return None;
+                    }
+                    None
+                }
+                ProgramImportSource::Linker { .. } => return None,
+            };
+            exports.push(export);
+        }
+        // A statically incompatible import may require live size information.
+        // Leave it to the regular path, which also owns linkage diagnostics.
+        let instance = linker
+            .instantiate_pre_with_module_exports(program, runtime, &exports, shared_import)
+            .ok()?;
+        Some(PreparedProgram {
+            instance,
+            imports_shared_memory: shared_import.is_some(),
+        })
+    }
+}
+
+struct PreparedProgram {
+    instance: wasmtime::InstancePre<WasmHostState>,
+    imports_shared_memory: bool,
+}
+
+/// Retained only by the embedding owner of the immutable host linker. Neither
+/// proof contains the actual shared memory or any Store-owned extern.
+pub(super) struct PreparedLinkage {
+    host: Option<wasmtime::InstancePre<WasmHostState>>,
+    program: Option<PreparedProgram>,
+}
+
+impl PreparedLinkage {
+    pub(super) fn new(linker: &WasmtimeLinker<WasmHostState>, modules: &WasmModules) -> Self {
+        Self {
+            host: host_imports::prepare(linker, modules.host(), modules.memories()).ok(),
+            program: modules.runtime.as_ref().and_then(|runtime| {
+                modules
+                    .plan
+                    .prepare(linker, &modules.program, runtime, modules.memories.shared())
+            }),
         }
     }
 }
@@ -520,6 +616,7 @@ pub(super) struct WasmModules {
     /// The memories the host module imports, admitted within the Store cap.
     /// Private, so every `WasmModules` comes from [`WasmModules::new`].
     memories: crate::host_memory_imports::HostMemoryImports,
+    import_free_host: Option<OnceLock<wasmtime::InstancePre<WasmHostState>>>,
     plan: ProgramImportPlan,
     pub(super) memory_cache_outcome: WasmModuleMemoryCacheOutcome,
     pub(super) matched_runtime_image_cache: WasmRuntimeMatchedImageCacheOutcome,
@@ -536,19 +633,26 @@ impl WasmModules {
         matched_runtime_image_cache: WasmRuntimeMatchedImageCacheOutcome,
         loading: WasmRuntimeModuleLoading,
     ) -> Result<Self, EngineError> {
-        let memories = crate::host_memory_imports::HostMemoryImports::admit(
-            runtime.as_ref().unwrap_or(&program),
-        )?;
+        let host = runtime.as_ref().unwrap_or(&program);
+        let memories = crate::host_memory_imports::HostMemoryImports::admit(host)?;
         let plan = ProgramImportPlan::build(&program, runtime.as_ref(), &memories);
         Ok(Self {
             program,
             runtime,
             memories,
+            import_free_host: None,
             plan,
             memory_cache_outcome,
             matched_runtime_image_cache,
             loading,
         })
+    }
+
+    pub(super) fn retain_linkage(mut self) -> Self {
+        let import_free = self.host().imports().len() == 0;
+        self.import_free_host = import_free.then(OnceLock::new);
+        self.plan.reusable_entries = self.runtime.is_some().then(Mutex::default);
+        self
     }
 
     /// The module that owns the host imports and memory imports.
@@ -573,8 +677,8 @@ impl WasmModules {
         &self.memories
     }
 
-    pub(super) fn has_foreign_imports(&self) -> bool {
-        self.plan.has_foreign_imports
+    pub(super) fn foreign_imports(&self) -> &[ForeignImport] {
+        &self.plan.foreign
     }
 
     pub(super) fn runtime_private_memory_export(&self) -> Option<&wasmtime::ModuleExport> {
@@ -591,16 +695,6 @@ impl WasmModules {
 
     pub(super) fn program_prelude_phase_export(&self) -> Option<&wasmtime::ModuleExport> {
         self.plan.program_prelude_phase_export.as_ref()
-    }
-
-    pub(super) fn roots_embed_call_export(&self) -> Option<&wasmtime::ModuleExport> {
-        self.plan.roots_embed_call_export.as_ref()
-    }
-
-    pub(super) fn roots_embed_call_types(
-        &self,
-    ) -> Option<&(wasmtime::ArrayType, wasmtime::StructType)> {
-        self.plan.roots_embed_call_types.as_ref()
     }
 
     pub(super) fn roots_embed_promise_export(&self) -> Option<(&wasmtime::ModuleExport, usize)> {
@@ -767,23 +861,57 @@ pub(super) fn instantiate(
     store: &mut WasmtimeStore<WasmHostState>,
     modules: &WasmModules,
 ) -> Result<(wasmtime::Instance, wasmtime::Instance), EngineError> {
-    let Some(runtime_module) = &modules.runtime else {
-        let program = linker
-            .instantiate(&mut *store, &modules.program)
-            .map_err(|err| {
-                crate::pooled_stores::classify_allocation_error(err, "wasmtime instantiate failed")
-            })?;
-        return Ok((program, program));
-    };
+    instantiate_with_linkage(linker, store, modules, None)
+}
 
-    let runtime = linker
-        .instantiate(&mut *store, runtime_module)
-        .map_err(|err| {
-            crate::pooled_stores::classify_allocation_error(
-                err,
-                "wasmtime runtime instantiate failed",
-            )
-        })?;
+/// `prepared` is available only while the caller's linker still uses the
+/// same fixed host definitions against which preparation ran.
+pub(super) fn instantiate_with_linkage(
+    linker: &mut WasmtimeLinker<WasmHostState>,
+    store: &mut WasmtimeStore<WasmHostState>,
+    modules: &WasmModules,
+    prepared: Option<&PreparedLinkage>,
+) -> Result<(wasmtime::Instance, wasmtime::Instance), EngineError> {
+    let context = if modules.runtime.is_some() {
+        "wasmtime runtime instantiate failed"
+    } else {
+        "wasmtime instantiate failed"
+    };
+    let host_pre = prepared.and_then(|plan| plan.host.as_ref());
+    let program_pre = prepared.and_then(|plan| plan.program.as_ref());
+    let shared = if modules.memories.shared().is_some()
+        && (host_pre.is_some() || program_pre.is_some_and(|pre| pre.imports_shared_memory))
+    {
+        Some(
+            linker
+                .get(
+                    &mut *store,
+                    WASM_HOST_IMPORT_NAMESPACE,
+                    WASM_HOST_IMPORT_SHARED_MEMORY,
+                )
+                .map_err(|error| crate::pooled_stores::classify_allocation_error(error, context))?
+                .into_shared_memory()
+                .ok_or_else(|| {
+                    EngineError::new("wasmtime shared-memory definition is not shared memory")
+                })?,
+        )
+    } else {
+        None
+    };
+    let runtime = match (host_pre, shared.as_ref()) {
+        (Some(pre), Some(memory)) => pre.instantiate_with_shared_memory(&mut *store, memory),
+        (Some(pre), None) => pre.instantiate(&mut *store),
+        (None, _) => host_imports::instantiate(
+            linker,
+            store,
+            modules.host(),
+            modules.import_free_host.as_ref(),
+        ),
+    }
+    .map_err(|error| crate::pooled_stores::classify_allocation_error(error, context))?;
+    if modules.runtime.is_none() {
+        return Ok((runtime, runtime));
+    }
 
     // R defines the Store's private memory; P imports it from the host
     // namespace, and native source compilation also resolves host imports
@@ -823,7 +951,54 @@ pub(super) fn instantiate(
         }
     }
 
-    let mut imports = Vec::with_capacity(modules.plan.entries.len());
+    if let Some(program) = program_pre {
+        let memory = shared.as_ref().filter(|_| program.imports_shared_memory);
+        let program = program
+            .instance
+            .instantiate_with_module_exports(&mut *store, runtime, memory)
+            .map_err(|error| {
+                crate::pooled_stores::classify_allocation_error(
+                    error,
+                    "wasmtime instantiate failed",
+                )
+            })?;
+        return Ok((program, runtime));
+    }
+
+    let slot = modules.plan.reusable_entries.as_ref();
+    let mut imports = slot
+        .map(|slot| std::mem::take(&mut *slot.lock().unwrap_or_else(|e| e.into_inner())))
+        .unwrap_or_default();
+    imports.reserve_exact(modules.plan.entries.len());
+    let program = instantiate_linked_program(
+        linker,
+        store,
+        modules,
+        runtime,
+        private_memory,
+        &mut imports,
+    );
+    if let Some(slot) = slot {
+        imports.clear();
+        // A concurrent/reentrant entry may have already returned another
+        // buffer. Never hold the lock while running Wasm or host code.
+        let mut slot = slot.lock().unwrap_or_else(|e| e.into_inner());
+        if slot.capacity() < imports.capacity() {
+            *slot = imports;
+        }
+    }
+    Ok((program?, runtime))
+}
+
+fn instantiate_linked_program(
+    linker: &WasmtimeLinker<WasmHostState>,
+    store: &mut WasmtimeStore<WasmHostState>,
+    modules: &WasmModules,
+    runtime: wasmtime::Instance,
+    private_memory: Option<WasmtimeMemory>,
+    imports: &mut Vec<WasmtimeExtern>,
+) -> Result<wasmtime::Instance, EngineError> {
+    let namespace = scriptw_aot_wasm::RUNTIME_IMPORT_NAMESPACE;
     for entry in &modules.plan.entries {
         match entry {
             ProgramImportSource::RuntimeExport { name, export } => {
@@ -854,8 +1029,7 @@ pub(super) fn instantiate(
         }
     }
 
-    let program = wasmtime::Instance::new(&mut *store, &modules.program, &imports).map_err(
-        |err| crate::pooled_stores::classify_allocation_error(err, "wasmtime instantiate failed"),
-    )?;
-    Ok((program, runtime))
+    wasmtime::Instance::new(&mut *store, &modules.program, imports).map_err(|err| {
+        crate::pooled_stores::classify_allocation_error(err, "wasmtime instantiate failed")
+    })
 }

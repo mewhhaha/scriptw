@@ -27,6 +27,9 @@
 # scalar or reference lane needed by each path, and reads `StringValue.CODE_UNITS`
 # at field_index 1 (32 B layout); total drops from 225 to 155 operators
 # (exit operator219 becomes operator149).
+# Layout 95 (Wave 8B): adds `GlobalBuiltinBacking` after `ObjectPropertyStorage`
+# (type 80), shifting later GC type indices up by one (85, 99, 100, 150, 158
+# become 86, 100, 101, 151, 159).
 I32Const { value: 8 }
 I32Const { value: 0 }
 I32Store8 { memarg: MemArg { align: 0, max_align: 0, offset: 0, memory: 0 } }
@@ -68,16 +71,16 @@ RefNull { hty: Concrete(Module(73)) }
 LocalSet local11
 RefNull { hty: Concrete(Module(80)) }
 LocalSet local12
-RefNull { hty: Concrete(Module(85)) }
+RefNull { hty: Concrete(Module(86)) }
 LocalSet local13
-RefNull { hty: Concrete(Module(158)) }
+RefNull { hty: Concrete(Module(159)) }
 LocalSet local14
-RefNull { hty: Concrete(Module(100)) }
+RefNull { hty: Concrete(Module(101)) }
 LocalSet local15
 Block { blockty: Empty }
 LocalGet local16
 LocalGet local8
-ArrayGet { array_type_index: 99 }
+ArrayGet { array_type_index: 100 }
 LocalSet local10
 LocalGet local10
 StructGet { struct_type_index: 63, field_index: 1 }
@@ -95,21 +98,21 @@ Br operator149
 End
 StructGet { struct_type_index: 73, field_index: 1 }
 LocalSet local12
-Block { blockty: Type(Ref((ref (module 85)))) }
+Block { blockty: Type(Ref((ref (module 86)))) }
 LocalGet local12
-BrOnCast { relative_depth: 0, from_ref_type: (ref null (module 80)), to_ref_type: (ref (module 85)) }
+BrOnCast { relative_depth: 0, from_ref_type: (ref null (module 80)), to_ref_type: (ref (module 86)) }
 Drop
 Br operator149
 End
 LocalSet local13
 LocalGet local13
-StructGet { struct_type_index: 85, field_index: 0 }
+StructGet { struct_type_index: 86, field_index: 0 }
 LocalGet local18
 RefEq
 I32Eqz
 BrIf operator149
 LocalGet local13
-StructGet { struct_type_index: 85, field_index: 1 }
+StructGet { struct_type_index: 86, field_index: 1 }
 LocalGet local19
 I32Const { value: 8 }
 I32Mul
@@ -121,11 +124,11 @@ LocalGet local19
 I32Eqz
 If { blockty: Empty }
 LocalGet local13
-StructGet { struct_type_index: 85, field_index: 2 }
+StructGet { struct_type_index: 86, field_index: 2 }
 LocalSet local21
 Else
 LocalGet local13
-StructGet { struct_type_index: 85, field_index: 3 }
+StructGet { struct_type_index: 86, field_index: 3 }
 LocalSet local21
 End
 LocalGet local20
@@ -136,7 +139,7 @@ LocalGet local21
 F64ReinterpretI64
 LocalSet local1
 LocalGet local13
-StructGet { struct_type_index: 85, field_index: 1 }
+StructGet { struct_type_index: 86, field_index: 1 }
 LocalGet local22
 I32Const { value: 8 }
 I32Mul
@@ -148,11 +151,11 @@ LocalGet local22
 I32Eqz
 If { blockty: Empty }
 LocalGet local13
-StructGet { struct_type_index: 85, field_index: 6 }
+StructGet { struct_type_index: 86, field_index: 6 }
 LocalSet local17
 Else
 LocalGet local13
-StructGet { struct_type_index: 85, field_index: 7 }
+StructGet { struct_type_index: 86, field_index: 7 }
 LocalSet local17
 End
 LocalGet local20
@@ -160,14 +163,14 @@ I32Const { value: 4 }
 I32Ne
 BrIf operator149
 LocalGet local17
-RefTestNonNull { hty: Concrete(Module(150)) }
+RefTestNonNull { hty: Concrete(Module(151)) }
 I32Eqz
 BrIf operator149
 LocalGet local17
-RefCastNonNull { hty: Concrete(Module(150)) }
+RefCastNonNull { hty: Concrete(Module(151)) }
 LocalSet local23
 LocalGet local23
-StructGet { struct_type_index: 150, field_index: 1 }
+StructGet { struct_type_index: 151, field_index: 1 }
 LocalSet local24
 LocalGet local24
 ArrayLen
