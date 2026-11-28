@@ -28,12 +28,28 @@ pub use inputs::RuntimeArtifactInputs;
 const MAGIC: &[u8; 8] = b"SCRWRB01";
 const DIGEST_BYTES: usize = 32;
 
+/// Pre-sliced package metadata when the raw Wasm code section has been stripped
+/// for `native-host-only` builds (retaining only the data pool and Intl frames).
+pub(super) struct StrippedPackageSpans {
+    pub(super) wasm_start: usize,
+    pub(super) wasm_len: usize,
+    pub(super) largest_body: usize,
+    pub(super) data: Vec<(usize, usize, [u8; DIGEST_BYTES])>,
+    pub(super) frames: Vec<(
+        scriptw_intl::IntlDataComponent,
+        usize,
+        usize,
+        [u8; DIGEST_BYTES],
+    )>,
+}
+
 /// An exact emitted runtime paired with its fully checked raw package. There
 /// is no constructor accepting a caller-supplied layout or native image.
 pub struct RuntimeBuildArtifact {
     runtime: Arc<RuntimeArtifact>,
     package: Vec<u8>,
     compiler_prefix: Option<Vec<u8>>,
+    stripped: Option<StrippedPackageSpans>,
 }
 
 impl RuntimeBuildArtifact {
@@ -45,6 +61,89 @@ impl RuntimeBuildArtifact {
     }
     pub fn package_bytes(&self) -> &[u8] {
         &self.package
+    }
+
+    /// Compacts the build package for `native-host-only` artifacts by dropping
+    /// the raw Wasm code section while keeping the exact data pool segments,
+    /// Intl frames, and cryptographic envelope intact. `self.wasm()` continues
+    /// to expose the full validated runtime Wasm for native compilation.
+    pub fn strip_code_section_for_native_host(&mut self) -> Result<(), EmitError> {
+        use scriptw_intl::IntlDataComponent;
+        use wasmparser::{Parser, Payload};
+
+        if self.stripped.is_some() {
+            return Ok(());
+        }
+        let orig_offset = self.package.len() - DIGEST_BYTES - self.runtime.bytes().len();
+        let orig_wasm = &self.package[orig_offset..self.package.len() - DIGEST_BYTES];
+        let mut largest_body = 0usize;
+        let mut data_slices = Vec::new();
+        let mut frame_slices = std::collections::BTreeMap::new();
+        for payload in Parser::new(0).parse_all(orig_wasm) {
+            match payload.map_err(|error| EmitError::unsupported(error.to_string()))? {
+                Payload::CodeSectionEntry(body) => {
+                    largest_body = largest_body.max(body.range().len());
+                }
+                Payload::DataSection(reader) => {
+                    for row in reader {
+                        data_slices.push(
+                            row.map_err(|error| EmitError::unsupported(error.to_string()))?
+                                .data,
+                        );
+                    }
+                }
+                Payload::CustomSection(section) => {
+                    if let Some(component) = IntlDataComponent::ALL
+                        .into_iter()
+                        .find(|component| component.section_name() == section.name())
+                    {
+                        if frame_slices.insert(component, section.data()).is_some() {
+                            return Err(EmitError::unsupported("duplicate Intl frame"));
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        if data_slices.len() != crate::data::RUNTIME_DATA_SEGMENT_COUNT
+            || frame_slices.len() != IntlDataComponent::ALL.len()
+        {
+            return Err(EmitError::unsupported(
+                "incomplete runtime sections for native-host-only package compaction",
+            ));
+        }
+
+        let payload_len: usize = data_slices.iter().map(|s| s.len()).sum::<usize>()
+            + frame_slices.values().map(|s| s.len()).sum::<usize>();
+        let mut compacted = Vec::with_capacity(orig_offset + payload_len + DIGEST_BYTES);
+        compacted.extend_from_slice(&self.package[..orig_offset - 8]);
+        compacted.extend_from_slice(&(payload_len as u64).to_le_bytes());
+
+        let mut data = Vec::with_capacity(data_slices.len());
+        for bytes in data_slices {
+            let start = compacted.len();
+            compacted.extend_from_slice(bytes);
+            data.push((start, bytes.len(), Sha256::digest(bytes).into()));
+        }
+        let mut frames = Vec::with_capacity(IntlDataComponent::ALL.len());
+        for component in IntlDataComponent::ALL {
+            let bytes = frame_slices[&component];
+            let start = compacted.len();
+            compacted.extend_from_slice(bytes);
+            frames.push((component, start, bytes.len(), Sha256::digest(bytes).into()));
+        }
+        let envelope_digest = Sha256::digest(&compacted);
+        compacted.extend_from_slice(&envelope_digest);
+
+        self.package = compacted;
+        self.stripped = Some(StrippedPackageSpans {
+            wasm_start: orig_offset,
+            wasm_len: payload_len,
+            largest_body,
+            data,
+            frames,
+        });
+        Ok(())
     }
 }
 
@@ -141,6 +240,7 @@ pub fn build_runtime_artifact_with_source_compilation_profile(
         runtime,
         package,
         compiler_prefix,
+        stripped: None,
     })
 }
 

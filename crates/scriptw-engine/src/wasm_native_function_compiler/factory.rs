@@ -1,7 +1,108 @@
 use super::*;
 use crate::wasm_native_source_compiler::CallbackTrace;
+use scriptw_aot_wasm::NativeProgramTemplate;
 use scriptw_ir::RuntimeFunctionProgram;
+use sha2::{Digest, Sha256};
+use std::collections::VecDeque;
+use std::sync::{Arc, Mutex, OnceLock};
 use wasmtime::{AsContextMut, FuncType, HeapType, StructType, ValType};
+
+const MAX_CACHED_NATIVE_FUNCTIONS: usize = 64;
+const MAX_CACHED_TEMPLATE_BYTES: usize = 16 * 1024 * 1024;
+const MAX_SINGLE_CACHED_TEMPLATE_BYTES: usize = 2 * 1024 * 1024;
+
+pub(super) struct CachedNativeFunction {
+    digest: [u8; 32],
+    kind: DynamicFunctionKind,
+    arguments: Vec<Vec<u16>>,
+    policy: WasmCompilationPolicy,
+    pub(super) template: NativeProgramTemplate,
+    pub(super) program_initialize_export: String,
+    pub(super) factory_export: String,
+}
+
+#[derive(Default)]
+struct NativeFunctionTemplateCache {
+    entries: VecDeque<Arc<CachedNativeFunction>>,
+    total_bytes: usize,
+}
+
+fn template_cache() -> &'static Mutex<NativeFunctionTemplateCache> {
+    static CACHE: OnceLock<Mutex<NativeFunctionTemplateCache>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(NativeFunctionTemplateCache::default()))
+}
+
+fn request_digest(kind: DynamicFunctionKind, arguments: &[Vec<u16>]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    let kind_byte = match kind {
+        DynamicFunctionKind::Ordinary => 0u8,
+        DynamicFunctionKind::Generator => 1u8,
+        DynamicFunctionKind::Async => 2u8,
+        DynamicFunctionKind::AsyncGenerator => 3u8,
+    };
+    hasher.update([kind_byte]);
+    hasher.update((arguments.len() as u64).to_le_bytes());
+    for arg in arguments {
+        hasher.update((arg.len() as u64).to_le_bytes());
+        for &unit in arg {
+            hasher.update(unit.to_le_bytes());
+        }
+    }
+    hasher.finalize().into()
+}
+
+pub(super) fn lookup_cached_template(
+    context: &NativeSourceCompilerContext,
+    request: &ConvertedRequest,
+) -> wasmtime::Result<Option<Arc<CachedNativeFunction>>> {
+    let runtime = context.validated_runtime()?;
+    let digest = request_digest(request.kind, &request.arguments);
+    let cache = template_cache()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    for entry in &cache.entries {
+        if entry.digest == digest
+            && entry.kind == request.kind
+            && entry.policy == context.policy
+            && Arc::ptr_eq(entry.template.runtime(), runtime.runtime())
+            && entry.arguments == request.arguments
+        {
+            return Ok(Some(Arc::clone(entry)));
+        }
+    }
+    Ok(None)
+}
+
+fn retain_cached_template(entry: Arc<CachedNativeFunction>) {
+    let bytes = entry.template.bytes().len();
+    if bytes > MAX_SINGLE_CACHED_TEMPLATE_BYTES {
+        return;
+    }
+    let mut cache = template_cache()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if cache.entries.iter().any(|existing| {
+        existing.digest == entry.digest
+            && existing.kind == entry.kind
+            && existing.policy == entry.policy
+            && Arc::ptr_eq(existing.template.runtime(), entry.template.runtime())
+            && existing.arguments == entry.arguments
+    }) {
+        return;
+    }
+    while cache.entries.len() >= MAX_CACHED_NATIVE_FUNCTIONS
+        || cache.total_bytes.saturating_add(bytes) > MAX_CACHED_TEMPLATE_BYTES
+    {
+        let Some(evicted) = cache.entries.pop_front() else {
+            break;
+        };
+        cache.total_bytes = cache
+            .total_bytes
+            .saturating_sub(evicted.template.bytes().len());
+    }
+    cache.total_bytes = cache.total_bytes.saturating_add(bytes);
+    cache.entries.push_back(entry);
+}
 
 pub(super) fn instantiate_and_create(
     store: &mut impl AsContextMut<Data = WasmHostState>,
@@ -33,28 +134,65 @@ pub(super) fn instantiate_and_create(
     // Only this P reaches Module::new; the admitted R is never compiled here.
     drop(checks);
     let canonicalize = trace.map(|trace| trace.phase(Phase::TemplateCanonicalize));
-    let template = scriptw_aot_wasm::NativeProgramTemplate::for_function(&artifact)
+    let template = NativeProgramTemplate::for_function(&artifact)
         .map_err(|e| wasmtime::Error::new(EngineError::new(e.to_string())))?;
     context.check_budget()?;
     drop(canonicalize);
+    let program_initialize_export = artifact.program_initialize_export().to_string();
+    let factory_export = artifact.factory_export().to_string();
+    let entry = Arc::new(CachedNativeFunction {
+        digest: request_digest(request.kind, &request.arguments),
+        kind: request.kind,
+        arguments: request.arguments.clone(),
+        policy: context.policy.clone(),
+        template,
+        program_initialize_export,
+        factory_export,
+    });
+    retain_cached_template(Arc::clone(&entry));
+    instantiate_and_create_from_template(
+        store,
+        engine,
+        context,
+        request,
+        &entry.template,
+        &entry.program_initialize_export,
+        &entry.factory_export,
+        signature,
+        trace,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn instantiate_and_create_from_template(
+    store: &mut impl AsContextMut<Data = WasmHostState>,
+    engine: &WasmtimeEngine,
+    context: &NativeSourceCompilerContext,
+    request: &ConvertedRequest,
+    template: &NativeProgramTemplate,
+    program_initialize_export: &str,
+    factory_export: &str,
+    signature: &NativeFunctionSignature,
+    trace: Option<&CallbackTrace<'_>>,
+) -> wasmtime::Result<[Val; 5]> {
     let instance = crate::wasm_native_program_template::instantiate(
         &mut *store,
         engine,
         context,
-        &template,
+        template,
         trace,
     )?;
     context.check_budget()?;
     let _invoke = trace.map(|trace| trace.phase(Phase::FactoryInvoke));
     let initialize = instance
-        .get_func(&mut *store, artifact.program_initialize_export())
+        .get_func(&mut *store, program_initialize_export)
         .ok_or_else(|| abi_error("P has no declared program initializer export"))?;
     let factory = instance
-        .get_func(&mut *store, artifact.factory_export())
+        .get_func(&mut *store, factory_export)
         .ok_or_else(|| abi_error("P has no declared function factory export"))?;
     let initialization = crate::wasm_native_program_template::initializer_arguments(
         &mut *store,
-        &template,
+        template,
         &initialize,
         &signature.program,
     )?;

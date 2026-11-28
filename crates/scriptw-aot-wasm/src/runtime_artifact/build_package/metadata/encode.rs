@@ -63,9 +63,15 @@ impl RuntimeBuildArtifact {
         word(&mut out, self.package.len());
         out.extend_from_slice(&Sha256::digest(&self.package));
         out.extend_from_slice(&self.package[self.package.len() - 32..]);
-        let offset = self.package.len() - 32 - self.runtime.bytes().len();
+        let (offset, wasm_len) = match &self.stripped {
+            Some(s) => (s.wasm_start, s.wasm_len),
+            None => (
+                self.package.len() - 32 - self.runtime.bytes().len(),
+                self.runtime.bytes().len(),
+            ),
+        };
         word(&mut out, offset);
-        word(&mut out, self.runtime.bytes().len());
+        word(&mut out, wasm_len);
         out.extend_from_slice(&self.runtime.wasm_sha256());
         out.extend_from_slice(self.runtime.key().as_bytes());
         out.extend_from_slice(&identity.digest());
@@ -88,43 +94,60 @@ impl RuntimeBuildArtifact {
             &mut out,
             self.compiler_prefix.as_deref().unwrap_or_default(),
         );
-        let wasm = &self.package[offset..self.package.len() - 32];
-        let mut largest_body = 0;
-        let mut data = Vec::new();
-        let mut frames = std::collections::BTreeMap::new();
-        for payload in Parser::new(0).parse_all(wasm) {
-            match payload.map_err(|error| EmitError::unsupported(error.to_string()))? {
-                Payload::CodeSectionEntry(body) => {
-                    largest_body = largest_body.max(body.range().len())
-                }
-                Payload::DataSection(reader) => {
-                    for row in reader {
-                        data.push(
-                            row.map_err(|error| EmitError::unsupported(error.to_string()))?
-                                .data,
-                        );
-                    }
-                }
-                Payload::CustomSection(section) => {
-                    if let Some(component) = IntlDataComponent::ALL
-                        .into_iter()
-                        .find(|component| component.section_name() == section.name())
-                    {
-                        assert!(frames.insert(component, section.data()).is_none());
-                    }
-                }
-                _ => {}
+        if let Some(s) = &self.stripped {
+            word(&mut out, s.largest_body);
+            assert_eq!(s.data.len(), RUNTIME_DATA_SEGMENT_COUNT);
+            for &(start, len, digest) in &s.data {
+                word(&mut out, start);
+                word(&mut out, len);
+                out.extend_from_slice(&digest);
             }
-        }
-        word(&mut out, largest_body);
-        assert_eq!(data.len(), RUNTIME_DATA_SEGMENT_COUNT);
-        for bytes in data {
-            span(&mut out, &self.package, bytes);
-        }
-        assert_eq!(frames.len(), IntlDataComponent::ALL.len());
-        for component in IntlDataComponent::ALL {
-            out.extend_from_slice(&component.code().to_le_bytes());
-            span(&mut out, &self.package, frames[&component]);
+            assert_eq!(s.frames.len(), IntlDataComponent::ALL.len());
+            for &(component, start, len, digest) in &s.frames {
+                out.extend_from_slice(&component.code().to_le_bytes());
+                word(&mut out, start);
+                word(&mut out, len);
+                out.extend_from_slice(&digest);
+            }
+        } else {
+            let wasm = &self.package[offset..self.package.len() - 32];
+            let mut largest_body = 0;
+            let mut data = Vec::new();
+            let mut frames = std::collections::BTreeMap::new();
+            for payload in Parser::new(0).parse_all(wasm) {
+                match payload.map_err(|error| EmitError::unsupported(error.to_string()))? {
+                    Payload::CodeSectionEntry(body) => {
+                        largest_body = largest_body.max(body.range().len())
+                    }
+                    Payload::DataSection(reader) => {
+                        for row in reader {
+                            data.push(
+                                row.map_err(|error| EmitError::unsupported(error.to_string()))?
+                                    .data,
+                            );
+                        }
+                    }
+                    Payload::CustomSection(section) => {
+                        if let Some(component) = IntlDataComponent::ALL
+                            .into_iter()
+                            .find(|component| component.section_name() == section.name())
+                        {
+                            assert!(frames.insert(component, section.data()).is_none());
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            word(&mut out, largest_body);
+            assert_eq!(data.len(), RUNTIME_DATA_SEGMENT_COUNT);
+            for bytes in data {
+                span(&mut out, &self.package, bytes);
+            }
+            assert_eq!(frames.len(), IntlDataComponent::ALL.len());
+            for component in IntlDataComponent::ALL {
+                out.extend_from_slice(&component.code().to_le_bytes());
+                span(&mut out, &self.package, frames[&component]);
+            }
         }
         if out.len() + 32 > MAX_METADATA_BYTES {
             return Err(EmitError::unsupported(

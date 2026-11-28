@@ -108,11 +108,16 @@ pub(crate) fn write_bundle(
                     .expect("consumer-admitted Minimal compiler metadata");
                 for &profile in profiles {
                     let started = std::time::Instant::now();
-                    let runtime =
+                    let mut runtime =
                         scriptw_aot_wasm::build_runtime_artifact_with_source_compilation_profile(
                             &selection, &source, profile,
                         )
                         .expect("the compiler emits and admits its exact build runtime");
+                    if native_host_only && profile == RuntimeSourceCompilationProfile::NativeHost {
+                        runtime
+                            .strip_code_section_for_native_host()
+                            .expect("native-host-only package compaction succeeds");
+                    }
                     println!(
                         "build runtime {profile:?} fresh emission/admission: {:?}",
                         started.elapsed()

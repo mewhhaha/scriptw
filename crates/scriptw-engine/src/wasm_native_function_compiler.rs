@@ -88,26 +88,46 @@ fn compile(
         let request = ConvertedRequest::decode(&mut roots, inputs, signature, context.execution())?;
         drop(decode);
         context.check_budget()?;
-        let parse_lower = trace.as_ref().map(|trace| trace.phase(Phase::ParseLower));
-        let lowered = lower_runtime_function(
-            request.kind,
-            &request.arguments,
-            context.policy.host_surface_policy(),
-        )
-        .map(|program| program.with_language_features(context.policy.language_features()));
-        drop(parse_lower);
-        context.check_budget()?;
-        match lowered {
-            Ok(program) => {
-                let completion = factory::instantiate_and_create(
+        let completion_or_syntax =
+            if let Some(cached) = factory::lookup_cached_template(&context, &request)? {
+                Ok(factory::instantiate_and_create_from_template(
                     &mut roots,
                     &engine,
                     &context,
                     &request,
-                    &program,
+                    &cached.template,
+                    &cached.program_initialize_export,
+                    &cached.factory_export,
                     signature,
                     trace.as_ref(),
-                )?;
+                )?)
+            } else {
+                let parse_lower = trace.as_ref().map(|trace| trace.phase(Phase::ParseLower));
+                let lowered = lower_runtime_function(
+                    request.kind,
+                    &request.arguments,
+                    context.policy.host_surface_policy(),
+                )
+                .map(|program| program.with_language_features(context.policy.language_features()));
+                drop(parse_lower);
+                context.check_budget()?;
+                match lowered {
+                    Ok(program) => Ok(factory::instantiate_and_create(
+                        &mut roots,
+                        &engine,
+                        &context,
+                        &request,
+                        &program,
+                        signature,
+                        trace.as_ref(),
+                    )?),
+                    Err(error) => match CompileRejection::classify(error)? {
+                        CompileRejection::Syntax(message) => Err(message),
+                    },
+                }
+            };
+        match completion_or_syntax {
+            Ok(completion) => {
                 let reply = EscapedReply::completion(&mut roots, completion)?;
                 #[cfg(test)]
                 if let Some(observer) = &context.function_test_observer {
@@ -115,17 +135,15 @@ fn compile(
                 }
                 reply
             }
-            Err(error) => match CompileRejection::classify(error)? {
-                CompileRejection::Syntax(message) => {
-                    let reply = EscapedReply::syntax(&mut roots, &message, signature)?;
-                    context.check_budget()?;
-                    #[cfg(test)]
-                    if let Some(observer) = &context.function_test_observer {
-                        observer.syntax_rejection();
-                    }
-                    reply
+            Err(message) => {
+                let reply = EscapedReply::syntax(&mut roots, &message, signature)?;
+                context.check_budget()?;
+                #[cfg(test)]
+                if let Some(observer) = &context.function_test_observer {
+                    observer.syntax_rejection();
                 }
-            },
+                reply
+            }
         }
     }; // Only the actual outgoing reference roots escape the temporary scope.
     context.check_budget()?;

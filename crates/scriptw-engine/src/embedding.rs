@@ -336,9 +336,16 @@ impl EmbeddedRuntime {
             // modules have no start function; external bytes cannot add one.
             // The same walk keeps a Collect-mode P's profile sites section.
             let mut profile_sites = execution_profile::ProfileSitesScan::default();
+            let skip_admitted_cargo_runtime = allow_native_host
+                && artifact.runtime.as_ref().is_some_and(|rt| {
+                    rt.0.immutable_build_package_digest(scriptw_runtime_image::package())
+                        .is_some()
+                });
             for bytes in [
                 Some(artifact.bytes.as_slice()),
-                artifact.runtime.as_ref().map(LinkedRuntime::bytes),
+                (!skip_admitted_cargo_runtime)
+                    .then(|| artifact.runtime.as_ref().map(LinkedRuntime::bytes))
+                    .flatten(),
             ]
             .into_iter()
             .flatten()

@@ -40,35 +40,50 @@ impl RuntimeBuildArtifact {
                 "execution receipt source/Intl differs from admitted runtime",
             ));
         }
-        let start = self.package.len() - 32 - self.wasm().len();
-        let wasm = &self.package[start..self.package.len() - 32];
-        let mut sections = std::collections::BTreeMap::new();
-        for payload in Parser::new(0).parse_all(wasm) {
-            if let Payload::CustomSection(section) =
-                payload.map_err(|error| EmitError::unsupported(error.to_string()))?
-            {
-                if let Some(component) = IntlDataComponent::ALL
-                    .into_iter()
-                    .find(|c| c.section_name() == section.name())
+        let (start, wasm_len, frames) = if let Some(s) = &self.stripped {
+            let frames = s
+                .frames
+                .iter()
+                .map(|&(component, fstart, flen, digest)| wire::ExecutionFrame {
+                    component: component.code(),
+                    start: fstart as u64,
+                    length: flen as u64,
+                    digest,
+                })
+                .collect();
+            (s.wasm_start, s.wasm_len, frames)
+        } else {
+            let start = self.package.len() - 32 - self.wasm().len();
+            let wasm = &self.package[start..self.package.len() - 32];
+            let mut sections = std::collections::BTreeMap::new();
+            for payload in Parser::new(0).parse_all(wasm) {
+                if let Payload::CustomSection(section) =
+                    payload.map_err(|error| EmitError::unsupported(error.to_string()))?
                 {
-                    if sections.insert(component, section.data()).is_some() {
-                        return Err(EmitError::unsupported("duplicate Intl frame"));
+                    if let Some(component) = IntlDataComponent::ALL
+                        .into_iter()
+                        .find(|c| c.section_name() == section.name())
+                    {
+                        if sections.insert(component, section.data()).is_some() {
+                            return Err(EmitError::unsupported("duplicate Intl frame"));
+                        }
                     }
                 }
             }
-        }
-        let mut frames = Vec::new();
-        for component in IntlDataComponent::ALL {
-            let bytes = sections
-                .remove(&component)
-                .ok_or_else(|| EmitError::unsupported("missing Intl frame"))?;
-            frames.push(wire::ExecutionFrame {
-                component: component.code(),
-                start: (bytes.as_ptr().addr() - self.package.as_ptr().addr()) as u64,
-                length: bytes.len() as u64,
-                digest: Sha256::digest(bytes).into(),
-            });
-        }
+            let mut frames = Vec::new();
+            for component in IntlDataComponent::ALL {
+                let bytes = sections
+                    .remove(&component)
+                    .ok_or_else(|| EmitError::unsupported("missing Intl frame"))?;
+                frames.push(wire::ExecutionFrame {
+                    component: component.code(),
+                    start: (bytes.as_ptr().addr() - self.package.as_ptr().addr()) as u64,
+                    length: bytes.len() as u64,
+                    digest: Sha256::digest(bytes).into(),
+                });
+            }
+            (start, wasm.len(), frames)
+        };
         let identity = data.identity().artifact_identity();
         let receipt = wire::ExecutionReceipt {
             layout: LAYOUT_VERSION,
@@ -77,7 +92,7 @@ impl RuntimeBuildArtifact {
             key: *self.key().as_bytes(),
             package_length: self.package.len() as u64,
             wasm_start: start as u64,
-            wasm_length: wasm.len() as u64,
+            wasm_length: wasm_len as u64,
             package_digest: Sha256::digest(&self.package).into(),
             envelope_digest: self.package[self.package.len() - 32..].try_into().unwrap(),
             wasm_digest: self.runtime.wasm_sha256(),
