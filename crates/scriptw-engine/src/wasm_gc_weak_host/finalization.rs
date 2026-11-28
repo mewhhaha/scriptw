@@ -31,7 +31,15 @@ pub(super) fn link(linker: &mut FixedHostFunctions<'_, '_>) -> Result<(), Engine
     linker.func_wrap(row.module(), row.name(), |mut caller: WasmtimeCaller<'_, WasmHostState>| -> wasmtime::Result<Option<Rooted<EqRef>>> {
         loop {
             let cursor = caller.data().weak.poll_cursor;
-            let Some(weak) = caller.data().weak.registries.get(cursor).copied() else { return Ok(None); };
+            let Some(weak) = caller.data().weak.registries.get(cursor).copied() else {
+                let retire_count = caller.gc_weak_retire_count();
+                let state = &mut caller.data_mut().weak;
+                if retire_count == state.sweeping_weak_retire_count {
+                    state.last_swept_weak_retire_count = retire_count;
+                    state.finalization_dirty = false;
+                }
+                return Ok(None);
+            };
             if let Some(registry) = weak.upgrade(&mut caller)? {
                 caller.data_mut().weak.poll_cursor += 1;
                 return registry.as_eqref(&mut caller);

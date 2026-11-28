@@ -13,70 +13,84 @@ pub(super) enum Alignment {
 
 pub(super) const PAGE_ALIGNMENT: usize = 64 * 1024;
 
-pub(super) const PARTS: [(&str, &str, Alignment); 13] = [
+/// `(symbol, file_name, alignment, is_portable_only)`
+pub(super) const PARTS: [(&str, &str, Alignment, bool); 13] = [
     (
         "SCRIPTW_RUNTIME_EXECUTION",
         "scriptw-runtime-execution.bin",
         Alignment::Byte,
+        false,
     ),
     (
         "SCRIPTW_RUNTIME_PORTABLE_EXECUTION",
         "scriptw-runtime-portable-execution.bin",
         Alignment::Byte,
+        true,
     ),
     (
         "SCRIPTW_RUNTIME_METADATA",
         "scriptw-runtime-metadata.bin",
         Alignment::Byte,
+        false,
     ),
     (
         "SCRIPTW_RUNTIME_PORTABLE_METADATA",
         "scriptw-runtime-portable-metadata.bin",
         Alignment::Byte,
+        true,
     ),
     (
         "SCRIPTW_RUNTIME_INTL_METADATA",
         "scriptw-runtime-intl-metadata.bin",
         Alignment::Byte,
+        false,
     ),
     (
         "SCRIPTW_RUNTIME_PACKAGE",
         "scriptw-runtime-package.bin",
         Alignment::Byte,
+        false,
     ),
     (
         "SCRIPTW_RUNTIME_NATIVE",
         "scriptw-runtime-native.bin",
         Alignment::Page,
+        false,
     ),
     (
         "SCRIPTW_RUNTIME_NATIVE_DIGEST",
         "scriptw-runtime-native.sha256",
         Alignment::Byte,
+        false,
     ),
     (
         "SCRIPTW_RUNTIME_MANIFEST",
         "scriptw-runtime-manifest.bin",
         Alignment::Byte,
+        false,
     ),
     (
         "SCRIPTW_RUNTIME_PORTABLE_PACKAGE",
         "scriptw-runtime-portable-package.bin",
         Alignment::Byte,
+        true,
     ),
     (
         "SCRIPTW_RUNTIME_PORTABLE_NATIVE",
         "scriptw-runtime-portable-native.bin",
         Alignment::Page,
+        true,
     ),
     (
         "SCRIPTW_RUNTIME_PORTABLE_NATIVE_DIGEST",
         "scriptw-runtime-portable-native.sha256",
         Alignment::Byte,
+        true,
     ),
     (
         "SCRIPTW_RUNTIME_PORTABLE_MANIFEST",
         "scriptw-runtime-portable-manifest.bin",
         Alignment::Byte,
+        true,
     ),
 ];

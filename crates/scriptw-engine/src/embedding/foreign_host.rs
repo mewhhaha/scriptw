@@ -43,14 +43,8 @@ pub(super) fn copy_array(
     if units {
         let mut data = Vec::new();
         data.try_reserve_exact(length)?;
-        for i in 0..u32::try_from(length)? {
-            let Val::I32(unit) = array.get(&mut *store, i)? else {
-                return Err(wasmtime::Error::msg(
-                    "foreign UTF-16 array has wrong storage",
-                ));
-            };
-            data.push(u16::try_from(unit)?);
-        }
+        data.resize(length, 0);
+        array.copy_to_i16_slice(&mut *store, &mut data)?;
         Ok(ForeignValue::StringUtf16(data))
     } else {
         let mut data = Vec::new();
@@ -69,12 +63,8 @@ pub(super) fn allocate_array(
     let allocator = ArrayRefPre::new(&mut *store, ty);
     let array = match value {
         ForeignValue::StringUtf16(units) => {
-            let length = u32::try_from(units.len())?;
-            let array = ArrayRef::new(&mut *store, &allocator, &Val::I32(0), length)?;
-            for (i, unit) in units.iter().enumerate() {
-                array.set(&mut *store, u32::try_from(i)?, Val::I32(i32::from(*unit)))?;
-            }
-            array
+            u32::try_from(units.len())?;
+            ArrayRef::new_from_i16_slice(&mut *store, &allocator, units)?
         }
         ForeignValue::Bytes(bytes) => {
             u32::try_from(bytes.len())?;

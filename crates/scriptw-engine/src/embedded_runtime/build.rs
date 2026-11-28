@@ -24,15 +24,21 @@ pub(crate) fn write_bundle(
     target_arch: &str,
     endian: &str,
 ) {
+    let native_host_only = std::env::var_os("CARGO_FEATURE_NATIVE_HOST_ONLY").is_some();
+    let profiles: &[RuntimeSourceCompilationProfile] = if native_host_only {
+        &[RuntimeSourceCompilationProfile::NativeHost]
+    } else {
+        &[
+            RuntimeSourceCompilationProfile::NativeHost,
+            RuntimeSourceCompilationProfile::Portable,
+        ]
+    };
     // Raw Intl needs little endian; other targets retain normal runtime checks.
     if endian != "little" || !matches!(target_arch, "x86_64" | "aarch64" | "riscv64") {
         println!(
             "cargo:warning=embedded runtime unavailable for {target}; preserving normal runtime compilation"
         );
-        for profile in [
-            RuntimeSourceCompilationProfile::NativeHost,
-            RuntimeSourceCompilationProfile::Portable,
-        ] {
+        for &profile in profiles {
             publication::publish(out, profile, &[], &[], &[], &[], &[]);
         }
         publication::publish_intl_metadata(out, &[]);
@@ -100,10 +106,7 @@ pub(crate) fn write_bundle(
                     .expect("admitted Minimal components")
                     .minimal_build_metadata(&source)
                     .expect("consumer-admitted Minimal compiler metadata");
-                for profile in [
-                    RuntimeSourceCompilationProfile::NativeHost,
-                    RuntimeSourceCompilationProfile::Portable,
-                ] {
+                for &profile in profiles {
                     let started = std::time::Instant::now();
                     let runtime =
                         scriptw_aot_wasm::build_runtime_artifact_with_source_compilation_profile(

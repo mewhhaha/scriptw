@@ -6,10 +6,11 @@ use sha2::{Digest, Sha256};
 /// place in the executable file. Check each against the actual linked bytes.
 #[test]
 fn linked_images_match_their_build_digest_and_map_from_the_executable() {
-    for image in [
-        native().expect("supported Cargo image"),
-        portable_native().expect("supported Cargo image"),
-    ] {
+    #[allow(unused_mut)]
+    let mut images = vec![native().expect("supported Cargo image")];
+    #[cfg(not(feature = "native-host-only"))]
+    images.push(portable_native().expect("supported Cargo image"));
+    for image in images {
         assert_eq!(
             <[u8; 32]>::from(Sha256::digest(image.bytes())),
             *image.build_digest(),
@@ -40,6 +41,11 @@ fn linked_images_match_their_build_digest_and_map_from_the_executable() {
             );
         }
     }
-    let (host, portable) = (native().unwrap(), portable_native().unwrap());
-    assert_ne!(host.build_digest(), portable.build_digest());
+    #[cfg(not(feature = "native-host-only"))]
+    {
+        let (host, portable) = (native().unwrap(), portable_native().unwrap());
+        assert_ne!(host.build_digest(), portable.build_digest());
+    }
+    #[cfg(feature = "native-host-only")]
+    assert!(portable_native().is_none());
 }

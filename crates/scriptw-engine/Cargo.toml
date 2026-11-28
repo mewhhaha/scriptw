@@ -17,7 +17,7 @@ rayon = "1.11.0"
 blake3 = { version = "1.8.7", default-features = false, features = ["std"] }
 sha2 = "0.10.9"
 wasmparser = "0.245.1"
-wasmtime = { package = "wtime-aot-host", git = "https://github.com/mewhhaha/wtime.git", tag = "v0.1.12" }
+wasmtime = { package = "wtime-aot-host", git = "https://github.com/mewhhaha/wtime.git", branch = "feat/aarch64-store-ci" }
 
 [target.'cfg(unix)'.dependencies]
 rustix = { version = "1.1.4", features = ["fs", "mm", "param"] }
@@ -37,6 +37,7 @@ sha2 = "0.10.9"
 # This does not remove the static Rust compiler APIs or Cranelift dependency.
 default = ["native-source-compiler"]
 native-source-compiler = []
+native-host-only = ["scriptw-runtime-image/native-host-only"]
 # Off by default; address-only hooks for excluded precompiled phase diagnostics.
 benchmark-module-images = []
 # Off by default: verification-only hooks of profile-guided compilation

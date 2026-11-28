@@ -78,7 +78,7 @@ pub fn native() -> Option<LinkedNativeImage> {
 /// Portable-profile counterpart of native(), with the same source boundary.
 #[inline(never)]
 pub fn portable_native() -> Option<LinkedNativeImage> {
-    #[cfg(scriptw_runtime_image)]
+    #[cfg(all(scriptw_runtime_image, not(feature = "native-host-only")))]
     // SAFETY: same target-defined immutable static contract as native().
     return Some(unsafe {
         LinkedNativeImage {
@@ -86,7 +86,7 @@ pub fn portable_native() -> Option<LinkedNativeImage> {
             build_digest: &super::SCRIPTW_RUNTIME_PORTABLE_NATIVE_DIGEST,
         }
     });
-    #[cfg(not(scriptw_runtime_image))]
+    #[cfg(not(all(scriptw_runtime_image, not(feature = "native-host-only"))))]
     None
 }
 

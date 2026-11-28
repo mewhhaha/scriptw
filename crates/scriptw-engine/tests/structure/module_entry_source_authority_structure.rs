@@ -84,7 +84,11 @@ fn parsed_entry_handoffs_cannot_accept_a_second_source_authority() {
             .count(),
         1
     );
-    assert!(ENGINE_SOURCE.contains("discover_module_graph_from_parsed_script(\n            entry_locator,") || ENGINE_SOURCE.contains("discover_module_graph_from_parsed_script("));
+    assert!(
+        ENGINE_SOURCE
+            .contains("discover_module_graph_from_parsed_script(\n            entry_locator,")
+            || ENGINE_SOURCE.contains("discover_module_graph_from_parsed_script(")
+    );
     assert!(ENGINE_SOURCE.contains("load_module_graph_from_parsed("));
     assert!(!ENGINE_SOURCE.contains("source_override"));
     assert!(!ENGINE_SOURCE.contains("let entry = ModuleEntry"));

@@ -9,7 +9,13 @@ use sha2::{Digest, Sha256};
 use std::path::Path;
 
 pub(super) fn write(out: &Path) {
-    for prefix in ["scriptw-runtime", "scriptw-runtime-portable"] {
+    let native_host_only = std::env::var_os("CARGO_FEATURE_NATIVE_HOST_ONLY").is_some();
+    let prefixes: &[&str] = if native_host_only {
+        &["scriptw-runtime"]
+    } else {
+        &["scriptw-runtime", "scriptw-runtime-portable"]
+    };
+    for &prefix in prefixes {
         let raw = std::fs::read(out.join(format!("{prefix}-native.bin")))
             .expect("the checked native producer published its image");
         // An unsupported target publishes empty images and links none.

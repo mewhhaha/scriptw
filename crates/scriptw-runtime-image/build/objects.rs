@@ -12,11 +12,19 @@ use std::process::Command;
 
 pub(super) fn embed(out: &Path, target: &str) {
     println!("cargo:rustc-check-cfg=cfg(scriptw_runtime_image)");
-    let lengths = PARTS.map(|(_, name, _)| {
-        std::fs::metadata(out.join(name))
-            .expect("checked runtime producer published every image")
-            .len()
-    });
+    let native_host_only = std::env::var_os("CARGO_FEATURE_NATIVE_HOST_ONLY").is_some();
+    let active_parts: Vec<_> = PARTS
+        .into_iter()
+        .filter(|(_, _, _, is_portable)| !native_host_only || !is_portable)
+        .collect();
+    let lengths: Vec<u64> = active_parts
+        .iter()
+        .map(|(_, name, _, _)| {
+            std::fs::metadata(out.join(name))
+                .expect("checked runtime producer published every image")
+                .len()
+        })
+        .collect();
     if lengths.iter().all(|&length| length == 0) {
         // Unsupported targets retain the ordinary runtime path. They need
         // neither a native data object nor a target archiver for empty images.
@@ -34,7 +42,7 @@ pub(super) fn embed(out: &Path, target: &str) {
     };
     let mut definitions = format!("#![no_std]\n{}", wrapper("pub "));
     let mut declarations = format!("{}unsafe extern \"C\" {{\n", wrapper(""));
-    for ((symbol, name, alignment), length) in PARTS.into_iter().zip(lengths) {
+    for ((symbol, name, alignment, _), length) in active_parts.into_iter().zip(lengths) {
         let path = out.join(name);
         match alignment {
             Alignment::Byte => {

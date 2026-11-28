@@ -16,6 +16,9 @@ pub(super) struct WeakGcState {
     kept: Vec<OwnedRooted<AnyRef>>,
     registries: Vec<WeakAnyRef>,
     poll_cursor: usize,
+    last_swept_weak_retire_count: u64,
+    sweeping_weak_retire_count: u64,
+    finalization_dirty: bool,
 }
 
 fn required(reference: Option<Rooted<EqRef>>) -> wasmtime::Result<Rooted<AnyRef>> {

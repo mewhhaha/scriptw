@@ -43,8 +43,16 @@ pub(super) fn link(linker: &mut FixedHostFunctions<'_, '_>) -> Result<(), Engine
             row.module(),
             row.name(),
             |mut caller: WasmtimeCaller<'_, WasmHostState>| {
-                caller.data_mut().weak.kept.clear();
-                caller.data_mut().weak.poll_cursor = 0;
+                let retire_count = caller.gc_weak_retire_count();
+                let weak = &mut caller.data_mut().weak;
+                weak.kept.clear();
+                if weak.finalization_dirty || retire_count != weak.last_swept_weak_retire_count {
+                    weak.poll_cursor = 0;
+                    weak.sweeping_weak_retire_count = retire_count;
+                    weak.finalization_dirty = true;
+                } else {
+                    weak.poll_cursor = weak.registries.len();
+                }
             },
         )
         .map_err(bind_error)?;

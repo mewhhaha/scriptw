@@ -48,6 +48,7 @@ pub(super) fn link(linker: &mut FixedHostFunctions<'_, '_>) -> Result<(), Engine
                 );
                 caller.data().output_events.record_exception(&text);
                 caller.data().realm.host_hooks().report_exception(&text);
+                caller.data_mut().weak.finalization_dirty = true;
                 Ok(())
             },
         )

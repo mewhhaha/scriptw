@@ -10,7 +10,7 @@ build = "../scriptw-cli/build.rs"
 scriptw-engine = { path = "../scriptw-engine", default-features = false }
 serde_json = "1.0"
 sha2 = "0.10.9"
-wasmtime = { package = "wtime-aot-host", git = "https://github.com/mewhhaha/wtime.git", tag = "v0.1.12" }
+wasmtime = { package = "wtime-aot-host", git = "https://github.com/mewhhaha/wtime.git", branch = "feat/aarch64-store-ci" }
 
 [features]
 # Enables the same excluded mapping diagnostic as the producer host.
